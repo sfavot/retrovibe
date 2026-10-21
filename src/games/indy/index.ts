@@ -25,7 +25,7 @@ export const indy: GameDefinition = {
     container.replaceChildren(h("p", { class: "boot", role: "status" }, copy.loading));
     try {
       const [daw, exe] = await Promise.all([fetchBinary("DESKTOP.DAW"), fetchBinary("DESKADV.EXE")]);
-      const app = new App(container, parseDaw(daw), extractPalette(exe));
+      const app = new App(container, parseDaw(daw), extractPalette(exe), () => fetchBinary("DESKADV.HLP"));
       app.showTitle();
       // Développement : ?seed=1234 lance directement une partie avec cette graine.
       const seed = new URLSearchParams(location.search).get("seed");

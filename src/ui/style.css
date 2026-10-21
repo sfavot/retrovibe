@@ -748,3 +748,154 @@ button.secondary {
     display: flex;
   }
 }
+
+/* ------------------------------------------------------------------ manuel d'origine */
+
+.manual {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.manual-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 20px;
+  margin-bottom: 20px;
+}
+
+.manual-bar h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--accent);
+}
+
+.manual-bar p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.manual-body {
+  display: grid;
+  grid-template-columns: 17rem minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.manual-nav {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px;
+}
+
+.manual-nav summary {
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.manual-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.manual-nav-item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem 0.3rem calc(0.6rem + var(--depth, 0) * 1rem);
+  font-size: 0.92rem;
+}
+
+.manual-nav-item[aria-current="page"] {
+  background: var(--panel-2);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.manual-page {
+  background: var(--bubble);
+  color: var(--bubble-ink);
+  border-radius: var(--radius);
+  padding: 24px 28px 28px;
+  line-height: 1.6;
+  box-shadow: 0 20px 60px #0007;
+  min-height: 20rem;
+}
+
+.manual-page:focus {
+  outline: none;
+}
+
+.manual-page h2,
+.manual-page h3 {
+  margin: 0 0 0.75rem;
+  color: #5c3a00;
+  line-height: 1.25;
+}
+
+.manual-page h2 {
+  font-size: 1.7rem;
+}
+
+.manual-page h3 {
+  margin-top: 1.4rem;
+  font-size: 1.25rem;
+}
+
+.manual-page p {
+  margin: 0 0 0.9rem;
+  display: flow-root;
+}
+
+.manual-links {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 1.1rem;
+}
+
+.manual-link {
+  display: inline;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  color: #7a4a00;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.manual-link:hover {
+  background: none;
+  color: #4a2c00;
+}
+
+.manual-image {
+  float: left;
+  margin: 0.2rem 14px 8px 0;
+}
+
+@media (max-width: 800px) {
+  .manual-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manual-nav {
+    position: static;
+    max-height: 60vh;
+  }
+
+  .manual-page {
+    padding: 18px 16px 22px;
+  }
+}

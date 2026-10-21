@@ -30,6 +30,12 @@ export const copy = {
   resumeGame: "Reprendre la partie en cours",
   resumeHint: "Sauvegardée automatiquement sur cet appareil.",
   paused: "Pause",
+  manual: "Manuel d'origine",
+  manualBack: "← Écran titre",
+  manualContents: "Sommaire",
+  manualNote: "Guide LucasArts de 1996, en anglais.",
+  manualLoading: "Chargement du manuel…",
+  manualUnavailable: "Manuel indisponible : DESKADV.HLP est introuvable ou illisible. Placez-le dans le dossier original/ puis rechargez la page.",
   help: "Aide",
   helpText: [
     "Flèches ou ZQSD : se déplacer (deux touches pour les diagonales)",

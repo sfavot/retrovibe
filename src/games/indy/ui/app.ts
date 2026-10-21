@@ -1,5 +1,6 @@
 import { AudioPlayer } from "../audio/audio";
 import { type Palette, PaletteAnimation } from "../data/palette";
+import { type HelpDocument, parseHelp } from "../data/help";
 import type { GameData } from "../data/types";
 import { Assets, IndyIds, IndySounds } from "../engine/assets";
 import { Game, type GameSnapshot, storyFromSnapshot } from "../engine/game";
@@ -12,6 +13,7 @@ import { copy } from "../copy";
 import { copy as shared } from "../../../ui/copy";
 import { h } from "../../../ui/dom";
 import { GameView } from "./game-view";
+import { renderManual } from "./manual";
 import { saveSlot } from "./save";
 import { Sidebar } from "./sidebar";
 
@@ -49,11 +51,13 @@ export class App {
   private pointerWalk: { id: number; x: number; y: number } | null = null;
   private itemDrag: { tile: number; ghost: HTMLElement; startX: number; startY: number; moved: boolean } | null = null;
   private settings = { size: WorldSize.Medium as WorldSize, difficulty: 50 };
+  private manual: HelpDocument | null = null;
 
   constructor(
     container: HTMLElement,
     data: GameData,
     private readonly basePalette: Palette,
+    private readonly loadManual: () => Promise<ArrayBuffer>,
   ) {
     this.assets = new Assets(data);
     this.palette = new PaletteAnimation(basePalette);
@@ -144,6 +148,7 @@ export class App {
     }
     const start = h("button", { class: saved ? "" : "primary", type: "button" }, copy.start);
     const status = h("p", { class: "status-line", role: "status" });
+    const manual = h("button", { class: "secondary", type: "button", onclick: () => void this.showManual() }, copy.manual);
     start.addEventListener("click", () => {
       this.audio.unlock();
       start.disabled = true;
@@ -172,11 +177,27 @@ export class App {
           radios("difficulty", copy.difficulty, copy.difficulties, this.settings.difficulty, (v) => (this.settings.difficulty = v)),
           start,
           status,
+          manual,
           h("ul", { class: "help-list" }, ...copy.helpText.map((t) => h("li", {}, t))),
         ),
       ),
     );
     if (!saved) queueMicrotask(() => start.focus());
+  }
+
+  /** Le manuel d'origine (DESKADV.HLP), lu à la première ouverture. */
+  async showManual(): Promise<void> {
+    window.scrollTo(0, 0);
+    this.root.replaceChildren(h("p", { class: "boot", role: "status" }, copy.manualLoading));
+    try {
+      this.manual ??= parseHelp(await this.loadManual());
+      this.root.replaceChildren(renderManual(this.manual, () => this.showTitle()));
+    } catch (e) {
+      console.error(e);
+      this.root.replaceChildren(
+        h("div", { class: "boot error", role: "alert" }, h("p", {}, copy.manualUnavailable), h("button", { type: "button", onclick: () => this.showTitle() }, copy.manualBack)),
+      );
+    }
   }
 
   async startGame(seed = randomSeed()): Promise<void> {

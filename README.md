@@ -21,7 +21,7 @@ et le routage se fait par hash, donc le site marche sous n'importe quel sous-dos
 1. `npm install`
 2. `npm run dev` puis ouvrir http://localhost:5173
 
-`original/` contient `DESKTOP.DAW`, `DESKADV.EXE` (pour la palette) et, pour le son, les `.WAV` / `.MID`.
+`original/` contient `DESKTOP.DAW`, `DESKADV.EXE` (pour la palette), `DESKADV.HLP` (le manuel d'origine, affiché depuis l'écran titre) et, pour le son, les `.WAV` / `.MID`.
 
 En développement, `?seed=1234` démarre directement une partie avec cette graine et `__indy.game` est exposé dans la console.
 

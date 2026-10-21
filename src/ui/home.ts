@@ -8,7 +8,6 @@ export function renderHome(container: HTMLElement, games: readonly GameDefinitio
       "main",
       { class: "home" },
       h("h1", {}, copy.homeTitle),
-      h("p", { class: "muted" }, copy.homeIntro),
       h(
         "ul",
         { class: "game-list" },

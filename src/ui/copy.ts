@@ -4,7 +4,6 @@
  */
 export const copy = {
   homeTitle: "Choisissez votre jeu",
-  homeIntro: "Les fichiers originaux de chaque jeu doivent être fournis localement.",
   play: "Jouer",
   backToGames: "← Tous les jeux",
 };

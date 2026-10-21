@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# Installeurs / archives d'origine (lourds, inutiles au site) : non versionnés.
+*.exe
+*.7z
+# ... sauf l'exécutable du jeu, lu pour la palette et versionné dans original/.
+!original/DESKADV.EXE
+
+# Configuration locale de Claude Code
+.claude/

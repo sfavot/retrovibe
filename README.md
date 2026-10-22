@@ -47,7 +47,7 @@ Réimplémentation du moteur d'*Indiana Jones and his Desktop Adventures* (Lucas
 
 ### Architecture
 
-- `src/games/indy/data/` — lecture de `DESKTOP.DAW` (tuiles, zones, scripts, puzzles, personnages) et de la palette de l'exécutable.
+- `src/games/indy/data/` — lecture de `DESKTOP.DAW` (tuiles, zones, scripts, puzzles, personnages) et, dans l'exécutable, de la palette et des ressources (curseurs, son intégré).
 - `src/games/indy/engine/` — moteur : état des zones, scripts (`script.ts`), monstres, héros, combats, sauvegarde (`game.ts`).
 - `src/games/indy/engine/generation/` — génération du monde : disposition de la carte (algorithme d'origine, porté depuis WebFun),
   affectation des zones et de la chaîne de puzzles, et un solveur qui rejette toute partie impossible à terminer.
@@ -61,11 +61,15 @@ Réimplémentation du moteur d'*Indiana Jones and his Desktop Adventures* (Lucas
 ## Ce qui a été reconstitué
 
 - **Opcodes de script** : Indy n'utilise pas la même table que Yoda Stories. La table de `script.ts` a été déduite
-  de l'usage de chaque opcode dans les 2 825 actions du fichier de données. Quelques opcodes rares restent sans effet
-  (voir les commentaires).
+  de l'usage de chaque opcode dans les 2 825 actions du fichier de données, puis vérifiée dans le désassemblage
+  de `DESKADV.EXE` (voir les commentaires).
 - **Génération du monde** : la disposition suit l'algorithme original ; l'affectation des zones est une reconstitution
   (WebFun ne gère pas les puzzles d'Indy). Comme dans l'original, Marcus remet le premier objet de la chaîne.
-- **Valeurs non présentes dans les données** : soins des objets comestibles, objet posé sur les emplacements « bonus »,
-  comportements des types de déplacement ennemis.
+- **Comportements lus dans le désassemblage de `DESKADV.EXE`** : déplacement du héros (seule la case visée compte,
+  pas de glissement), soins des objets comestibles, sons et musiques appelés en dur (`EERIE.MID`, `EEP.WAV`),
+  formule de l'Indy Quotient, historique des objectifs et « Replay Story », vitesse de jeu. Les adresses sont citées en
+  commentaire ; la formule de l'Indy Quotient reste à confirmer.
+- **Valeurs non présentes dans les données** : objet posé sur les emplacements « bonus », comportements des types de
+  déplacement ennemis.
 
 Référence : [WebFun](https://codeberg.org/cyco/WebFun) (MIT), réimplémentation de *Yoda Stories*.

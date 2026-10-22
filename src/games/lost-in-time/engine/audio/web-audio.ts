@@ -10,6 +10,8 @@ export class WebAudioSoundBackend implements SoundBackend, Mutable {
   /** Gain général : couper le son passe par lui, pas par l'arrêt des sources (le timing reste identique). */
   private master: GainNode | null = null;
   private mutedFlag = false;
+  /** Pause de l'interface (onglet masqué) : le contexte est suspendu, sa propre horloge s'arrête avec. */
+  private suspended = false;
   private source: AudioBufferSourceNode | null = null;
   private gain: GainNode | null = null;
   private queued: AudioBufferSourceNode[] = [];
@@ -23,7 +25,17 @@ export class WebAudioSoundBackend implements SoundBackend, Mutable {
       this.master.gain.value = this.mutedFlag ? 0 : 1;
       this.master.connect(this.ctx.destination);
     }
-    if (this.ctx.state === "suspended") void this.ctx.resume();
+    if (!this.suspended && this.ctx.state === "suspended") void this.ctx.resume();
+  }
+
+  suspend(): void {
+    this.suspended = true;
+    if (this.ctx?.state === "running") void this.ctx.suspend();
+  }
+
+  resume(): void {
+    this.suspended = false;
+    if (this.ctx?.state === "suspended") void this.ctx.resume();
   }
 
   get muted(): boolean {

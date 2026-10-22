@@ -47,7 +47,13 @@
 }
 
 .lit-canvas:focus-visible {
-  outline-offset: -3px;
+  outline: none;
+}
+
+/* L'anneau de focus entoure l'écran au lieu de le recouvrir : le jeu dessine jusqu'aux bords (libellés du bas à x = 0). */
+.lit-stage:has(.lit-canvas:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .lit-overlay {

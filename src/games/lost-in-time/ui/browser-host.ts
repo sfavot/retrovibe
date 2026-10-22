@@ -1,6 +1,7 @@
 import type { Language } from "../data/tot";
 import { GameInput } from "../engine/input";
 import type { Host } from "../engine/host";
+import { PausableClock } from "./clock";
 
 /** Fichier du jeu absent du serveur (ou renvoyé sous forme de page HTML par le serveur de dev). */
 function isMissing(response: Response): boolean {
@@ -22,6 +23,7 @@ export class BrowserHost implements Host {
   private readonly files = new Map<string, Promise<Uint8Array | undefined>>();
   private readonly sizes = new Map<string, Promise<number | undefined>>();
   private readonly loaded = new Map<string, Uint8Array>();
+  private readonly clock = new PausableClock(() => performance.now());
 
   /** `baseUrl` : dossier des fichiers du jeu, avec la barre finale. */
   constructor(private readonly baseUrl: string) {}
@@ -84,8 +86,15 @@ export class BrowserHost implements Host {
     return this.loaded.get(serverName(name));
   }
 
+  /** Horloge du jeu : elle s'arrête pendant la pause, pour que les scripts, vidéos et animations ne rattrapent pas le temps perdu. */
   now(): number {
-    return performance.now();
+    return this.clock.now();
+  }
+
+  /** Met le jeu en pause (onglet masqué) ou le relance ; l'audio suit dans l'interface. */
+  setPaused(paused: boolean): void {
+    if (paused) this.clock.pause();
+    else this.clock.resume();
   }
 
   nextFrame(): Promise<void> {

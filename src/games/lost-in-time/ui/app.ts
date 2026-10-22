@@ -27,6 +27,7 @@ export class App {
   private readonly game: Game;
   private readonly presenter: CanvasPresenter;
   private readonly prefs: AudioPrefs;
+  private readonly soundButton: HTMLButtonElement;
 
   constructor(
     container: HTMLElement,
@@ -44,14 +45,16 @@ export class App {
     this.game = new Game(host, this.system.sys);
     this.presenter = new CanvasPresenter(this.canvas, this.system.gfx, host.input);
     this.prefs = new AudioPrefs(new LocalStorageStore(), [this.soundBackend, this.cdBackend]);
+    this.soundButton = this.soundToggle();
     const footer = h(
       "div",
       { class: "lit-footer" },
       h("a", { class: "back-link", href: "#/" }, shared.backToGames),
-      h("div", { class: "lit-toggles" }, this.soundToggle()),
+      h("div", { class: "lit-toggles" }, this.soundButton),
     );
     container.replaceChildren(h("main", { class: "lit" }, this.stage, footer));
     this.bindInput();
+    this.bindLifecycle();
     if (import.meta.env.DEV) {
       Object.assign(window, { __lit: { game: this.game, host, ...this.system } });
     }
@@ -64,6 +67,29 @@ export class App {
       this.unlockAudio();
     });
     return button;
+  }
+
+  /**
+   * Onglet masqué : le jeu s'arrête (horloge, audio CD et effets) et repart au même point au retour,
+   * pour que la musique et les scripts restent synchronisés. Autre onglet : la préférence de son suit.
+   */
+  private bindLifecycle(): void {
+    const sync = (): void => {
+      const hidden = document.hidden;
+      this.host.setPaused(hidden);
+      if (hidden) {
+        this.cdBackend.suspend();
+        this.soundBackend.suspend();
+      } else {
+        this.cdBackend.resume();
+        this.soundBackend.resume();
+      }
+    };
+    document.addEventListener("visibilitychange", sync);
+    if (document.hidden) sync();
+    window.addEventListener("storage", () => {
+      if (this.prefs.reload()) this.soundButton.setAttribute("aria-pressed", String(this.prefs.isEnabled()));
+    });
   }
 
   /** Lance la boucle d'affichage et le jeu (INTRO.TOT) ; les erreurs s'affichent à la place de l'écran. */

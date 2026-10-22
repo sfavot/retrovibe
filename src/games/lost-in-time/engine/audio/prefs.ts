@@ -41,6 +41,18 @@ export class AudioPrefs {
     for (const target of this.targets) target.muted = !this.on;
   }
 
+  /**
+   * Relit la préférence depuis le stockage (autre onglet qui l'a changée) ; retourne vrai si elle a changé.
+   * Sans cela, un onglet garde son ancienne valeur et la réécrit au prochain clic.
+   */
+  reload(): boolean {
+    const on = this.store.get(KEY) !== "0";
+    if (on === this.on) return false;
+    this.on = on;
+    this.apply();
+    return true;
+  }
+
   isEnabled(): boolean {
     return this.on;
   }

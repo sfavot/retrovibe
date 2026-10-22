@@ -807,7 +807,9 @@ export class DrawImpl implements DrawSystem {
       ratio = Math.trunc(ratio / mapping.width);
       if (ratio === 0) return;
       for (let i = 0; i < text.length; i++) {
-        const index = ((text.charCodeAt(i) << 24) >> 24) - mapping.base;
+        // Octet non signé : les caractères accentués (CP850, > 0x7f) sont des cases de la planche, après les lettres.
+        // (ScummVM lit un `char` signé et les perd, ce qui laisse un trou dans « Prunelière ».)
+        const index = (text.charCodeAt(i) & 0xff) - mapping.base;
         const sy = Math.trunc(index / ratio) * mapping.height;
         const sx = (index % ratio) * mapping.width;
         dest.blit(

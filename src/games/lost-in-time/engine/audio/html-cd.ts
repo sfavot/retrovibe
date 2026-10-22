@@ -13,6 +13,9 @@ export class HtmlCdBackend implements CdBackend, Mutable {
   private endSec = 0;
   private startSec = 0;
   private active = false;
+  /** Pause de l'interface (onglet masqué) : la lecture reprend à la même position au retour. */
+  private suspended = false;
+  private playingWhenSuspended = false;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(url: string) {
@@ -32,7 +35,21 @@ export class HtmlCdBackend implements CdBackend, Mutable {
 
   /** À rappeler après une interaction : relance une lecture bloquée par la politique d'autoplay. */
   unlock(): void {
-    if (this.active && this.audio.paused) void this.audio.play().catch(() => {});
+    if (!this.suspended && this.active && this.audio.paused) void this.audio.play().catch(() => {});
+  }
+
+  /** Met la lecture en pause sans la terminer : `playing` garde sa valeur, le moteur ne voit pas de fin de plage. */
+  suspend(): void {
+    if (this.suspended) return;
+    this.playingWhenSuspended = this.playing;
+    this.suspended = true;
+    this.audio.pause();
+  }
+
+  resume(): void {
+    if (!this.suspended) return;
+    this.suspended = false;
+    this.unlock();
   }
 
   play(startSec: number, endSec: number): void {
@@ -44,6 +61,7 @@ export class HtmlCdBackend implements CdBackend, Mutable {
     const begin = (): void => {
       if (!this.active || this.startSec !== startSec) return;
       audio.currentTime = startSec;
+      if (this.suspended) return; // reprise au retour de la pause
       void audio.play().catch(() => {
         // bloqué (autoplay) : l'état « playing » est faux, la position vient de l'horloge
       });
@@ -63,6 +81,7 @@ export class HtmlCdBackend implements CdBackend, Mutable {
   }
 
   get playing(): boolean {
+    if (this.suspended) return this.active && this.playingWhenSuspended;
     return this.active && !this.audio.paused && !this.audio.ended && this.audio.readyState >= 3;
   }
 

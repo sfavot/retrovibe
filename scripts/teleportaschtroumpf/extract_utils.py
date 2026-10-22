@@ -14,7 +14,7 @@ import shutil
 import sys
 
 SECTEUR = 2352
-EXT_GARDEES = {'.MCG', '.MUX', '.HY8', '.VOC', '.PAL', '.MUT', '.PRC', '.DAT', '.PFN'}
+EXT_GARDEES = {'.MCG', '.MUX', '.HY8', '.VOC', '.PAL', '.MUT', '.PRC', '.DAT', '.PFN', '.DOC'}
 SIGNATURE_MUX = bytes([0x07, 0xAA, 0x00, 0x00])
 
 

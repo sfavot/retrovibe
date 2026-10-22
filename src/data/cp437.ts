@@ -16,3 +16,15 @@ export function decodeCp437(bytes: Uint8Array): string {
   for (const byte of bytes) out += byte < 0x80 ? String.fromCharCode(byte) : HIGH[byte - 0x80];
   return out;
 }
+
+/** Octet CP437 de chaque caractère (table inverse de `decodeCp437`). */
+const REVERSE = (() => {
+  const map = new Map<string, number>();
+  for (let code = 0; code < 0x100; code++) map.set(decodeCp437(Uint8Array.of(code)), code);
+  return map;
+})();
+
+/** Encode du texte en CP437 (la police PFN attend ces octets) ; un caractère absent de la page de code devient `?`. */
+export function encodeCp437(text: string): Uint8Array {
+  return Uint8Array.from(text, (char) => REVERSE.get(char) ?? 0x3f);
+}

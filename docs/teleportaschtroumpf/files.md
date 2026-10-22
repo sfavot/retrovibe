@@ -4,8 +4,8 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 
 ## Taille
 
-- Total versionné (`original/teleportaschtroumpf/`) : **192.1 Mo** (201431603 octets)
-- Fichiers de données (`DATA/`) : 1421 ; `SMURF.EXE` : 0.2 Mo
+- Total versionné (`original/teleportaschtroumpf/`) : **192.1 Mo** (201435382 octets)
+- Fichiers de données (`DATA/`) : 1423 ; `SMURF.EXE` : 0.2 Mo
 
 ## Par extension (fichiers gardés)
 
@@ -13,6 +13,7 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 |---|---:|---:|
 | (MUX sans extension) | 1 | 0.0 Mo |
 | .DAT | 2 | 0.0 Mo |
+| .DOC | 2 | 0.0 Mo |
 | .HY8 | 33 | 1.2 Mo |
 | .ION | 1 | 0.0 Mo |
 | .MCG | 118 | 7.3 Mo |
@@ -73,7 +74,7 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 | S48 | 12 |
 | S49 | 14 |
 | S51 | 15 |
-| S52 | 15 |
+| S52 | 17 |
 
 ## Fichiers exclus (agrégés par catégorie)
 
@@ -82,7 +83,6 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 | (sans extension, non MUX) | 6 | 7.3 Mo |
 | .BAT | 2 | 0.0 Mo |
 | .CC | 1 | 0.3 Mo |
-| .DOC | 2 | 0.0 Mo |
 | .FRM | 8 | 0.0 Mo |
 | .LBM | 4 | 0.2 Mo |
 | .LSR | 1 | 0.0 Mo |

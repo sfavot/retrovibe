@@ -1,8 +1,9 @@
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../data/mcg";
 
 /**
- * Actions abstraites du jeu (engine.md §4 et §9.6). Clavier et souris sont deux sources de ces mêmes actions :
- * l'original émule les boutons de la souris au clavier (Espace = gauche, Entrée = droit).
+ * Actions abstraites du jeu (engine.md §4 et §9.6). Clavier et boutons de souris sont deux sources de ces mêmes actions :
+ * l'original émule les boutons de la souris au clavier (Espace = gauche, Entrée = droit). La position du pointeur ne
+ * désigne rien ; les scènes à pointeur libre seules la lisent (`mouseX`, `mouseY`).
  */
 export type Action =
   | "up"
@@ -52,61 +53,68 @@ export function actionForKey(code: string): Action | undefined {
 /** Boutons de souris du navigateur (`MouseEvent.button`) : 0 = gauche, 2 = droit. */
 const BUTTON_ACTIONS: Readonly<Record<number, Action>> = { 0: "validate", 2: "cancel" };
 
-/** Position de repos du curseur virtuel de la navigation par les bords (`14b3:0039`). */
+/** Position initiale du pointeur (centre de l'écran). */
 const CENTER_X = 0xa0;
 const CENTER_Y = 100;
+
+/** Appuis rapides mémorisés au plus par action : au-delà, un clavier qui s'emballe n'accumule pas de retard. */
+const MAX_PENDING_PRESSES = 4;
 
 /**
  * État des entrées. L'hôte l'alimente (`keyDown`, `mouseDown`…), le moteur et les scènes le lisent.
  *
  * - `pressed(a)` : l'action est tenue maintenant ;
- * - `justPressed(a)` : l'action a été enfoncée depuis la dernière mise à jour de scène (mémorisée jusque-là, donc
- *   un appui plus court que le pas de la scène n'est pas perdu). Le moteur appelle `endUpdate()` après chaque `update`.
+ * - `justPressed(a)` : l'action a été enfoncée et cet appui n'a pas encore été consommé par une mise à jour de scène.
+ *   Les appuis sont comptés : plusieurs appuis rapides pendant un même pas de scène sont rendus un par un aux mises à
+ *   jour suivantes (au plus `MAX_PENDING_PRESSES`), aucun n'est perdu ni fusionné. Le moteur appelle `endUpdate()` après
+ *   chaque `update`.
  */
 export class Input {
-  /** Position de la souris en coordonnées 320×200 (pour un survol facultatif). */
+  /** Position de la souris en coordonnées 320×200 : sert seulement aux scènes qui dessinent leur curseur HY8 (aucune zone cliquable). */
   mouseX = CENTER_X;
   mouseY = CENTER_Y;
-  /** Navigation par les bords (§4.1) : si vrai, `pushMouse` lève up/down/left/right quand le curseur virtuel touche un bord. */
-  edgeNavigation = false;
 
   private readonly held = new Map<Action, Set<string>>();
-  private readonly latched = new Set<Action>();
-  private virtualX = CENTER_X;
-  private virtualY = CENTER_Y;
+  /** Appuis pas encore consommés, par action. */
+  private readonly pending = new Map<Action, number>();
 
   pressed(action: Action): boolean {
     return (this.held.get(action)?.size ?? 0) > 0;
   }
 
   justPressed(action: Action): boolean {
-    return this.latched.has(action);
+    return (this.pending.get(action) ?? 0) > 0;
   }
 
   /** Vrai si l'une des actions vient d'être enfoncée. */
   anyJustPressed(...actions: Action[]): boolean {
-    return actions.some((a) => this.latched.has(a));
+    return actions.some((a) => this.justPressed(a));
   }
 
-  /** À appeler après chaque `update` de scène : oublie les appuis « récents ». */
+  /** À appeler après chaque `update` de scène : consomme un appui de chaque action (les suivants attendent leur tour). */
   endUpdate(): void {
-    this.latched.clear();
+    for (const [action, count] of this.pending) {
+      if (count > 1) this.pending.set(action, count - 1);
+      else this.pending.delete(action);
+    }
   }
 
   /** Relâche tout et oublie les appuis récents (changement de scène, perte du focus). */
   reset(): void {
     this.held.clear();
-    this.latched.clear();
+    this.pending.clear();
   }
 
-  /** `source` identifie l'origine (touche, bouton) : l'action reste tenue tant qu'une source la tient. */
+  /**
+   * `source` identifie l'origine (touche, bouton) : l'action reste tenue tant qu'une source la tient. La répétition
+   * automatique du clavier (même source déjà tenue) ne compte pas comme un nouvel appui.
+   */
   press(action: Action, source: string): void {
     let sources = this.held.get(action);
     if (!sources) this.held.set(action, (sources = new Set()));
-    if (sources.size === 0 || !sources.has(source)) {
-      if (sources.size === 0) this.latched.add(action);
-      sources.add(source);
-    }
+    if (sources.has(source)) return;
+    if (sources.size === 0) this.pending.set(action, Math.min(MAX_PENDING_PRESSES, (this.pending.get(action) ?? 0) + 1));
+    sources.add(source);
   }
 
   release(action: Action, source: string): void {
@@ -130,7 +138,8 @@ export class Input {
 
   mouseDown(button: number): void {
     const action = BUTTON_ACTIONS[button];
-    if (action) this.press(action, `mouse:${button}`);
+    if (!action) return;
+    this.press(action, `mouse:${button}`);
   }
 
   mouseUp(button: number): void {
@@ -142,27 +151,5 @@ export class Input {
   mouseMove(x: number, y: number): void {
     this.mouseX = Math.min(SCREEN_WIDTH - 1, Math.max(0, Math.round(x)));
     this.mouseY = Math.min(SCREEN_HEIGHT - 1, Math.max(0, Math.round(y)));
-  }
-
-  /**
-   * Déplacement relatif (en pixels, comme les mickeys de l'original : 1 mickey = 1 pixel). Sans effet si
-   * `edgeNavigation` est faux. Un curseur virtuel borné à l'écran accumule les déplacements ; au contact d'un bord
-   * (x < 2 → gauche, x ≥ 319 → droite, sinon y < 2 → haut, y ≥ 199 → bas) l'action correspondante est levée
-   * pour un appui bref et le curseur retourne au centre (`14b3:004c`).
-   */
-  pushMouse(dx: number, dy: number): void {
-    if (!this.edgeNavigation) return;
-    this.virtualX = Math.min(SCREEN_WIDTH - 1, Math.max(0, this.virtualX + dx));
-    this.virtualY = Math.min(SCREEN_HEIGHT - 1, Math.max(0, this.virtualY + dy));
-    let edge: Action | null = null;
-    if (this.virtualX < 2) edge = "left";
-    else if (this.virtualX >= 0x13f) edge = "right";
-    else if (this.virtualY < 2) edge = "up";
-    else if (this.virtualY >= 199) edge = "down";
-    if (edge) {
-      this.virtualX = CENTER_X;
-      this.virtualY = CENTER_Y;
-      this.latched.add(edge);
-    }
   }
 }

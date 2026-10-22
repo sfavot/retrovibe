@@ -14,7 +14,8 @@ Brief pour les phases 3 (écrans) et 4 (mini-jeux). Spec de comportement : `engi
 | `engine/surface.ts` | `Surface` : tampons A/B/C 320×200 indexés, `drawMcg`, `blitImage`, `drawSprite`, `drawFrame`, `drawText`. |
 | `engine/sprites.ts` | `placeSprite` (composition de sprites HY8, ancrage bas-gauche, miroir), `AnimationPlayer`. Partagé avec la visionneuse (`ui/panels.ts`). |
 | `engine/palette.ts` | `Palette` (256 × RVB 8 bits, entrée 0 noire, conversion VGA) et `Fade` (fondus). |
-| `engine/input.ts` | `Input` : actions abstraites, « tenu » / « vient d'être appuyé », souris 320×200, navigation par les bords. |
+| `engine/menu.ts` | `Menu` : liste d'éléments (clavier, validation, voix d'aide, bip, rebouclage optionnel), surbrillance par palette ou sprite. |
+| `engine/input.ts` | `Input` : actions abstraites, « tenu » / « vient d'être appuyé », position de la souris 320×200 (pointeur libre seulement). |
 | `engine/options.ts` | Options parents (`localStorage` via `host.storage`), verrou parental. |
 | `engine/resources.ts` | `Resources` : MCG / HY8 / PFN / VOC décodés et gardés, MUX non gardés, `prefetch`. |
 | `engine/paths.ts` | `resolveGameFile` (nom d'origine → chemin `DATA/…`), `voiceName`, `musicName`. |
@@ -22,6 +23,7 @@ Brief pour les phases 3 (écrans) et 4 (mini-jeux). Spec de comportement : `engi
 | `engine/picture.ts` | `PictureScene` (image fixe, fondus, attente) et `WaitScene`. |
 | `audio/backend.ts`, `audio/voice.ts`, `audio/web-audio.ts` | `AudioBackend` abstrait, `VoiceChannel` (voie unique + musique + bips), implémentation Web Audio. |
 | `scenes/boot.ts` | Séquence de démarrage. |
+| `scenes/flow.ts`, `scenes/s07-menu.ts`, `scenes/sNN-*.ts` | Flux entre écrans, menu principal S07 et souches des autres écrans (voir « Menus et flux »). |
 | `ui/app.ts`, `ui/browser-host.ts`, `ui/dev.html`, `ui/dev.ts`, `ui/style.css` | Hôte navigateur, canvas à l'échelle entière, boucle `requestAnimationFrame`, page de dev. |
 | `index.ts` | `GameDefinition` `teleportaschtroumpf` (pas encore dans `src/games/registry.ts`). |
 
@@ -120,12 +122,11 @@ Scènes toutes faites : `PictureScene` (MCG + fondu + attente + `onEnd`), `WaitS
 
 ## Entrées
 
-Actions (`engine/input.ts`) : `up down left right validate cancel skip pause volumeUp volumeDown`. Sources : flèches et Q/A/Z/X (haut/bas/gauche/droite, positions physiques QWERTY comme les scancodes d'origine), Espace / clic gauche = `validate`, Entrée / clic droit = `cancel` (voix d'aide), Échap = `skip`, P = `pause`, F1/F2 = volume −/+ (géré par le moteur).
+Actions (`engine/input.ts`) : `up down left right validate cancel skip pause volumeUp volumeDown`. Sources : flèches et Q/A/Z/X (haut/bas/gauche/droite, positions physiques QWERTY comme les scancodes d'origine), Espace / clic gauche = `validate`, Entrée / clic droit = `cancel` (voix d'aide) ; la position du pointeur ne désigne jamais un élément, Échap = `skip`, P = `pause`, F1/F2 = volume −/+ (géré par le moteur).
 
 - `ctx.input.pressed(a)` : tenu ; `justPressed(a)` : enfoncé depuis le dernier `update` (mémorisé, un appui plus court que le pas n'est pas perdu) ; `anyJustPressed(...)`.
-- `ctx.input.mouseX/mouseY` : position 320×200 pour un survol ; l'original n'en a pas besoin : un menu est une liste (index courant + haut/bas + `validate`).
-- Navigation par les bords (option `ctx.input.edgeNavigation = true`, déplacements relatifs par `input.pushMouse(dx, dy)`) : un curseur virtuel lève up/down/left/right au contact d'un bord et revient au centre. `BrowserHost` ne l'active pas (la souris absolue sert au survol) ; à brancher avec le pointer lock si on veut imiter exactement l'original.
-- Le curseur système est caché sur le canvas (`cursor: none`) : les scènes à pointeur libre dessinent leur sprite de curseur.
+- `ctx.input.mouseX/mouseY` : position 320×200, lue seulement par les scènes à pointeur libre qui dessinent leur curseur HY8 (E2). Aucun écran de menu n'a de zone cliquable : clavier d'origine seul (décision `plan.md`), les boutons de la souris sont les actions `validate` (gauche) et `cancel` (droit).
+- Curseur : le curseur système est masqué en permanence sur le canvas (`cursor: none` dans `style.css`) ; ni `Host.setCursor` ni `Scene.ownCursor` n'existent plus.
 
 ## Son
 
@@ -175,7 +176,7 @@ Les tests qui lisent les fichiers du jeu utilisent `describe.skipIf(!hasOriginal
 
 ## Démarrage (`scenes/boot.ts`)
 
-Logo S52D0 : image `s52d00.mcg` en fondu d'entrée → vidéo `s52d0.mux` (≈ 12 s, passable) → fondu au noir → attente de 3 s sur écran noir (passable ; c'est ce que fait l'original : fondu, `02c0(3)`, fondu) → intro S06 `s06a.mux` (passable) → titre S05 : vidéo `s05asphi.mux` (non passable) puis `s05a.mcg` 1 s, fondu au noir → fond du menu `s07a001d.mcg` (fondu d'entrée, musique `s52m00Nm.voc`). Les fichiers suivants sont lus d'avance pendant le logo. La scène finale est provisoire : le menu S07 (phase 3) la remplace (`createMenuBackdrop`). Le retour d'une partie ne rejoue pas le démarrage.
+Logo S52D0 : image `s52d00.mcg` en fondu d'entrée → vidéo `s52d0.mux` (≈ 12 s, passable) → fondu au noir → attente de 3 s sur écran noir (passable ; c'est ce que fait l'original : fondu, `02c0(3)`, fondu) → intro S06 `s06a.mux` (passable) → titre S05 : vidéo `s05asphi.mux` (non passable) puis `s05a.mcg` 1 s, fondu au noir → menu S07 (`goMainMenu`, voir « Menus et flux »). Les fichiers suivants sont lus d'avance pendant le logo. Le retour d'une partie ne rejoue pas le démarrage.
 
 ## Écarts à `engine.md` et décisions
 
@@ -185,5 +186,55 @@ Logo S52D0 : image `s52d00.mcg` en fondu d'entrée → vidéo `s52d0.mux` (≈ 1
 - Conversion d'affichage `(v >> 2) × 255 / 63` arrondie (pas tronquée).
 - Vidéo : l'image est `floor(temps audio × cadence)` (la cadence vient de l'en-tête, `mux.md`) ; la constante « 12 » du PIT reste non expliquée (engine.md §8.1).
 - Attente du logo sur écran noir : conforme au code (`154c:000f`), à revoir visuellement ; si elle paraît trop longue, c'est `LOGO_WAIT_SECONDS`.
-- La navigation par les bords n'est pas branchée par défaut dans le navigateur (survol possible via `mouseX/mouseY`).
+- Pas de navigation par poussée contre les bords ni de sélection au survol : clavier d'origine seul (décision `plan.md`).
 - Le masquage du bouton bas pendant un clic gauche maintenu (`14b3:01c9`, masque `0xCD`) n'est pas reproduit.
+
+## Menus et flux
+
+### `Host` : sortie
+
+`host.exit()` (« Quitter » après le générique). Navigateur (`ui/app.ts`) : retour à l'accueil (`location.hash = "#/"`) si le jeu est monté depuis le site, redémarrage du jeu sur la page de dev. Hôte de test : `host.exited`.
+
+### `engine/menu.ts`
+
+`new Menu({ items, axis, wrap?, highlight?, initial?, changeSound? })`, avec `items: { voice? }[]`. `axis` : `"vertical"` (haut/bas), `"horizontal"` (gauche/droite) ou `"none"` (la scène déplace elle-même la sélection avec `select`, ex. S46 à deux dimensions). `wrap` (défaut vrai : S07, S08) ; `wrap: false` borne l'index (S09, S04, S49, S48 : l'original ne reboucle pas). `changeSound` : bip de navigation (`s07a001b.voc` pour S07, S08 et S04) joué à chaque changement par une touche, jamais à l'entrée ni via `select`. La scène appelle `await menu.load(ctx)` dans `load`, `menu.enter(ctx)` dans `enter` (et `resume`), `menu.update(ctx)` dans `update` (renvoie `{ kind: "validate" | "help", index } | null`), `menu.render(ctx)` dans `render`, `menu.exit(ctx)` dans `exit`. Espace / clic gauche = `validate` sur l'élément courant ; Entrée / clic droit = voix de l'élément (jouée par le menu) puis `help`. Surbrillance : `paletteHighlight(premièreEntrée, [r, g, b])` (S07) ou `spriteHighlight(sprites, place)` ; toute autre stratégie est un `MenuHighlight` (`select`, `deselect`, `render`).
+
+### `scenes/flow.ts` : les points d'entrée fixes
+
+Seul endroit qui décide « l'écran suivant » ; un écran ne reçoit que ses paramètres et un rappel `onDone`, et n'enchaîne rien lui-même. Toutes les fonctions remplacent la scène courante avec fondu (pas de second fondu si l'écran est déjà noir) :
+
+| Fonction | Effet |
+|---|---|
+| `goMainMenu(ctx)` | S07 |
+| `goRules(ctx)`, `goIntro(ctx)` | vidéo `s10a.mux` / `s06a.mux` puis S07 |
+| `goFreeMap(ctx)` | carte libre (souche E2) puis S07 |
+| `goPlayers(ctx)` | S09 → `goCharacters(ctx, n)` |
+| `goCharacters(ctx, players)` | S08 → `play` : `startGame` ; `back` : S09 ; `menu` : S07 |
+| `goParents(ctx)` | S04 puis S07 |
+| `askConfirmation(ctx, n, onAnswer, mode?)` | S49 numéro `n` ; `mode` `"replace"` (défaut) ou `"push"` (au-dessus d'un écran à reprendre : `onAnswer` appelle `ctx.scenes.pop`) |
+| `startGame(ctx, setup: GameSetup)` | partie (souche E2) puis S07 |
+| `quitGame(ctx)` | S49 n = 10 ; Non : S07 ; Oui : générique S52 puis `host.exit()` |
+
+Les écrans de partie (pause S48, abandon S46, aide S45) sont **empilés** par le plateau : `ctx.scenes.push(createPauseScene(cb), { fade: true })` ; le rappel décide (`ctx.scenes.pop(...)` pour reprendre).
+
+### Contrat des écrans
+
+Chaque écran garde la **signature** de sa fabrique exportée (documentée en tête de fichier : paramètres, résultat, références `engine.md`). Seule la partie (`game-placeholder.ts`) reste une souche de l'E2.
+
+| Fichier | Fabrique | Reçoit | Rend (`onDone`) |
+|---|---|---|---|
+| `s09-players.ts` | `createPlayersScene(onDone)` | rien | `(ctx, players: 1..4)` |
+| `s08-characters.ts` | `createCharactersScene(players, onDone)` | nombre de joueurs | `(ctx, CharactersResult)` : `play` + `PlayerSetup[]`, `back` (S09) ou `menu` (S07) |
+| `s04-parents.ts` | `createParentsScene(onDone)` | rien (lit / sauve `ctx.options`) | `(ctx)` |
+| `s49-confirm.ts` | `createConfirmScene(n, onDone)` | numéro du message 0..11 | `(ctx, yes: boolean)` ; gauche / droite choisissent, Espace valide, Échap sans effet |
+| `s48-pause.ts` | `createPauseScene(onDone)` | rien (empilée) | `(ctx, PauseChoice)` : `resume`, `abandon`, `map`, `help` |
+| `s46-abandon.ts` | `createAbandonScene(players: number \| readonly number[], onDone)` | nombre de joueurs (0..n−1) ou personnages (0..5) des joueurs restants, 1 à 4 (empilée) | `(ctx, AbandonResult)` : `cancel`, `player` + index (dans le tableau reçu), `all` |
+| `s45-help.ts` | `createHelpScene(game, onDone)` | `Game` (empilée) | `(ctx)` |
+| `s52-credits.ts` | `createCreditsScene(onDone)` | rien | `(ctx)` en fin de défilement (texte `s52dsphi.doc`) |
+| `game-placeholder.ts` | `createGamePlaceholder(setup, onDone)`, `createFreeMapPlaceholder(onDone)` | `GameSetup` / rien | `(ctx)` en fin de partie / carte (souches E2 : rendent la main au premier clic) |
+
+S46 : après un `player`, l'original compacte les joueurs puis **réaffiche S46** avec ceux qui restent ; ce réaffichage (recréer `createAbandonScene` avec les personnages restants) est à la charge de l'appelant, qui doit aussi mettre fin à la partie s'il n'en reste plus.
+
+### Menu S07 (`scenes/s07-menu.ts`)
+
+`createMenuScene()`. Fond `s07a001d.mcg`, musique `s52m00Nm.voc` tirée une fois (si la voie n'a pas déjà une musique : un retour d'écran ne la retire pas), surbrillance des entrées 120+i en `10 A4 CC`, bip de navigation `s07a001b.voc` à chaque changement de bouton (pas à l'entrée), voix d'aide `s07v00Nt.voc` (N = 4, 5, 7, 2, 8, 6) à Entrée / clic droit. Parents : uniquement la touche droite maintenue 4 s sur le bouton (valider ne fait rien). Jouer sous verrou parental ne fait rien (aucun message dans l'original).

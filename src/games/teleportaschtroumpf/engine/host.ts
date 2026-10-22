@@ -35,4 +35,9 @@ export interface Host {
    * Les deux tampons sont réutilisés d'une image à l'autre : les copier si on les garde.
    */
   present(surface: Uint8Array, palette: Uint8Array): void;
+  /**
+   * Sort du jeu (« Quitter », après le générique). Navigateur : retour à l'accueil du site, ou redémarrage sur la
+   * page de dev. Les scènes ne doivent rien faire d'autre après cet appel.
+   */
+  exit(): void;
 }

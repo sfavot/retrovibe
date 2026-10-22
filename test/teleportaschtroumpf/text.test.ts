@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { decodeCp437 } from "../../src/data/cp437";
+import { decodeCp437, encodeCp437 } from "../../src/data/cp437";
 import { parseConfirmationTexts, parseDescription, parseKeyedTexts, parseQuiz } from "../../src/games/teleportaschtroumpf/data/text";
 import { hasOriginalFiles, readData } from "./helpers";
+
+describe("encodeCp437", () => {
+  it("encode les accents du jeu ; un caractère inconnu devient ?", () => {
+    expect([...encodeCp437("é à ç")]).toEqual([0x82, 0x20, 0x85, 0x20, 0x87]);
+    expect([...encodeCp437("€")]).toEqual([0x3f]);
+    expect(encodeCp437("goûter")[2]).toBe(0x96);
+  });
+
+  it("est l'inverse de decodeCp437 sur les 256 octets", () => {
+    const all = Uint8Array.from({ length: 256 }, (_, i) => i);
+    expect([...encodeCp437(decodeCp437(all))]).toEqual([...all]);
+  });
+});
 
 describe("decodeCp437", () => {
   it("décode les caractères accentués du français", () => {

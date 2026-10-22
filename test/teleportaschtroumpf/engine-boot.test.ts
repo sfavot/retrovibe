@@ -61,7 +61,7 @@ describe.skipIf(!hasOriginalFiles)("démarrage headless", () => {
     // Puis l'image du titre (1 s) et le fond du menu.
     await advanceUntil(() => sequence.length >= 6, 20_000);
     await advanceUntil(() => sequence.length >= 7, 5000);
-    expect(names().slice(5)).toEqual(["PictureScene", "PictureScene"]);
+    expect(names().slice(5)).toEqual(["PictureScene", "MenuScene"]);
     const holdMs = sequence[6].at - sequence[5].at;
     expect(holdMs).toBeGreaterThan(1000);
     expect(holdMs).toBeLessThan(1000 + 700); // 1 s + fondu de sortie
@@ -74,6 +74,7 @@ describe.skipIf(!hasOriginalFiles)("démarrage headless", () => {
     expect(shown.surface).toEqual(menu.pixels);
     const palette = new Palette();
     palette.load(menu.palette);
+    palette.setColor(120, 0x10, 0xa4, 0xcc); // le premier bouton (Règles) est en surbrillance
     expect(shown.palette).toEqual(palette.display());
     expect([...shown.palette.subarray(0, 3)]).toEqual([0, 0, 0]);
 

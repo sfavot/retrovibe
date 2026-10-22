@@ -1,4 +1,4 @@
-import { decodeCp437 } from "../../../data/cp437";
+import { decodeCp437, encodeCp437 } from "../../../data/cp437";
 import { extensionOf, baseName, type GameFiles } from "../data/files";
 import { LETTER_SPACING, advance, parsePfn } from "../data/font";
 import { parseHy8, type Hy8 } from "../data/hy8";
@@ -419,14 +419,6 @@ const vocPanel: Panel = (ctx) => {
     h("div", { class: "bar" }, play, button("stop", stop)),
   );
 };
-
-/** Texte -> octets CP437 (inverse de `decodeCp437`, `?` si absent). */
-function encodeCp437(text: string): number[] {
-  const reverse = new Map<string, number>();
-  const all = decodeCp437(Uint8Array.from({ length: 256 }, (_, i) => i));
-  for (let i = 255; i >= 0; i--) reverse.set(all[i], i);
-  return [...text].map((c) => reverse.get(c) ?? 0x3f);
-}
 
 const pfnPanel: Panel = (ctx) => {
   const font = parsePfn(ctx.bytes);

@@ -1,8 +1,8 @@
-import type { Voc } from "../data/voc";
-import { musicName } from "../engine/paths";
+import { musicName, voiceName } from "../engine/paths";
 import { PictureScene, WaitScene } from "../engine/picture";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene } from "../engine/scene";
 import { VideoScene } from "../engine/video";
+import { goMainMenu } from "./flow";
 
 /** Attente après la vidéo du logo : jusqu'à 3 s (`1f33:02c0(3)`), passable. */
 export const LOGO_WAIT_SECONDS = 3;
@@ -10,11 +10,21 @@ export const LOGO_WAIT_SECONDS = 3;
 export const TITLE_HOLD_SECONDS = 1;
 
 /** Fichiers lus d'avance pendant le logo, pour que l'enchaînement n'attende pas le réseau. */
-const PREFETCH = ["s52d0.mux", "s06a.mux", "s05asphi.mux", "s05a.mcg", "s07a001d.mcg"] as const;
+const PREFETCH = [
+  "s52d0.mux",
+  "s06a.mux",
+  "s05asphi.mux",
+  "s05a.mcg",
+  // Menu S07 : fond, voix d'entrée, voix d'aide, les trois musiques possibles.
+  "s07a001d.mcg",
+  "s07a001b.voc",
+  ...[2, 4, 5, 6, 7, 8].map((n) => voiceName("s07v", n)),
+  ...[1, 2, 3].map(musicName),
+] as const;
 
 /**
  * Séquence de démarrage (engine.md §1.1 étape 8, §1.2, §9.12) :
- * logo S52D0 (image, vidéo, attente) → intro S06 (passable) → titre S05 (vidéo puis image 1 s) → menu.
+ * logo S52D0 (image, vidéo, attente) → intro S06 (passable) → titre S05 (vidéo puis image 1 s) → menu S07 (`goMainMenu`, `s07-menu.ts`).
  * Chaque scène enchaîne la suivante par `ctx.scenes.replace` ; les fondus sont ceux de l'original.
  */
 export function createBootScene(): Scene {
@@ -57,22 +67,6 @@ function createTitlePicture(): Scene {
     mcg: "s05a.mcg",
     seconds: TITLE_HOLD_SECONDS,
     fadeOutAtEnd: true,
-    onEnd: (ctx) => ctx.scenes.replace(createMenuBackdrop()),
-  });
-}
-
-/**
- * Scène provisoire (phase 2) : seulement le fond du menu S07, sans texte ni interaction, avec la musique de fond
- * `s52m00Nm.voc` (N tiré de 1 à 3, comme `21ee:0006`). Le menu réel la remplacera en phase 3.
- */
-export function createMenuBackdrop(): Scene {
-  let music: Voc | null = null;
-  return new PictureScene({
-    mcg: "s07a001d.mcg",
-    fadeIn: true,
-    load: async (ctx: SceneContext) => {
-      music = await ctx.resources.voc(musicName(1 + ctx.rng.below(3)));
-    },
-    onEnter: (ctx) => ctx.voice.setMusic(music),
+    onEnd: goMainMenu,
   });
 }

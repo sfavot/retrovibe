@@ -209,6 +209,30 @@ describe("Input", () => {
     expect(input.justPressed("skip")).toBe(true);
   });
 
+  it("plusieurs appuis rapides dans un même pas sont rendus un par un aux pas suivants", () => {
+    const input = new Input();
+    for (let i = 0; i < 3; i++) {
+      input.keyDown("ArrowDown");
+      input.keyUp("ArrowDown");
+    }
+    for (let i = 0; i < 3; i++) {
+      expect(input.justPressed("down")).toBe(true);
+      input.endUpdate();
+    }
+    expect(input.justPressed("down")).toBe(false);
+    // Plafond : un clavier qui s'emballe n'accumule pas plus de 4 appuis d'avance.
+    for (let i = 0; i < 10; i++) {
+      input.keyDown("ArrowUp");
+      input.keyUp("ArrowUp");
+    }
+    let count = 0;
+    while (input.justPressed("up")) {
+      count++;
+      input.endUpdate();
+    }
+    expect(count).toBe(4);
+  });
+
   it("traduit clavier et souris vers les mêmes actions", () => {
     expect(actionForKey("ArrowUp")).toBe("up");
     expect(actionForKey("KeyQ")).toBe("up");
@@ -238,29 +262,6 @@ describe("Input", () => {
     expect([input.mouseX, input.mouseY]).toEqual([0, 199]);
     input.mouseMove(319.6, 10);
     expect(input.mouseX).toBe(319);
-  });
-
-  it("navigation par les bords (option) : déplacements poussés contre un bord", () => {
-    const input = new Input();
-    input.pushMouse(-500, 0);
-    expect(input.justPressed("left")).toBe(false); // option désactivée
-    input.edgeNavigation = true;
-    input.pushMouse(-100, 0);
-    expect(input.anyJustPressed("left", "right", "up", "down")).toBe(false);
-    input.pushMouse(-100, 0);
-    expect(input.justPressed("left")).toBe(true);
-    input.endUpdate();
-    // Le curseur est revenu au centre : il faut repartir de là.
-    input.pushMouse(100, 0);
-    expect(input.justPressed("right")).toBe(false);
-    input.pushMouse(100, 0);
-    expect(input.justPressed("right")).toBe(true);
-    input.endUpdate();
-    input.pushMouse(0, 200);
-    expect(input.justPressed("down")).toBe(true);
-    input.endUpdate();
-    input.pushMouse(0, -300);
-    expect(input.justPressed("up")).toBe(true);
   });
 });
 

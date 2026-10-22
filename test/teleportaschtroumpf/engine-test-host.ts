@@ -99,6 +99,8 @@ export class TestHost implements Host {
   readonly storage = new MemoryStorage();
   readonly presentations: Presentation[] = [];
   readonly loaded: string[] = [];
+  /** Vrai après `exit()` (sortie du jeu). */
+  exited = false;
   private files: GameFiles | null = null;
 
   async loadFile(name: string): Promise<Uint8Array> {
@@ -119,6 +121,10 @@ export class TestHost implements Host {
 
   present(surface: Uint8Array, palette: Uint8Array): void {
     this.presentations.push({ surface: surface.slice(), palette: palette.slice(), at: this.time });
+  }
+
+  exit(): void {
+    this.exited = true;
   }
 
   get lastPresentation(): Presentation {

@@ -38,11 +38,15 @@ export class BrowserHost implements Host {
   private readonly pixels = new Uint32Array(this.image.data.buffer);
   private readonly table = new Uint32Array(256);
 
-  /** `base` : URL du dossier des fichiers du jeu, sans barre finale (ex. `./teleportaschtroumpf`). */
+  /**
+   * `base` : URL du dossier des fichiers du jeu, sans barre finale (ex. `./teleportaschtroumpf`).
+   * `onExit` : ce que fait `exit()` une fois le son coupé (retour à l'accueil, redémarrage…).
+   */
   constructor(
     private readonly base: string,
     private readonly files: GameFiles,
     private readonly canvas: HTMLCanvasElement,
+    private readonly onExit: () => void,
     audio: WebAudioBackend = new WebAudioBackend(),
   ) {
     this.audio = audio;
@@ -77,6 +81,11 @@ export class BrowserHost implements Host {
     }
     for (let i = 0; i < pixels.length; i++) pixels[i] = table[surface[i]];
     this.context.putImageData(this.image, 0, 0);
+  }
+
+  exit(): void {
+    this.audio.stop();
+    this.onExit();
   }
 
   /** Position du pointeur dans l'écran du jeu (320×200). */

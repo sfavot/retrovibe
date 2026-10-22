@@ -22,7 +22,7 @@
 .tsm-canvas {
   display: block;
   image-rendering: pixelated;
-  /* Le jeu dessine ses propres curseurs ; pas de défilement ni de zoom tactile sur l'écran. */
+  /* Curseur système toujours masqué (les scènes à pointeur libre dessinent le leur) ; pas de défilement ni de zoom tactile. */
   cursor: none;
   touch-action: none;
   user-select: none;

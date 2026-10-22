@@ -26,6 +26,16 @@ export interface AppOptions {
   backLabel?: string;
 }
 
+/**
+ * Sortie du jeu (`Host.exit`) : retour à l'accueil du site quand le jeu est monté depuis le site (lien de retour
+ * présent), sinon, sur la page de dev, redémarrage du jeu. L'ancienne boucle s'arrête d'elle-même : son canvas n'est
+ * plus dans la page.
+ */
+function leave(container: HTMLElement, options: AppOptions): void {
+  if (options.backLabel) location.hash = "#/";
+  else void mountApp(container, options);
+}
+
 /** Marge réservée autour de l'écran (lien de retour, espacements), en pixels CSS. */
 const CHROME_HEIGHT = 96;
 
@@ -51,7 +61,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const canvas = h("canvas", { class: "tsm-canvas", width: SCREEN_WIDTH, height: SCREEN_HEIGHT, tabindex: 0, "aria-label": copy.canvasLabel });
   try {
     const files = await fetchGameFiles(options.base);
-    host = new BrowserHost(options.base, files, canvas);
+    host = new BrowserHost(options.base, files, canvas, () => leave(container, options));
     engine = new Engine(host);
     await engine.start(createBootScene());
   } catch (error) {

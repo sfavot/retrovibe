@@ -23,7 +23,11 @@ Ce document sert de brief commun aux sous-agents. Chaque tâche indique ses entr
   - **Mini-jeux à ingrédient.** 8 mini-jeux donnent un ingrédient : S22, S27, S28, S31, S32, S33, S34 et S36.
   - **Mini-jeux à points.** Les autres donnent des points (rosée).
   - **Interface d'un mini-jeu.** Il lit le joueur et le niveau (0..2) et écrit lui-même son gain ; l'API TS passe par `Game.resolveMinigame`.
-- **Décision (souris, 2026-10-22)** : adaptation au web. Curseur système visible et survol des boutons pour les sélectionner, plus clic. Les flèches et les touches de l'original restent actives. Le CSS `cursor: none` de `ui/style.css` ne s'applique plus que dans les scènes qui dessinent leur propre curseur HY8 (S51, S35, S26, S41, S25, S13, S24). Pas de navigation par poussée contre les bords.
+- **Décision (navigation, 2026-10-22, remplace la décision « souris » précédente)** : on garde le **clavier d'origine seul**.
+  - Flèches et Q/A/Z/X pour se déplacer, Espace = valider, Entrée = voix d'aide.
+  - Les boutons de la souris gardent leur rôle d'origine : gauche = valider, droit = aide.
+  - Pas de survol pour sélectionner, pas de zones cliquables invisibles (S08, S04), pas de navigation par poussée contre les bords.
+  - Curseur système masqué sur le canvas. Les scènes qui dessinent leur propre curseur HY8 (S51, S35, S26, S41, S25, S13, S24) le pilotent avec la position de la souris, comme l'original.
 - Visionneuse : `src/games/teleportaschtroumpf/ui/asset-viewer.html`. Jeu en dev : `src/games/teleportaschtroumpf/ui/dev.html`.
 
 ## État au 2026-10-22 (étude d'extraction)

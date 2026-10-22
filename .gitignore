@@ -6,6 +6,7 @@ dist/
 *.7z
 # ... sauf l'exécutable du jeu, lu pour la palette et versionné dans original/.
 !original/indy/DESKADV.EXE
+!original/teleportaschtroumpf/SMURF.EXE
 
 # Configuration locale de Claude Code
 .claude/

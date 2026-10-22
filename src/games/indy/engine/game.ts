@@ -3,6 +3,7 @@ import { type Assets, IndyIds, IndySounds } from "./assets";
 import { DIRECTION_VECTORS, Direction, type Point, directionOf, samePoint } from "./geometry";
 import { killMonster, moveMonsters, placeMonsters } from "./monsters";
 import { Rng, randomSeed } from "./rng";
+import { indyQuotient } from "./score";
 import { Mode, type ScriptHost, ScriptOutcome, runScripts } from "./script";
 import { type Sector, SectorKind, type Story, World } from "./world";
 import { type ZoneSnapshot, ZoneState, isAlive, restoreZone, snapshotZone } from "./zone-state";
@@ -62,6 +63,8 @@ export const GameEvent = {
   Weapon: "weapon",
   Zone: "zone",
   Tick: "tick",
+  /** Victoire (avant l'écran de fin), une seule fois par partie. */
+  Won: "won",
 } as const;
 
 export class Game extends EventTarget {
@@ -92,6 +95,9 @@ export class Game extends EventTarget {
   private readonly startedAt = Date.now();
   /** Temps de jeu des sessions précédentes (parties reprises). */
   private playedMs = 0;
+  /** Difficultés enregistrées à chaque son 0 (DESKADV.EXE 3:e4af) : leur somme et leur nombre servent au score. */
+  private difficultySum = 0;
+  private difficultyCount = 0;
 
   constructor(
     readonly assets: Assets,
@@ -214,6 +220,8 @@ export class Game extends EventTarget {
       weapon: this.weapon?.id ?? -1,
       gameWon: this.gameWon,
       playedMs: this.playedMs + (Date.now() - this.startedAt),
+      difficultySum: this.difficultySum,
+      difficultyCount: this.difficultyCount,
     };
   }
 
@@ -224,6 +232,8 @@ export class Game extends EventTarget {
     this.weapon = this.assets.character(s.weapon) ?? null;
     this.gameWon = s.gameWon;
     this.playedMs = s.playedMs;
+    this.difficultySum = s.difficultySum;
+    this.difficultyCount = s.difficultyCount;
     this.setZone(s.zoneId, { x: s.hero.x, y: s.hero.y });
     Object.assign(this.hero, s.hero);
     this.emit(GameEvent.Inventory);
@@ -444,14 +454,14 @@ export class Game extends EventTarget {
       if (!exit) return false;
       exit.argument = zone.id;
       room.doorInLocation = { x: h.x, y: h.y };
-      this.presenter.playSound(IndySounds.Door);
+      this.playSound(IndySounds.Door);
       this.requestZoneChange(room.id, exit.x, exit.y, { type: "room" });
       await this.performPendingZoneChange();
       return true;
     }
     if (h.type === HotspotType.Teleporter) return this.teleport();
     if (h.type === HotspotType.DoorOut && h.argument >= 0 && zone.doorInLocation) {
-      this.presenter.playSound(IndySounds.Door);
+      this.playSound(IndySounds.Door);
       this.requestZoneChange(h.argument, zone.doorInLocation.x, zone.doorInLocation.y, { type: "room" });
       await this.performPendingZoneChange();
       return true;
@@ -472,7 +482,7 @@ export class Game extends EventTarget {
     if (choice === null || !destinations.includes(choice)) return false;
     const target = this.zones.get(this.story.sectors[choice]!.zoneId)!;
     const pad = target.hotspots.find((h) => h.type === HotspotType.Teleporter && h.enabled)!;
-    this.presenter.playSound(IndySounds.Flourish);
+    this.playSound(IndySounds.Flourish);
     this.requestZoneChange(target.id, pad.x, pad.y, { type: "room" });
     await this.performPendingZoneChange();
     return true;
@@ -494,7 +504,7 @@ export class Game extends EventTarget {
     if (!this.hasItem(p.tile)) return false;
     if (p.x === hero.x && p.y === hero.y) {
       if (assets.isWeaponTile(p.tile)) this.equip(p.tile);
-      else if (!this.consume(p.tile)) this.presenter.playSound(IndySounds.NoGo);
+      else if (!(await this.consume(p.tile))) this.playSound(IndySounds.NoGo);
       return false;
     }
     if (Math.max(Math.abs(p.x - hero.x), Math.abs(p.y - hero.y)) > 1 || !this.zone.inBounds(p.x, p.y)) return false;
@@ -531,19 +541,34 @@ export class Game extends EventTarget {
       await this.performPendingZoneChange();
       return true;
     }
-    if (!handled && outcome === ScriptOutcome.Idle) this.presenter.playSound(IndySounds.NoGo);
+    if (!handled && outcome === ScriptOutcome.Idle) this.playSound(IndySounds.NoGo);
     return this.zone !== before;
   }
 
-  /** Mange / boit un objet. Renvoie faux si l'objet ne se consomme pas. */
-  consume(tile: number): boolean {
-    const bonus = HEALTH_BONUS[tile];
-    if (bonus === undefined) return false;
-    if (bonus > 0 && this.hero.health >= MAX_HEALTH) return false;
-    this.removeItem(tile);
-    this.setHealth(this.hero.health + bonus);
-    if (bonus < 0) this.presenter.playSound(IndySounds.Hurt);
-    return true;
+  /**
+   * Mange / boit un objet (4:3f99 de l'original). Renvoie faux s'il ne se consomme pas, ou si le héros est en pleine
+   * forme (l'original refuse alors de manger, avec le son NoGo, mais pas de boire).
+   */
+  async consume(tile: number): Promise<boolean> {
+    const assets = this.assets;
+    if (assets.isEdible(tile)) {
+      if (this.hero.health >= MAX_HEALTH) return false;
+      if (tile === IndyIds.bananasTile && this.zone.id === IndyIds.easterEggZone && this.hero.x === IndyIds.easterEggSpot.x && this.hero.y === IndyIds.easterEggSpot.y) {
+        this.playSound(IndySounds.TooMuchFruit);
+        await this.presenter.speak(TOO_MUCH_FRUIT, null);
+      }
+      this.removeItem(tile);
+      this.setHealth(this.hero.health + (HEALTH_BONUS[tile] ?? 0));
+      this.playSound(IndySounds.Eat);
+      return true;
+    }
+    if (assets.isDrink(tile)) {
+      this.removeItem(tile);
+      this.playSound(IndySounds.Hurt);
+      this.setHealth(this.hero.health - this.scaleDamage(DRINK_DAMAGE));
+      return true;
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------- santé
@@ -554,40 +579,50 @@ export class Game extends EventTarget {
     if (this.hero.health <= 0 && !this.over) void this.lose();
   }
 
-  hurtHero(damage: number): void {
-    if (this.over) return;
-    // Barème du moteur original : à difficulté normale (50), les dégâts sont divisés par 2.
+  /** Barème de l'original : les dégâts sont divisés par 100 / difficulté (÷2 à difficulté normale), avec un minimum de 1. */
+  private scaleDamage(damage: number): number {
     const divisor = Math.max(1, Math.floor(100 / Math.max(1, this.settings.difficulty)));
-    const scaled = Math.floor(damage / divisor);
-    if (scaled <= 0) return;
-    this.presenter.playSound(IndySounds.Hurt);
-    this.setHealth(this.hero.health - scaled);
+    return Math.max(1, Math.floor(damage / divisor));
+  }
+
+  hurtHero(damage: number): void {
+    if (this.over || damage <= 0) return;
+    this.playSound(IndySounds.Hurt);
+    this.setHealth(this.hero.health - this.scaleDamage(damage));
+  }
+
+  /** Mort scriptée (opcode KillHero) : même défaite qu'une santé tombée à 0. */
+  private killHero(): void {
+    if (!this.over) this.setHealth(0);
   }
 
   private async lose(): Promise<void> {
     this.over = true;
-    this.presenter.playSound(IndySounds.Defeat);
+    this.playSound(IndySounds.Defeat);
     await this.presenter.ended("lose", 0);
   }
 
   private async win(): Promise<void> {
     if (this.gameWon) return;
     this.gameWon = true;
-    this.presenter.playSound(IndySounds.Victory);
+    this.emit(GameEvent.Won);
+    this.playSound(IndySounds.Victory);
     await this.presenter.ended("win", this.score());
   }
 
-  /** « Indy Quotient » : temps, exploration, difficulté et puzzles résolus (barème de WebFun). */
+  /** Tous les sons passent ici : l'original enregistre la difficulté à chaque son 0 (manger), entendu ou non. */
+  private playSound(id: number): void {
+    if (id === 0) {
+      this.difficultySum += this.settings.difficulty;
+      this.difficultyCount++;
+    }
+    this.presenter.playSound(id);
+  }
+
+  /** « Indy Quotient » : formule de l'original (voir `indyQuotient`), sur le temps de jeu écoulé. */
   score(): number {
-    const sectors = this.story.sectors.filter((s): s is Sector => !!s);
-    const minutes = (this.playedMs + Date.now() - this.startedAt) / 60000;
-    const time = Math.max(0, Math.min(200, 200 - 20 * Math.floor(minutes - 5 * this.story.size)));
-    const visited = sectors.filter((s) => s.visited).length / Math.max(1, sectors.length);
-    const exploration = Math.max(10, Math.min(100, Math.ceil(visited * 10) * 10));
-    const difficulty = Math.max(1, Math.min(10, Math.ceil(this.settings.difficulty / 10))) * 40;
-    const solved = sectors.filter((s) => s.solved && s.kind === SectorKind.Puzzle).length;
-    const puzzles = Math.max(10, Math.min(100, Math.ceil((solved / Math.max(1, this.story.puzzleCount)) * 10) * 10)) * 3;
-    return Math.min(1000, time + exploration + difficulty + puzzles);
+    const seconds = Math.floor((this.playedMs + Date.now() - this.startedAt) / 1000);
+    return indyQuotient(seconds, this.story.pace, this.difficultySum, this.difficultyCount);
   }
 
   // ---------------------------------------------------------------- combat
@@ -628,7 +663,7 @@ export class Game extends EventTarget {
     const target = { x: this.hero.x + v.x, y: this.hero.y + v.y };
     const projectile = weapon.frames[0][FrameEntry.Left] >= 0;
     this.attack = { weapon, frame: 0, projectile, bullet: projectile ? { x: this.hero.x, y: this.hero.y } : null };
-    if (weapon.reference >= 0) this.presenter.playSound(weapon.reference);
+    if (weapon.reference >= 0) this.playSound(weapon.reference);
     if (projectile) return false;
     const monster = this.zone.monsterAt(target.x, target.y);
     if (monster) {
@@ -660,7 +695,10 @@ export class Game extends EventTarget {
     if (!m) return;
     m.damageTaken += Math.max(1, damage);
     m.cooldown = 1;
-    if (!isAlive(m)) killMonster(m, this.zone);
+    if (!isAlive(m)) {
+      killMonster(m, this.zone);
+      this.playSound(IndySounds.MonsterDeath);
+    }
   }
 
   // ---------------------------------------------------------------- déplacements
@@ -715,19 +753,12 @@ export class Game extends EventTarget {
     if (!zone.inBounds(target.x, target.y)) await this.trySectorTransition(move);
   }
 
+  /**
+   * Comme MoveHero de l'original (DESKADV.EXE 4:733e) : seule la case cible compte. Une cible bloquée
+   * n'entraîne ni glissement ni repli sur un axe ; seule la poussée en ligne droite (Maj) existe.
+   */
   private tryMove(move: Point): boolean {
-    const drag = this.input.drag;
-    const straight = move.x === 0 || move.y === 0;
-    if (this.doMove(move, drag && straight)) return true;
-    if (move.x !== 0 && move.y !== 0) {
-      if (this.doMove({ x: move.x, y: 0 }, drag)) return true;
-      if (this.doMove({ x: 0, y: move.y }, drag)) return true;
-      return false;
-    }
-    if (drag) return false;
-    // Contourne un obstacle en glissant en diagonale.
-    const sides = move.x === 0 ? [{ x: -1, y: move.y }, { x: 1, y: move.y }] : [{ x: move.x, y: 1 }, { x: move.x, y: -1 }];
-    return sides.some((side) => this.doMove(side, false));
+    return this.doMove(move, this.input.drag && (move.x === 0 || move.y === 0));
   }
 
   private doMove(rel: Point, drag: boolean): boolean {
@@ -735,9 +766,7 @@ export class Game extends EventTarget {
     const hero = this.hero;
     const target = { x: hero.x + rel.x, y: hero.y + rel.y };
     if (!zone.inBounds(target.x, target.y)) return false;
-    if (rel.x !== 0 && rel.y !== 0 && !zone.isFree(hero.x + rel.x, hero.y) && !zone.isFree(hero.x, hero.y + rel.y)) {
-      return false;
-    }
+    // Passer en coin entre deux obstacles est permis : seule la case cible est testée (comme l'original).
     if (zone.isFree(target.x, target.y)) {
       if (drag) this.drag({ x: hero.x - rel.x, y: hero.y - rel.y }, { x: hero.x, y: hero.y });
       hero.x = target.x;
@@ -760,7 +789,7 @@ export class Game extends EventTarget {
     if (tile === -1 || !this.assets.isDraggable(tile)) return false;
     zone.setTile(from.x, from.y, Layer.Object, -1);
     zone.setTile(to.x, to.y, Layer.Object, tile);
-    this.presenter.playSound(IndySounds.Push);
+    this.playSound(IndySounds.Push);
     return true;
   }
 
@@ -792,7 +821,7 @@ export class Game extends EventTarget {
       tick: this.tick,
       hero: { x: this.hero.x, y: this.hero.y },
       hurtHero: (damage: number) => game.hurtHero(damage),
-      playSound: (id: number) => game.presenter.playSound(id),
+      playSound: (id: number) => game.playSound(id),
     };
   }
 
@@ -816,7 +845,7 @@ export class Game extends EventTarget {
       random: (n) => game.rng.mod(n),
       speak: (text, at) => game.presenter.speak(text, at),
       wait: (ticks) => game.waitTicks(ticks),
-      playSound: (id) => game.presenter.playSound(id),
+      playSound: (id) => game.playSound(id),
       dropItem: (tile, at) => game.dropItem(tile, at),
       drawOverlay: (x, y, tile) => game.overlays.push({ x, y, tile }),
       clearOverlays: () => {
@@ -831,6 +860,7 @@ export class Game extends EventTarget {
         if (sector) sector.solved = true;
       },
       win: () => game.win(),
+      killHero: () => game.killHero(),
       changeZone: (zoneId, x, y) => game.requestZoneChange(zoneId, x, y, { type: "room" }),
     };
   }
@@ -851,7 +881,7 @@ export class Game extends EventTarget {
   }
 }
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** État complet d'une partie, sérialisable en JSON. */
 export interface GameSnapshot {
@@ -865,6 +895,28 @@ export interface GameSnapshot {
   weapon: number;
   gameWon: boolean;
   playedMs: number;
+  difficultySum: number;
+  difficultyCount: number;
+}
+
+/**
+ * Relit une sauvegarde de n'importe quelle version connue, au format courant (null : version inconnue).
+ * v1 → v2 : `puzzleCount` devient `pace` (les départs de voyage et barrages, inconnus, sont comptés pour 0 : W = puzzles + 1),
+ * et la difficulté de la partie tient lieu de seule difficulté enregistrée (sinon le score retomberait au minimum).
+ */
+export function migrateSnapshot(raw: unknown): GameSnapshot | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const snapshot = raw as GameSnapshot;
+  if (snapshot.version === SAVE_VERSION) return snapshot;
+  if (snapshot.version !== 1) return null;
+  const { puzzleCount, ...story } = snapshot.story as GameSnapshot["story"] & { puzzleCount: number };
+  return {
+    ...snapshot,
+    version: SAVE_VERSION,
+    story: { ...story, pace: puzzleCount + 1 },
+    difficultySum: snapshot.settings.difficulty,
+    difficultyCount: 1,
+  };
 }
 
 export function storyFromSnapshot(s: GameSnapshot): Story {
@@ -876,10 +928,20 @@ const MARCUS_DESK = 794;
 /** Objet de la mission où Marcus est enlevé (MarcusGO). */
 const MARCUS_KIDNAPPED = 1048;
 
-/** Soins des objets comestibles (valeurs choisies : le fichier de données ne les précise pas). */
+/**
+ * Soins des objets comestibles (DESKADV.EXE 4:3f99). L'original compte la santé en dégâts cumulés
+ * (compteurs de 1 à 100 et de 1 à 3, mort à (100, 3)), soit 3 × 100 = 300 points : exactement MAX_HEALTH,
+ * donc les valeurs sont reprises telles quelles (un soin n'est pas mis à l'échelle de la difficulté).
+ * Les autres comestibles ne soignent pas mais sont consommés.
+ */
 const HEALTH_BONUS: Record<number, number> = {
-  1133: 50, // Bananas
-  1085: 150, // First Aid Kit
-  696: 300, // Yerba Buena
-  1038: -20, // Tequila
+  [IndyIds.bananasTile]: 25, // Bananas
+  1085: 75, // First Aid Kit
+  696: 50, // Yerba Buena
 };
+
+/** Dégâts d'une boisson (Tequila), mis à l'échelle de la difficulté comme n'importe quel dégât. */
+const DRINK_DAMAGE = 35;
+
+/** Texte d'origine (anglais, comme les dialogues du jeu). */
+const TOO_MUCH_FRUIT = "Ugh. Too much fruit!";

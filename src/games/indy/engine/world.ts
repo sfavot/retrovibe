@@ -51,8 +51,8 @@ export interface Story {
   goalPuzzle: number;
   /** Zones dont un hotspot a été préparé par la génération : zoneId → index → argument. */
   hotspotArguments: Map<number, Map<number, number>>;
-  /** Nombre de puzzles de la chaîne (pour le score). */
-  puzzleCount: number;
+  /** « W » de l'original, qui règle le temps de référence du score (voir `paceOf`). */
+  pace: number;
   /** Objet remis par Marcus avec le briefing (début de la chaîne de puzzles), -1 : aucun. */
   startItem: number;
 }

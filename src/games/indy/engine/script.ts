@@ -72,9 +72,13 @@ export const Instr = {
   SpeakNpc: 0x1c,
   AddItem: 0x1d,
   DropItem: 0x1e,
+  /** Sans argument (DESKADV.EXE 3:38fa) : tue le héros, comme une santé tombée à 0. Utilisé une fois (zone 118, action 11). */
+  KillHero: 0x1f,
   RemoveItem: 0x20,
   MarkAsSolved: 0x21,
   ChangeZone: 0x22,
+  /** Sans argument : l'original n'y fait rien. */
+  Noop: 0x23,
 } as const;
 
 /** Ce dont la machine de script a besoin du jeu. */
@@ -99,6 +103,8 @@ export interface ScriptHost {
   moveHeroTo(x: number, y: number): void;
   markSolved(): void;
   win(): Promise<void>;
+  /** Tue le héros (défaite immédiate). */
+  killHero(): void;
   /** Demande un changement de zone ; le script en cours s'arrête. */
   changeZone(zoneId: number, x: number, y: number): void;
 }
@@ -251,6 +257,9 @@ async function execute(
     case Instr.WinGame:
       await host.win();
       return;
+    case Instr.KillHero:
+      host.killHero();
+      return;
     case Instr.AddItem:
       if (a[0] >= 0) host.addItem(a[0]);
       return;
@@ -270,6 +279,8 @@ async function execute(
     case Instr.ChangeZone:
       host.changeZone(a[0], a[1], a[2]);
       return ABORT;
+    case Instr.Noop:
+      return;
     // Rafraîchissements d'écran : le rendu est continu, rien à faire.
     case Instr.Redraw:
     case Instr.RedrawTile:

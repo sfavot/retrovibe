@@ -1,6 +1,8 @@
 import { type Zone, HotspotType, PuzzleType, ZoneType } from "../../data/types";
 import { type Assets, IndyIds } from "../assets";
+import { isGoalDrawable } from "../history";
 import { Rng } from "../rng";
+import { paceOf } from "../score";
 import { type Sector, SectorKind, type Story, WORLD_SIZE, WorldSize, emptySector } from "../world";
 import { Cell, type Layout, distanceToCenter, generateLayout } from "./layout";
 import { canReachHotspot } from "./reachability";
@@ -19,18 +21,30 @@ interface Quest {
   maxDistance: number;
 }
 
+export interface GenerateOptions {
+  maxAttempts?: number;
+  /** Objectifs des parties précédentes, du plus ancien au plus récent : les 10 derniers ne sont pas retirés. */
+  history?: readonly number[];
+  /** Victoires cumulées : MysteryGO n'est tirable qu'à partir de 10. */
+  victories?: number;
+  /** Objectif imposé (« Rejouer cette histoire ») : ni l'historique ni les victoires ne comptent alors. */
+  goal?: number;
+}
+
 /**
  * Génère une partie : carte, mission, chaîne de puzzles et emplacement des objets.
  * La disposition suit l'algorithme d'origine ; l'affectation des zones est une reconstitution,
  * validée par un solveur qui rejette (et regénère) toute partie impossible à terminer.
+ * À graine, taille et options égales, le monde est identique.
  */
-export function generateStory(assets: Assets, seed: number, size: WorldSize, maxAttempts = 40): Story {
+export function generateStory(assets: Assets, seed: number, size: WorldSize, options: GenerateOptions = {}): Story {
+  const { maxAttempts = 40 } = options;
   const errors: string[] = [];
   const rng = new Rng(seed);
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const attemptSeed = attempt === 0 ? seed : rng.next() * 0x8000 + rng.next();
     try {
-      const story = new StoryBuilder(assets, attemptSeed, size).build();
+      const story = new StoryBuilder(assets, attemptSeed, size, options).build();
       const result = solve(assets, story);
       if (result.solvable) return story;
       errors.push(`graine ${attemptSeed} : ${result.reason}`);
@@ -58,6 +72,7 @@ class StoryBuilder {
     private readonly assets: Assets,
     private readonly seed: number,
     private readonly size: WorldSize,
+    private readonly options: GenerateOptions = {},
   ) {
     this.rng = new Rng(seed);
   }
@@ -84,7 +99,7 @@ class StoryBuilder {
       sectors: this.sectors,
       goalPuzzle,
       hotspotArguments: this.hotspotArguments,
-      puzzleCount: Math.max(1, this.layout.puzzleCount - 1),
+      pace: paceOf(this.layout),
       startItem: this.startItem,
     };
   }
@@ -164,7 +179,12 @@ class StoryBuilder {
     if (puzzleCount < 2) throw new GenerationError("trop peu de puzzles");
     const goalIndex = this.indexOfOrder(puzzleCount - 1);
 
-    const missions = this.rng.shuffle(this.assets.data.puzzles.filter((p) => p.type === PuzzleType.Mission));
+    const { goal, history = [], victories = 0 } = this.options;
+    const missions = this.rng.shuffle(
+      this.assets.data.puzzles.filter(
+        (p) => p.type === PuzzleType.Mission && (goal === undefined ? isGoalDrawable(p.id, history, victories) : p.id === goal),
+      ),
+    );
     let mission: number | undefined;
     for (const puzzle of missions) {
       const zone = this.zonesOfType(ZoneType.Goal).find((z) => this.treeHas(z.id, (r) => r.providedItems, puzzle.item));

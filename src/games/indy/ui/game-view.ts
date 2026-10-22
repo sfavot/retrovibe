@@ -3,6 +3,7 @@ import { HotspotType, TILE_SIZE, ZoneType } from "../data/types";
 import type { AudioPlayer } from "../audio/audio";
 import type { Game, Presenter, Transition } from "../engine/game";
 import type { Point } from "../engine/geometry";
+import { itemCategory, mapClue, mapClueText } from "../engine/map-clues";
 import { type Sector, SectorKind, WORLD_SIZE } from "../engine/world";
 import { IndexedFrame, PaletteBlitter, VIEW_PIXELS, VIEW_TILES, cameraFor, composeView } from "../render/zone-renderer";
 import { copy } from "../copy";
@@ -312,8 +313,59 @@ export class GameView implements Presenter {
       }
       queueMicrotask(() => frameEl.querySelector<HTMLButtonElement>(".map-target")?.focus());
     }
-    const keys = onChoose ? ["Escape"] : undefined;
+    if (!onChoose) this.addMapClues(game, frameEl, panel);
+    const keys = frameEl.querySelector("button") ? ["Escape"] : undefined;
     return this.modal(panel, true, keys).then(() => window.clearInterval(timer));
+  }
+
+  /** Un bouton par secteur visité doté d'un indice ; l'indice s'affiche dans une bulle (Échap ou clic la ferme). */
+  private addMapClues(game: Game, frameEl: HTMLElement, panel: HTMLElement): void {
+    let bubble: HTMLElement | null = null;
+    let opener: HTMLElement | null = null;
+    const closeBubble = () => {
+      bubble?.remove();
+      bubble = null;
+      opener?.focus();
+    };
+    const categoryOf = (tile: number) => itemCategory(game.assets.tile(tile));
+    for (let y = 0; y < WORLD_SIZE; y++) {
+      for (let x = 0; x < WORLD_SIZE; x++) {
+        const sector = game.world.at(x, y);
+        const clue = sector && mapClue(sector, categoryOf);
+        if (!clue) continue;
+        const text = mapClueText(clue);
+        const button = h("button", { type: "button", class: "map-clue-target", "aria-label": copy.clueLabel(x + 1, y + 1) });
+        button.style.left = `${(x / WORLD_SIZE) * 100}%`;
+        button.style.top = `${(y / WORLD_SIZE) * 100}%`;
+        button.addEventListener("click", (e) => {
+          e.stopPropagation();
+          bubble?.remove();
+          opener = button;
+          // Le texte arrive après l'insertion : une zone live déjà présente est annoncée, une zone insérée pleine ne l'est pas toujours.
+          const current = h("div", { class: "map-clue", role: "status" });
+          bubble = current;
+          window.setTimeout(() => (current.textContent = text), 50);
+          bubble.style.left = `${Math.max(0, Math.min(60, ((x + 0.5) / WORLD_SIZE) * 100 - 20))}%`;
+          if (y < WORLD_SIZE / 2) bubble.style.top = `${((y + 1) / WORLD_SIZE) * 100 + 1}%`;
+          else bubble.style.bottom = `${(1 - y / WORLD_SIZE) * 100 + 1}%`;
+          bubble.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            closeBubble();
+          });
+          frameEl.append(bubble);
+        });
+        frameEl.append(button);
+      }
+    }
+    // Échap ferme d'abord la bulle, puis (au second appui) la carte.
+    panel.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && bubble) {
+        e.stopPropagation();
+        e.preventDefault();
+        closeBubble();
+      }
+    });
+    queueMicrotask(() => frameEl.querySelector<HTMLButtonElement>(".map-clue-target")?.focus());
   }
 }
 

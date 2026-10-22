@@ -1,37 +1,30 @@
 import { AudioPlayer } from "../audio/audio";
 import { type Palette, PaletteAnimation } from "../data/palette";
+import type { Cursor } from "../data/resources";
 import { type HelpDocument, parseHelp } from "../data/help";
 import type { GameData } from "../data/types";
 import { Assets, IndyIds, IndySounds } from "../engine/assets";
-import { Game, type GameSnapshot, storyFromSnapshot } from "../engine/game";
+import { Game, GameEvent, type GameSnapshot, storyFromSnapshot } from "../engine/game";
 import type { Point } from "../engine/geometry";
 import { generateStory } from "../engine/generation/generator";
 import { randomSeed } from "../engine/rng";
 import { WorldSize } from "../engine/world";
-import { tileCanvas } from "../render/zone-renderer";
+import { VIEW_TILES, tileCanvas } from "../render/zone-renderer";
 import { copy } from "../copy";
 import { copy as shared } from "../../../ui/copy";
 import { h } from "../../../ui/dom";
 import { GameView } from "./game-view";
+import { nearestPreset, nextPreset, speedSetting } from "./game-speed";
+import { MoveKeys } from "./move-keys";
 import { renderManual } from "./manual";
+import { stepToward, WalkCursors } from "./walk-cursor";
+import { progressStore } from "./progress";
 import { saveSlot } from "./save";
 import { Sidebar } from "./sidebar";
 
-const TICK_MS = 110;
 const AUTOSAVE_MS = 4000;
 /** Case de départ : devant le bureau de Marcus, en ville. */
 const START = { zone: IndyIds.townZone, at: { x: 11, y: 5 } };
-
-const MOVE_KEYS: Record<string, Point> = {
-  ArrowUp: { x: 0, y: -1 },
-  ArrowDown: { x: 0, y: 1 },
-  ArrowLeft: { x: -1, y: 0 },
-  ArrowRight: { x: 1, y: 0 },
-  KeyW: { x: 0, y: -1 },
-  KeyS: { x: 0, y: 1 },
-  KeyA: { x: -1, y: 0 },
-  KeyD: { x: 1, y: 0 },
-};
 
 export class App {
   private readonly assets: Assets;
@@ -45,29 +38,43 @@ export class App {
   private timer = 0;
   private autosaveTimer = 0;
   private paused = false;
-  private readonly held = new Set<string>();
-  /** Touches appuyées depuis le dernier tick : un appui bref compte pour un pas. */
-  private readonly tapped = new Set<string>();
+  private readonly keys = new MoveKeys();
+  private readonly walkCursors: WalkCursors;
+  /** Dernière position de la souris sur la vue (null pour le tactile ou hors de la vue). */
+  private mouse: { x: number; y: number } | null = null;
   private pointerWalk: { id: number; x: number; y: number } | null = null;
   private itemDrag: { tile: number; ghost: HTMLElement; startX: number; startY: number; moved: boolean } | null = null;
+  /** Réglages de l'écran titre. */
   private settings = { size: WorldSize.Medium as WorldSize, difficulty: 50 };
+  /** Réglages de la partie en cours (ceux de la sauvegarde si elle est reprise) : le Replay de défaite les reprend. */
+  private gameSettings = { ...this.settings };
   private manual: HelpDocument | null = null;
+  /** Durée d'un tick (ms), mémorisée entre les parties. */
+  private tickMs = speedSetting.read();
 
   constructor(
     container: HTMLElement,
     data: GameData,
     private readonly basePalette: Palette,
+    exe: ArrayBuffer,
     private readonly loadManual: () => Promise<ArrayBuffer>,
+    cursors: Map<number, Cursor> = new Map(),
   ) {
+    this.walkCursors = new WalkCursors(cursors);
     this.assets = new Assets(data);
     this.palette = new PaletteAnimation(basePalette);
-    this.audio = new AudioPlayer(data.sounds, `${import.meta.env.BASE_URL}indy/`);
+    this.audio = new AudioPlayer(data.sounds, `${import.meta.env.BASE_URL}indy/`, exe);
     this.view = new GameView(this.palette, this.audio);
     this.view.onEnded = (kind) => {
       if (kind === "lose") {
-        this.game = null;
+        // Même objectif, nouvelle graine ; l'écran titre reste le recours si la génération échoue.
+        const goal = this.game?.story.goalPuzzle;
+        this.stopGame();
         saveSlot.clear();
-        this.showTitle();
+        this.replayStory(goal, this.gameSettings).catch((e: unknown) => {
+          console.error(e);
+          this.showTitle();
+        });
       }
     };
     this.sidebar = new Sidebar(basePalette, {
@@ -84,6 +91,7 @@ export class App {
         this.sidebar.musicButton.setAttribute("aria-pressed", String(this.audio.musicEnabled));
       },
       onHelp: () => void this.showHelp(),
+      onCycleSpeed: () => this.setSpeed(nextPreset(this.tickMs)),
       onItemPointerDown: (tile, e) => this.startItemDrag(tile, e),
       onItemUseOnHero: (tile) => {
         const game = this.game;
@@ -149,19 +157,25 @@ export class App {
     const start = h("button", { class: saved ? "" : "primary", type: "button" }, copy.start);
     const status = h("p", { class: "status-line", role: "status" });
     const manual = h("button", { class: "secondary", type: "button", onclick: () => void this.showManual() }, copy.manual);
-    start.addEventListener("click", () => {
+    const replay = progressStore.read().history.length
+      ? h("button", { class: "secondary", type: "button" }, copy.replayStory)
+      : null;
+    const launchers = [start, replay].filter((b): b is HTMLButtonElement => b !== null);
+    const begin = (run: () => Promise<void>) => {
       this.audio.unlock();
-      start.disabled = true;
+      for (const b of launchers) b.disabled = true;
       status.textContent = copy.generating;
       // Laisse le navigateur afficher le message avant la génération (synchrone).
       window.setTimeout(() => {
-        this.startGame().catch((e: unknown) => {
+        run().catch((e: unknown) => {
           console.error(e);
           status.textContent = String(e instanceof Error ? e.message : e);
-          start.disabled = false;
+          for (const b of launchers) b.disabled = false;
         });
       }, 30);
-    });
+    };
+    start.addEventListener("click", () => begin(() => this.startGame()));
+    replay?.addEventListener("click", () => begin(() => this.replayStory()));
     this.root.replaceChildren(
       h(
         "section",
@@ -175,7 +189,9 @@ export class App {
           h("h1", {}, copy.newGame),
           radios("size", copy.worldSize, copy.sizes, this.settings.size, (v) => (this.settings.size = v)),
           radios("difficulty", copy.difficulty, copy.difficulties, this.settings.difficulty, (v) => (this.settings.difficulty = v)),
+          radios("speed", copy.gameSpeed, copy.speeds, nearestPreset(this.tickMs), (v) => this.setSpeed(v)),
           start,
+          replay,
           status,
           manual,
           h("ul", { class: "help-list" }, ...copy.helpText.map((t) => h("li", {}, t))),
@@ -200,20 +216,44 @@ export class App {
     }
   }
 
-  async startGame(seed = randomSeed()): Promise<void> {
-    const story = generateStory(this.assets, seed, this.settings.size);
-    const game = this.launch(new Game(this.assets, story, this.view, { difficulty: this.settings.difficulty }));
+  /**
+   * Nouvelle histoire. L'objectif est tiré selon l'historique et les victoires enregistrés, sauf si `goal` l'impose.
+   * `record: false` (graine imposée en développement) laisse l'historique intact, pour retrouver le même monde.
+   */
+  async startGame(
+    seed = randomSeed(),
+    { goal, record = true, settings = this.settings }: { goal?: number; record?: boolean; settings?: { size: WorldSize; difficulty: number } } = {},
+  ): Promise<void> {
+    const { history, victories } = progressStore.read();
+    const story = generateStory(this.assets, seed, settings.size, { history, victories, goal });
+    if (record) progressStore.recordGoal(story.goalPuzzle);
+    this.gameSettings = { ...settings };
+    const game = this.launch(new Game(this.assets, story, this.view, { difficulty: settings.difficulty }), record);
     this.audio.playMusic(IndySounds.Theme);
     await game.start(START.zone, this.freeCellNear(START.zone, START.at));
   }
 
+  /**
+   * « Rejouer cette histoire » : l'objectif donné (celui de la partie perdue) ou, à défaut, le dernier de
+   * l'historique, avec une nouvelle graine et les réglages donnés (ceux de l'écran titre par défaut).
+   */
+  async replayStory(goal = progressStore.read().history.at(-1), settings = this.settings): Promise<void> {
+    if (goal === undefined) throw new Error(copy.noStoryToReplay);
+    await this.startGame(randomSeed(), { goal, settings });
+  }
+
   async resumeGame(snapshot: GameSnapshot): Promise<void> {
-    const game = this.launch(new Game(this.assets, storyFromSnapshot(snapshot), this.view, snapshot.settings));
+    const story = storyFromSnapshot(snapshot);
+    this.gameSettings = { size: story.size, difficulty: snapshot.settings.difficulty };
+    // Une sauvegarde est une partie en cours : sa victoire compte (l'histoire a été enregistrée à son démarrage).
+    const game = this.launch(new Game(this.assets, story, this.view, snapshot.settings), true);
     await game.resume(snapshot);
   }
 
-  private launch(game: Game): Game {
+  /** `record` : la partie compte dans la progression (faux pour une graine imposée en développement). */
+  private launch(game: Game, record: boolean): Game {
     this.game = game;
+    if (record) game.addEventListener(GameEvent.Won, () => progressStore.recordVictory());
     // Accès de débogage en développement uniquement (console : __indy.game).
     if (import.meta.env.DEV) Object.assign(window, { __indy: { game, app: this } });
     this.paused = false;
@@ -223,9 +263,24 @@ export class App {
     this.sidebar.setPaused(false);
     this.view.attach(game);
     this.sidebar.attach(game);
-    this.timer = window.setInterval(() => this.tick(), TICK_MS);
+    this.startTimer();
+    this.sidebar.setSpeed(this.tickMs);
+    window.clearInterval(this.autosaveTimer);
     this.autosaveTimer = window.setInterval(() => this.autosave(), AUTOSAVE_MS);
     return game;
+  }
+
+  private startTimer(): void {
+    window.clearInterval(this.timer);
+    this.timer = window.setInterval(() => this.tick(), this.tickMs);
+  }
+
+  /** Change la durée d'un tick, la mémorise et, en partie, relance la boucle à la nouvelle cadence. */
+  private setSpeed(ms: number): void {
+    this.tickMs = nearestPreset(ms);
+    speedSetting.write(this.tickMs);
+    this.sidebar.setSpeed(this.tickMs);
+    if (this.game) this.startTimer();
   }
 
   /** Sauvegarde automatique, uniquement entre deux actions (jamais au milieu d'un script). */
@@ -270,6 +325,8 @@ export class App {
   togglePause(force?: boolean): void {
     if (!this.game) return;
     this.paused = force ?? !this.paused;
+    // Rien ne doit survivre à la pause : ni touche maintenue, ni appui bref qui déplacerait Indy à la reprise.
+    if (!this.paused) this.keys.clear();
     this.sidebar.setPaused(this.paused);
     this.view.element.classList.toggle("paused", this.paused);
     this.view.element.dataset.pausedLabel = copy.paused;
@@ -305,10 +362,9 @@ export class App {
       if (!game || this.view.modalOpen) return;
       if (e.target instanceof HTMLInputElement) return;
       this.audio.unlock();
-      if (MOVE_KEYS[e.code]) {
+      if (MoveKeys.handles(e.code)) {
         e.preventDefault();
-        this.held.add(e.code);
-        this.tapped.add(e.code);
+        if (!this.paused) this.keys.press(e.code);
       } else if (e.code === "Space") {
         e.preventDefault();
         if (!e.repeat) game.requestAttack();
@@ -322,10 +378,10 @@ export class App {
       game.input.drag = e.shiftKey;
     });
     window.addEventListener("keyup", (e) => {
-      this.held.delete(e.code);
+      this.keys.release(e.code);
       if (this.game) this.game.input.drag = e.shiftKey;
     });
-    window.addEventListener("blur", () => this.held.clear());
+    window.addEventListener("blur", () => this.keys.clear());
     // Onglet masqué : pause automatique, pour ne pas laisser Indy sans défense.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden && this.game && !this.paused) this.togglePause(true);
@@ -346,6 +402,8 @@ export class App {
       this.pointerWalk = { id: e.pointerId, x: e.clientX, y: e.clientY };
     });
     canvas.addEventListener("pointermove", (e) => {
+      this.mouse = e.pointerType === "mouse" ? { x: e.clientX, y: e.clientY } : null;
+      this.refreshCursor();
       if (this.pointerWalk?.id === e.pointerId) {
         this.pointerWalk.x = e.clientX;
         this.pointerWalk.y = e.clientY;
@@ -354,6 +412,10 @@ export class App {
     const endWalk = (e: PointerEvent) => {
       if (this.pointerWalk?.id === e.pointerId) this.pointerWalk = null;
     };
+    canvas.addEventListener("pointerleave", () => {
+      this.mouse = null;
+      this.refreshCursor();
+    });
     canvas.addEventListener("pointerup", endWalk);
     canvas.addEventListener("pointercancel", endWalk);
 
@@ -365,22 +427,31 @@ export class App {
   private updateMove(): void {
     const game = this.game;
     if (!game) return;
-    let x = 0;
-    let y = 0;
-    for (const code of new Set([...this.held, ...this.tapped])) {
-      const v = MOVE_KEYS[code];
-      x += v.x;
-      y += v.y;
-    }
-    this.tapped.clear();
+    let { x, y } = this.keys.direction();
     if (x === 0 && y === 0 && this.pointerWalk) {
       const target = this.view.tileAt(this.pointerWalk.x, this.pointerWalk.y);
       if (target) {
-        x = target.x - game.hero.x;
-        y = target.y - game.hero.y;
+        ({ x, y } = stepToward(game.hero, target));
       }
     }
     game.input.move = { x: Math.sign(x), y: Math.sign(y) };
+    this.refreshCursor();
+  }
+
+  /** Souris : flèche de la direction que prendrait Indy au clic ; curseur standard sur sa case ou sans souris. */
+  private refreshCursor(): void {
+    const canvas = this.view.canvas;
+    const game = this.game;
+    let css: string | null = null;
+    // Pas de flèche pendant qu'un objet est sélectionné : le clic le dépose, il ne déplace pas Indy.
+    if (game && this.mouse && !this.view.modalOpen && this.sidebar.selected === null) {
+      const target = this.view.tileAt(this.mouse.x, this.mouse.y);
+      if (target) {
+        const tileSize = canvas.getBoundingClientRect().width / VIEW_TILES;
+        css = this.walkCursors.css(stepToward(game.hero, target), WalkCursors.scaleFor(tileSize));
+      }
+    }
+    canvas.style.cursor = css ?? "";
   }
 
   private startItemDrag(tile: number, e: PointerEvent): void {

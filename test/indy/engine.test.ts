@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { HotspotType, Layer } from "../../src/games/indy/data/types";
-import { Assets, IndyIds } from "../../src/games/indy/engine/assets";
-import { Game, type GameSnapshot, type Presenter, storyFromSnapshot } from "../../src/games/indy/engine/game";
+import { Assets, IndyIds, IndySounds } from "../../src/games/indy/engine/assets";
+import { Instr, Mode, ScriptOutcome, runScripts } from "../../src/games/indy/engine/script";
+import { MAX_HEALTH, Game, type GameSnapshot, type Presenter, storyFromSnapshot } from "../../src/games/indy/engine/game";
 import { generateStory } from "../../src/games/indy/engine/generation/generator";
 import { Direction } from "../../src/games/indy/engine/geometry";
 import { SectorKind, WorldSize, emptySector } from "../../src/games/indy/engine/world";
@@ -117,6 +118,50 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
     expect([game.hero.x, game.hero.y]).toEqual([11, 4]);
   });
 
+  it("ne teste que la case visée : une diagonale passe en coin entre deux obstacles, sans glissement sur un refus", async () => {
+    const { game } = await newGame();
+    const z = game.zone;
+    const free = (x: number, y: number) => z.isFree(x, y);
+    let spot: { x: number; y: number } | null = null;
+    for (let y = 1; y < z.height - 2 && !spot; y++) {
+      for (let x = 1; x < z.width - 2 && !spot; x++) {
+        if (free(x, y) && free(x + 1, y) && free(x, y + 1) && free(x + 1, y + 1)) spot = { x, y };
+      }
+    }
+    expect(spot).not.toBeNull();
+    const { x, y } = spot!;
+    const at = (hx: number, hy: number) => {
+      game.hero.x = hx;
+      game.hero.y = hy;
+    };
+    game.input.move = { x: 1, y: 1 };
+    at(x, y);
+    await steps(game, 1);
+    expect([game.hero.x, game.hero.y]).toEqual([x + 1, y + 1]);
+
+    // Les deux côtés bloqués : la case visée étant libre, le coin se franchit (MoveHero n'y regarde pas).
+    at(x, y);
+    z.setTile(x + 1, y, Layer.Object, 1);
+    z.setTile(x, y + 1, Layer.Object, 1);
+    await steps(game, 1);
+    expect([game.hero.x, game.hero.y]).toEqual([x + 1, y + 1]);
+
+    // Case visée bloquée : aucun mouvement, pas de repli sur un axe libre.
+    at(x, y);
+    z.setTile(x, y + 1, Layer.Object, -1);
+    z.setTile(x + 1, y, Layer.Object, -1);
+    z.setTile(x + 1, y + 1, Layer.Object, 1);
+    await steps(game, 1);
+    expect([game.hero.x, game.hero.y]).toEqual([x, y]);
+
+    // Pas droit bloqué : pas de contournement en diagonale.
+    game.input.move = { x: 1, y: 0 };
+    z.setTile(x + 1, y, Layer.Object, 1);
+    z.setTile(x + 1, y + 1, Layer.Object, -1);
+    await steps(game, 1);
+    expect([game.hero.x, game.hero.y]).toEqual([x, y]);
+  });
+
   it("passe dans le secteur voisin en sortant par le bord", async () => {
     const { game } = await newGame();
     const here = game.world.locate(game.zone.id)!;
@@ -155,7 +200,7 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
   });
 
   it("frappe un monstre au fouet jusqu'à le tuer", async () => {
-    const { game } = await newGame();
+    const { game, presenter } = await newGame();
     await takeWhip(game);
     const zoneId = game.assets.data.zones.find((z) => z.monsters.some((m) => game.assets.character(m.character)?.name === "Snake"))!.id;
     await game.debugTeleport(zoneId, 0, 0);
@@ -183,6 +228,7 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
     }
     expect(snake.damageTaken).toBeGreaterThan(0);
     expect(killed).toBe(true);
+    expect(presenter.sounds.filter((id) => id === IndySounds.MonsterDeath)).toHaveLength(1); // EEP.WAV, une seule fois
     expect(zone.getTile(snake.x, snake.y, Layer.Object)).not.toBe(snake.character.frames[0][1]);
   });
 
@@ -194,15 +240,97 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
     expect(presenter.endings).toContain("lose");
   });
 
-  it("consomme un objet de soin", async () => {
-    const { game } = await newGame();
-    game.hurtHero(200);
-    const before = game.hero.health;
-    game.addItem(1133); // Bananas
+  it("consomme un objet de soin : valeurs de l'original, son SCHWING, objet retiré", async () => {
+    for (const [tile, heal] of [[696, 50], [1085, 75], [1133, 25]]) {
+      const { game, presenter } = await newGame();
+      game.hurtHero(400); // 200 PV perdus à difficulté normale (÷2)
+      const before = game.hero.health;
+      game.addItem(tile);
+      game.requestPlacement(tile, game.hero.x, game.hero.y);
+      await steps(game, 1);
+      expect(game.hero.health).toBe(before + heal);
+      expect(game.inventory).not.toContain(tile);
+      expect(presenter.sounds).toContain(IndySounds.Eat);
+    }
+  });
+
+  it("refuse de manger en pleine forme (NoGo), mais pas de boire", async () => {
+    const { game, presenter } = await newGame();
+    game.addItem(1133);
     game.requestPlacement(1133, game.hero.x, game.hero.y);
     await steps(game, 1);
-    expect(game.hero.health).toBeGreaterThan(before);
-    expect(game.inventory).not.toContain(1133);
+    expect(game.inventory).toContain(1133);
+    expect(presenter.sounds).toContain(IndySounds.NoGo);
+    expect(presenter.sounds).not.toContain(IndySounds.Eat);
+
+    game.addItem(1038); // Tequila
+    game.requestPlacement(1038, game.hero.x, game.hero.y);
+    await steps(game, 1);
+    expect(game.inventory).not.toContain(1038);
+    expect(game.hero.health).toBe(MAX_HEALTH - 17); // -35 divisé par 2 à difficulté 50
+    expect(presenter.sounds).toContain(IndySounds.Hurt);
+  });
+
+  it("met les dégâts de boisson à l'échelle de la difficulté", async () => {
+    const { game } = await newGame();
+    game.settings.difficulty = 100;
+    game.addItem(1038);
+    game.requestPlacement(1038, game.hero.x, game.hero.y);
+    await steps(game, 1);
+    expect(game.hero.health).toBe(MAX_HEALTH - 35);
+  });
+
+  it("ne soigne jamais au-delà de la santé maximale", async () => {
+    const { game } = await newGame();
+    game.hurtHero(20);
+    game.addItem(1085);
+    game.requestPlacement(1085, game.hero.x, game.hero.y);
+    await steps(game, 1);
+    expect(game.hero.health).toBe(MAX_HEALTH);
+  });
+
+  it("œuf de Pâques : trop de bananes dans Interior2B (zone 113) en (3, 4)", async () => {
+    const eat = async (zone: number, x: number, y: number) => {
+      const { game, presenter } = await newGame();
+      await game.debugTeleport(zone, 0, 0);
+      game.hero.x = x;
+      game.hero.y = y;
+      game.hurtHero(100);
+      presenter.speeches.length = 0;
+      game.addItem(1133);
+      game.requestPlacement(1133, x, y);
+      await steps(game, 1);
+      return { game, presenter };
+    };
+    const egg = await eat(113, 3, 4);
+    expect(egg.presenter.speeches).toContain("Ugh. Too much fruit!");
+    expect(egg.presenter.sounds).toContain(IndySounds.TooMuchFruit);
+    expect(egg.game.inventory).not.toContain(1133); // l'objet est quand même mangé
+    expect(egg.presenter.sounds).toContain(IndySounds.Eat);
+    const elsewhere = await eat(113, 4, 4);
+    expect(elsewhere.presenter.speeches).not.toContain("Ugh. Too much fruit!");
+    expect(elsewhere.presenter.sounds).not.toContain(IndySounds.TooMuchFruit);
+  });
+
+  it("opcode KillHero : défaite immédiate ; opcode 0x23 : sans effet", async () => {
+    const { game, presenter } = await newGame();
+    const noop = { opcode: Instr.Noop, args: new Int16Array(5), text: "" };
+    const kill = { opcode: Instr.KillHero, args: new Int16Array(5), text: "" };
+    const run = (instructions: Array<typeof kill | typeof noop>) =>
+      runScripts(game["scriptHost"](), Mode.Walk, [{ name: "t", conditions: [], instructions }], () => "");
+    expect(await run([noop])).toBe(ScriptOutcome.Ran);
+    expect(game.hero.health).toBe(MAX_HEALTH);
+    await run([kill]);
+    expect(game.hero.health).toBe(0);
+    await Promise.resolve();
+    expect(presenter.endings).toEqual(["lose"]);
+    expect(presenter.sounds).toContain(IndySounds.Defeat);
+  });
+
+  it("la zone 118 « Walkthru24 » tue le héros via l'opcode 0x1f", () => {
+    const zone = new Assets(loadGameData()).zone(118);
+    const uses = zone.actions.flatMap((a) => a.instructions).filter((i) => i.opcode === Instr.KillHero);
+    expect(uses).toHaveLength(1);
   });
 
   it("barrage : donner l'objet demandé au PNJ le fait s'écarter", async () => {

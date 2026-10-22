@@ -33,6 +33,19 @@ describe.skipIf(!hasOriginalFiles)("DESKTOP.DAW", () => {
     expect(data.puzzles[0].type).toBe(PuzzleType.Transaction);
   });
 
+  it("lit les champs auxiliaires des zones et puzzles", () => {
+    const data = loadGameData();
+    const monstersWithFlag = data.zones.filter((z) => z.flag === 1 && z.monsters.length > 0).length;
+    expect(data.zones.filter((z) => z.flag === 1)).toHaveLength(247);
+    expect(monstersWithFlag).toBe(245);
+    expect(data.zones.filter((z) => z.flag === 0 && z.monsters.length === 0)).toHaveLength(94);
+    for (const p of data.puzzles) {
+      if (p.type === PuzzleType.Goal) expect(p.unknown).toBe(0x80);
+      if (p.type === PuzzleType.Mission) expect(p.unknown).toBe(0);
+    }
+    expect(data.puzzles.filter((p) => p.unknown === 0x11f)).toHaveLength(65);
+  });
+
   it("lit les armes et ennemis", () => {
     const data = loadGameData();
     expect(data.characters[0].name).toBe("HERO");

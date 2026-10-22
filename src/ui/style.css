@@ -490,6 +490,38 @@ button.secondary {
   background: #d9a44155;
 }
 
+.map-clue-target {
+  position: absolute;
+  width: 10%;
+  height: 10%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.map-clue-target:hover,
+.map-clue-target:focus-visible {
+  background: #d9a44155;
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.map-clue {
+  position: absolute;
+  z-index: 1;
+  width: 40%;
+  padding: 6px 10px;
+  background: var(--bubble);
+  color: var(--bubble-ink);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  text-align: center;
+  cursor: pointer;
+  animation: fade-in 0.15s ease-out;
+}
+
 @keyframes pulse {
   to {
     border-color: #fff3;

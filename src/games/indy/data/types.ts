@@ -133,8 +133,14 @@ export interface Zone {
   providedItems: number[];
   npcs: number[];
   actions: Action[];
+  /**
+   * Premier u16 du bloc IZAX, 0 ou 1. Vaut 1 sur 247 zones dont 245 ont des monstres ; vaut 0 sur 119 zones
+   * dont 94 n'en ont pas (les 25 autres sont surtout des intérieurs / fins). Sens exact inconnu.
+   */
+  flag: number;
 }
 
+/** Un puzzle (SpanishKeyTX, id 116) a le type -1 : jamais sélectionné par type. */
 export enum PuzzleType {
   /** « TX » : un PNJ demande un objet. */
   Transaction = 0,
@@ -151,6 +157,11 @@ export interface Puzzle {
   name: string;
   type: PuzzleType;
   itemClass: number;
+  /**
+   * Masque de bits au sens inconnu. Goal : 0x80 ; Mission : 0 ; Transaction / Offer : 0x11f dans la grande majorité
+   * (bits 0 à 4 et 8, absents surtout pour les clés et la bougie) ; bit 5 (0x20) jamais pour les objets de classe 1.
+   * Aucune corrélation exploitable avec les zones qui fournissent ou requièrent l'objet.
+   */
   unknown: number;
   /** [0] demande, [1] remerciement, [2] offre / indice, [3] briefing, [4] inutilisé. */
   texts: string[];

@@ -36,6 +36,10 @@ export interface Layout {
   /** Ordre des puzzles (-1 = aucun) ; le plus grand indice est l'objectif. */
   order: number[];
   puzzleCount: number;
+  /** Départs de voyage posés (n1 ou n2 de DESKADV.EXE 3:6c5c, voir `paceOf`). */
+  travels: number;
+  /** Barrages posés (l'autre compteur de 3:6c5c). */
+  blockades: number;
 }
 
 class Grid {
@@ -123,7 +127,14 @@ class LayoutGenerator {
     for (let i = 0; i < this.placedTravels; i++) this.placeIsland();
     this.choosePuzzles();
     const puzzleCount = Math.max(-1, ...this.order) + 1;
-    return { cells: this.grid.cells, order: this.order, puzzleCount };
+    const cells = this.grid.cells;
+    return {
+      cells,
+      order: this.order,
+      puzzleCount,
+      travels: cells.filter((c) => c === Cell.TravelStart).length,
+      blockades: cells.filter(isBlockade).length,
+    };
   }
 
   // ------------------------------------------------------------ anneaux

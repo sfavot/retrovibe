@@ -47,8 +47,6 @@ function reachableCells(assets: Assets, zone: Zone, fromEdges: boolean): Set<num
         const nx = x + dx;
         const ny = y + dy;
         if (seen.has(key(nx, ny)) || !walkable(assets, zone, nx, ny)) continue;
-        // Pas de passage en diagonale entre deux obstacles.
-        if (dx && dy && !walkable(assets, zone, x + dx, y) && !walkable(assets, zone, x, y + dy)) continue;
         seen.add(key(nx, ny));
         queue.push([nx, ny]);
       }

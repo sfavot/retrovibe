@@ -1,3 +1,5 @@
+import { readWave } from "../data/resources";
+import { exeSounds, soundFileNames } from "../engine/assets";
 import { type MidiNote, parseMidi } from "./midi";
 
 /**
@@ -12,10 +14,16 @@ export class AudioPlayer {
   soundEnabled = true;
   musicEnabled = true;
 
+  private readonly soundNames: string[];
+
   constructor(
-    private readonly soundNames: string[],
+    dawSounds: string[],
     private readonly baseUrl: string,
-  ) {}
+    /** DESKADV.EXE, déjà chargé : source des effets WAVE enfouis dans ses ressources. */
+    private readonly exe: ArrayBuffer,
+  ) {
+    this.soundNames = soundFileNames(dawSounds);
+  }
 
   /** À appeler dans un gestionnaire d'événement utilisateur. */
   unlock(): void {
@@ -30,6 +38,10 @@ export class AudioPlayer {
   }
 
   play(id: number): void {
+    if (id in exeSounds) {
+      this.playExeSound(exeSounds[id]);
+      return;
+    }
     const name = this.fileName(id);
     if (!name || !this.ctx) return;
     if (name.toUpperCase().endsWith(".MID")) {
@@ -37,15 +49,40 @@ export class AudioPlayer {
       return;
     }
     if (!this.soundEnabled) return;
-    void this.load(name).then((buffer) => {
-      if (!buffer || !this.ctx) return;
-      const source = this.ctx.createBufferSource();
-      source.buffer = buffer;
-      const gain = this.ctx.createGain();
-      gain.gain.value = 0.6;
-      source.connect(gain).connect(this.ctx.destination);
-      source.start();
-    });
+    void this.load(name).then((buffer) => buffer && this.playBuffer(buffer));
+  }
+
+  /** Effet sonore enfoui dans les ressources WAVE de DESKADV.EXE. */
+  private playExeSound(resourceId: number): void {
+    if (!this.ctx || !this.soundEnabled) return;
+    void this.loadExeWave(resourceId).then((buffer) => buffer && this.playBuffer(buffer));
+  }
+
+  private loadExeWave(resourceId: number): Promise<AudioBuffer | null> {
+    const key = `DESKADV.EXE#WAVE${resourceId}`;
+    let buffer = this.buffers.get(key);
+    if (!buffer) {
+      buffer = Promise.resolve()
+        .then(() => {
+          const wave = readWave(this.exe, resourceId);
+          if (!wave) throw new Error(`Ressource WAVE ${resourceId} introuvable`);
+          // decodeAudioData consomme son tampon : copie pour ne pas toucher à l'exécutable.
+          return this.ctx!.decodeAudioData(wave.slice().buffer);
+        })
+        .catch(() => null);
+      this.buffers.set(key, buffer);
+    }
+    return buffer;
+  }
+
+  private playBuffer(buffer: AudioBuffer): void {
+    if (!this.ctx) return;
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0.6;
+    source.connect(gain).connect(this.ctx.destination);
+    source.start();
   }
 
   playMusic(id: number, loop = false): void {

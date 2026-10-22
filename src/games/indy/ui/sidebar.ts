@@ -12,6 +12,7 @@ export interface SidebarActions {
   onToggleSound(): void;
   onToggleMusic(): void;
   onHelp(): void;
+  onCycleSpeed(): void;
   /** Début d'un glisser-déposer d'objet depuis l'inventaire. */
   onItemPointerDown(tile: number, event: PointerEvent): void;
   onItemUseOnHero(tile: number): void;
@@ -28,6 +29,7 @@ export class Sidebar {
   readonly soundButton: HTMLButtonElement;
   readonly musicButton: HTMLButtonElement;
   readonly mapButton: HTMLButtonElement;
+  readonly speedButton: HTMLButtonElement;
   private game: Game | null = null;
   selected: number | null = null;
 
@@ -47,6 +49,7 @@ export class Sidebar {
     this.pauseButton = h("button", { type: "button", onclick: () => actions.onPause() }, copy.pause);
     this.soundButton = h("button", { type: "button", class: "toggle", "aria-pressed": "true", onclick: () => actions.onToggleSound() }, copy.sound);
     this.musicButton = h("button", { type: "button", class: "toggle", "aria-pressed": "true", onclick: () => actions.onToggleMusic() }, copy.music);
+    this.speedButton = h("button", { type: "button", onclick: () => actions.onCycleSpeed() });
     this.element = h(
       "aside",
       { class: "sidebar" },
@@ -62,10 +65,21 @@ export class Sidebar {
         this.pauseButton,
         this.soundButton,
         this.musicButton,
+        this.speedButton,
         h("button", { type: "button", onclick: () => actions.onHelp() }, copy.help),
         h("button", { type: "button", class: "secondary", onclick: () => actions.onNewGame() }, copy.newGame),
       ),
     );
+  }
+
+  /** Affiche la vitesse courante sur le bouton de réglage ; ses changements ultérieurs sont annoncés (zone live). */
+  setSpeed(ms: number): void {
+    const label = copy.speedButton(copy.speeds[ms] ?? String(ms));
+    if (this.speedButton.textContent === label) return;
+    const first = !this.speedButton.textContent;
+    this.speedButton.textContent = label;
+    // Activée après le premier libellé, pour ne rien annoncer à l'affichage initial.
+    if (first) this.speedButton.setAttribute("aria-live", "polite");
   }
 
   attach(game: Game): void {

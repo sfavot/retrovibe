@@ -89,7 +89,7 @@ export function parseDaw(buffer: ArrayBuffer | Uint8Array): GameData {
         const count = r.u16();
         for (let id = 0; id < count; id++) {
           expectTag(r, "IZON");
-          r.u32();
+          r.u32(); // taille totale de l'enregistrement (marqueur et taille compris), toujours 16 + largeur × hauteur × 6
           const width = r.u16();
           const height = r.u16();
           const type = r.u32();
@@ -107,6 +107,7 @@ export function parseDaw(buffer: ArrayBuffer | Uint8Array): GameData {
             providedItems: [],
             npcs: [],
             actions: [],
+            flag: 0,
           });
         }
         break;
@@ -116,7 +117,7 @@ export function parseDaw(buffer: ArrayBuffer | Uint8Array): GameData {
         for (const z of data.zones) {
           expectTag(r, "IZAX");
           r.u32();
-          r.u16();
+          z.flag = r.u16();
           const monsterCount = r.u16();
           for (let i = 0; i < monsterCount; i++) z.monsters.push({ character: r.u16(), x: r.u16(), y: r.u16() });
           z.requiredItems = Array.from(r.i16Array(r.u16()));
@@ -143,7 +144,7 @@ export function parseDaw(buffer: ArrayBuffer | Uint8Array): GameData {
         for (let i = 0; i < data.zones.length; i++) {
           expectTag(r, "IZX4");
           r.u32();
-          r.u16();
+          r.u16(); // toujours 1 pour les 366 zones : aucune information
         }
         break;
       case "HTSP":

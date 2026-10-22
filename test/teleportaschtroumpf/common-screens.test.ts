@@ -95,13 +95,13 @@ describe("utilitaires des écrans communs", () => {
     expect(text("")).toEqual([]);
   });
 
-  it("timeGraduations : 27 graduations, calcul 16 bits de l'original", () => {
+  it("timeGraduations : 27 graduations, sans le débordement 16 bits de l'original", () => {
     expect(timeGraduations(0, 1800)).toBe(0);
     expect(timeGraduations(600, 1800)).toBe(9);
     expect(timeGraduations(1800, 1800)).toBe(27);
     expect(timeGraduations(2000, 1800)).toBe(27);
-    // 3000 × 27 = 81000 dépasse 16 bits : 15464 / 3600 = 4 (défaut de l'original).
-    expect(timeGraduations(3000, 3600)).toBe(4);
+    // 3000 × 27 = 81000 dépasse 16 bits : l'original retombait à 4, la barre continue ici à 81000 / 3600 = 22.
+    expect(timeGraduations(3000, 3600)).toBe(22);
   });
 
   it("pointsText : points/objectif sur deux chiffres", () => {

@@ -43,10 +43,17 @@ export function doorAt(screen: number, row: Row, x: number): number | null {
   return null;
 }
 
+/**
+ * Indice de zone 1..54 (`291e:1536`) : `(écran − 1) × 6 + zone (0..2) + 1`, plus 3 en rangée basse. Sert de clé aux tables
+ * de `291e:0401` (voix d'aide, classes de zone) et d'argument à la carte S02 consultée depuis la pause (`DS:D2C4`).
+ */
+export function zoneIndex(screen: number, row: Row, x: number): number {
+  return (screen - 1) * 6 + (row === "bottom" ? 3 : 0) + zoneOf(x) + 1;
+}
+
 /** Classe de la zone pour le bouton (table `291e:11f4`). */
 export function doorClassAt(screen: number, row: Row, x: number): DoorClass {
-  const index = (screen - 1) * 6 + (row === "bottom" ? 3 : 0) + zoneOf(x);
-  return DOOR_CLASSES[index] ?? "door";
+  return DOOR_CLASSES[zoneIndex(screen, row, x) - 1] ?? "door";
 }
 
 export interface EdgeResult {

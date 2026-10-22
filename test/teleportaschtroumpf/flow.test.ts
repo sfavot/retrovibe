@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
 import { isLocked, saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
+import type { GameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
 import { PARENTS_HOLD_SECONDS, createMenuScene } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles } from "./helpers";
@@ -111,18 +112,18 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
     expect(t.engine.ctx.voice.hasMusic).toBe(true);
   }, 60_000);
 
-  it("Schtroumpf : carte libre (souche) puis retour au menu", async () => {
+  it("Schtroumpf : carte libre puis retour au menu", async () => {
     const t = await startMenu();
     await t.settle("MenuScene");
     await t.select(2);
     await t.click(0);
-    await t.settle("PictureScene");
-    expect(t.lastFile()).toMatch(/S02A001D\.MCG/i);
+    await t.settle("FreeModeScene");
+    expect(t.lastFile()).toMatch(/S02A00[12]D\.MCG/i);
     await t.click();
     await t.settle("MenuScene");
   });
 
-  it("Jouer : S09 → S08 → partie (souche) → menu", async () => {
+  it("Jouer : S09 → S08 → partie sur le plateau → abandon → menu", async () => {
     const t = await startMenu();
     t.host.audio.enabled = false; // sortie son verrouillée : aucune voix à attendre
     await t.settle("MenuScene");
@@ -137,9 +138,18 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
     await t.press("Space"); // personnage de départ, niveau 1
     await runFor(t.engine, t.host, 1500); // la capsule se pose
     await t.press("Space"); // bouton Jouer
-    await t.settle("PictureScene");
-    expect(t.lastFile()).toMatch(/S01A001D\.MCG/i);
-    await t.click();
+    await t.settle("GameScene");
+    expect(t.host.loaded.some((path) => /S01A001D\.MCG/i.test(path))).toBe(true);
+    // Annonce du personnage (S19 est une souche vide), puis le joueur a la main.
+    await runUntil(t.engine, t.host, () => (t.engine.ctx.scenes.top as GameScene).board?.playing === true);
+    // P → pause → abandon → Oui : retour au menu.
+    await t.press("KeyP");
+    await t.settle("PauseScene");
+    await runFor(t.engine, t.host, 300);
+    await t.press("ArrowRight");
+    await t.press("Space");
+    await t.settle("ConfirmScene"); // un seul joueur : S49 tout de suite
+    await t.press("Space");
     await t.settle("MenuScene");
   });
 

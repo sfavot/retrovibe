@@ -175,6 +175,26 @@ describe("SceneManager", () => {
     await runFor(engine, host, 200);
     expect(seen).toBe(false);
   });
+
+  it("plusieurs appuis en attente au changement de scène sont tous oubliés", async () => {
+    const { host, engine, scenes, ctx, log } = setup();
+    scenes.replace(new Probe("a", log));
+    await runFor(engine, host, 100);
+    for (let i = 0; i < 3; i++) {
+      ctx.input.keyDown("Space");
+      ctx.input.keyUp("Space");
+    }
+    let presses = 0;
+    scenes.replace({
+      enter() {},
+      update(c) {
+        if (c.input.justPressed("validate")) presses++;
+      },
+      render() {},
+    });
+    await runFor(engine, host, 500);
+    expect(presses).toBe(0);
+  });
 });
 
 describe("Engine", () => {

@@ -66,8 +66,11 @@ export type GameEvent =
   | { type: "release"; player: number; from: "jail" | "turlusiphon" }
   /** Le pion change d'écran ou de rangée (marche au bord, piège, puits, vœu, Schtroumpf à lunettes). */
   | { type: "moved"; player: number; from: Position; to: Position; cause: "edge" | "hazard" | "wish" | "bespectacled" }
-  /** Animation d'événement du plateau (S13 à S21). */
-  | { type: "hazard"; player: number; kind: Hazard["kind"]; scene: number }
+  /**
+   * Animation d'événement du plateau (S13 à S21). `from` est la position du pion au déclenchement, `to` celle qu'il a une
+   * fois l'effet appliqué (identique pour un événement sans déplacement ; téléportation, cage, siphon, puits : arrivée).
+   */
+  | { type: "hazard"; player: number; kind: Hazard["kind"]; scene: number; from: Position; to: Position }
   /** Sortie du plateau : vidéo `s01b` (gauche) ou `s01c` (droite), le tour se termine. */
   | { type: "exit"; player: number; side: "left" | "right"; video: "s01b" | "s01c" }
   /** Un mini-jeu (ou S13, S38, S39, S41) est lancé : `resolveMinigame` doit suivre. */
@@ -295,6 +298,14 @@ export class Game {
     this.state.paused = paused;
   }
 
+  /**
+   * Le joueur a touché une touche de navigation (marche, saut, indice vocal déjà donné…) : les indices vocaux de
+   * `291e:0401` (12 s, 24 s) ne se déclenchent plus ce tour (`DS:3E3E` / `DS:3E3D`).
+   */
+  markActive(): void {
+    this.state.turn.acted = true;
+  }
+
   /** Abandon (S46) d'un joueur ou de tous. Un joueur qui part compacte la liste ; plus personne : fin sans vidéo. */
   abandon(player: number | "all"): GameEvent[] {
     this.assertTurn();
@@ -355,6 +366,26 @@ export class Game {
     s.phase = "turn";
     this.completeTurn();
     return this.takeEvents();
+  }
+
+  /**
+   * Ouvre le mini-jeu `scene` pour le joueur courant hors de la porte du plateau (mode libre de la carte S02 ;
+   * outils de test des mini-jeux) : même requête que par une porte (`state.pending`, événement `minigame`). Il faut
+   * ensuite `resolveMinigame` (le tour se termine alors comme sur le plateau) ou `abortMinigame` (rien n'est appliqué).
+   */
+  openMinigame(scene: number): MinigameRequest {
+    this.assertTurn();
+    this.startMinigame(scene);
+    this.takeEvents();
+    return this.state.pending!;
+  }
+
+  /** Abandonne le mini-jeu ouvert par `openMinigame` sans rien appliquer : le tour reprend tel quel. */
+  abortMinigame(): void {
+    const s = this.state;
+    if (s.phase !== "minigame") return;
+    s.pending = null;
+    s.phase = "turn";
   }
 
   // --- Mise en place ------------------------------------------------------------------------------
@@ -578,30 +609,40 @@ export class Game {
     const s = this.state;
     const p = this.player;
     const e = h.effect;
-    this.emit({ type: "hazard", player: s.current, kind: h.kind, scene: h.scene });
+    const from: Position = { screen: p.screen, row: p.row, x: p.x };
+    const event: Extract<GameEvent, { type: "hazard" }> = { type: "hazard", player: s.current, kind: h.kind, scene: h.scene, from, to: { ...from } };
+    this.emit(event);
+    const arrived = () => {
+      event.to = { screen: p.screen, row: p.row, x: p.x };
+    };
     switch (e.kind) {
       case "teleport":
         this.setPosition(e.to, "hazard");
+        arrived();
         break;
       case "randomTeleport": {
         const screen = e.screens[this.rng.below(e.screens.length)];
         if (e.counter === "ice") s.iceCrossings = this.rng.below(4);
         if (e.counter === "bridge") s.bridgeCrossings = this.rng.below(4);
         this.setPosition(arrival(screen, this.rng), "hazard");
+        arrived();
         break;
       }
       case "jail":
         p.x = e.x;
         p.status = 2;
+        arrived();
         this.completeTurn();
         break;
       case "turlusiphon":
         p.x = e.x;
         p.status = 4;
+        arrived();
         this.completeTurn();
         break;
       case "well":
         p.x = e.x;
+        arrived();
         this.startMinigame(14);
         break;
     }

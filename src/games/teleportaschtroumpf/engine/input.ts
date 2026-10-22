@@ -99,7 +99,12 @@ export class Input {
     }
   }
 
-  /** Relâche tout et oublie les appuis récents (changement de scène, perte du focus). */
+  /** Oublie tous les appuis pas encore consommés, sans relâcher les touches tenues (changement de scène). */
+  discardPresses(): void {
+    this.pending.clear();
+  }
+
+  /** Relâche tout et oublie les appuis récents (perte du focus). */
   reset(): void {
     this.held.clear();
     this.pending.clear();

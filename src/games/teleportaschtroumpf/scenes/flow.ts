@@ -1,7 +1,8 @@
 import type { GameSetup } from "../game/rules";
 import type { Scene, SceneContext, TransitionOptions } from "../engine/scene";
 import { VideoScene } from "../engine/video";
-import { createFreeMapPlaceholder, createGamePlaceholder } from "./game-placeholder";
+import { createGameScene } from "./game";
+import { createFreeModeScene } from "./s02-map";
 import { createMenuScene } from "./s07-menu";
 import { createCharactersScene } from "./s08-characters";
 import { createPlayersScene } from "./s09-players";
@@ -46,9 +47,9 @@ export function goIntro(ctx: SceneContext): void {
   playVideo(ctx, "s06a.mux");
 }
 
-/** Mode « Schtroumpf » : carte libre (S02, souche E2), puis retour au menu. */
+/** Mode « Schtroumpf » : carte libre (S02, `s02-map.ts`), puis retour au menu. */
 export function goFreeMap(ctx: SceneContext): void {
-  go(ctx, createFreeMapPlaceholder(goMainMenu));
+  go(ctx, createFreeModeScene(goMainMenu));
 }
 
 /** S09 : nombre de joueurs, puis S08 avec ce nombre. */
@@ -90,9 +91,9 @@ export function askConfirmation(
   else go(ctx, scene);
 }
 
-/** Partie (souche E2) puis retour au menu à sa fin. */
+/** Partie (`game.ts` : plateau S01 et tout ce qui s'en déclenche), puis retour au menu à sa fin. */
 export function startGame(ctx: SceneContext, setup: GameSetup): void {
-  go(ctx, createGamePlaceholder(setup, goMainMenu));
+  go(ctx, createGameScene(setup, goMainMenu));
 }
 
 /** Quitter : confirmation (n = 10) ; Non → menu ; Oui → générique (S52) puis `host.exit()`. */

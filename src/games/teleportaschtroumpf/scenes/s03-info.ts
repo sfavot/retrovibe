@@ -23,14 +23,13 @@ export async function loadInfo(ctx: SceneContext): Promise<InfoResources> {
 }
 
 /**
- * Nombre de graduations allumées : `min(27, ⌊temps écoulé × 27 / durée⌋)`. Reproduit le calcul 16 bits de l'original
- * (`IMUL AX,AX,0x1b` puis `DIV` non signé, `1e20:0015`) : le produit est tronqué à 16 bits, si bien que la barre retombe
- * quand le temps écoulé dépasse 2427 s (parties de 60 min et plus). Défaut de l'original, conservé.
+ * Nombre de graduations allumées : `min(27, ⌊temps écoulé × 27 / durée⌋)` (`1e20:0015`). L'original fait le produit
+ * sur 16 bits (`IMUL AX,AX,0x1b`), qui déborde au-delà de 2427 s écoulées et fait retomber la barre : défaut corrigé
+ * ici (calcul sans troncature), à la demande.
  */
 export function timeGraduations(elapsedSeconds: number, durationSeconds: number): number {
   if (durationSeconds <= 0) return 0;
-  const product = (Math.floor(elapsedSeconds) * TIME_GRADUATIONS) & 0xffff;
-  return Math.min(TIME_GRADUATIONS, Math.floor(product / durationSeconds));
+  return Math.min(TIME_GRADUATIONS, Math.floor((Math.floor(elapsedSeconds) * TIME_GRADUATIONS) / durationSeconds));
 }
 
 /** Texte « points/objectif » d'un joueur (`1e20:0007`) : `5/13`, `12/13` ; l'objectif a toujours deux chiffres. */

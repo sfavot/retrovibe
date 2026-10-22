@@ -189,8 +189,9 @@ export class SceneManager {
       this.stack.push({ scene: scene!, ticks: scene!.step ?? DEFAULT_STEP });
       scene!.enter(ctx);
     }
-    // Les appuis faits pendant le chargement ne doivent pas agir sur la scène qui arrive.
-    ctx.input.endUpdate();
+    // Les appuis faits avant le changement (pendant la scène précédente, le fondu ou le chargement) ne doivent pas
+    // agir sur la scène qui arrive : on les oublie tous, pas seulement le premier.
+    ctx.input.discardPresses();
     this.dirty = true;
     if (pending.fade) ctx.fade.in();
   }

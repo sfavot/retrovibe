@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
 import { STORAGE_KEY, loadOptions } from "../../src/games/teleportaschtroumpf/engine/options";
 import type { Scene, SceneContext } from "../../src/games/teleportaschtroumpf/engine/scene";
+import type { GameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
 import { createMenuScene } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
 import { createCharactersScene, type CharactersResult } from "../../src/games/teleportaschtroumpf/scenes/s08-characters";
 import { createPlayersScene } from "../../src/games/teleportaschtroumpf/scenes/s09-players";
@@ -429,7 +430,7 @@ describe.skipIf(!hasOriginalFiles)("S04 : menu parents", () => {
 });
 
 describe.skipIf(!hasOriginalFiles)("parcours S07 → Jouer → S09 → S08 → partie", () => {
-  it("enchaîne les vrais écrans et aboutit à la souche de partie", async () => {
+  it("enchaîne les vrais écrans et aboutit à la partie", async () => {
     const host = new TestHost();
     host.audio.enabled = false;
     const engine = new Engine(host, { seed: 11 });
@@ -460,7 +461,10 @@ describe.skipIf(!hasOriginalFiles)("parcours S07 → Jouer → S09 → S08 → p
     await press("Space");
     await runFor(engine, host, 1500);
     await press("Space"); // Jouer
-    await settle("PictureScene"); // souche de partie (E2)
+    await settle("GameScene");
     expect(host.loaded.some((path) => /S01A001D\.MCG/i.test(path))).toBe(true);
+    // Les joueurs, personnages et niveaux choisis à S08 sont ceux de la partie.
+    const { players } = (engine.ctx.scenes.top as GameScene).game.state;
+    expect(players.map((p) => p.level)).toEqual([2, 0]);
   }, 60_000);
 });

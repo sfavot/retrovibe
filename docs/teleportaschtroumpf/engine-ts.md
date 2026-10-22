@@ -23,7 +23,9 @@ Brief pour les phases 3 (écrans) et 4 (mini-jeux). Spec de comportement : `engi
 | `engine/picture.ts` | `PictureScene` (image fixe, fondus, attente) et `WaitScene`. |
 | `audio/backend.ts`, `audio/voice.ts`, `audio/web-audio.ts` | `AudioBackend` abstrait, `VoiceChannel` (voie unique + musique + bips), implémentation Web Audio. |
 | `scenes/boot.ts` | Séquence de démarrage. |
-| `scenes/flow.ts`, `scenes/s07-menu.ts`, `scenes/sNN-*.ts` | Flux entre écrans, menu principal S07 et souches des autres écrans (voir « Menus et flux »). |
+| `scenes/flow.ts`, `scenes/s07-menu.ts`, `scenes/sNN-*.ts` | Flux entre écrans, menu principal S07 et les écrans (voir « Menus et flux »). |
+| `game/` | Logique pure de la partie et du plateau (`Game`, tables), sans rendu (`rules.md`). |
+| `scenes/game.ts`, `scenes/s01-board.ts`, `scenes/board/` | Partie (`28a3:00ad`) et plateau S01 (`291e:0401`) ; écrans empilés `s02-map.ts`, `events.ts`, `grand-schtroumpf.ts` et souche `minigames.ts` (voir « Partie et plateau »). |
 | `ui/app.ts`, `ui/browser-host.ts`, `ui/dev.html`, `ui/dev.ts`, `ui/style.css` | Hôte navigateur, canvas à l'échelle entière, boucle `requestAnimationFrame`, page de dev. |
 | `index.ts` | `GameDefinition` `teleportaschtroumpf` (pas encore dans `src/games/registry.ts`). |
 
@@ -207,19 +209,19 @@ Seul endroit qui décide « l'écran suivant » ; un écran ne reçoit que ses p
 |---|---|
 | `goMainMenu(ctx)` | S07 |
 | `goRules(ctx)`, `goIntro(ctx)` | vidéo `s10a.mux` / `s06a.mux` puis S07 |
-| `goFreeMap(ctx)` | carte libre (souche E2) puis S07 |
+| `goFreeMap(ctx)` | mode libre (`createFreeModeScene`, `s02-map.ts`, souche) puis S07 |
 | `goPlayers(ctx)` | S09 → `goCharacters(ctx, n)` |
 | `goCharacters(ctx, players)` | S08 → `play` : `startGame` ; `back` : S09 ; `menu` : S07 |
 | `goParents(ctx)` | S04 puis S07 |
 | `askConfirmation(ctx, n, onAnswer, mode?)` | S49 numéro `n` ; `mode` `"replace"` (défaut) ou `"push"` (au-dessus d'un écran à reprendre : `onAnswer` appelle `ctx.scenes.pop`) |
-| `startGame(ctx, setup: GameSetup)` | partie (souche E2) puis S07 |
+| `startGame(ctx, setup: GameSetup)` | partie (`scenes/game.ts`) puis S07 |
 | `quitGame(ctx)` | S49 n = 10 ; Non : S07 ; Oui : générique S52 puis `host.exit()` |
 
 Les écrans de partie (pause S48, abandon S46, aide S45) sont **empilés** par le plateau : `ctx.scenes.push(createPauseScene(cb), { fade: true })` ; le rappel décide (`ctx.scenes.pop(...)` pour reprendre).
 
 ### Contrat des écrans
 
-Chaque écran garde la **signature** de sa fabrique exportée (documentée en tête de fichier : paramètres, résultat, références `engine.md`). Seule la partie (`game-placeholder.ts`) reste une souche de l'E2.
+Chaque écran garde la **signature** de sa fabrique exportée (documentée en tête de fichier : paramètres, résultat, références `engine.md`). La partie et le plateau sont faits (E2a) ; les quatre souches (carte S02 et mode libre, événements S13 à S21, Grand Schtroumpf, mini-jeux) ont leur contrat dans « Partie et plateau ».
 
 | Fichier | Fabrique | Reçoit | Rend (`onDone`) |
 |---|---|---|---|
@@ -231,10 +233,41 @@ Chaque écran garde la **signature** de sa fabrique exportée (documentée en t�
 | `s46-abandon.ts` | `createAbandonScene(players: number \| readonly number[], onDone)` | nombre de joueurs (0..n−1) ou personnages (0..5) des joueurs restants, 1 à 4 (empilée) | `(ctx, AbandonResult)` : `cancel`, `player` + index (dans le tableau reçu), `all` |
 | `s45-help.ts` | `createHelpScene(game, onDone)` | `Game` (empilée) | `(ctx)` |
 | `s52-credits.ts` | `createCreditsScene(onDone)` | rien | `(ctx)` en fin de défilement (texte `s52dsphi.doc`) |
-| `game-placeholder.ts` | `createGamePlaceholder(setup, onDone)`, `createFreeMapPlaceholder(onDone)` | `GameSetup` / rien | `(ctx)` en fin de partie / carte (souches E2 : rendent la main au premier clic) |
+| `game.ts` | `createGameScene(setup, onDone)` | `GameSetup` (joueurs, options parents) | `(ctx)` en fin de partie (victoire, temps écoulé, abandon général) |
+| `s02-map.ts` | `createMapScene(request, onDone)`, `createFreeModeScene(onDone)` | `MapRequest` / rien | `(ctx, k)` (`k` = 1 retour, 2..18 lieu) / `(ctx)` (mode libre) |
 
 S46 : après un `player`, l'original compacte les joueurs puis **réaffiche S46** avec ceux qui restent ; ce réaffichage (recréer `createAbandonScene` avec les personnages restants) est à la charge de l'appelant, qui doit aussi mettre fin à la partie s'il n'en reste plus.
 
 ### Menu S07 (`scenes/s07-menu.ts`)
 
 `createMenuScene()`. Fond `s07a001d.mcg`, musique `s52m00Nm.voc` tirée une fois (si la voie n'a pas déjà une musique : un retour d'écran ne la retire pas), surbrillance des entrées 120+i en `10 A4 CC`, bip de navigation `s07a001b.voc` à chaque changement de bouton (pas à l'entrée), voix d'aide `s07v00Nt.voc` (N = 4, 5, 7, 2, 8, 6) à Entrée / clic droit. Parents : uniquement la touche droite maintenue 4 s sur le bouton (valider ne fait rien). Jouer sous verrou parental ne fait rien (aucun message dans l'original).
+
+## Partie et plateau (E2a)
+
+Détail RE et écarts : `screens-game.md`. Logique : `game/` (`rules.md`).
+
+### Architecture
+
+- `scenes/game.ts` (`GameScene`, `step = 4`) est la scène de partie `28a3:00ad`. Elle tient un script (générateur) qui présente dans l'ordre les `GameEvent` de `game/` (file `queue`) puis laisse jouer un tour. Les écrans (pause, aide, abandon, mini-jeux, événements, vidéos) sont **empilés** au-dessus ; leur rappel appelle `ctx.scenes.pop()` ; `resume()` redessine le plateau et le script reprend.
+- `scenes/s01-board.ts` (`Board`) : rendu et marche d'un tour (fond, bandeau, décor, pion, minuteur). `Board.step` lit les touches et appelle `Game.walk / jump / press` ; il rend les événements produits, ou une demande `pause` / `help`. Modules : `board/walker.ts` (poses, pur), `board/ambient.ts` (décor), `board/hud.ts`, `board/voices.ts` (choix des voix, `VoiceLine` chargée en tâche de fond), `board/clock.ts` (secondes entières → `Game.tick`).
+- Le chrono du tour est gelé (pause, voix, annonce) ; celui de la partie court aussi pendant mini-jeux et vidéos.
+- Fin de partie : vidéo S11 ou S42, `lastGameMinutes` enregistré, musique coupée, `onDone` (→ menu S07).
+
+### Contrats des écrans empilés
+
+Chaque fichier documente son contrat en tête (détail RE : `screens-map.md`, `screens-events.md`, `screens-grand-schtroumpf.md`). `game.ts` empile ces scènes et les retire (`pop`) dans leur rappel. Seul `minigames.ts` reste une souche, jusqu'au lot E3.
+
+| Module | Fabrique | Reçoit | Rend |
+|---|---|---|---|
+| `s02-map.ts` (`map/`) | `createMapScene({ mode: "consult" \| "free" \| "wish", zone? }, onDone)` ; `createFreeModeScene(onDone)` | mode ; `zone` (1..54) du pion en consultation (fond `s02a002d`, haut / bas font défiler) ; `free` et `wish` : haut / bas changent de lieu, Espace valide (`wish` : fond `s02a007d`, 36 s sans choix = retour) | `onDone(ctx, k)` : `k` = 1 retour (toujours en consultation), 2..18 lieu de `MAP_LOCATIONS`. Le mode libre (fond `s02a001d`, Entrée joue l'aide du lieu) enchaîne tout seul voix d'accroche, mini-jeu (`createMinigame`, issue ignorée) et retour à la carte ; `onDone(ctx)` seulement sur « retour » |
+| `events.ts` (`events/`) | `createBoardEventScene({ game, event, before, after }, onDone)` ; `createWellScene(game, onDone)` ; `approachX(event, before, after)` | événement `hazard` ou `release` (état de `game/` déjà à jour), position au déclenchement et à l'arrivée ; puits S13 : `game.state.pending` (scène 14, `wellMode` `"travel"` ou `"ingredient"`) | `onDone(ctx)` après la vidéo (non passable) et sa voix ; puits : `onDone(ctx, MinigameOutcome)` `well` (`ingredient` ou `destination`, `null` si rien choisi). `approachX` donne le `x` où le pion s'arrête avant la vidéo, `null` sans marche (fusée, libérations) |
+| `grand-schtroumpf.ts` (`grand-schtroumpf/`) | `createGrandSchtroumpfScene(request, onDone)` ; `Commentary`, `isCommentVideo`, `s42VideoFile` | `kind` : `ingredients` (S19, avec `game`), `timeWarning` / `timeout` (`video`), `victory` (`winner`), `progress` (`code` 201..204, 211..215, `26ee:0f17`), `comment` (`code` de `26ee:027e` : voix `s42v`, vidéo si `isCommentVideo`) | `onDone(ctx)` à la fin de la voix ou de la dernière vidéo ; les codes `progress` / `comment` viennent de `Commentary` (mémoire des répliques propre à la partie) |
+| `minigames.ts` (souche, E3) | `createMinigame(id, game, onDone(ctx, outcome))` ; `createMinigameAftermath(…)` | `game.state.pending` ; issue appliquée par l'appelant (`Game.resolveMinigame`) | `MinigameOutcome` ; souche : Espace réussi, Entrée échoué |
+
+Dans `game.ts`, `hazard()` fait marcher le pion de sa position de déclenchement jusqu'à `approachX` (`Board.walkToward`, même animation que la marche du joueur) avant d'empiler l'événement sans fondu ; le puits S13 est empilé sans fondu (il fond lui-même après la voix d'accroche), les autres mini-jeux avec.
+
+Brancher un mini-jeu : `scenes/minigames/sNN-nom.ts` puis une entrée dans `FACTORIES` de `minigames.ts`. `Game.openMinigame(scène)` / `abortMinigame()` ouvrent un mini-jeu hors plateau (mode libre, tests).
+
+### Tests
+
+`test/teleportaschtroumpf/game-helpers.ts` : `Session` (moteur de test + partie) et `advance`, qui laisse passer les promesses entre deux images (les voix se chargent en tâche de fond ; `runFor` ne le fait pas).

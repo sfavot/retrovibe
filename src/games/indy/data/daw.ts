@@ -1,4 +1,4 @@
-import { BinaryReader } from "./reader";
+import { BinaryReader } from "../../../data/reader";
 import {
   type Action,
   type Character,

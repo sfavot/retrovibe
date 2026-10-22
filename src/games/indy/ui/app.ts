@@ -61,7 +61,7 @@ export class App {
   ) {
     this.assets = new Assets(data);
     this.palette = new PaletteAnimation(basePalette);
-    this.audio = new AudioPlayer(data.sounds, import.meta.env.BASE_URL);
+    this.audio = new AudioPlayer(data.sounds, `${import.meta.env.BASE_URL}indy/`);
     this.view = new GameView(this.palette, this.audio);
     this.view.onEnded = (kind) => {
       if (kind === "lose") {

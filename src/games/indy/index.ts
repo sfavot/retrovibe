@@ -7,7 +7,7 @@ import { copy } from "./copy";
 import type { GameDefinition } from "../types";
 
 async function fetchBinary(name: string): Promise<ArrayBuffer> {
-  const response = await fetch(`${import.meta.env.BASE_URL}${name}`);
+  const response = await fetch(`${import.meta.env.BASE_URL}indy/${name}`);
   if (!response.ok) throw new MissingFileError(name);
   const type = response.headers.get("content-type") ?? "";
   // Le serveur de dev renvoie index.html pour un fichier absent.

@@ -5,7 +5,7 @@
  * `|FONT` les styles de texte, `|CONTEXT` et `|TTLBTREE` les repères des rubriques, `|bmN` les images (MRB).
  * Seul ce qu'utilise le fichier du jeu est géré (rubriques non compressées, images 24 bits) ; le reste lève une erreur.
  */
-import { BinaryReader, decodeText } from "./reader";
+import { BinaryReader, decodeText } from "../../../data/reader";
 
 export interface HelpFont {
   bold: boolean;

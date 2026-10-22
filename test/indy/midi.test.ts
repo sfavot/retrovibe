@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parseMidi } from "../../src/games/indy/audio/midi";
 import { hasOriginalFiles } from "./helpers";
 
-const ORIGINAL = resolve(import.meta.dirname, "../../original");
+const ORIGINAL = resolve(import.meta.dirname, "../../original/indy");
 
 describe.skipIf(!hasOriginalFiles)("musiques MIDI", () => {
   const files = hasOriginalFiles ? readdirSync(ORIGINAL).filter((f) => f.toUpperCase().endsWith(".MID")) : [];

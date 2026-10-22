@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { type HelpDocument, parseHelp } from "../../src/games/indy/data/help";
 import { hasOriginalFiles } from "./helpers";
 
-const hlp = resolve(import.meta.dirname, "../../original/DESKADV.HLP");
+const hlp = resolve(import.meta.dirname, "../../original/indy/DESKADV.HLP");
 
 describe.skipIf(!hasOriginalFiles)("DESKADV.HLP", () => {
   const doc: HelpDocument = parseHelp(readFileSync(hlp));

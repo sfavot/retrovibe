@@ -3,7 +3,7 @@
 Le but : vibecoder à l'arrache, dans le navigateur, des jeux des années 90 que j'ai aimés dans mon enfance.
 
 Chaque jeu est une réimplémentation de son moteur en TypeScript, qui lit les fichiers du jeu original.
-Ces fichiers sont versionnés dans `original/` et servis tels quels, ce qui permet de tout déployer sur GitHub Pages.
+Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qui permet de tout déployer sur GitHub Pages.
 
 | Jeu | État |
 | --- | --- |
@@ -21,7 +21,7 @@ et le routage se fait par hash, donc le site marche sous n'importe quel sous-dos
 1. `npm install`
 2. `npm run dev` puis ouvrir http://localhost:5173
 
-`original/` contient `DESKTOP.DAW`, `DESKADV.EXE` (pour la palette), `DESKADV.HLP` (le manuel d'origine, affiché depuis l'écran titre) et, pour le son, les `.WAV` / `.MID`.
+`original/indy/` contient `DESKTOP.DAW`, `DESKADV.EXE` (pour la palette), `DESKADV.HLP` (le manuel d'origine, affiché depuis l'écran titre) et, pour le son, les `.WAV` / `.MID`.
 
 En développement, `?seed=1234` démarre directement une partie avec cette graine et `__indy.game` est exposé dans la console.
 
@@ -43,7 +43,7 @@ affiche jusqu'où il va. Il ne sait pas résoudre les énigmes internes des zone
 
 ## Indy Desktop Adventures
 
-Réimplémentation du moteur d'*Indiana Jones and his Desktop Adventures* (LucasArts, 1996). Le code ne contient aucune donnée du jeu : il lit les fichiers de `original/` au démarrage.
+Réimplémentation du moteur d'*Indiana Jones and his Desktop Adventures* (LucasArts, 1996). Le code ne contient aucune donnée du jeu : il lit les fichiers de `original/indy/` au démarrage.
 
 ### Architecture
 

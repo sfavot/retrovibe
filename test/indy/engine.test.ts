@@ -37,6 +37,8 @@ class FakePresenter implements Presenter {
   }
 }
 
+const WHIP_HOUSE_ZONE = 333;
+
 async function newGame(seed = 7) {
   const assets = new Assets(loadGameData());
   const story = generateStory(assets, seed, WorldSize.Medium);
@@ -44,6 +46,23 @@ async function newGame(seed = 7) {
   const game = new Game(assets, story, presenter);
   await game.start(IndyIds.townZone, { x: 11, y: 5 });
   return { assets, story, presenter, game };
+}
+
+/** Ramasse le fouet posé dans la maison de la ville (zone « Interior14C »), comme le fait le joueur. */
+async function takeWhip(game: Game) {
+  const spot = game.assets.zone(WHIP_HOUSE_ZONE).hotspots.find((h) => h.type === HotspotType.DropWeapon && h.argument === IndyIds.whipTile)!;
+  await game.debugTeleport(WHIP_HOUSE_ZONE, 0, 0);
+  const dir = [
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+  ].find((d) => game.zone.isFree(spot.x - d.x, spot.y - d.y))!;
+  game.hero.x = spot.x - dir.x;
+  game.hero.y = spot.y - dir.y;
+  game.input.move = dir;
+  await steps(game, 2);
+  game.input.move = { x: 0, y: 0 };
 }
 
 /** Partie dont la case à l'ouest de la ville est remplacée par la zone voulue. */
@@ -73,11 +92,11 @@ async function steps(game: Game, n: number) {
 }
 
 describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
-  it("démarre en ville avec le fouet, le briefing et l'objet de Marcus", async () => {
+  it("démarre en ville sans le fouet, avec le briefing et l'objet de Marcus", async () => {
     const { game, presenter, story } = await newGame();
     expect(game.zone.id).toBe(IndyIds.townZone);
-    expect(game.inventory).toContain(IndyIds.whipTile);
-    expect(game.weapon?.name).toBe("WhipWeapon");
+    expect(game.inventory).not.toContain(IndyIds.whipTile);
+    expect(game.weapon).toBeNull();
     expect(presenter.speeches[0]).toMatch(/Indy/);
     if (story.startItem >= 0) expect(game.inventory).toContain(story.startItem);
   });
@@ -127,8 +146,17 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
     expect(game.world.locate(game.zone.id)).toEqual({ x: here.x + dir.x, y: here.y + dir.y });
   });
 
+  it("ramasse le fouet dans la maison et l'équipe", async () => {
+    const { game, presenter } = await newGame();
+    await takeWhip(game);
+    expect(presenter.pickups).toContain(IndyIds.whipTile);
+    expect(game.inventory).toContain(IndyIds.whipTile);
+    expect(game.weapon?.name).toBe("WhipWeapon");
+  });
+
   it("frappe un monstre au fouet jusqu'à le tuer", async () => {
     const { game } = await newGame();
+    await takeWhip(game);
     const zoneId = game.assets.data.zones.find((z) => z.monsters.some((m) => game.assets.character(m.character)?.name === "Snake"))!.id;
     await game.debugTeleport(zoneId, 0, 0);
     const zone = game.zone;

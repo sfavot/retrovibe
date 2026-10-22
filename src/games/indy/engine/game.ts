@@ -240,8 +240,6 @@ export class Game extends EventTarget {
   // ---------------------------------------------------------------- démarrage et boucle
 
   async start(startZone: number, at: Point): Promise<void> {
-    this.addItem(IndyIds.whipTile);
-    this.equip(IndyIds.whipTile);
     this.setZone(startZone, at);
     const goal = this.assets.puzzle(this.story.goalPuzzle);
     if (goal?.texts[3]) await this.presenter.message(goal.texts[3]);

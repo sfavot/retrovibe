@@ -5,7 +5,7 @@
 export const copy = {
   title: "Indiana Jones and his Desktop Adventures",
   description: "Une aventure générée à chaque partie, de la ville aux temples perdus (LucasArts, 1996).",
-  coverAlt: "Écran titre d'Indiana Jones and his Desktop Adventures", // à valider
+  coverAlt: "Écran titre d'Indiana Jones and his Desktop Adventures",
   loading: "Chargement des données du jeu…",
   missingFiles:
     "Fichiers du jeu introuvables. Placez DESKTOP.DAW et DESKADV.EXE (et les fichiers .WAV / .MID) dans le dossier original/indy/ puis rechargez la page.",

@@ -18,6 +18,17 @@ export function renderHome(container: HTMLElement, games: readonly GameDefinitio
             h(
               "a",
               { class: "game-card", href: `#/${game.id}` },
+              game.cover
+                ? h("img", {
+                    class: game.coverPixelated ? "game-card-cover pixelated" : "game-card-cover",
+                    src: game.cover,
+                    alt: game.coverAlt ?? "",
+                    width: game.coverSize?.[0],
+                    height: game.coverSize?.[1],
+                    loading: "lazy",
+                    decoding: "async",
+                  })
+                : null,
               h("span", { class: "game-card-title" }, game.title),
               h("span", { class: "game-card-desc" }, game.description),
               h("span", { class: "game-card-cta", "aria-hidden": "true" }, copy.play),

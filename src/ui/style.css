@@ -73,6 +73,24 @@ button.secondary {
   color: var(--muted);
 }
 
+/* Lien présenté comme un bouton (secondaire) : même aspect que `button`. */
+a.button {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+a.button:hover {
+  background: #44362a;
+  border-color: #6b5640;
+}
+
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
@@ -115,6 +133,7 @@ button.secondary {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
   gap: 16px;
+  container-type: inline-size;
 }
 
 .game-card {
@@ -128,7 +147,71 @@ button.secondary {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
+  overflow: hidden;
   transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+/* Jaquette en haut de la carte, bord à bord */
+.game-card-cover {
+  display: block;
+  width: calc(100% + 36px);
+  max-width: none;
+  height: auto;
+  aspect-ratio: 3 / 4;
+  margin: -18px -18px 6px;
+  /* Formats variés (carré, portrait) : l'image entière, centrée sur un fond neutre */
+  object-fit: contain;
+  object-position: center;
+  background: var(--panel-2);
+}
+
+.game-card-cover.pixelated {
+  image-rendering: pixelated;
+}
+
+/* Plusieurs colonnes : on plafonne la hauteur de la jaquette */
+@container (min-width: 37rem) {
+  .game-card-cover {
+    aspect-ratio: auto;
+    height: clamp(11rem, 22vw, 16rem);
+  }
+}
+
+/* Une seule colonne (liste < 2 colonnes de 18rem + gap) : vignette à gauche */
+@container (max-width: 36.99rem) {
+  .game-card {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+    column-gap: 14px;
+    row-gap: 4px;
+    padding: 0;
+    align-items: start;
+  }
+  .game-card-cover {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    width: 100%;
+    height: auto;
+    margin: 0;
+    aspect-ratio: 3 / 4;
+  }
+  .game-card-title,
+  .game-card-desc,
+  .game-card-cta {
+    grid-column: 2;
+  }
+  .game-card-title,
+  .game-card-desc {
+    padding-right: 14px;
+  }
+  .game-card-title {
+    padding-top: 14px;
+  }
+  .game-card-cta {
+    justify-self: start;
+    margin: 6px 14px 14px 0;
+  }
 }
 
 .game-card:hover {

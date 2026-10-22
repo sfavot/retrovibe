@@ -1,0 +1,82 @@
+/* Lost in Time : écran du jeu, canvas pixelisé au format 4:3 de l'affichage d'origine. */
+
+.lit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.lit-stage {
+  position: relative;
+  /* Largeur limitée par la hauteur de la fenêtre pour que l'écran reste entier sans défilement vertical. */
+  width: min(100%, calc((100dvh - 80px) * 4 / 3));
+  min-width: 0;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px #0009;
+  overflow: hidden;
+}
+
+.lit-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  width: min(100%, calc((100dvh - 80px) * 4 / 3));
+}
+
+.lit-toggles {
+  display: flex;
+  gap: 8px;
+}
+
+.lit-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  /* Le jeu dessine son propre curseur ; pas de défilement ni de zoom tactile sur l'écran. */
+  cursor: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.lit-canvas:focus-visible {
+  outline-offset: -3px;
+}
+
+.lit-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  text-align: center;
+  background: #000c;
+}
+
+.lit-overlay p {
+  margin: 0;
+  max-width: 28rem;
+}
+
+/* Écran titre : la jaquette (280x343) est en portrait, pas carrée comme l'image d'Indy ; c'est une illustration, pas du pixel art. */
+.lit-title-picture {
+  width: min(336px, calc(100vw - 32px));
+  height: auto;
+  aspect-ratio: 280 / 343;
+  image-rendering: auto;
+}
+
+.lit-title-note {
+  margin: 0;
+  font-size: 0.85rem;
+}

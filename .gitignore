@@ -9,3 +9,6 @@ dist/
 
 # Configuration locale de Claude Code
 .claude/
+
+# Archives et installeurs des jeux (lourds, hors du site)
+archives/

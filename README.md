@@ -8,7 +8,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | Jeu | État |
 | --- | --- |
 | Indiana Jones and his Desktop Adventures | jouable |
-| Gabriel Knight, Lost in Time… | à venir |
+| Lost in Time (Coktel Vision, 1993) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -21,7 +21,7 @@ et le routage se fait par hash, donc le site marche sous n'importe quel sous-dos
 1. `npm install`
 2. `npm run dev` puis ouvrir http://localhost:5173
 
-`original/indy/` contient `DESKTOP.DAW`, `DESKADV.EXE` (pour la palette), `DESKADV.HLP` (le manuel d'origine, affiché depuis l'écran titre) et, pour le son, les `.WAV` / `.MID`.
+`original/indy/` contient `DESKTOP.DAW`, `DESKADV.EXE` (pour la palette), `DESKADV.HLP` (le manuel d'origine, affiché depuis l'écran titre), `COVER.png` (l'image de l'écran titre, générée à partir des données du jeu avec `npx vite-node scripts/indy-cover.mts`) et, pour le son, les `.WAV` / `.MID`.
 
 En développement, `?seed=1234` démarre directement une partie avec cette graine et `__indy.game` est exposé dans la console.
 
@@ -57,6 +57,31 @@ Réimplémentation du moteur d'*Indiana Jones and his Desktop Adventures* (Lucas
   référencé dans `registry.ts`. Les routes sont `#/` (accueil) et `#/<id>` (jeu). Indy est dans `src/games/indy/`.
 - `src/games/indy/ui/` — interface d'Indy (écran titre, vue de jeu, bulles, inventaire, carte). Ses textes sont dans `copy.ts`.
 - `src/ui/` — éléments communs : page d'accueil, helper DOM, styles, textes de l'accueil.
+
+## Lost in Time
+
+Réimplémentation du moteur de *Lost in Time* (Coktel Vision, 1993), d'après le moteur `gob` de ScummVM : une machine virtuelle qui exécute les scripts `.TOT` du jeu. Comme pour Indy, le code ne contient aucune donnée : il lit les fichiers de `original/lost-in-time/`.
+
+### Fichiers de données
+
+`INTRO.STK` (archive de départ, lancée sur `INTRO.TOT`), `*.ITK` et `*.LTK` (données et textes de chaque partie), `LOST.LIC` (plages du CD), `CAT2.INF` à `CAT4.INF` (lus par le jeu), `MUSIC.mp3` (la piste audio du CD) et `COVER.png` (la jaquette du jeu).
+Les fichiers sont chargés à la demande. Les sauvegardes (`CAT.INF`, `IMA.INF`, `BLOC.INF`) sont dans le `localStorage`, sous le préfixe `lost-in-time:`.
+
+### Architecture
+
+- `src/games/lost-in-time/data/` — lecteurs : archives STK / ITK (LZSS), TOT, polices, sprites, palettes, IMD (vidéo), SND, LIC.
+- `src/games/lost-in-time/engine/` — machine virtuelle : interpréteur et opcodes, expressions, ressources, cycle de vie des TOT (`game.ts`), zones de la souris (`hotspots.ts`), entrées (`input.ts`), sauvegardes (`saves.ts`).
+  `host.ts` définit la frontière avec l'extérieur (fichiers, horloge, entrées, sous-systèmes) et `system.ts` assemble les vrais sous-systèmes.
+- `src/games/lost-in-time/engine/graphics/`, `mult/`, `video/`, `audio/` — affichage et palette, animations, vidéos IMD, sons (Web Audio) et piste CD (`<audio>`).
+- `src/games/lost-in-time/render/` — présentation de l'image indexée sur le canvas.
+- `src/games/lost-in-time/ui/` — hôte du navigateur (fichiers, images, entrées), page du jeu (canvas 4:3) et styles. Ses textes sont dans `copy.ts`.
+
+### Scripts
+
+- `scripts/lost-in-time-music.sh <track01.flac>` — convertit la piste audio du CD en `original/lost-in-time/MUSIC.mp3`.
+- `scripts/lost-in-time-degob-fixture.mjs <dossier degob>` — régénère `test/lost-in-time/fixtures/degob-ops.json` (opcodes par script, pour les tests).
+
+En développement, `__lit` (jeu, sous-systèmes, hôte) est exposé dans la console. Les tests sont dans `test/lost-in-time/`.
 
 ## Ce qui a été reconstitué
 

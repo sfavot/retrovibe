@@ -25,6 +25,10 @@ export const indy: GameDefinition = {
   id: "indy",
   title: copy.title,
   description: copy.description,
+  cover: `${GAME_URL}COVER.png`,
+  coverSize: [576, 576],
+  coverPixelated: true,
+  coverAlt: copy.coverAlt,
   async start(container) {
     container.replaceChildren(h("p", { class: "boot", role: "status" }, copy.loading));
     try {

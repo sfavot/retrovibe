@@ -23,6 +23,7 @@ const BLOCKED_DIRECTION: Partial<Record<ZoneType, [number, number]>> = {
  */
 export function solve(assets: Assets, story: Story): SolveResult {
   const sectors = story.sectors;
+  // Le fouet est posé dans une maison de la ville, point de départ : il est toujours à portée.
   const inventory = new Set<number>([IndyIds.whipTile]);
   if (story.startItem >= 0) inventory.add(story.startItem);
   const solved = new Set<number>();

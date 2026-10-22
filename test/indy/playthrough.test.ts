@@ -426,6 +426,8 @@ describe.skipIf(!hasOriginalFiles || !process.env.PLAY)("parties jouées par un 
         if (!done) void game.step();
       }
       await start;
+      // Le robot ne fouille pas la maison de la ville : on lui remet le fouet qu'il y trouverait.
+      game.addItem(IndyIds.whipTile);
       const steps = solve(assets, story).steps;
       let failure: string | null = null;
       let index = 0;

@@ -17,7 +17,8 @@ async function play(steps: (ctx: ReturnType<typeof makeFullGame>) => Step[]): Pr
 const dropObject: Step[] = [{ click: [160, 100], right: true }, { wait: 30 }];
 const openBar: Step[] = [{ move: [160, 0] }, { wait: 30 }];
 
-describe.skipIf(!hasOriginalFiles)("scènes jouées (partie 4)", () => {
+// Parties simulées de bout en bout : lentes sur la CI, d'où un délai large.
+describe.skipIf(!hasOriginalFiles)("scènes jouées (partie 4)", { timeout: 60_000 }, () => {
   it("saisie du nom de sauvegarde : effacer le nom ne dessine rien hors du champ", async () => {
     // Régression : un cercle (DRAW_INVALIDATE) était tracé à chaque redessin du champ, d'où des traits
     // verticaux jaunes à droite de la boîte une fois le nom effacé.

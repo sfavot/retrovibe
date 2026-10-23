@@ -98,3 +98,9 @@ En développement, `__lit` (jeu, sous-systèmes, hôte) est exposé dans la cons
   déplacement ennemis.
 
 Référence : [WebFun](https://codeberg.org/cyco/WebFun) (MIT), réimplémentation de *Yoda Stories*.
+
+## Licence
+
+Le code est sous [GPL v3 ou ultérieure](LICENSE) : le moteur de Lost in Time est porté de [ScummVM](https://www.scummvm.org/) (GPL v3+),
+y compris l'émulateur OPL (MAME) utilisé pour la musique AdLib. Les fichiers des jeux de `original/` ne sont pas couverts
+par cette licence : ils restent la propriété de leurs ayants droit.

@@ -598,17 +598,16 @@ export class Hotspots implements HotspotSystem {
 
   private fillRect(x: number, y: number, w: number, h: number, color: number): void {
     const draw = this.sys.draw;
-    draw.fillRect(BACK_SURFACE, x, y, w, h, color);
-    draw.invalidate(BACK_SURFACE, x, y, x + w - 1, y + h - 1);
+    // la zone modifiée est marquée par l'opération de dessin elle-même (dirtiedRect), comme dans ScummVM
+    draw.fillRect(BACK_SURFACE, x, y, w, h, color, true);
   }
 
-  private printText(x: number, y: number, text: ArrayLike<number>, font: number, color: number, width: number, h: number): void {
+  private printText(x: number, y: number, text: ArrayLike<number>, font: number, color: number): void {
     if (text.length === 0) return;
     const draw = this.sys.draw;
     let s = "";
     for (let i = 0; i < text.length; i++) s += String.fromCharCode(text[i]);
-    draw.printText({ x, y, backColor: 0, frontColor: color, fontIndex: font, text: s, transparent: true });
-    draw.invalidate(BACK_SURFACE, x, y, x + width - 1, y + h - 1);
+    draw.printText({ x, y, backColor: 0, frontColor: color, fontIndex: font, text: s, transparent: true, deltaVeto: true });
   }
 
   private textCursor(font: FontMetrics, str: number[], pos: number, x: number, y: number, height: number) {
@@ -665,7 +664,7 @@ export class Hotspots implements HotspotSystem {
       if (editSize !== 0 && temp.length > editSize) temp = str.slice();
 
       this.fillRect(x, y, fieldW, height, backColor);
-      this.printText(x, textY, temp, fontIndex, frontColor, fieldW, height);
+      this.printText(x, textY, temp, fontIndex, frontColor);
 
       if (editSize !== 0 && pos === editSize) pos--;
       const curSym = temp[pos] ?? 0;
@@ -688,7 +687,7 @@ export class Hotspots implements HotspotSystem {
         // efface le curseur
         c = this.textCursor(font, str, pos, x, y, height);
         this.fillRect(c.x, c.y, c.w, c.h, backColor);
-        this.printText(c.x, textY, [curSym], fontIndex, frontColor, font.charWidthDefault, font.charHeight);
+        this.printText(c.x, textY, [curSym], fontIndex, frontColor);
 
         if (key !== 0 || out.id !== 0) break;
 
@@ -818,7 +817,7 @@ export class Hotspots implements HotspotSystem {
       const h = spot.bottom - spot.top + 1;
       this.fillRect(spot.left, spot.top, w, h, desc.backColor);
       const y = spot.top + Math.trunc((h - font.charHeight) / 2);
-      this.printText(spot.left, y, vars.cstr(spot.key), desc.fontIndex, desc.frontColor, w, h);
+      this.printText(spot.left, y, vars.cstr(spot.key), desc.fontIndex, desc.frontColor);
       input++;
     }
   }

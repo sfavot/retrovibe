@@ -378,7 +378,8 @@ export class DrawImpl implements DrawSystem {
     this.spriteOperation(DRAW_BLITSURF);
   }
 
-  fillRect(surface: number, x: number, y: number, width: number, height: number, color: number): void {
+  /** `deltaVeto` : ignore le décalage de fond (DRAW_FILLRECT | 0x10, comme Hotspots::fillRect). */
+  fillRect(surface: number, x: number, y: number, width: number, height: number, color: number, deltaVeto = false): void {
     this.destSurface = surface;
     this.destSpriteX = x;
     this.destSpriteY = y;
@@ -386,7 +387,7 @@ export class DrawImpl implements DrawSystem {
     this.spriteBottom = height;
     this.backColor = s16(color);
     if (!this.surfaceAt(surface)) return;
-    this.spriteOperation(DRAW_FILLRECT);
+    this.spriteOperation(deltaVeto ? DRAW_FILLRECT | 0x10 : DRAW_FILLRECT);
   }
 
   drawLine(surface: number, x1: number, y1: number, x2: number, y2: number, color: number): void {
@@ -421,7 +422,7 @@ export class DrawImpl implements DrawSystem {
       this.backColor = 0;
       this.transparency = 1;
     }
-    this.spriteOperation(DRAW_PRINTTEXT);
+    this.spriteOperation(args.deltaVeto ? DRAW_PRINTTEXT | 0x10 : DRAW_PRINTTEXT);
   }
 
   printTotText(id: number): Promise<void> {

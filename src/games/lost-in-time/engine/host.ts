@@ -145,6 +145,8 @@ export interface PrintTextArgs {
   /** Texte d'un morceau, variables déjà substituées. */
   text: string;
   transparent: boolean;
+  /** Ignore le décalage de fond (DRAW_PRINTTEXT | 0x10 des zones de saisie). */
+  deltaVeto?: boolean;
 }
 
 export interface PaletteLoadArgs {
@@ -337,7 +339,7 @@ export interface DrawSystem {
     y: number,
     transparency: number,
   ): void;
-  fillRect(surface: number, x: number, y: number, width: number, height: number, color: number): void;
+  fillRect(surface: number, x: number, y: number, width: number, height: number, color: number, deltaVeto?: boolean): void;
   drawLine(surface: number, x1: number, y1: number, x2: number, y2: number, color: number): void;
   putPixel(surface: number, x: number, y: number, color: number): void;
   invalidate(surface: number, x: number, y: number, right: number, bottom: number): void;

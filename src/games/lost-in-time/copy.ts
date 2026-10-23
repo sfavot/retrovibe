@@ -14,8 +14,17 @@ export const copy = {
   play: "Jouer",
   sound: "Son",
   manual: "Manuel d'origine",
+  // Barre tactile sous l'écran (écrans tactiles seulement).
+  menu: "Menu",
+  menuLabel: "Menu : afficher la barre du haut (sauvegarder, charger, quitter)",
+  inventory: "Inventaire",
+  inventoryLabel: "Inventaire : ouvrir, fermer ou y ranger l'objet en main (clic droit)",
+  skip: "Passer",
+  skipLabel: "Passer ou annuler (Échap)",
+  keyboard: "Clavier",
+  confirm: "Valider",
   loadHint:
-    "Pour reprendre une partie sauvegardée : en jeu, approchez la souris du haut de l'écran, puis cliquez sur la disquette et choisissez CHARGER.",
+    "Pour reprendre une partie sauvegardée : en jeu, approchez la souris du haut de l'écran (sur écran tactile : bouton Menu), puis cliquez sur la disquette et choisissez CHARGER.",
   manualNote: "Manuel Coktel Vision, en français (PDF, dans un nouvel onglet).",
   // Contrôles en jeu, affichés sous les boutons de l'écran titre.
   helpText: [
@@ -23,6 +32,7 @@ export const copy = {
     "Clic gauche : examiner, prendre ou utiliser",
     "Clic droit : ouvrir ou fermer l'inventaire (l'objet en main y retourne)",
     "Combiner deux objets : prendre le premier en main, puis cliquer sur la mallette de la barre du haut",
-    "Barre du haut (approchez la souris du haut de l'écran) : sauvegarder, charger, quitter",
+    "Barre du haut (approchez la souris du haut de l'écran ; au doigt, bouton Menu ou glissez jusqu'au bord haut) : sauvegarder, charger, quitter",
+    "Écran tactile : toucher vaut un clic gauche ; un appui long ou le bouton Inventaire remplace le clic droit (ouvrir ou fermer l'inventaire, y ranger l'objet en main), Passer remplace Échap, Menu affiche la barre du haut, Clavier et Valider servent à nommer une sauvegarde",
   ],
 };

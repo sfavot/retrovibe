@@ -290,7 +290,9 @@ export class Interpreter implements ExprEnv {
     if (sync) {
       g.mouseX = input.mouseX;
       g.mouseY = input.mouseY;
-      g.mouseButtons = input.mouseButtons === MOUSE_BOTH ? MOUSE_NONE : input.mouseButtons;
+      // une seule lecture : lire les boutons consomme un clic bref (voir GameInput)
+      const buttons = input.mouseButtons;
+      g.mouseButtons = buttons === MOUSE_BOTH ? MOUSE_NONE : buttons;
     }
     return input.popKey();
   }
@@ -298,7 +300,8 @@ export class Interpreter implements ExprEnv {
   forceMouseUp(onlyWhenSynced = false): void {
     const g = this.game;
     const input = g.host.input;
-    if (onlyWhenSynced && g.mouseButtons !== input.mouseButtons) return;
+    // simple comparaison : lire les boutons consommerait un clic bref
+    if (onlyWhenSynced && g.mouseButtons !== input.peekButtons()) return;
     g.mouseButtons = MOUSE_NONE;
     input.mouseButtons = MOUSE_NONE;
   }

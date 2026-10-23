@@ -14,7 +14,7 @@ import {
   type VmContext,
 } from "../../src/games/lost-in-time/engine/host";
 import { Hotspots } from "../../src/games/lost-in-time/engine/hotspots";
-import { KEY_BACKSPACE, KEY_ESCAPE, KEY_LEFT, KEY_RETURN, KEY_SPACE } from "../../src/games/lost-in-time/engine/input";
+import { GameInput, KEY_BACKSPACE, KEY_ESCAPE, KEY_LEFT, KEY_RETURN, KEY_SPACE } from "../../src/games/lost-in-time/engine/input";
 import { Variables } from "../../src/games/lost-in-time/engine/variables";
 import { hasOriginalFiles } from "./helpers";
 
@@ -54,7 +54,8 @@ function setup() {
       if (sync) {
         vm.mouseX = input.mouseX;
         vm.mouseY = input.mouseY;
-        vm.mouseButtons = input.mouseButtons === 3 ? 0 : input.mouseButtons;
+        const buttons = input.mouseButtons;
+        vm.mouseButtons = buttons === 3 ? 0 : buttons;
       }
       return input.popKey();
     },
@@ -222,6 +223,28 @@ describe("zones : évaluation d'un bloc", () => {
   });
 });
 
+describe("zones : toucher (clic court de GameInput)", () => {
+  it("position et clic donnés ensemble : l'entrée de la zone est jouée avant le clic", async () => {
+    const { host, hs, ctx, called } = setup();
+    const input = new GameInput();
+    Object.defineProperty(host, "input", { value: input });
+    const move = (i: number, left: number, enter: number): HotspotDef =>
+      clickDef(i, { type: 1, flags: 1, left, width: 50, height: 50, key: i + 0xa000, id: 5 + i, funcEnter: enter, funcLeave: 200 + i });
+    const next = host.nextFrame.bind(host);
+    let n = 0;
+    host.nextFrame = () => {
+      if (++n === 5) {
+        input.pointerMove(110, 10);
+        input.click(0);
+      }
+      return next();
+    };
+    const leave = await hs.evaluate(blockOf([move(0, 0, 300), move(1, 100, 301)]), ctx);
+    expect(called).toEqual([301]);
+    expect(leave).toBe(201);
+  });
+});
+
 describe("zones : saisie de texte (type 4)", () => {
   function inputDef(): HotspotDef {
     return clickDef(0, {
@@ -250,6 +273,22 @@ describe("zones : saisie de texte (type 4)", () => {
     expect(vars.readVar32(56)).toBe(2);
     expect(sys.count("draw", "printText")).toBeGreaterThan(3);
     expect(sys.count("draw", "fillRect")).toBeGreaterThan(3);
+  });
+
+  it("signale la saisie en cours (clavier virtuel), plus après la validation", async () => {
+    const { host, hs, ctx, vars } = setup();
+    vars.writeString(300, "");
+    const seen: boolean[] = [];
+    const next = host.nextFrame.bind(host);
+    host.nextFrame = () => {
+      seen.push(hs.textEntry);
+      if (host.frames === 20) host.input.pushKey(KEY_RETURN);
+      return next();
+    };
+    expect(hs.textEntry).toBe(false);
+    await hs.evaluate(blockOf([inputDef()]), ctx);
+    expect(seen.slice(0, 15).every(Boolean)).toBe(true);
+    expect(hs.textEntry).toBe(false);
   });
 
   it("reprend le texte déjà présent dans la variable et respecte la largeur du champ", async () => {

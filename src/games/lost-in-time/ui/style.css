@@ -44,6 +44,8 @@
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  /* pas de menu « enregistrer l'image » d'iOS sur un appui long (il vaut un clic droit) */
+  -webkit-touch-callout: none;
 }
 
 .lit-canvas:focus-visible {
@@ -83,4 +85,35 @@
 .lit-title-note {
   margin: 0;
   font-size: 0.85rem;
+}
+
+/* Barre tactile (Menu, Inventaire, Passer ; pendant une saisie : Passer, Clavier, Valider) : même largeur que l'écran, trois boutons égaux sur une ligne. */
+.lit-touch-bar {
+  width: min(100%, calc((100dvh - 80px) * 4 / 3));
+}
+
+@media (pointer: coarse) {
+  .lit-touch-bar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .lit-touch-bar button {
+    padding-inline: 0.5rem;
+  }
+}
+
+/* Champ de saisie invisible : il ne sert qu'à ouvrir le clavier virtuel (16px évite le zoom d'iOS au focus). */
+.lit-text-field {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  font-size: 16px;
+  opacity: 0;
+  pointer-events: none;
 }

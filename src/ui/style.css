@@ -859,6 +859,8 @@ a.button:hover {
   flex: 1;
   padding: 0.9rem;
   font-weight: 700;
+  /* pas de zoom au double toucher */
+  touch-action: manipulation;
 }
 
 @media (pointer: coarse) {

@@ -23,6 +23,8 @@ export interface InputState {
   mouseY: number;
   /** MOUSE_NONE / MOUSE_LEFT / MOUSE_RIGHT / MOUSE_BOTH. */
   mouseButtons: number;
+  /** Boutons tels que la prochaine lecture de `mouseButtons` les verra, sans compter comme une lecture. */
+  peekButtons(): number;
   /** Retire et retourne la plus ancienne touche en attente, 0 s'il n'y en a pas. */
   popKey(): number;
   clearKeys(): void;
@@ -621,6 +623,10 @@ export class HeadlessInput implements InputState {
   mouseY = 92;
   mouseButtons = MOUSE_NONE;
   private readonly keys: number[] = [];
+
+  peekButtons(): number {
+    return this.mouseButtons;
+  }
 
   pushKey(key: number): void {
     this.keys.push(key);

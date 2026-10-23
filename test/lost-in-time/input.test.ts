@@ -8,6 +8,7 @@ import {
   KEY_LEFT,
   KEY_RETURN,
   KEY_SPACE,
+  textEditKeys,
   toCP850,
   translateKey,
 } from "../../src/games/lost-in-time/engine/input";
@@ -78,5 +79,72 @@ describe("GameInput", () => {
     expect(input.popKey()).toBe(0);
     input.pointerMove(400, -5);
     expect([input.mouseX, input.mouseY]).toEqual([319, 0]);
+  });
+});
+
+describe("GameInput : barre et gestes tactiles", () => {
+  it("pressKey pousse un code du jeu, sauf 0 ou tampon plein", () => {
+    const input = new GameInput();
+    expect(input.pressKey(KEY_ESCAPE)).toBe(true);
+    expect(input.pressKey(0)).toBe(false);
+    expect(input.popKey()).toBe(KEY_ESCAPE);
+    for (let i = 0; i < 16; i++) input.pressKey(0x61);
+    expect(input.pressKey(0x62)).toBe(false);
+  });
+
+  it("clic droit court : vu une fois puis relâché", () => {
+    const input = new GameInput();
+    input.click(2);
+    expect(input.mouseButtons).toBe(MOUSE_RIGHT);
+    expect(input.mouseButtons).toBe(MOUSE_NONE);
+  });
+
+  it("clic court après un déplacement : le moteur lit d'abord la nouvelle position sans bouton", () => {
+    const input = new GameInput();
+    input.pointerMove(10, 180);
+    input.click(0);
+    // lecture 1 (checkKeys) : position nouvelle, pas encore de bouton -> le survol est joué
+    expect([input.mouseX, input.mouseY, input.mouseButtons]).toEqual([10, 180, MOUSE_NONE]);
+    // lecture 2 : le clic, puis le relâchement
+    expect(input.mouseButtons).toBe(MOUSE_LEFT);
+    expect(input.mouseButtons).toBe(MOUSE_NONE);
+  });
+
+  it("peekButtons annonce le clic sans le consommer (forceMouseUp de keyFunc)", () => {
+    const input = new GameInput();
+    input.click(0);
+    expect(input.peekButtons()).toBe(MOUSE_LEFT);
+    expect(input.peekButtons()).toBe(MOUSE_LEFT);
+    expect(input.mouseButtons).toBe(MOUSE_LEFT);
+    expect(input.peekButtons()).toBe(MOUSE_NONE);
+    input.pointerMove(10, 10);
+    input.click(2);
+    expect(input.peekButtons()).toBe(MOUSE_NONE); // la position doit d'abord être lue
+  });
+
+  it("un déplacement vers la même case ne retarde pas le clic", () => {
+    const input = new GameInput();
+    input.pointerMove(152, 92);
+    input.click(0);
+    expect(input.mouseButtons).toBe(MOUSE_LEFT);
+  });
+});
+
+describe("textEditKeys (champ caché du clavier virtuel)", () => {
+  it("caractères ajoutés, espace et accents", () => {
+    expect(textEditKeys(" ", " ab")).toEqual([0x61, 0x62]);
+    expect(textEditKeys(" ", "  ")).toEqual([KEY_SPACE]);
+    expect(textEditKeys(" ", " é")).toEqual([0x82]);
+    expect(textEditKeys(" ", " €")).toEqual([]);
+  });
+
+  it("suppression : retour arrière, saut de ligne : Entrée", () => {
+    expect(textEditKeys(" ", "")).toEqual([KEY_BACKSPACE]);
+    expect(textEditKeys(" ", " \n")).toEqual([KEY_RETURN]);
+  });
+
+  it("composition corrigée : retours arrière puis le nouveau texte", () => {
+    expect(textEditKeys(" helo", " hello")).toEqual([KEY_BACKSPACE, 0x6c, 0x6f]);
+    expect(textEditKeys(" hel", " hel")).toEqual([]);
   });
 });

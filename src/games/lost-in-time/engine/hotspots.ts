@@ -214,6 +214,7 @@ export class Hotspots implements HotspotSystem {
   private currentX = 0;
   private currentY = 0;
   private vm: VmContext | null = null;
+  private editing = false;
 
   /** `sys` : seuls le dessin et le curseur servent ; la machine virtuelle arrive par attach(). */
   constructor(private readonly sys: Pick<Subsystems, "draw" | "cursor">) {}
@@ -225,6 +226,11 @@ export class Hotspots implements HotspotSystem {
   private get machine(): VmContext {
     if (!this.vm) throw new Error("Hotspots : machine virtuelle non attachée");
     return this.vm;
+  }
+
+  /** Un champ de saisie attend du texte (l'interface propose alors le clavier virtuel). */
+  get textEntry(): boolean {
+    return this.editing;
   }
 
   private get terminated(): boolean {
@@ -631,7 +637,16 @@ export class Hotspots implements HotspotSystem {
    * Hotspots::updateInput : édite la chaîne de la variable `keyOffset` dans le champ (x, y, width,
    * height). Retourne Entrée / haut / bas / F1..F10, ou 0 (zone cliquée, délai écoulé, arrêt).
    */
-  private async updateInput(
+  private async updateInput(...args: Parameters<Hotspots["editInput"]>): Promise<number> {
+    this.editing = true;
+    try {
+      return await this.editInput(...args);
+    } finally {
+      this.editing = false;
+    }
+  }
+
+  private async editInput(
     x: number,
     y: number,
     width: number,

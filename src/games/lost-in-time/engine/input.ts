@@ -74,11 +74,32 @@ export function translateKey(e: KeyEventLike): number {
   return 0;
 }
 
+/**
+ * Saisie sans clavier physique (champ caché, clavier virtuel) : codes du jeu pour passer du texte
+ * `before` au texte `after`. Ce qui a été retiré à la fin devient des retours arrière, ce qui a été
+ * ajouté devient des caractères (saut de ligne : Entrée).
+ */
+export function textEditKeys(before: string, after: string): number[] {
+  let common = 0;
+  while (common < before.length && common < after.length && before[common] === after[common]) common++;
+  const keys: number[] = Array.from({ length: before.length - common }, () => KEY_BACKSPACE);
+  for (const char of after.slice(common)) {
+    if (char === "\n" || char === "\r") keys.push(KEY_RETURN);
+    else if (char === " ") keys.push(KEY_SPACE);
+    else {
+      const key = translateKey({ code: "", key: char });
+      if (key !== 0) keys.push(key);
+    }
+  }
+  return keys;
+}
+
 const KEY_BUFFER_SIZE = 16;
 
 /**
  * Entrées pour le navigateur : un appui trop bref pour être vu par le moteur reste enregistré
- * jusqu'à ce qu'il l'ait lu une fois (le relâchement est alors appliqué).
+ * jusqu'à ce qu'il l'ait lu une fois (le relâchement est alors appliqué). Un clic court (`click`)
+ * attend en plus que le moteur ait lu la nouvelle position : le survol est joué avant le clic.
  */
 export class GameInput implements InputState {
   mouseX = 152;
@@ -86,10 +107,24 @@ export class GameInput implements InputState {
   private buttons = MOUSE_NONE;
   private pendingRelease = 0;
   private seen = false;
+  /** Boutons d'un clic court pas encore appliqué (voir `click`). */
+  private queuedClick = 0;
+  /** Position changée depuis la dernière lecture des boutons par le moteur. */
+  private moved = false;
   private readonly keys: number[] = [];
 
-  /** Lire les boutons compte comme les avoir « vus » : un relâchement en attente est appliqué ensuite. */
+  /**
+   * Lire les boutons compte comme les avoir « vus » : un relâchement en attente est appliqué ensuite.
+   * Le moteur lit la position juste avant les boutons (checkKeys) : un clic court en attente n'est
+   * appuyé qu'à une lecture où la position n'a pas changé depuis la précédente.
+   */
   get mouseButtons(): number {
+    if (this.queuedClick !== 0 && !this.moved) {
+      this.buttons |= this.queuedClick;
+      this.pendingRelease |= this.queuedClick;
+      this.queuedClick = 0;
+    }
+    this.moved = false;
     const value = this.buttons;
     if (this.pendingRelease !== 0) {
       this.buttons &= ~this.pendingRelease;
@@ -97,6 +132,10 @@ export class GameInput implements InputState {
     }
     this.seen = true;
     return value;
+  }
+
+  peekButtons(): number {
+    return this.buttons | (this.moved ? 0 : this.queuedClick);
   }
 
   set mouseButtons(value: number) {
@@ -117,14 +156,29 @@ export class GameInput implements InputState {
     else this.pendingRelease |= bit;
   }
 
+  /**
+   * Clic court (tactile, boutons de l'interface) : appuyé une fois que le moteur a lu la position
+   * courante, puis relâché après une lecture.
+   */
+  click(button: number): void {
+    this.queuedClick |= button === 2 ? 2 : button === 0 ? 1 : 0;
+  }
+
   /** `width` / `height` : taille de l'écran du jeu (640x400 pour l'écran-titre). */
   pointerMove(x: number, y: number, width = 320, height = 200): void {
-    this.mouseX = Math.max(0, Math.min(width - 1, Math.trunc(x)));
-    this.mouseY = Math.max(0, Math.min(height - 1, Math.trunc(y)));
+    const mx = Math.max(0, Math.min(width - 1, Math.trunc(x)));
+    const my = Math.max(0, Math.min(height - 1, Math.trunc(y)));
+    if (mx !== this.mouseX || my !== this.mouseY) this.moved = true;
+    this.mouseX = mx;
+    this.mouseY = my;
   }
 
   keyDown(e: KeyEventLike): boolean {
-    const key = translateKey(e);
+    return this.pressKey(translateKey(e));
+  }
+
+  /** Ajoute un code du jeu (KEY_ESCAPE…) au tampon de touches ; false s'il est nul ou si le tampon est plein. */
+  pressKey(key: number): boolean {
     if (key === 0 || this.keys.length >= KEY_BUFFER_SIZE) return false;
     this.keys.push(key);
     return true;

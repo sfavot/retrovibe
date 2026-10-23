@@ -1,6 +1,7 @@
 import { parseSnd } from "../../data/snd";
 import type { Host, SoundLoadArgs, SoundSystem } from "../host";
-import type { SoundBackend, SoundSource } from "./backend";
+import type { AdlibOutput, SoundBackend, SoundSource } from "./backend";
+import { parseAdl } from "./adlib/adl-player";
 
 /** Nombre d'emplacements de sons (Sound::kSoundsCount). */
 export const SOUND_SLOTS = 60;
@@ -65,18 +66,15 @@ interface Voice {
   fadeEndMs: number | null;
 }
 
-/** Lecteur ADL : seul l'état est tenu (la synthèse OPL n'existe pas encore). */
+/**
+ * État du lecteur ADL côté moteur (ADLPlayer/AdLib de ScummVM). La synthèse vit dans `AdlibOutput`
+ * (AudioWorklet) qui signale la fin du morceau ; sans sortie, une musique joue jusqu'à son arrêt.
+ */
 class AdlState {
   index = -1;
   loaded = false;
   playing = false;
   repeating = 0;
-
-  unload(): void {
-    this.loaded = false;
-    this.playing = false;
-    this.index = -1;
-  }
 }
 
 export interface SoundEngineOptions {
@@ -103,11 +101,19 @@ export class SoundEngine implements SoundSystem {
   private composition: number[] = [];
   private compositionPos = -1;
   private readonly adl = new AdlState();
+  private readonly adlibOut: AdlibOutput | null;
   private imdEndMs = 0;
   private readonly environments = new Map<number, SoundDesc[]>();
 
   constructor(private readonly options: SoundEngineOptions) {
     this.backend = options.backend;
+    this.adlibOut = options.backend.adlib ?? null;
+    if (this.adlibOut) {
+      this.adlibOut.onStopped = () => {
+        this.adl.playing = false;
+        this.adl.repeating = 0;
+      };
+    }
   }
 
   private get now(): number {
@@ -172,7 +178,7 @@ export class SoundEngine implements SoundSystem {
   private sampleFree(desc: SoundDesc | null, noteAdLib = false, index = -1): void {
     if (!desc || desc.empty) return;
     if (desc.type === "adl") {
-      if (noteAdLib && (index === -1 || this.adl.index === index)) this.adl.unload();
+      if (noteAdLib && (index === -1 || this.adl.index === index)) this.adlUnload();
     } else {
       this.blasterStop(0, desc);
     }
@@ -381,27 +387,41 @@ export class SoundEngine implements SoundSystem {
   }
 
   // --- AdLib ---------------------------------------------------------------------------------
-  // TODO : pas d'émulateur OPL. On garde l'état (chargé / en lecture / index / répétitions) et la
-  // lecture reste silencieuse ; une musique ADL « joue » jusqu'à stopAdlib, un autre chargement
-  // ou la libération de son emplacement, sa durée réelle étant inconnue sans synthèse.
+  // Le lecteur et l'émulateur OPL2 tournent dans `AdlibOutput` (AudioWorklet) : la fin d'un morceau
+  // (sans répétition restante) revient par `onStopped`, comme `_playing` de AdLib::onTimer.
 
   private adlLoad(sample: SoundDesc, index: number): void {
-    this.adl.unload();
-    // ADLPlayer::readHeader refuse les fichiers de moins de 60 octets
-    if (sample.size < 60) return;
+    this.adlUnload();
+    // ADLPlayer::load : fichier refusé s'il fait moins de 60 octets
+    if (!sample.data || !parseAdl(sample.data)) return;
     this.adl.loaded = true;
     this.adl.index = index;
+    this.adlibOut?.load(sample.data);
+  }
+
+  /** ADLPlayer::unload : arrête et vide le lecteur. */
+  private adlUnload(): void {
+    this.adl.loaded = false;
+    this.adl.playing = false;
+    this.adl.repeating = 0;
+    this.adl.index = -1;
+    this.adlibOut?.unload();
   }
 
   private adlPlay(): void {
-    if (this.adl.loaded) this.adl.playing = true;
+    if (!this.adl.loaded) return;
+    this.adl.playing = true;
+    this.adlibOut?.setRepeating(this.adl.repeating);
+    this.adlibOut?.play();
   }
 
   stopAdlib(): void {
     this.adl.playing = false;
+    this.adl.repeating = 0;
+    this.adlibOut?.stop();
   }
 
-  /** Une musique ADL est-elle « en lecture » (état seul, aucun son). */
+  /** La musique ADL joue-t-elle encore ? (fin de morceau comprise ; AdLib::isPlaying) */
   get adlibPlaying(): boolean {
     return this.adl.playing;
   }

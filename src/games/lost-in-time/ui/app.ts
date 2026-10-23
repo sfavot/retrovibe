@@ -94,6 +94,8 @@ export class App {
 
   /** Lance la boucle d'affichage et le jeu (INTRO.TOT) ; les erreurs s'affichent à la place de l'écran. */
   run(): void {
+    // run() part du clic « Jouer » : c'est le geste qui débloque le contexte audio
+    this.unlockAudio();
     const frame = (): void => {
       this.presenter.present();
       requestAnimationFrame(frame);

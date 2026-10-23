@@ -3,8 +3,26 @@
  * Les implémentations Web Audio / HTMLAudioElement sont dans web-audio.ts et html-cd.ts.
  */
 
+/**
+ * Musique AdLib (ADL) : lecteur + émulateur OPL2 derrière une commande asynchrone. Les appels
+ * reproduisent ceux de ScummVM (ADLPlayer) ; l'état « en lecture » revient par `onStopped`.
+ */
+export interface AdlibOutput {
+  /** Charge un morceau (remplace le précédent, sans le jouer). */
+  load(data: Uint8Array): void;
+  unload(): void;
+  /** Passages supplémentaires après le premier ; négatif = boucle infinie. */
+  setRepeating(count: number): void;
+  play(): void;
+  stop(): void;
+  /** Appelé quand la lecture s'arrête d'elle-même (fin du morceau, plus de répétition). */
+  onStopped: (() => void) | null;
+}
+
 /** Sortie des effets sonores : un canal « Sound Blaster » et une file pour le son des vidéos IMD. */
 export interface SoundBackend {
+  /** Sortie de la musique AdLib ; sans elle, une musique ADL « joue » jusqu'à son arrêt. */
+  readonly adlib?: AdlibOutput;
   /**
    * Joue un échantillon 8 bits signé à `rate` Hz, en remplaçant le précédent.
    * `passes` : nombre de lectures complètes, Infinity pour une boucle.

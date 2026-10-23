@@ -1,4 +1,5 @@
 import type { SoundBackend } from "./backend";
+import { WorkletAdlibOutput } from "./adlib/worklet-output";
 import type { Mutable } from "./prefs";
 
 /**
@@ -17,15 +18,31 @@ export class WebAudioSoundBackend implements SoundBackend, Mutable {
   private queued: AudioBufferSourceNode[] = [];
   private queueEnd = 0;
   private readonly buffers = new WeakMap<Int8Array, AudioBuffer>();
+  /** Musique AdLib : synthèse dans un AudioWorklet, branchée sur le même gain général (mute, pause). */
+  readonly adlib = new WorkletAdlibOutput();
 
-  unlock(): void {
+  constructor() {
+    // Une musique AdLib demandée avant tout geste crée le contexte (suspendu), le prochain geste le reprend
+    this.adlib.ensureContext = () => this.ensure();
+  }
+
+  /** Crée le contexte, le gain général et le worklet AdLib une seule fois. */
+  private ensure(): AudioContext {
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
       this.master.gain.value = this.mutedFlag ? 0 : 1;
       this.master.connect(this.ctx.destination);
+      this.adlib.attach(this.ctx, this.master);
+      if (this.suspended) void this.ctx.suspend();
     }
-    if (!this.suspended && this.ctx.state === "suspended") void this.ctx.resume();
+    return this.ctx;
+  }
+
+  /** À appeler de façon synchrone dans un geste utilisateur : crée puis reprend le contexte. */
+  unlock(): void {
+    const ctx = this.ensure();
+    if (!this.suspended && ctx.state === "suspended") void ctx.resume();
   }
 
   suspend(): void {
@@ -60,8 +77,8 @@ export class WebAudioSoundBackend implements SoundBackend, Mutable {
 
   playSample(pcm: Int8Array, rate: number, passes: number): void {
     this.stopSample(0);
-    const ctx = this.ctx;
-    if (!ctx || pcm.length === 0) return;
+    const ctx = this.ensure();
+    if (pcm.length === 0) return;
     const source = ctx.createBufferSource();
     source.buffer = this.buffer(ctx, pcm, rate);
     const gain = ctx.createGain();
@@ -92,8 +109,8 @@ export class WebAudioSoundBackend implements SoundBackend, Mutable {
   }
 
   queuePcm(pcm: Int8Array, rate: number): void {
-    const ctx = this.ctx;
-    if (!ctx || pcm.length === 0) return;
+    const ctx = this.ensure();
+    if (pcm.length === 0) return;
     const source = ctx.createBufferSource();
     source.buffer = this.buffer(ctx, pcm, rate);
     source.connect(this.master ?? ctx.destination);

@@ -5,7 +5,7 @@ import { TICKS_PER_SECOND, type Timer } from "../../engine/clock";
 import type { Scene, SceneContext } from "../../engine/scene";
 import { AnimationPlayer } from "../../engine/sprites";
 import type { Game } from "../../game/rules";
-import { Clip, SoundHush, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
+import { Clip, SoundHush, levelTimeLimit, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
 
 /**
  * S29 « L'Anniversaire » (`1da0:0009`, 2 004 octets ; RE : `docs/teleportaschtroumpf/minigames/s29.md`).
@@ -61,7 +61,7 @@ export type CandleState = typeof CANDLE_OUT | typeof CANDLE_LIT | typeof CANDLE_
 
 /** Temps imparti (secondes) au niveau interne 0..2. */
 export function timeLimit(level: number): number {
-  return TIME_LIMIT_SECONDS - TIME_LIMIT_PER_LEVEL * level;
+  return levelTimeLimit(TIME_LIMIT_SECONDS, TIME_LIMIT_PER_LEVEL, level);
 }
 
 /** Gouttes de rosée données selon les secondes écoulées à la fin (`1da0:07dd`) : moins de 10 s, 3 ; moins de 20 s, 2 ; sinon 1. */

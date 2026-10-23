@@ -21,7 +21,8 @@ import { StubScene } from "../common/stub";
  * - l'issue rendue à l'appelant : `ingredientOutcome`, `pointsOutcome` ; le choix de la vidéo de réussite des mini-jeux à ingrédient : `goalClip` (`ingredientInGoal` en est le prédicat, sans sens implicite) ;
  * - une vidéo MUX jouée à l'intérieur d'un mini-jeu : `Clip` ;
  * - le curseur HY8 à souris + flèches des scènes à pointeur libre : `Pointer` ;
- * - le fondu sonore de fin (`1343:0037`) : `SoundHush` ; le cadre de survol (`32af:0006`) : `drawFrame` ;
+ * - le fondu sonore de fin (`1343:0037`) : `SoundHush` ; le cadre de survol (`32af:0006`) : `drawFrame`, ses couleurs `FRAME_SHADOW` / `FRAME_LINE` ; la copie et le remplissage de rectangles : `copyRect`, `fillRect` ;
+ * - le chrono : `levelTimeLimit` (temps `base − pas × niveau`), `pointsForTime` (3 / 2 / 1 points par tiers du temps) ; les zones d'objets cachés de S25 et S26 : `isObjectHit`, `OBJECT_ORIGIN_X` / `OBJECT_ORIGIN_Y`, `ObjectRect` ;
  * - la souche commune, réservée aux tests de parcours (`forceMinigameStubs` dans `minigames.ts`) : `createStubMinigame`, `MinigameStub`, `STUB_POINTS`.
  *
  * Ce qui n'est **pas** ici faute de preuve : voix d'introduction (jouée avant la scène par `scenes/game.ts` et `map/free-mode.ts`),
@@ -240,6 +241,59 @@ export function drawFrame(surface: Surface, x1: number, y1: number, x2: number, 
     plot(x1, y);
     plot(x2, y);
   }
+}
+
+/** Couleurs du cadre de survol / de sélection : ombre puis trait (S24, S25, S26). */
+export const FRAME_SHADOW = 0x7e;
+export const FRAME_LINE = 0x7f;
+
+/** Recopie un rectangle de `source` (un tableau entier de 320 × 200) vers `work`, copie opaque rognée à l'écran (`13fc:0427`, S24). */
+export function copyRect(source: Uint8Array, work: Uint8Array, sx: number, sy: number, dx: number, dy: number, w: number, h: number): void {
+  for (let row = 0; row < h; row++) {
+    for (let col = 0; col < w; col++) {
+      const fromX = sx + col;
+      const fromY = sy + row;
+      const toX = dx + col;
+      const toY = dy + row;
+      if (fromX < 0 || fromX >= SCREEN_WIDTH || fromY < 0 || fromY >= SCREEN_HEIGHT) continue;
+      if (toX < 0 || toX >= SCREEN_WIDTH || toY < 0 || toY >= SCREEN_HEIGHT) continue;
+      work[toY * SCREEN_WIDTH + toX] = source[fromY * SCREEN_WIDTH + fromX];
+    }
+  }
+}
+
+/** Remplit un rectangle, bords compris, rogné à l'écran (`328a:0022`, S24). */
+export function fillRect(work: Uint8Array, x1: number, y1: number, x2: number, y2: number, color: number): void {
+  for (let y = Math.max(0, y1); y <= Math.min(SCREEN_HEIGHT - 1, y2); y++) {
+    for (let x = Math.max(0, x1); x <= Math.min(SCREEN_WIDTH - 1, x2); x++) work[y * SCREEN_WIDTH + x] = color;
+  }
+}
+
+// --- Chrono et zones des mini-jeux de recherche ---------------------------------------------------
+
+/** Temps imparti qui baisse avec le niveau : `base − pas × niveau` secondes (S24, S25, S29, S40 ; S26 ajoute un bonus, il garde sa formule). */
+export function levelTimeLimit(base: number, step: number, level: number): number {
+  return base - step * level;
+}
+
+/** Points selon les secondes écoulées : moins du tiers du temps, 3 ; moins des deux tiers, 2 ; sinon 1 (divisions entières ; S24, S25, S26). */
+export function pointsForTime(seconds: number, limit: number): number {
+  if (seconds < Math.floor(limit / 3)) return 3;
+  if (seconds < Math.floor((2 * limit) / 3)) return 2;
+  return 1;
+}
+
+/** Décalage entre les zones des tables d'objets cachés et les coordonnées du curseur (S25, S26). */
+export const OBJECT_ORIGIN_X = 32;
+export const OBJECT_ORIGIN_Y = 40;
+
+/** Zone d'un objet caché : `[x1, y1, x2, y2]`. */
+export type ObjectRect = readonly [number, number, number, number];
+
+/** Le curseur est sur l'objet : zone décalée de `(32, 40)` et élargie de `margin` de chaque côté, bord droit et bas exclus (`260f:01e4`, `1ed0:0318`). */
+export function isObjectHit(rect: ObjectRect, margin: number, x: number, y: number): boolean {
+  const [x1, y1, x2, y2] = rect;
+  return x1 - OBJECT_ORIGIN_X - margin <= x && y1 - OBJECT_ORIGIN_Y - margin <= y && x < x2 + margin - OBJECT_ORIGIN_X && y < y2 + margin - OBJECT_ORIGIN_Y;
 }
 
 // --- Curseur HY8 des scènes à pointeur libre ------------------------------------------------------

@@ -5,7 +5,7 @@ import { saveOptions } from "../engine/options";
 import type { Scene, SceneContext } from "../engine/scene";
 import { VideoScene } from "../engine/video";
 import { zoneIndex } from "../game/board";
-import { newGame, type Game, type GameEvent, type GameSetup } from "../game/rules";
+import { Game, newGame, type GameEvent, type GameSetup } from "../game/rules";
 import type { GameResult, MinigameOutcome, MinigameRequest } from "../game/state";
 import type { Position } from "../game/tables";
 import { GameClock } from "./board/clock";
@@ -18,6 +18,7 @@ import { Board, loadBoardResources, type BoardLook, type BoardResources } from "
 import { createHelpScene } from "./s45-help";
 import { createAbandonScene } from "./s46-abandon";
 import { createPauseScene, type PauseChoice } from "./s48-pause";
+import { captureSave, clearSave, writeSave, type GameSave } from "./save";
 
 /**
  * Partie (engine.md §1.4, `28a3:00ad`) : enchaîne les tours des joueurs sur le plateau S01 (`s01-board.ts`) et aiguille vers
@@ -36,12 +37,25 @@ import { createPauseScene, type PauseChoice } from "./s48-pause";
  * `Game.resolveMinigame`), événements du plateau (`events.ts`), vidéos de sortie `s01b` / `s01c`, indices vocaux. Pause (P) :
  * S48 empilée, qui mène à la reprise, à l'abandon (S46, rappelée tant qu'il reste des joueurs), à la carte S02 ou à l'aide S45.
  *
+ * Sauvegarde (`save.ts`) : au début de chaque tour (`beginTurn`), avant toute présentation, la partie est écrite dans le stockage
+ * local ; elle est effacée au lancement d'une nouvelle partie et dès que la fin de partie est connue. `resumeGameScene` reprend
+ * une sauvegarde : même état, même suite de tirages, directement sur l'annonce du tour sauvegardé (sans introduction S19
+ * si elle avait été dite).
+ *
  * Les chronos (`Game.tick`) suivent l'horloge de jeu en secondes entières ; ils sont gelés (tour seulement) pendant la pause,
  * les voix et l'annonce de début de tour ; la partie compte le temps des mini-jeux et des vidéos.
  */
 export function createGameScene(setup: GameSetup, onDone: (ctx: SceneContext) => void): GameScene {
-  return new GameScene(setup, onDone);
+  return new GameScene({ setup }, onDone);
 }
+
+/** Reprend une partie sauvegardée (`readSave`) au début de son tour ; mêmes rappels que `createGameScene`. */
+export function resumeGameScene(save: GameSave, onDone: (ctx: SceneContext) => void): GameScene {
+  return new GameScene({ save }, onDone);
+}
+
+/** Origine d'une partie : une nouvelle (réglages des joueurs) ou une sauvegarde. */
+type Start = { setup: GameSetup } | { save: GameSave };
 
 /** Étapes d'un script de scène : `frame` = reprendre à la prochaine image, `resume` = reprendre au retour d'une scène empilée. */
 type Wait = "frame" | "resume";
@@ -79,7 +93,7 @@ export class GameScene implements Scene {
   private result: GameResult | null = null;
 
   constructor(
-    private readonly setup: GameSetup,
+    private readonly start: Start,
     private readonly onDone: (ctx: SceneContext) => void,
   ) {}
 
@@ -88,12 +102,34 @@ export class GameScene implements Scene {
   }
 
   enter(ctx: SceneContext): void {
-    this.game = newGame(this.setup, ctx.rng);
+    if ("save" in this.start) this.restoreSave(ctx, this.start.save);
+    else {
+      // Une nouvelle partie remplace la sauvegarde de la précédente.
+      clearSave(ctx.host.storage);
+      this.game = newGame(this.start.setup, ctx.rng);
+      this.queue.push(...this.game.takeEvents());
+    }
     this.board = new Board(this.resources);
     this.clock = new GameClock(ctx);
-    this.queue.push(...this.game.takeEvents());
     this.script = this.run(ctx);
     ctx.fade.blackout();
+  }
+
+  /** Reprend `save` : état, générateur, mémoire des répliques, puis le début du tour sauvegardé (annonce du personnage). */
+  private restoreSave(ctx: SceneContext, save: GameSave): void {
+    ctx.rng.seed(save.rng);
+    this.game = Game.restore(save.state, ctx.rng);
+    this.commentary.restore(save.commentary);
+    this.introShown = save.introShown;
+    this.warning = save.warning;
+    const { current, round, turn } = this.game.state;
+    this.queue.push({ type: "turn", player: current, round, wellOpen: turn.wellOpen });
+  }
+
+  /** Écrit la partie telle qu'elle est au début du tour (appelé avant que le tour ne consomme du hasard). */
+  private save(ctx: SceneContext): void {
+    if (this.game.isOver()) return;
+    writeSave(ctx.host.storage, captureSave(this.game, ctx.rng, { commentary: this.commentary.snapshot(), introShown: this.introShown, warning: this.warning }));
   }
 
   update(): void {
@@ -188,6 +224,8 @@ export class GameScene implements Scene {
         break;
       case "over":
         this.result = event.result;
+        // La partie est jouée : plus rien à reprendre, même si l'onglet se ferme pendant la vidéo de fin.
+        clearSave(ctx.host.storage);
         break;
       // Déplacements de bord : déjà suivis par le plateau (`Board.step`). Gains, pertes, Schtroumpf à lunettes, oiseau : montrés
       // par le mini-jeu lui-même (`createMinigameAftermath` pour S38 et S39).
@@ -209,6 +247,8 @@ export class GameScene implements Scene {
   private *beginTurn(ctx: SceneContext, player: number, wellOpen: boolean): Script {
     // Le chrono du tour ne court pas pendant l'annonce (`1f33:0181(1)` n'est relancé qu'après).
     this.freeze(ctx);
+    // Le temps de la partie est à jour (`freeze`) et rien n'a encore tiré au hasard : c'est le point de reprise du tour.
+    this.save(ctx);
     ctx.voice.setMusic(this.musics[ctx.rng.below(this.musics.length)]);
     // `26ee:0f17`, avant l'affichage du plateau du joueur (jamais pour un tour passé : voir `skipTurn`).
     const progress = this.commentary.beforeTurn(this.game, ctx.rng);
@@ -360,6 +400,7 @@ export class GameScene implements Scene {
   /** Fin de partie : vidéo de victoire (S11) ou de fin du temps (S42), heure de fin enregistrée, retour au menu. */
   private *finish(ctx: SceneContext): Script {
     const result = this.result;
+    clearSave(ctx.host.storage);
     if (result?.kind === "victory") yield* this.grandSchtroumpf(ctx, { kind: "victory", winner: result.winner }, true);
     else if (result?.kind === "timeout") yield* this.grandSchtroumpf(ctx, { kind: "timeout", video: result.video }, true);
     // `21ee:1c92` : l'heure de fin sert au verrou parental (pause entre deux parties).

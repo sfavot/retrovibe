@@ -29,6 +29,31 @@ Ce document sert de brief commun aux sous-agents. Chaque tâche indique ses entr
   - Pas de survol pour sélectionner, pas de zones cliquables invisibles (S08, S04), pas de navigation par poussée contre les bords.
   - Curseur système masqué sur le canvas. Les scènes qui dessinent leur propre curseur HY8 (S51, S35, S26, S41, S25, S13, S24) le pilotent avec la position de la souris, comme l'original.
 - Visionneuse : `src/games/teleportaschtroumpf/ui/asset-viewer.html`. Jeu en dev : `src/games/teleportaschtroumpf/ui/dev.html`.
+- Phases 3 et 4 terminées :
+  - écrans hors partie, partie, plateau, carte, événements, Grand Schtroumpf ;
+  - les 20 mini-jeux (`docs/teleportaschtroumpf/minigames/`) ;
+  - le canal de bruitages mélangés (`engine.md` §5.2 bis).
+- Défauts de l'original corrigés à la demande, chacun documenté dans sa doc :
+  - débordements 16 bits du temps ;
+  - palier de points de S25 ;
+  - bonus de l'oiseau de S51 et indice partagé entre S36 et S27 ;
+  - animation du choc de S36.
+- Phase 5 terminée :
+  - jeu inscrit sur le site (jaquette `COVER.webp`) ;
+  - écran de présentation commun aux trois jeux (`src/ui/title-screen.ts`) ;
+  - manuel d'origine (`MANUEL.pdf`) et liste des contrôles ;
+  - bouton « Son » ;
+  - pause quand l'onglet est masqué ;
+  - reprise d'une partie interrompue (adaptation web, sauvegarde au début de chaque tour) ;
+  - robot de partie (`PLAY=1`, aucun bug trouvé sur 40 graines) ;
+  - revue et corrections.
+- Écarts connus restants :
+  - Les commentaires du Grand Schtroumpf en tour normal ne se déclenchent jamais, comme dans l'original.
+  - L'attente de fin de bip des menus n'est pas reproduite.
+  - La notice PDF a perdu la mise en forme du .doc.
+  - La jaquette fournie est celle de l'édition CD-i, avec un filigrane.
+  - Préférence de son en double avec Lost in Time : pourrait passer dans `src/ui/`.
+- Limite d'hébergement : le site publié pèse environ 320 Mo ; ajouter `mathemagique` et `zoombinis` tels quels dépasserait le 1 Go de GitHub Pages.
 
 ## État au 2026-10-22 (étude d'extraction)
 

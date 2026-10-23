@@ -7,7 +7,7 @@ import type { Timer } from "../../engine/clock";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Game } from "../../game/rules";
 import { DEFAULT_FONT } from "../common/text";
-import { minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
+import { levelTimeLimit, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
 
 /**
  * S40 « Le Quizz » (`2ee8:000d`, 2 401 octets ; RE : `docs/teleportaschtroumpf/minigames/s40.md`).
@@ -45,7 +45,7 @@ const PERIOD = 0x2e;
 
 /** Temps imparti (secondes) au niveau interne 0..2. */
 export function timeLimit(level: number): number {
-  return TIME_LIMIT_SECONDS - TIME_LIMIT_PER_LEVEL * level;
+  return levelTimeLimit(TIME_LIMIT_SECONDS, TIME_LIMIT_PER_LEVEL, level);
 }
 
 /** Numéro `n` du fichier `s40a<nnn>t.voc` : question, puis bonne réponse et deux fausses (`3 + 4q + décalage`, `4 + 4q + proposition + décalage`). */

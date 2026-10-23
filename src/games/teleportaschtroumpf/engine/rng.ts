@@ -14,6 +14,11 @@ export class BorlandRandom {
     this.state = seed >>> 0;
   }
 
+  /** État interne (32 bits) : `seed(state)` reprend la suite de tirages exactement là (sauvegarde de partie). */
+  get current(): number {
+    return this.state;
+  }
+
   /** Entier de 0 à 32767 (`rand()`). */
   next(): number {
     this.state = (Math.imul(this.state, 0x015a4e35) + 1) >>> 0;

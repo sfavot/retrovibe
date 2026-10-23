@@ -36,6 +36,7 @@ export class Engine {
   private volumeCooldown = 0;
   private fadeWasActive = false;
   private presented = false;
+  private paused = false;
 
   constructor(
     private readonly host: Host,
@@ -75,11 +76,32 @@ export class Engine {
     this.scenes.replace(scene);
   }
 
+  /** Vrai entre `setPaused(true)` et `setPaused(false)`. */
+  get isPaused(): boolean {
+    return this.paused;
+  }
+
+  /**
+   * Pause de l'hôte (onglet masqué) : plus aucun tick ni son, `frame` ne fait rien. À la reprise le jeu repart du
+   * même point : l'absence n'est pas rattrapée et le son reprend là où il s'était arrêté, donc vidéos et sons restent
+   * synchronisés. Sans rapport avec la touche « pause » du jeu (action `pause`, gérée par les scènes).
+   */
+  setPaused(paused: boolean): void {
+    if (paused === this.paused) return;
+    this.paused = paused;
+    if (paused) this.host.audio.suspend();
+    else {
+      this.clock.resync();
+      this.host.audio.resume();
+    }
+  }
+
   /**
    * Une image affichée : avance l'horloge, joue les ticks dus (entrées globales, son, fondu, scène),
    * dessine la scène si besoin et présente le résultat à l'hôte.
    */
   frame(nowMs: number): void {
+    if (this.paused) return;
     this.clock.update(nowMs);
     let changed = !this.presented;
     while (this.clock.consume()) this.tick();

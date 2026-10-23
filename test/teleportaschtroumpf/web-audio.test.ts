@@ -111,3 +111,69 @@ describe("WebAudioBackend : canal de bruitages", () => {
     expect(backend.effectPlaying).toBe(false);
   });
 });
+
+/** Contexte dont `resume()` / `suspend()` ne se résolvent qu'à la demande, comme dans un navigateur. */
+class SlowContext extends FakeContext {
+  override state = "suspended";
+  pending: (() => void)[] = [];
+  resumeCalls = 0;
+  private later(next: string): Promise<void> {
+    return new Promise((resolve) =>
+      this.pending.push(() => {
+        this.state = next;
+        resolve();
+      }),
+    );
+  }
+  override resume() {
+    this.resumeCalls++;
+    return this.later("running");
+  }
+  suspend() {
+    return this.later("suspended");
+  }
+}
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** Laisse la chaîne de promesses avancer, puis résout l'opération du contexte en attente. */
+const settle = async (ctx: SlowContext) => {
+  await flush();
+  ctx.pending.shift()?.();
+  await flush();
+};
+
+describe("WebAudioBackend : reprise du contexte", () => {
+  beforeEach(() => vi.stubGlobal("AudioContext", SlowContext));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("pendant la reprise, la voie et le bruitage restent vivants (rien ne les relance ni ne les croit finis)", async () => {
+    const backend = new WebAudioBackend();
+    backend.unlock();
+    const ctx = FakeContext.last as SlowContext;
+    await settle(ctx); // premier déblocage résolu
+    backend.play(sound(10), true);
+    backend.playEffect(sound(2));
+    backend.suspend();
+    await settle(ctx); // suspension résolue
+    backend.resume();
+    await flush();
+    expect(ctx.state).toBe("suspended"); // promesse de reprise non résolue
+    expect(backend.playing).toBe(true);
+    expect(backend.effectPlaying).toBe(true);
+    await settle(ctx);
+    expect(ctx.state).toBe("running");
+    expect(backend.playing).toBe(true);
+  });
+
+  it("un resume() juste après suspend() n'abandonne pas le contexte suspendu", async () => {
+    const backend = new WebAudioBackend();
+    backend.unlock();
+    const ctx = FakeContext.last as SlowContext;
+    await settle(ctx);
+    expect(ctx.state).toBe("running");
+    backend.suspend();
+    backend.resume(); // la suspension n'est pas encore terminée
+    for (let i = 0; i < 3; i++) await settle(ctx);
+    expect(ctx.state).toBe("running");
+  });
+});

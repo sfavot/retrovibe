@@ -1,16 +1,13 @@
+import { OBJECT_ORIGIN_X as ORIGIN_X, OBJECT_ORIGIN_Y as ORIGIN_Y } from "../../../src/games/teleportaschtroumpf/scenes/minigames/common";
 import { describe, expect, it } from "vitest";
 import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   BASE_TIME_LIMIT,
-  ORIGIN_X,
-  ORIGIN_Y,
   SoundGameScene,
   TARGETS,
   createSoundGame,
   drawPicture,
-  isHit,
-  pointsForTime,
   soundFile,
   timeLimit,
   tolerance,
@@ -49,31 +46,14 @@ describe("S26 : règles du jeu sonore (pur, `1ed0:000b`)", () => {
     expect(soundFile(4, 1)).toBe("s26a005b.voc");
   });
 
-  it("zone cliquable : décalée de (32, 40), élargie de 6 px (10 avec l'oiseau), bord droit et bas exclus", () => {
-    const rect = [201, 87, 239, 116] as const;
-    const [x1, y1, x2, y2] = rect;
-    const left = x1 - ORIGIN_X;
-    const top = y1 - ORIGIN_Y;
-    const right = x2 - ORIGIN_X;
-    const bottom = y2 - ORIGIN_Y;
-    const m = tolerance(false);
-    expect(m).toBe(6);
+  it("tolérance : 6 px, 10 avec l'oiseau", () => {
+    expect(tolerance(false)).toBe(6);
     expect(tolerance(true)).toBe(10);
-    expect(isHit(rect, m, left - m, top - m)).toBe(true);
-    expect(isHit(rect, m, left - m - 1, top)).toBe(false);
-    expect(isHit(rect, m, left, top - m - 1)).toBe(false);
-    expect(isHit(rect, m, right + m - 1, bottom + m - 1)).toBe(true);
-    expect(isHit(rect, m, right + m, bottom)).toBe(false);
-    expect(isHit(rect, m, left, bottom + m)).toBe(false);
-    expect(isHit(rect, tolerance(true), left - 8, top)).toBe(true);
-    expect(isHit(rect, m, left - 8, top)).toBe(false);
   });
 
-  it("temps : 15 s, 19 avec l'oiseau ; points : 3 sous le tiers, 2 sous les deux tiers, sinon 1", () => {
+  it("temps : 15 s, 19 avec l'oiseau", () => {
     expect(timeLimit(false)).toBe(BASE_TIME_LIMIT);
     expect(timeLimit(true)).toBe(19);
-    expect([0, 4, 5, 9, 10, 14, 15].map((s) => pointsForTime(s, 15))).toEqual([3, 3, 2, 2, 1, 1, 1]);
-    expect([0, 5, 6, 11, 12, 18].map((s) => pointsForTime(s, 19))).toEqual([3, 3, 2, 2, 1, 1]);
   });
 
   it("la requête est exigée : sans Game.openMinigame(26) la scène ne se construit pas", () => {

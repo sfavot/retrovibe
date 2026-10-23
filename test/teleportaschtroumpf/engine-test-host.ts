@@ -31,6 +31,13 @@ export class FakeAudio implements AudioBackend {
   /** Bruitages mélangés lancés (`playEffect`), dans l'ordre. */
   readonly effects: PlayedSound[] = [];
   effectStops = 0;
+  /** Sortie coupée par l'utilisateur (`setMuted`) : les sons continuent de se dérouler, muets. */
+  muted = false;
+  /** Vrai entre `suspend()` et `resume()` : le temps de lecture est figé. */
+  suspended = false;
+  private suspendedAt = 0;
+  /** Durée cumulée des suspensions (ms) : le temps de lecture est `nowMs() - pausedMs`. */
+  private pausedMs = 0;
   private current: PlayedSound | null = null;
   private currentEffect: PlayedSound | null = null;
 
@@ -40,10 +47,31 @@ export class FakeAudio implements AudioBackend {
     this.unlocked = true;
   }
 
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+  }
+
+  suspend(): void {
+    if (this.suspended) return;
+    this.suspended = true;
+    this.suspendedAt = this.nowMs();
+  }
+
+  resume(): void {
+    if (!this.suspended) return;
+    this.suspended = false;
+    this.pausedMs += this.nowMs() - this.suspendedAt;
+  }
+
+  /** Temps de lecture (ms) : figé pendant une suspension. */
+  private time(): number {
+    return (this.suspended ? this.suspendedAt : this.nowMs()) - this.pausedMs;
+  }
+
   play(sound: PcmSound, loop: boolean): void {
     this.current = null;
     if (!this.enabled) return;
-    this.current = { sound, loop, at: this.nowMs() };
+    this.current = { sound, loop, at: this.time() };
     this.plays.push(this.current);
   }
 
@@ -55,7 +83,7 @@ export class FakeAudio implements AudioBackend {
   playEffect(sound: PcmSound): void {
     this.currentEffect = null;
     if (!this.enabled) return;
-    this.currentEffect = { sound, loop: false, at: this.nowMs() };
+    this.currentEffect = { sound, loop: false, at: this.time() };
     this.effects.push(this.currentEffect);
   }
 
@@ -66,11 +94,11 @@ export class FakeAudio implements AudioBackend {
 
   get effectPlaying(): boolean {
     const e = this.currentEffect;
-    return !!e && (this.nowMs() - e.at) / 1000 < e.sound.samples.length / e.sound.sampleRate;
+    return !!e && (this.time() - e.at) / 1000 < e.sound.samples.length / e.sound.sampleRate;
   }
 
   private elapsed(): number {
-    return this.current ? (this.nowMs() - this.current.at) / 1000 : 0;
+    return this.current ? (this.time() - this.current.at) / 1000 : 0;
   }
 
   get playing(): boolean {
@@ -99,6 +127,9 @@ export class MemoryStorage implements HostStorage {
   set(key: string, value: string): boolean {
     this.data.set(key, value);
     return true;
+  }
+  remove(key: string): void {
+    this.data.delete(key);
   }
 }
 

@@ -17,16 +17,43 @@ export class WebAudioBackend implements AudioBackend {
   private effectSource: AudioBufferSourceNode | null = null;
   private effectActive = false;
   private gain = 1;
+  private muted = false;
+  /** Figé par `suspend()` (onglet masqué) : le contexte ne doit pas repartir avant `resume()`. */
+  private suspended = false;
+  /** Reprises lancées dont la promesse `ctx.resume()` n'est pas résolue : le contexte y est encore `suspended`, mais les sons sont seulement en attente. */
+  private resuming = 0;
+  /** Suite des `suspend()` / `resume()` du contexte : chaque appel attend la fin du précédent, pour que le dernier gagne. */
+  private transition: Promise<unknown> = Promise.resolve();
+  private transitions = 0;
   private readonly buffers = new WeakMap<Uint8Array, AudioBuffer>();
 
   unlock(): void {
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.gainNode = this.ctx.createGain();
-      this.gainNode.gain.value = this.gain;
+      this.gainNode.gain.value = this.outputGain();
       this.gainNode.connect(this.ctx.destination);
     }
-    if (this.ctx.state === "suspended") void this.ctx.resume();
+    if (this.ctx.state === "suspended" && !this.suspended) this.startResume(this.ctx);
+  }
+
+  /** Exécute `op` tout de suite si aucune transition n'est en cours, sinon à la suite de la dernière. */
+  private enqueue(op: () => Promise<void> | undefined): Promise<unknown> {
+    const run = (): Promise<unknown> => Promise.resolve(op()).catch(() => undefined);
+    this.transitions++;
+    const done = (): void => {
+      this.transitions--;
+    };
+    this.transition = (this.transitions === 1 ? run() : this.transition.then(run)).finally(done);
+    return this.transition;
+  }
+
+  /** Relance le contexte après les transitions en cours ; tant que la promesse n'est pas résolue, la sortie reste « vivante ». */
+  private startResume(ctx: AudioContext): void {
+    this.resuming++;
+    void this.enqueue(() => ctx.resume()).finally(() => {
+      this.resuming--;
+    });
   }
 
   private buffer(ctx: AudioContext, sound: PcmSound): AudioBuffer {
@@ -87,8 +114,13 @@ export class WebAudioBackend implements AudioBackend {
     }
   }
 
+  /** Vrai si la sortie est utilisable : contexte démarré, figé par `suspend()` ou en cours de reprise (les sons y sont seulement en pause). */
+  private get live(): boolean {
+    return this.ctx?.state === "running" || ((this.suspended || this.resuming > 0) && this.ctx !== null);
+  }
+
   get effectPlaying(): boolean {
-    return this.effectActive && this.ctx?.state === "running";
+    return this.effectActive && this.live;
   }
 
   stop(): void {
@@ -105,17 +137,42 @@ export class WebAudioBackend implements AudioBackend {
   }
 
   get playing(): boolean {
-    return this.active && this.ctx?.state === "running";
+    return this.active && this.live;
   }
 
   get position(): number {
+    // `currentTime` est figé tant que le contexte est suspendu : la position aussi.
     if (!this.active || !this.ctx) return 0;
     const elapsed = this.ctx.currentTime - this.startedAt;
     return this.looping && this.duration > 0 ? elapsed % this.duration : Math.min(elapsed, this.duration);
   }
 
+  /** Gain réellement envoyé : le volume du jeu, ou 0 si l'utilisateur a coupé le son. */
+  private outputGain(): number {
+    return this.muted ? 0 : this.gain;
+  }
+
   setGain(gain: number): void {
     this.gain = gain;
-    if (this.gainNode) this.gainNode.gain.value = gain;
+    if (this.gainNode) this.gainNode.gain.value = this.outputGain();
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (this.gainNode) this.gainNode.gain.value = this.outputGain();
+  }
+
+  suspend(): void {
+    this.suspended = true;
+    const ctx = this.ctx;
+    if (!ctx) return;
+    // Chaînée : un `resume()` très proche ne doit pas passer avant et laisser le contexte suspendu.
+    void this.enqueue(() => (ctx.state === "running" ? ctx.suspend() : undefined));
+  }
+
+  resume(): void {
+    this.suspended = false;
+    // Appelé quel que soit l'état : une suspension encore en cours est rattrapée par la chaîne.
+    if (this.ctx) this.startResume(this.ctx);
   }
 }

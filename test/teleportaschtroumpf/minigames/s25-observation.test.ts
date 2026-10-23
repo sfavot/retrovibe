@@ -3,17 +3,13 @@ import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   HIDDEN_OBJECTS,
-  ORIGIN_X,
-  ORIGIN_Y,
   START_X,
   START_Y,
   ObservationScene,
   createObservation,
   drawPicture,
   internalLevel,
-  isHit,
   pictureFile,
-  pointsForTime,
   timeLimit,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s25-observation";
 import { hasOriginalFiles, listData } from "../helpers";
@@ -53,28 +49,6 @@ describe("S25 : règles de l'observation (pur, `260f:000e`)", () => {
   it("temps : 35 − 5 × niveau interne (niveau du joueur + 1) = 30, 25, 20 s ; l'oiseau force 0 = 35 s", () => {
     expect([0, 1, 2].map((level) => timeLimit(internalLevel(level, false)))).toEqual([30, 25, 20]);
     expect([0, 1, 2].map((level) => timeLimit(internalLevel(level, true)))).toEqual([35, 35, 35]);
-  });
-
-  it("points : 3 sous le tiers du temps, 2 sous les deux tiers, sinon 1 (divisions entières)", () => {
-    expect([0, 9, 10, 19, 20, 29].map((s) => pointsForTime(s, 30))).toEqual([3, 3, 2, 2, 1, 1]);
-    expect([0, 7, 8, 15, 16, 24].map((s) => pointsForTime(s, 25))).toEqual([3, 3, 2, 2, 1, 1]);
-    expect([0, 5, 6, 12, 13, 19].map((s) => pointsForTime(s, 20))).toEqual([3, 3, 2, 2, 1, 1]);
-    expect([0, 10, 11, 22, 23, 34].map((s) => pointsForTime(s, 35))).toEqual([3, 3, 2, 2, 1, 1]);
-  });
-
-  it("zone cliquable : décalée de (32, 40), sans marge, bord droit et bas exclus", () => {
-    const rect = HIDDEN_OBJECTS[0];
-    const [x1, y1, x2, y2] = rect;
-    const left = x1 - ORIGIN_X;
-    const top = y1 - ORIGIN_Y;
-    const right = x2 - ORIGIN_X;
-    const bottom = y2 - ORIGIN_Y;
-    expect(isHit(rect, left, top)).toBe(true);
-    expect(isHit(rect, right - 1, bottom - 1)).toBe(true);
-    expect(isHit(rect, left - 1, top)).toBe(false);
-    expect(isHit(rect, left, top - 1)).toBe(false);
-    expect(isHit(rect, right, top)).toBe(false);
-    expect(isHit(rect, left, bottom)).toBe(false);
   });
 
   it("la requête est exigée : sans Game.openMinigame(25) la scène ne se construit pas", () => {

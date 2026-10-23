@@ -6,7 +6,9 @@ Sous-commandes :
   iso <bin> <iso> <nb_secteurs>      -> secteurs bruts MODE1/2352 -> ISO 2048
   copier <racine_iso> <dest> <stats> -> filtre et copie DATA/JEU_F + SMURF.EXE ; stats JSON
   inventaire <dest> <stats> <sortie_md>
+  manuel <html_textutil> <html_propre> -> met en page la notice (HTML de textutil) avant l'impression en PDF
 """
+import html
 import json
 import os
 import re
@@ -126,15 +128,82 @@ def cmd_inventaire(dest, stats_json, sortie):
     L += ['', '## Pistes audio du CD', '',
           '- Les pistes CD-DA 2 à 7 existent sur le disque mais ne sont pas extraites : '
           'le jeu ne les lit jamais (voir `docs/teleportaschtroumpf/engine.md` §5).', '',
+          '## Notice', '',
+          '- `MANUEL.pdf` : la notice d\'Infogrames (`Lisez moi.doc` à la racine du CD), convertie par '
+          '`textutil` puis Chrome en mode headless (mise en page simplifiée : le lecteur Word de `textutil` perd gras et '
+          'tailles). Elle n\'est pas lue par le jeu.', '',
           '## Régénérer', '', '```', 'bash scripts/teleportaschtroumpf-extract.sh [archive.rar]', '```', '',
           'Archive par défaut : `archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar` '
-          '(non versionnée). Outils requis : `bsdtar`, `7zz`, `python3`.', '']
+          '(non versionnée). Outils requis : `bsdtar`, `7zz`, `python3` ; pour la notice, `textutil` et Google Chrome (macOS).', '']
     os.makedirs(os.path.dirname(sortie), exist_ok=True)
     with open(sortie, 'w') as o:
         o.write('\n'.join(L))
+
+CSS_MANUEL = """
+@page { size: A4; margin: 20mm 18mm; }
+body { font: 11pt/1.45 Helvetica, Arial, sans-serif; color: #111; max-width: 40em; margin: 0 auto; }
+h1 { font-size: 20pt; margin: 0 0 1em; }
+h3 { font-size: 11pt; margin: 1.1em 0 .3em; break-after: avoid; }
+h2 { font-size: 14pt; margin: 1.6em 0 .5em; break-after: avoid; border-bottom: 1px solid #999; padding-bottom: .15em; }
+p { margin: 0 0 .45em; }
+ul { margin: 0 0 .8em; padding-left: 1.4em; }
+li { margin: 0 0 .25em; }
+"""
+TITRES = {
+    'Crédits', 'But du jeu', 'Configuration Nécessaire', 'Commandes', 'Menu principal', 'Le menu «Schtroumpf»',
+    'Personnalisation', 'par le menu «Parents»', 'Début de partie', 'Écran de jeu', 'Fin de partie', 'Ecran Pause',
+    'La carte du Pays Schtroumpf', 'L’écran «Infos»', 'Temps limité', 'Aide sonore', 'Guide de Dépannage',
+    'Lancement du jeu', 'AVERTISSEMENT SUR L’EPILEPSIE',
+}
+SOUS_TITRES = {
+    'Clavier', 'Sélection', 'Validation', 'Option «durée»:', 'Option «pause»:', 'Option «motif d’arrêt de jeu»:',
+    'LE PROGRAMME NE SE CHARGE PAS CORRECTEMENT', 'LE MESSAGE “ Mémoire RAM = 540 KO” APPARAÎT',
+    'Optimisation de la mémoire', 'BOOT MINIMAL', 'Sous Windows 95', 'Sous Dos 5.xx ou Dos 6.xx.',
+}
+
+
+def cmd_manuel(entree, sortie):
+    """Notice : le lecteur Word de textutil perd gras et tailles, mais garde le texte ; les titres sont donc
+    repérés par leur libellé (liste fermée, la notice est un document figé)."""
+    src = open(entree, encoding='utf-8').read()
+    paras = []
+    for m in re.finditer(r'<p class="p\d+">(.*?)</p>', src, re.S):
+        brut = re.sub(r'<[^>]+>', '', m.group(1).replace('<br>', ''))
+        paras.append(re.sub(r'\s+', ' ', html.unescape(brut).replace('\xa0', ' ')).strip())
+    # Le « É » initial manque dans le document d'origine : « cran de jeu ».
+    paras = ['Écran de jeu' if p == 'cran de jeu' else p for p in paras]
+    corps, liste = [], []
+
+    def vider():
+        if liste:
+            corps.append('<ul>%s</ul>' % ''.join('<li>%s</li>' % html.escape(i) for i in liste))
+            liste.clear()
+
+    for p in paras:
+        if not p:
+            continue
+        if p.startswith('•'):
+            liste.append(p.lstrip('• \t'))
+            continue
+        vider()
+        t = html.escape(p)
+        if p in TITRES:
+            if p == 'par le menu «Parents»':  # titre sur deux lignes dans le document
+                corps[-1] = corps[-1][:-5] + ' ' + t + '</h2>'
+            else:
+                corps.append('<h1>%s</h1>' % t if p == 'Crédits' else '<h2>%s</h2>' % t)
+        elif p in SOUS_TITRES:
+            corps.append('<h3>%s</h3>' % t)
+        else:
+            corps.append('<p>%s</p>' % t)
+    vider()
+    titre_doc = 'Le Téléportaschtroumpf : notice d\'origine'
+    with open(sortie, 'w', encoding='utf-8') as o:
+        o.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>%s</title><style>%s</style></head>'
+                '<body>%s</body></html>' % (html.escape(titre_doc), CSS_MANUEL, '\n'.join(corps)))
 
 
 if __name__ == '__main__':
     c, a = sys.argv[1], sys.argv[2:]
     {'pistes': cmd_pistes, 'iso': cmd_iso,
-     'copier': cmd_copier, 'inventaire': cmd_inventaire}[c](*a)
+     'copier': cmd_copier, 'inventaire': cmd_inventaire, 'manuel': cmd_manuel}[c](*a)

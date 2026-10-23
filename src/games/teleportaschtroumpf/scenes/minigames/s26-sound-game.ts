@@ -4,7 +4,7 @@ import type { Voc } from "../../data/voc";
 import type { Timer } from "../../engine/clock";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Game } from "../../game/rules";
-import { Pointer, drawFrame, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
+import { FRAME_LINE, FRAME_SHADOW, OBJECT_ORIGIN_X, OBJECT_ORIGIN_Y, Pointer, drawFrame, isObjectHit, minigameRequest, pointsForTime, pointsOutcome, type ObjectRect, type MinigameDone, type MinigameFactory } from "./common";
 
 /**
  * S26 « Jeu Sonore » (`1ed0:000b`, 1 582 octets ; RE : `docs/teleportaschtroumpf/minigames/s26.md`).
@@ -19,14 +19,11 @@ import { Pointer, drawFrame, minigameRequest, pointsOutcome, type MinigameDone, 
  * - rend : `onDone(ctx, { kind: "points", points })` : 3, 2 ou 1 point selon la rapidité (tiers du temps imparti), 0 en cas d'échec ; l'appelant applique l'issue.
  */
 
-/** Zone d'un objet : `[x1, y1, x2, y2]` dans le repère de l'original, décalé de `(32, 40)` par rapport à l'écran (`1ed0:0318..03b8`). */
-export type Rect = readonly [number, number, number, number];
-
 /**
  * Les quatre objets de chacun des neuf décors (`DS:1A80`, 360 octets : 9 décors × 4 objets × 5 mots, le 5e étant le numéro 0..3). Le
  * décor 5 n'est jamais tiré ; il est identique au décor 7.
  */
-export const TARGETS: readonly (readonly Rect[])[] = [
+export const TARGETS: readonly (readonly ObjectRect[])[] = [
   [[261, 177, 321, 210], [104, 164, 164, 221], [136, 121, 183, 142], [201, 87, 239, 116]],
   [[106, 199, 166, 234], [286, 132, 345, 191], [138, 121, 185, 141], [221, 149, 259, 180]],
   [[274, 202, 335, 237], [98, 123, 159, 182], [206, 157, 255, 180], [306, 125, 344, 155]],
@@ -38,9 +35,6 @@ export const TARGETS: readonly (readonly Rect[])[] = [
   [[282, 52, 315, 130], [69, 56, 144, 134], [179, 144, 250, 198], [276, 154, 325, 179]],
 ];
 
-/** Décalage entre le repère de la table et l'écran. */
-export const ORIGIN_X = 32;
-export const ORIGIN_Y = 40;
 /** Marge autour de la zone : 6 px, et 4 de plus avec l'indice de l'oiseau (`(2 − niveau) × 3 + bonus`, le niveau valant 0). */
 export const BASE_TOLERANCE = 6;
 export const BONUS_TOLERANCE = 4;
@@ -56,9 +50,6 @@ const PAUSE_TICKS = 30;
 /** Cadence de la boucle du curseur (`1f33:0348(5)`) et nombre d'images du curseur. */
 const LOOP_TICKS = 5;
 const CURSOR_FRAMES = 4;
-/** Couleurs des deux cadres de la bonne réponse (`32af:0006`) : ombre `0x7E`, trait `0x7F`. */
-const FRAME_SHADOW = 0x7e;
-const FRAME_LINE = 0x7f;
 const VOICE_COUNT = 6;
 
 /** Décor (1 à 9, jamais 5) tiré par `rand × 9 / 0x8000 + 1` jusqu'à ne pas valoir 5. */
@@ -85,19 +76,6 @@ export function tolerance(bonus: boolean): number {
 
 export function timeLimit(bonus: boolean): number {
   return BASE_TIME_LIMIT + (bonus ? BONUS_TIME_LIMIT : 0);
-}
-
-/** Le curseur est sur l'objet : zone décalée de `(32, 40)` et élargie de `margin` de chaque côté (`1ed0:0318..03b8`, bord droit / bas exclu). */
-export function isHit(rect: Rect, margin: number, x: number, y: number): boolean {
-  const [x1, y1, x2, y2] = rect;
-  return x1 - ORIGIN_X - margin <= x && y1 - ORIGIN_Y - margin <= y && x < x2 + margin - ORIGIN_X && y < y2 + margin - ORIGIN_Y;
-}
-
-/** Points selon les secondes écoulées : moins du tiers du temps, 3 ; moins des deux tiers, 2 ; sinon 1 (`1ed0:0547..059e`, divisions entières). */
-export function pointsForTime(seconds: number, limit: number): number {
-  if (seconds < Math.floor(limit / 3)) return 3;
-  if (seconds < Math.floor((2 * limit) / 3)) return 2;
-  return 1;
 }
 
 export type SoundGamePhase = "view" | "fadeOut" | "pause" | "listen" | "hunt" | "revealFade" | "revealSound" | "revealPause" | "verdict" | "done";
@@ -151,14 +129,14 @@ export class SoundGameScene implements Scene {
   }
 
   /** Zone de l'objet à trouver, dans le repère de la table. */
-  get targetRect(): Rect {
+  get targetRect(): ObjectRect {
     return TARGETS[this.picture - 1][this.target - 1];
   }
 
   /** Centre de l'objet à trouver à l'écran. */
   get targetCenter(): { x: number; y: number } {
     const [x1, y1, x2, y2] = this.targetRect;
-    return { x: Math.floor((x1 + x2) / 2) - ORIGIN_X, y: Math.floor((y1 + y2) / 2) - ORIGIN_Y };
+    return { x: Math.floor((x1 + x2) / 2) - OBJECT_ORIGIN_X, y: Math.floor((y1 + y2) / 2) - OBJECT_ORIGIN_Y };
   }
 
   get hasBonus(): boolean {
@@ -348,7 +326,7 @@ export class SoundGameScene implements Scene {
   /** `1ed0:02ce..03b8` : le décor revient (noir, puis fondu) et le clic est jugé sur la position courante du curseur. */
   private endHunt(ctx: SceneContext): void {
     const { x, y } = this.pointer.position(ctx);
-    this.success = this.click === 1 && isHit(this.targetRect, this.margin, x, y);
+    this.success = this.click === 1 && isObjectHit(this.targetRect, this.margin, x, y);
     this.earned = this.success ? pointsForTime(this.elapsed, this.limit) : 0;
     this.cursorShown = false;
     ctx.palette.load(this.picturePalette);

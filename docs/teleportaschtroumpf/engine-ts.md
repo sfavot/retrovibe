@@ -27,6 +27,7 @@ Brief pour les phases 3 (écrans) et 4 (mini-jeux). Spec de comportement : `engi
 | `game/` | Logique pure de la partie et du plateau (`Game`, tables), sans rendu (`rules.md`). |
 | `scenes/game.ts`, `scenes/s01-board.ts`, `scenes/board/` | Partie (`28a3:00ad`) et plateau S01 (`291e:0401`) ; écrans empilés `s02-map.ts`, `events.ts`, `grand-schtroumpf.ts` et `minigames.ts` + `minigames/` (voir « Partie et plateau » et « Écrire un mini-jeu »). |
 | `ui/app.ts`, `ui/browser-host.ts`, `ui/dev.html`, `ui/dev.ts`, `ui/style.css` | Hôte navigateur, canvas à l'échelle entière, boucle `requestAnimationFrame`, page de dev. |
+| `scenes/save.ts` | Sauvegarde de la partie en cours (voir « Reprise d'une partie interrompue »). |
 | `index.ts` | `GameDefinition` `teleportaschtroumpf` (pas encore dans `src/games/registry.ts`). |
 
 Page de dev : `npx vite`, puis `/src/games/teleportaschtroumpf/ui/dev.html` (hors build). Les fichiers du jeu sont servis en `/teleportaschtroumpf/…` depuis `original/teleportaschtroumpf/`.
@@ -198,6 +199,15 @@ Logo S52D0 : image `s52d00.mcg` en fondu d'entrée → vidéo `s52d0.mux` (≈ 1
 
 `host.exit()` (« Quitter » après le générique). Navigateur (`ui/app.ts`) : retour à l'accueil (`location.hash = "#/"`) si le jeu est monté depuis le site, redémarrage du jeu sur la page de dev. Hôte de test : `host.exited`.
 
+### UI navigateur (`ui/app.ts`, `ui/prefs.ts`, `ui/browser-host.ts`)
+
+- **Bouton « Son »** sous l'écran (classe partagée `toggle`, `aria-pressed`) : coupe et rétablit toute la sortie (voie, musique, vidéos, bruitages) via `AudioBackend.setMuted`, qui met le gain général Web Audio à 0 sans arrêter les sons (`playing`, `effectPlaying`, `position` inchangés : moteur et vidéos restent synchronisés). **Indépendant** du volume 0 à 15 (F1/F2, `setGain`). Préférence `SoundPrefs` (`ui/prefs.ts`, clé `retrovibe:teleportaschtroumpf:sound`, localStorage protégé), relue sur l'événement `storage` (autre onglet). Un clic débloque l'audio et rend le focus au canvas.
+- **Onglet masqué** : `Engine.setPaused(true)` : `frame` ne fait plus rien, `AudioBackend.suspend()` fige le contexte (`currentTime`, donc `position`) ; au retour, `setPaused(false)` relance le contexte et `Clock.resync()` oublie l'absence (pas de rattrapage) : le jeu repart au même point. Rien à voir avec la touche « pause » du jeu.
+- **Clavier / focus** : le canvas bloque le comportement du navigateur pour toute touche du jeu (F1, F2, Espace, Entrée, flèches, Échap, Q/A/Z/X, P) ; il reprend le focus au retour sur l'onglet, au focus de la fenêtre et après un clic sur « Son » ; anneau `:focus-visible` dans l'écran.
+- **États** : « Chargement… » pendant le chargement ; `MissingFilesError` (`files.json` absent ou illisible, ressource 404) donne un message dédié (`copy.missingFiles`), distinct de `loadError` / `runtimeError` ; le lien de retour reste affiché.
+- **Responsive** : échelle entière calculée sur la place réellement disponible (largeur du conteneur, hauteur de la fenêtre moins le pied de page), pied de page de la largeur de l'écran qui passe à la ligne ; pas de défilement horizontal à 375 px.
+- Tests : `test/teleportaschtroumpf/ui-sound.test.ts`, `ui-pause.test.ts` ; `FakeAudio` simule `muted` et `suspend`/`resume`.
+
 ### `engine/menu.ts`
 
 `new Menu({ items, axis, wrap?, highlight?, initial?, changeSound? })`, avec `items: { voice? }[]`. `axis` : `"vertical"` (haut/bas), `"horizontal"` (gauche/droite) ou `"none"` (la scène déplace elle-même la sélection avec `select`, ex. S46 à deux dimensions). `wrap` (défaut vrai : S07, S08) ; `wrap: false` borne l'index (S09, S04, S49, S48 : l'original ne reboucle pas). `changeSound` : bip de navigation (`s07a001b.voc` pour S07, S08 et S04) joué à chaque changement par une touche, jamais à l'entrée ni via `select`. La scène appelle `await menu.load(ctx)` dans `load`, `menu.enter(ctx)` dans `enter` (et `resume`), `menu.update(ctx)` dans `update` (renvoie `{ kind: "validate" | "help", index } | null`), `menu.render(ctx)` dans `render`, `menu.exit(ctx)` dans `exit`. Espace / clic gauche = `validate` sur l'élément courant ; Entrée / clic droit = voix de l'élément (jouée par le menu) puis `help`. Surbrillance : `paletteHighlight(premièreEntrée, [r, g, b])` (S07) ou `spriteHighlight(sprites, place)` ; toute autre stratégie est un `MenuHighlight` (`select`, `deselect`, `render`).
@@ -254,6 +264,18 @@ Détail RE et écarts : `screens-game.md`. Logique : `game/` (`rules.md`).
 - Le chrono du tour est gelé (pause, voix, annonce) ; celui de la partie court aussi pendant mini-jeux et vidéos.
 - Fin de partie : vidéo S11 ou S42, `lastGameMinutes` enregistré, musique coupée, `onDone` (→ menu S07).
 
+### Reprise d'une partie interrompue (adaptation web, `scenes/save.ts`)
+
+L'original n'a pas de sauvegarde ; ici, quitter en cours de partie (onglet fermé, retour à l'accueil) permet de reprendre au même point.
+
+- **Écriture** : au début de chaque tour (`GameScene.beginTurn`, après la mise à jour du chrono de partie, avant tout tirage du tour), jamais pendant un mini-jeu ni un événement. Un seul emplacement, clé `retrovibe:teleportaschtroumpf:game` (`HostStorage`, `remove` facultatif : sans lui, une valeur vide vaut « absente »).
+- **Contenu** (`GameSave`, JSON pur, `version: 1`) : `Game.state` (joueur courant, tour, temps de partie `elapsed`, objectif, chrono du tour), état du `BorlandRandom` (`rng.current`), mémoire de `Commentary` (répliques déjà dites), `introShown` (S19 déjà dit), avertissement de temps annoncé du tour. Un tour passé (prison, siphon) n'écrit rien : la reprise revient au dernier tour jouable.
+- **Reprise** : `resumeGameScene(save, onDone)` remet l'état (`Game.restore`) et la graine (`rng.seed`), puis rejoue le début du tour sauvegardé (annonce du personnage) : mêmes tirages qu'une partie non interrompue. Pas de logo, d'introduction ni de menu. Le chrono reprend à `state.elapsed` ; le temps passé hors du jeu ne compte pas (nouvelle `Clock`, `GameClock` repart de zéro).
+- **Effacement** : au lancement d'une nouvelle partie (`enter`), dès que la fin de partie est connue (événement `over` : victoire, temps écoulé, abandon complet), et à `finish`.
+- **Lecture** : `readSave` vérifie la version et la forme ; une sauvegarde illisible, d'une autre version ou incohérente est ignorée et effacée. Changer le format impose d'incrémenter `SAVE_VERSION`.
+- **Écran de présentation** (`ui/title.ts`, `index.ts`) : avec une sauvegarde valide, « Reprendre la partie » est le bouton principal (focus) et « Jouer » passe en secondaire ; `mountApp(…, { resume: true })` démarre alors directement sur `resumeGameScene`.
+- Tests : `test/teleportaschtroumpf/save-format.test.ts` (aller-retour JSON, validation), `save-scene.test.ts` (écriture, reprise, effacement).
+
 ### Contrats des écrans empilés
 
 Chaque fichier documente son contrat en tête (détail RE : `screens-map.md`, `screens-events.md`, `screens-grand-schtroumpf.md`). `game.ts` empile ces scènes et les retire (`pop`) dans leur rappel. Les mini-jeux (`minigames.ts`) sont écrits (lot E3) : les 20 le sont, aucun n'est une souche.
@@ -280,7 +302,7 @@ Recette pour les agents qui écrivent un mini-jeu en parallèle des autres. Exem
 ### Ce qui est à toi, ce qui ne l'est pas
 
 - À toi : **ton fichier** `scenes/minigames/sNN-nom.ts` (déjà inscrit dans `minigames.ts` : tu remplaces le corps de la souche et gardes l'export de la fabrique), `test/teleportaschtroumpf/minigames/sNN-nom.test.ts` (à créer), `docs/teleportaschtroumpf/minigames/sNN.md` (à créer), et d'éventuels fichiers à toi dans un sous-dossier `scenes/minigames/sNN/` ou `sNN-*.ts`. S38 et S39 gardent aussi leur `createXxxAftermath` (présentation de l'issue, inscrite dans `AFTERMATHS`).
-- Pas à toi, jamais en parallèle : `minigames.ts`, `minigames/common.ts`, `engine/**`, `game/**`, `registry.ts`, les autres mini-jeux et leurs tests. Si un outil manque dans `common.ts`, écris-le dans ton fichier et signale-le (le lot suivant le rangera en commun). Si `game/` est faux (règle prouvée par la RE), signale-le sans le corriger.
+- Pas à toi, jamais en parallèle : `minigames.ts`, `minigames/common.ts`, `engine/**`, `game/**`, `registry.ts`, les autres mini-jeux et leurs tests. Si un outil manque dans `common.ts`, écris-le dans ton fichier et signale-le (le lot suivant le rangera en commun) ; avant d'écrire un chrono, un calcul de points ou un rectangle, vérifie la liste ci-dessous. Si `game/` est faux (règle prouvée par la RE), signale-le sans le corriger.
 - Le rapport de chaque mini-jeu dit : ce qui est reproduit, les écarts, ce qui n'a pas pu être vérifié.
 
 ### Lire d'abord
@@ -304,6 +326,11 @@ Recette pour les agents qui écrivent un mini-jeu en parallèle des autres. Exem
 | `goalClip(game, ing, { inGoal, notInGoal })` | vidéo de réussite des mini-jeux à ingrédient : les deux fichiers sont nommés explicitement car le sens **n'est pas universel** (`c2` dans l'objectif pour S27, S28, S31, S32 (`cd2`), S34, S36 ; `c1` pour S22 et S33). Test : `minigames/ingredient-clips.test.ts` |
 | `SoundHush` | fondu sonore de fin `1343:0037` : `start(ctx[, volume])`, `update(ctx)` à chaque tick (vrai quand le son est coupé et le volume rendu), `restore(ctx)` dans `exit` ; la musique (`holdMusic`) reste à la scène |
 | `drawFrame(surface, x1, y1, x2, y2, couleur)` | cadre d'un pixel `32af:0006` (cadres de survol), rogné à l'écran |
+| `FRAME_SHADOW`, `FRAME_LINE` | couleurs (`0x7e`, `0x7f`) du double cadre de survol et de sélection (S24, S25, S26) |
+| `copyRect(source, work, sx, sy, dx, dy, w, h)`, `fillRect(work, x1, y1, x2, y2, couleur)` | copie opaque et remplissage de rectangle (`13fc:0427`, `328a:0022`), rognés à l'écran ; travaillent sur un `Uint8Array` 320 × 200 |
+| `levelTimeLimit(base, pas, niveau)` | temps imparti `base − pas × niveau` (S24, S25, S29, S40) ; la formule à bonus de S26 reste chez lui |
+| `pointsForTime(secondes, limite)` | 3 sous le tiers du temps, 2 sous les deux tiers, sinon 1, divisions entières (S24, S25, S26) ; S29 a des seuils fixes (10 s, 20 s) et les garde |
+| `isObjectHit(rect, marge, x, y)`, `OBJECT_ORIGIN_X/Y`, `ObjectRect` | zone d'un objet caché décalée de (32, 40), élargie de `marge`, bord droit et bas exclus (S25 sans marge, S26 avec) ; le `isHit` de S28 (zones par cible) reste chez lui |
 | `Clip` | une vidéo MUX dans ta scène : `load`, `start`, `update`, `render`, `stop` ; options `skippable`, `onFrame(ctx, image, marqueurs)` (rappel par image décodée, `"stop"` interrompt), `overlay(ctx)` (sprites par-dessus) ; la dernière image reste affichée après la fin |
 | `Pointer` | curseur HY8 des scènes à pointeur libre : sprite à la position de la souris, flèches = 2 px par tick, bornes de la scène |
 | `createStubMinigame`, `MinigameStub`, `STUB_POINTS` | la souche, outil des tests de parcours (jamais dans un vrai mini-jeu) |

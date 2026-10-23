@@ -4,7 +4,7 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 
 ## Taille
 
-- Total versionné (`original/teleportaschtroumpf/`) : **192.1 Mo** (201435382 octets)
+- Total versionné (`original/teleportaschtroumpf/`) : **192.6 Mo** (201964058 octets)
 - Fichiers de données (`DATA/`) : 1423 ; `SMURF.EXE` : 0.2 Mo
 
 ## Par extension (fichiers gardés)
@@ -102,10 +102,14 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 
 - Les pistes CD-DA 2 à 7 existent sur le disque mais ne sont pas extraites : le jeu ne les lit jamais (voir `docs/teleportaschtroumpf/engine.md` §5).
 
+## Notice
+
+- `MANUEL.pdf` : la notice d'Infogrames (`Lisez moi.doc` à la racine du CD), convertie par `textutil` puis Chrome en mode headless (mise en page simplifiée : le lecteur Word de `textutil` perd gras et tailles). Elle n'est pas lue par le jeu.
+
 ## Régénérer
 
 ```
 bash scripts/teleportaschtroumpf-extract.sh [archive.rar]
 ```
 
-Archive par défaut : `archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar` (non versionnée). Outils requis : `bsdtar`, `7zz`, `python3`.
+Archive par défaut : `archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar` (non versionnée). Outils requis : `bsdtar`, `7zz`, `python3` ; pour la notice, `textutil` et Google Chrome (macOS).

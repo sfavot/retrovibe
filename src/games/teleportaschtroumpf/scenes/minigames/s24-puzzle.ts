@@ -6,7 +6,7 @@ import { voiceName } from "../../engine/paths";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Surface } from "../../engine/surface";
 import type { Game } from "../../game/rules";
-import { Pointer, SoundHush, drawFrame, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
+import { FRAME_LINE, FRAME_SHADOW, Pointer, SoundHush, copyRect, drawFrame, fillRect, levelTimeLimit, minigameLevel, minigameRequest, pointsForTime, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
 
 /**
  * S24 « Le Puzzle » (`2e6a:0001`, 2 028 octets ; RE : `docs/teleportaschtroumpf/minigames/s24.md`).
@@ -45,9 +45,7 @@ export const SLOT_Y = 0x9f;
 export const PICTURE_COUNT = 5;
 /** Largeur d'une colonne de trous : `0x107 / n` ; chaque trou tombe dans sa colonne. */
 const BOARD_WIDTH = 0x107;
-/** Couleurs des cadres : ombre `0x7E` (la vignette, le trou survolé), trait `0x7F` (le trou survolé, et le remplissage du trou). */
-const FRAME_SHADOW = 0x7e;
-const FRAME_LINE = 0x7f;
+/** Remplissage du trou : couleur du trait des cadres (`FRAME_LINE`, `0x7F`). */
 const HOLE_FILL = 0x7f;
 
 /** Nombre de trous : `niveau + 3` (3, 4 ou 5). */
@@ -57,19 +55,12 @@ export function holeCount(level: number): number {
 
 /** Temps imparti : `40 − 5 × niveau` secondes. */
 export function timeLimit(level: number): number {
-  return 40 - 5 * level;
+  return levelTimeLimit(40, 5, level);
 }
 
 /** Aperçu du tableau entier avant le jeu : `5 − niveau` secondes (`1f33:0279`), qu'un clic gauche raccourcit. */
 export function previewSeconds(level: number): number {
   return 5 - level;
-}
-
-/** Points selon les secondes lues : moins du tiers du temps, 3 ; moins des deux tiers, 2 ; sinon 1 (`2e6a:0789..07b0`, divisions entières). */
-export function pointsForTime(seconds: number, limit: number): number {
-  if (seconds < Math.floor(limit / 3)) return 3;
-  if (seconds < Math.floor((2 * limit) / 3)) return 2;
-  return 1;
 }
 
 /**
@@ -99,28 +90,6 @@ export function placeHoles(below: (n: number) => number, count: number): Hole[] 
 function drawHoleFrames(surface: Surface, h: Hole): void {
   drawFrame(surface, h.x - 1, h.y - 1, h.x + 0x25, h.y + 0x16, FRAME_SHADOW);
   drawFrame(surface, h.x - 2, h.y - 2, h.x + 0x24, h.y + 0x15, FRAME_LINE);
-}
-
-/** Recopie un rectangle de `source` (le tableau entier) vers `work` (`13fc:0427`, copie opaque). */
-function copyRect(source: Uint8Array, work: Uint8Array, sx: number, sy: number, dx: number, dy: number, w: number, h: number): void {
-  for (let row = 0; row < h; row++) {
-    for (let col = 0; col < w; col++) {
-      const fromX = sx + col;
-      const fromY = sy + row;
-      const toX = dx + col;
-      const toY = dy + row;
-      if (fromX < 0 || fromX >= SCREEN_WIDTH || fromY < 0 || fromY >= SCREEN_HEIGHT) continue;
-      if (toX < 0 || toX >= SCREEN_WIDTH || toY < 0 || toY >= SCREEN_HEIGHT) continue;
-      work[toY * SCREEN_WIDTH + toX] = source[fromY * SCREEN_WIDTH + fromX];
-    }
-  }
-}
-
-/** Remplit un rectangle, bords compris (`328a:0022`). */
-function fillRect(work: Uint8Array, x1: number, y1: number, x2: number, y2: number, color: number): void {
-  for (let y = Math.max(0, y1); y <= Math.min(SCREEN_HEIGHT - 1, y2); y++) {
-    for (let x = Math.max(0, x1); x <= Math.min(SCREEN_WIDTH - 1, x2); x++) work[y * SCREEN_WIDTH + x] = color;
-  }
 }
 
 /** Attente maximale du relâchement des boutons (`1f33:036d`), en centièmes. */

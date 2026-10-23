@@ -13,6 +13,8 @@ export interface HostStorage {
   get(key: string): string | null;
   /** Renvoie faux si l'écriture a échoué. */
   set(key: string, value: string): boolean;
+  /** Efface la clé. */
+  remove(key: string): void;
 }
 
 export interface Host {

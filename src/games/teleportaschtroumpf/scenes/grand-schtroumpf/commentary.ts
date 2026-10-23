@@ -83,11 +83,31 @@ export function elapsedPercent(game: Game): number {
   return Math.floor((Math.floor(elapsed) * 100) / durationSeconds);
 }
 
+/** Mémoire de `Commentary` : codes déjà dits et derniers tours de réplique. */
+export interface CommentarySnapshot {
+  said: number[];
+  lastProgressRound: number;
+  lastCommentRound: number;
+}
+
 export class Commentary {
   private readonly said = new Set<number>();
   /** Tour de plateau de la dernière réplique d'avancement (`DS:28AE`) et du dernier passage dans le bloc de réplique (`DS:28B0`). */
   private lastProgressRound = 0;
   private lastCommentRound = 0;
+
+  /** Mémoire des répliques, en JSON pur (sauvegarde de partie, `scenes/save.ts`). */
+  snapshot(): CommentarySnapshot {
+    return { said: [...this.said], lastProgressRound: this.lastProgressRound, lastCommentRound: this.lastCommentRound };
+  }
+
+  /** Reprend une mémoire sauvegardée par `snapshot`. */
+  restore(snapshot: CommentarySnapshot): void {
+    this.said.clear();
+    for (const code of snapshot.said) this.said.add(code);
+    this.lastProgressRound = snapshot.lastProgressRound;
+    this.lastCommentRound = snapshot.lastCommentRound;
+  }
 
   /**
    * `291e:0401`, début du tour, avant l'affichage : commentaire d'avancement (`26ee:0f17`) si plus de 4 tours se sont écoulés

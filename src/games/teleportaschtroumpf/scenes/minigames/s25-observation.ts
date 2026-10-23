@@ -3,7 +3,7 @@ import type { Voc } from "../../data/voc";
 import type { Timer } from "../../engine/clock";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Game } from "../../game/rules";
-import { Pointer, SoundHush, drawFrame, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
+import { FRAME_LINE, FRAME_SHADOW, OBJECT_ORIGIN_X, OBJECT_ORIGIN_Y, Pointer, SoundHush, drawFrame, isObjectHit, levelTimeLimit, minigameLevel, minigameRequest, pointsForTime, pointsOutcome, type ObjectRect, type MinigameDone, type MinigameFactory } from "./common";
 
 /**
  * S25 « Observation » (`260f:000e`, 1 215 octets ; RE : `docs/teleportaschtroumpf/minigames/s25.md`).
@@ -18,14 +18,11 @@ import { Pointer, SoundHush, drawFrame, minigameLevel, minigameRequest, pointsOu
  *   « Écarts » du document sur le chrono lu par l'original), 0 en cas d'échec ; l'appelant applique l'issue.
  */
 
-/** Zone d'un objet cachée dans un décor : `[x1, y1, x2, y2]` dans le repère de l'original, décalé de `(32, 40)` par rapport à l'écran. */
-export type Rect = readonly [number, number, number, number];
-
 /**
  * Zones des 25 décors (`DS:2470`, 250 octets : 25 × 5 mots, le 5e valant toujours 1), dans l'ordre `s25a<lettre a..e>0<chiffre 1..5>d.mcg` :
  * indice `5 × lettre + (chiffre − 1)`. Chaque zone fait 37 ou 38 px de côté.
  */
-export const HIDDEN_OBJECTS: readonly Rect[] = [
+export const HIDDEN_OBJECTS: readonly ObjectRect[] = [
   [78, 103, 116, 141], [193, 71, 231, 109], [236, 77, 273, 115], [269, 92, 307, 130], [295, 196, 333, 234],
   [236, 164, 274, 202], [240, 105, 278, 143], [151, 187, 189, 225], [298, 147, 336, 185], [202, 110, 240, 148],
   [295, 155, 333, 193], [254, 54, 292, 92], [167, 49, 205, 87], [104, 92, 142, 130], [150, 110, 188, 148],
@@ -33,9 +30,6 @@ export const HIDDEN_OBJECTS: readonly Rect[] = [
   [265, 183, 303, 221], [207, 195, 245, 233], [119, 163, 157, 201], [92, 52, 130, 90], [239, 71, 277, 109],
 ];
 
-/** Décalage entre le repère de la table et l'écran. */
-export const ORIGIN_X = 32;
-export const ORIGIN_Y = 40;
 /** Nombre de décors par lettre et de lettres (`rand × 5000 / 0x8000 % 5`, deux fois). */
 export const PICTURE_CHOICES = 5;
 /** Temps imparti : `35 − 5 × niveau interne`, le niveau interne valant `niveau du joueur + 1` (1..3), ou 0 avec l'indice de l'oiseau. */
@@ -44,9 +38,6 @@ export const TIME_PER_LEVEL = 5;
 /** Position de départ du curseur (`14b3:0039`). */
 export const START_X = 0xa0;
 export const START_Y = 100;
-/** Couleurs des deux cadres de la bonne réponse (`32af:0006`) : ombre `0x7E`, trait `0x7F`. */
-const FRAME_SHADOW = 0x7e;
-const FRAME_LINE = 0x7f;
 /** Voix de fin : `s25c` 1..12 (réussite), `s25b` 7..12 (clic à côté), `s25b` 1..6 (temps écoulé). */
 const WIN_VOICES = 12;
 const FAIL_VOICES = 6;
@@ -71,20 +62,7 @@ export function internalLevel(level: number, bonus: boolean): number {
 
 /** Temps imparti en secondes (`0x23 − 5 × niveau interne`). */
 export function timeLimit(internal: number): number {
-  return BASE_TIME_LIMIT - TIME_PER_LEVEL * internal;
-}
-
-/** Le curseur est sur l'objet : zone décalée de `(32, 40)`, bord droit et bas exclus (`260f:01e4..0238`, comparaisons non signées). */
-export function isHit(rect: Rect, x: number, y: number): boolean {
-  const [x1, y1, x2, y2] = rect;
-  return x1 - ORIGIN_X <= x && y1 - ORIGIN_Y <= y && x < x2 - ORIGIN_X && y < y2 - ORIGIN_Y;
-}
-
-/** Points selon les secondes écoulées : moins du tiers du temps, 3 ; moins des deux tiers, 2 ; sinon 1 (`260f:0364..03d1`, divisions entières). */
-export function pointsForTime(seconds: number, limit: number): number {
-  if (seconds < Math.floor(limit / 3)) return 3;
-  if (seconds < Math.floor((2 * limit) / 3)) return 2;
-  return 1;
+  return levelTimeLimit(BASE_TIME_LIMIT, TIME_PER_LEVEL, internal);
 }
 
 export type ObservationEnding = "hit" | "miss" | "timeout";
@@ -138,14 +116,14 @@ export class ObservationScene implements Scene {
   }
 
   /** Décor tiré : lettre 0..4, chiffre 0..4, fichier et zone de l'objet. */
-  get picture(): { letter: number; digit: number; file: string; rect: Rect } {
+  get picture(): { letter: number; digit: number; file: string; rect: ObjectRect } {
     return { letter: this.letter, digit: this.digit, file: pictureFile(this.letter, this.digit), rect: HIDDEN_OBJECTS[this.letter * PICTURE_CHOICES + this.digit] };
   }
 
   /** Centre de l'objet à trouver à l'écran. */
   get targetCenter(): { x: number; y: number } {
     const [x1, y1, x2, y2] = this.picture.rect;
-    return { x: Math.floor((x1 + x2) / 2) - ORIGIN_X, y: Math.floor((y1 + y2) / 2) - ORIGIN_Y };
+    return { x: Math.floor((x1 + x2) / 2) - OBJECT_ORIGIN_X, y: Math.floor((y1 + y2) / 2) - OBJECT_ORIGIN_Y };
   }
 
   /** Fin de la recherche : `hit`, `miss` (clic à côté) ou `timeout` ; `null` pendant la recherche. */
@@ -266,7 +244,7 @@ export class ObservationScene implements Scene {
       return;
     }
     const { x, y } = this.pointer.position(ctx);
-    const hit = isHit(this.picture.rect, x, y);
+    const hit = isObjectHit(this.picture.rect, 0, x, y);
     this.result = hit ? "hit" : "miss";
     // Le décor sans curseur n'est recopié à l'écran que sur une réussite (cadres) ; sur un échec, le dernier dessin reste affiché.
     this.cursorShown = !hit;

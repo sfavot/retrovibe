@@ -9,6 +9,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | --- | --- |
 | Indiana Jones and his Desktop Adventures | jouable |
 | Lost in Time (Coktel Vision, 1993) | jouable (en cours de validation) |
+| Le Téléportaschtroumpf (Infogrames Multimedia, 1995) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -82,6 +83,32 @@ Les fichiers sont chargés à la demande. Les sauvegardes (`CAT.INF`, `IMA.INF`,
 - `scripts/lost-in-time-degob-fixture.mjs <dossier degob>` — régénère `test/lost-in-time/fixtures/degob-ops.json` (opcodes par script, pour les tests).
 
 En développement, `__lit` (jeu, sous-systèmes, hôte) est exposé dans la console. Les tests sont dans `test/lost-in-time/`.
+
+## Le Téléportaschtroumpf
+
+Réimplémentation du jeu de plateau et de mini-jeux *Le Téléportaschtroumpf* (Infogrames Multimedia, 1995, CD pour DOS). Sa logique est écrite en dur dans `SMURF.EXE` : elle a été reconstituée par rétro-ingénierie du désassemblage.
+
+### Fichiers de données
+
+Ils viennent du CD : `scripts/teleportaschtroumpf-extract.sh [archive.rar]` lit l'archive placée dans `archives/` (non versionnée), en extrait la piste de données et ne garde que les fichiers utiles dans `original/teleportaschtroumpf/`. Ce dossier contient `SMURF.EXE`, `DATA/` (images MCG, sprites HY8, vidéos et sons MUX, voix et effets VOC, polices PFN), `files.json` (liste des fichiers, pour la résolution des noms sans tenir compte de la casse) `COVER.webp` (la jaquette du jeu, conservée par le script d'extraction) et `MANUEL.pdf` (la notice d'Infogrames, `Lisez moi.doc` sur le CD, convertie par le script avec `textutil` et Chrome ; lien « Manuel d'origine » de l'écran de présentation). Le script régénère aussi l'inventaire `docs/teleportaschtroumpf/files.md`.
+
+### Architecture
+
+- `src/games/teleportaschtroumpf/data/` — lecteurs des formats du jeu (MCG, HY8, MUX, VOC, PFN…).
+- `src/games/teleportaschtroumpf/engine/` — moteur : boucle, tampons d'image et palette, entrées, pile de scènes.
+- `src/games/teleportaschtroumpf/audio/` — voix, effets et musiques (Web Audio).
+- `src/games/teleportaschtroumpf/game/` — règles : plateau, joueurs, objectif et gains.
+- `src/games/teleportaschtroumpf/scenes/` — les écrans (menus, préparation de partie, plateau, carte, événements, Grand Schtroumpf).
+- `src/games/teleportaschtroumpf/scenes/minigames/` — les mini-jeux.
+- `src/games/teleportaschtroumpf/ui/` — page du jeu (canvas), hôte du navigateur et pages de développement.
+
+### Pages de développement
+
+Avec `npm run dev` : `src/games/teleportaschtroumpf/ui/asset-viewer.html` est une visionneuse des ressources (images, sprites, sons) et `src/games/teleportaschtroumpf/ui/dev.html` lance le jeu seul, sans la page d'accueil.
+
+### Documentation
+
+`docs/teleportaschtroumpf/` : plan (`plan.md`), formats de fichiers, rétro-ingénierie (`re-index.md`, `engine.md`), règles (`rules.md`), écrans (`screens-*.md`) et mini-jeux (`minigames/`).
 
 ## Ce qui a été reconstitué
 

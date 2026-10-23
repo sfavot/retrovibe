@@ -29,14 +29,50 @@
   -webkit-user-select: none;
 }
 
+/* Anneau de focus à l'intérieur de l'écran (le cadre `.tsm-stage` rogne ce qui déborde). */
 .tsm-canvas:focus-visible {
+  outline: 3px solid var(--focus, #f6d27a);
   outline-offset: -3px;
 }
 
-.tsm-status {
+.tsm-footer {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  max-width: 100%;
+}
+
+.tsm-toggles {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.tsm-status,
+.tsm-error {
+  margin: 0;
+  max-width: 36rem;
+}
+
+.tsm-status[hidden],
+.tsm-error:empty {
+  display: none;
+}
+
+/* Jaquette de l'écran de présentation : photo du boîtier, sans pixels nets (format carré par défaut). */
+.tsm-title-picture {
+  image-rendering: auto;
+}
+
+/* Notice et contrôles de l'écran de présentation. */
+.tsm-title-note {
   margin: 0;
 }
 
-.tsm-status[hidden] {
-  display: none;
+.tsm-title-controls {
+  margin: 0.4rem 0 0;
+  font-size: 1rem;
 }

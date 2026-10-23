@@ -23,7 +23,22 @@ export const localStorageStore: HostStorage = {
       return false;
     }
   },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // stockage bloqué : rien à effacer
+    }
+  },
 };
+
+/** Un fichier du jeu manque (`files.json` absent, ressource en 404) : le jeu n'est pas installé, ce n'est pas un bogue d'exécution. */
+export class MissingFilesError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MissingFilesError";
+  }
+}
 
 /**
  * Hôte du navigateur : fichiers par `fetch` (le cache HTTP du navigateur fait le reste ; les décodés sont gardés par
@@ -58,9 +73,10 @@ export class BrowserHost implements Host {
 
   async loadFile(name: string): Promise<Uint8Array> {
     const path = resolveGameFile(this.files, name);
-    if (!path) throw new Error(`fichier introuvable : ${name}`);
+    if (!path) throw new MissingFilesError(`fichier introuvable : ${name}`);
     const url = `${this.base}/${path.split("/").map(encodeURIComponent).join("/")}`;
     const response = await fetch(url);
+    if (response.status === 404) throw new MissingFilesError(`${path} : HTTP 404`);
     if (!response.ok) throw new Error(`${path} : HTTP ${response.status}`);
     return new Uint8Array(await response.arrayBuffer());
   }

@@ -3,6 +3,7 @@ import { Engine } from "../../../src/games/teleportaschtroumpf/engine/engine";
 import type { Scene, SceneContext } from "../../../src/games/teleportaschtroumpf/engine/scene";
 import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
 import type { Hy8 } from "../../../src/games/teleportaschtroumpf/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../src/games/teleportaschtroumpf/data/mcg";
 import { Surface } from "../../../src/games/teleportaschtroumpf/engine/surface";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import { MINIGAMES } from "../../../src/games/teleportaschtroumpf/game/tables";
@@ -10,14 +11,21 @@ import {
   Clip,
   POINTER_KEY_SPEED,
   HUSH_STEP_TICKS,
+  OBJECT_ORIGIN_X,
+  OBJECT_ORIGIN_Y,
   Pointer,
   STUB_POINTS,
   SoundHush,
+  copyRect,
   drawFrame,
+  fillRect,
+  isObjectHit,
   ingredientInGoal,
   ingredientOutcome,
+  levelTimeLimit,
   minigameLevel,
   minigameRequest,
+  pointsForTime,
   pointsOutcome,
   sceneIngredient,
   stubOutcome,
@@ -355,5 +363,84 @@ describe("drawFrame (`32af:0006`)", () => {
     expect(surface.work[21 * 320 + 11]).toBe(0);
     drawFrame(surface, -5, -5, 2, 2, 7);
     expect(surface.work[2 * 320 + 0]).toBe(7);
+  });
+});
+
+describe("chrono et zones des mini-jeux de recherche", () => {
+  it("levelTimeLimit : base − pas × niveau", () => {
+    expect([0, 1, 2].map((level) => levelTimeLimit(40, 5, level))).toEqual([40, 35, 30]);
+    expect([0, 1, 2].map((level) => levelTimeLimit(35, 7, level))).toEqual([35, 28, 21]);
+  });
+
+  it("pointsForTime : 3 sous le tiers du temps, 2 sous les deux tiers, sinon 1 (divisions entières)", () => {
+    expect([0, 12, 13, 25, 26, 39].map((s) => pointsForTime(s, 40))).toEqual([3, 3, 2, 2, 1, 1]);
+    expect([0, 10, 11, 22, 23, 34].map((s) => pointsForTime(s, 35))).toEqual([3, 3, 2, 2, 1, 1]);
+    expect([0, 9, 10, 19, 20, 29].map((s) => pointsForTime(s, 30))).toEqual([3, 3, 2, 2, 1, 1]);
+    expect([0, 7, 8, 15, 16, 24].map((s) => pointsForTime(s, 25))).toEqual([3, 3, 2, 2, 1, 1]);
+    expect([0, 5, 6, 12, 13, 19].map((s) => pointsForTime(s, 20))).toEqual([3, 3, 2, 2, 1, 1]);
+    expect([0, 4, 5, 9, 10, 14, 15].map((s) => pointsForTime(s, 15))).toEqual([3, 3, 2, 2, 1, 1, 1]);
+    expect([0, 5, 6, 11, 12, 18].map((s) => pointsForTime(s, 19))).toEqual([3, 3, 2, 2, 1, 1]);
+  });
+
+  it("isObjectHit sans marge (S25) : zone décalée de (32, 40), bord droit et bas exclus", () => {
+    const rect = [201, 87, 239, 116] as const;
+    const [x1, y1, x2, y2] = rect;
+    const left = x1 - OBJECT_ORIGIN_X;
+    const top = y1 - OBJECT_ORIGIN_Y;
+    const right = x2 - OBJECT_ORIGIN_X;
+    const bottom = y2 - OBJECT_ORIGIN_Y;
+    expect(isObjectHit(rect, 0, left, top)).toBe(true);
+    expect(isObjectHit(rect, 0, right - 1, bottom - 1)).toBe(true);
+    expect(isObjectHit(rect, 0, left - 1, top)).toBe(false);
+    expect(isObjectHit(rect, 0, left, top - 1)).toBe(false);
+    expect(isObjectHit(rect, 0, right, top)).toBe(false);
+    expect(isObjectHit(rect, 0, left, bottom)).toBe(false);
+  });
+
+  it("isObjectHit avec marge (S26) : zone élargie de `margin` de chaque côté", () => {
+    const rect = [201, 87, 239, 116] as const;
+    const [x1, y1, x2, y2] = rect;
+    const left = x1 - OBJECT_ORIGIN_X;
+    const top = y1 - OBJECT_ORIGIN_Y;
+    const right = x2 - OBJECT_ORIGIN_X;
+    const bottom = y2 - OBJECT_ORIGIN_Y;
+    const m = 6;
+    expect(isObjectHit(rect, m, left - m, top - m)).toBe(true);
+    expect(isObjectHit(rect, m, left - m - 1, top)).toBe(false);
+    expect(isObjectHit(rect, m, left, top - m - 1)).toBe(false);
+    expect(isObjectHit(rect, m, right + m - 1, bottom + m - 1)).toBe(true);
+    expect(isObjectHit(rect, m, right + m, bottom)).toBe(false);
+    expect(isObjectHit(rect, m, left, bottom + m)).toBe(false);
+    expect(isObjectHit(rect, 10, left - 8, top)).toBe(true);
+    expect(isObjectHit(rect, m, left - 8, top)).toBe(false);
+  });
+});
+
+describe("copyRect et fillRect (`13fc:0427`, `328a:0022`)", () => {
+  const size = SCREEN_WIDTH * SCREEN_HEIGHT;
+
+  it("fillRect : remplit bords compris et se rogne à l'écran", () => {
+    const work = new Uint8Array(size);
+    fillRect(work, 2, 3, 4, 5, 9);
+    expect(work[3 * SCREEN_WIDTH + 2]).toBe(9);
+    expect(work[5 * SCREEN_WIDTH + 4]).toBe(9);
+    expect(work[3 * SCREEN_WIDTH + 5]).toBe(0);
+    expect(work[6 * SCREEN_WIDTH + 4]).toBe(0);
+    fillRect(work, -5, SCREEN_HEIGHT - 1, 2, SCREEN_HEIGHT + 4, 7);
+    expect(work[(SCREEN_HEIGHT - 1) * SCREEN_WIDTH]).toBe(7);
+    expect(work[(SCREEN_HEIGHT - 1) * SCREEN_WIDTH + 3]).toBe(0);
+  });
+
+  it("copyRect : copie opaque d'un rectangle, rognée à l'écran", () => {
+    const source = new Uint8Array(size).map((_, i) => (i % 251) + 1);
+    const work = new Uint8Array(size);
+    copyRect(source, work, 10, 20, 100, 50, 3, 2);
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 3; col++) expect(work[(50 + row) * SCREEN_WIDTH + 100 + col]).toBe(source[(20 + row) * SCREEN_WIDTH + 10 + col]);
+    }
+    expect(work[50 * SCREEN_WIDTH + 103]).toBe(0);
+    copyRect(source, work, 0, 0, SCREEN_WIDTH - 1, 0, 3, 1);
+    expect(work[SCREEN_WIDTH - 1]).toBe(source[0]);
+    expect(work[0]).toBe(0);
   });
 });

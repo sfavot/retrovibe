@@ -33,4 +33,16 @@ export interface AudioBackend {
   readonly effectPlaying: boolean;
   /** Gain de 0 à 1, commun à la voie et au bruitage. */
   setGain(gain: number): void;
+  /**
+   * Coupe (ou rétablit) toute la sortie, voie et bruitage : réglage de l'utilisateur, **indépendant** du volume 0 à 15
+   * de l'original (`setGain`). Les sons continuent de se dérouler, muets : `playing`, `effectPlaying` et `position`
+   * ne changent pas, donc le moteur et les vidéos restent synchronisés.
+   */
+  setMuted(muted: boolean): void;
+  /**
+   * Fige la sortie (onglet masqué) : plus aucun son, et `position` ne bouge plus. `playing` et `effectPlaying`
+   * restent ce qu'ils étaient. `resume()` repart du même point.
+   */
+  suspend(): void;
+  resume(): void;
 }

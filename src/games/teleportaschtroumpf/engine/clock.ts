@@ -43,6 +43,14 @@ export class Clock {
     this.pending += whole;
   }
 
+  /**
+   * Oublie le temps écoulé depuis le dernier `update` (reprise après une pause) : le prochain appel ne fait que fixer
+   * une nouvelle origine, sans rattraper l'absence. Les ticks déjà gagnés mais pas consommés restent dus.
+   */
+  resync(): void {
+    this.last = null;
+  }
+
   /** Consomme un tick en attente : vrai si un tick vient d'être compté. */
   consume(): boolean {
     if (this.pending <= 0) return false;

@@ -12,7 +12,6 @@ import {
   createPuzzle,
   holeCount,
   placeHoles,
-  pointsForTime,
   previewSeconds,
   timeLimit,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s24-puzzle";
@@ -24,12 +23,6 @@ describe("S24 : règles du puzzle (pur, `2e6a:0001`)", () => {
     expect([0, 1, 2].map(holeCount)).toEqual([3, 4, 5]);
     expect([0, 1, 2].map(timeLimit)).toEqual([40, 35, 30]);
     expect([0, 1, 2].map(previewSeconds)).toEqual([5, 4, 3]);
-  });
-
-  it("points : moins du tiers du temps 3, moins des deux tiers 2, sinon 1 (divisions entières)", () => {
-    expect([0, 12, 13, 25, 26, 39].map((s) => pointsForTime(s, 40))).toEqual([3, 3, 2, 2, 1, 1]);
-    expect([0, 10, 11, 22, 23, 34].map((s) => pointsForTime(s, 35))).toEqual([3, 3, 2, 2, 1, 1]);
-    expect([0, 9, 10, 19, 20, 29].map((s) => pointsForTime(s, 30))).toEqual([3, 3, 2, 2, 1, 1]);
   });
 
   it("trous : un par colonne, jamais chevauchés, vignettes en permutation, tirage fixe pour une graine", () => {

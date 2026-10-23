@@ -76,8 +76,6 @@
 
 /* Écran titre : la jaquette (280x343) est en portrait, pas carrée comme l'image d'Indy ; c'est une illustration, pas du pixel art. */
 .lit-title-picture {
-  width: min(336px, calc(100vw - 32px));
-  height: auto;
   aspect-ratio: 280 / 343;
   image-rendering: auto;
 }

@@ -11,8 +11,8 @@ import { randomSeed } from "../engine/rng";
 import { WorldSize } from "../engine/world";
 import { VIEW_TILES, tileCanvas } from "../render/zone-renderer";
 import { copy } from "../copy";
-import { copy as shared } from "../../../ui/copy";
 import { h } from "../../../ui/dom";
+import { titleScreen } from "../../../ui/title-screen";
 import { GameView } from "./game-view";
 import { nearestPreset, nextPreset, speedSetting } from "./game-speed";
 import { MoveKeys } from "./move-keys";
@@ -124,7 +124,7 @@ export class App {
   showTitle(): void {
     this.stopGame();
     window.scrollTo(0, 0);
-    const picture = h("canvas", { class: "title-picture", width: 288, height: 288, "aria-hidden": "true" });
+    const picture = h("canvas", { width: 288, height: 288, "aria-hidden": "true" });
     const ctx = picture.getContext("2d")!;
     const image = ctx.createImageData(288, 288);
     const rgba = new Uint32Array(image.data.buffer);
@@ -177,25 +177,18 @@ export class App {
     start.addEventListener("click", () => begin(() => this.startGame()));
     replay?.addEventListener("click", () => begin(() => this.replayStory()));
     this.root.replaceChildren(
-      h(
-        "section",
-        { class: "title-screen" },
+      titleScreen(
         picture,
-        h(
-          "div",
-          { class: "title-form" },
-          h("a", { class: "back-link", href: "#/" }, shared.backToGames),
-          resumeSection,
-          h("h1", {}, copy.newGame),
-          radios("size", copy.worldSize, copy.sizes, this.settings.size, (v) => (this.settings.size = v)),
-          radios("difficulty", copy.difficulty, copy.difficulties, this.settings.difficulty, (v) => (this.settings.difficulty = v)),
-          radios("speed", copy.gameSpeed, copy.speeds, nearestPreset(this.tickMs), (v) => this.setSpeed(v)),
-          start,
-          replay,
-          status,
-          manual,
-          h("ul", { class: "help-list" }, ...copy.helpText.map((t) => h("li", {}, t))),
-        ),
+        resumeSection,
+        h("h1", {}, copy.newGame),
+        radios("size", copy.worldSize, copy.sizes, this.settings.size, (v) => (this.settings.size = v)),
+        radios("difficulty", copy.difficulty, copy.difficulties, this.settings.difficulty, (v) => (this.settings.difficulty = v)),
+        radios("speed", copy.gameSpeed, copy.speeds, nearestPreset(this.tickMs), (v) => this.setSpeed(v)),
+        start,
+        replay,
+        status,
+        manual,
+        h("ul", { class: "help-list" }, ...copy.helpText.map((t) => h("li", {}, t))),
       ),
     );
     if (!saved) queueMicrotask(() => start.focus());

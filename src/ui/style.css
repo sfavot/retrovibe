@@ -265,6 +265,8 @@ a.button:hover {
 
 /* ------------------------------------------------------------------ écran titre */
 
+/* Composant commun `src/ui/title-screen.ts` : image à gauche, colonne (retour, titre, actions) à droite ;
+   sur un écran étroit, l'image passe au-dessus. */
 .title-screen {
   display: flex;
   flex-wrap: wrap;
@@ -275,7 +277,8 @@ a.button:hover {
 }
 
 .title-picture {
-  width: min(432px, calc(100vw - 32px));
+  width: min(336px, calc(100vw - 32px));
+  height: auto;
   aspect-ratio: 1;
   image-rendering: pixelated;
   border-radius: var(--radius);

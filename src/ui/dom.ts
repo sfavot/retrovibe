@@ -1,4 +1,4 @@
-type Child = Node | string | null | undefined | false;
+export type Child = Node | string | null | undefined | false;
 
 /** Création concise d'éléments DOM. */
 export function h<K extends keyof HTMLElementTagNameMap>(

@@ -31,6 +31,7 @@ export const copy = {
     "Entrée ou clic droit : voix d'aide du Grand Schtroumpf.",
     "Échap : passer une séquence.",
     "P : pause, sur le plateau.",
+    "Menu Parents : au menu principal, sur le bouton Parents, maintenir la flèche droite 4 secondes.",
     "F1 / F2 : baisser / monter le volume.",
   ],
   loading: "Chargement…",

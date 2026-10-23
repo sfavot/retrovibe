@@ -44,6 +44,31 @@ export function scanMux(bytes: Uint8Array, firstChunkOffset: number): { audio: U
 }
 
 /**
+ * Fond d'une vidéo « en surimpression » (`179a:0673` avec `0x1000` : Grand Schtroumpf `154c:097b`, S39). Les images de ces
+ * vidéos ne sont que des deltas du personnage : après chaque image, l'original recopie le fond B dans A (`179a:04f9`), et
+ * l'image suivante se décode sur ce fond ; seules les 128 premières couleurs de la vidéo sont chargées. Le fond est l'écran
+ * d'avant la vidéo, passé en 128..255 par `13fc:0002(+1)` (pixels + 0x80, couleurs 0..127 recopiées en 128..255).
+ */
+export class VideoBackdrop {
+  readonly pixels = new Uint8Array(64000);
+  /** Couleurs 128..255 du fond ; `combine` y pose les 128 couleurs de la vidéo. */
+  readonly palette = new Uint8Array(768);
+
+  /** `13fc:0002(+1)` sur l'écran et la palette courants. */
+  capture(ctx: SceneContext): void {
+    const work = ctx.surface.work;
+    for (let i = 0; i < this.pixels.length; i++) this.pixels[i] = (work[i] + 0x80) & 0xff;
+    this.palette.set(ctx.palette.colors.subarray(0, 384), 384);
+  }
+
+  /** Palette affichée : les 128 premières couleurs de la vidéo, puis celles du fond. */
+  combine(videoPalette: Uint8Array): Uint8Array {
+    this.palette.set(videoPalette.subarray(0, 384), 0);
+    return this.palette;
+  }
+}
+
+/**
  * Lecture d'une vidéo MUX : décode les images dans l'ordre (le codage inter l'impose) jusqu'à celle qui correspond
  * à un temps donné, `image = floor(temps × images par seconde)`. Le temps vient de la position audio quand il y a du son
  * (engine.md §2.3 : le pas vidéo est asservi au son), sinon de l'horloge.
@@ -58,7 +83,11 @@ export class VideoPlayer {
   /** Numéro (à partir de 0) de la dernière image décodée, −1 avant la première. */
   shown = -1;
 
-  constructor(bytes: Uint8Array) {
+  /** `backdrop` : vidéo en surimpression, chaque image se décode sur ce fond. */
+  constructor(
+    bytes: Uint8Array,
+    private readonly backdrop?: VideoBackdrop,
+  ) {
     this.decoder = new MuxDecoder(bytes);
     const scan = scanMux(bytes, this.decoder.header.firstChunkOffset);
     this.audio = this.decoder.header.audioFrequency > 0 ? scan.audio : null;
@@ -100,6 +129,7 @@ export class VideoPlayer {
     const wanted = Math.min(frame, this.frameCount - 1);
     const before = this.shown;
     while (this.shown < wanted) {
+      if (this.backdrop) this.decoder.pixels.set(this.backdrop.pixels);
       const decoded = this.decoder.nextFrame();
       if (!decoded) {
         this.shown = this.frameCount;
@@ -129,6 +159,8 @@ export interface VideoSceneOptions {
   onFrame?(ctx: SceneContext, frame: number, markers: readonly Uint8Array[]): "stop" | void;
   /** Dessiné par-dessus chaque image affichée (sprites posés par `onFrame`, comme le rappel de l'original dessine dans le tampon). */
   overlay?(ctx: SceneContext): void;
+  /** Vidéo en surimpression (`0x1000`) : fond capturé par l'appelant avant le début de la lecture. */
+  backdrop?: VideoBackdrop;
 }
 
 /**
@@ -149,16 +181,19 @@ export class VideoScene implements Scene {
   private audioEndedTick: number | null = null;
   private ending = false;
   private done = false;
+  /** Retenue de la musique avant la vidéo, rendue à la sortie (une annonce peut la retenir autour de plusieurs vidéos). */
+  private musicHeldBefore = false;
 
   constructor(private readonly options: VideoSceneOptions) {}
 
   async load(ctx: SceneContext): Promise<void> {
-    this.player = new VideoPlayer(await ctx.resources.bytes(this.options.file));
+    this.player = new VideoPlayer(await ctx.resources.bytes(this.options.file), this.options.backdrop);
   }
 
   enter(ctx: SceneContext): void {
     const player = this.player!;
     ctx.fade.reset();
+    this.musicHeldBefore = ctx.voice.musicHeld;
     ctx.voice.holdMusic(true);
     ctx.voice.stop();
     this.usingAudio = false;
@@ -223,14 +258,15 @@ export class VideoScene implements Scene {
   render(ctx: SceneContext): void {
     const player = this.player!;
     if (player.shown < 0) return;
-    ctx.palette.load(player.palette);
+    const { backdrop } = this.options;
+    ctx.palette.load(backdrop ? backdrop.combine(player.palette) : player.palette);
     ctx.surface.drawFullScreen(player.pixels);
     this.options.overlay?.(ctx);
   }
 
   exit(ctx: SceneContext): void {
     ctx.voice.stop();
-    ctx.voice.holdMusic(false);
+    ctx.voice.holdMusic(this.musicHeldBefore);
   }
 
   private end(ctx: SceneContext): void {

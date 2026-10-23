@@ -65,6 +65,10 @@ Un type inconnu lève une erreur. Une image peut ne contenir aucun chunk vidéo 
 
 L'image est conservée d'une image à l'autre (nécessaire pour l'inter).
 
+### Vidéos en surimpression (`179a:0673` avec `0x1000`, sûr)
+
+105 fichiers commencent par une image inter, sans image complète : S38A..E, les 30 vidéos de S39 et les 70 de S42 (habillage et vidéos de `154c:097b`). Ce ne sont que des deltas du personnage sur un fond. Avec `0x1000`, après chaque image, le lecteur recopie A à l'écran puis restaure A depuis le fond B (`179a:04e7`..`0501`, `12ec:037c` dans le sens de `13fc:0411`) : l'image suivante se décode sur le fond, et non sur l'image précédente. Seules les 128 premières couleurs de la vidéo sont chargées (`179a:023e`, 0x180 octets). Avant, l'appelant a passé l'écran courant en 128..255 (`13fc:0002(+1)` : couleurs 0..127 recopiées en 128..255, pixels + 0x80) et l'a figé en B (`265b:007c`, `154c:09fb`). Décodées image sur image, ces vidéos laissent une traînée. Port : `VideoBackdrop` (`engine/video.ts`), et `OverlayVideo` pour S38, dont le fond change en cours de vidéo.
+
 ## Relevé (233 fichiers)
 
 - 21 015 chunks 05 (images), 20 901 chunks vidéo, 3 086 palettes, 5 123 + 222 chunks audio, 265 chunks 08.

@@ -23,7 +23,7 @@ Les trois tables ont la même forme : u32 relatifs au début de la table, nombre
 
 ## Images (table à `h[1]`)
 
-- La table d'images a 2 octets de remplissage après ses offsets (premier offset = 4·n + 2), et chaque image est suivie de 2 octets de remplissage, sauf la dernière. Ces octets ne sont jamais lus (le blitter normalise le pointeur en segment, `317b:01fc`..`0228`, d'où la marge de 2 octets).
+- Chaque image est précédée d'un **mot d'attributs** u16 (premier offset de la table = 4·n + 2 : celui de la première image ; puis 2 octets entre deux images). Le blit le lit en `[SI-4]` et le combine au mot d'index (`317b:0279`, `XOR CX,[SI-4]`, puis `TEST CH,0x80`) : **0x8000 = image stockée en miroir horizontal**, retournée à l'affichage sans décaler sa position. Valeurs rencontrées : 0 (1097 images) et 0x8000 (39 : `s01a000s.hy8` 34..51, 53..63 et 112..117 ; 2 dans `s30c001s.hy8` et `s31a000s.hy8`). Sûr. Le décodeur rend ces images déjà retournées. (Lecture antérieure, fausse : « 2 octets de remplissage jamais lus » ; elle donnait un Schtroumpf tourné à l'envers en course, en saut, impatient et à l'arrivée.)
 - Image : `[largeur/16][hauteur]` (u8, u8), puis pour chaque ligne `[nb spans]` suivi des spans, puis 1 octet d'écart de fin.
 - Span : `[skip][n4][n1]`, puis `4·n4 + n1` pixels. `skip` pixels transparents sont sautés avant. Le pixel 0 est transparent (le blit ignore ce qui n'est pas écrit).
 - Écart de fin : vaut exactement `largeur - x` (x = position après le dernier span). Vérifié sur les 1136 images des 33 fichiers : aucun écart différent, aucun débordement de ligne, offsets strictement croissants et dans le fichier. Le décodeur lève une erreur sinon.

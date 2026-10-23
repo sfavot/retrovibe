@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Session } from "./game-helpers";
 import { hasOriginalFiles } from "./helpers";
+import { FIDGET_AFTER_SECONDS, POSE_FIDGET_RIGHT, POSE_IDLE_RIGHT } from "../../src/games/teleportaschtroumpf/scenes/board/walker";
 import { STUB_POINTS, forceMinigameStubs } from "../../src/games/teleportaschtroumpf/scenes/minigames";
 
 // Ces tests traversent un mini-jeu sans le jouer : la souche commune les garde indépendants des vrais mini-jeux.
@@ -21,6 +22,27 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     expect(s.game.state.paused).toBe(false);
   }, 60_000);
 
+  it("pas de musique pendant l'annonce du début de tour (S19 comprise) : elle part quand le joueur a la main", async () => {
+    const s = await Session.start({ players: TWO, audio: true });
+    await s.ready();
+    const voices = s.host.audio.plays.length;
+    expect(voices).toBeGreaterThan(5); // ouverture, ingrédients, points, annonce du personnage
+    expect(s.host.audio.plays.some((p) => p.loop)).toBe(false);
+    await s.run(200);
+    expect(s.host.audio.plays.slice(voices).some((p) => p.loop)).toBe(true);
+  }, 60_000);
+
+  it("l'impatience du pion attend 8 s à partir de la prise de main, pas du début de l'annonce", async () => {
+    const s = await Session.start({ players: TWO, audio: true });
+    const shownAt = s.host.time;
+    await s.ready();
+    expect(s.host.time - shownAt).toBeGreaterThan(FIDGET_AFTER_SECONDS * 1000); // l'annonce (S19 comprise) dure plus longtemps
+    await s.run(500);
+    expect(s.board.walker.pose).toBe(POSE_IDLE_RIGHT);
+    await s.run(FIDGET_AFTER_SECONDS * 1000);
+    expect(s.board.walker.pose).toBe(POSE_FIDGET_RIGHT);
+  }, 60_000);
+
   it("porte → bonne scène → issue appliquée → joueur suivant", async () => {
     const s = await Session.start({ players: TWO });
     await s.ready();
@@ -37,6 +59,19 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     expect(s.game.state.current).toBe(1);
     expect(s.board.shown.player).toBe(1);
     expect(s.board.shown).toMatchObject({ screen: 1, row: "top", x: 0x0b });
+  }, 60_000);
+
+  it("la pression qui ouvre la porte ne coupe pas la voix d'accroche du mini-jeu", async () => {
+    const s = await Session.start({ players: TWO, audio: true });
+    await s.ready();
+    s.place({ screen: 2, row: "top", x: 0x20 }); // S35
+    const intro = await Promise.all([1, 2].map((n) => s.ctx.resources.voc(`s35a00${n}t.voc`)));
+    await s.tap("Space");
+    expect(s.host.audio.plays.some((p) => intro.some((v) => v.samples === p.sound.samples))).toBe(true);
+    // La voix est dite en entier avant le mini-jeu.
+    expect(s.ctx.voice.voicePlaying).toBe(true);
+    expect(s.top()).toBe("GameScene");
+    await s.settle("MinigameStub");
   }, 60_000);
 
   it("échec du mini-jeu : rien n'est gagné, le tour passe quand même ; au dernier joueur le tour de plateau avance", async () => {
@@ -128,9 +163,18 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     await s.until(() => s.board.shown.look === "jail");
     expect(s.board.shown).toMatchObject({ screen: 3, row: "bottom", x: 0xac });
     await s.settle("BoardEventScene"); // libération (S20)
+    // Le bandeau du plateau reste affiché sous la vidéo (`2a78:0009`) : s20c n'a que des pixels parasites à cet endroit.
+    const hud = 152 * 320;
+    expect(s.ctx.surface.work.subarray(hud).every((p, i) => p === s.ctx.surface.background[hud + i])).toBe(true);
     await s.ready();
     expect(s.game.player.status).toBe(0);
     expect(s.board.shown.look).toBe("normal");
+    // Le pion libéré est encore dans la zone de la cage : le chrono du tour part de la prise de main (`291e:0b6a`), pas
+    // de la libération ; il n'est repris qu'après 16 s sur place.
+    expect(s.game.state.turn.elapsed).toBeLessThan(2);
+    await s.run(10_000);
+    expect(s.game.player.status).toBe(0);
+    expect(s.top()).toBe("GameScene");
   }, 120_000);
 
   it("S13 interactif : la porte du puits ouvert lance l'animation puis le puits (code 14)", async () => {

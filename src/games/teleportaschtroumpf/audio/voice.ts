@@ -11,7 +11,8 @@ export const BEEP_COUNT = 3;
  * - lancer un son (`play`, `playBeep`, `playPcm`) coupe le précédent, musique comprise ;
  * - la **musique** (`setMusic`) repart au début, en boucle, dès que rien ne joue (appel de `update()` à chaque tick) :
  *   pas de reprise à la position où elle s'était arrêtée ;
- * - `holdMusic(true)` empêche ce redémarrage (pendant une vidéo) ;
+ * - `holdMusic(true)` empêche ce redémarrage (pendant une vidéo, ou une annonce dont les attentes ne relancent pas la
+ *   musique) ;
  * - les trois **bips** sont des sons courts préchargés par `setBeeps`, joués sur la même voie ;
  * - le **bruitage** mélangé (`playEffect`, `348d:0b42(2, ptr)`, engine.md §5.2 bis) est un second canal, à un seul
  *   emplacement : un nouveau bruitage remplace le précédent, et ni la voie ni la musique ne sont coupées ;
@@ -105,6 +106,11 @@ export class VoiceChannel {
 
   get hasMusic(): boolean {
     return this.music !== null;
+  }
+
+  /** Vrai si la musique est retenue (`holdMusic(true)`). */
+  get musicHeld(): boolean {
+    return this.holding;
   }
 
   holdMusic(hold: boolean): void {

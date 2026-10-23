@@ -91,6 +91,11 @@ export class Walker {
     this.arrived = false;
   }
 
+  /** Relance le chrono de pose (`1f33:0181(6)`, `291e:0b72` : quand le joueur prend la main) : l'impatience attend 8 s de plus. */
+  restartPoseTimer(nowTicks: number): void {
+    this.startTick = nowTicks;
+  }
+
   /** Animation d'arrivée (`de32` : après une téléportation), puis attente tourné vers la droite. */
   startArrival(nowTicks: number): void {
     this.setPose(POSE_ARRIVE, nowTicks, true);

@@ -19,7 +19,8 @@ export { createWellScene } from "./events/well";
  *   `scene` donne l'animation, `kind` le type) ou `release` (libération de la prison ou du Turlusiphon au début du tour,
  *   animations S20 `s20c/f/i/l/o` et S21 `s21b/d/f/h/j/l`), `request.before` (position du pion au déclenchement) et
  *   `request.after` (position une fois l'effet appliqué : arrivée de la téléportation, cage, siphon) ;
- * - joue : la vidéo MUX de l'événement en plein écran (non passable : `179a:0673` est appelé sans les drapeaux de saut), puis
+ * - joue : la vidéo MUX de l'événement (non passable : `179a:0673` est appelé sans les drapeaux de saut), le bas de l'écran
+ *   (bandeau du joueur) restant celui du plateau, puis
  *   la voix de l'événement s'il y en a une (`s14a`, `s15a`, `s16a`, `s17a`, `s18a` : 1 à 3 ou 4 ; `s21v` : 1 à 3) ; la vidéo
  *   dépend du côté d'où le pion arrive (`before.x`) et, pour la libération du Turlusiphon, de son regard (`Player.facingRight`) ;
  * - rend : `onDone(ctx)` ; le plateau place alors le pion en `after` (animation d'arrivée si l'écran change), rien d'autre à rendre : toute
@@ -50,6 +51,13 @@ export interface BoardEventRequest {
 type Phase = "video" | "voice" | "done";
 
 /**
+ * Bande du bas gardée pendant la vidéo (`2a78:0039` : `13fc:067d` met de côté le rectangle `(0, 0x92)`, 0x13F × 0x35, puis le
+ * rappel par image `2a78:0009` le recopie sur chaque image) : lignes 146 à 199, le bandeau et un peu de décor au-dessus.
+ */
+const KEPT_FIRST_ROW = 0x92;
+const KEPT_OFFSET = KEPT_FIRST_ROW * 320;
+
+/**
  * Scène d'un événement du plateau : la vidéo (une `VideoScene` pilotée de l'intérieur, pour ne rien empiler), puis la voix
  * (`1f33:03a7` : on attend la fin), puis `onDone`. Sa dernière image reste à l'écran pendant la voix.
  */
@@ -59,6 +67,7 @@ export class BoardEventScene implements Scene {
   private video: VideoScene | null = null;
   private voc: Voc | null = null;
   private phase: Phase = "video";
+  private kept: Uint8Array | null = null;
 
   constructor(
     private readonly request: BoardEventRequest,
@@ -76,7 +85,14 @@ export class BoardEventScene implements Scene {
     this.clip = pickClip(event, before, after, facingRight, ctx.rng);
     if (!this.clip) return;
     // Les vidéos des événements ne sont pas passables (`179a:0673` sans les drapeaux 0x400 / 0x800).
-    this.video = new VideoScene({ file: this.clip.video, skippable: false, onEnd: (c) => this.videoEnded(c) });
+    this.video = new VideoScene({
+      file: this.clip.video,
+      skippable: false,
+      onEnd: (c) => this.videoEnded(c),
+      overlay: (c) => {
+        if (this.kept) c.surface.work.set(this.kept, KEPT_OFFSET);
+      },
+    });
     const voice = this.clip.voice;
     const [, voc] = await Promise.all([this.video.load(ctx), voice ? ctx.resources.voc(voice).catch(() => null) : null]);
     this.voc = voc;
@@ -84,6 +100,7 @@ export class BoardEventScene implements Scene {
 
   enter(ctx: SceneContext): void {
     this.phase = "video";
+    this.kept = ctx.surface.work.slice(KEPT_OFFSET);
     if (this.video) this.video.enter(ctx);
   }
 

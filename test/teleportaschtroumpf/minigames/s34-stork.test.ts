@@ -608,7 +608,8 @@ describe.skipIf(!hasOriginalFiles)("S34 La Cigogne : parcours depuis le plateau 
   }, 180_000);
 
   it("plateau : traversée réussie → l'ingrédient 0 est donné", async () => {
-    const s = await enterFromBoard(34, "StorkScene", { seed: 3 });
+    // Graine où le robot gagne en entrant par la porte (le déroulé du plateau, voix d'accroche comprise, change le tirage).
+    const s = await enterFromBoard(34, "StorkScene", { seed: 10 });
     const scene = s.ctx.scenes.top as StorkScene;
     await drive(scene, s.host, () => s.run(32));
     expect(scene.state.end).toBe("success");

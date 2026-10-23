@@ -13,11 +13,13 @@ Appelée par `291e:0401` au tout premier tour, après `1e52:0271` (tirage de l'o
 
 Port : `IngredientsScene` (`ingredients.ts`) ; le déroulé est calculé par `ingredientsScript` (pur, testé). Avant S19 le bandeau n'a que le portrait (`Board.setGoalHidden`), `Board.redraw` rend l'objectif complet au retour. Le clic coupe la voix en cours (`Space` / clic gauche), pas la pause.
 
+**Musique** (sûr, désassemblage) : ni `1f33:00fc` ni `1f33:03a7` ne relancent la musique (`15f9:089f(DS:6F04)`), et `291e:0401` non plus : elle se tait pendant toute l'annonce du début de tour (S19, personnage, répliques) et ne repart qu'avec la boucle du plateau. Port : `game.ts` retient la musique (`holdMusic`) de `beginTurn` / `skipTurn` jusqu'à la main au joueur ; `VideoScene` rend à sa sortie la retenue d'avant.
+
 ## S42 : vidéos et voix du Grand Schtroumpf
 
 ### Habillage `154c:097b(nom)` (sûr)
 
-Joue 4 vidéos à la suite : `s42%c.mux` avec `%c = 'a' + (rand × 5000 / 0x8000) % 5` (a..e), la vidéo `nom`, `s42g.mux`, `s42%c.mux` avec `'h' + …` (h..l, second tirage). Drapeaux `179a:0673` via `154c:07c2` : `0x1040` pour les clips (pas de saut), `0x1c40` pour la vidéo (`0x400` clic, `0x800` Échap : passable). Appelée pour : avertissements de temps, fin du temps (`28a3:0438`) et répliques-vidéos de `26ee:027e`. Port : `ClipSequence` (clips d'habillage non passables, vidéo passable).
+Joue 4 vidéos à la suite : `s42%c.mux` avec `%c = 'a' + (rand × 5000 / 0x8000) % 5` (a..e), la vidéo `nom`, `s42g.mux`, `s42%c.mux` avec `'h' + …` (h..l, second tirage). Drapeaux `179a:0673` via `154c:07c2` : `0x1040` pour les clips (pas de saut), `0x1c40` pour la vidéo (`0x400` clic, `0x800` Échap : passable). Appelée pour : avertissements de temps, fin du temps (`28a3:0438`) et répliques-vidéos de `26ee:027e`. Les quatre vidéos sont en surimpression sur le plateau (`0x1000`, voir `mux.md`) : `13fc:0002(+1)` avant, `13fc:0002(-1)` et recopie du plateau à la fin, sans fondu. Port : `ClipSequence` avec `overlay` (clips d'habillage non passables, vidéo passable) ; pas de fondu autour des avertissements et des répliques (la fin du temps garde le sien, `28a3:0438`).
 
 ### Avertissements de temps (`291e:0401`, sûr ; règles dans `game/rules.ts`)
 

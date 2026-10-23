@@ -3,7 +3,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../data/mcg";
 import type { Action } from "../../engine/input";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Surface } from "../../engine/surface";
-import { VideoScene } from "../../engine/video";
+import { VideoScene, type VideoBackdrop } from "../../engine/video";
 import type { Game, GameEvent } from "../../game/rules";
 import { hasIngredient, type MinigameOutcome, type MinigameRequest } from "../../game/state";
 import { INGREDIENT_COUNT, minigameInfo } from "../../game/tables";
@@ -105,6 +105,8 @@ export interface ClipOptions {
   onFrame?(ctx: SceneContext, frame: number, markers: readonly Uint8Array[]): "stop" | void;
   /** Dessiné par-dessus chaque image (sprites posés par `onFrame`). */
   overlay?(ctx: SceneContext): void;
+  /** Vidéo en surimpression (`0x1000`) : fond à capturer avant `start`. */
+  backdrop?: VideoBackdrop;
 }
 
 /**
@@ -129,6 +131,7 @@ export class Clip {
       skippable: options.skippable,
       onFrame: options.onFrame,
       overlay: options.overlay,
+      backdrop: options.backdrop,
       onEnd: (ctx) => {
         // L'image finale est redessinée avant que `exit` ne coupe le son : `render` la montre encore ensuite.
         this.video.render(ctx);

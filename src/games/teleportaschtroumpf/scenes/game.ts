@@ -11,7 +11,7 @@ import type { Position } from "../game/tables";
 import { GameClock } from "./board/clock";
 import { VoiceLine, hintVoice, introVoice, zoneHelpVoice, type VoiceFile } from "./board/voices";
 import { approachX, createBoardEventScene, createWellScene } from "./events";
-import { Commentary, createGrandSchtroumpfScene, isCommentVideo, type GrandSchtroumpfRequest } from "./grand-schtroumpf";
+import { Commentary, createGrandSchtroumpfScene, type GrandSchtroumpfRequest } from "./grand-schtroumpf";
 import { createMinigame, createMinigameAftermath } from "./minigames";
 import { createMapScene } from "./s02-map";
 import { Board, loadBoardResources, type BoardLook, type BoardResources } from "./s01-board";
@@ -250,6 +250,8 @@ export class GameScene implements Scene {
     // Le temps de la partie est à jour (`freeze`) et rien n'a encore tiré au hasard : c'est le point de reprise du tour.
     this.save(ctx);
     ctx.voice.setMusic(this.musics[ctx.rng.below(this.musics.length)]);
+    // Les attentes de l'annonce (`1f33:00fc`, `1f33:03a7`) ne relancent pas la musique : seule la boucle du plateau le fait.
+    ctx.voice.holdMusic(true);
     // `26ee:0f17`, avant l'affichage du plateau du joueur (jamais pour un tour passé : voir `skipTurn`).
     const progress = this.commentary.beforeTurn(this.game, ctx.rng);
     if (progress !== 0) {
@@ -269,22 +271,28 @@ export class GameScene implements Scene {
     if (this.warning !== null) {
       const video = this.warning;
       this.warning = null;
-      yield* this.grandSchtroumpf(ctx, { kind: "timeWarning", video }, true);
-      yield* this.backToBoard(ctx);
+      // Vidéo par-dessus le plateau, sans fondu (`154c:097b`) ; `resume` le redessine à la fin.
+      yield* this.grandSchtroumpf(ctx, { kind: "timeWarning", video }, false);
     }
     yield* this.comment(ctx, this.commentary.afterAnnouncement(this.game, ctx.rng, { warned, skipped: false }));
+    ctx.voice.holdMusic(false);
+    // `291e:0b72` : le chrono de pose repart avec celui du tour, l'annonce ne compte pas dans l'attente avant l'impatience.
+    this.board.walker.restartPoseTimer(ctx.clock.ticks);
     this.unfreeze(ctx);
   }
 
   /** Tour passé : le joueur est dans sa cage ou sous le siphon (`291e:0401`, états 2 et 4). */
   private *skipTurn(ctx: SceneContext, player: number, reason: "jail" | "turlusiphon"): Script {
     const character = this.game.state.players[player].character;
+    // Pas de musique pendant l'annonce, comme au début d'un tour jouable (`beginTurn`).
+    ctx.voice.holdMusic(true);
     yield* this.showPlayer(ctx, player, reason === "jail" ? "jail" : "siphon", false);
     yield* this.speak(ctx, hintVoice(VOICE_ANNOUNCE, character, ctx.rng));
     yield* this.wait(ctx, ANNOUNCE_PAUSE_TICKS);
     yield* this.speak(ctx, hintVoice(reason === "jail" ? VOICE_JAIL : VOICE_SIPHON, character, ctx.rng));
     // Le joueur vient d'être pris : le Grand Schtroumpf commente (`26ee:027e`, `DS:274E == 2`).
     yield* this.comment(ctx, this.commentary.afterAnnouncement(this.game, ctx.rng, { warned: false, skipped: true }));
+    ctx.voice.holdMusic(false);
   }
 
   /** Libération au début du tour (animations de S20 et S21). */
@@ -428,20 +436,10 @@ export class GameScene implements Scene {
     yield* this.overlay(ctx, createGrandSchtroumpfScene(request, done), fade);
   }
 
-  /** Réplique du Grand Schtroumpf (`code` de `Commentary`, 0 = rien) : voix par-dessus le plateau ou vidéo plein écran. */
+  /** Réplique du Grand Schtroumpf (`code` de `Commentary`, 0 = rien) : voix ou vidéo, par-dessus le plateau et sans fondu. */
   private *comment(ctx: SceneContext, code: number): Script {
     if (code === 0) return;
-    const video = isCommentVideo(code);
-    yield* this.grandSchtroumpf(ctx, { kind: "comment", code }, video);
-    if (video) yield* this.backToBoard(ctx);
-  }
-
-  /** Après une vidéo plein écran : le plateau revient en fondu. */
-  private *backToBoard(ctx: SceneContext): Script {
-    ctx.fade.blackout();
-    this.board.redraw(ctx);
-    ctx.fade.in();
-    while (ctx.fade.active) yield "frame";
+    yield* this.grandSchtroumpf(ctx, { kind: "comment", code }, false);
   }
 
   /** Affiche le plateau d'un joueur : fondu au noir de l'écran précédent, nouvel écran, fondu d'entrée. */
@@ -457,11 +455,18 @@ export class GameScene implements Scene {
     while (ctx.fade.active) yield "frame";
   }
 
-  /** Dit une voix jusqu'au bout ; Espace la coupe. Sans fichier, rien. */
+  /**
+   * Dit une voix jusqu'au bout ; Espace la coupe. Sans fichier, rien. La pression de l'image en cours ne compte pas : c'est
+   * souvent elle qui a déclenché la voix (porte d'un mini-jeu, « rien ici »).
+   */
   private *speak(ctx: SceneContext, file: VoiceFile | null): Script {
     if (file === null) return;
     const line = new VoiceLine(ctx, file);
-    while (!line.update(ctx, ctx.input.justPressed("validate"))) yield "frame";
+    let skip = false;
+    while (!line.update(ctx, skip)) {
+      yield "frame";
+      skip = ctx.input.justPressed("validate");
+    }
   }
 
   private *wait(ctx: SceneContext, ticks: number): Script {

@@ -62,6 +62,7 @@ describe("VoiceChannel", () => {
     expect(backend.plays).toHaveLength(1);
     voice.holdMusic(true); // coupe la musique en cours
     expect(voice.playing).toBe(false);
+    expect(voice.musicHeld).toBe(true);
   });
 
   it("stop coupe tout ; la musique repart ensuite à l'update", () => {

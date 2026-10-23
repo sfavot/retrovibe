@@ -5,6 +5,7 @@ import { voiceName } from "../../engine/paths";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Game } from "../../game/rules";
 import { BIRD_HINT_SCENES } from "../../game/tables";
+import { VideoBackdrop } from "../../engine/video";
 import { Clip, minigameRequest, type AftermathFactory, type MinigameDone, type MinigameFactory } from "./common";
 
 /**
@@ -15,6 +16,8 @@ import { Clip, minigameRequest, type AftermathFactory, type MinigameDone, type M
  * - reçoit : `game`, la partie en cours ; la requête est `game.state.pending` (scène 39) ; ni niveau ni indice de l'oiseau n'ont de sens ici ;
  * - joue : une histoire en vidéos MUX (`s39a1` à `s39m3`), non passables. Seul, le joueur voit l'une des cinq histoires courtes (a à e) ;
  *   à plusieurs, l'une des trois longues (avec les vidéos k). Après la vidéo `k2`, l'original attend un clic (60 s au plus) ;
+ * - les vidéos sont en surimpression (`0x1000`, `VideoBackdrop`) sur l'écran d'avant l'histoire, capturé à l'entrée (sans ce
+ *   fond, l'oiseau laisse une traînée) ;
  * - rend : `onDone(ctx, { kind: "none" })` à la fin de la dernière vidéo ; `Game.resolveMinigame` tire alors la scène désignée
  *   (`resolveBird`) et pose l'indice.
  *
@@ -58,6 +61,7 @@ export class BirdScene implements Scene {
   private stage: "clip" | "gap" | "wait" | "done" = "clip";
   private waitStart = 0;
   private done = false;
+  private readonly backdrop = new VideoBackdrop();
 
   constructor(
     private readonly game: Game,
@@ -86,11 +90,14 @@ export class BirdScene implements Scene {
   async load(ctx: SceneContext): Promise<void> {
     // Un seul tirage, avant les vidéos (`265b:0025`).
     this.story = pickStory(ctx.rng.below(32000), this.game.state.players.length);
-    this.clips = BIRD_STORIES[this.story].map((name) => new Clip(storyFile(name), (c) => this.clipEnded(c, name), { skippable: false }));
+    const options = { skippable: false, backdrop: this.backdrop };
+    this.clips = BIRD_STORIES[this.story].map((name) => new Clip(storyFile(name), (c) => this.clipEnded(c, name), options));
     await Promise.all(this.clips.map((clip) => clip.load(ctx)));
   }
 
   enter(ctx: SceneContext): void {
+    // `265b:007c` : l'écran d'avant l'histoire devient le fond des vidéos.
+    this.backdrop.capture(ctx);
     this.index = 0;
     this.done = false;
     this.stage = "clip";

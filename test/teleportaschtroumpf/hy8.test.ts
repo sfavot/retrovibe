@@ -37,6 +37,17 @@ describe("HY8 : données invalides", () => {
     expect(hy8.trailer).toHaveLength(12);
   });
 
+  it("retourne une image dont le mot d'attributs vaut 0x8000 (stockée en miroir)", () => {
+    // Image 16x1 : un span de 3 pixels après 2 transparents, écart de fin 11.
+    const image = [0x01, 0x01, 0x01, 0x02, 0x00, 0x03, 7, 8, 9, 11];
+    const plain = parseHy8(minimal(image)).images[0].pixels;
+    expect([...plain.subarray(0, 5)]).toEqual([0, 0, 7, 8, 9]);
+    const bytes = minimal(image);
+    bytes.set([0x00, 0x80], 36 + 4); // mot d'attributs de l'image, juste avant elle
+    const mirrored = parseHy8(bytes).images[0].pixels;
+    expect([...mirrored]).toEqual([...plain].reverse());
+  });
+
   it("refuse un fichier plus court que l'en-tête", () => {
     expect(() => parseHy8(new Uint8Array(20))).toThrow(/HY8 invalide/);
   });

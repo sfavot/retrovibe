@@ -3,7 +3,10 @@ import { BinaryReader } from "../../../data/reader";
 /** Taille de l'en-tête : 6 u32 little-endian. */
 const HEADER_BYTES = 24;
 
-/** Image : pixels indexés (palette de la scène), `width * height` octets, 0 = transparent. */
+/**
+ * Image : pixels indexés (palette de la scène), `width * height` octets, 0 = transparent. Une image stockée en miroir
+ * (mot d'attributs `HY8_IMAGE_MIRROR_X`) est déjà retournée : `pixels` est ce que le blit d'origine affiche.
+ */
 export interface Hy8Image {
   width: number;
   height: number;
@@ -19,6 +22,12 @@ export interface Hy8Point {
 /** Type d'une partie de sprite : ce qu'elle dessine (`31fe:0481`, table de sauts en `CS:0x19`). */
 export const HY8_PART_SUB_SPRITE = 0;
 export const HY8_PART_IMAGE = 1;
+
+/**
+ * Mot d'attributs (u16) qui précède chaque image : le blit `317b:01cc` le combine (XOR, `317b:0279`) au mot d'index reçu,
+ * donc 0x8000 = image stockée en miroir horizontal. Seules valeurs rencontrées : 0 et 0x8000 (39 images sur 1136).
+ */
+const HY8_IMAGE_MIRROR_X = 0x8000;
 
 /** Bit de `flags` d'une partie ou d'une frame : miroir horizontal. */
 export const HY8_FLAG_MIRROR_X = 0x80;
@@ -90,6 +99,7 @@ function fail(message: string): never {
 
 function readImage(bytes: Uint8Array, start: number, limit: number, index: number): Hy8Image {
   if (start + 2 > limit) fail(`image ${index} : en-tête hors du fichier`);
+  const attributes = bytes[start - 2] | (bytes[start - 1] << 8);
   const width = bytes[start] * 16;
   const height = bytes[start + 1];
   const pixels = new Uint8Array(width * height);
@@ -119,13 +129,14 @@ function readImage(bytes: Uint8Array, start: number, limit: number, index: numbe
     }
     p++;
   }
+  if (attributes & HY8_IMAGE_MIRROR_X) for (let y = 0; y < height; y++) pixels.subarray(y * width, (y + 1) * width).reverse();
   return { width, height, pixels };
 }
 
 /**
  * Table de u32 relatifs à `base` ; le nombre d'entrées est `premier offset / 4`.
- * `padding` : octets de remplissage tolérés entre la table et le premier enregistrement
- * (2 pour la table d'images, 0 ailleurs).
+ * `padding` : octets entre la table et le premier enregistrement (2 pour la table d'images : le mot d'attributs de la
+ * première image, voir `HY8_IMAGE_MIRROR_X` ; 0 ailleurs).
  */
 function readOffsetTable(bytes: Uint8Array, base: number, limit: number, what: string, padding: number): number[] {
   if (base + 4 > limit) fail(`${what} : table hors du fichier`);

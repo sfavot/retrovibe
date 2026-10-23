@@ -83,15 +83,18 @@ export function createGrandSchtroumpfScene(request: GrandSchtroumpfRequest, onDo
     case "ingredients":
       return new IngredientsScene(request.game, onDone);
     case "timeWarning":
+      // Par-dessus le plateau, qui revient tel quel à la fin (`154c:097b` : `13fc:0002(-1)`, sans fondu).
+      return new ClipSequence((ctx) => framedClips(s42VideoFile(request.video), ctx), onDone, { overlay: true, fadeOut: false });
     case "timeout":
-      return new ClipSequence((ctx) => framedClips(s42VideoFile(request.video), ctx), onDone);
+      // `28a3:0438` : fondu au noir avant le retour au menu.
+      return new ClipSequence((ctx) => framedClips(s42VideoFile(request.video), ctx), onDone, { overlay: true });
     case "victory":
       return new VideoScene({ file: "s11a.mux", fadeOutAtEnd: true, onEnd: onDone });
     case "progress":
       return new ClipSequence((ctx) => progressClips(request.code, ctx), onDone);
     case "comment":
       return isCommentVideo(request.code)
-        ? new ClipSequence((ctx) => framedClips(s42VideoFile(request.code), ctx), onDone)
+        ? new ClipSequence((ctx) => framedClips(s42VideoFile(request.code), ctx), onDone, { overlay: true, fadeOut: false })
         : new CommentVoiceScene(request.code, onDone);
   }
 }

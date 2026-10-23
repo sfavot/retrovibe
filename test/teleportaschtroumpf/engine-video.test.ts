@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MuxDecoder } from "../../src/games/teleportaschtroumpf/data/mux";
 import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
 import { Palette } from "../../src/games/teleportaschtroumpf/engine/palette";
-import { VideoPlayer, VideoScene, scanMux } from "../../src/games/teleportaschtroumpf/engine/video";
+import { VideoBackdrop, VideoPlayer, VideoScene, scanMux } from "../../src/games/teleportaschtroumpf/engine/video";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles, readData } from "./helpers";
 
@@ -145,6 +145,45 @@ describe.skipIf(!hasOriginalFiles)("lecture MUX", () => {
     await runFor(engine, host, 100);
     expect(ended).toBe(true);
     host.input.keyUp("Escape");
+  });
+
+  it("à la sortie, rend la retenue de la musique d'avant la vidéo (une annonce peut la retenir autour)", async () => {
+    const host = new TestHost();
+    const engine = new Engine(host, { seed: 1 });
+    const { voice, scenes } = engine.ctx;
+    const blank = { enter() {}, update() {}, render() {} };
+    for (const held of [true, false]) {
+      voice.holdMusic(held);
+      scenes.replace(new VideoScene({ file: "s52d0.mux", onEnd: () => {} }));
+      await runFor(engine, host, 300);
+      expect(voice.musicHeld).toBe(true);
+      scenes.replace(blank);
+      await runFor(engine, host, 100);
+      expect(voice.musicHeld).toBe(held);
+    }
+  });
+
+  it("surimpression (0x1000) : chaque image se décode sur le fond capturé, l'oiseau de S39 ne laisse pas de traînée", async () => {
+    const host = new TestHost();
+    const engine = new Engine(host, { seed: 1 });
+    const { ctx } = engine;
+    ctx.surface.work.fill(5);
+    ctx.palette.setColor(5, 1, 2, 3);
+    const backdrop = new VideoBackdrop();
+    backdrop.capture(ctx);
+    expect(backdrop.pixels.every((p) => p === 0x85)).toBe(true);
+    const bytes = new Uint8Array(readData("S39/S39A/S39A1.MUX"));
+    const plain = new VideoPlayer(bytes);
+    const overlay = new VideoPlayer(bytes, backdrop);
+    plain.seek(plain.frameCount - 1);
+    overlay.seek(overlay.frameCount - 1);
+    // Sans fond, les images de l'oiseau s'accumulent ; avec, seule la dernière recouvre le fond.
+    const covered = (pixels: Uint8Array, background: number) => pixels.filter((p) => p !== background).length;
+    expect(covered(overlay.pixels, 0x85)).toBeLessThan(covered(plain.pixels, 0) * 0.8);
+    // Les 128 couleurs de la vidéo, puis celles du fond décalées de 128.
+    const palette = backdrop.combine(overlay.palette);
+    expect([...palette.subarray(0, 384)]).toEqual([...overlay.palette.subarray(0, 384)]);
+    expect([...palette.subarray(0x85 * 3, 0x85 * 3 + 3)]).toEqual([1, 2, 3]);
   });
 
   it("non passable : Échap n'a aucun effet", async () => {

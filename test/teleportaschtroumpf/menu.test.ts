@@ -15,21 +15,32 @@ interface Harness {
   palette: Palette;
   input: Input;
   voices: string[];
+  /** Bruitages mélangés lancés (`playEffect`) et état « un bruitage sonne ». */
+  effects: string[];
+  busy: { effect: boolean };
   /** Un pas de scène : met à jour le menu puis oublie les appuis récents (comme le gestionnaire de scènes). */
   step(): MenuEvent | null;
   /** Éléments dont la couleur est en surbrillance. */
   lit(): number[];
 }
 
-async function harness(axis: "vertical" | "horizontal" | "none", options: { wrap?: boolean; initial?: number; changeSound?: string } = {}): Promise<Harness> {
+async function harness(axis: "vertical" | "horizontal" | "none", options: { wrap?: boolean; initial?: number; changeSound?: string; changeSoundIfIdle?: boolean } = {}): Promise<Harness> {
   const input = new Input();
   const palette = new Palette();
   for (let i = 0; i < 3; i++) palette.setColor(120 + i, 83, 23, 23);
   const voices: string[] = [];
+  const effects: string[] = [];
+  const busy = { effect: false };
   const ctx = {
     input,
     palette,
-    voice: { play: (v: { name: string }) => voices.push(v.name) },
+    voice: {
+      play: (v: { name: string }) => voices.push(v.name),
+      playEffect: (v: { name: string }) => effects.push(v.name),
+      get effectPlaying() {
+        return busy.effect;
+      },
+    },
     resources: { voc: async (name: string) => ({ name }) },
   } as unknown as SceneContext;
   const menu = new Menu({ items: ITEMS, axis, highlight: paletteHighlight(120, HOVER), ...options });
@@ -41,6 +52,8 @@ async function harness(axis: "vertical" | "horizontal" | "none", options: { wrap
     palette,
     input,
     voices,
+    effects,
+    busy,
     step() {
       const event = menu.update(ctx);
       input.endUpdate();
@@ -128,20 +141,40 @@ describe("Menu", () => {
     expect(h.menu.index).toBe(0);
   });
 
-  it("joue le bip de navigation à chaque changement par touche, pas à l'entrée ni via select()", async () => {
+  it("joue le bip de navigation (bruitage mélangé) à chaque changement par touche, pas à l'entrée ni via select()", async () => {
     const h = await harness("vertical", { changeSound: "bip.voc" });
-    expect(h.voices).toEqual([]);
+    expect(h.effects).toEqual([]);
     h.input.keyDown("ArrowDown");
     h.step();
     h.input.keyUp("ArrowDown");
-    expect(h.voices).toEqual(["bip.voc"]);
+    expect(h.effects).toEqual(["bip.voc"]);
     h.menu.select(h.ctx, 2);
-    expect(h.voices).toEqual(["bip.voc"]);
+    expect(h.effects).toEqual(["bip.voc"]);
+    expect(h.voices).toEqual([]); // la voie n'est pas touchée
     // Sans changement (borné) : pas de bip.
     const b = await harness("vertical", { wrap: false, changeSound: "bip.voc" });
     b.input.keyDown("ArrowUp");
     b.step();
-    expect(b.voices).toEqual([]);
+    expect(b.effects).toEqual([]);
+  });
+
+  it("changeSoundIfIdle : le bip n'est lancé que si aucun bruitage ne sonne ; sinon il remplace le bruitage", async () => {
+    const idle = await harness("vertical", { changeSound: "bip.voc", changeSoundIfIdle: true });
+    idle.busy.effect = true;
+    idle.input.keyDown("ArrowDown");
+    idle.step();
+    idle.input.keyUp("ArrowDown");
+    expect(idle.effects).toEqual([]);
+    idle.busy.effect = false;
+    idle.input.keyDown("ArrowDown");
+    idle.step();
+    expect(idle.effects).toEqual(["bip.voc"]);
+
+    const replace = await harness("vertical", { changeSound: "bip.voc" });
+    replace.busy.effect = true;
+    replace.input.keyDown("ArrowDown");
+    replace.step();
+    expect(replace.effects).toEqual(["bip.voc"]);
   });
 
   it("valide à Espace et au clic gauche, sans tenir compte de la position du pointeur", async () => {

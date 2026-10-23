@@ -4,10 +4,8 @@ import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
 import type { Scene } from "../../src/games/teleportaschtroumpf/engine/scene";
 import { Game, newGame, type GameEvent } from "../../src/games/teleportaschtroumpf/game/rules";
 import type { MinigameOutcome } from "../../src/games/teleportaschtroumpf/game/state";
-import { MINIGAMES } from "../../src/games/teleportaschtroumpf/game/tables";
 import { createBoardEventScene, createWellScene } from "../../src/games/teleportaschtroumpf/scenes/events";
 import { s42VideoFile } from "../../src/games/teleportaschtroumpf/scenes/grand-schtroumpf";
-import { MINIGAME_IDS, STUB_POINTS, createMinigame, createMinigameAftermath } from "../../src/games/teleportaschtroumpf/scenes/minigames";
 import { createFreeModeScene, createMapScene } from "../../src/games/teleportaschtroumpf/scenes/s02-map";
 import { TestHost } from "./engine-test-host";
 import { advance, advanceUntil } from "./game-helpers";
@@ -34,6 +32,18 @@ async function launch(scene: Scene) {
 }
 
 describe("game/ : compléments pour le plateau", () => {
+  it("points d'un mini-jeu : un gain supérieur à 3 (S51 : jusqu'à 11) est appliqué en entier, plafonné à 60", () => {
+    const game = oneGame();
+    game.player.points = 40;
+    game.openMinigame(51);
+    expect(game.resolveMinigame({ kind: "points", points: 11 })).toContainEqual({ type: "gain", player: 0, points: 11 });
+    expect(game.player.points).toBe(51);
+    game.openMinigame(51);
+    const events = game.resolveMinigame({ kind: "points", points: 11 });
+    expect(game.player.points).toBe(60);
+    expect(events).toContainEqual({ type: "gain", player: 0, points: 9 });
+  });
+
   it("l'événement hazard donne la position au déclenchement et celle d'arrivée", () => {
     const game = oneGame();
     const p = game.player;
@@ -83,49 +93,6 @@ describe("game/ : compléments pour le plateau", () => {
     expect(() => game.openMinigame(37)).toThrow();
     game.openMinigame(24);
     expect(() => game.openMinigame(25)).toThrow(); // déjà un mini-jeu en cours
-  });
-});
-
-describe("registre des mini-jeux (souche commune)", () => {
-  it("couvre exactement les codes de la table de portes, sauf le puits (S13, events.ts)", () => {
-    expect([...MINIGAME_IDS].sort((a, b) => a - b)).toEqual(MINIGAMES.map((m) => m.scene).filter((scene) => scene !== 14).sort((a, b) => a - b));
-    expect(() => createMinigame(14, oneGame(), () => undefined)).toThrow(RangeError);
-    expect(() => createMinigame(37, oneGame(), () => undefined)).toThrow(RangeError);
-  });
-
-  describe.skipIf(!hasOriginalFiles)("souche : Espace = réussi, Entrée = échoué", () => {
-    it.each(MINIGAME_IDS.map((id) => [id]))("scène %i : l'issue est du type attendu par Game.resolveMinigame", async (id) => {
-      for (const [key, success] of [["Space", true], ["Enter", false]] as const) {
-        const game = oneGame();
-        game.openMinigame(id);
-        let outcome: MinigameOutcome | undefined;
-        const { press } = await launch(createMinigame(id, game, (_ctx, o) => (outcome = o)));
-        await press(key);
-        expect(outcome).toBeDefined();
-        game.resolveMinigame(outcome!);
-        const info = MINIGAMES.find((m) => m.scene === id)!;
-        const player = game.state.players[0];
-        if (info.kind === "points") expect(player.points).toBe(success ? STUB_POINTS : 0);
-        if (info.kind === "ingredient") expect(((player.ingredients >> info.ingredient!) & 1) === 1).toBe(success);
-      }
-    }, 60_000);
-
-    it("le magicien (S41) échange 3 points contre le premier ingrédient manquant", async () => {
-      const game = oneGame();
-      game.player.points = 5;
-      game.openMinigame(41);
-      let outcome: MinigameOutcome | undefined;
-      const { press } = await launch(createMinigame(41, game, (_ctx, o) => (outcome = o)));
-      await press("Space");
-      expect(outcome).toEqual({ kind: "magician", choice: 0 });
-      game.resolveMinigame(outcome!);
-      expect(game.player.points).toBe(2);
-      expect(game.player.ingredients & 1).toBe(1);
-    }, 60_000);
-  });
-
-  it("la présentation de l'issue (S38, S39) est vide dans la souche", () => {
-    expect(createMinigameAftermath(38, oneGame(), [], () => undefined)).toBeNull();
   });
 });
 

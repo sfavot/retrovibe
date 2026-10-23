@@ -47,7 +47,7 @@ export interface MinigameRequest {
 export type MinigameOutcome =
   /** S22, 27, 28, 31, 32, 33, 34, 36 : réussite ou échec. */
   | { kind: "ingredient"; success: boolean }
-  /** S23, 24, 25, 26, 29, 30, 35, 40, 51 : points gagnés (0 en cas d'échec). */
+  /** S23, 24, 25, 26, 29, 30, 35, 40, 51 : points gagnés, entiers ≥ 0 (0 en cas d'échec) : 1 à 3 pour la plupart, 0 à 11 pour S51 (un point par cadeau ouvert) ; `Game` plafonne le total à 60. */
   | { kind: "points"; points: number }
   /** S13 : ingrédient choisi (mode `ingredient`) ou lieu `k` de la carte (mode `travel`), `null` si rien. */
   | { kind: "well"; ingredient?: number | null; destination?: number | null }

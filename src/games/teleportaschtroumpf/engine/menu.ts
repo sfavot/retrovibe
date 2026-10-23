@@ -69,6 +69,11 @@ export interface MenuOptions {
   initial?: number;
   /** Bip de navigation (nom du `.voc`) joué à chaque changement d'élément par les touches de direction (`21ee:0e8f`). */
   changeSound?: string;
+  /**
+   * Le bip ne se lance que si aucun bruitage ne sonne (`if (348d:0b42(1, 0) == 0)`, S46, S48, S49) ; sinon il remplace le
+   * bruitage en cours (S07, S08, S04).
+   */
+  changeSoundIfIdle?: boolean;
 }
 
 /** Ce que `update` renvoie : un élément validé (clic gauche, Espace) ou l'aide demandée (clic droit, Entrée). */
@@ -158,7 +163,8 @@ export class Menu {
   move(ctx: SceneContext, index: number): void {
     if (index === this.current) return;
     this.select(ctx, index);
-    if (this.beep) ctx.voice.play(this.beep);
+    // Bruitage mélangé `348d:0b42(2, bip)` : la musique n'est pas coupée.
+    if (this.beep && !(this.options.changeSoundIfIdle && ctx.voice.effectPlaying)) ctx.voice.playEffect(this.beep);
   }
 
   render(ctx: SceneContext): void {

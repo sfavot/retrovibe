@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { forceMinigameStubs } from "../../src/games/teleportaschtroumpf/scenes/minigames";
 import { Session } from "./game-helpers";
 import { hasOriginalFiles } from "./helpers";
+
+// Ces tests traversent un mini-jeu sans le jouer : la souche commune les garde indépendants des vrais mini-jeux.
+forceMinigameStubs();
 
 const TWO = [{ character: 0 }, { character: 3 }];
 const THREE = [{ character: 0 }, { character: 3 }, { character: 5 }];

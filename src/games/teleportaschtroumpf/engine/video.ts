@@ -90,16 +90,23 @@ export class VideoPlayer {
     return this.frameAt(seconds) >= this.frameCount;
   }
 
-  /** Décode jusqu'à l'image `frame` (bornée à la dernière) ; renvoie vrai si l'image affichée a changé. */
-  seek(frame: number): boolean {
+  /**
+   * Décode jusqu'à l'image `frame` (bornée à la dernière) ; renvoie vrai si l'image affichée a changé.
+   * `onFrame` est appelé après chaque image décodée, dans l'ordre, avec son numéro et les marqueurs (chunks 08) qu'elle
+   * portait : c'est le rappel par image de `179a:0673` (`179a:016e` range le marqueur en `DS:6DE4`). S'il rend `true`, le
+   * décodage s'arrête sur cette image.
+   */
+  seek(frame: number, onFrame?: (index: number, markers: readonly Uint8Array[]) => boolean | void): boolean {
     const wanted = Math.min(frame, this.frameCount - 1);
     const before = this.shown;
     while (this.shown < wanted) {
-      if (!this.decoder.nextFrame()) {
+      const decoded = this.decoder.nextFrame();
+      if (!decoded) {
         this.shown = this.frameCount;
         break;
       }
       this.shown++;
+      if (onFrame?.(this.shown, decoded.markers) === true) break;
     }
     return this.shown !== before;
   }
@@ -114,6 +121,14 @@ export interface VideoSceneOptions {
   fadeOutAtEnd?: boolean;
   /** Appelé une fois, à la fin : c'est là qu'on enchaîne (`ctx.scenes.replace(...)`). */
   onEnd(ctx: SceneContext): void;
+  /**
+   * Rappel par image décodée (le rappel `cb_image` de `179a:0673`) : numéro de l'image (0 = la première) et marqueurs de
+   * l'image. Rendre `"stop"` interrompt la vidéo sur cette image (l'original lève le drapeau d'arrêt `DS:6337`) : `onEnd`
+   * est alors appelé comme pour une fin normale.
+   */
+  onFrame?(ctx: SceneContext, frame: number, markers: readonly Uint8Array[]): "stop" | void;
+  /** Dessiné par-dessus chaque image affichée (sprites posés par `onFrame`, comme le rappel de l'original dessine dans le tampon). */
+  overlay?(ctx: SceneContext): void;
 }
 
 /**
@@ -153,7 +168,8 @@ export class VideoScene implements Scene {
     this.audioEndedTick = null;
     this.ending = false;
     this.done = false;
-    player.seek(0);
+    const { onFrame } = this.options;
+    player.seek(0, onFrame && ((index, markers) => void onFrame(ctx, index, markers)));
   }
 
   /**
@@ -198,8 +214,10 @@ export class VideoScene implements Scene {
     const time = this.time(ctx);
     // La piste son déborde un peu la dernière image : on laisse finir le son avant de conclure.
     const framesOver = player.endedAt(time) && !(this.usingAudio && ctx.voice.voicePlaying);
-    player.seek(player.frameAt(time));
-    if (skip || framesOver || player.shown >= player.frameCount) this.end(ctx);
+    const { onFrame } = this.options;
+    let stopped = false;
+    player.seek(player.frameAt(time), onFrame && ((index, markers) => (stopped = onFrame(ctx, index, markers) === "stop")));
+    if (skip || stopped || framesOver || player.shown >= player.frameCount) this.end(ctx);
   }
 
   render(ctx: SceneContext): void {
@@ -207,6 +225,7 @@ export class VideoScene implements Scene {
     if (player.shown < 0) return;
     ctx.palette.load(player.palette);
     ctx.surface.drawFullScreen(player.pixels);
+    this.options.overlay?.(ctx);
   }
 
   exit(ctx: SceneContext): void {

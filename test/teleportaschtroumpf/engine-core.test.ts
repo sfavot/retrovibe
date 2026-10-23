@@ -263,6 +263,24 @@ describe("Input", () => {
     input.mouseMove(319.6, 10);
     expect(input.mouseX).toBe(319);
   });
+
+  it("pilote clavier du curseur (`3134:03c8`) : 1 << keyPointerShift pixels par appel, 4 px au départ puis 2 px une fois le pas posé à 1", () => {
+    const input = new Input();
+    expect(input.keyPointerShift).toBe(2);
+    input.mouseMove(100, 100);
+    input.keyDown("ArrowRight");
+    input.keyDown("ArrowDown");
+    input.moveMouseByKeys();
+    expect([input.mouseX, input.mouseY]).toEqual([104, 104]);
+    input.keyPointerShift = 1;
+    input.moveMouseByKeys();
+    expect([input.mouseX, input.mouseY]).toEqual([106, 106]);
+    input.keyUp("ArrowRight");
+    input.keyUp("ArrowDown");
+    input.keyDown("ArrowLeft");
+    input.moveMouseByKeys();
+    expect([input.mouseX, input.mouseY]).toEqual([104, 106]);
+  });
 });
 
 describe("Options parents", () => {

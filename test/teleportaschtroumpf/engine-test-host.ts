@@ -28,7 +28,11 @@ export class FakeAudio implements AudioBackend {
   unlocked = false;
   /** Si faux, simule une sortie verrouillée : rien ne joue. */
   enabled = true;
+  /** Bruitages mélangés lancés (`playEffect`), dans l'ordre. */
+  readonly effects: PlayedSound[] = [];
+  effectStops = 0;
   private current: PlayedSound | null = null;
+  private currentEffect: PlayedSound | null = null;
 
   constructor(private readonly nowMs: () => number) {}
 
@@ -46,6 +50,23 @@ export class FakeAudio implements AudioBackend {
   stop(): void {
     this.stops++;
     this.current = null;
+  }
+
+  playEffect(sound: PcmSound): void {
+    this.currentEffect = null;
+    if (!this.enabled) return;
+    this.currentEffect = { sound, loop: false, at: this.nowMs() };
+    this.effects.push(this.currentEffect);
+  }
+
+  stopEffect(): void {
+    this.effectStops++;
+    this.currentEffect = null;
+  }
+
+  get effectPlaying(): boolean {
+    const e = this.currentEffect;
+    return !!e && (this.nowMs() - e.at) / 1000 < e.sound.samples.length / e.sound.sampleRate;
   }
 
   private elapsed(): number {

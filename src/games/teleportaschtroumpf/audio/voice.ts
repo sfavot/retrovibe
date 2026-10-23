@@ -13,7 +13,10 @@ export const BEEP_COUNT = 3;
  *   pas de reprise à la position où elle s'était arrêtée ;
  * - `holdMusic(true)` empêche ce redémarrage (pendant une vidéo) ;
  * - les trois **bips** sont des sons courts préchargés par `setBeeps`, joués sur la même voie ;
- * - volume 0–15, transmis au backend sous forme de gain linéaire.
+ * - le **bruitage** mélangé (`playEffect`, `348d:0b42(2, ptr)`, engine.md §5.2 bis) est un second canal, à un seul
+ *   emplacement : un nouveau bruitage remplace le précédent, et ni la voie ni la musique ne sont coupées ;
+ *   `effectPlaying` est `348d:0b42(1, 0) != 0` (« un bruitage sonne encore ») ;
+ * - volume 0–15, transmis au backend sous forme de gain linéaire, pour la voie comme pour le bruitage.
  */
 export class VoiceChannel {
   private music: PcmSound | null = null;
@@ -58,6 +61,20 @@ export class VoiceChannel {
   play(sound: PcmSound): void {
     this.backend.play(sound, false);
     this.current = "voice";
+  }
+
+  /** Joue un bruitage mélangé (`348d:0b42(2, ptr)`) : remplace le bruitage précédent, sans couper la voie ni la musique. */
+  playEffect(sound: PcmSound): void {
+    this.backend.playEffect(sound);
+  }
+
+  /** Vrai tant qu'un bruitage sonne (`348d:0b42(1, 0) != 0`). */
+  get effectPlaying(): boolean {
+    return this.backend.effectPlaying;
+  }
+
+  stopEffect(): void {
+    this.backend.stopEffect();
   }
 
   /** Même chose pour du PCM brut (piste son d'une vidéo MUX). */

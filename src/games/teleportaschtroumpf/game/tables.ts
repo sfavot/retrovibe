@@ -117,8 +117,8 @@ export const MINIGAMES: readonly MinigameInfo[] = [
   { scene: 33, entry: "1ceb:000c", kind: "ingredient", ingredient: 7, bonusTag: 0x21 },
   { scene: 34, entry: "1b05:000b", kind: "ingredient", ingredient: 0, bonusTag: 0x22 },
   { scene: 35, entry: "1bda:0021", kind: "points", bonusTag: 0x23 },
-  // Anomalie de l'original : S36 teste la même valeur que S27 (0x1B) au lieu de 0x24.
-  { scene: 36, entry: "23c9:0004", kind: "ingredient", ingredient: 1, bonusTag: 0x1b },
+  // Défaut de l'original corrigé (2026-10-23) : S36 testait la valeur de S27 (0x1B) ; elle lit maintenant la sienne (0x24, scène 36).
+  { scene: 36, entry: "23c9:0004", kind: "ingredient", ingredient: 1, bonusTag: 0x24 },
   { scene: 38, entry: "1fc6:0008", kind: "steal" },
   { scene: 39, entry: "265b:000d", kind: "bird" },
   { scene: 40, entry: "2ee8:000d", kind: "points", bonusTag: 0x28 },

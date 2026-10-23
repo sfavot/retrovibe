@@ -1,4 +1,3 @@
-import { SCREEN_WIDTH } from "../../data/mcg";
 import type { Hy8 } from "../../data/hy8";
 import type { Voc } from "../../data/voc";
 import { TICKS_PER_SECOND } from "../../engine/clock";
@@ -8,6 +7,7 @@ import { VideoScene } from "../../engine/video";
 import type { Game } from "../../game/rules";
 import { hasIngredient, type MinigameOutcome } from "../../game/state";
 import { VoiceLine } from "../board/voices";
+import { drawFrame } from "../minigames/common";
 import { createMapScene } from "../s02-map";
 
 /**
@@ -44,8 +44,6 @@ const POINTER_MIN_X = 8;
 const POINTER_MAX_X = 0x134;
 const POINTER_MIN_Y = 0x0f;
 const POINTER_MAX_Y = 0xbe;
-/** Déplacement du curseur au clavier (pixels par pas) : l'original émule la souris avec les flèches. */
-const KEY_SPEED = 3;
 /** Couleurs du cadre (`2daf:0462`, `0x7f` puis `0x7e`). */
 const FRAME_OUTER = 0x7f;
 const FRAME_INNER = 0x7e;
@@ -214,16 +212,15 @@ export class WellScene implements Scene {
 
   private pick(ctx: SceneContext): void {
     const input = ctx.input;
-    // Les flèches déplacent le curseur comme le clavier de l'original émule la souris.
-    const dx = (input.pressed("right") ? KEY_SPEED : 0) - (input.pressed("left") ? KEY_SPEED : 0);
-    const dy = (input.pressed("down") ? KEY_SPEED : 0) - (input.pressed("up") ? KEY_SPEED : 0);
-    if (dx !== 0 || dy !== 0) input.mouseMove(input.mouseX + dx, input.mouseY + dy);
+    // Les flèches déplacent le curseur comme le clavier de l'original émule la souris (`3134:03bb`) ; le puits n'écrit pas le pas
+    // (`DS:3FD0`) : 4 px par tick tant qu'un mini-jeu à pointeur libre n'a pas posé 2 px (`Input.keyPointerShift`).
+    input.moveMouseByKeys();
     const { x, y } = this.pointer(ctx);
     this.slot = WELL_SLOTS.findIndex((s) => x > s.x && x < s.x + SLOT_SIZE && y > s.y && y < s.y + SLOT_SIZE);
     if (this.slot < 0) this.slot = null;
 
     if (this.slot !== null && this.slot !== this.beeped) {
-      if (!ctx.voice.voicePlaying && this.beep) ctx.voice.play(this.beep);
+      if (!ctx.voice.effectPlaying && this.beep) ctx.voice.playEffect(this.beep);
       this.beeped = this.slot;
     }
 
@@ -264,8 +261,8 @@ export class WellScene implements Scene {
     surface.restoreBackground();
     if (this.slot !== null) {
       const { x, y } = WELL_SLOTS[this.slot];
-      frame(surface.work, x - 1, y - 1, x + 0x1f, y + 0x1f, FRAME_OUTER);
-      frame(surface.work, x, y, x + SLOT_SIZE, y + SLOT_SIZE, FRAME_INNER);
+      drawFrame(surface, x - 1, y - 1, x + 0x1f, y + 0x1f, FRAME_OUTER);
+      drawFrame(surface, x, y, x + SLOT_SIZE, y + SLOT_SIZE, FRAME_INNER);
     }
     const { x, y } = this.pointer(ctx);
     if (this.sprites) surface.drawSprite(this.sprites, 0, x, y);
@@ -282,21 +279,6 @@ export class WellScene implements Scene {
   private finish(ctx: SceneContext): void {
     this.phase = "done";
     this.onDone(ctx, this.outcome);
-  }
-}
-
-/** Contour d'un rectangle `[x1, x2] × [y1, y2]` bords compris, rogné à l'écran (`32af:0006`). */
-function frame(pixels: Uint8Array, x1: number, y1: number, x2: number, y2: number, color: number): void {
-  const put = (x: number, y: number) => {
-    if (x >= 0 && x < SCREEN_WIDTH && y >= 0 && y * SCREEN_WIDTH + x < pixels.length) pixels[y * SCREEN_WIDTH + x] = color;
-  };
-  for (let x = x1; x <= x2; x++) {
-    put(x, y1);
-    put(x, y2);
-  }
-  for (let y = y1; y <= y2; y++) {
-    put(x1, y);
-    put(x2, y);
   }
 }
 

@@ -28,9 +28,9 @@ Les joueurs jouent chacun leur tour, à tour de rôle. Un tour se termine quand 
 
 ### Les portes
 
-- **Mini-jeux** (S22 à S36, S40, S51) : on y joue, puis le tour passe. Huit d'entre eux donnent un **ingrédient** si on les réussit (S22, S27, S28, S31, S32, S33, S34, S36 : un ingrédient chacun) ; les autres donnent des **gouttes de rosée** (1 à 3 selon la performance, 0 en cas d'échec, jusqu'à 60 gouttes au total).
+- **Mini-jeux** (S22 à S36, S40, S51) : on y joue, puis le tour passe. Huit d'entre eux donnent un **ingrédient** si on les réussit (S22, S27, S28, S31, S32, S33, S34, S36 : un ingrédient chacun) ; les autres donnent des **gouttes de rosée** (1 à 3 selon la performance, 0 en cas d'échec ; S51 fait exception : une goutte par cadeau ouvert, de 0 à 10 ou 11) ; le total est plafonné à 60 gouttes.
 - **Le Schtroumpf à lunettes** (S38) est un coquin : seul, il vole parfois un ingrédient (ou une goutte s'il n'y a pas d'ingrédient) ; à plusieurs, il prend au mieux placé pour donner au moins bien placé. Sinon, il emmène le joueur devant un jeu au hasard.
-- **L'oiseau** (S39) ne donne rien, mais indique un mini-jeu au hasard : la prochaine fois que quiconque y joue, la partie est plus facile (et le jeu « Chez Gargamel » réussit à coup sûr).
+- **L'oiseau** (S39) ne donne rien, mais indique un mini-jeu au hasard : la prochaine fois que quiconque y joue, la partie est plus facile (et le jeu « Chez Gargamel » réussit à coup sûr). Au jeu des cadeaux (S51), l'original rendait le piège plus probable avec l'indice ; défaut de l'original, corrigé (décision du 2026-10-23) : niveau le plus facile (voir §5).
 - **Le magicien** (S41) échange **3 gouttes de rosée contre un ingrédient** au choix. Il refuse si on a moins de 3 gouttes ; il est fermé si on a déjà les 8 ingrédients.
 - **Le puits aux vœux** (S13) n'est ouvert que certains tours (hasard, plus souvent pour qui est en retard). Une fois sur deux (toujours si on a les 8 ingrédients) on y **voyage** : on choisit un lieu sur la carte et le pion s'y rend ; sinon on y **choisit un ingrédient manquant**, donné sans épreuve.
 
@@ -184,10 +184,10 @@ Les codes de porte 15 à 18, 20, 21 qui ne tombent pas dans une plage d'événem
 | Scène | Fonction | Gain | Appels / preuve | Confiance |
 |---|---|---|---|---|
 | 22 Dragon | `1c78:0005` | ingrédient 3 si réussi | `1e52:0053(·, 3)` sous `cRam3cd74` | sûr (condition de réussite : probable) |
-| 23 Musicien | `24d0:000c` | 1 à 3 points si réussi (0 sinon) | `1e52:00ad` | sûr |
+| 23 Musicien | `24d0:000c` | 1 à 3 points selon le score (`goal − 2` → 1, `goal − 1` → 2, `goal` → 3) ; 0 si une erreur est faite, si 10 s s'écoulent pendant la reproduction d'une manche, ou si `score < goal − 2` | `1e52:00ad` | sûr |
 | 24 Puzzle | `2e6a:0001` | 1 à 3 points (tiers du temps) | `1e52:00ad` | sûr |
 | 25 Observation | `260f:000e` | 1 à 3 points ; échec : `1e52:00a8` (stub vide) = 0 | idem | sûr |
-| 26 Jeu sonore | `1ed0:000b` | 0 à 3 points | idem | probable |
+| 26 Jeu sonore | `1ed0:000b` | 1 à 3 points selon le temps (tiers du temps) ; 0 si le clic est hors de la zone (6 px de tolérance, 10 avec l'indice), si c'est un clic droit ou Entrée, ou si 15 s (19 avec l'indice) passent sans clic | idem | sûr |
 | 27 Luge | `1f84:000e` | ingrédient 2 | `1e52:0053(·, 2)` | sûr |
 | 28 Schtroumpfs noirs | `2573:000f` | ingrédient 6 | idem | sûr |
 | 29 Anniversaire | `1da0:0009` | 1 à 3 points (score : < 10 → 3, < 20 → 2) | `1da0:07dd` | sûr |
@@ -202,10 +202,10 @@ Les codes de porte 15 à 18, 20, 21 qui ne tombent pas dans une plage d'événem
 | 39 Oiseau | `265b:000d` | aucun gain ; pose le bonus | `DS:25F5` | sûr |
 | 40 Quiz | `2ee8:000d` | 1 point si bonne réponse | `1e52:00ad(·, local_2c[3])` | sûr |
 | 41 Magicien | `2143:0009` | échange 3 points contre un ingrédient | `1e52:00ad(·, 0xFFFD)` | sûr |
-| 51 Cadeaux | `19a8:0006` | autant de points que de cadeaux (`iRam375e6`, voix : < 2 → 1, < 4 → 2, sinon 3) | `1e52:00ad(·, iRam375e6)` | probable (borne max inconnue) |
+| 51 Cadeaux | `19a8:0006` | **un point par cadeau ouvert** (`iRam375e6`), de 0 à 10 (fonds 1 et 3) ou 11 (fond 2) ; seule la voix suit les paliers (< 2 → 1, < 4 → 2, sinon 3) ; un piège ouvert fait tout perdre (0) | `1e52:00ad(·, iRam375e6)` | sûr |
 | 13 Puits aux vœux | `2daf:0006` | voir ci-dessous | | sûr |
 
-Dans chaque jeu à ingrédient, l'ingrédient n'est ajouté que si le joueur ne l'a pas déjà (`1e52:0034 == 0`) ; une vidéo de fin (`sNNc1`/`c2`) diffère selon que l'ingrédient fait partie de l'objectif (`1e52:0008`).
+Dans chaque jeu à ingrédient, l'ingrédient n'est ajouté que si le joueur ne l'a pas déjà (`1e52:0034 == 0`) ; la vidéo de fin diffère selon que l'ingrédient fait partie de l'objectif (`1e52:0008`), **dans un sens qui dépend du jeu** : `c2` (`cd2` pour S32) quand il en fait partie pour S27, S28, S31, S32, S34 et S36 ; `c1` pour S22 et S33 (relu dans chaque fonction, `minigames/sNN.md`).
 
 **Correspondance ingrédient ↔ scène** : `0 → S34, 1 → S36, 2 → S27, 3 → S22, 4 → S32, 5 → S31, 6 → S28, 7 → S33`. Le nom des ingrédients n'est pas dans l'EXE (voix `s19v`, `1e52:0324` : `DS:1a20/1a30`) : hypothèse « 0..7 » conservée.
 
@@ -215,9 +215,21 @@ Dans chaque jeu à ingrédient, l'ingrédient n'est ajouté que si le joueur ne 
 
 **Schtroumpf à lunettes S38** (`1fc6:0008`, sûr). Une « promenade » désigne `DI = 9 + rand × 17 / 0x8000` (25 refusé, soit 9..24) : vidéo `DI`, puis le joueur est placé devant l'une des 16 portes (`CS:1fc6:0857/084d/0843/083b`, voir `BESPECTACLED_DESTINATIONS`), regard droit. *Seul* : si ni ingrédient ni point, ou si `rand × 2 ≠ 0` : promenade ; sinon, perte d'un ingrédient possédé tiré au hasard, ou d'un point s'il n'a aucun ingrédient (aucune promenade). *À plusieurs* : `rand × 2 ≠ 0` : promenade ; sinon on prend le premier plus pauvre et le premier plus riche en ingrédients et en points (comparaisons strictes) ; rien à prendre (0 partout) : promenade ; seulement des points : le plus riche donne 1 point au plus pauvre (si tous ont autant, le joueur courant donne 1 point à un autre joueur tiré) ; seulement des ingrédients : le premier ingrédient (0..7) que le plus riche a et que le plus pauvre n'a pas passe de l'un à l'autre (si aucun : promenade) ; les deux : si `⌊max points / 2⌋ ≤ max ingrédients`, ingrédients (à défaut, points), sinon points. Le joueur courant n'est pas forcément concerné par le transfert.
 
-**Oiseau S39** (`265b:000d`) : après une histoire en vidéos, tire `rand × 17 / 0x8000` dans `DS:25F5` (les 17 scènes : 22, 30, 31, 32, 36, 24, 26, 51, 28, 34, 27, 23, 25, 29, 33, 35, 40) et le range dans `DS:6F37` (`iRam3d397`). La prochaine scène dont la fonction compare `DS:6F37` à sa valeur la remet à 0 et se simplifie (niveau forcé à 0 dans S23, S24, S25, S29, S35, S40, S28, S31 ; à 3 dans S27, S33, S34, S36 ; S22 : niveau 0 et `iRam3cd7d = 5` ; S26 : `iRam3d3b6 = 4` ; S30 : `local_3 = 3` ; S32 : réussite certaine ; S51 : `iRam3c7a2 = 2`). **Anomalie** : S36 compare à `0x1B` (la valeur de S27) au lieu de `0x24` : un indice « mine » n'est jamais consommé (hypothèse : bug de l'original, reproduit). Le sens exact de chaque niveau interne reste à vérifier scène par scène (phase 4) : hypothèse « plus facile ».
+**Oiseau S39** (`265b:000d`) : après une histoire en vidéos, tire `rand × 17 / 0x8000` dans `DS:25F5` (les 17 scènes : 22, 30, 31, 32, 36, 24, 26, 51, 28, 34, 27, 23, 25, 29, 33, 35, 40) et le range dans `DS:6F37` (`iRam3d397`). La prochaine scène dont la fonction compare `DS:6F37` à sa valeur la remet à 0 et se simplifie. Effet relu scène par scène (`minigames/sNN.md`) :
 
-**Magicien S41** (`2143:0009`, sûr) : si points < 3 ou masque = `0xFF` : vidéos de refus (`s41a1`+`s41c`) si le masque n'est pas plein, sinon rien ; sinon `2143:08a1` pose la question « échanger 3 gouttes de rosée contre un ingrédient ? » (`S49_12T`) ; si non : `s41e` ; si oui : `2143:01cd` : 8 zones cliquables (un ingrédient chacune ; la 9ᵉ, zone 8, est le chapeau), cliquer un ingrédient déjà possédé joue une réplique ; confirmation `2143:070c` ; retourne le choix (9 = temps écoulé). Résultat : choix 0..7 non possédé avec `points > 2` : ingrédient donné, −3 points ; choix 8 : −3 points sans ingrédient (hypothèse : tour de magie raté / le chapeau garde la rosée) ; refus ou temps écoulé : rien.
+- **niveau interne 0** : S24 (3 trous, 40 s), S25 (35 s), S28 (zone de tir entière), S29, S35 (55 s), S40 (35 s) ; S23 (niveau 0 **et** une note de moins : 4) ; S31 (niveau 0 : 3 tortues, **et** toutes lentes) ;
+- **S22** : niveau 0 (dragon le plus lent) **et** cinq dragons déjà comptés (`iRam3cd7d = 5`) ;
+- **S26** : tolérance 10 px au lieu de 6 et 19 s au lieu de 15 (`DS:6F56 = 4`) ; le niveau du joueur n'y a aucun effet ;
+- **S27** : niveau interne 3 (descentes `s27l` / `s27i`) ; la mine S36 a son propre indice (`0x24` = 36, sa scène dans `DS:25F5`) : niveau 3, mine `j` ou `k`, qui n'est pas « plus facile ». Défaut de l'original, corrigé (décision du 2026-10-23) : l'original comparait à `0x1B` (la valeur de S27, `23c9:0004`), donc un indice « S27 » était consommé par S36 et un indice « mine » jamais ; chaque mini-jeu ne lit et ne consomme maintenant que le sien ;
+- **S30** : `local_3 = 3`, l'atterrissage des deux premières zones donne 3 points ;
+- **S32** : réussite certaine (`b = 1`) ;
+- **S33** : niveau interne 3 = 5 symboles sans répétition (60 formules), le plus facile ;
+- **S34** : 3 oiseaux, c'est-à-dire le niveau 0 du joueur (ce n'est **pas** un « niveau 3 » : l'ancienne notation comptait le nombre d'oiseaux) ;
+- **S51** : diviseur 3, soit 1 chance sur 3 de piège comme au niveau 0 (le plus facile). Défaut de l'original, corrigé (décision du 2026-10-23) : l'original prenait le diviseur 2, soit 1 chance sur 2, pire que tous les niveaux (1/3, 1/4, 1/5) (`19a8:0014..0030`).
+
+Les niveaux 0 et 3 ne sont donc pas « tous plus faciles » par construction : S36 est l'exception (niveau 3 = paire `j` / `k`), établie dans le code.
+
+**Magicien S41** (`2143:0009`, sûr) : si points < 3 ou masque = `0xFF` : vidéos de refus (`s41a1`+`s41c`) si le masque n'est pas plein, sinon rien ; sinon `2143:08a1` pose la question « échanger 3 gouttes de rosée contre un ingrédient ? » (`S49_12T`) ; si non : `s41e` ; si oui : `2143:01cd` : 8 zones cliquables (un ingrédient chacune ; la 9ᵉ, zone 8, est le chapeau), cliquer un ingrédient déjà possédé joue une réplique ; confirmation `2143:070c` ; retourne le choix (9 = temps écoulé). Résultat : choix 0..7 non possédé avec `points > 2` : ingrédient donné, −3 points ; choix 8 : −3 points sans ingrédient (**sûr pour le code** : le chapeau coûte 3 gouttes après la même confirmation et les mêmes voix ; ce qu'il représente à l'écran reste une hypothèse, un tour raté, rien dans les vidéos ni les textes ne le dit) ; refus ou temps écoulé : rien.
 
 ### 6. Victoire, temps, abandon
 
@@ -246,13 +258,13 @@ Dans chaque jeu à ingrédient, l'ingrédient n'est ajouté que si le joueur ne 
 
 ## Questions ouvertes
 
-1. **Signification exacte du bonus de l'oiseau** par scène (niveau interne 0 ou 3, variables propres) : à vérifier dans chaque mini-jeu en phase 4.
+1. ~~**Signification exacte du bonus de l'oiseau** par scène~~ : **réglée** par les 20 mini-jeux (voir le paragraphe « Oiseau S39 » du §5 et `minigames/sNN.md`).
 2. **Plages de bord** : les bornes `<`/`≤` des plages d'événements ont été traduites à ±1 ; l'appui exactement à `x = 0xFF` ou `0x113` (écrans 3, 5, 6) n'est géré ni par la marche ni par le bouton dans l'original (trou de 1 px), non reproduit.
 3. **Animations de marche** : la distance parcourue pendant une animation de bord (`x = 0x0B` ou `0x134` après un changement de rangée), le décalage du recul du Turlusiphon (`0x14`) et la marche jusqu'à la cage sont pris à leurs valeurs finales.
 4. **Pause** : le chrono global est-il gelé ? (`engine.md` §8, question 4) : non dans le code lu, donc non gelé.
-5. **Choix 8 du magicien** (zone « chapeau »), sa valeur exacte (rien d'autre que −3 points dans le code) et l'usage de l'entrée 18 de `CS:2daf:0aa8`.
+5. ~~**Choix 8 du magicien**~~ : **réglé pour le code** (−3 points sans ingrédient, `minigames/s41.md`) ; reste ouvert ce que le chapeau représente (hypothèse) et l'usage de l'entrée 18 de `CS:2daf:0aa8`.
 6. **Textes** : noms des 8 ingrédients (voix `s19v`), correspondance personnage ↔ nom (probable), message exact de l'oiseau/indice pour chaque scène : non extraits ; aucune copy n'est écrite dans le code.
-7. **Borne des points de S51** (nombre de cadeaux) et conditions d'échec de S26/S23.
+7. ~~**Borne des points de S51** et conditions d'échec de S26/S23~~ : **réglée** (S51 : 0 à 10 ou 11 points, un par cadeau ; S23 : une erreur ou 10 s sans reproduire une manche ; S26 : clic hors zone, clic droit / Entrée ou 15 s sans clic ; voir le tableau du §5).
 8. **Commentaires du Grand Schtroumpf** (`26ee:027e`, `26ee:0f17`, voix `s42v`/`s01v` par personnage et situation) : portés côté scènes, pas dans `game/` (`screens-grand-schtroumpf.md`) ; `rules.ts` n'émet que les avertissements de temps. `26ee:0f17` et `27e` divisent par le nombre de joueurs × ingrédients requis (défaut probable de l'original) : le code TS calcule la part exacte.
 9. **Réinitialisation des drapeaux d'avertissement** entre deux parties de la même session (non réinitialisés dans l'original).
 10. **Action automatique (36 s)** : le mode de choix de la porte quand le pion est sur une zone N (`11f4`) : le code lu suggère « rien et fin de tour » ; non exécuté.

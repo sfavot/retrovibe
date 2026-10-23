@@ -31,9 +31,9 @@ Chaque enregistrement se décode en une image **320 x 140** (44 800 pixels, indi
 | S36J | 9 | 31, 8 | 1 1 1 1 66 136 36 20 64 |
 | S36L | 11 | 61, 10 | 1 1 1 1 1 66 136 16 36 20 64 |
 
-### Bits de flags (déduits de `23c9:0004`)
+### Bits de flags (`23c9:0004`, établis par `minigames/s36.md`)
 
-Trois voies : gauche (x = 0x51), centre (0xa1), droite (0xf1). Test par touche :
+Trois voies : gauche (x = 0x51), centre (0xa1), droite (0xf1). Touches : bit 8 de l'état clavier `DS:4BBB` = droite (flèche ou `X`), bit 4 = gauche (flèche ou `Z`), bit 1 = haut (flèche ou `Q`), bit 2 = bas. Test par touche :
 
 | Bit | Test dans le code | Sens retenu |
 |---|---|---|
@@ -43,6 +43,8 @@ Trois voies : gauche (x = 0x51), centre (0xa1), droite (0xf1). Test par touche :
 | 0x20 | « gauche », x = 0xa1 | aiguillage centre -> gauche |
 | 0x08 / 0x04 / 0x02 | collision si le chariot est à x = 0x51 / 0xa1 / 0xf1 et dans la fenêtre verticale de l'obstacle | obstacle sur la voie gauche / centre / droite |
 
+Fenêtres verticales (sûres, relues dans `23c9:0004`), avec `ref` = haut du tronçon sous le chariot + 60 (`DS:3D518`) et `y` l'ordonnée du chariot : **aiguillage vers la droite** (bits 0x80 et 0x10) si `ref ≤ y ≤ ref + 20` et si le compteur d'appui est entre 1 et 3 ; **aiguillage vers la gauche** (0x40 et 0x20) si `ref ≤ y ≤ ref + 10` ; hors fenêtre ou sans aiguillage, le son de refus est joué (si aucun son ne sort) et le chariot ne change pas de voie ; **obstacle** (0x08, 0x04, 0x02) : choc si `ref − 30 ≤ y ≤ ref − 20` et si le chariot est sur la voie de l'obstacle, hors changement de voie.
+
 Vérification visuelle sur S36E : le tronçon de flags 16 a un aiguillage centre -> droite, 36 (0x24) un aiguillage centre -> gauche avec un obstacle au centre, 66 (0x42) une jonction droite -> centre avec un obstacle à droite, 136 (0x88) une jonction gauche -> centre. Le bit 0x01 seul : tronçon libre (aucun test dans le code, mais c'est la valeur des tronçons sans aiguillage).
 
 ## Format PRC
@@ -51,17 +53,15 @@ Suite de u16 little-endian (45 à 138 octets) : chaque valeur est l'**indice (ba
 
 ## Déroulé du mini-jeu (`23c9:0004`)
 
-1. **Variante.** Un octet de difficulté lu dans la table des scènes (`3646:6eb6 + scène * 0x14`, 0 à 3 ; 3 si Échap) choisit une paire de variantes via le `switch` `CS:23c9:0db5`, puis `rand` tranche : 0 -> L ou G, 1 -> F ou H, 2 -> E ou I, 3 -> J ou K (la première lettre si `rand` donne 0 : L, F, E, J ; sinon G, H, I, K). Lecture : `s36a000s.hy8` (sprites du chariot : 5 animations aux indices 0 à 4), `s36a001s.hy8` (animation de choc), voix `s36a001b/002b/003b.voc`.
+1. **Variante.** Le niveau interne (l'octet de difficulté du joueur `3646:6eb6 + joueur * 0x14`, 0 à 2 ; **3 avec l'indice de l'oiseau**, qui est comparé à `0x1B`, la valeur de S27, dans l'original ; défaut de l'original, corrigé (décision du 2026-10-23) : l'indice propre de S36 (`0x24`), `minigames/s36.md`) choisit une paire de variantes via le `switch` `CS:23c9:0db5`, puis `rand` tranche : 0 -> L ou G, 1 -> F ou H, 2 -> E ou I, 3 -> J ou K (la première lettre si `rand` donne 0 : L, F, E, J ; sinon G, H, I, K). Lecture : `s36a000s.hy8` (sprites du chariot : 5 animations aux indices 0 à 4), `s36a001s.hy8` (animation de choc), voix `s36a001b/002b/003b.voc`.
 2. **Chargement** (`23c9:0dbd`) : le MUT est lu enregistrement par enregistrement et rangé en EMS (flags dans `3646:7436[i]`, taille dans `72c2[i]`) ; la PRC est copiée dans `730a`. Tampons : 3 images de 64 000 octets (les trois tronçons visibles), 20 000 (enregistrement compressé), 30 000 (travail LZ).
 3. **Départ** : les trois premiers éléments de la PRC sont décodés (`23c9:103e` charge l'enregistrement, `357c:011d` le décode) ; chariot à x = 0xa1 (0xf1 pour la variante J), y = 100, vitesse de défilement 10 px par image, vitesse verticale 5.
 4. **Boucle** : défilement vertical par des copies de lignes dans les trois tampons ; haut/bas (bits 1 et 2 de l'état clavier) déplacent le chariot en y entre 0x3c et 0xaa ; gauche/droite changent de voie si le tronçon sous le chariot a l'aiguillage correspondant et que le chariot est dans la fenêtre verticale de l'aiguillage (sinon son d'échec, sans changement) ; heurter un obstacle déclenche l'animation de choc (`s36a001s.hy8`) et l'échec. Tous les 140 px de défilement, le tronçon suivant de la PRC est décodé dans le tampon libéré.
-5. **Fin** : la boucle s'arrête dès qu'on a consommé la PRC jusqu'à l'avant-dernier élément ; échec (choc) -> `s36b.mux` ; réussite -> la scène est marquée faite (`1e52:0053`) et on joue `s36c1.mux` ou `s36c2.mux` selon `1e52:0008(1)` (rôle exact non établi).
+5. **Fin** : la boucle s'arrête dès qu'on a consommé la PRC jusqu'à l'avant-dernier élément ; échec (choc) -> `s36b.mux` ; réussite -> la scène est marquée faite (`1e52:0053`) et on joue `s36c1.mux` ou `s36c2.mux` selon `1e52:0008(1)` : `s36c2` si l'ingrédient 1 fait partie de l'objectif de la partie, `s36c1` sinon (même sens que S27, **probable** : non établi par un texte du jeu).
 
 `23c9:0fc0` (sans appelant) est un code de test : affiche les 11 enregistrements d'un MUT l'un après l'autre.
 
 ## Incertitudes
 
-- Noms des bits de flags : directions déduites du code et confirmées visuellement, pas par un texte du jeu ; le rôle du bit 0x01 est supposé.
-- Correspondance exacte des bits d'état clavier (`b01b` : 1 haut, 2 bas, 4 gauche, 8 droite) non vérifiée dans le pilote d'entrée.
-- Détails de la fenêtre de collision et d'aiguillage (marges de 10 et 20 px autour de `3d518`) à reprendre dans `23c9:0004` à la phase 4.
-- Raison du choix entre `s36c1` et `s36c2` à la réussite, et rôle des quatre éléments de remplissage de la PRC.
+- Noms des bits de flags : directions déduites du code et confirmées visuellement (et par `minigames/s36.md`, qui a relu les fenêtres de collision et d'aiguillage, les touches et le choix de variante) ; pas par un texte du jeu. Le rôle du bit 0x01 est supposé (tronçon libre).
+- Choix entre `s36c1` et `s36c2` à la réussite : sens probable (voir ci-dessus) ; rôle des quatre éléments de remplissage de la PRC : ils servent de tampon, le dernier n'est jamais décodé.

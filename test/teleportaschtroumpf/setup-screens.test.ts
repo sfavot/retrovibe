@@ -381,7 +381,7 @@ describe.skipIf(!hasOriginalFiles)("S04 : menu parents", () => {
 
   it("le changement de ligne joue le bip, pas le changement de valeur", async () => {
     const t = await parents();
-    const plays = () => t.host.audio.plays.length;
+    const plays = () => t.host.audio.effects.length;
     t.host.audio.enabled = true;
     const before = plays();
     await t.press("ArrowRight");

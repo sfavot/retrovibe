@@ -318,7 +318,8 @@ class CharactersScene implements Scene {
     if (input.justPressed("down")) shiftLevel(2);
 
     if (changed) {
-      ctx.voice.play(this.click);
+      // Bruitage mélangé `348d:0b42` : le bip n'est lancé que si aucun bruitage ne sonne.
+      if (!ctx.voice.effectPlaying) ctx.voice.playEffect(this.click);
       this.applyLevelColor(ctx);
       return;
     }

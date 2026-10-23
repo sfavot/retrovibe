@@ -6,6 +6,7 @@ import { Menu, paletteHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
+import { CLICK_SOUND } from "./setup/common";
 
 /** Choix de S48 (codes 200 à 203 de `269a:0007`, engine.md §1.5). */
 export type PauseChoice = "resume" | "abandon" | "map" | "help";
@@ -61,6 +62,8 @@ class PauseScene implements Scene {
     wrap: false,
     items: CHOICES.map(() => ({})),
     highlight: paletteHighlight(PALETTE_FIRST_BUTTON, HOVER_COLOR),
+    changeSound: CLICK_SOUND,
+    changeSoundIfIdle: true,
   });
 
   constructor(private readonly onDone: (ctx: SceneContext, choice: PauseChoice) => void) {}

@@ -6,7 +6,11 @@ export interface PcmSound {
 
 /**
  * Frontière entre la voie son du jeu (pure, testable sous node) et le navigateur.
- * Une seule voie : `play` remplace ce qui jouait (comme `15f9:089f`).
+ * Deux canaux :
+ * - la **voie** (voix, musique, vidéo) : `play` remplace ce qui jouait (comme `15f9:089f`) ;
+ * - le **bruitage** mélangé (`348d:0b42`, engine.md §5.2 bis) : un seul emplacement, `playEffect` remplace le
+ *   bruitage précédent, et l'on entend le bruitage **par-dessus** la voie sans la couper. Les deux canaux passent
+ *   par le même volume.
  */
 export interface AudioBackend {
   /** Autorise la sortie (politique d'autoplay) : à appeler depuis un geste de l'utilisateur. */
@@ -18,6 +22,15 @@ export interface AudioBackend {
   readonly playing: boolean;
   /** Position de lecture dans le son courant, en secondes depuis son début (revient à 0 à chaque tour d'une boucle). */
   readonly position: number;
-  /** Gain de 0 à 1. */
+  /**
+   * Joue `sound` comme bruitage mélangé, une fois : remplace le bruitage précédent, ne touche pas à la voie.
+   * Sans effet tant que la sortie est verrouillée.
+   */
+  playEffect(sound: PcmSound): void;
+  /** Coupe le bruitage ; la voie n'est pas touchée. */
+  stopEffect(): void;
+  /** Vrai tant qu'un bruitage sort (équivalent de `348d:0b42(1, 0) != 0`) ; faux dès qu'il est fini. */
+  readonly effectPlaying: boolean;
+  /** Gain de 0 à 1, commun à la voie et au bruitage. */
   setGain(gain: number): void;
 }

@@ -1,8 +1,10 @@
 import type { AudioBackend, PcmSound } from "./backend";
 
 /**
- * Voie son via Web Audio. Le contexte n'est créé qu'après un geste de l'utilisateur (`unlock()`), comme
- * l'exigent les navigateurs ; avant cela, `play` ne fait rien et `playing` reste faux.
+ * Sortie son via Web Audio : la voie et le bruitage (`playEffect`) sont deux sources sur le même `GainNode`, donc
+ * le même volume ; leur somme est écrêtée à la sortie, comme la somme saturée de `348d:021a`. Le contexte n'est créé qu'après un geste de
+ * l'utilisateur (`unlock()`), comme l'exigent les navigateurs ; avant cela, `play` et `playEffect` ne font rien et
+ * `playing` et `effectPlaying` restent faux.
  */
 export class WebAudioBackend implements AudioBackend {
   private ctx: AudioContext | null = null;
@@ -12,6 +14,8 @@ export class WebAudioBackend implements AudioBackend {
   private duration = 0;
   private looping = false;
   private active = false;
+  private effectSource: AudioBufferSourceNode | null = null;
+  private effectActive = false;
   private gain = 1;
   private readonly buffers = new WeakMap<Uint8Array, AudioBuffer>();
 
@@ -53,6 +57,38 @@ export class WebAudioBackend implements AudioBackend {
     this.duration = source.buffer.duration;
     this.looping = loop;
     this.active = true;
+  }
+
+  playEffect(sound: PcmSound): void {
+    this.stopEffect();
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== "running" || !this.gainNode || sound.samples.length === 0) return;
+    const source = ctx.createBufferSource();
+    source.buffer = this.buffer(ctx, sound);
+    source.connect(this.gainNode);
+    source.onended = () => {
+      if (this.effectSource === source) this.effectActive = false;
+    };
+    source.start();
+    this.effectSource = source;
+    this.effectActive = true;
+  }
+
+  stopEffect(): void {
+    const source = this.effectSource;
+    this.effectSource = null;
+    this.effectActive = false;
+    if (!source) return;
+    source.onended = null;
+    try {
+      source.stop();
+    } catch {
+      // déjà arrêté
+    }
+  }
+
+  get effectPlaying(): boolean {
+    return this.effectActive && this.ctx?.state === "running";
   }
 
   stop(): void {

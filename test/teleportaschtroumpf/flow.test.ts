@@ -71,7 +71,7 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
     const t = await startMenu();
     await t.settle("MenuScene");
     const beep = (await t.engine.ctx.resources.voc("s07a001b.voc")).samples;
-    const beeps = () => t.host.audio.plays.filter((p) => p.sound.samples === beep).length;
+    const beeps = () => t.host.audio.effects.filter((p) => p.sound.samples === beep).length;
     expect(beeps()).toBe(0);
     await t.press("ArrowDown");
     expect(beeps()).toBe(1);

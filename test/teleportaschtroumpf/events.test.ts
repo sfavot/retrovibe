@@ -284,6 +284,25 @@ describe.skipIf(!hasOriginalFiles)("puits aux vœux S13", () => {
     await advance(engine, host, 100);
   };
 
+  it("flèches : le curseur avance de 4 px par tick (`DS:3FD0` = 2), puis de 2 px une fois qu'un mini-jeu à pointeur libre l'a posé à 1", async () => {
+    const { host, engine } = await inPick(openWell("ingredient"));
+    const held = async (code: string) => {
+      host.input.mouseMove(100, 100);
+      host.input.keyDown(code);
+      await advance(engine, host, 200);
+      host.input.keyUp(code);
+      return host.input.mouseX - 100;
+    };
+    const fast = await held("ArrowRight");
+    expect(fast).toBeGreaterThan(0);
+    expect(fast % 4).toBe(0);
+    host.input.keyPointerShift = 1;
+    const slow = await held("ArrowRight");
+    expect(slow % 2).toBe(0);
+    expect(Math.abs(slow / 2 - fast / 4)).toBeLessThanOrEqual(1); // même durée, à un tick près
+    expect(slow).toBeLessThan(fast);
+  }, 90_000);
+
   it("ingrédient : la case sous le curseur est encadrée, le clic donne l'ingrédient manquant", async () => {
     const game = openWell("ingredient");
     const { scene, host, engine, outcomes } = await inPick(game);
@@ -346,14 +365,14 @@ describe.skipIf(!hasOriginalFiles)("puits aux vœux S13", () => {
   it("bip au changement de case, pas à chaque image", async () => {
     const game = openWell("ingredient");
     const { host, engine } = await inPick(game, true);
-    host.audio.stop();
-    const before = host.audio.plays.length;
+    host.audio.stopEffect();
+    const before = host.audio.effects.length;
     host.input.mouseMove(centre(2).x, centre(2).y);
     await advance(engine, host, 300);
-    const after = host.audio.plays.length;
+    const after = host.audio.effects.length;
     expect(after).toBe(before + 1);
     await advance(engine, host, 1000);
-    expect(host.audio.plays.length).toBe(after); // même case : pas de nouveau bip
+    expect(host.audio.effects.length).toBe(after); // même case : pas de nouveau bip
   }, 180_000);
 
   it("36 s sans choix : rien n'est donné", async () => {

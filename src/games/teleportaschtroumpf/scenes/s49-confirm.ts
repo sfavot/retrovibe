@@ -7,6 +7,7 @@ import { Menu, paletteHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
+import { CLICK_SOUND } from "./setup/common";
 import { TEXT_COLOR, loadDefaultFont, wrapText } from "./common/text";
 
 /** Messages dont le texte est déjà dessiné dans l'image (`S49_07T` OUI, `S49_08T` NON, `S49_12T`) : rien n'est redessiné. */
@@ -54,6 +55,8 @@ class ConfirmScene implements Scene {
     wrap: false,
     items: [{ voice: voiceName("s49v", 7) }, { voice: voiceName("s49v", 8) }],
     highlight: paletteHighlight(PALETTE_YES, HOVER_COLOR),
+    changeSound: CLICK_SOUND,
+    changeSoundIfIdle: true,
   });
 
   constructor(

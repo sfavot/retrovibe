@@ -4,6 +4,7 @@ import { Menu, type MenuHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
+import { CLICK_SOUND } from "./setup/common";
 import { askConfirmation } from "./flow";
 
 /** Issue de S46 (`1823:0415`, engine.md §1.5). */
@@ -98,6 +99,8 @@ class AbandonScene implements Scene {
       axis: "none",
       items: [...this.slots.map(() => ({ voice: voiceName("s46a", 3) })), { voice: voiceName("s46a", 2) }, { voice: voiceName("s46a", 4) }],
       highlight: this.highlight(),
+      changeSound: CLICK_SOUND,
+      changeSoundIfIdle: true,
     });
   }
 
@@ -147,7 +150,7 @@ class AbandonScene implements Scene {
     }
     let index = this.menu.index;
     for (const direction of DIRECTIONS) if (ctx.input.justPressed(direction)) index = this.navigate(index, direction);
-    this.menu.select(ctx, index);
+    this.menu.move(ctx, index);
     const event = this.menu.update(ctx);
     if (event?.kind !== "validate") return;
     if (event.index < this.count) this.ask(ctx, { kind: "player", index: event.index }, CONFIRM_BY_CHARACTER[this.characters[event.index]]);

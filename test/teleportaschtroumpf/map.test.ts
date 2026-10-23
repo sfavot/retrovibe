@@ -176,12 +176,12 @@ describe.skipIf(!hasOriginalFiles)("carte S02 : sélection (mode libre et puits)
   it("le bip de navigation (s07a001b) accompagne chaque changement de lieu, pas une butée", async () => {
     const t = await launch(new MapScene({ mode: "free" }, () => undefined), { audio: true });
     const beep = (await t.engine.ctx.resources.voc("s07a001b.voc")).samples;
-    const before = t.host.audio.plays.length;
+    const before = t.host.audio.effects.length;
     await t.press("ArrowDown"); // butée basse
-    expect(t.host.audio.plays.length).toBe(before);
+    expect(t.host.audio.effects.length).toBe(before);
     await t.press("ArrowUp");
-    expect(t.host.audio.plays.length).toBe(before + 1);
-    expect(t.host.audio.plays.at(-1)?.sound.samples).toBe(beep);
+    expect(t.host.audio.effects.length).toBe(before + 1);
+    expect(t.host.audio.effects.at(-1)?.sound.samples).toBe(beep);
   }, 60_000);
 
   it("Entrée joue la voix d'aide s45v du lieu ; rien sur « retour »", async () => {

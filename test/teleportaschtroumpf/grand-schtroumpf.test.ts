@@ -6,9 +6,13 @@ import { Game, newGame } from "../../src/games/teleportaschtroumpf/game/rules";
 import { createGrandSchtroumpfScene } from "../../src/games/teleportaschtroumpf/scenes/grand-schtroumpf";
 import { Commentary, elapsedPercent, isCommentVideo } from "../../src/games/teleportaschtroumpf/scenes/grand-schtroumpf/commentary";
 import { ingredientsScript } from "../../src/games/teleportaschtroumpf/scenes/grand-schtroumpf/ingredients";
+import { forceMinigameStubs } from "../../src/games/teleportaschtroumpf/scenes/minigames";
 import { TestHost } from "./engine-test-host";
 import { Session, advance } from "./game-helpers";
 import { hasOriginalFiles } from "./helpers";
+
+// Ces tests traversent un mini-jeu sans le jouer : la souche commune les garde indépendants des vrais mini-jeux.
+forceMinigameStubs();
 
 /** Hasard scripté : `below(n)` rend les valeurs dans l'ordre et note les `n` demandés. */
 function scripted(...values: number[]): { rng: BorlandRandom; asked: number[] } {

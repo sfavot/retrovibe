@@ -6,7 +6,7 @@ Comportement de l'original (RE de `21ee:01d2`, `21ee:0435`, `21ee:0c19`, `21ee:1
 
 - Drapeaux de navigation `DS:4BBB` : bit 1 haut, 2 bas, 4 gauche, 8 droite ; boutons `DS:4BBD` : 1 = clic gauche (Espace), 2 = clic droit (Entrée) (engine.md §4.1).
 - `1f33:03a7(f)` attend la fin du son (avec `f` ≠ 0, un clic gauche le coupe) puis le relâchement des boutons ; `1f33:00fc(n)` attend `n` centièmes ; `1f33:030e` attend le relâchement des flèches ; `13fc:03f9` recopie l'écran, `13fc:0411` restaure le fond (B → A), `12ec:037c` appelé avec `[0x30e]` puis `[0x310]` empilés recopie A → B (fige l'image courante dans le fond ; sens inverse de `13fc:0411`).
-- **Bip de navigation** : `348d:0b42(2, DS:7084)` joue `s07a001b.voc` (0,26 s, chargé par `21ee:0006` / `21ee:13a1` dans `DS:7084`) à chaque déplacement de sélection ; `0b42(1, 0)` interroge la fin du son. C'est le bip des **menus** (S07 aussi : `21ee:0e8f` l'appelle à chaque haut / bas), pas une voix d'entrée. Reproduit par `voice.play(s07a001b.voc)` (une seule voie).
+- **Bip de navigation** : `348d:0b42(2, DS:7084)` joue `s07a001b.voc` (0,26 s, chargé par `21ee:0006` / `21ee:13a1` dans `DS:7084`) à chaque déplacement de sélection ; `0b42(1, 0)` interroge la fin du son. C'est le bip des **menus** (S07 aussi : `21ee:0e8f` l'appelle à chaque haut / bas), pas une voix d'entrée. Reproduit par le **canal de bruitage mélangé** (`voice.playEffect(s07a001b.voc)`, `engine.md` §5.2 bis) : il ne coupe ni la musique ni une voix. Dans S07, S08 (boutons) et S04 le bip est lancé sans condition (il remplace un bip en cours) ; pour le choix du personnage de S08, comme dans S46, S48, S49 et la carte, seulement si aucun bruitage ne sonne (`voice.effectPlaying`). L'original attend la fin du bip (`while (0b42(1, 0))`) avant de relire les touches : non reproduit.
 - Aucune musique dans S09 ; S08 et S04 relancent la musique dans leur boucle (`15f9:089f(0, 0x100000)` puis `089f(DS:6F04, 0xA00002)`), pas pendant les attentes de voix : reproduit avec `voice.holdMusic`.
 
 ## S09 : nombre de joueurs (`21ee:01d2`)
@@ -63,6 +63,6 @@ Pas d'adaptation souris : clavier d'origine seul (gauche = valider, droit sans e
 
 ## Écarts et points ouverts
 
-- Autres menus de l'original : seul `0b42(2, DS:7084)` (bip) est prouvé pour S07, S08 (boutons) et S04 ; aucune preuve RE d'un bip de navigation à S49, S48 ni S46, ils n'en jouent donc pas. À vérifier si l'on désassemble ces écrans.
+- Autres menus de l'original : seul `0b42(2, DS:7084)` (bip) est prouvé pour S07, S08 (boutons) et S04 ; le recensement complet de `348d:0b42` (`engine.md` §5.2 bis) prouve aussi le bip de navigation à S49 (`1823:000c`), S48 (`269a:0007`) et S46 (`1823:0415`), lancé seulement si rien ne sonne : ajouté (`changeSound` + `changeSoundIfIdle` du `Menu`). S09 n'a aucun appel `0b42` : pas de bip.
 - L'EXE contient les messages S04 en trois langues, choisis par `DS:617B` ; ici seule la version française.
 - Cadence des animations (capsule, cadran) estimée : l'original n'a pas de temporisation dans ces boucles.

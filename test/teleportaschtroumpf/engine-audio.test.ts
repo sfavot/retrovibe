@@ -113,3 +113,70 @@ describe("VoiceChannel", () => {
     expect(backend.plays).toHaveLength(1);
   });
 });
+
+describe("VoiceChannel : canal de bruitages mélangé (`348d:0b42`)", () => {
+  it("un bruitage ne coupe ni la voix ni la musique", () => {
+    const { backend, voice, advance } = setup();
+    voice.setMusic(sound(10, 9));
+    advance(16);
+    voice.playEffect(sound(1, 5));
+    expect(backend.effects.map((e) => e.sound.samples[0])).toEqual([5]);
+    expect(backend.plays).toHaveLength(1); // la musique n'a pas été relancée
+    expect(backend.stops).toBe(0);
+    expect(voice.playing).toBe(true);
+    expect(voice.effectPlaying).toBe(true);
+
+    voice.play(sound(5, 3)); // une voix sur la voie, pendant le bruitage
+    voice.playEffect(sound(1, 6));
+    expect(voice.voicePlaying).toBe(true);
+    expect(backend.plays.map((p) => p.sound.samples[0])).toEqual([9, 3]);
+  });
+
+  it("un seul emplacement : un second bruitage remplace le premier, qui s'arrête de sonner sur la sortie", () => {
+    const { backend, voice, advance } = setup();
+    voice.playEffect(sound(5, 1));
+    advance(1000);
+    voice.playEffect(sound(2, 2));
+    expect(backend.effects.map((e) => e.sound.samples[0])).toEqual([1, 2]);
+    advance(1500);
+    expect(voice.effectPlaying).toBe(true); // c'est le second, depuis 1,5 s sur 2 s
+    advance(600);
+    expect(voice.effectPlaying).toBe(false); // fini : plus rien ne sonne (`0b42(1, 0) == 0`)
+  });
+
+  it("la fin d'un bruitage ne touche pas la voie ; stopEffect ne coupe que le bruitage", () => {
+    const { backend, voice, advance } = setup();
+    voice.setMusic(sound(10, 9));
+    advance(16);
+    voice.playEffect(sound(1, 5));
+    advance(1500);
+    expect(voice.effectPlaying).toBe(false);
+    expect(voice.playing).toBe(true);
+    voice.playEffect(sound(5, 5));
+    voice.stopEffect();
+    expect(voice.effectPlaying).toBe(false);
+    expect(voice.playing).toBe(true);
+    expect(backend.stops).toBe(0);
+    voice.stop(); // couper la voie ne dit rien du bruitage
+    voice.playEffect(sound(5, 7));
+    voice.stop();
+    expect(voice.effectPlaying).toBe(true);
+  });
+
+  it("le volume s'applique au bruitage comme à la voie (même gain)", () => {
+    const { backend, voice } = setup();
+    voice.setVolume(5);
+    voice.playEffect(sound(1, 5));
+    expect(backend.gain).toBeCloseTo(5 / 15);
+    voice.setVolume(0);
+    expect(backend.gain).toBe(0);
+  });
+
+  it("sortie verrouillée : aucun bruitage ne sonne", () => {
+    const { backend, voice } = setup();
+    backend.enabled = false;
+    voice.playEffect(sound(1, 5));
+    expect(voice.effectPlaying).toBe(false);
+    expect(backend.effects).toHaveLength(0);
+  });
+});

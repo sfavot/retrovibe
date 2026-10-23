@@ -21,11 +21,11 @@ Brief pour les phases 3 (écrans) et 4 (mini-jeux). Spec de comportement : `engi
 | `engine/paths.ts` | `resolveGameFile` (nom d'origine → chemin `DATA/…`), `voiceName`, `musicName`. |
 | `engine/video.ts` | `VideoPlayer` (MUX synchronisé sur le son) et `VideoScene` générique. |
 | `engine/picture.ts` | `PictureScene` (image fixe, fondus, attente) et `WaitScene`. |
-| `audio/backend.ts`, `audio/voice.ts`, `audio/web-audio.ts` | `AudioBackend` abstrait, `VoiceChannel` (voie unique + musique + bips), implémentation Web Audio. |
+| `audio/backend.ts`, `audio/voice.ts`, `audio/web-audio.ts` | `AudioBackend` abstrait, `VoiceChannel` (voie + musique + bips + canal de bruitages), implémentation Web Audio (deux sources sur le même `GainNode`, somme écrêtée à la sortie). |
 | `scenes/boot.ts` | Séquence de démarrage. |
 | `scenes/flow.ts`, `scenes/s07-menu.ts`, `scenes/sNN-*.ts` | Flux entre écrans, menu principal S07 et les écrans (voir « Menus et flux »). |
 | `game/` | Logique pure de la partie et du plateau (`Game`, tables), sans rendu (`rules.md`). |
-| `scenes/game.ts`, `scenes/s01-board.ts`, `scenes/board/` | Partie (`28a3:00ad`) et plateau S01 (`291e:0401`) ; écrans empilés `s02-map.ts`, `events.ts`, `grand-schtroumpf.ts` et souche `minigames.ts` (voir « Partie et plateau »). |
+| `scenes/game.ts`, `scenes/s01-board.ts`, `scenes/board/` | Partie (`28a3:00ad`) et plateau S01 (`291e:0401`) ; écrans empilés `s02-map.ts`, `events.ts`, `grand-schtroumpf.ts` et `minigames.ts` + `minigames/` (voir « Partie et plateau » et « Écrire un mini-jeu »). |
 | `ui/app.ts`, `ui/browser-host.ts`, `ui/dev.html`, `ui/dev.ts`, `ui/style.css` | Hôte navigateur, canvas à l'échelle entière, boucle `requestAnimationFrame`, page de dev. |
 | `index.ts` | `GameDefinition` `teleportaschtroumpf` (pas encore dans `src/games/registry.ts`). |
 
@@ -132,13 +132,14 @@ Actions (`engine/input.ts`) : `up down left right validate cancel skip pause vol
 
 ## Son
 
-Une seule voie (`ctx.voice`, `audio/voice.ts`) :
+Deux canaux, qui passent par le même volume (`ctx.voice`, `audio/voice.ts`) : la **voie** (`15f9:089f` : voix, musique, vidéo ; un son en coupe un autre) et le **bruitage mélangé** (`348d:0b42(2, ptr)`, `engine.md` §5.2 bis : un seul emplacement, additionné à la voie sans la couper, volume commun). Les sons de S23, S26, S30, S36 et S40 restent sur la voie. La liste exacte des sons du canal de bruitages est le tableau de recensement de `engine.md` §5.2 bis.
 
-- `voice.play(voc)` (voix, bruitage ; `voc` = résultat de `ctx.resources.voc("s07v004t.voc")`) coupe ce qui jouait, musique comprise ; `voice.playBeep(0..2)` joue un des 3 bips préchargés (`s52d001b`, `s01a002b`, `s01a001b`) sur la même voie ; `voice.stop()`.
+
+- `voice.play(voc)` (voix ; `voc` = résultat de `ctx.resources.voc("s07v004t.voc")`) coupe ce qui jouait sur la voie, musique comprise ; `voice.playEffect(voc)` : bruitage mélangé, **remplace le bruitage précédent** sans couper ni la voix ni la musique ni la vidéo ; `voice.effectPlaying` : un bruitage sonne encore (`0b42(1, 0) != 0`, à utiliser pour « seulement si rien ne sonne » à la place de `voicePlaying`) ; `voice.stopEffect()` (`voice.stop()` ne coupe que la voie) ; `voice.playBeep(0..2)` joue un des 3 bips préchargés (`s52d001b`, `s01a002b`, `s01a001b`) sur la même voie ; `voice.stop()`.
 - `voice.setMusic(voc | null)` : musique de fond (`musicName(1 + ctx.rng.below(3))` → `s52m00Nm.voc`). Elle repart **au début, en boucle**, dès que la voie est libre (vérifié à chaque tick) : pas de reprise à la position où la voix l'a coupée. `voice.holdMusic(true)` la retient (vidéos).
 - `voiceName("s07v", 4)` → `s07v004t.voc`. `voice.volume` 0–15 (défaut 15).
 - `voice.voicePlaying` : vrai tant qu'une voix sort (pour attendre la fin d'une voix avant d'enchaîner, comme `1f33:03a7`).
-- Navigateur : le contexte audio ne démarre qu'au premier geste (`WebAudioBackend.unlock()` sur `pointerdown` / `keydown`). Avant, `play` ne fait rien et `playing` reste faux : le moteur n'attend donc jamais un son qui ne sortira pas (les vidéos retombent sur l'horloge).
+- Navigateur : le contexte audio ne démarre qu'au premier geste (`WebAudioBackend.unlock()` sur `pointerdown` / `keydown`). Avant, `play` et `playEffect` ne font rien et `playing` et `effectPlaying` restent faux : le moteur n'attend donc jamais un son qui ne sortira pas (les vidéos retombent sur l'horloge).
 - Pas de CD audio.
 
 ## Vidéo MUX
@@ -255,19 +256,94 @@ Détail RE et écarts : `screens-game.md`. Logique : `game/` (`rules.md`).
 
 ### Contrats des écrans empilés
 
-Chaque fichier documente son contrat en tête (détail RE : `screens-map.md`, `screens-events.md`, `screens-grand-schtroumpf.md`). `game.ts` empile ces scènes et les retire (`pop`) dans leur rappel. Seul `minigames.ts` reste une souche, jusqu'au lot E3.
+Chaque fichier documente son contrat en tête (détail RE : `screens-map.md`, `screens-events.md`, `screens-grand-schtroumpf.md`). `game.ts` empile ces scènes et les retire (`pop`) dans leur rappel. Les mini-jeux (`minigames.ts`) sont écrits (lot E3) : les 20 le sont, aucun n'est une souche.
 
 | Module | Fabrique | Reçoit | Rend |
 |---|---|---|---|
 | `s02-map.ts` (`map/`) | `createMapScene({ mode: "consult" \| "free" \| "wish", zone? }, onDone)` ; `createFreeModeScene(onDone)` | mode ; `zone` (1..54) du pion en consultation (fond `s02a002d`, haut / bas font défiler) ; `free` et `wish` : haut / bas changent de lieu, Espace valide (`wish` : fond `s02a007d`, 36 s sans choix = retour) | `onDone(ctx, k)` : `k` = 1 retour (toujours en consultation), 2..18 lieu de `MAP_LOCATIONS`. Le mode libre (fond `s02a001d`, Entrée joue l'aide du lieu) enchaîne tout seul voix d'accroche, mini-jeu (`createMinigame`, issue ignorée) et retour à la carte ; `onDone(ctx)` seulement sur « retour » |
 | `events.ts` (`events/`) | `createBoardEventScene({ game, event, before, after }, onDone)` ; `createWellScene(game, onDone)` ; `approachX(event, before, after)` | événement `hazard` ou `release` (état de `game/` déjà à jour), position au déclenchement et à l'arrivée ; puits S13 : `game.state.pending` (scène 14, `wellMode` `"travel"` ou `"ingredient"`) | `onDone(ctx)` après la vidéo (non passable) et sa voix ; puits : `onDone(ctx, MinigameOutcome)` `well` (`ingredient` ou `destination`, `null` si rien choisi). `approachX` donne le `x` où le pion s'arrête avant la vidéo, `null` sans marche (fusée, libérations) |
 | `grand-schtroumpf.ts` (`grand-schtroumpf/`) | `createGrandSchtroumpfScene(request, onDone)` ; `Commentary`, `isCommentVideo`, `s42VideoFile` | `kind` : `ingredients` (S19, avec `game`), `timeWarning` / `timeout` (`video`), `victory` (`winner`), `progress` (`code` 201..204, 211..215, `26ee:0f17`), `comment` (`code` de `26ee:027e` : voix `s42v`, vidéo si `isCommentVideo`) | `onDone(ctx)` à la fin de la voix ou de la dernière vidéo ; les codes `progress` / `comment` viennent de `Commentary` (mémoire des répliques propre à la partie) |
-| `minigames.ts` (souche, E3) | `createMinigame(id, game, onDone(ctx, outcome))` ; `createMinigameAftermath(…)` | `game.state.pending` ; issue appliquée par l'appelant (`Game.resolveMinigame`) | `MinigameOutcome` ; souche : Espace réussi, Entrée échoué |
+| `minigames.ts` + `minigames/` (E3) | `createMinigame(id, game, onDone(ctx, outcome))` ; `createMinigameAftermath(…)` | `game.state.pending` ; issue appliquée par l'appelant (`Game.resolveMinigame`) | `MinigameOutcome` ; un fichier par mini-jeu (`minigames/sNN-nom.ts`), les 20 écrits ; la souche commune (Espace réussi, Entrée échoué) n'existe plus que pour les tests, via `forceMinigameStubs()` |
 
 Dans `game.ts`, `hazard()` fait marcher le pion de sa position de déclenchement jusqu'à `approachX` (`Board.walkToward`, même animation que la marche du joueur) avant d'empiler l'événement sans fondu ; le puits S13 est empilé sans fondu (il fond lui-même après la voix d'accroche), les autres mini-jeux avec.
 
-Brancher un mini-jeu : `scenes/minigames/sNN-nom.ts` puis une entrée dans `FACTORIES` de `minigames.ts`. `Game.openMinigame(scène)` / `abortMinigame()` ouvrent un mini-jeu hors plateau (mode libre, tests).
+Brancher un mini-jeu : il l'est déjà (un fichier par scène, inscrit dans `FACTORIES` de `minigames.ts`) ; voir « Écrire un mini-jeu ». `Game.openMinigame(scène)` / `abortMinigame()` ouvrent un mini-jeu hors plateau (mode libre, tests).
 
 ### Tests
 
 `test/teleportaschtroumpf/game-helpers.ts` : `Session` (moteur de test + partie) et `advance`, qui laisse passer les promesses entre deux images (les voix se chargent en tâche de fond ; `runFor` ne le fait pas).
+
+## Écrire un mini-jeu
+
+Recette pour les agents qui écrivent un mini-jeu en parallèle des autres. Exemples complets : `scenes/minigames/s32-gargamel.ts` (le plus court : un tirage et une vidéo) et `s27-sled.ts` (une vidéo pilotée au clavier avec dessin par-dessus et animation de chute), avec leurs documents `docs/teleportaschtroumpf/minigames/s32.md` et `s27.md` (modèle du document de RE : déroulé, ressources, commandes, règles par niveau, issue, écarts, confiance).
+
+### Ce qui est à toi, ce qui ne l'est pas
+
+- À toi : **ton fichier** `scenes/minigames/sNN-nom.ts` (déjà inscrit dans `minigames.ts` : tu remplaces le corps de la souche et gardes l'export de la fabrique), `test/teleportaschtroumpf/minigames/sNN-nom.test.ts` (à créer), `docs/teleportaschtroumpf/minigames/sNN.md` (à créer), et d'éventuels fichiers à toi dans un sous-dossier `scenes/minigames/sNN/` ou `sNN-*.ts`. S38 et S39 gardent aussi leur `createXxxAftermath` (présentation de l'issue, inscrite dans `AFTERMATHS`).
+- Pas à toi, jamais en parallèle : `minigames.ts`, `minigames/common.ts`, `engine/**`, `game/**`, `registry.ts`, les autres mini-jeux et leurs tests. Si un outil manque dans `common.ts`, écris-le dans ton fichier et signale-le (le lot suivant le rangera en commun). Si `game/` est faux (règle prouvée par la RE), signale-le sans le corriger.
+- Le rapport de chaque mini-jeu dit : ce qui est reproduit, les écarts, ce qui n'a pas pu être vérifié.
+
+### Lire d'abord
+
+1. L'en-tête de ton fichier (contrat, fonction d'entrée et ressources `re-index.md`), `rules.md` §5 (gain, bonus de l'oiseau de ta scène), `game/tables.ts` (`MINIGAMES`).
+2. `s27.md` et `s32.md` : ce que la RE d'un mini-jeu doit documenter.
+3. `scenes/minigames/common.ts` et `s27-sled.ts` pour le style (scène à états, `step = 1` quand une vidéo ou un pointeur est en jeu).
+4. `engine.md` §2 (temps), §3 (rendu, curseur), §4 (entrées), §5 (son) ; `hy8.md`, `mux.md`.
+
+### Le contrat
+
+`export const createXxx: MinigameFactory = (game, onDone) => scene`. La requête est `minigameRequest(game, NN)` (joueur, personnage, `level` 0..2, `bonus`, `successChance` pour S32). **Ne jamais** appeler `game.resolveMinigame` : rends `onDone(ctx, outcome)` une seule fois, à la fin (le plateau retire la scène avec fondu dans ce rappel). Le type de l'issue est fixé par la scène (`ingredient`, `points` : entier ≥ 0, 1 à 3 pour la plupart, 0 à 11 pour S51 (un point par cadeau ouvert) ; `Game` plafonne le total à 60, `magician`, `none`) ; l'appelant applique les gains (`Game.resolveMinigame` ne donne l'ingrédient qu'une fois). Voix d'accroche `sNNa` : jouée avant ta scène par l'appelant ; ne la rejoue pas. Fondu d'entrée : fait par le plateau (`push` avec fondu) ; fondu de sortie : `pop({ fade: true })` dans `onDone` ; un fondu interne (S27 avant la vidéo d'échec) se fait avec `ctx.fade.out()` puis l'attente de `!ctx.fade.active`.
+
+### Outils de `common.ts`
+
+| Outil | Rôle |
+|---|---|
+| `minigameRequest(game, scene)` | la requête ouverte (erreur claire sinon) |
+| `minigameLevel(request, bonusLevel)` | niveau du joueur, ou `bonusLevel` (la valeur de l'original) avec l'indice de l'oiseau ; `Game` a déjà consommé l'indice |
+| `ingredientOutcome(ok)`, `pointsOutcome(n)`, `sceneIngredient(scene)`, `ingredientInGoal(game, ing)` | issue (`pointsOutcome` : 0 ou plus, pas de borne à 3 ; le plafond de 60 est appliqué par `Game`), ingrédient de la scène, prédicat « dans l'objectif » (sans sens de vidéo implicite) |
+| `goalClip(game, ing, { inGoal, notInGoal })` | vidéo de réussite des mini-jeux à ingrédient : les deux fichiers sont nommés explicitement car le sens **n'est pas universel** (`c2` dans l'objectif pour S27, S28, S31, S32 (`cd2`), S34, S36 ; `c1` pour S22 et S33). Test : `minigames/ingredient-clips.test.ts` |
+| `SoundHush` | fondu sonore de fin `1343:0037` : `start(ctx[, volume])`, `update(ctx)` à chaque tick (vrai quand le son est coupé et le volume rendu), `restore(ctx)` dans `exit` ; la musique (`holdMusic`) reste à la scène |
+| `drawFrame(surface, x1, y1, x2, y2, couleur)` | cadre d'un pixel `32af:0006` (cadres de survol), rogné à l'écran |
+| `Clip` | une vidéo MUX dans ta scène : `load`, `start`, `update`, `render`, `stop` ; options `skippable`, `onFrame(ctx, image, marqueurs)` (rappel par image décodée, `"stop"` interrompt), `overlay(ctx)` (sprites par-dessus) ; la dernière image reste affichée après la fin |
+| `Pointer` | curseur HY8 des scènes à pointeur libre : sprite à la position de la souris, flèches = 2 px par tick, bornes de la scène |
+| `createStubMinigame`, `MinigameStub`, `STUB_POINTS` | la souche, outil des tests de parcours (jamais dans un vrai mini-jeu) |
+
+Pas dans `common.ts`, faute de preuve : minuteries d'inactivité et indices vocaux, voix de résultat (aucun dans S32 ni S27 ; les scènes à pointeur libre ont les leurs, `well.ts` en est un exemple : 16 s puis 36 s). Si ta scène a les mêmes seuils que celle d'un autre, écris-les chez toi.
+
+### Faire la RE d'un mini-jeu
+
+1. **Fonction d'entrée** : `MINIGAMES[].entry` (`game/tables.ts`), puis `archives/teleportaschtroumpf/re/decomp/<seg>_<off>_*.c` (décompilation Ghidra), `disasm.txt` (`grep -n '^1f84:' disasm.txt`) et `strings.tsv`. Les chaînes de ressources sont dans l'en-tête du fichier `.c`. Régénérer : `bash scripts/teleportaschtroumpf/re/run.sh`.
+2. **Lecture de la décompilation** : les noms `iRam0003xxxx` sont des adresses linéaires, `DS:offset = xxxx − 0x36460` (`uRam0003d397` = `DS:6F37`) ; en cdecl le **dernier** argument poussé est le premier paramètre ; `0x1000:xxxx` dans le désassemblage est un appel traduit par Ghidra vers `seg:off` (le commentaire `; -> seg:off` donne la cible). `rand × n / 0x8000 == 0` = `ctx.rng.below(n) === 0`.
+3. **Code que Ghidra n'a pas vu** : les rappels passés à `179a:0673` (`PUSH seg; PUSH off` avant l'appel) et les routines proches (`1f84:02ce` pour S27) ne sont pas dans `decomp/` ; octets dans l'exécutable à `0x4200 + (seg − 0x1000) × 16 + off` (`seg` au sens Ghidra ; un `lcall off, seg` brut a `seg − 0x1000`). Désassembler avec `capstone` mode 16 bits dans un environnement jetable **hors du dépôt** (`python3 -m venv`, `pip install capstone`, `Cs(CS_ARCH_X86, CS_MODE_16).disasm(octets, off)`), en annotant les `lcall` avec `seg + 0x1000`. S27 : `1f84:02ce..0427`.
+4. **Fonctions de bibliothèque courantes** : `13fc:0411` (fond B → A), `13fc:03f9` (affiche), `1f33:00fc(n)` (attend n centièmes de seconde), `1f33:03a7` (attend la fin du son), `1f33:0348(n)` (cadence en ticks, 5 pour la plupart des mini-jeux), `31fe:0481(indice, x, y, hy8)` (sprite), `12d7:0083` / `0144` / `00c1` (animation : init, choix, image suivante ; boucle finie quand le compteur `+0x16` retombe à 0), `1e52:0034` / `0053` / `00ad` / `0008` (a l'ingrédient / donne / points / dans l'objectif), `154c:0954(nom)` (vidéo passable, drapeaux `0x12D08`), `179a:0673(nom, drapeaux, rappel_image, rappel_fin)` (vidéo ; `0x400` clic et `0x800` Échap la passent, `0x80` dessin dans le tampon arrière, `0x10000` rappel à chaque image) ; `15f9:089f(son, 0x800001)` joue un son en mémoire. Voir `engine.md` §2 à §5.
+5. **Marqueurs MUX** : les chunks 08 sont des nombres ASCII que l'original range en `DS:6DE4` (`atoi`) : signalent les obstacles de S27, et sans doute les événements d'autres vidéos interactives (S30, S34). `MuxDecoder.nextFrame()` les rend dans `markers` ; `VideoPlayer.seek(image, onFrame)` les passe à ton rappel.
+6. **Niveaux et indice de l'oiseau** : `rules.md` §5 donne la valeur écrite par l'original ; c'est à toi de dire ce qu'elle change (S27 : le niveau 3 sélectionne `s27l` / `s27i`, ce qui n'est pas « plus facile » dans les deux cas).
+7. Documente adresses et confiance (**sûr** / **probable** / **hypothèse**) dans `docs/teleportaschtroumpf/minigames/sNN.md`.
+
+### Tester sans navigateur
+
+`test/teleportaschtroumpf/minigames/harness.ts` :
+
+- `launchMinigame(id, { seed, level, bonus, audio, setup, character })` : le mini-jeu seul, comme le mode libre ; rend un `LaunchedMinigame` (`.scene`, `.game`, `.host`, `.ctx`, `.outcome`, `run(ms, onFrame)`, `until(cond)`, `tap(code)`, `finish()` qui attend l'issue et le retrait de la scène, `shot(nom)`). `setup(game)` prépare la partie avant l'ouverture (objectif, ingrédients, points).
+- `enterFromBoard(id, "NomDeLaClasse", options)` : une partie réelle, le pion devant la porte, Espace ; `Session` de `game-helpers.ts` (`ready()`, `settle`, `tap`, `until`). `enterFromFreeMode(id)` : la carte libre, le lieu choisi aux flèches ; `.free.stage === "map"` au retour. Un test de parcours par chemin (plateau, libre) : lancement, jeu, issue appliquée (plateau) ou retour à la carte (libre).
+- Le moteur de test avance à 60 Hz simulés sans attendre le temps réel : une descente de 40 s se joue en quelques dizaines de millisecondes. `describe.skipIf(!hasOriginalFiles)` pour tout test qui lit les fichiers du jeu.
+- Un **pilote** (voir `bot` dans `s27-sled.test.ts`) lit l'état de la scène (getters de test : `stage`, `position`…) et appuie sur les touches par `host.input.keyDown/keyUp` ; prévois ces getters en écrivant la scène. Sorties son coupées par défaut : les voix finissent aussitôt ; `audio: true` pour tester ce qui est joué (`host.audio.plays`).
+- Tests du plateau ou de la partie qui traversent un mini-jeu sans le jouer : `forceMinigameStubs()` (outil de test de `minigames.ts` : les 20 mini-jeux sont écrits, la souche ne sert plus qu'à cela ; le test du registre vérifie qu'aucun vrai mini-jeu ne la rend) en tête du fichier de test (déjà fait pour `game-flow`, `game-end`, `game-pause`, `grand-schtroumpf`) ; ne dépends jamais de la souche d'un autre mini-jeu.
+- À tester pour chaque mini-jeu : réussite, échec, effet du niveau et de l'indice de l'oiseau, graine fixe (`seed`), ce que les commandes font, issue du bon type, les deux parcours.
+
+### Produire et regarder des captures
+
+`TELEPORTA_SHOTS=/tmp/mes-captures npx vitest run test/teleportaschtroumpf/minigames/sNN` : chaque `run.shot("nom")` écrit `nom.png` (320×200, palette indexée de ce qu'afficherait le navigateur, fondu compris). Regarde les PNG (l'outil de lecture d'images les affiche) à plusieurs moments : début, milieu, chaque état (réussite, échec, aide, curseur), et vérifie la position des sprites, la palette (le fond MCG ou la vidéo donne la palette, les HY8 s'y accordent), les textes. `scripts/teleportaschtroumpf/proto/png.py` fait la même chose depuis Python. Supprime les captures quand tu as fini ; elles ne vont pas dans le dépôt.
+
+### Pièges rencontrés (S27, S32)
+
+- **Une vidéo se passe ou non selon la fonction qui la lance** : `154c:0954` (drapeaux `0x12D08`) la rend passable, `179a:0673` appelée directement avec `0x80` ou `0x12088` ne l'est pas. `Clip` : `skippable` (défaut vrai).
+- **`VideoScene` demande `step = 1`** : la scène qui la pilote doit être de pas 1 (pas de 5 ticks par défaut), sinon l'image et le son se désynchronisent et les rappels par image arrivent par rafales.
+- **Rappel par image = une fois par image décodée**, y compris l'image 0 : toute logique de jeu liée à la vidéo (déplacements, collisions) se compte en images (11 par seconde), pas en ticks.
+- **`render` et fondus** : `VideoScene.render` recharge la palette de la vidéo à chaque rendu ; la scène du dessous n'est pas redessinée pendant une scène empilée. Une scène qui garde l'image de la vidéo comme fond (chute de S27) appelle `ctx.surface.commitBackground()` à la fin de la vidéo puis `restoreBackground()` avant chaque dessin.
+- **Boucles bloquantes de l'original** (`while (…) { 13fc:0411; …; 1f33:00fc(n); 13fc:03f9 }`) deviennent des phases avec compteur de ticks (`n` centièmes = `n × 0,6` ticks) ; jamais de `await` dans `update`.
+- **Les ressources sont chargées dans `load`**, toutes (y compris les vidéos de fin, choisies d'après l'objectif de la partie), car `update` ne peut pas attendre.
+- **Un mini-jeu rend son issue une fois** : garde un drapeau `done` (une vidéo sautée à la dernière image peut appeler deux fois la fin).
+- **Tirage au sort** : `ctx.rng.below(n)` consomme un nombre par appel comme `rand()` ; garde le même nombre d'appels que l'original (S27 tire `rand × 2` même au niveau où les deux vidéos sont identiques), sans quoi les graines fixes des tests changent de sens.
+- **Tests de parcours** : un `Session` avance par `advance` (une promesse cédée entre deux images) ; `enterFromBoard` / `enterFromFreeMode` attendent déjà la scène voulue (`settle` par nom de classe : nomme la classe de ta scène).
+- **`Pointer`** et flèches : le pas du curseur au clavier est `1 << DS:3FD0` pixels par tick (`3134:03c8`), porté par `Input.keyPointerShift` et appliqué par `Input.moveMouseByKeys()`. `Pointer.update` pose le décalage à 1 (2 px), comme les six mini-jeux à pointeur libre (S24, 25, 26, 35, 41, 51 écrivent `DS:3FD0 = 1`). Le puits S13 (`well.ts`) ne l'écrit pas : 4 px par tick (valeur initiale 2) tant qu'aucun de ces mini-jeux n'a été joué, puis 2 px (voir `screens-events.md`).

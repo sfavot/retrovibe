@@ -154,8 +154,8 @@ export class MapScene implements Scene {
     if (k === this.k) return;
     this.k = k;
     this.placeSelection();
-    // Le bip n'est lancé que si aucun son n'est en cours (`348d:0b42`).
-    if (this.beep && !ctx.voice.voicePlaying) ctx.voice.play(this.beep);
+    // Bruitage mélangé `348d:0b42` : le bip n'est lancé que si aucun bruitage ne sonne.
+    if (this.beep && !ctx.voice.effectPlaying) ctx.voice.playEffect(this.beep);
   }
 
   /** Puits : voix d'encouragement à 16 s (une fois, 1 chance sur 3) ; à 36 s la carte rend « retour » d'office. */

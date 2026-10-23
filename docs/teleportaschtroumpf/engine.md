@@ -225,7 +225,7 @@ Autre usage de ces numéros : `28a3:04dc(scène)` (table `CS:28a3:04dc`, 21 code
 | Callback | Rôle |
 |---|---|
 | `16dc:0002` | tick de jeu : `DS:6124 += 1` (u32), `DS:6120` décrémenté jusqu'à 0, puis `14b3:0247` (déplacement du curseur par les drapeaux du joystick, inactif) |
-| `3134:03bb` | déplacement du curseur par les drapeaux clavier (±2 px/tick, tables `CS:3134:0116/0127`, seulement si `DS:190 == 1`) |
+| `3134:03bb` | déplacement du curseur par les drapeaux clavier (`±(1 << DS:3FD0)` px/tick, tables `CS:3134:0116/0127`, seulement si `DS:190 == 1` ; `DS:3FD0` vaut 2 au départ dans l'image du programme et passe à 1 quand S24, S25, S26, S35, S41 ou S51 démarrent, rien ne le remet : 4 px puis 2 px) |
 | `3134:043c` | souris : `INT 33h` AX=3 (boutons) et AX=0Bh (déplacements) |
 | `30d4:04a2` | curseur graphique 16×16 de bibliothèque (désactivé par défaut, voir §3.4) |
 | `179a:05d0` | pendant une vidéo MUX : compensation de l'horloge (voir §2.3) |
@@ -386,6 +386,49 @@ Principales conclusions (sûres) :
 
 Il n'y a **qu'une voie** : lancer un son coupe le précédent. Les scènes appellent `15f9:089f(0x6F04, 0xA00002)` en boucle dans leur attente : si rien ne joue (`0x100000` renvoie 0), la **musique de fond** `DS:6F04` (`s52m00Nm.voc`) repart au début en boucle. Une voix (`15f9:0e1c(nom)` = `089f(nom, 0x800002)`) interrompt la musique, qui redémarre depuis le début ensuite. **Sûr** pour le mécanisme ; l'absence de reprise de position est **probable**.
 
+### 5.2 bis. Le canal de bruitage mélangé `348d:0b42` (sûr)
+
+La voie unique ci-dessus est celle de `15f9:089f` (voix, musique, bips d'EMS). Le pilote Sound Blaster (`348d`) a **en plus un emplacement de bruitage mélangé**. RE de `348d:0b42`, `348d:015d` et `348d:021a` (`disasm.txt`) :
+
+- **Signature** : `348d:0b42(mode, ptr)`, appel far, `mode` à `[BP+6]` (le dernier argument empilé, `PUSH ptr` puis `PUSH mode`), `ptr` far à `[BP+8]`. `mode` est un **masque de bits**, sans autre sens : `mode & 2` **enregistre** un son (le `2` de `0b42(2, ptr)`) ; `mode & 1` **interroge** (le `1` de `0b42(1, 0)`). Les deux peuvent se cumuler. Le pilote ne joue rien dans `0b42`.
+- **Enregistrer** (`mode & 2`, `348d:0b53..0b85`) : `ptr` est un VOC déjà en mémoire (en-tête de 0x1A octets, bloc de données à `ptr + 0x1A`). Le pilote pose le pointeur de lecture `CS:E5/E7` à `ptr + 0x1B + 3` (soit `ptr + 0x1E`) et le **nombre d'octets restants** `CS:E1` (dword) à `longueur 24 bits du bloc − 4`. Il ne lit pas la fréquence du VOC : l'échantillonnage n'est pas converti (voir plus bas).
+- **Interroger** (`mode & 1`, `0b87..0b99`) : rend `CS:E1` dans `DX:AX` (nombre d'octets restants ; `0 = rien ne sonne`). C'est le `OR AX,DX` des appelants, utilisé comme « un bruitage sonne-t-il encore ? » (`if (0b42(1, 0) == 0) 0b42(2, ptr)`) ou comme attente de la fin du son (`while (0b42(1, 0)) 1764:018a`). Sans bit 1 ni bit 2, la fonction rend 0.
+- **Un seul emplacement** : il n'y a ni file ni liste (un pointeur, un compteur). Un nouvel `0b42(2, ptr)` **remplace** le bruitage en cours, de force, sans toucher à la voie, à la musique ni à la vidéo. Plusieurs appels à la suite ne gardent que le dernier (S33 enchaîne trois sons, un par emplacement, à chaque proposition).
+- **Mélange** (`348d:015d`, interruption de fin de tampon DMA, appelle `348d:030d` qui remplit la moitié de tampon avec la voie, puis `348d:021a` qui y **additionne** le bruitage) : `021a` lit `min(taille de demi-tampon CS:0C, octets restants)` octets du bruitage, les ajoute **octet à octet** à ceux de la voie déjà écrits (échantillons 8 bits non signés, centrés sur `0x80`, somme saturée à −128..127), décrémente `CS:E1` et avance `CS:E5/E7`. Sans reste (`CS:E1 == 0`), elle ne fait rien.
+- **Fin d'un bruitage** : quand `CS:E1` tombe à 0, `021a` ne fait plus rien : **rien n'est arrêté ni signalé**, la voie et la musique continuent. La fin se constate seulement par `0b42(1, 0)`.
+- **Volume général** : `021a` n'applique **aucun** facteur (ni `DS:0212` ni autre) ; le volume 0 à 15 de F1 / F2 passe par `348d:097b(0x40, v)` (probablement le mélangeur matériel du Sound Blaster, **hypothèse**) donc agit en aval du mélange DMA : il s'applique au bruitage **comme à la voie**. Le TS le reproduit en passant les deux sources par le même `GainNode`.
+- **Cadence** : le mélange n'a lieu qu'à chaque remplissage de demi-tampon, donc tant que le flux DMA tourne (voix, musique ou vidéo). Si `030d` n'a plus rien à lire, `015d` appelle `348d:07ae` (arrêt du DSP). **Non reproduit** (hypothèse, à vérifier au son) : le TS joue le bruitage même quand aucune voie ne sonne ; dans l'original, un bruitage lancé sans flux ouvert n'est entendu que si un flux démarre ensuite.
+- **Fréquence** : les octets du bruitage sont additionnés tels quels à ceux de la voie : un VOC dont la fréquence diffère de celle du flux est joué à la fréquence du flux (hauteur décalée). **Non reproduit** : le TS joue chaque bruitage à sa propre fréquence.
+
+**Recensement des appels** (`grep` de `-> 348d:0b42` dans `disasm.txt` : 90 appels `CALLF`, aucun appel proche ni saut ; les rappels vidéo que Ghidra n'a pas vus, comme `1f84:02ce`, sont lus dans l'exécutable). Un appel `0b42(1, 0)` est une interrogation, un appel `0b42(2, ptr)` un lancement ; `s07a001b` est le bip de navigation (`DS:7084` ou une copie chargée par la fonction elle-même).
+
+| Fonction | Scène | Appels | Son(s) lancé(s) par `0b42(2, ·)` | Condition |
+|---|---|---|---|---|
+| `1c78:0005` | S22 | 9 | `s22a001b` (rugissement), `s22a002b` (brûlure), `s22a003c` / `s22a004c` (poses) | rugissement si rien ne sonne ; attente de la fin avant la sortie |
+| `2e6a:0001` | S24 | 3 | `s24a001b` (juste), `s24a002b` (faux) | juste si rien ne sonne ; faux toujours |
+| `260f:000e` | S25 | 3 | `s25a001b` (clic) | toujours ; attente de la fin avant le fondu sonore |
+| `1f84:02ce` (rappel, hors `disasm.txt`) | S27 | 4 | `s27a002b` (pas de la luge) | si rien ne sonne et pas ramené à une borne |
+| `2573:06e3` | S28 | 2 | `s28a002b` (touché), `s28a003b` (raté) | toujours |
+| `1da0:0009` | S29 | 3 | `s29a001b` (souffle), `s29a002b` (à vide), `s29a003b` (rallumage) | toujours |
+| `2f87:0656` | S31 | 8 | `s31a002b` (saut), `s31a003b` (plouf) | si rien ne sonne |
+| `1ceb:000c` | S33 | 7 | `s33a001b` (déplacement), `s33a003b` / `s33a004b` (bien placé / autre) | toujours |
+| `1b05:0929`, `1b05:0b96` | S34 | 5 | `s34a001b` (battement, contact sol / plafond), `s34a004b` (choc) | battement si rien ne sonne ; choc toujours, au contact |
+| `1bda:0021` | S35 | 4 | `s35a001b` (peint), `s35a002b` (faux) | si rien ne sonne |
+| `2143:01cd`, `070c`, `08a1` | S41 | 9 | `s07a001b` (question, zone, confirmation) | si rien ne sonne |
+| `19a8:0006` | S51 | 4 | `s51a001b` (ouverture), `s29a002b` (fin) | si rien ne sonne |
+| `2daf:0006` | S13 | 3 | `s07a001b` | si rien ne sonne |
+| `1a3c:0225` | S02 (carte) | 3 | `s07a001b` | si rien ne sonne |
+| `21ee:0e8f` | S07 | 3 | `s07a001b` | toujours |
+| `21ee:0435`, `21ee:0c19` | S08 | 11 | `s07a001b` | bouton : toujours ; personnage : si rien ne sonne |
+| `21ee:13a1` | S04 | 1 | `s07a001b` | toujours |
+| `269a:0007` | S48 (pause) | 3 | `s07a001b` | si rien ne sonne |
+| `1823:000c` | S49 (confirmation) | 3 | `s07a001b` | si rien ne sonne |
+| `1823:0415` (+ copie `1823:0e21`) | S46 (abandon) | 3 (+ 3) | `s07a001b` | si rien ne sonne |
+
+**Aucun** appel dans S23 (`24d0`), S26 (`1ed0`), S30 (`2d6b`), S36 (`23c9`), S38, S39, S40 (`2ee8`), S09 ni S01 : leurs sons passent par `15f9:089f` (une voie) ; le « clic » de S40 (`s07a001b`) aussi (`15f9:089f(·, 1, 0x80)`). La crête de S27 (`s27a003b`, chute) reste sur la voie.
+
+**Moteur TS** : `AudioBackend.playEffect / stopEffect / effectPlaying` et `VoiceChannel.playEffect / stopEffect / effectPlaying` (`engine-ts.md`, section Son). Les scènes ci-dessus lancent leurs bruitages par `ctx.voice.playEffect` et testent « rien ne sonne » par `ctx.voice.effectPlaying` (et non par `voicePlaying`).
+
 - Pompe : `15f9:0755` (qui appelle `15f9:05b6` et `15f9:0313`) est exécutée à **chaque recopie d'écran** (`13fc:03f9`, `13fc:0411`), à chaque `1764:018a` (pompe générale) et dans les copies EMS (`12ec:0314/0348/037c`) pour lire la suite du fichier dans les tampons ; sans ces appels le flux manquerait de données. **Sûr.**
 - Sons courts en EMS : trois VOC préchargés par `305a:0008` (`s52d001b.voc` en `DS:8349`, `s01a002b.voc`, `s01a001b.voc`) et joués par `15f9:089f(&handle, 0x800004)` ; par exemple le « tic » de points de `1e52:00ad`.
 
@@ -471,6 +514,7 @@ Voir §7 pour les voix `sNNv%dt.voc`.
 11. **`save000.mcg`** : déclencheur non identifié.
 12. **Scènes S36 (cadence `DS:71C6`) et celles du §2.2 « autres »** : cadence à relire scène par scène.
 13. **Version anglaise/allemande** : seule `jeu_f` est présente ; le code gère `a` et `g` pour les textes en dur.
+14. **Canal de bruitage mélangé `348d:0b42`** : **fermée** (§5.2 bis). RE faite, canal ajouté au moteur TS. Restent deux hypothèses sans effet audible vérifié : le mélange n'a lieu que tant qu'un flux DMA tourne, et le bruitage est joué à la fréquence du flux et non à la sienne.
 
 ## 9. Conseils pour l'implémentation TypeScript (tâche 2.2)
 
@@ -481,7 +525,7 @@ Voir §7 pour les voix `sNNv%dt.voc`.
 5. **Fondus** : implémenter `fadeOut(n=16)` / `fadeIn(n=16)` par `pal[i] − floor(cur × pal[i] / n)` sur 17 pas d'un balayage vertical (≈ 70 Hz, soit 0,24 s) ; `fadeOut` laisse un écran noir. Ne pas reproduire le défaut de `cur` non réinitialisé.
 6. **Entrées** : exposer **navigation haut/bas/gauche/droite** + **clic gauche** (valider) + **clic droit** (aide vocale / annuler) comme dans l'original. Pour la souris, l'original ne fait pas de survol : il traduit des mouvements relatifs poussés contre un bord de l'écran en drapeaux haut/bas/gauche/droite. Une réimplémentation peut soit imiter cela (accumuler les déplacements et lever un drapeau au bord), soit faire un survol des boutons dessinés ; les deux donnent le même résultat visible (choix du bouton, puis clic gauche). Clavier : flèches (et Q/A/Z/X), Espace = bouton gauche, Entrée = bouton droit, Échap = saut de vidéo, P = pause, F1/F2 = volume. Pas de curseur système sur les menus ; sprite HY8 dédié dans S51, S35, S26, S41, S25, S13, S24.
 7. **Menus par sélection** : modéliser S07/S08/S09/S04/S49/S46/S48/S02 comme des listes de choix avec index courant, pas des zones ; la surbrillance d'un bouton S07 = remplacer sa couleur de palette (index 120+i) par `(0x10, 0xA4, 0xCC)`.
-8. **Son** : **une seule voie voix/musique** (comme l'original) : lancer un son coupe le précédent, la musique `s52m00Nm.voc` redémarre en boucle quand rien ne joue ; trois bips préchargés pour les petits effets ; volume 0 à 15. Pas de CD audio (les pistes CD ne sont pas extraites). Ne pas oublier le déblocage audio par un premier clic.
+8. **Son** : **une voie voix/musique** (comme l'original) : lancer un son coupe le précédent, plus **un canal de bruitage mélangé** (§5.2 bis : un seul emplacement, additionné à la voie sans la couper), la musique `s52m00Nm.voc` redémarre en boucle quand rien ne joue ; trois bips préchargés pour les petits effets ; volume 0 à 15. Pas de CD audio (les pistes CD ne sont pas extraites). Ne pas oublier le déblocage audio par un premier clic.
 9. **Aléatoire** : reproduire `rand` Borland (`seed = seed×0x015A4E35+1`, `(seed>>16)&0x7FFF`) et les tirages `rand()*N/0x8000`, graine `Date.now()/1000 & 0xFFFF` ; ou fixer la graine pour les tests.
 10. **Options parents** : stocker en `localStorage` (`durée 0..3`, `pause 0..4`, `message 0..8`, `horodatage`), à la place de `c:\smurf.cfg` ; durée = `(idx+1)×1800 s`, verrou = `d300×30 min`. Pas de sauvegarde de partie.
 11. **Chemins** : développer `sNNxXXX.ext` en `DATA/SNN/SNNx/SNNXXX.EXT` ; voix `sNNv` + `%03d` + `t.voc`.

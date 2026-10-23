@@ -85,6 +85,7 @@ export class BrowserHost implements Host {
 
   exit(): void {
     this.audio.stop();
+    this.audio.stopEffect();
     this.onExit();
   }
 

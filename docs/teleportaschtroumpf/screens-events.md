@@ -77,14 +77,14 @@ Le regard est `DS:3DE40` (1 = vers la droite). `game/rules.ts` applique déjà l
 1. Voix `s13a003t` ou `s13a004t` (`3 + rand × 2`), fondu, palette `s13g.pal`, vidéo `s13g.mux` (flags `0x2904` : **Échap la passe** ; 40 images, 3,6 s). Voix `s13c001t..006t` (`1 + rand × 6`).
 2. La dernière image de la vidéo devient le fond. Le curseur est le sprite 0 de `s13a000s.hy8` (32 × 31, couleurs 128 et 129) dessiné en (`DS:4BB9`, `DS:4BB7`) = position de la souris bornée à `x ∈ [8, 0x134]`, `y ∈ [0x0F, 0xBE]`. La vidéo laisse du magenta aux couleurs 128 et 129 : l'original charge `s13g.pal` (entrées 128 = `0,142,189`, 129 = `16,16,19`) ; sans elle le curseur est rose.
 3. Huit cases de 0x20 de côté (bords exclus), une par ingrédient ; coin haut-gauche (`x`, `y`) : 0 (0x49, 0x90) ; 1 (0x8B, 0x73) ; 2 (0x3C, 0x31) ; 3 (0x89, 0x4A) ; 4 (0x28, 0x77) ; 5 (0x6D, 0x30) ; 6 (0x29, 0x4D) ; 7 (0x6E, 0x8E). Case sous le curseur : deux cadres `32af:0006` (rectangle) : (x−1, y−1)-(x+0x1F, y+0x1F) en couleur `0x7F` (clair), puis (x, y)-(x+0x20, y+0x20) en `0x7E` (sombre), puis le curseur par-dessus.
-4. Changement de case (pas lors du simple retour à vide) : bip `s07a001b.voc` si aucune voix ne sort.
+4. Changement de case (pas lors du simple retour à vide) : bip `s07a001b.voc` (`348d:0b42`, `voice.playEffect`, sans couper la musique) si aucun bruitage ne sonne (`voice.effectPlaying`).
 5. Clic gauche sur une case : si l'ingrédient est déjà possédé (`1e52:0034`), voix `s13c016t..020t` (`0x10 + rand × 5`) et on continue ; sinon choix.
 6. Chrono 2 : à 16 s, une fois, une chance sur 3 : voix `s13b021t` ou `023t` (`0x15 + 2 × rand × 2`). À 36 s : fin sans choix.
 7. Fin : sans choix, voix `s13b024t`/`025t` ; avec choix, voix `s13c` + `7 + T[i]`, `T = [1, 6, 3, 5, 2, 7, 8, 0]` (table `DS:2C1D`), soit `s13c008t, 013t, 010t, 012t, 009t, 014t, 015t, 007t` pour les ingrédients 0 à 7. Puis `1e52:0053(joueur, ingrédient)`, compteur +1 (appliqué par `Game.resolveMinigame`).
 
 ### Écarts à l'original
 
-- Le curseur suit la position de la souris ; **les flèches** déplacent aussi le curseur (3 px par image, extension : l'original émule la souris par le pilote de clavier), Espace / clic gauche valide. Le bouton de l'original est testé en continu (`DS:4BBD == 1`), ici c'est un appui (front).
+- Le curseur suit la position de la souris ; **les flèches** déplacent aussi le curseur, comme dans l'original (pilote clavier `3134:03bb`, actif car `DS:190 = 1` en `2daf:0225`) : pas de `1 << DS:3FD0` pixels par tick ; le puits n'écrit pas `DS:3FD0` (initial 2 dans l'image du programme, mis à 1 par S24, 25, 26, 35, 41 et 51 et jamais remis) : **4 px par tick** tant qu'aucun de ces mini-jeux n'a été joué dans la session, **2 px** ensuite (`Input.keyPointerShift`), Espace / clic gauche valide. Le bouton de l'original est testé en continu (`DS:4BBD == 1`), ici c'est un appui (front).
 - La voix d'accroche et la voix de fin sont dites sur ce qui est à l'écran (plateau ou noir selon que `game.ts` empile avec ou sans fondu) : l'original n'a pas de fondu avant la voix, il fond après.
 - Au retour de la carte, l'écran est noir sous la voix (`s13b0xx`) : l'original n'efface rien.
 - La vidéo `s13g` est passable aussi par Espace / clic gauche (`VideoScene` ne distingue pas Échap).

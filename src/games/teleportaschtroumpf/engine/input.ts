@@ -73,6 +73,14 @@ export class Input {
   /** Position de la souris en coordonnées 320×200 : sert seulement aux scènes qui dessinent leur curseur HY8 (aucune zone cliquable). */
   mouseX = CENTER_X;
   mouseY = CENTER_Y;
+  /**
+   * Décalage du pas du curseur au clavier (`DS:3FD0`, lu par `3134:03c8`) : une flèche déplace le curseur de `1 << keyPointerShift`
+   * pixels par tick. Valeur initiale 2 (4 px) ; les six mini-jeux à pointeur libre (S24, S25, S26, S35, S41, S51) l'écrivent à 1
+   * (2 px) à leur mise en place et rien ne le remet : le puits aux vœux (S13, qui active le même pilote mais ne l'écrit pas) va donc
+   * à 4 px par tick tant qu'aucun de ces mini-jeux n'a été joué, puis à 2 px. L'état vit ici car il dure autant que l'hôte, comme
+   * la variable dure autant que le processus.
+   */
+  keyPointerShift = 2;
 
   private readonly held = new Map<Action, Set<string>>();
   /** Appuis pas encore consommés, par action. */
@@ -150,6 +158,14 @@ export class Input {
   mouseUp(button: number): void {
     const action = BUTTON_ACTIONS[button];
     if (action) this.release(action, `mouse:${button}`);
+  }
+
+  /** Pilote clavier du curseur (`3134:03bb`) : les flèches tenues déplacent la position de la souris de `1 << keyPointerShift` pixels. */
+  moveMouseByKeys(): void {
+    const step = 1 << this.keyPointerShift;
+    const dx = (this.pressed("right") ? step : 0) - (this.pressed("left") ? step : 0);
+    const dy = (this.pressed("down") ? step : 0) - (this.pressed("up") ? step : 0);
+    if (dx !== 0 || dy !== 0) this.mouseMove(this.mouseX + dx, this.mouseY + dy);
   }
 
   /** Position absolue du pointeur, en pixels 320×200 (bornée à l'écran). */

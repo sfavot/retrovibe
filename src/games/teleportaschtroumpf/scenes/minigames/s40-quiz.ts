@@ -270,8 +270,8 @@ export class QuizScene implements Scene {
         if (ctx.voice.voicePlaying) return;
         // `1f33:0181(2)` : le chrono démarre à la fin de la voix ; la souris revient au centre (`14b3:0039`).
         this.timer = ctx.clock.createTimer();
-        ctx.input.mouseMove(0xa0, 100);
-        this.lastMouseY = 100;
+        ctx.input.warpMouse(0xa0, 100);
+        this.lastMouseY = ctx.input.mouseY;
         this.phase = "choose";
         return;
       case "choose":

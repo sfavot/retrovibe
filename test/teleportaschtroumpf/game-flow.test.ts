@@ -152,6 +152,25 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     expect(s.game.state.current).toBe(0);
   }, 60_000);
 
+  it("passer d'une rangée à l'autre du même écran garde le décor (l'oiseau ne repart pas) ; changer d'écran le renouvelle", async () => {
+    const s = await Session.start();
+    await s.ready();
+    const ambient = () => (s.board as unknown as { ambient: object | null }).ambient;
+    // Écran 3, rangée basse, juste à droite du nid de l'oiseau (porte 39) : on passe dans la rangée haute du même écran.
+    s.place({ screen: 3, row: "bottom", x: 0x10 }, false);
+    const before = ambient();
+    s.host.input.keyDown("ArrowLeft");
+    await s.until(() => s.board.shown.row === "top");
+    s.host.input.keyUp("ArrowLeft");
+    expect(s.board.shown).toMatchObject({ screen: 3, row: "top" });
+    expect(ambient()).toBe(before);
+    s.place({ screen: 3, row: "bottom", x: 0x130 });
+    s.host.input.keyDown("ArrowRight");
+    await s.until(() => s.board.shown.screen === 4);
+    s.host.input.keyUp("ArrowRight");
+    expect(ambient()).not.toBe(before);
+  }, 60_000);
+
   it("prison : le tour s'arrête, le tour suivant est passé (voix), puis libération", async () => {
     const s = await Session.start();
     await s.ready();

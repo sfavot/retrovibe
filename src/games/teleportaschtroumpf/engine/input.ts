@@ -81,6 +81,11 @@ export class Input {
    * la variable dure autant que le processus.
    */
   keyPointerShift = 2;
+  /**
+   * Une vraie souris survole l'écran (l'hôte le tient à jour) : sa position est celle du pointeur du navigateur, qu'aucun jeu ne
+   * peut déplacer. La souris de l'original était relative : le jeu la recentrait sans que rien ne bouge sous la main du joueur.
+   */
+  pointerHovering = false;
 
   private readonly held = new Map<Action, Set<string>>();
   /** Appuis pas encore consommés, par action. */
@@ -166,6 +171,14 @@ export class Input {
     const dx = (this.pressed("right") ? step : 0) - (this.pressed("left") ? step : 0);
     const dy = (this.pressed("down") ? step : 0) - (this.pressed("up") ? step : 0);
     if (dx !== 0 || dy !== 0) this.mouseMove(this.mouseX + dx, this.mouseY + dy);
+  }
+
+  /**
+   * `14b3:0039` : le jeu replace la souris (au centre, le plus souvent). Sans effet quand une vraie souris survole l'écran : le curseur
+   * dessiné sauterait loin du pointeur, et un clic sans bouger viserait un endroit que le joueur ne montre pas.
+   */
+  warpMouse(x: number, y: number): void {
+    if (!this.pointerHovering) this.mouseMove(x, y);
   }
 
   /** Position absolue du pointeur, en pixels 320×200 (bornée à l'écran). */

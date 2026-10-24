@@ -33,8 +33,8 @@ export function blackSmurfsWinClip(game: Game): string {
  *
  * - reçoit : `game`, la partie en cours ; la requête est `game.state.pending` (scène 28) : `level` 0..2 rétrécit la zone qui touche une
  *   cible de 0, 4 ou 8 pixels de chaque côté, `bonus` (indice de l'oiseau) force le niveau 0 ;
- * - joue : des Schtroumpfs noirs sortent de huit trous, l'un après l'autre. Les flèches (ou `Z`, `Q`, `X`, `A`, ou la souris poussée vers
- *   un bord) déplacent le viseur de 5 pixels par image, Espace (ou clic gauche) tire. Une cible qu'on laisse plus de 3 s perd la partie ;
+ * - joue : des Schtroumpfs noirs sortent de huit trous, l'un après l'autre. Les flèches (ou `Z`, `Q`, `X`, `A`) déplacent le viseur de
+ *   5 pixels par image ; la souris aussi, le viseur allant vers le pointeur à cette même vitesse. Espace (ou clic gauche) tire. Une cible qu'on laisse plus de 3 s perd la partie ;
  *   un tir qui rate ne coûte rien. La partie est gagnée quand dix cibles sont apparues sans une seule oubliée ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la vidéo de fin (`s28c2` si l'ingrédient 6 fait partie de l'objectif
  *   de la partie, `s28c1` sinon, `s28b` en cas d'échec ; toutes passables) ; l'appelant applique l'issue (ingrédient 6).
@@ -84,9 +84,6 @@ export const START_X = 0xa0;
 export const START_Y = 0x64;
 /** Pixels par image dans chaque direction (`2573:0222..0243`). */
 export const CURSOR_STEP = 5;
-/** Écart de la souris au centre qui compte comme une poussée (`2573:019c..01d8`). */
-const MOUSE_PUSH_X = 0x96;
-const MOUSE_PUSH_Y = 0x50;
 
 /** Une cible attend 2 s (chrono 3, `>= 2`) avant de sortir ; sortie finie, elle reste 3 s (chrono 2, `> 2`). */
 const WAIT_SECONDS = 2;
@@ -149,6 +146,9 @@ export class BlackSmurfsScene implements Scene {
   private cursorX = START_X;
   private cursorY = START_Y;
   private keys = { left: false, right: false, up: false, down: false, click: false };
+  /** Dernière position lue de la souris, et le point que le viseur rejoint depuis qu'elle a bougé (aucun après une touche). */
+  private mouse = { x: START_X, y: START_Y };
+  private aim: { x: number; y: number } | null = null;
   private armed = true;
   private clickFrames = 0;
   private clicking = false;
@@ -270,6 +270,7 @@ export class BlackSmurfsScene implements Scene {
     this.cursorX = START_X;
     this.cursorY = START_Y;
     this.keys = { left: false, right: false, up: false, down: false, click: false };
+    this.aim = null;
     this.armed = true;
     this.clickFrames = 0;
     this.clicking = false;
@@ -348,12 +349,12 @@ export class BlackSmurfsScene implements Scene {
     return target.file === "a" ? this.spritesA : this.spritesB;
   }
 
-  /** `14b3:000d` : clavier et souris remis à zéro (souris au centre) ; les deux chronos de la partie démarrent. */
+  /** `14b3:000d` : clavier et souris remis à zéro (le viseur au centre attend que la souris bouge) ; les deux chronos de la partie démarrent. */
   private start(ctx: SceneContext): void {
     this.started = true;
     this.waitTimer = ctx.clock.createTimer();
     this.upTimer = ctx.clock.createTimer();
-    ctx.input.mouseMove(START_X, START_Y);
+    this.mouse = { x: ctx.input.mouseX, y: ctx.input.mouseY };
     this.nextAt = ctx.clock.ticks + START_GAP_TICKS;
   }
 
@@ -377,19 +378,22 @@ export class BlackSmurfsScene implements Scene {
     this.nextAt = ctx.clock.ticks + LOOP_TICKS;
     this.count++;
 
-    // Déplacement (`2573:019c..0243`) : souris poussée à plus de 150 / 80 pixels du centre, ou touches (qui recentrent la souris).
-    const dx = input.mouseX - START_X;
-    const dy = input.mouseY - START_Y;
+    // Déplacement (`2573:019c..0243`) : 5 pixels par direction, au clavier ou vers le pointeur (voir « Écarts » : l'original avance
+    // tant que la souris est poussée loin du centre). Une touche fait oublier le pointeur, comme l'original recentre la souris.
     const keys = this.keys;
-    const right = dx > MOUSE_PUSH_X || keys.right;
-    const left = dx < -MOUSE_PUSH_X || keys.left;
-    const up = dy < -MOUSE_PUSH_Y || keys.up;
-    const down = dy > MOUSE_PUSH_Y || keys.down;
-    if (keys.right || keys.left || keys.up || keys.down) input.mouseMove(START_X, START_Y);
-    if (right) this.cursorX += CURSOR_STEP;
-    if (left) this.cursorX -= CURSOR_STEP;
-    if (up) this.cursorY -= CURSOR_STEP;
-    if (down) this.cursorY += CURSOR_STEP;
+    if (input.mouseX !== this.mouse.x || input.mouseY !== this.mouse.y) {
+      this.mouse = { x: input.mouseX, y: input.mouseY };
+      this.aim = { ...this.mouse };
+    }
+    if (keys.right || keys.left || keys.up || keys.down) this.aim = null;
+    if (this.aim) {
+      this.cursorX += Math.max(-CURSOR_STEP, Math.min(CURSOR_STEP, this.aim.x - this.cursorX));
+      this.cursorY += Math.max(-CURSOR_STEP, Math.min(CURSOR_STEP, this.aim.y - this.cursorY));
+    }
+    if (keys.right) this.cursorX += CURSOR_STEP;
+    if (keys.left) this.cursorX -= CURSOR_STEP;
+    if (keys.up) this.cursorY -= CURSOR_STEP;
+    if (keys.down) this.cursorY += CURSOR_STEP;
     const click = keys.click;
     this.keys = { left: false, right: false, up: false, down: false, click: false };
     if (click) this.clicking = true;

@@ -317,7 +317,7 @@ export class PuzzleScene implements Scene {
 
   /** `2e6a:028e..02b3` : curseur replacé au centre, chrono 2 démarré, le curseur HY8 remplace celui du système. */
   private beginPlay(ctx: SceneContext): void {
-    ctx.input.mouseMove(0xa0, 0x64);
+    ctx.input.warpMouse(0xa0, 0x64);
     this.shown = this.pointer.position(ctx);
     this.timer = ctx.clock.createTimer();
     this.startVolume = ctx.voice.volume;

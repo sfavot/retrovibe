@@ -16,7 +16,8 @@ export const SPRITE_INDEX_MASK = 0x0fff;
 
 /**
  * Pose les images d'un sprite composé. Ancrage : x = bord gauche, y = ligne du bas de l'image ;
- * en miroir x, le bord droit est sur le point (`x -= largeur`, voir docs/teleportaschtroumpf/hy8.md).
+ * en miroir x, le bord droit est sur le point (`x -= largeur`, voir docs/teleportaschtroumpf/hy8.md), sauf pour une image
+ * stockée en miroir, dont le point reste le bord gauche.
  * Le miroir de frame (0x8000) inverse les x des points et le miroir de chaque partie.
  */
 export function placeSprite(hy8: Hy8, spriteIndex: number, frameMirror: boolean, ox = 0, oy = 0, depth = 0): PlacedImage[] {
@@ -32,7 +33,7 @@ export function placeSprite(hy8: Hy8, spriteIndex: number, frameMirror: boolean,
     if (part.kind === HY8_PART_IMAGE) {
       const image = hy8.images[part.target];
       if (!image) throw new Error(`image ${part.target} absente (${hy8.images.length} images)`);
-      placed.push({ image, left: mirror ? x - image.width : x, top: y - image.height + 1, mirror });
+      placed.push({ image, left: mirror && !image.storedMirrored ? x - image.width : x, top: y - image.height + 1, mirror });
     } else if (part.kind === HY8_PART_SUB_SPRITE) {
       placed.push(...placeSprite(hy8, part.target, frameMirror, x, y, depth + 1));
     }

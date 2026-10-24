@@ -11,6 +11,8 @@ export interface Hy8Image {
   width: number;
   height: number;
   pixels: Uint8Array;
+  /** Image stockée en miroir (absent : non) : une partie miroir la pose sans la décaler de sa largeur (voir `placeSprite`). */
+  storedMirrored?: boolean;
 }
 
 /** Point en pixels relativement à la position passée au dessin du sprite (axe y vers le bas). */
@@ -130,7 +132,7 @@ function readImage(bytes: Uint8Array, start: number, limit: number, index: numbe
     p++;
   }
   if (attributes & HY8_IMAGE_MIRROR_X) for (let y = 0; y < height; y++) pixels.subarray(y * width, (y + 1) * width).reverse();
-  return { width, height, pixels };
+  return { width, height, pixels, storedMirrored: (attributes & HY8_IMAGE_MIRROR_X) !== 0 };
 }
 
 /**

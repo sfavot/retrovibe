@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { HY8_PART_IMAGE, parseHy8 } from "../../src/games/teleportaschtroumpf/data/hy8";
+import { placeSprite } from "../../src/games/teleportaschtroumpf/engine/sprites";
 import { hasOriginalFiles, listData, readData, withExtension } from "./helpers";
 
 const sha1 = (bytes: Uint8Array) => createHash("sha1").update(bytes).digest("hex");
@@ -138,6 +139,32 @@ describe.skipIf(!hasOriginalFiles)("HY8 des fichiers originaux", () => {
     expect(hy8.animations[0].frames.map((f) => f.sprite)).toEqual([0, 1, 2, 3, 4, 5]);
     expect(hy8.animations[1].frames.map((f) => f.sprite)).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14]);
     expect(hy8.animations[0].frames[0]).toEqual({ sprite: 0, flags: 0, duration: 1, dx: 0, dy: 0 });
+  });
+
+  it("pose une image stockée en miroir sans la décaler : chaque animation tournée à gauche est le miroir exact de celle de droite", () => {
+    const hy8 = parseHy8(readData("S01/S01A/S01A000S.HY8"));
+    expect(hy8.images.filter((image) => image.storedMirrored)).toHaveLength(35);
+    // Pixels non transparents d'une frame, de la colonne la plus à gauche à la plus à droite (relatives à l'ancre).
+    const extent = (sprite: number, mirror: boolean): [number, number] => {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const p of placeSprite(hy8, sprite & 0x0fff, mirror)) {
+        const { width, height, pixels } = p.image;
+        for (let y = 0; y < height; y++)
+          for (let x = 0; x < width; x++)
+            if (pixels[y * width + x]) {
+              const column = p.left + (p.mirror ? width - 1 - x : x);
+              min = Math.min(min, column);
+              max = Math.max(max, column);
+            }
+      }
+      return [min, max];
+    };
+    const frames = (animation: number) => hy8.animations[animation].frames.map((f) => extent(f.sprite, (f.flags & 0x8000) !== 0));
+    // Saut, course, impatience, arrivée (droite, gauche) et oiseau du décor (vers la gauche, vers la droite).
+    for (const [right, left] of [[4, 5], [6, 7], [9, 0xb], [0xc, 0xd], [0x1c, 0x1f]]) {
+      expect(frames(left), `animations ${right} / ${left}`).toEqual(frames(right).map(([min, max]) => [-max, -min]));
+    }
   });
 
   it("garde les animations vides de S33A001S", () => {

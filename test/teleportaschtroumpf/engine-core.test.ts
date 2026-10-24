@@ -264,6 +264,17 @@ describe("Input", () => {
     expect(input.mouseX).toBe(319);
   });
 
+  it("recentrage (`14b3:0039`) : la souris va au point donné, sauf si une vraie souris survole l'écran", () => {
+    const input = new Input();
+    input.mouseMove(30, 40);
+    input.warpMouse(0xa0, 100);
+    expect([input.mouseX, input.mouseY]).toEqual([0xa0, 100]);
+    input.mouseMove(30, 40);
+    input.pointerHovering = true;
+    input.warpMouse(0xa0, 100);
+    expect([input.mouseX, input.mouseY]).toEqual([30, 40]);
+  });
+
   it("pilote clavier du curseur (`3134:03c8`) : 1 << keyPointerShift pixels par appel, 4 px au départ puis 2 px une fois le pas posé à 1", () => {
     const input = new Input();
     expect(input.keyPointerShift).toBe(2);

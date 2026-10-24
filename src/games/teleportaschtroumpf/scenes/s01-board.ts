@@ -153,12 +153,9 @@ export class Board {
 
   /** Le pion arrive à `to` (téléportation, événement) : fond de l'écran d'arrivée, animation d'arrivée si demandée. */
   moveTo(ctx: SceneContext, to: Position, options: { facingRight?: boolean; arrival?: boolean; look?: BoardLook } = {}): void {
-    const screenChanged = to.screen !== this.view.screen || to.row !== this.view.row;
+    const from = this.position;
     this.view = { ...this.view, ...to, look: options.look ?? this.view.look, facingRight: options.facingRight ?? this.view.facingRight };
-    if (screenChanged) {
-      this.drawBackground(ctx);
-      this.resetScreen(ctx);
-    }
+    this.leave(ctx, from);
     if (options.arrival) this.walker.startArrival(ctx.clock.ticks);
     else this.walker.reset(this.view.facingRight, ctx.clock.ticks);
     this.advance(ctx);
@@ -276,6 +273,19 @@ export class Board {
     this.ambient = new Ambient(this.resources.sprites, this.view.screen, this.view.wellOpen, new BorlandRandom(ctx.rng.next()));
   }
 
+  /**
+   * Le pion a quitté `from` : sur un autre écran, fond et décor neufs ; sur l'autre rangée du même écran, le décor continue (l'écran
+   * montre ses deux rangées : le recréer relançait l'oiseau en passant d'une rangée à l'autre), seul le bruit de zone est réarmé.
+   */
+  private leave(ctx: SceneContext, from: Position): void {
+    if (this.view.screen !== from.screen) {
+      this.drawBackground(ctx);
+      this.resetScreen(ctx);
+    } else if (this.view.row !== from.row) {
+      this.inZone = false;
+    }
+  }
+
   /** Image de décor suivante. */
   private advance(ctx: SceneContext): void {
     this.ambient?.update(Math.floor((ctx.clock.ticks - this.since) / TICKS_PER_SECOND));
@@ -285,12 +295,9 @@ export class Board {
   private followGame(ctx: SceneContext): void {
     const p = this.game.player;
     if (this.game.state.current !== this.view.player) return;
-    const screenChanged = p.screen !== this.view.screen || p.row !== this.view.row;
+    const from = this.position;
     this.view = { ...this.view, screen: p.screen, row: p.row, x: p.x, facingRight: p.facingRight };
-    if (screenChanged) {
-      this.drawBackground(ctx);
-      this.resetScreen(ctx);
-    }
+    this.leave(ctx, from);
   }
 
   /** Bruit de craquement en entrant dans le lac ou sur le pont (`15f9:089f`, seulement si rien ne joue). */

@@ -224,22 +224,30 @@ describe.skipIf(!hasOriginalFiles)("S28 Les Schtroumpfs Noirs : cibles, viseur, 
     expect(scene.cursor.x).toBe(before - CURSOR_STEP);
   }, 30_000);
 
-  it("souris poussée à plus de 150 pixels (horizontalement) ou 80 (verticalement) du centre : le viseur avance ; les touches recentrent la souris", async () => {
+  it("souris : le viseur va vers le pointeur à 5 pixels par image et par axe ; une touche le fait oublier jusqu'au prochain mouvement", async () => {
     const run = await launch({ seed: 5 });
     const scene = run.scene as BlackSmurfsScene;
-    run.ctx.input.mouseMove(START_X + 150, START_Y);
-    await run.run(500);
+    await run.run(300);
     expect(scene.cursor).toEqual({ x: START_X, y: START_Y });
-    run.ctx.input.mouseMove(START_X + 151, START_Y - 81);
-    await run.run(1000);
-    expect(scene.cursor.x).toBeGreaterThan(START_X + 40);
-    expect(scene.cursor.y).toBeLessThan(START_Y - 40);
-    // Les touches remettent la souris au centre : le viseur ne bouge plus ensuite sans elles.
+    const iterations = scene.iterations;
+    run.ctx.input.mouseMove(START_X + 100, START_Y - 30);
+    await run.run(500);
+    const steps = scene.iterations - iterations;
+    expect(scene.cursor).toEqual({ x: START_X + CURSOR_STEP * steps, y: START_Y - 30 });
+    await run.run(2000);
+    expect(scene.cursor).toEqual({ x: START_X + 100, y: START_Y - 30 });
+    run.ctx.input.mouseMove(START_X + 98, START_Y - 30);
+    await run.run(200);
+    expect(scene.cursor).toEqual({ x: START_X + 98, y: START_Y - 30 });
+    // Une touche reprend la main : la souris immobile ne ramène plus le viseur.
     await run.tap("ArrowLeft", 100);
     const settled = scene.cursor;
+    expect(settled.x).toBeLessThan(START_X + 98);
     await run.run(500);
     expect(scene.cursor).toEqual(settled);
-    expect(run.ctx.input.mouseX).toBe(START_X);
+    run.ctx.input.mouseMove(START_X, START_Y);
+    await run.run(3000);
+    expect(scene.cursor).toEqual({ x: START_X, y: START_Y });
   }, 30_000);
 
   it("une cible oubliée plus de 3 s après sa sortie : la partie est perdue, 0 ingrédient, vidéo s28b, l'issue est appliquée", async () => {

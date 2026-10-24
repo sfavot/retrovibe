@@ -488,7 +488,7 @@ export class MagicianScene implements Scene {
     ctx.fade.reset();
     ctx.palette.load(this.palette);
     ctx.surface.drawMcg(this.choiceMcg, { asBackground: true });
-    ctx.input.mouseMove(0xa0, 0x64);
+    ctx.input.warpMouse(0xa0, 0x64);
     this.position = this.pointer.position(ctx);
     this.zone = -1;
     this.previousZone = -1;

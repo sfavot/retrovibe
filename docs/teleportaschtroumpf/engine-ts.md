@@ -128,7 +128,7 @@ Scènes toutes faites : `PictureScene` (MCG + fondu + attente + `onEnd`), `WaitS
 Actions (`engine/input.ts`) : `up down left right validate cancel skip pause volumeUp volumeDown`. Sources : flèches et Q/A/Z/X (haut/bas/gauche/droite, positions physiques QWERTY comme les scancodes d'origine), Espace / clic gauche = `validate`, Entrée / clic droit = `cancel` (voix d'aide) ; la position du pointeur ne désigne jamais un élément, Échap = `skip`, P = `pause`, F1/F2 = volume −/+ (géré par le moteur).
 
 - `ctx.input.pressed(a)` : tenu ; `justPressed(a)` : enfoncé depuis le dernier `update` (mémorisé, un appui plus court que le pas n'est pas perdu) ; `anyJustPressed(...)`.
-- `ctx.input.mouseX/mouseY` : position 320×200, lue seulement par les scènes à pointeur libre qui dessinent leur curseur HY8 (E2). Aucun écran de menu n'a de zone cliquable : clavier d'origine seul (décision `plan.md`), les boutons de la souris sont les actions `validate` (gauche) et `cancel` (droit).
+- `ctx.input.mouseX/mouseY` : position 320×200, lue seulement par les scènes à pointeur libre qui dessinent leur curseur HY8 (E2). Le recentrage de l'original (`14b3:0039`) passe par `ctx.input.warpMouse(x, y)`, sans effet quand une vraie souris survole le canvas (`Input.pointerHovering`, tenu par l'hôte) : la souris DOS était relative, celle du navigateur ne se déplace pas, et le curseur dessiné sauterait loin du pointeur. Aucun écran de menu n'a de zone cliquable : clavier d'origine seul (décision `plan.md`), les boutons de la souris sont les actions `validate` (gauche) et `cancel` (droit).
 - Curseur : le curseur système est masqué en permanence sur le canvas (`cursor: none` dans `style.css`) ; ni `Host.setCursor` ni `Scene.ownCursor` n'existent plus.
 
 ## Son

@@ -187,7 +187,7 @@ export class ObservationScene implements Scene {
         if (ctx.fade.active) return;
         // `14b3:000d` / `0039` : entrées remises à zéro (un clic fait pendant le fondu est oublié), curseur au centre.
         ctx.input.justPressed("validate");
-        ctx.input.mouseMove(START_X, START_Y);
+        ctx.input.warpMouse(START_X, START_Y);
         this.cursorShown = true;
         this.timer = ctx.clock.createTimer();
         this.phase = "hunt";

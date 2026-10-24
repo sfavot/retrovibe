@@ -250,7 +250,7 @@ export class GiftsScene implements Scene {
     ctx.palette.load(this.mcg.palette);
     ctx.surface.drawMcg(this.mcg, { asBackground: true });
     // `14b3:0039` : le curseur est replacé au centre de l'écran.
-    ctx.input.mouseMove(0xa0, 0x64);
+    ctx.input.warpMouse(0xa0, 0x64);
     this.gifts = GIFT_LAYOUTS[this.layoutIndex].map(([x, y, base, minX, minY, maxX, maxY]) => ({
       x,
       y,

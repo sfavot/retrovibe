@@ -296,7 +296,7 @@ export class SoundGameScene implements Scene {
   private startHunt(ctx: SceneContext): void {
     ctx.palette.load(this.spritePalette);
     ctx.fade.reset();
-    ctx.input.mouseMove(0xa0, 100);
+    ctx.input.warpMouse(0xa0, 100);
     this.timer = ctx.clock.createTimer();
     this.nextAt = ctx.clock.ticks;
     this.frame = 0;

@@ -115,7 +115,14 @@ export class BrowserHost implements Host {
   /** Branche clavier et souris du canvas sur `input` ; le son se débloque au premier geste. */
   private bindInput(audio: WebAudioBackend): void {
     const { canvas, input } = this;
-    canvas.addEventListener("pointermove", (event) => this.pointer(event));
+    canvas.addEventListener("pointermove", (event) => {
+      // Un doigt ne survole rien : seul un pointeur de souris (ou de stylet) qui passe sur l'écran fixe la position.
+      input.pointerHovering = event.pointerType !== "touch";
+      this.pointer(event);
+    });
+    canvas.addEventListener("pointerleave", () => {
+      input.pointerHovering = false;
+    });
     canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       canvas.focus();

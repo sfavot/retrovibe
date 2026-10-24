@@ -117,7 +117,11 @@ Avec `npm run dev` : `src/games/teleportaschtroumpf/ui/asset-viewer.html` est un
 
 ### Fichiers de données
 
-Ils viennent de l'image ISO du CD : `scripts/mathemagique-extract.sh [archive.zip]` lit l'archive placée dans `archives/` (non versionnée), extrait le CD complet dans `archives/mathemagique/cd/` (pour la rétro-ingénierie) et ne garde que les fichiers utiles dans `original/mathemagique/`. Ce dossier contient `MATH` (l'exécutable du jeu), les archives Mohawk `*.DAT` (sauf `MIDIMAC.DAT`, le jeu MIDI pour Mac) et `MPC/PVG.MHK`, les images `*.WMF`, les polices `*.TTF` et `*.FON`, les quatre vidéos QuickTime du CD converties en `QTW/*.mp4` (H.264 + AAC) et `files.json` (liste des fichiers). Le script régénère aussi l'inventaire `docs/mathemagique/files.md`.
+Ils viennent de l'image ISO du CD : `scripts/mathemagique-extract.sh [archive.zip]` lit l'archive placée dans `archives/` (non versionnée), extrait le CD complet dans `archives/mathemagique/cd/` (pour la rétro-ingénierie) et ne garde que les fichiers utiles dans `original/mathemagique/`. Ce dossier contient `MATH` (l'exécutable du jeu), les archives Mohawk `*.DAT` (sauf `MIDIMAC.DAT`, le jeu MIDI pour Mac) et `MPC/PVG.MHK`, les images `*.WMF`, les polices `*.TTF` et `*.FON` et `files.json` (liste des fichiers). Le script régénère aussi l'inventaire `docs/mathemagique/files.md`.
+
+### Son (soundfont)
+
+Le MIDI est joué par `spessasynth_lib` avec la soundfont General MIDI *GeneralUser GS* (non versionnée dans `archives/mathemagique/soundfont/`), réduite aux timbres des 66 MIDI du jeu : `npx vite-node scripts/mathemagique/soundfont.mts` produit `original/mathemagique/mathemagique-gm.sf2` (environ 18 Mo) et copie sa licence à côté (`mathemagique-gm-LICENSE.txt`). Le script d'extraction du CD conserve ces deux fichiers. Détails : `docs/mathemagique/audio.md`.
 
 ### Pages de développement
 

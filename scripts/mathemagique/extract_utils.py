@@ -3,8 +3,7 @@
 Lancé avec `python3 -I` : les données extraites ne sont pas de confiance (rien n'en est exécuté).
 Sous-commandes :
   iso <iso> <dest>                    -> extrait tout l'ISO 9660 (analyse faite ici : 7zz oublie des fichiers)
-  copier <cd> <dest> <stats_json>     -> copie dans <dest> les fichiers utiles au jeu (hors vidéos) ; stats JSON
-  videos <cd>                         -> liste (un par ligne) les chemins relatifs des QTW/*.MOV à convertir
+  copier <cd> <dest> <stats_json>     -> copie dans <dest> les fichiers utiles au jeu ; stats JSON
   inventaire <dest> <cd> <stats> <sortie_md>
 """
 import json
@@ -29,7 +28,7 @@ POURQUOI_EXCLUS = [
     ('`INSTALL.EXE`, `MSSETUP.*`, `_MS*.EXE`, `MS*STF.DLL`, `MSDETECT.INC`, `BBINSTAL.MST`',
      'installeur Microsoft Setup.'),
     ('`PVG.EXE`', 'visionneuse de l\'application ; ses ressources `MPC/PVG.MHK` sont gardées.'),
-    ('`QTW/` (QuickTime et `.MOV`)', 'QuickTime pour Windows et vidéos d\'origine ; les vidéos sont gardées converties en `.mp4`.'),
+    ('`QTW/` (QuickTime et `.MOV`)', 'QuickTime pour Windows et vidéos du guide des parents, que le jeu ne lit pas.'),
     ('`MPCRSRC/`', 'sauvegardes `.BAK` et doublons.'),
     ('`MWROSTER`', 'modèle de fichier de sauvegarde (liste des élèves).'),
     ('autres fichiers à la racine du CD', 'non utilisés par la réimplémentation.'),
@@ -119,8 +118,6 @@ def est_garde(rel):
 def cmd_copier(cd, dest, stats_json):
     gardes = []
     for chemin, rel in liste_fichiers(cd):
-        if rel.startswith('QTW/') and rel.upper().endswith('.MOV'):
-            continue  # converties en mp4 par le script shell
         taille = os.path.getsize(chemin)
         if est_garde(rel):
             cible = os.path.join(dest, rel)
@@ -129,12 +126,6 @@ def cmd_copier(cd, dest, stats_json):
             gardes.append({'rel': rel, 'taille': taille})
     with open(stats_json, 'w') as o:
         json.dump({'gardes': gardes}, o)
-
-
-def cmd_videos(cd):
-    for _, rel in liste_fichiers(cd):
-        if rel.startswith('QTW/') and rel.upper().endswith('.MOV'):
-            print(rel)
 
 
 def mohawk(chemin):
@@ -203,7 +194,7 @@ def cmd_inventaire(dest, cd, stats_json, sortie):
     L += ['', 'Le CD complet est extrait dans `archives/mathemagique/cd/` (non versionné).', '',
           '## Régénérer', '', '```', 'bash scripts/mathemagique-extract.sh [archive.zip]', '```', '',
           'Archive par défaut : `archives/mathemagique/Math-Workshop_Win_EN_ISO-Version.zip` (non versionnée). '
-          'Outils requis : `unzip`, `ffmpeg`, `python3`.', '']
+          'Outils requis : `unzip`, `python3`.', '']
     os.makedirs(os.path.dirname(sortie), exist_ok=True)
     with open(sortie, 'w') as o:
         o.write('\n'.join(L))
@@ -211,4 +202,4 @@ def cmd_inventaire(dest, cd, stats_json, sortie):
 
 if __name__ == '__main__':
     c, a = sys.argv[1], sys.argv[2:]
-    {'iso': cmd_iso, 'copier': cmd_copier, 'videos': cmd_videos, 'inventaire': cmd_inventaire}[c](*a)
+    {'iso': cmd_iso, 'copier': cmd_copier, 'inventaire': cmd_inventaire}[c](*a)

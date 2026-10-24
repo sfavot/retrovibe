@@ -4,7 +4,7 @@ Généré par `scripts/mathemagique-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/mathemagique/`) : **82.6 Mo** (86603941 octets), 72 fichiers
+- Total versionné (`original/mathemagique/`) : **70.0 Mo** (73398573 octets), 68 fichiers
 
 ## Par groupe de fichiers
 
@@ -14,7 +14,6 @@ Généré par `scripts/mathemagique-extract.sh` (ne pas éditer à la main).
 | .DAT | 18 | 68.2 Mo |
 | .FON | 5 | 50.0 Ko |
 | .MHK (MPC/) | 1 | 816.0 Ko |
-| .MP4 | 4 | 12.6 Mo |
 | .TTF | 7 | 241.2 Ko |
 | .WMF | 6 | 109.3 Ko |
 | .WMF (PVGWMF/) | 30 | 218.3 Ko |
@@ -51,7 +50,7 @@ Types de ressources (tag de 4 octets : nombre de ressources). Les octets non imp
 - `BROD*.DLL`, `MOHAWK.WIN`, `MATH.INF` : DLL Broderbund, MOHAWK.WIN et manifeste de l'installeur : utiles à la rétro-ingénierie, pas servis au navigateur.
 - `INSTALL.EXE`, `MSSETUP.*`, `_MS*.EXE`, `MS*STF.DLL`, `MSDETECT.INC`, `BBINSTAL.MST` : installeur Microsoft Setup.
 - `PVG.EXE` : visionneuse de l'application ; ses ressources `MPC/PVG.MHK` sont gardées.
-- `QTW/` (QuickTime et `.MOV`) : QuickTime pour Windows et vidéos d'origine ; les vidéos sont gardées converties en `.mp4`.
+- `QTW/` (QuickTime et `.MOV`) : QuickTime pour Windows et vidéos du guide des parents, que le jeu ne lit pas.
 - `MPCRSRC/` : sauvegardes `.BAK` et doublons.
 - `MWROSTER` : modèle de fichier de sauvegarde (liste des élèves).
 - autres fichiers à la racine du CD : non utilisés par la réimplémentation.
@@ -64,4 +63,4 @@ Le CD complet est extrait dans `archives/mathemagique/cd/` (non versionné).
 bash scripts/mathemagique-extract.sh [archive.zip]
 ```
 
-Archive par défaut : `archives/mathemagique/Math-Workshop_Win_EN_ISO-Version.zip` (non versionnée). Outils requis : `unzip`, `ffmpeg`, `python3`.
+Archive par défaut : `archives/mathemagique/Math-Workshop_Win_EN_ISO-Version.zip` (non versionnée). Outils requis : `unzip`, `python3`.

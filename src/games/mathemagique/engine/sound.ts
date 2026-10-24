@@ -9,10 +9,13 @@
  *  - `ambient: true` : le son n'est joué que si la préférence « Ambient Sounds » est active (`ambientEnabled`) ;
  *  - `preload` / `release` : préchargement par liste (`SNDL`) ; la conversion en flottants est faite une fois par archive (`pcm.ts`) ;
  *  - MIDI : une musique à la fois, bouclée si demandé (repères `setup end` / `loop end`) ; le séquenceur est avancé par `tick()`.
+ *    Un seul séquenceur pour toute la scène : `playSong` sert aux scènes qui ont besoin d'options de lecture propres (réécriture, repères,
+ *    tempo : Rhythm Shop) ; il suit les mêmes règles que `playMusic` (remplace la musique, `stopMusic` / `releaseAll` / `stopAmbient`,
+ *    reprise quand le synthétiseur devient prêt).
  * Rien n'utilise de minuteur : le moteur appelle `tick()` à chaque tick (voir `installServices`).
  */
 import { loadPcm } from "../audio/pcm";
-import { MidiPlayer, parsePrograms, parseSysx, type ProgramEntry } from "../audio/sequencer";
+import { MidiPlayer, parsePrograms, parseSysx, type PlayOptions, type ProgramEntry } from "../audio/sequencer";
 import { parseSong, type Song } from "../audio/smf";
 import type { AudioSink, WaveHandle } from "../audio/sink";
 import { isMidi, parseMidi } from "../data/midi";
@@ -36,6 +39,14 @@ export interface PlaySoundOptions {
   ambient?: boolean;
   /** MIDI : rappel de fin (non bouclé, pas après `stop`). */
   onEnd?: () => void;
+}
+
+/**
+ * Options de `playSong` : celles de `MidiPlayer.play` (`loop`, `rewrite`, `bpm`, `programs`, `onMarker`, `onEnd`, repères de boucle) et `ambient`.
+ */
+export interface PlaySongOptions extends PlayOptions {
+  /** Joué seulement si « Ambient Sounds » est actif. */
+  ambient?: boolean;
 }
 
 /** Son lancé. Pour un MIDI, `wave` vaut -1. */
@@ -85,7 +96,7 @@ export class SoundService {
   private readonly waves = new Set<SoundHandle>();
   private voice: SoundHandle | null = null;
   private music: SoundHandle | null = null;
-  private musicRequest: { archive: WaveArchive; id: number; options: PlaySoundOptions } | null = null;
+  private musicRequest: { song: Song; options: PlaySongOptions } | null = null;
   private readonly preloads = new Set<PreloadSet>();
 
   constructor(
@@ -141,11 +152,28 @@ export class SoundService {
   playMusic(archive: WaveArchive, id: number, options: PlaySoundOptions = {}): SoundHandle | null {
     if (options.ambient && !this.ambientEnabled()) return null;
     const { song, programs } = loadSong(archive.mohawk, id);
+    return this.start(id, song, { loop: options.loop ?? false, programs, ambient: options.ambient, onEnd: options.onEnd });
+  }
+
+  /**
+   * Joue un morceau déjà décodé avec les options du séquenceur (réécriture, tempo, repères `onMarker`, `onEnd`, boucle). Même séquenceur et
+   * mêmes règles que `playMusic` : remplace la musique en cours, coupé par `stop` / `stopMusic` / `releaseAll` (et `stopAmbient` si `ambient`),
+   * avancé par `tick()`. Renvoie `null` si `ambient` est demandé alors que la préférence est coupée.
+   *
+   * `restartMusic` rejoue aussi ce morceau avec les mêmes options (donc la même réécriture) quand le synthétiseur devient prêt : les repères
+   * déjà passés sont signalés de nouveau et `onEnd` n'arrive qu'une fois, à la fin de la lecture rejouée.
+   */
+  playSong(song: Song, options: PlaySongOptions = {}): SoundHandle | null {
+    if (options.ambient && !this.ambientEnabled()) return null;
+    return this.start(-1, song, options);
+  }
+
+  private start(id: number, song: Song, options: PlaySongOptions): SoundHandle {
     this.stopMusic();
     const handle: SoundHandle = { id, kind: "midi", channel: "effect", ambient: options.ambient ?? false, wave: -1, stopped: false };
     this.music = handle;
-    this.musicRequest = { archive, id, options };
-    this.startSequencer(handle, song, programs, options);
+    this.musicRequest = { song, options };
+    this.startSequencer(handle, song, options);
     return handle;
   }
 
@@ -157,14 +185,12 @@ export class SoundService {
     const request = this.musicRequest;
     const handle = this.music;
     if (!request || !handle || handle.stopped) return;
-    const { song, programs } = loadSong(request.archive.mohawk, request.id);
-    this.startSequencer(handle, song, programs, request.options);
+    this.startSequencer(handle, request.song, request.options);
   }
 
-  private startSequencer(handle: SoundHandle, song: Song, programs: ProgramEntry[], options: PlaySoundOptions): void {
+  private startSequencer(handle: SoundHandle, song: Song, options: PlaySongOptions): void {
     this.player.play(song, {
-      loop: options.loop ?? false,
-      programs,
+      ...options,
       onEnd: () => {
         handle.stopped = true;
         if (this.music === handle) {

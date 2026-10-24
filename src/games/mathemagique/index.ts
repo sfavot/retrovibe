@@ -9,6 +9,8 @@ import "./ui/style.css";
 const GAME_URL = `${import.meta.env.BASE_URL}mathemagique`;
 /** Jaquette : image de l'écran titre, générée par `scripts/mathemagique/cover.mts`. */
 const COVER_URL = `${GAME_URL}/COVER.png`;
+/** Manuel (page web), servi depuis `original/mathemagique/`. */
+const MANUAL_URL = `${GAME_URL}/MANUEL.html`;
 const COVER_SIZE: [number, number] = [576, 432];
 
 export const mathemagique: GameDefinition = {
@@ -27,7 +29,12 @@ export const mathemagique: GameDefinition = {
     play.addEventListener("click", () => {
       play.disabled = true;
       void import("./ui/app")
-        .then(({ mountApp }) => mountApp(container, { base: GAME_URL, backLabel: shared.backToGames }))
+        .then(({ mountApp }) =>
+          mountApp(container, {
+            base: GAME_URL,
+            backLabel: shared.backToGames,
+          }),
+        )
         .catch((error: unknown) => {
           console.error(error);
           play.disabled = false;
@@ -35,7 +42,37 @@ export const mathemagique: GameDefinition = {
         });
     });
     queueMicrotask(() => play.focus());
-    const picture = h("img", { class: "mw-title-picture", src: COVER_URL, alt: copy.coverAlt, width: COVER_SIZE[0], height: COVER_SIZE[1] });
-    container.replaceChildren(titleScreen(picture, h("h1", {}, copy.title), play, failure));
+    const picture = h("img", {
+      class: "mw-title-picture",
+      src: COVER_URL,
+      alt: copy.coverAlt,
+      width: COVER_SIZE[0],
+      height: COVER_SIZE[1],
+    });
+    container.replaceChildren(
+      titleScreen(
+        picture,
+        h("h1", {}, copy.title),
+        play,
+        failure,
+        h(
+          "a",
+          {
+            class: "button secondary",
+            href: MANUAL_URL,
+            target: "_blank",
+            rel: "noopener",
+          },
+          copy.manual,
+        ),
+        h("p", { class: "muted mw-title-note" }, copy.manualNote),
+        h("h2", { class: "mw-title-controls" }, copy.controlsTitle),
+        h(
+          "ul",
+          { class: "help-list" },
+          ...copy.controls.map((text) => h("li", {}, text)),
+        ),
+      ),
+    );
   },
 };

@@ -482,7 +482,7 @@ function fromBase64(text: string): Uint8Array {
   return bytes;
 }
 
-/** `missing` : rien en stockage ; `invalid` : contenu illisible (base64, taille ou version) — le stockage n'est pas touché tant qu'on n'appelle pas `save`. */
+/** `missing` : rien en stockage ; `invalid` : contenu illisible (base64, taille ou version) — le stockage n'est pas touché tant qu'on n'appelle pas `save` (qui en garde alors une copie de secours). */
 export type RosterLoadStatus = "ok" | "missing" | "invalid";
 
 export interface RosterLoad {
@@ -490,24 +490,70 @@ export interface RosterLoad {
   status: RosterLoadStatus;
 }
 
-/** Lit et écrit le roster dans le stockage de l'hôte. */
+/** Copie du contenu illisible, gardée avant le premier écrasement (une seule fois : jamais remplacée). */
+export const ROSTER_BACKUP_KEY = "retrovibe:mathemagique:roster.bak";
+
+function isReadable(text: string): boolean {
+  try {
+    Roster.decode(fromBase64(text));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Lit et écrit le roster dans le stockage de l'hôte.
+ *
+ * Sécurité des données : un contenu illisible (`invalid`) est copié sous `ROSTER_BACKUP_KEY` (si aucune copie n'existe) avant le premier
+ * écrasement, avec un avertissement en console. Entre deux onglets, `save` relit le stockage : si le contenu n'est plus celui vu au
+ * dernier `load` / `save`, l'autre écriture est écrasée (pas de fusion : limite connue, dernière écriture gagnante) avec un avertissement.
+ */
 export class RosterStore {
+  /** Contenu brut vu au dernier `load` / `save` réussi ; `null` = rien en stockage. */
+  private lastRaw: string | null = null;
+  /** Le dernier `load` a rendu un contenu illisible, pas encore sauvegardé. */
+  private unreadablePending = false;
+
   constructor(private readonly storage: HostStorage) {}
 
   /** Roster enregistré ; roster neuf (non enregistré) si `missing` ou `invalid`. */
   load(): RosterLoad {
     const text = this.storage.get(ROSTER_STORAGE_KEY);
+    this.lastRaw = text;
+    this.unreadablePending = false;
     if (text === null) return { roster: Roster.createEmpty(), status: "missing" };
     try {
       return { roster: Roster.decode(fromBase64(text)), status: "ok" };
     } catch {
+      this.unreadablePending = true;
       return { roster: Roster.createEmpty(), status: "invalid" };
     }
   }
 
   /** Renvoie faux si l'écriture a échoué (quota, mode privé). */
   save(roster: Roster): boolean {
-    return this.storage.set(ROSTER_STORAGE_KEY, toBase64(roster.encode()));
+    const current = this.storage.get(ROSTER_STORAGE_KEY);
+    if (current !== null && (this.unreadablePending || current !== this.lastRaw)) {
+      if (current !== this.lastRaw) console.warn("Math Workshop : les joueurs ont été modifiés dans un autre onglet ; cette écriture les remplace (pas de fusion).");
+      if (!isReadable(current)) this.backUp(current);
+    }
+    const text = toBase64(roster.encode());
+    const ok = this.storage.set(ROSTER_STORAGE_KEY, text);
+    if (ok) {
+      this.lastRaw = text;
+      this.unreadablePending = false;
+    }
+    return ok;
+  }
+
+  private backUp(raw: string): void {
+    if (this.storage.get(ROSTER_BACKUP_KEY) !== null) {
+      console.warn("Math Workshop : les joueurs enregistrés sont illisibles ; une copie existe déjà, elle est conservée.");
+      return;
+    }
+    if (this.storage.set(ROSTER_BACKUP_KEY, raw)) console.warn(`Math Workshop : les joueurs enregistrés sont illisibles ; copie gardée sous « ${ROSTER_BACKUP_KEY} » avant écrasement.`);
+    else console.warn("Math Workshop : les joueurs enregistrés sont illisibles et la copie de secours a échoué (stockage plein ou indisponible) ; ils vont être écrasés.");
   }
 
   clear(): void {
@@ -528,6 +574,7 @@ export class RosterState {
   saved = true;
   /** Contenu du stockage illisible au chargement : l'hôte peut le signaler avant d'écraser. */
   readonly loadStatus: RosterLoadStatus;
+  private warnedUnsaved = false;
 
   constructor(private readonly store: RosterStore) {
     const { roster, status } = store.load();
@@ -541,6 +588,10 @@ export class RosterState {
 
   save(): boolean {
     this.saved = this.store.save(this.roster);
+    if (!this.saved && !this.warnedUnsaved) {
+      this.warnedUnsaved = true;
+      console.warn("Math Workshop : les joueurs n'ont pas pu être enregistrés (stockage plein ou indisponible).");
+    }
     return this.saved;
   }
 }

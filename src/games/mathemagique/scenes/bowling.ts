@@ -662,7 +662,6 @@ export class BowlingScene implements Scene {
   // --- Partie ---
 
   private startGame(): void {
-    const { sound } = this.services;
     this.progress.startRound();
     this.mode = "playing";
     this.lastHalf = 0;
@@ -671,7 +670,11 @@ export class BowlingScene implements Scene {
     this.blit(TIME_BAR);
     this.syncGroups();
     this.nextQuestion();
-    sound.playSound(this.archive, this.musicId, { loop: true, ambient: true });
+    this.startMusic();
+  }
+
+  private startMusic(): void {
+    this.services.sound.playSound(this.archive, this.musicId, { loop: true, ambient: true });
   }
 
   /** `1010:3d9d` : arrête la partie, rend la barre pleine, vide la fenêtre et remet les cases au repos. */
@@ -938,7 +941,11 @@ export class BowlingScene implements Scene {
     this.syncGroups();
     this.composeAll();
     this.repaintAll();
-    if (result.ambientChanged && !this.ctx.roster.roster.ambient) this.services.sound.stopAmbient();
+    if (result.ambientChanged) {
+      // « Ambient Sounds » rallumé en cours de partie : la musique repart (comme le hub et Pattern Windows).
+      if (!this.ctx.roster.roster.ambient) this.services.sound.stopAmbient();
+      else if (this.mode === "playing" && !this.services.sound.musicPlaying) this.startMusic();
+    }
   }
 
   // --- Aide de Polly ---

@@ -10,7 +10,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | Indiana Jones and his Desktop Adventures | jouable |
 | Lost in Time (Coktel Vision, 1993) | jouable (en cours de validation) |
 | Le Téléportaschtroumpf (Infogrames Multimedia, 1995) | jouable (en cours de validation) |
-| Math Workshop / Mathémagique (Broderbund, 1994) | rétro-ingénierie en cours |
+| Math Workshop / Mathémagique (Broderbund, 1994) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -113,7 +113,9 @@ Avec `npm run dev` : `src/games/teleportaschtroumpf/ui/asset-viewer.html` est un
 
 ## Math Workshop (Mathémagique)
 
-*Math Workshop* (Broderbund, 1994, CD pour Windows 3.x ; *Mathémagique* en français). Le moteur (« Mohawk » de Broderbund) et ses activités sont compilés dans l'exécutable 16 bits `MATH` : ils sont reconstitués par rétro-ingénierie avec Ghidra. Les lecteurs de données sont faits, le jeu n'est pas encore jouable.
+*Math Workshop* (Broderbund, 1994, CD pour Windows 3.x ; *Mathémagique* en français). Le moteur (« Mohawk » de Broderbund) et ses activités sont compilés dans l'exécutable 16 bits `MATH` : ils sont reconstitués par rétro-ingénierie avec Ghidra. Les lecteurs de données et les activités sont faits : le jeu est jouable, en cours de validation.
+
+**Commandes** (aussi listées sur l'écran de présentation) : souris ou toucher pour tout ; Bowling, touches 1 à 4 ; Espace pour faire tourner la pièce (Hidden, Patterns, Sticklers) ; 1 à 9 ou Tab pour changer d'outil (Rhythm Shop) ; X couleur suivante, Z couleur précédente (Pattern Windows) ; Ctrl + clic sur Sign-in pour les préférences (appui long sur écran tactile) ; Ctrl + Q pour quitter. **Manuel** : `original/mathemagique/MANUEL.html`, lié depuis l'écran de présentation.
 
 ### Fichiers de données
 
@@ -129,7 +131,11 @@ Le MIDI est joué par `spessasynth_lib` avec la soundfont General MIDI *GeneralU
 
 ### Pages de développement
 
-Avec `npm run dev` : `src/games/mathemagique/ui/dev.html` lance le jeu seul, sans la page d'accueil (`__mw` expose `engine`, `host` et `services` dans la console ; pour l'instant, une scène provisoire affiche l'écran titre), et `src/games/mathemagique/ui/asset-viewer.html` est une visionneuse des ressources des archives Mohawk (images `SHAP` et `tBMP`, palettes, animations `\0SCR` avec leurs sons, `WAVE`, MIDI à télécharger, listes de chaînes).
+Avec `npm run dev` : `src/games/mathemagique/ui/dev.html` lance le jeu seul, sans la page d'accueil (`__mw` expose `engine`, `host` et `services` dans la console), et `src/games/mathemagique/ui/asset-viewer.html` est une visionneuse des ressources des archives Mohawk (images `SHAP` et `tBMP`, palettes, animations `\0SCR` avec leurs sons, `WAVE`, MIDI à télécharger, listes de chaînes).
+
+### Robot de partie
+
+`PLAY=1 npx vitest run test/mathemagique/playthrough` joue tout le jeu sans affichage (titre, hub, les 7 activités, Hall of Fame, préférences) et vérifie des invariants à chaque tick (`PLAY_SEEDS`, `PLAY_FROM`, `PLAY_ONLY`, `PLAY_DEBUG=1` ; voir `docs/mathemagique/playthrough.md`).
 
 ### Documentation
 

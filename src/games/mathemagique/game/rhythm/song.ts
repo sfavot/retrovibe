@@ -1,13 +1,14 @@
 /**
  * Musique du Rhythm Shop (rhythm.md §3) : options de lecture du `MidiPlayer`, routage des repères `Cue` en événements typés pour la scène, et
- * temps du jeu (minuterie de 4 ms). Pur : le séquenceur et son horloge viennent de l'appelant.
+ * temps du jeu (minuterie de 4 ms). Pur : le séquenceur (celui de `SoundService`, `playSong`) et son horloge viennent de l'appelant.
  *
  * Le morceau ne dépend pas de la variante : les 4 variantes d'un morceau changent les outils, ni le motif ni la musique. Seuls les emplacements
  * remplis du Pattern Bin comptent (`rhythmRewrite`) : les autres sont muets, la mesure est jouée une fois.
  */
 import { rhythmRewrite } from "../../audio/rhythm-rewrite";
-import { type MidiPlayer, type PlayOptions, type ProgramEntry } from "../../audio/sequencer";
+import { type PlayOptions, type ProgramEntry } from "../../audio/sequencer";
 import { type MarkerEvent, type Song, bpmOf, initialMicrosPerQuarter } from "../../audio/smf";
+import { type PlaySongOptions } from "../../engine/sound";
 import { MEASURE } from "./pieces";
 import { filledSlots, isPatternComplete } from "./logic";
 
@@ -73,7 +74,7 @@ export interface RhythmPlayRequest {
   bpm?: number;
 }
 
-/** Options de `MidiPlayer.play` : réécriture (une mesure, emplacements vides muets), tempo entier, routage des repères. */
+/** Options de lecture (`MidiPlayer.play` via `SoundService.playSong`) : réécriture (une mesure, emplacements vides muets), tempo entier, routage des repères. */
 export function rhythmPlayOptions(song: Song, request: RhythmPlayRequest): PlayOptions {
   const options: PlayOptions = {
     rewrite: rhythmRewrite(filledSlots(request.pattern)),
@@ -89,9 +90,17 @@ export function rhythmPlayOptions(song: Song, request: RhythmPlayRequest): PlayO
   return options;
 }
 
-/** Joue le morceau avec le motif donné. Renvoie `true` si le motif est complet (la scène fait alors danser Algebird sur les repères). */
-export function playRhythmSong(player: MidiPlayer, song: Song, request: RhythmPlayRequest): boolean {
-  player.play(song, rhythmPlayOptions(song, request));
+/** Ce dont `playRhythmSong` a besoin du séquenceur : `SoundService.playSong` (un seul séquenceur, celui du son de la scène). */
+export interface RhythmSongPlayer {
+  playSong(song: Song, options?: PlaySongOptions): unknown;
+}
+
+/**
+ * Joue le morceau avec le motif donné sur le séquenceur du `SoundService` (la musique en cours est remplacée). Renvoie `true` si le motif est
+ * complet (la scène fait alors danser Algebird sur les repères).
+ */
+export function playRhythmSong(player: RhythmSongPlayer, song: Song, request: RhythmPlayRequest): boolean {
+  player.playSong(song, rhythmPlayOptions(song, request));
   return isPatternComplete(request.pattern);
 }
 

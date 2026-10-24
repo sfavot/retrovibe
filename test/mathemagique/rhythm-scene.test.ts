@@ -37,6 +37,7 @@ async function boot(options: { drag?: boolean } = {}) {
   const api = {
     host,
     engine,
+    services,
     playerId: added.id,
     get scene() {
       return scene;
@@ -134,6 +135,8 @@ describe.skipIf(!hasOriginalFiles)("Rhythm Shop : scène (vraies données)", () 
       expect(api.scene.inspect().state).toBe("playing");
       expect(api.scene.inspect().dancing).toBe(true);
       await api.until(() => midiNoteOns(api) > 0);
+      // Un seul séquenceur : la lecture passe par le SoundService (poignée de musique), pas par un lecteur propre à la scène.
+      expect(api.services.sound.musicPlaying).toBe(true);
       expect(api.engine.ctx.roster.roster.getVar(api.playerId, "rhythmVariant", 0)).toBe(1);
       await api.until(() => api.scene.inspect().state === "finale");
       expect(api.scene.inspect().reaction).not.toBeNull();
@@ -144,6 +147,28 @@ describe.skipIf(!hasOriginalFiles)("Rhythm Shop : scène (vraies données)", () 
       expect(api.scene.inspect().variant).toBe(1);
     }, 60_000);
   }
+
+  it("un clic pendant Play Pattern coupe la musique du SoundService", async () => {
+    const api = await boot();
+    await api.idle();
+    await solveFanfare(api, false);
+    await api.until(() => api.services.sound.musicPlaying);
+    await api.run(300);
+    await api.click(300, 100);
+    await api.until(() => !api.services.sound.musicPlaying);
+    expect(api.services.sound.musicPlaying).toBe(false);
+  }, 60_000);
+
+  it("pendant Play Pattern, Ctrl+touche ne coupe pas le morceau (il revient au moteur, ex. Ctrl+Q)", async () => {
+    const api = await boot();
+    await api.idle();
+    await solveFanfare(api, false);
+    await api.until(() => api.services.sound.musicPlaying);
+    await api.run(300);
+    api.host.press("KeyA", { ctrl: true, key: "a" });
+    await api.run(100);
+    expect(api.scene.inspect().state).toBe("playing");
+  }, 60_000);
 
   it("dépôt erroné : refusé sans réaction ; Cutter avec deux pièces : réplique d'Algebird du type 5", async () => {
     const api = await boot();

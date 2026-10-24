@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Math Workshop (Mathémagique) : manuel</title>
+<meta name="description" content="Manuel en français de Math Workshop (Mathémagique), le jeu éducatif de Broderbund (1994) : démarrer, la salle de contrôle, les sept activités, les commandes.">
+<style>
+:root {
+  --bg: #fbf8f1;
+  --surface: #ffffff;
+  --text: #2b2433;
+  --muted: #5e566a;
+  --accent: #b03a8c;
+  --accent-ink: #ffffff;
+  --accent-soft: #f6e4f0;
+  --line: #e3dccd;
+  --code-bg: #efe9dc;
+  --shadow: 0 1px 3px rgba(43, 36, 51, 0.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17131d;
+    --surface: #211c2a;
+    --text: #ece7f3;
+    --muted: #b0a7bf;
+    --accent: #e48ccb;
+    --accent-ink: #17131d;
+    --accent-soft: #35223a;
+    --line: #3a3347;
+    --code-bg: #2c2538;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 1rem; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 1rem/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 0.4rem;
+  z-index: 10;
+}
+.skip:focus { top: 0.5rem; }
+a { color: var(--accent); text-underline-offset: 0.15em; }
+a:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+.top, main, footer {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.top { padding-top: 2rem; padding-bottom: 0.5rem; }
+.kicker {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 { margin: 0.1rem 0 0; font-size: clamp(1.8rem, 6vw, 2.5rem); line-height: 1.15; }
+.sub { margin: 0.2rem 0 1.2rem; font-size: 1.15rem; color: var(--muted); }
+nav ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+nav a {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  background: var(--accent-soft);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  text-decoration: none;
+  color: var(--text);
+}
+nav a:hover { background: var(--accent); color: var(--accent-ink); }
+main { padding-top: 1rem; padding-bottom: 2rem; }
+h2 {
+  margin: 2.6rem 0 0.8rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--line);
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+h3 { margin: 1.6rem 0 0.5rem; font-size: 1.15rem; }
+p, ul, ol, table, figure, details { margin: 0 0 1rem; }
+ul, ol { padding-left: 1.4rem; }
+li { margin: 0.25rem 0; }
+li > ul, li > ol { margin: 0.25rem 0 0.25rem; }
+.goal {
+  padding: 0.7rem 1rem;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+figure { text-align: center; }
+figure img, .poly-wrap img { display: block; margin: 0 auto; }
+figure img {
+  width: 100%;
+  max-width: 576px;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow);
+  background: var(--surface);
+}
+figcaption { margin-top: 0.4rem; font-size: 0.9rem; color: var(--muted); }
+.poly-wrap { margin: 0 0 0.5rem; text-align: center; }
+.poly { width: 132px; height: auto; }
+@media (min-width: 36rem) {
+  .poly-wrap { float: right; margin: 0 0 0.5rem 1.2rem; }
+  .poly { width: 150px; }
+}
+.ranks { columns: 12rem; column-gap: 1.5rem; }
+.ranks li { break-inside: avoid; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: var(--surface); }
+th, td { padding: 0.5rem 0.7rem; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { background: var(--accent-soft); }
+code { padding: 0.05em 0.3em; background: var(--code-bg); border-radius: 0.25rem; font-size: 0.92em; }
+details { padding: 0.6rem 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: 0.5rem; }
+summary { cursor: pointer; font-weight: 600; }
+details p { margin: 0.6rem 0 0; }
+footer {
+  padding-top: 1rem;
+  padding-bottom: 2.5rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+h2::after { content: ""; display: block; clear: both; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media print { nav, .skip { display: none; } body { background: #fff; color: #000; } }
+
+</style>
+</head>
+<body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="top">
+<p class="kicker">Broderbund, 1994</p>
+<h1>Math Workshop (Mathémagique)</h1>
+<p class="sub">Manuel en français</p>
+<nav aria-label="Sommaire"><ol><li><a href="#presentation">Présentation</a></li><li><a href="#demarrer">Démarrer</a></li><li><a href="#la-salle-de-controle-control-room">La salle de contrôle (Control Room)</a></li><li><a href="#bowling-for-numbers">Bowling for Numbers</a></li><li><a href="#rhythm-shop">Rhythm Shop</a></li><li><a href="#pattern-windows">Pattern Windows</a></li><li><a href="#hidden-picture-puzzles">Hidden Picture Puzzles</a></li><li><a href="#puzzle-patterns">Puzzle Patterns</a></li><li><a href="#super-sticklers">Super Sticklers</a></li><li><a href="#rockets">Rockets</a></li><li><a href="#hall-of-fame-et-certificats">Hall of Fame et certificats</a></li><li><a href="#commandes">Commandes</a></li><li><a href="#sur-mobile">Sur mobile</a></li><li><a href="#la-version-de-1994-et-celle-de-1997">La version de 1994 et celle de 1997</a></li><li><a href="#credits-et-mentions">Crédits et mentions</a></li></ol></nav>
+</header>
+<main id="contenu">
+<p><em>Le texte du jeu et les voix sont en anglais : les noms des boutons, des activités et des personnages restent ceux qui s'affichent à l'écran.</em></p>
+<h2 id="presentation">Présentation</h2>
+<p><strong>Math Workshop</strong> (affiché « Math Workshop (Mathémagique) ») est un jeu éducatif de maths pour enfants, édité par Broderbund en 1994 sur CD-ROM pour Windows. Cette page décrit la version anglaise, jouée ici dans le navigateur.</p>
+<p>Vous êtes chez <strong>Poly Gonzales</strong>, qui dirige l'atelier. Dans sa salle de contrôle, chaque objet du décor ouvre une activité :</p>
+<ul><li>un bowling où un gorille, <strong>Gus</strong>, lance ses boules quand on répond juste (calcul, fractions, estimation) ;</li><li>une boutique de rythmes où l'on découpe des fractions de mesure pour reconstituer des morceaux, devant <strong>Algebird</strong>, un oiseau qui danse ;</li><li>un vitrail à peindre, avec dix motifs ;</li><li>trois sortes de puzzles : des photos cachées, des tableaux à motifs et des dessins faits de traits ;</li><li>un jeu de fusées, où l'on affronte Poly au jeu de Nim.</li></ul>
+<p>On y travaille, sans le dire, les opérations, les fractions, l'estimation, les motifs, l'orientation dans l'espace et la logique. Il n'y a pas de « game over » : on peut recommencer autant de fois qu'on veut.</p>
+<figure><img src="COVER.png" alt="L&#x27;écran titre : la façade de Math Workshop, avec sa porte." width="576" height="432" loading="lazy"><figcaption>L'écran titre.</figcaption></figure>
+<h2 id="demarrer">Démarrer</h2>
+<h3>L'écran titre</h3>
+<p>Au premier lancement, le logo « Brøderbund présente » s'affiche d'abord (un clic ou une touche le passe). Puis l'écran titre : <strong>cliquez sur la porte</strong> pour entrer. Si vous ne faites rien, la porte s'ouvre toute seule à la fin de la musique. L'horloge de la façade indique l'heure de votre ordinateur.</p>
+<p>La plaque en bas à gauche ouvre les <strong>crédits</strong> ; le bouton EXIT y ramène à l'écran titre.</p>
+<h3>Se connecter</h3>
+<p>En entrant, Poly vous accueille et le <strong>moniteur de connexion</strong> monte devant vous. C'est lui qui retient qui joue : les niveaux réussis au bowling, les vitraux peints et les morceaux du Rhythm Shop sont gardés par joueur.</p>
+<figure><img src="manuel/connexion.png" alt="Le moniteur de connexion, avec la liste des joueurs." width="576" height="432" loading="lazy"><figcaption>Le moniteur de connexion : trois noms visibles, des flèches pour parcourir la liste, New Player et OK.</figcaption></figure>
+<ul><li><strong>Nouveau joueur</strong> : cliquez sur <strong>New Player</strong> (si la liste est vide, la saisie commence directement), tapez le prénom (28 caractères au plus, accents acceptés) puis cliquez sur <strong>OK</strong> ou appuyez sur Entrée. Un prénom déjà pris est refusé.</li><li><strong>Joueur existant</strong> : parcourez la liste avec les flèches, cliquez sur le nom (ou double-cliquez), puis <strong>OK</strong>. Les noms sont rangés par ordre alphabétique.</li><li><strong>Changer de joueur en cours de route</strong> : bouton <strong>Sign-in</strong> (le crayon) sur le pupitre de Poly, ou clic sur l'étiquette du nom dans le Bowling et dans Pattern Windows.</li></ul>
+<p>Sans joueur connecté, un clic sur une activité fait demander à Poly de se connecter d'abord.</p>
+<p>Les joueurs (40 au plus) et leurs progrès sont enregistrés <strong>dans le navigateur de cet appareil</strong> : ils ne suivent pas d'un appareil, ni d'un navigateur, à l'autre, et disparaissent si vous effacez les données du site.</p>
+<h3>Les préférences</h3>
+<p>Elles ne sont pas affichées par un bouton : <strong>Ctrl + clic sur Sign-in</strong> (sur écran tactile, un appui long, voir « Sur mobile »).</p>
+<figure><img src="manuel/preferences.png" alt="Le moniteur en mode préférences." width="576" height="432" loading="lazy"><figcaption>Les préférences : Ambient Sounds, Click &amp; Stick Mouse, Bowling Timer et le bouton Roster.</figcaption></figure>
+<ul><li><strong>Ambient Sounds</strong> : la musique de fond et les bavardages de Poly dans l'atelier (ON / OFF). Les bruitages et les voix des activités ne sont pas concernés.</li><li><strong>Click &amp; Stick Mouse</strong> : pour déplacer une pièce, on <strong>clique pour la prendre, puis on clique pour la poser</strong> (réglage d'origine, plus simple pour les petites mains). Désactivé, il faut <strong>glisser</strong> la pièce en gardant le bouton enfoncé.</li><li><strong>Bowling Timer</strong> : le temps donné, en secondes, pour réussir une série au Bowling, de 1 à 999 (180 par défaut). Une valeur hors de cette plage est ignorée.</li><li><strong>Roster</strong> : la liste des joueurs. Elle permet d'en ajouter (<strong>Add</strong>) ou de supprimer le joueur sélectionné (<strong>Delete</strong>) ; <strong>Preferences</strong> revient aux réglages.</li></ul>
+<p>Les réglages sont communs à tous les joueurs de l'appareil.</p>
+<h2 id="la-salle-de-controle-control-room">La salle de contrôle (Control Room)</h2>
+<p>C'est l'écran d'accueil de l'atelier. <strong>Cliquez sur un objet du décor</strong> pour lancer l'activité correspondante.</p>
+<figure><img src="manuel/hub.png" alt="La salle de contrôle, avec Poly à son pupitre." width="576" height="432" loading="lazy"><figcaption>La salle de contrôle.</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th scope="col">Objet</th><th scope="col">Activité</th></tr></thead><tbody><tr><td>Le rideau en forme de gueule rouge, aux quilles</td><td><strong>Bowling for Numbers</strong></td></tr><tr><td>Le trou dans le mur, avec un engrenage et une note de musique</td><td><strong>Rhythm Shop</strong></td></tr><tr><td>La verrière en vitrail, au plafond</td><td><strong>Pattern Windows</strong></td></tr><tr><td>La télévision</td><td><strong>Hidden Picture Puzzles</strong></td></tr><tr><td>Le cadre au papillon</td><td><strong>Puzzle Patterns</strong></td></tr><tr><td>Le chevalet, à gauche</td><td><strong>Super Sticklers</strong></td></tr><tr><td>L'étagère aux fusées, à droite</td><td><strong>Rockets</strong></td></tr></tbody></table></div>
+<p class="poly-wrap"><img src="manuel/poly.png" alt="Poly Gonzales." width="176" height="189" loading="lazy" class="poly"></p>
+<p><strong>Poly</strong> est la jeune responsable de l'atelier. <strong>Cliquer sur elle</strong> lance une <em>Math Trivia</em> : un petit dessin humoristique sur un fait mathématique, avec son histoire racontée par Poly (19 au total, sans répétition tant qu'elles n'ont pas toutes été vues). Un clic sur l'image ou sur Poly la raconte à nouveau ; <strong>OK</strong> referme le moniteur.</p>
+<p>Le <strong>pupitre</strong> de Poly porte trois boutons :</p>
+<ul><li><strong>Quit</strong> (rouge) : un sifflet apparaît ; cliquez dessus pour quitter et retourner à l'accueil du site, ou cliquez ailleurs pour rester. Ctrl + Q quitte directement ;</li><li><strong>Help</strong> (le visage souriant) : Poly vient expliquer. Cliquez ensuite sur n'importe quel objet pour entendre ce qu'il fait ; un clic pendant une explication l'interrompt ; cliquez sur <strong>Poly</strong> pour quitter l'aide. La première fois, Poly explique d'elle-même tout le fonctionnement ;</li><li><strong>Sign-in</strong> (le crayon) : changer de joueur (avec Ctrl, les préférences).</li></ul>
+<p>D'autres éléments du décor réagissent au clic, simplement pour le plaisir : les fenêtres, la rampe de l'escalier et les leviers du pupitre (qui figent ou relancent certaines animations).</p>
+<p>Dans toutes les activités, <strong>Exit</strong> (rouge) ramène à la salle de contrôle et <strong>Help</strong> (un visage souriant) fait venir Poly, qui explique chaque élément de l'écran quand on clique dessus. Un clic sur Poly, ou sur la main « stop », referme l'aide.</p>
+<h2 id="bowling-for-numbers">Bowling for Numbers</h2>
+<p class="goal"><strong>But</strong> : répondre juste à dix questions pour que Gus lance un <strong>strike</strong>, puis réussir dix strikes pour finir un niveau.</p>
+<figure><img src="manuel/bowling.png" alt="Bowling for Numbers : une addition, quatre réponses possibles et Gus au bout de la piste." width="576" height="432" loading="lazy"><figcaption>Le Bowling : la question, les quatre réponses, la barre de temps, les niveaux, votre nom et votre rang.</figcaption></figure>
+<p><strong>Comment jouer</strong></p>
+<ol><li>Choisissez le <strong>type de questions</strong> avec les six boutons de gauche :<ul><li><strong>+ − × ÷</strong> : addition, soustraction, multiplication, division ;</li><li><strong>=</strong> : fractions équivalentes (on reconnaît la même quantité sous des dessins différents) ;</li><li><strong>≈</strong> : estimation (« About how many… ? », par exemple combien de <em>pinheads</em> de large mesure un <em>toothpick</em>).</li></ul></li><li>Choisissez un <strong>niveau</strong>, de <strong>1</strong> à <strong>4</strong>, ou <strong>BONUS</strong>. Le bonus ne s'ouvre pour un type de questions qu'une fois ses quatre niveaux réussis.</li><li>Cliquez sur <strong>GO!</strong>. Le bouton devient <strong>STOP</strong> (pour arrêter la partie).</li><li>Une question s'affiche, avec <strong>quatre réponses</strong> : cliquez sur la bonne, ou appuyez sur <strong>1, 2, 3 ou 4</strong>.</li><li><strong>Dix bonnes réponses</strong> (pas forcément de suite) font un <strong>strike</strong> : Gus lance sa boule et un témoin s'allume en haut de la machine (le « Strike Zone »). <strong>Dix strikes</strong> terminent le niveau : un ruban est gagné et le rang monte.</li></ol>
+<p><strong>À savoir</strong></p>
+<ul><li>La <strong>barre de temps</strong> montre le temps qu'il reste pour donner les dix réponses de la série en cours (180 secondes, réglable dans les préférences). Quand il est écoulé, Gus est déçu mais <strong>les strikes déjà obtenus sont conservés</strong>.</li><li>Une <strong>mauvaise réponse</strong> ne coûte rien : la bonne réponse est montrée, puis une nouvelle question arrive. Une question ratée peut revenir un peu plus tard.</li><li>Dans un même niveau, les questions se corsent peu à peu au fil des strikes.</li><li>Le jeu retient, pour chaque type de questions, le niveau en cours et les strikes obtenus.</li><li>Cliquez sur l'étiquette du nom pour changer de joueur, sur Gus pour le voir réagir, et sur le <strong>trophée</strong> pour voir le Hall of Fame.</li></ul>
+<p><strong>Les rangs.</strong> Votre rang, affiché sous votre nom, monte d'un cran à chaque niveau terminé (de 1 à 4, pour chacun des six types de questions ; le bonus ne compte pas). Il y a <strong>25 rangs</strong> :</p>
+<ol class="ranks"><li>Rookie Roller</li><li>Ball Polisher</li><li>Twinkle Toes</li><li>Gutter Nut</li><li>Cereal Bowler</li><li>Lane Brain</li><li>Alley Duster</li><li>Toe Jammer</li><li>Spare Ribber</li><li>Pin Pal</li><li>Spare Splitter</li><li>Alley Cat</li><li>Bowl Fighter</li><li>Slammin' Slider</li><li>Bowlmeister</li><li>Side Splitter</li><li>Steam Roller</li><li>Alley Rapper</li><li>King Pin</li><li>Strikenator</li><li>Super Bowler</li><li>Pin Crusher</li><li>Star Shooter</li><li>Pin Wizard</li><li>Strike Master</li></ol>
+<p><strong>Pour l'estimation (≈).</strong> Les questions portent sur des longueurs, des durées et des poids, avec des unités parfois cocasses (des <em>pinheads</em>, des <em>sugar cubes</em>, des <em>cans of soda</em>, des <em>cats</em>…). Quelques repères utiles : 1 inch = 2,54 cm ; 1 foot = 12 inches ; 1 yard = 3 feet ; 1 ounce ≈ 28 g ; 1 pound = 16 ounces ; 1 kilogram ≈ 2,2 pounds ; 1 minute = 60 secondes ; 1 hour = 3 600 secondes ; 1 day = 86 400 secondes ; 1 month ≈ 30,4 jours ; 1 year = 365 jours dans le jeu.</p>
+<p><em>Il n'y a ni série personnalisée (Custom Play) ni suivi de pourcentages dans cette version : pour suivre les progrès, voir le Hall of Fame.</em></p>
+<h2 id="rhythm-shop">Rhythm Shop</h2>
+<p class="goal"><strong>But</strong> : reconstituer le rythme d'un morceau en fabriquant les bonnes <strong>fractions de mesure</strong>, pour faire danser <strong>Algebird</strong>.</p>
+<figure><img src="manuel/rhythm-shop.png" alt="Le Rhythm Shop : la machine Fractionaire 2000, avec Algebird en bas à gauche." width="576" height="432" loading="lazy"><figcaption>Le Rhythm Shop : le Teletune (en haut à gauche), les trois outils, le Fractionator, le Parts Bin (la barre entière) et le Pattern Bin (le motif à remplir).</figcaption></figure>
+<p><strong>Comment jouer</strong></p>
+<ol><li>Choisissez un niveau avec les trois <strong>visages</strong> (Level Brothers), puis un morceau avec les <strong>flèches</strong> du <strong>Teletune</strong>, l'écran en haut à gauche. Il affiche le nom du morceau et sa « recette », par exemple <em>Fanfare (2) 1/2 bars</em> : deux moitiés de mesure. Il y a <strong>45 morceaux</strong>, 15 par niveau.</li><li>Le <strong>Pattern Bin</strong> (le bac du bas) montre les emplacements à remplir, avec leur taille. Le <strong>Parts Bin</strong> (juste au-dessus) contient au départ la barre entière, <strong>1/1</strong>.</li><li>Prenez une pièce et déposez-la dans le <strong>Fractionator</strong>, la zone du milieu, où se font les transformations.</li><li>Choisissez un <strong>outil</strong> (voir ci-dessous) puis cliquez sur <strong>DO IT!</strong> (le bouton clignote quand l'opération est possible).</li><li>Glissez les pièces obtenues dans les emplacements du Pattern Bin, dans le bon ordre. Une pièce déjà posée peut être reprise.</li><li>Quand tous les emplacements sont remplis, la machine joue le morceau en entier, Algebird danse et une petite animation de félicitations suit. La prochaine fois, le même morceau revient avec le même motif, mais d'<strong>autres réglages d'outils</strong> à utiliser.</li></ol>
+<p><strong>Les trois outils</strong></p>
+<ul><li><strong>Cutter</strong> coupe une pièce en parts égales (le réglage donne le nombre de parts : 2, 3, 4…). Il n'y a qu'une pièce à la fois dans le Fractionator. Impossible de couper en parts plus petites que 1/16, ni en parts qui ne tombent pas juste.</li><li><strong>Gluer</strong> colle plusieurs pièces <strong>de même taille</strong> en une seule plus grande.</li><li><strong>Melder</strong> (« fusionner ») réunit des pièces <strong>de tailles différentes</strong> en une seule de la taille indiquée : par exemple 1/4 + 1/8 donnent 3/8.</li></ul>
+<p><strong>Les autres boutons</strong></p>
+<ul><li><strong>UNDO</strong> annule la dernière opération tant que les pièces sont dans le Fractionator ; <strong>EMPTY</strong> renvoie toutes les pièces du Fractionator dans le Parts Bin.</li><li>Les deux boutons ▶ (<strong>Play Parts</strong>, <strong>Play Pattern</strong>) font écouter : le premier le rythme des pièces du Parts Bin, le second le morceau avec les emplacements déjà remplis. Algebird ne danse que si le motif est complet.</li><li>Si une opération est impossible, <strong>Algebird</strong> vous le fait comprendre par une petite réplique. Cliquez sur lui pour le voir réagir.</li></ul>
+<p>Il n'y a ni score ni limite de temps.</p>
+<h2 id="pattern-windows">Pattern Windows</h2>
+<p class="goal"><strong>But</strong> : peindre à son goût un vitrail, avec <strong>dix motifs</strong> et <strong>15 couleurs</strong>.</p>
+<figure><img src="manuel/pattern-windows.png" alt="Pattern Windows : le vitrail du motif Checker, quelques bandes de couleur, la palette à droite." width="576" height="432" loading="lazy"><figcaption>Pattern Windows : le vitrail à gauche ; à droite la plaque dorée (nom, titre du motif et version), la palette et les boutons.</figcaption></figure>
+<p><strong>Comment jouer</strong></p>
+<ul><li>Cliquez sur une <strong>couleur</strong> de la palette, puis <strong>cliquez</strong> ou <strong>glissez</strong> dans le vitrail : chaque pièce touchée prend cette couleur. Cliquer de nouveau sur une pièce déjà de la couleur choisie l'efface (elle reprend sa couleur d'avant).</li><li>Les <strong>flèches</strong> de la plaque dorée changent de motif : <em>Checker, Triangles, Crosses, Stars, Links, Lace, Cubes, Turtle Shell, Hooks, Circles</em>.</li><li>Les <strong>numéros de version 1, 2 et 3</strong> permettent de garder jusqu'à <strong>trois peintures par motif</strong>, par joueur. Tout est enregistré automatiquement.</li><li>Sous la palette, de gauche à droite : <strong>Kaléidoscope</strong> (les couleurs défilent quelques secondes dans le vitrail), <strong>Faucet</strong> (le robinet : peint tout le vitrail de la couleur choisie ; avec le blanc, il efface tout) et <strong>Print</strong>. Au-dessus : <strong>Yuck!</strong> annule la dernière peinture (cliquez de nouveau pour la rétablir), <strong>Exit</strong> et <strong>Help</strong>.</li><li><strong>Print</strong> n'imprime pas : il <strong>télécharge une image PNG</strong> du vitrail.</li><li>Les touches <strong>x</strong> et <strong>z</strong> passent à la couleur suivante ou précédente.</li></ul>
+<p><strong>Idées de Poly</strong> : combien de formes différentes voyez-vous dans chaque fenêtre ? Combien faut-il de couleurs, au minimum, pour que deux pièces voisines n'aient jamais la même ? Peignez un motif qui se répète, puis lancez le Kaléidoscope !</p>
+<h2 id="hidden-picture-puzzles">Hidden Picture Puzzles</h2>
+<p class="goal"><strong>But</strong> : remplir exactement l'écran de la télévision avec des pièces, pour faire apparaître une photo cachée.</p>
+<figure><img src="manuel/hidden-menu.png" alt="Le menu de Hidden Picture Puzzles : neuf photos et les boutons de la télévision." width="576" height="432" loading="lazy"><figcaption>Le menu : neuf photos en noir et blanc, les trois visages de niveau, Help, Rotate, Reset et Exit.</figcaption></figure>
+<p><strong>Comment jouer</strong></p>
+<ol><li>Choisissez un niveau avec les <strong>visages</strong> (Level Brothers) : <strong>vert</strong> (écran de 4 × 4 carrés), <strong>orange</strong> (5 × 5) ou <strong>rouge</strong> (6 × 6). Cliquez ensuite sur une des <strong>neuf photos</strong>.</li><li>La télévision découpe l'écran en pièces de 1 à 7 carrés et les éparpille à droite.</li><li>Prenez une pièce, déplacez-la, <strong>tournez-la</strong> avec le bouton <strong>Rotate</strong> ou la touche <strong>Espace</strong> (quart de tour, dans le sens des aiguilles d'une montre) et posez-la sur l'écran. Proche de la grille, elle s'y <strong>aimante</strong>, à condition de ne pas en recouvrir une autre. Une pièce posée se reprend par un clic.</li><li>Chaque pièce posée révèle la partie de la photo qu'elle recouvre. Quand toutes sont en place, un petit air joue et la <strong>photo s'anime</strong>. Cliquez sur la télévision pour la revoir.</li></ol>
+<figure><img src="manuel/hidden-puzzle.png" alt="Un puzzle en cours : l&#x27;écran blanc de la télévision et les pièces éparpillées à droite." width="576" height="432" loading="lazy"><figcaption>Un puzzle commencé : les pièces sont à droite.</figcaption></figure>
+<p><strong>À savoir</strong></p>
+<ul><li>Rotate agit sur la dernière pièce prise, même lâchée.</li><li><strong>Reset</strong> éparpille de nouveau les pièces, avec le même découpage. En rechoisissant la même photo, le découpage change.</li><li>Chaque puzzle a plusieurs solutions. Il n'y a ni score ni minuteur.</li></ul>
+<h2 id="puzzle-patterns">Puzzle Patterns</h2>
+<p class="goal"><strong>But</strong> : reconstituer un tableau en plaçant huit pièces dans le cadre, en s'aidant du motif du cadre.</p>
+<figure><img src="manuel/puzzle-patterns.png" alt="Un puzzle en cours : trois pièces posées dans le cadre doré, les autres empilées à droite." width="576" height="432" loading="lazy"><figcaption>Puzzle Patterns : le cadre au centre, les pièces à droite, la barre de boutons en bas.</figcaption></figure>
+<p><strong>Comment jouer</strong></p>
+<ol><li>Choisissez un niveau avec les trois <strong>visages</strong> : trois menus de <strong>neuf tableaux</strong>, soit 27 puzzles, du plus simple (vert) au plus difficile (rouge). Cliquez sur un tableau.</li><li>Le cadre de 4 × 4 carrés reste vide, et les <strong>huit pièces rectangulaires</strong> (deux carrés chacune) sont empilées à droite, parfois la tête en bas.</li><li>Prenez une pièce, tournez-la au besoin (<strong>Rotate</strong> ou <strong>Espace</strong>) et déposez-la dans le cadre, où elle s'aimante.</li><li>Le puzzle est réussi quand les huit pièces sont à leur place, dans le bon sens : le tableau <strong>s'anime</strong> (cliquez dessus pour le revoir).</li></ol>
+<p><strong>Le cadre est un indice</strong> : son motif se répète dans l'image. Regardez-le bien avant de commencer. Triez les pièces par couleur ou par sens, remettez les personnages à l'endroit, et appariez les bords entre eux.</p>
+<p>Les boutons : <strong>Exit</strong>, <strong>Reset</strong> (mélange de nouveau les pièces du même puzzle), les trois niveaux, <strong>Help</strong> (Poly) et <strong>Rotate</strong>. Il n'y a ni score ni minuteur.</p>
+<h2 id="super-sticklers">Super Sticklers</h2>
+<p class="goal"><strong>But</strong> : recoller des <strong>traits</strong> pour refaire un dessin, qui s'anime une fois terminé.</p>
+<figure><img src="manuel/super-sticklers.png" alt="Super Sticklers : un ballon dessiné en blanc sur le chevalet et les traits noirs à placer." width="576" height="432" loading="lazy"><figcaption>Super Sticklers (niveau vert) : le chevalet à gauche, les traits à droite.</figcaption></figure>
+<p><strong>Comment jouer</strong></p>
+<ol><li>Choisissez un niveau avec les <strong>visages</strong>, puis un dessin parmi les <strong>neuf</strong> du menu (27 en tout).</li><li>Les <strong>traits</strong> (<em>Sticky Lines</em>) sont éparpillés à droite. Prenez-en un, tournez-le au besoin (<strong>Rotate</strong> ou <strong>Espace</strong>) et posez-le sur le chevalet, sur le dessin à refaire. Un trait bien placé et bien orienté se <strong>colle</strong> de lui-même.</li><li>Quand tous les traits sont collés, le dessin s'anime (cliquez sur le chevalet pour le revoir).</li></ol>
+<p><strong>Les niveaux changent l'aide donnée :</strong></p>
+<ul><li><strong>Vert</strong> : le dessin est tracé en blanc sur le chevalet ; il suffit de le recouvrir ;</li><li><strong>Orange</strong> : la moitié du dessin est déjà tracée en noir ; le reste n'apparaît qu'en silhouette ;</li><li><strong>Rouge</strong> : on ne voit que la silhouette, avec une <strong>petite image du dessin terminé</strong> en haut à droite, pour s'y référer.</li></ul>
+<p><strong>Reset</strong> remet tous les traits en vrac. Il n'y a ni score ni minuteur.</p>
+<h2 id="rockets">Rockets</h2>
+<p class="goal"><strong>But</strong> : lancer <strong>la dernière fusée</strong>. C'est un jeu de <strong>Nim</strong> contre Poly (ou contre un ami).</p>
+<figure><img src="manuel/rockets.png" alt="Rockets : les fusées sur l&#x27;établi, le pavé de nombres, Poly à droite." width="576" height="432" loading="lazy"><figcaption>Rockets : le panneau « Launch up to… Rockets » en haut, le pavé « Number of Rockets » et les boutons Poly et a Friend en bas.</figcaption></figure>
+<p><strong>Comment jouer contre Poly</strong></p>
+<ol><li>Choisissez le <strong>nombre de fusées</strong>, de <strong>11 à 21</strong>, avec le pavé (le <strong>?</strong> en tire un au hasard).</li><li>Le panneau <strong>Launch up to… Rockets</strong> indique le <strong>nombre maximal de fusées</strong> qu'on peut lancer à chaque tour, de 2 à 5. Cliquez dessus pour le changer, <strong>avant</strong> la partie ou après (pas pendant).</li><li>À tour de rôle, on <strong>clique sur des fusées</strong> pour les lancer : de 1 jusqu'au maximum du tour. Pour que Poly commence, cliquez d'abord sur <strong>elle</strong>.</li><li>Quand vous avez lancé le maximum, Poly joue toute seule. Si vous en avez lancé moins, <strong>cliquez sur Poly</strong> pour lui passer la main (au moins une fusée doit être partie).</li><li>Celui qui lance <strong>la dernière fusée</strong> gagne.</li></ol>
+<p><strong>À savoir</strong></p>
+<ul><li>Poly s'adapte : plus vous gagnez, mieux elle joue.</li><li><strong>Reset</strong> recommence avec le même nombre de fusées. Changer le nombre recommence aussi la partie.</li><li><strong>Help</strong> : Poly explique chaque élément de l'écran.</li></ul>
+<p><strong>Jouer avec un ami</strong> : choisissez <strong>a Friend</strong> (Poly s'éclipse). Le jeu n'impose plus rien (ni limite par tour, ni gagnant) : à vous de convenir des règles. Le maximum du panneau peut alors aller jusqu'à 10. Quelques idées : tirer au sort qui commence, changer le maximum à chaque partie (que se passe-t-il au-delà de 5 ?), décider que celui qui lance la dernière fusée <strong>perd</strong>, n'autoriser que des fusées qui se ressemblent, ou inventer ses propres règles !</p>
+<p><strong>Un indice pour battre Poly</strong> : pensez à son dernier tour. Combien de fusées doit-il rester pour qu'elle ne puisse pas toutes les lancer ?</p>
+<details><summary>La solution (pour les parents)</summary><p>Si le maximum par tour est M, la partie se gagne en <strong>laissant à l'adversaire un nombre de fusées multiple de M + 1</strong> (par exemple 3, 6, 9… quand M vaut 2). Après chaque coup de l'adversaire, on lance de quoi retomber sur un multiple de M + 1. Poly le sait bien : elle ne se trompe volontairement que de temps en temps, selon son niveau.</p></details>
+<h2 id="hall-of-fame-et-certificats">Hall of Fame et certificats</h2>
+<p>Le <strong>Hall of Fame</strong> se trouve dans le Bowling : cliquez sur le <strong>trophée</strong>. Il montre, pour chaque joueur, son rang et, pour chacun des six types de questions, des <strong>rubans</strong> de couleur : un par niveau réussi (1, 2, 3, 4 et BONUS).</p>
+<figure><img src="manuel/hall-of-fame.png" alt="Le Hall of Fame : des joueurs, leur rang et leurs rubans." width="576" height="432" loading="lazy"><figcaption>Le Hall of Fame : huit joueurs par page, les flèches pour changer de page, et « Print My Certificate » en bas.</figcaption></figure>
+<ul><li>Les <strong>flèches</strong> en haut à gauche changent de page (huit joueurs par page).</li><li>Cliquez sur une <strong>case</strong> de la grille (un joueur, un type de questions) puis sur <strong>Print My Certificate</strong> : un <strong>certificat</strong> (« Certificate of Merit »), à ce nom, avec les rubans gagnés et le rang, est <strong>téléchargé en image PNG</strong> (au format paysage). Aucun certificat n'est possible tant qu'aucun niveau de ce type n'est réussi.</li><li><strong>Exit</strong> revient au Bowling.</li></ul>
+<h2 id="commandes">Commandes</h2>
+<p><strong>Souris ou toucher</strong> : un clic (ou un toucher) suffit pour tout.</p>
+<p><strong>Déplacer une pièce</strong> (Hidden Picture Puzzles, Puzzle Patterns, Super Sticklers, Rhythm Shop) : selon le réglage <strong>Click &amp; Stick Mouse</strong> (activé par défaut), cliquer pour prendre puis cliquer pour poser, ou bien glisser sans relâcher. En mode cliquer-poser, tant qu'une pièce est en main, un clic la pose.</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">Touche</th><th scope="col">Où</th><th scope="col">Effet</th></tr></thead><tbody><tr><td><strong>1</strong> à <strong>4</strong></td><td>Bowling for Numbers</td><td>choisir la réponse 1 à 4</td></tr><tr><td><strong>Espace</strong></td><td>Hidden Picture Puzzles, Puzzle Patterns, Super Sticklers</td><td>tourner la pièce (quart de tour)</td></tr><tr><td><strong>1</strong> à <strong>9</strong></td><td>Rhythm Shop</td><td>choisir un des neuf outils (Cutter, Gluer, Melder, de gauche à droite)</td></tr><tr><td><strong>Tab</strong></td><td>Rhythm Shop</td><td>outil suivant</td></tr><tr><td><strong>x</strong> / <strong>z</strong></td><td>Pattern Windows</td><td>couleur suivante / précédente</td></tr><tr><td><strong>Entrée</strong></td><td>moniteur de connexion</td><td>valider le nom, fermer (OK)</td></tr><tr><td><strong>Tab</strong>, <strong>Maj + Tab</strong>, <strong>Entrée</strong></td><td>dans le jeu</td><td>parcourir les boutons au clavier et activer celui qui est sélectionné</td></tr><tr><td><strong>Ctrl + clic</strong> sur Sign-in</td><td>salle de contrôle</td><td>ouvrir les préférences</td></tr><tr><td><strong>Ctrl + Q</strong></td><td>partout</td><td>quitter le jeu</td></tr></tbody></table></div>
+<h2 id="sur-mobile">Sur mobile</h2>
+<p>Le jeu se joue au doigt : un toucher remplace le clic.</p>
+<ul><li><strong>Les préférences</strong> : faites un <strong>appui long</strong> (environ une demi-seconde) sur le bouton Sign-in, à la place du Ctrl + clic.</li><li><strong>Les touches</strong> (1 à 4, Espace, x / z, Tab) n'ont pas besoin de clavier : touchez directement les réponses, le bouton <strong>Rotate</strong>, les couleurs ou les boutons d'outils.</li><li><strong>Déplacer une pièce</strong> : touchez-la, puis touchez l'endroit où la poser (réglage d'origine). Le glisser est possible si vous désactivez Click &amp; Stick dans les préférences.</li><li>La saisie d'un nom fait apparaître le clavier de l'appareil.</li></ul>
+<h2 id="la-version-de-1994-et-celle-de-1997">La version de 1994 et celle de 1997</h2>
+<p>Il existe un manuel en anglais de <strong>Math Workshop Deluxe</strong> (version 2.0, 1997). Cette page décrit le jeu de <strong>1994</strong>, qui est celui joué ici. Ce que vous lirez dans le manuel de 1997 et que <strong>vous ne trouverez pas</strong> ici :</p>
+<ul><li>la salle de contrôle n'a <strong>qu'un seul étage</strong> (pas de « Level 1 / Level 2 » ni de bouton Upstairs, Downstairs) ;</li><li>il n'y a <strong>pas de Boiler Room</strong> (la chaufferie et ses flammes) ;</li><li>il n'y a que <strong>trois boutons</strong> sur le pupitre de Poly (Quit, Help, Sign-in) : pas de bouton Math Trivia (c'est un clic sur Poly), Preferences (c'est Ctrl + clic sur Sign-in) ni Tracking ;</li><li><strong>pas de suivi de progression</strong> ni d'export (le Hall of Fame est le seul suivi) ;</li><li><strong>pas de Custom Play</strong> ni de bouton Practice au Bowling ;</li><li><strong>pas de bouton Demo</strong> au Rhythm Shop ;</li><li><strong>pas de jeu à deux</strong> dans Hidden Picture Puzzles ;</li><li><strong>pas de Parents' Video Guide</strong> (les vidéos) ;</li><li>les <strong>tableaux</strong> de Puzzle Patterns du niveau rouge sont au nombre de neuf (le manuel de 1997 n'en cite que sept dans ses indices) ;</li><li><strong>Rockets</strong> est un jeu de Nim contre Poly, qui est une personne (Poly Gonzales) et non un perroquet ; son niveau n'est ni affiché ni enregistré ;</li><li>ici, « Print » et « Print My Certificate » <strong>téléchargent une image</strong> au lieu d'imprimer ;</li><li>les <strong>joueurs</strong> se gardent dans le navigateur (et non dans un fichier MWRoster) ; les prénoms peuvent contenir des lettres accentuées.</li></ul>
+<h2 id="credits-et-mentions">Crédits et mentions</h2>
+<p><strong>Math Workshop</strong> est un jeu <strong>Broderbund (Brøderbund Software)</strong>, © 1994. <em>Math Workshop</em>, <em>Active Mind Series</em> et <em>Brøderbund</em> sont des marques de leurs propriétaires.</p>
+<p><strong>Cette réimplémentation est un projet de fan</strong>, sans lien avec les ayants droit : elle fait tourner le jeu dans le navigateur en lisant les fichiers de données du CD d'origine, qui ne sont pas fournis ici. Cette page n'est pas le manuel d'origine : c'est un texte réécrit, adapté à la version de 1994.</p>
+<p><strong>L'équipe d'origine</strong>, d'après la liste du manuel de 1997 (celle du CD de 1994, qui défile à l'écran Crédits, peut différer) :</p>
+<ul><li><strong>Concept original</strong> : Mark Schlichting. <strong>Conception</strong> : Amanda Crispel (direction), Bo Everson, Hilary Nation, Tom Rettig. <strong>Production</strong> : Hilary Nation. <strong>Gestion de produit</strong> : Sioban Scanlon.</li><li><strong>Programmation</strong> : Lance Groody et Frankie Ford (direction), Bob Arient, Michael G. Rivard, Diane Cerreta, Rod Nelson, avec Grace Kim, Ben Ceschi, Samir Ramji, Guy Nicholas, Jeff Charvat, Bob Gulian, Glenn Axworthy, Michael Zacks.</li><li><strong>Direction artistique</strong> : Bo Everson, Michelle Bushneff. <strong>Personnages et animation</strong> : David Magliocco. <strong>Art et animation</strong> : Brad Pollard, Michelle Graham, Avril Harrison, Stephen Peterson, Cheryl Middleman, Phillip Bossant, Bob King, Kevin Dooley, avec Julie Glavin, Caitlin Mitchell-Dayton, Peter Mitchell-Dayton, Peter Babakitis. <strong>Infographie</strong> : Martha Embry.</li><li><strong>Direction sonore</strong> : Tom Rettig, Jonelle Adkisson. <strong>Conception sonore</strong> : Michael Barrett, Chris Clanin, avec Joey Edelman, Tom Hays, John Loose, Gary Schwantes, Brian Woodbury, Jane Scolieri, Tim Larkin.</li><li><strong>Voix</strong> : Miriam Carr, Tom Rettig, Mark Schlichting, Michael Barrett, Carl Albert. <strong>Dialogues</strong> : Suze Allen, Jana Goerlitz, avec Valorie Singer et Sioban Scanlon.</li><li><strong>Photographies</strong> sous licence de : American Photographic Archives, Inc. ; Association des Amis de Jacques Henri Lartigue ; Rick Doyle ; Underwood Photographic Archive ; Wayzata Technology, Inc. ; The IMAGE Bank, Inc.</li><li><strong>Remerciements particuliers</strong> à Margo Nanny et Phil Gonsalves, et à tous les enseignants, parents et enfants qui ont contribué au jeu.</li></ul>
+<p><strong>Cette version du site</strong> : la musique est jouée avec la soundfont <em>GeneralUser GS</em> (licence fournie avec le jeu), réduite aux instruments du jeu.</p>
+</main>
+<footer>
+<p>Manuel réécrit pour la version de 1994 de Math Workshop (réimplémentation de fan). Les illustrations sont des captures du jeu.</p>
+</footer>
+</body>
+</html>

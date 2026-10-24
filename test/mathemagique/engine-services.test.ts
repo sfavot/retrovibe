@@ -1,6 +1,8 @@
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
+import { parseSong } from "../../src/games/mathemagique/audio/smf";
+import { parseMidi } from "../../src/games/mathemagique/data/midi";
+import { MohawkArchive, TAG_SND } from "../../src/games/mathemagique/data/mohawk";
 import type { Shape } from "../../src/games/mathemagique/data/shap";
 import { Engine } from "../../src/games/mathemagique/engine/engine";
 import {
@@ -623,6 +625,70 @@ describe("SoundService", () => {
     sound.tick();
     expect(host.audio.midi.messages).toHaveLength(0);
     expect(sound.musicPlaying).toBe(false);
+  });
+
+  describe("playSong (séquenceur unique)", () => {
+    const songOf = (archive: Archive) => parseSong(parseMidi(archive.mohawk.get(TAG_SND, 950)).smf);
+
+    it("remplace la musique en cours : un seul morceau joue, l'ancienne poignée est arrêtée", () => {
+      const { sound } = sounds();
+      const archive = midiArchive();
+      const music = sound.playMusic(archive, 950, { loop: true })!;
+      const song = sound.playSong(songOf(archive))!;
+      expect(music.stopped).toBe(true);
+      expect(sound.isPlaying(music)).toBe(false);
+      expect(sound.isPlaying(song)).toBe(true);
+      sound.playMusic(archive, 950, { loop: true });
+      expect(song.stopped).toBe(true);
+    });
+
+    it("transmet onMarker/onEnd/bpm/rewrite, onEnd une seule fois à la fin", () => {
+      const { host, sound, archive } = (() => ({ ...sounds(), archive: midiArchive() }))();
+      let ended = 0;
+      let rewritten = 0;
+      const handle = sound.playSong(songOf(archive), {
+        bpm: 240,
+        rewrite: (events) => (rewritten++, events),
+        onEnd: () => ended++,
+      })!;
+      expect(rewritten).toBe(1);
+      for (let t = 0; t < 40; t++) {
+        host.time += 100;
+        sound.tick();
+      }
+      expect(ended).toBe(1);
+      expect(handle.stopped).toBe(true);
+      expect(sound.musicPlaying).toBe(false);
+    });
+
+    it("stopMusic / releaseAll le coupent ; restartMusic le rejoue avec les mêmes options (réécriture comprise)", () => {
+      const { host, sound, archive } = (() => ({ ...sounds(), archive: midiArchive() }))();
+      let rewritten = 0;
+      const handle = sound.playSong(songOf(archive), { rewrite: (events) => (rewritten++, events) })!;
+      host.audio.midi.messages.length = 0;
+      sound.restartMusic();
+      expect(rewritten).toBe(2);
+      sound.tick();
+      expect(host.audio.midi.messages.length).toBeGreaterThan(0);
+      expect(sound.isPlaying(handle)).toBe(true);
+      sound.releaseAll();
+      expect(handle.stopped).toBe(true);
+      host.audio.midi.messages.length = 0;
+      sound.restartMusic();
+      sound.tick();
+      expect(host.audio.midi.messages).toHaveLength(0);
+    });
+
+    it("ambient : refusé si la préférence est coupée, coupé par stopAmbient", () => {
+      let ambient = false;
+      const { sound, archive } = (() => ({ ...sounds({ ambientEnabled: () => ambient }), archive: midiArchive() }))();
+      expect(sound.playSong(songOf(archive), { ambient: true })).toBeNull();
+      ambient = true;
+      const handle = sound.playSong(songOf(archive), { ambient: true })!;
+      expect(sound.isPlaying(handle)).toBe(true);
+      sound.stopAmbient();
+      expect(sound.isPlaying(handle)).toBe(false);
+    });
   });
 
   it("joue un WAVE avec handle, isPlaying suit la durée, stop coupe", () => {

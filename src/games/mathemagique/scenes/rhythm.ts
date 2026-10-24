@@ -23,7 +23,7 @@ import type { Archive } from "../engine/resources";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices, SceneArchive } from "../engine/services";
-import { MidiPlayer, parsePrograms, parseSysx, type ProgramEntry } from "../audio/sequencer";
+import { parsePrograms, type ProgramEntry } from "../audio/sequencer";
 import { parseSong, type Song } from "../audio/smf";
 import type { Shape } from "../data/shap";
 import { PolyHelper, createScrPolyPorts, openPolyArchive, rosterIntroFlag, type PolyPorts } from "../game/poly";
@@ -56,7 +56,6 @@ import {
   IDLE_WAIT_MIN,
   MELD_SCR,
   MIDI_ARCHIVE,
-  MIDI_MAP_ARCHIVE,
   NEUTRAL_POSE,
   REACTION_ZONE,
   SND,
@@ -184,8 +183,6 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   let polly!: Archive;
   let midiArchive: Archive | null = null;
   let fonts!: { small: FonFont; medium: FonFont };
-  let initMessages: Uint8Array[] = [];
-  let player: MidiPlayer | null = null;
   const songCache = new Map<number, SongData | null>();
   const synthetic = new Map<number, Shape>();
 
@@ -632,11 +629,6 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   }
 
   // --- Lecture ---
-  function ensurePlayer(): MidiPlayer {
-    player ??= new MidiPlayer(ctx.host.audio.midi, { now: () => ctx.host.audio.now(), initMessages });
-    return player;
-  }
-
   const audioNow = () => ctx.host.audio.now();
 
   function lightUp(next: { bin: BinId; index: number } | null): void {
@@ -666,7 +658,7 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   function launchMeasure(data: SongData): void {
     const current = run;
     if (!current) return;
-    playRhythmSong(ensurePlayer(), data.song, {
+    playRhythmSong(sound, data.song, {
       pattern: board.pattern,
       programs: data.programs,
       onCue: onCue,
@@ -741,7 +733,7 @@ export function createRhythmScene(services: MathServices): RhythmScene {
     if (!current) return;
     run = null;
     if (current.mode === "pattern") {
-      player?.stop();
+      sound.stopMusic();
       sound.stopAll();
     }
     dancing = false;
@@ -826,7 +818,7 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   }
 
   function stopEverything(): void {
-    player?.stop();
+    sound.stopMusic();
     run = null;
     dancing = false;
     toolAnim = null;
@@ -836,16 +828,10 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   // --- Scène ---
   return {
     async load(c) {
-      const [rhythm, , midi, , small, medium] = await Promise.all([
+      const [rhythm, , midi, small, medium] = await Promise.all([
         c.resources.open(ARCHIVE),
         openPolyArchive(c.resources, RHYTHM_POLY),
         c.resources.open(MIDI_ARCHIVE).catch(() => null),
-        c.resources.open(MIDI_MAP_ARCHIVE, "persistent").then(
-          (map) => {
-            initMessages = parseSysx(map.raw("SYSX", 1));
-          },
-          () => undefined,
-        ),
         c.host.loadFile(FONT_SMALL).then((bytes) => parseFon(bytes)[0]!),
         c.host.loadFile(FONT_MEDIUM).then((bytes) => parseFon(bytes)[0]!),
       ]);
@@ -878,7 +864,6 @@ export function createRhythmScene(services: MathServices): RhythmScene {
       poseShape = neutralPose();
       blink = 0;
       errors = new ErrorLines(c.rng, { noRepeat: false });
-      player = null;
       services.useArchive(sceneArchive);
       pointer.cursor.setBase("arrow");
 
@@ -962,8 +947,6 @@ export function createRhythmScene(services: MathServices): RhythmScene {
 
     leave(c) {
       poly?.abort();
-      player?.stop();
-      player = null;
       services.endScene();
       if (c.roster.currentPlayerId !== 0) c.roster.save();
       poly = null;
@@ -984,7 +967,6 @@ export function createRhythmScene(services: MathServices): RhythmScene {
           stepToolAnimation();
           break;
         case "playing":
-          player?.tick();
           if (run?.mode === "parts") stepPlayParts(run);
           else stepDance();
           if (run && !run.fresh && ctx.input.buttonEvents.some((e) => e.down)) finishPlay(true);
@@ -1015,6 +997,8 @@ export function createRhythmScene(services: MathServices): RhythmScene {
 
     key(event: KeyEvent) {
       if (state === "playing") {
+        // Ctrl/Alt + touche (Ctrl+Q : sortie…) n'est pas « une touche de jeu » : il revient au moteur.
+        if (event.ctrl || event.alt) return false;
         if (!event.repeat) finishPlay(true);
         return true;
       }

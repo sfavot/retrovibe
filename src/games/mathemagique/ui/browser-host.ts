@@ -3,7 +3,13 @@ import type { GameFiles } from "../data/files";
 import type { Frame } from "../engine/graphics/frame";
 import type { CursorKind, Host, HostStorage } from "../engine/host";
 import { Input, mouseButtonFromDom } from "../engine/input";
-import { CanvasPresenter, PLAY_ORIGIN_X, PLAY_ORIGIN_Y, SCREEN_HEIGHT, SCREEN_WIDTH } from "../render/canvas-presenter";
+import {
+  CanvasPresenter,
+  PLAY_ORIGIN_X,
+  PLAY_ORIGIN_Y,
+  SCREEN_HEIGHT,
+  SCREEN_WIDTH,
+} from "../render/canvas-presenter";
 
 /** Accès à localStorage : indisponible ou plein, on échoue sans bruit (même principe que l'hôte du Téléportaschtroumpf). */
 export const localStorageStore: HostStorage = {
@@ -47,25 +53,89 @@ const DEFAULT_CURSORS: Readonly<Record<CursorKind, string>> = {
   hidden: "none",
 };
 
+/** Ce qu'il faut savoir d'un `KeyboardEvent` pour décider de son sort (sous-ensemble, pour tester sans DOM). */
+export type KeyInfo = Pick<
+  KeyboardEvent,
+  "key" | "code" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey"
+> & { isComposing?: boolean; altGraph?: boolean };
+
+/**
+ * Modificateurs vus par le jeu. AltGr (Ctrl+Alt sous Windows, `getModifierState("AltGraph")`) sert à taper des caractères (@, €, #…) :
+ * ce n'est ni Ctrl ni Alt, sinon le jeu prendrait « @ » pour un raccourci.
+ */
+export function gameModifiers(event: KeyInfo): {
+  ctrl: boolean;
+  alt: boolean;
+  shift: boolean;
+} {
+  return {
+    ctrl: event.ctrlKey && !event.altGraph,
+    alt: event.altKey && !event.altGraph,
+    shift: event.shiftKey,
+  };
+}
+
+/**
+ * Touches que le jeu ne lit pas au clavier : le texte composé (accents morts « ^ » puis « e », IME, clavier virtuel) arrive par le champ
+ * invisible (`text-input.ts`, événements `compositionend` / `beforeinput`), qui est l'unique source ; lire aussi la touche physique
+ * l'insérerait deux fois.
+ */
+export function isComposedKey(event: Pick<KeyInfo, "key" | "isComposing">): boolean {
+  return (
+    event.isComposing === true ||
+    event.key === "Dead" ||
+    event.key === "Process" ||
+    event.key === "Unidentified"
+  );
+}
+
 /**
  * Touches dont le navigateur ne doit pas faire son action quand le canvas a le focus (défilement par Espace et flèches, retour
- * arrière, recherche rapide des caractères imprimables…). Tab (navigation au clavier), F5, F12 et les autres touches de fonction
- * restent au navigateur.
+ * arrière, recherche rapide des caractères imprimables, Tab…). Le jeu possède Tab et Maj+Tab (focus des boutons, outils de l'Atelier
+ * du rythme) : le navigateur ne doit pas déplacer le focus DOM vers le bouton Son ou le lien de retour. La sortie au clavier est
+ * Échap, qui rend le focus au navigateur (`BrowserHost.bindKeyboard`). F5, F12 et les autres touches de fonction restent au navigateur.
  */
-export function gameOwnsKey(event: Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey" | "altKey">): boolean {
+export function gameOwnsKey(
+  event: Pick<KeyInfo, "key" | "code" | "ctrlKey" | "metaKey" | "altKey" | "altGraph">,
+): boolean {
   if (event.metaKey) return false;
+  const altGraph = event.altGraph === true;
   // Seuls Ctrl+Q (sortie) et Ctrl+V (« À propos ») sont au jeu ; Ctrl+R, Ctrl+W, Ctrl+C… restent au navigateur.
-  if (event.ctrlKey) return event.code === "KeyQ" || event.code === "KeyV";
-  if (event.altKey) return false;
+  if (event.ctrlKey && !altGraph) return event.code === "KeyQ" || event.code === "KeyV";
+  if (event.altKey && !altGraph) return false;
   if (event.key.length === 1) return true;
-  return event.code === "Space" || event.code === "Enter" || event.code === "NumpadEnter" || event.code === "Escape" || event.code === "Backspace" || event.code === "F1" || event.code.startsWith("Arrow");
+  return (
+    event.code === "Space" ||
+    event.code === "Tab" ||
+    event.code === "Enter" ||
+    event.code === "NumpadEnter" ||
+    event.code === "Escape" ||
+    event.code === "Backspace" ||
+    event.code === "F1" ||
+    event.code.startsWith("Arrow")
+  );
+}
+
+/**
+ * Le canvas perd le focus au profit de `related` : si c'est un autre récepteur clavier du jeu (le champ invisible, qui prend le focus au
+ * `pointerup`), rien n'est relâché ; sinon un `reset` jetterait le relâchement du clic en file et les boutons resteraient « enfoncés ».
+ */
+export function keepsInputOnBlur(
+  related: EventTarget | null,
+  keyTargets: ReadonlySet<EventTarget>,
+): boolean {
+  return related !== null && keyTargets.has(related);
 }
 
 /**
  * Coordonnées d'un point de l'écran dans la zone de jeu (576×432) : le canvas fait 640×480 logiques (zone de jeu centrée dans une
  * bordure noire) et s'affiche à la taille CSS `width × height`. Peut sortir de la zone (négatif ou au-delà).
  */
-export function toPlayArea(clientX: number, clientY: number, rect: { left: number; top: number; width: number; height: number }): { x: number; y: number } {
+export function toPlayArea(
+  clientX: number,
+  clientY: number,
+  rect: { left: number; top: number; width: number; height: number },
+): { x: number; y: number } {
   return {
     x: ((clientX - rect.left) * SCREEN_WIDTH) / rect.width - PLAY_ORIGIN_X,
     y: ((clientY - rect.top) * SCREEN_HEIGHT) / rect.height - PLAY_ORIGIN_Y,
@@ -83,7 +153,10 @@ class TouchPress {
   private readonly startY: number;
   private timer: ReturnType<typeof setTimeout> | null;
 
-  constructor(event: PointerEvent, onLongPress: (clientX: number, clientY: number) => void) {
+  constructor(
+    event: PointerEvent,
+    onLongPress: (clientX: number, clientY: number) => void,
+  ) {
     this.id = event.pointerId;
     this.startX = event.clientX;
     this.startY = event.clientY;
@@ -94,7 +167,12 @@ class TouchPress {
   }
 
   move(event: PointerEvent): void {
-    if (this.timer !== null && Math.hypot(event.clientX - this.startX, event.clientY - this.startY) > LONG_PRESS_SLOP) this.stop();
+    if (
+      this.timer !== null &&
+      Math.hypot(event.clientX - this.startX, event.clientY - this.startY) >
+        LONG_PRESS_SLOP
+    )
+      this.stop();
   }
 
   stop(): void {
@@ -116,6 +194,8 @@ export class BrowserHost implements Host {
   private cursor: CursorKind = "arrow";
   private presented = false;
   private touch: TouchPress | null = null;
+  /** Éléments qui reçoivent le clavier du jeu (le canvas et le champ invisible). */
+  private readonly keyTargets = new Set<EventTarget>();
   /** Appui long d'un doigt (position dans la zone de jeu) : l'équivalent tactile de Ctrl + clic. */
   onLongPress: ((x: number, y: number) => void) | null = null;
 
@@ -141,7 +221,8 @@ export class BrowserHost implements Host {
     if (!path) throw new MissingFilesError(`fichier introuvable : ${name}`);
     const url = `${this.base}/${path.split("/").map(encodeURIComponent).join("/")}`;
     const response = await fetch(url);
-    if (response.status === 404) throw new MissingFilesError(`${path} : HTTP 404`);
+    if (response.status === 404)
+      throw new MissingFilesError(`${path} : HTTP 404`);
     if (!response.ok) throw new Error(`${path} : HTTP ${response.status}`);
     return new Uint8Array(await response.arrayBuffer());
   }
@@ -217,17 +298,28 @@ export class BrowserHost implements Host {
       input.setPointerInside(event.pointerType !== "touch");
       this.pointer(event);
     });
-    canvas.addEventListener("pointerleave", () => input.setPointerInside(false));
+    // Glisser une pièce au doigt ne fait pas défiler la page (en plus de `touch-action: none`, pour les navigateurs qui l'ignorent).
+    canvas.addEventListener("touchmove", (event) => event.preventDefault(), {
+      passive: false,
+    });
+    canvas.addEventListener("pointerleave", () =>
+      input.setPointerInside(false),
+    );
     canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
-      if (event.pointerType === "touch" && event.isPrimary) this.touch = new TouchPress(event, (x, y) => this.longPress(x, y));
+      if (event.pointerType === "touch" && event.isPrimary)
+        this.touch = new TouchPress(event, (x, y) => this.longPress(x, y));
       canvas.focus();
       audio.unlock();
       const button = mouseButtonFromDom(event.button);
       if (!button) return;
       canvas.setPointerCapture(event.pointerId);
       this.pointer(event);
-      input.mouseDown(button, { ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey });
+      input.mouseDown(button, {
+        ctrl: event.ctrlKey,
+        shift: event.shiftKey,
+        alt: event.altKey,
+      });
     });
     const release = (event: PointerEvent): void => {
       if (this.touch?.id === event.pointerId) {
@@ -237,7 +329,11 @@ export class BrowserHost implements Host {
       const button = mouseButtonFromDom(event.button);
       if (!button) return;
       this.pointer(event);
-      input.mouseUp(button, { ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey });
+      input.mouseUp(button, {
+        ctrl: event.ctrlKey,
+        shift: event.shiftKey,
+        alt: event.altKey,
+      });
     };
     canvas.addEventListener("pointerup", release);
     canvas.addEventListener("pointercancel", release);
@@ -245,7 +341,9 @@ export class BrowserHost implements Host {
     canvas.addEventListener("contextmenu", (event) => event.preventDefault());
     this.bindKeyboard(canvas);
     // Perdre le focus relâche tout : sinon une touche tenue au moment du clic ailleurs resterait enfoncée.
-    canvas.addEventListener("blur", () => input.reset());
+    canvas.addEventListener("blur", (event) => {
+      if (!keepsInputOnBlur(event.relatedTarget, this.keyTargets)) input.reset();
+    });
   }
 
   /**
@@ -254,17 +352,49 @@ export class BrowserHost implements Host {
    */
   bindKeyboard(target: HTMLElement): void {
     const { input, audio } = this;
+    this.keyTargets.add(target);
+    const info = (event: KeyboardEvent): KeyInfo => ({
+      key: event.key,
+      code: event.code,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      altKey: event.altKey,
+      shiftKey: event.shiftKey,
+      isComposing: event.isComposing,
+      altGraph: event.getModifierState("AltGraph"),
+    });
     target.addEventListener("keydown", (event) => {
       audio.unlock();
       // Raccourcis du système (Cmd sur Mac) : jamais au jeu.
       if (event.metaKey) return;
-      input.keyDown({ key: event.key, code: event.code, repeat: event.repeat, ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey });
-      if (gameOwnsKey(event)) event.preventDefault();
+      const key = info(event);
+      // Texte composé : il arrive par le champ invisible, pas par la touche physique.
+      if (isComposedKey(key)) return;
+      const mods = gameModifiers(key);
+      // Maj+Échap est la sortie au clavier (le jeu possède Tab) : le canvas rend le focus au navigateur. Échap seul reste au jeu
+      // (code 27 du moniteur et du hub).
+      if (event.key === "Escape" && event.shiftKey && target === this.canvas) {
+        event.preventDefault();
+        this.canvas.blur();
+        return;
+      }
+      input.keyDown({
+        key: event.key,
+        code: event.code,
+        repeat: event.repeat,
+        ...mods,
+      });
+      if (gameOwnsKey(key)) event.preventDefault();
     });
     target.addEventListener("keyup", (event) => {
-      input.keyUp(event.code, { ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey });
-      if (gameOwnsKey(event)) event.preventDefault();
+      const key = info(event);
+      input.keyUp(event.code, gameModifiers(key));
+      if (gameOwnsKey(key)) event.preventDefault();
     });
-    if (target !== this.canvas) target.addEventListener("blur", () => input.reset());
+    // Le focus passe à un autre récepteur du jeu (canvas ↔ champ invisible) : on ne relâche rien.
+    if (target !== this.canvas)
+      target.addEventListener("blur", (event) => {
+        if (!keepsInputOnBlur(event.relatedTarget, this.keyTargets)) input.reset();
+      });
   }
 }

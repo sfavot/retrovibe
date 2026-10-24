@@ -42,6 +42,29 @@ export interface KeyEvent extends Modifiers {
   repeat: boolean;
 }
 
+/** Touches qui ne produisent rien seules (modificateurs et verrous) : appuyées seules, elles ne comptent pas comme « une touche ». */
+const MODIFIER_ONLY_KEYS: ReadonlySet<string> = new Set([
+  "Shift",
+  "Control",
+  "Alt",
+  "AltGraph",
+  "Meta",
+  "OS",
+  "CapsLock",
+  "NumLock",
+  "ScrollLock",
+  "Fn",
+  "FnLock",
+  "Hyper",
+  "Super",
+  "Symbol",
+  "SymbolLock",
+]);
+
+export function isModifierOnlyKey(key: string): boolean {
+  return MODIFIER_ONLY_KEYS.has(key);
+}
+
 /** Au plus autant d'événements en attente par file : un clavier ou une souris qui s'emballent n'accumulent pas de retard. */
 const MAX_QUEUED_EVENTS = 64;
 

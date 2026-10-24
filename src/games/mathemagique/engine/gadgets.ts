@@ -299,8 +299,13 @@ export class GadgetManager {
   // --- Souris ---
 
   /** Suit le survol (appelé à chaque tick avec la position vivante). */
-  updatePointer(x: number, y: number): void {
+  updatePointer(x: number, y: number, buttonHeld?: (button: MouseButton) => boolean): void {
     this.hoverRecord = this.hitRecord(x, y);
+    // Le bouton n'est plus tenu (relâchement perdu : focus quitté, Alt-Tab…) : l'appui mémorisé est périmé.
+    if (this.pressedRecord && this.pressedButton && buttonHeld && !buttonHeld(this.pressedButton)) {
+      this.pressedRecord = null;
+      this.pressedButton = null;
+    }
     if (this.pressedRecord && !this.pressedRecord.enabled) {
       this.pressedRecord = null;
       this.pressedButton = null;
@@ -310,6 +315,11 @@ export class GadgetManager {
   /** Événement bouton de la file de `Input` ; renvoie vrai s'il a été pris par un gadget. */
   handleButton(event: ButtonEvent): boolean {
     if (event.down) {
+      // Nouvel appui du même bouton alors qu'on en attend le relâchement : ce relâchement s'est perdu, l'appui est périmé.
+      if (this.pressedRecord && event.button === this.pressedButton) {
+        this.pressedRecord = null;
+        this.pressedButton = null;
+      }
       if (this.pressedRecord) return false;
       const record = this.hitRecord(event.x, event.y);
       if (!record) return false;

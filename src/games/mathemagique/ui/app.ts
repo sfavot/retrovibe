@@ -93,6 +93,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     host.audio.unlock();
     engine = new Engine(host);
     services = installServices(engine);
+    if (engine.ctx.roster.loadStatus === "invalid") console.warn("Math Workshop : les joueurs enregistrés sont illisibles ; une copie de secours sera gardée avant tout écrasement.");
     // Archives gardées toute la partie : curseurs d'origine (sablier, aide) et réglages d'initialisation du MIDI.
     const [milkyway, midiMap] = await Promise.all([engine.ctx.resources.open("MILKYWAY.DAT", "persistent"), engine.ctx.resources.open("MIDIMAP.DAT", "persistent")]);
     const cursors = loadCursorImages(milkyway);
@@ -198,8 +199,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       fail(error);
       return;
     }
-    // La toute première scène n'a pas pu se charger : le moteur ne tourne plus, rien à afficher.
-    if (engine.failed) {
+    // Une scène n'a pas pu se charger (la première : rien à afficher ; une autre : l'ancienne reste figée, souvent sous un fondu tenu) :
+    // même traitement qu'une erreur d'exécution, la boucle s'arrête.
+    if (engine.error) {
       fail(engine.error?.error);
       return;
     }

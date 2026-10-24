@@ -81,3 +81,13 @@
   pointer-events: none;
   font-size: 16px;
 }
+
+/* Manuel et contrôles de l'écran de présentation. */
+.mw-title-note {
+  margin: 0;
+}
+
+.mw-title-controls {
+  margin: 0.4rem 0 0;
+  font-size: 1rem;
+}

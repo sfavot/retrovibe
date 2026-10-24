@@ -97,7 +97,7 @@ export function installServices(engine: Engine): MathServices {
       pointer.tick(c.input);
       // Une pièce portée capte la souris : pas de survol de bouton.
       if (pointer.capturesClicks) gadgets.updatePointer(-1, -1);
-      else gadgets.updatePointer(c.input.mouseX, c.input.mouseY);
+      else gadgets.updatePointer(c.input.mouseX, c.input.mouseY, (button) => c.input.isButtonDown(button));
     }
     gadgets.tick();
     if (gadgets.draw(screen)) c.requestPresent();
@@ -122,7 +122,8 @@ export function installServices(engine: Engine): MathServices {
       gadgets.clear();
       gadgets.configure({ shape: undefined, playSound: undefined });
       pointer.reset();
-      palette.stopCycles(false);
+      // Les couleurs tournées par un cycle en cours reviennent à leur état d'origine (la scène suivante ne doit pas hériter d'une rotation).
+      palette.stopCycles(true);
       if (options.keepMusic) sound.stopAll();
       else sound.releaseAll();
     },

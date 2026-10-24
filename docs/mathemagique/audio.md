@@ -61,6 +61,16 @@ player.setBpm(140); player.stop();
 - `silenceEmptySlots(events, filled)` : l'emplacement courant est celui du dernier repère `a`–`x` (0 avant le premier) ; les Note On d'un emplacement vide passent à vélocité 0 (la note reste dans le flux, les durées ne bougent pas ; pour le synthétiseur, c'est un Note Off).
 - `filled` est lu à l'appel de la fonction : pour rejouer un motif modifié, rappeler `play` avec `rhythmRewrite(nouveauTableau)`.
 
+### Un seul séquenceur : `SoundService.playSong`
+
+Le `MidiPlayer` appartient au `SoundService` (`engine/sound.ts`), et aucune scène n'en crée un second sur `host.audio.midi` (deux séquenceurs sur un même puits se couperaient mutuellement : `reset()` à chaque départ, musique jamais arrêtée, `stopMusic` / `releaseAll` / ambiance / reprise à la fin du chargement contournés). `playMusic(archive, id, { loop, ambient, onEnd })` joue un `\0SND` MIDI ; `playSong(song, options)` joue un `Song` déjà décodé avec toutes les `PlayOptions` (`rewrite`, `bpm`, `programs`, `onMarker`, `onEnd`, `loop`, repères de boucle) plus `ambient`. Les deux passent par le même chemin (`start`) :
+
+- une seule musique à la fois : un nouveau départ remplace l'ancien (poignée précédente `stopped`) ;
+- `stop(handle)`, `stopMusic()`, `releaseAll()` (donc `endScene()` à la sortie de la scène) et `stopAmbient()` (si `ambient`) l'arrêtent ; `onEnd` n'est jamais appelé après un arrêt ;
+- le séquenceur est avancé par `SoundService.tick()` (le moteur l'appelle à chaque tick) : la scène n'a plus de `tick()` de lecteur ;
+- le son coupé est un réglage du puits (`AudioSink.setMuted`) : il s'applique à tout ce que le séquenceur envoie ;
+- **reprise quand le synthétiseur devient prêt** : `restartMusic()` rejoue aussi un morceau lancé par `playSong`, avec les mêmes options, donc la même réécriture (celle du Rhythm Shop est pure : rejouer la mesure donne les mêmes notes). Les repères déjà passés sont signalés de nouveau et `onEnd` n'arrive qu'à la fin de la lecture rejouée.
+
 ## Navigateur : `web-sink.ts`
 
 - **Déblocage** : le `AudioContext` est créé au premier `unlock()` (à appeler depuis un geste). Avant, `now()` vaut 0 et rien ne sort ; le MIDI n'est pas initialisé. `suspend()` / `resume()` (onglet masqué) suspendent le contexte : l'horloge `now()` s'arrête avec lui, la musique et les repères restent cohérents. Les transitions `suspend` / `resume` sont chaînées (le dernier appel gagne), comme dans le Téléportaschtroumpf.

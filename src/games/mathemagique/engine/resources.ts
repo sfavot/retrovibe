@@ -115,6 +115,8 @@ interface Entry {
   scope: ArchiveScope;
   /** Génération de la scène à laquelle l'archive appartient (voir `Resources.epoch`). */
   epoch: number;
+  /** Génération d'avant un `open` fait pendant un chargement de scène sur une archive déjà ouverte : rétablie si le chargement échoue. */
+  restoreEpoch?: number;
   promise: Promise<Archive>;
   archive?: Archive;
 }
@@ -139,7 +141,10 @@ export class Resources {
     const existing = this.entries.get(key);
     if (existing) {
       if (scope === "persistent") existing.scope = "persistent";
-      existing.epoch = Math.max(existing.epoch, epoch);
+      if (epoch > existing.epoch) {
+        if (this.loadingScene) existing.restoreEpoch ??= existing.epoch;
+        existing.epoch = epoch;
+      }
       return existing.promise;
     }
     const entry: Entry = {
@@ -184,8 +189,20 @@ export class Resources {
     this.loadingScene = true;
   }
 
-  /** Gestionnaire de scènes : le chargement a échoué, l'ancienne scène continue. */
+  /**
+   * Gestionnaire de scènes : le chargement a échoué, l'ancienne scène continue. Les archives de portée `scene` ouvertes par le
+   * chargement raté sont libérées ; celles de l'ancienne scène qu'il avait rouvertes lui restent attachées.
+   */
   abortSceneLoad(): void {
+    const loadingEpoch = this.epoch + 1;
+    for (const [key, entry] of this.entries) {
+      if (entry.epoch !== loadingEpoch) continue;
+      if (entry.restoreEpoch !== undefined) {
+        entry.epoch = entry.restoreEpoch;
+        entry.restoreEpoch = undefined;
+      }
+      else if (entry.scope === "scene") this.entries.delete(key);
+    }
     this.loadingScene = false;
   }
 
@@ -196,6 +213,7 @@ export class Resources {
   commitScene(): void {
     for (const [key, entry] of this.entries) if (entry.scope === "scene" && entry.epoch <= this.epoch) this.entries.delete(key);
     if (this.loadingScene) this.epoch++;
+    for (const entry of this.entries.values()) entry.restoreEpoch = undefined;
     this.loadingScene = false;
   }
 

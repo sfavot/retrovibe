@@ -428,10 +428,11 @@ class Hub implements HubScene {
   private openMonitorFlow(mode: MonitorMode, detail?: MonitorDetail): void {
     const open = this.opts.openMonitor;
     if ((!open && !this.overlay) || this.monitorOpen || this.busy) return;
+    // Garde posée avant de couper la voix : le `then` d'un clip interrompu peut rappeler `openMonitorFlow` (accueil → connexion).
+    this.monitorOpen = true;
     if (this.quit.open) this.dismissQuit();
     this.exitHelp();
     this.cutVoice();
-    this.monitorOpen = true;
     this.playerAtOpen = this.ctx.roster.currentPlayerId;
     this.ambientAtOpen = this.ctx.roster.roster.ambient;
     this.ready = false;
@@ -480,7 +481,8 @@ class Hub implements HubScene {
   }
 
   longPress(x: number, y: number): void {
-    if (this.busy || this.monitorOpen || this.helpMode) return;
+    // Clip bloquant de Poly en cours : comme les clics, l'appui long est ignoré (sinon il coupe la voix et rouvre la connexion).
+    if (this.busy || this.monitorOpen || this.helpMode || this.services.scr.blocking) return;
     if (rectContains(rectFromEdges(...HUB_CONSOLE_EDGES[HUB_CONSOLE.signIn - 1]!), x, y)) this.openMonitorFlow("preferences");
   }
 

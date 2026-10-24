@@ -118,7 +118,7 @@ export class Engine {
 
   /**
    * Dernière erreur de chargement. Si la toute première scène échoue, il n'y a rien à afficher : `failed` devient vrai et le moteur
-   * ne tourne plus. Sinon l'ancienne scène continue et l'erreur reste consultable ici.
+   * ne tourne plus. Sinon l'ancienne scène continue, mais l'hôte (`ui/app.ts`) doit tester `error` et arrêter la boucle : une scène figée sous un fondu tenu ne montrerait rien.
    */
   get error(): { error: unknown; sceneId: SceneId } | null {
     return this.failure;

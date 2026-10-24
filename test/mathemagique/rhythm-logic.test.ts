@@ -777,7 +777,7 @@ describe.runIf(hasOriginalFiles)("données réelles de RHYTHM.DAT", () => {
       const song = songOf(id);
       const cues: { cue: ReturnType<typeof cueOf>; at: number }[] = [];
       let ended = 0;
-      const complete = playRhythmSong(player, song, {
+      const complete = playRhythmSong({ playSong: (s, options) => player.play(s, options) }, song, {
         pattern,
         programs: parsePrograms(resource(id).programs),
         onCue: (cue) => cues.push({ cue, at: clock.t }),

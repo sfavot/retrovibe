@@ -27,7 +27,7 @@
  * gadgets et pointeur (`blockedThisTick`) comme la boucle d'attente de l'original, et applique le drapeau 8. À la fin (terminée ou
  * interrompue), `onEnd` est appelé depuis le tick, avant `Scene.tick`.
  */
-import type { Input } from "./input";
+import { isModifierOnlyKey, type Input } from "./input";
 import { TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL } from "../data/mohawk";
 import { resolveScrResources, SCR_CELL_COUNT, SCR_INITIAL_FLAGS, SCR_OFFSCREEN, type ScrClip, type ScrOp, type ScrScript } from "../data/scr";
 import type { ShapeList } from "../data/shpl";
@@ -529,7 +529,7 @@ export class ScrPlayer {
     this.blockedThisTick = this.blocking;
     const snapshot = [...this.active];
     if (input && this.blockedThisTick) {
-      const pressed = input.buttonEvents.some((e) => e.down) || input.keyEvents.some((e) => !e.repeat);
+      const pressed = input.buttonEvents.some((e) => e.down) || input.keyEvents.some((e) => !e.repeat && !isModifierOnlyKey(e.key));
       if (pressed) for (const a of snapshot) if (a.state === "running" && a.blocking && a.flags & SCR_FLAG.interruptible) a.interrupt();
     }
     this.stepping++;

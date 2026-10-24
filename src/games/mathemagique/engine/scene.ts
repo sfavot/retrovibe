@@ -129,7 +129,7 @@ interface Loading {
  *
  * Bascule : `load` de la nouvelle scène pendant que l'ancienne est gelée (plus de `tick`, son dernier écran reste affiché), puis dans
  * le même tick `leave` de l'ancienne, libération de ses archives, `enter` de la nouvelle. Si `load` échoue, l'ancienne scène
- * reprend et `onLoadError` est appelé. Une demande reçue pendant un chargement est gardée pour après (la dernière l'emporte).
+ * reprend et `onLoadError` est appelé. Une demande reçue pendant un chargement est gardée pour après (la dernière l'emporte), sauf si elle vise la scène déjà en chargement ou déjà demandée (ignorée).
  */
 export class SceneManager {
   private readonly factories = new Map<SceneId, SceneFactory>();
@@ -174,6 +174,8 @@ export class SceneManager {
 
   /** Demande une scène ; effective au début du prochain tick. */
   request(id: SceneId): void {
+    // Idempotent : un second clic sur la même sortie ne doit pas rejouer la scène après la bascule.
+    if (this.loading?.id === id || this.requested === id) return;
     this.requested = id;
   }
 

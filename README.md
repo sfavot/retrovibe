@@ -123,9 +123,13 @@ Ils viennent de l'image ISO du CD : `scripts/mathemagique-extract.sh [archive.zi
 
 Le MIDI est joué par `spessasynth_lib` avec la soundfont General MIDI *GeneralUser GS* (non versionnée dans `archives/mathemagique/soundfont/`), réduite aux timbres des 66 MIDI du jeu : `npx vite-node scripts/mathemagique/soundfont.mts` produit `original/mathemagique/mathemagique-gm.sf2` (environ 18 Mo) et copie sa licence à côté (`mathemagique-gm-LICENSE.txt`). Le script d'extraction du CD conserve ces deux fichiers. Détails : `docs/mathemagique/audio.md`.
 
+### Jaquette
+
+`npx vite-node scripts/mathemagique/cover.mts` génère `original/mathemagique/COVER.png` (576×432, l'écran titre de `TITLE.DAT` avec sa palette) et régénère `files.json`. Le script d'extraction du CD conserve ce fichier.
+
 ### Pages de développement
 
-Avec `npm run dev` : `src/games/mathemagique/ui/asset-viewer.html` est une visionneuse des ressources des archives Mohawk (images `SHAP` et `tBMP`, palettes, animations `\0SCR` avec leurs sons, `WAVE`, MIDI à télécharger, listes de chaînes).
+Avec `npm run dev` : `src/games/mathemagique/ui/dev.html` lance le jeu seul, sans la page d'accueil (`__mw` expose `engine`, `host` et `services` dans la console ; pour l'instant, une scène provisoire affiche l'écran titre), et `src/games/mathemagique/ui/asset-viewer.html` est une visionneuse des ressources des archives Mohawk (images `SHAP` et `tBMP`, palettes, animations `\0SCR` avec leurs sons, `WAVE`, MIDI à télécharger, listes de chaînes).
 
 ### Documentation
 

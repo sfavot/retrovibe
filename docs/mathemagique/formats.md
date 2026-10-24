@@ -80,3 +80,18 @@ Non décodés (T3b et suivants) ; observations brutes :
 - `PUZZ`, `PTRN` (100 octets, 0x23×0x23 ?), `PLST` (386), `STLV` (180, `0065 7530…`), `TARG` / `UNIT` (tableaux de u32 big-endian : cibles et unités des jeux), `CURS` (curseurs 1 bit, 68 octets), `SYSX` (messages MIDI), `RSFL` (2 octets, 0).
 - `tWAV` de `MPC/PVG.MHK` : WAVE Mohawk comme ci-dessus, avec bourrage (`tBMP` / `tPAL` : voir [shap.md](shap.md)).
 - Rôle exact des 11 SNDL pointant hors de leur archive ; sens de `Prg#` ; lien entre repères `Cue#` et animation de bouche.
+
+## `CURS` — curseurs — `engine/pointer.ts`
+
+`MILKYWAY.DAT` contient deux `CURS` (ids 1 et 2) de **68 octets**, big-endian, lus par `1008:0000` (`watch cursor`, `question mark cursor`) :
+
+| Octets | Contenu |
+|---|---|
+| 0–31 | **image** : 16 mots `u16`, un par ligne, le bit de poids fort est le pixel de gauche ; bit à 1 = pixel **noir** |
+| 32–63 | **masque** : 16 mots `u16` ; bit à 1 = pixel **opaque** (hors masque : transparent) |
+| 64 | `u16` point chaud `x` |
+| 66 | `u16` point chaud `y` |
+
+Un pixel est donc noir (masque 1, image 1), blanc (masque 1, image 0) ou transparent (masque 0). Aucun pixel n'a l'image à 1 hors du masque dans les deux curseurs. Vérifié au rendu : `CURS` 1 est la montre (sablier, mode « occupé » `CursorKind` `busy`), contour blanc et bracelet / aiguilles noirs, point chaud (8, 6) ; `CURS` 2 est un point d'interrogation noir cerné de blanc (mode aide, `help`), point chaud (5, 6). L'ordre « image puis masque » et le sens des bits sont déduits du rendu ; le point chaud est le couple de fin (hypothèse : le code de `MATH` passe les 4 octets à `CreateCursor` sans autre traitement relevé).
+
+`decodeCursor(bytes)` renvoie `{ width: 16, height: 16, hotspotX, hotspotY, rgba }` ; `cursorImage` l'encode en PNG (sans compression, aucune dépendance) et `loadCursorImages(archive)` rend `{ busy, help }` avec `dataUrl`, que l'hôte navigateur passe à `cssCursor(image, "wait" | "help")` pour la propriété CSS `cursor`.

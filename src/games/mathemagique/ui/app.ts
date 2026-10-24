@@ -1,0 +1,182 @@
+import "./style.css";
+import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
+import { h } from "../../../ui/dom";
+import { copy } from "../copy";
+import { fetchGameFiles } from "../data/files";
+import { Engine } from "../engine/engine";
+import { SceneId } from "../engine/scene";
+import { installServices, type MathServices } from "../engine/services";
+import { cssCursor, loadCursorImages } from "../engine/pointer";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../render/canvas-presenter";
+import { BootScene } from "./boot-scene";
+import { BrowserHost, MissingFilesError, localStorageStore } from "./browser-host";
+
+export interface AppOptions {
+  /** URL du dossier des fichiers du jeu, sans barre finale (ex. `./mathemagique`). */
+  base: string;
+  /** Libellé du lien de retour à l'accueil ; sans valeur, pas de lien (page de dev). */
+  backLabel?: string;
+  /** Expose `window.__mw` (`engine`, `host`, `services`) pour la console (page de dev). */
+  debug?: boolean;
+}
+
+/** Identifiant du jeu pour la préférence « Son » (`retrovibe:mathemagique:sound`). */
+const GAME_ID = "mathemagique";
+
+/** Marge sous l'écran (en plus de ce que la page occupe déjà autour). */
+const BOTTOM_MARGIN = 16;
+
+/**
+ * Sortie du jeu (`Host.exit`) : retour à l'accueil du site quand le jeu est monté depuis le site (lien de retour présent), sinon,
+ * sur la page de dev, redémarrage du jeu. L'ancienne boucle s'arrête d'elle-même : son canvas n'est plus dans la page.
+ */
+function leave(container: HTMLElement, options: AppOptions): void {
+  if (options.backLabel) location.hash = "#/";
+  else void mountApp(container, options);
+}
+
+/** Message affiché pour une erreur de chargement ou d'exécution ; les fichiers manquants ont leur propre texte. */
+function failureMessage(error: unknown, prefix: string): string {
+  if (error instanceof MissingFilesError) return copy.missingFiles;
+  return `${prefix} ${error instanceof Error ? error.message : String(error)}`;
+}
+
+/** Le canvas peut-il reprendre le focus sans le voler ? Seulement si personne d'autre ne l'a (`body`) ou s'il l'a déjà. */
+export function canvasMayTakeFocus(active: Element | null, body: Element, canvas: Element): boolean {
+  return active === null || active === body || active === canvas;
+}
+
+/** Échelle entière la plus grande qui tient dans la place disponible ; fractionnaire en dessous de 1. */
+export function fitScale(availableWidth: number, availableHeight: number): number {
+  const fit = Math.min(availableWidth / SCREEN_WIDTH, availableHeight / SCREEN_HEIGHT);
+  return fit >= 1 ? Math.floor(fit) : Math.max(fit, 0.1);
+}
+
+/**
+ * Monte le jeu : canvas 640×480 mis à l'échelle entière (`image-rendering: pixelated`), centré, boucle `requestAnimationFrame`,
+ * états de chargement et d'erreur, pause quand l'onglet est masqué. Les erreurs de chargement et d'exécution remplacent l'écran
+ * par un message.
+ */
+export async function mountApp(container: HTMLElement, options: AppOptions): Promise<void> {
+  const status = h("p", { class: "mw-status", role: "status" }, copy.loading);
+  const back = options.backLabel ? h("a", { class: "back-link", href: "#/" }, options.backLabel) : null;
+  // Région d'erreur présente dès le départ (vide) pour que les lecteurs d'écran annoncent le message quand il arrive.
+  const errors = h("p", { class: "mw-error", role: "alert" });
+  container.replaceChildren(h("main", { class: "mw" }, status, errors, back));
+  const main = container.firstElementChild as HTMLElement;
+
+  let host: BrowserHost;
+  let engine: Engine;
+  let services: MathServices;
+  const canvas = h("canvas", { class: "mw-canvas", width: SCREEN_WIDTH, height: SCREEN_HEIGHT, tabindex: 0, "aria-label": copy.canvasLabel });
+  try {
+    // Manifeste absent, illisible ou remplacé par une page d'erreur : le jeu n'est pas installé.
+    const files = await fetchGameFiles(options.base).catch((error: unknown) => {
+      throw new MissingFilesError(error instanceof Error ? error.message : String(error));
+    });
+    host = new BrowserHost(options.base, files, canvas, () => leave(container, options));
+    // Débloque le son tant que l'activation du clic (« Jouer ») est valable.
+    host.audio.unlock();
+    engine = new Engine(host);
+    services = installServices(engine);
+    // Archives gardées toute la partie : curseurs d'origine (sablier, aide) et réglages d'initialisation du MIDI.
+    const [milkyway, midiMap] = await Promise.all([engine.ctx.resources.open("MILKYWAY.DAT", "persistent"), engine.ctx.resources.open("MIDIMAP.DAT", "persistent")]);
+    const cursors = loadCursorImages(milkyway);
+    host.setCursorStyle("busy", cssCursor(cursors.busy, "progress"));
+    host.setCursorStyle("help", cssCursor(cursors.help, "help"));
+    services.sound.loadMidiMap(midiMap);
+    // Scène provisoire à la place de l'écran titre (vague H).
+    engine.register(SceneId.title, () => new BootScene(services));
+    engine.start();
+  } catch (error) {
+    console.error(error);
+    status.hidden = true;
+    errors.textContent = failureMessage(error, copy.loadError);
+    return;
+  }
+  // Musique demandée avant la fin du chargement de la soundfont : rejouée dès que le synthétiseur est prêt.
+  const stopWatchingReady = host.audio.onReady(() => services.sound.restartMusic());
+  if (options.debug) (window as unknown as { __mw: unknown }).__mw = { engine, host, services };
+
+  const prefs = new SoundPrefs(localStorageStore, host.audio, GAME_ID);
+  const soundButton = h("button", { type: "button", class: "toggle", "aria-pressed": String(prefs.isEnabled()) }, copy.sound);
+  const focusCanvas = (): void => {
+    if (canvasMayTakeFocus(document.activeElement, document.body, canvas)) canvas.focus();
+  };
+  soundButton.addEventListener("click", (event) => {
+    soundButton.setAttribute("aria-pressed", String(prefs.toggle()));
+    host.audio.unlock();
+    // Clic souris (`detail` > 0) : le canvas reprend la main ; activation au clavier : le focus reste sur le bouton.
+    if (event.detail > 0) canvas.focus();
+  });
+  const stage = h("div", { class: "mw-stage" }, canvas);
+  const footer = h("div", { class: "mw-footer" }, back, h("div", { class: "mw-toggles" }, soundButton));
+  main.prepend(stage);
+  main.append(footer);
+
+  const resize = (): void => {
+    // Place disponible : largeur du conteneur ; hauteur de la fenêtre moins ce qui n'est pas l'écran (pied de page, marges, bandeau).
+    const above = main.getBoundingClientRect().top + window.scrollY;
+    const around = main.offsetHeight - stage.offsetHeight;
+    const scale = fitScale(main.clientWidth - 32, window.innerHeight - above - around - BOTTOM_MARGIN);
+    canvas.style.width = `${SCREEN_WIDTH * scale}px`;
+    canvas.style.height = `${SCREEN_HEIGHT * scale}px`;
+    footer.style.width = canvas.style.width;
+  };
+
+  // Onglet masqué : le jeu s'arrête (horloge et son) et repart au même point au retour ; le canvas reprend le focus.
+  const onVisibility = (): void => {
+    engine.setPaused(document.hidden);
+    if (!document.hidden) focusCanvas();
+  };
+  // Autre onglet : la préférence de son suit.
+  const onStorage = (event: StorageEvent): void => {
+    if ((event.key === null || event.key === soundPrefKey(GAME_ID)) && prefs.reload()) soundButton.setAttribute("aria-pressed", String(prefs.isEnabled()));
+  };
+  const listeners: [EventTarget, string, EventListener][] = [
+    [window, "resize", resize],
+    [window, "focus", focusCanvas],
+    [window, "storage", onStorage as EventListener],
+    [document, "visibilitychange", onVisibility],
+  ];
+  for (const [target, type, listener] of listeners) target.addEventListener(type, listener);
+  const dispose = (): void => {
+    for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
+    stopWatchingReady();
+    host.silence();
+    host.close();
+  };
+  if (document.hidden) engine.setPaused(true);
+  resize();
+  focusCanvas();
+
+  const fail = (error: unknown): void => {
+    console.error(error);
+    dispose();
+    status.hidden = true;
+    errors.textContent = failureMessage(error, copy.runtimeError);
+  };
+  const frame = (): void => {
+    // La page a été remplacée (retour à l'accueil) : on arrête la boucle.
+    if (!canvas.isConnected) {
+      dispose();
+      return;
+    }
+    try {
+      engine.frame(host.now());
+    } catch (error) {
+      fail(error);
+      return;
+    }
+    // La toute première scène n'a pas pu se charger : le moteur ne tourne plus, rien à afficher.
+    if (engine.failed) {
+      fail(engine.error?.error);
+      return;
+    }
+    // Le message de chargement n'apparaît que pour un chargement qui dure (les scènes se chargent en un clin d'œil en local).
+    status.hidden = !engine.loading;
+    requestAnimationFrame(frame);
+  };
+  status.hidden = true;
+  requestAnimationFrame(frame);
+}

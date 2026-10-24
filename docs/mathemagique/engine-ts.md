@@ -154,3 +154,87 @@ Pour un chargement qui ne se règle que sur commande, piloter `engine.frame(...)
 - Le moteur (`Host`, horloge, scènes, pause sur onglet caché) est dupliqué entre Téléportaschtroumpf, Lost in Time et ce jeu ; une version commune demanderait de refactorer les deux autres (hors périmètre, déjà noté dans `plan.md`).
 - Ctrl+V (boîte « À propos ») : pas implémenté ici (il faut le rendu de texte) ; à brancher en vague G/H via `addKeyHandler("after", …)`.
 - Durée réelle du timer du Bowling : voir « Temps ».
+
+## Services (G1)
+
+Couches utilisées par tous les écrans, sous `src/games/mathemagique/engine/` : `sound.ts`, `scr-player.ts`, `gadgets.ts`, `pointer.ts`, `services.ts`. Tests : `test/mathemagique/engine-services.test.ts` (scripts et archives synthétiques, plus les vraies données quand elles sont présentes). Tout est piloté par le tick du moteur : aucun minuteur, aucun `await` dans un tick.
+
+### Mise en place (`services.ts`)
+
+`installServices(engine)` (une fois, avant `engine.start()`) crée la surface de jeu et la palette (`GRAPHICS.screen`, `GRAPHICS.palette`), branche `engine.setFrameSource`, enregistre les cinq services (`GRAPHICS`, `SOUND`, `SCR_PLAYER`, `GADGETS`, `POINTER`) et ajoute **un crochet de tick** puis un gestionnaire de touche `before`. Il rend aussi `MathServices` (`graphics`, `sound`, `scr`, `gadgets`, `pointer`, `useArchive`, `endScene`).
+
+Ordre du crochet : palette (`tick`, présentation si l'affichage change) → séquenceur MIDI → lecteur de scripts → entrées → gadgets (clignotements, dessin). Entrées : pour chaque événement bouton de `input.buttonEvents`, dans l'ordre, le **pointeur d'abord** (il capte tout pendant qu'une pièce est portée), sinon les gadgets ; puis suivi de la pièce et du survol. Pendant une animation **bloquante** (`scr.blockedThisTick`) ni gadgets ni pointeur ne traitent leurs événements (comme la boucle `1090:111c`, qui n'appelle pas `10a0:001b`) ; Tab / Entrée sont gelés de même.
+
+Contrat des scènes : dans `enter`, `services.useArchive(archive)` (formes et sons des gadgets), création des groupes, `gadgets.captureBackground(screen)` après avoir peint le décor ; dans `leave`, **`services.endScene()`** (animations arrêtées sans rappel, gadgets vidés, pièce portée abandonnée, curseur remis à la flèche, cycles de palette arrêtés, sons coupés ; `{ keepMusic: true }` garde la musique). Le moteur n'offre pas de crochet de sortie de scène avant `enter` : sans cet appel, les animations et gadgets de l'ancienne scène survivent.
+
+### Son (`sound.ts`, `SOUND`)
+
+`SoundService(audio, { ambientEnabled, midiInit })` sur `AudioSink` et `MidiPlayer`.
+
+- `playSound(archive, id, options)` joue un `\0SND` **sans en connaître le type** (WAVE ou MIDI, détecté à l'en-tête, comme `1088:1498`) ; `playWave` / `playMusic` si on le sait. Retourne un `SoundHandle` (ou `null` si un son `ambient` est demandé alors que « Ambient Sounds » est coupé).
+- Canaux : `effect` (plusieurs en parallèle) et `voice` (une seule, la nouvelle remplace l'ancienne : Poly, Gus). `stopVoice`, `stopAll` (WAVE), `stopMusic`, `stopAmbient` (coupe ce qui est marqué `ambient` quand la préférence est décochée), `isPlaying(handle)`, `anyPlaying`, `voicePlaying`, `musicPlaying`, `releaseAll`.
+- `preload(archive, ids)` / `preloadSndl(archive, sndlId)` convertissent les WAVE à l'avance (cache par archive de `pcm.ts`) et rendent un `PreloadSet` à `release()` ; les MIDI et les ids absents sont ignorés.
+- MIDI : une musique à la fois, `loop` entre `setup end` / `loop start` et `loop end` ; `loadMidiMap(archive)` lit `SYSX` 1 de `MIDIMAP.DAT` (G2 l'appelle une fois, l'archive est à ouvrir). `tick()` avance le séquenceur (fait par `installServices`).
+- « Ambient Sounds » : la préférence du roster (`roster.ambient`) est relue à chaque demande ; l'option `ambient: true` d'un son ou d'une musique de fond (MIDI 100, 2000–2003, 201, MIDI 65000 du hub, bavardages) le soumet à cette préférence.
+
+### Lecteur de scripts (`scr-player.ts`, `SCR_PLAYER`)
+
+`player.start(archive, scrId, options)` → `AnimationHandle` ; `player.tick(input)` (fait par `installServices`) ; plusieurs animations à la fois.
+
+Options : `flags` (descripteur, `SCR_FLAG`), `offsetX` / `offsetY` (translation de la zone **et** des cellules : +40 en `y` pour les scripts de Poly), `clipOverride` (zone de remplacement, avant décalage : lancement des fusées de NIM), `shplOverride` / `sndlOverride` (sinon `resolveScrResources` : SHPL de même id ou la plus proche en dessous, SNDL de la dizaine pour le Bowling), `z`, `loop`, `blocking`, `soundChannel` (`voice` pour Poly et Gus), `ambientSounds`, `onHook(hook, arg, anim)`, `onEnd(anim)`, `deferFirstStep`.
+
+Poignée : `state` (`running` / `done` / `interrupted`), `done`, `time`, `frameIndex`, `logicalIndex`, `duration`, `clip`, `step()`, `interrupt()`, `fastForward(logical?)`, `rewind(runFirstStep?)`, `whenEnded(cb)`.
+
+**Chronologie** (vérifiée sur `MAINSCRN` 1000 : 13 images, fin au tick 98, et `BOWLING` 1200 : son 14300 au tick 14). `start` exécute la première étape tout de suite ; le `n`-ième `tick` suivant est le tick `n` du script. Les opcodes de cellule et les hooks s'exécutent dès qu'ils sont atteints ; `frame`, `sound` et `END` attendent la fin de l'image précédente. Une image **présente l'état des cellules à l'instant de l'opcode `frame`** (copie prise à ce moment : les opcodes qui suivent préparent l'image suivante) ; `render` n'a donc aucun effet visible ici. `END` à `time == duration` : l'animation est `done`.
+
+**Dessin** : formes `SHAP` = `firstShapeId + indice − 1` de la SHPL, posées à `(zone.gauche + x, zone.haut + y)` avec le mode `0` (copie) ou `8` (index 0 transparent) selon le quartet bas des drapeaux de cellule (`0` → 0, tout le reste → 8), écrêtées à la zone. Une forme hors de la SHPL (POLLY 35900) est ignorée sans erreur (l'original lève une erreur). La palette de la SHPL n'est pas appliquée (les SHPL d'animation n'en ont pas) : c'est la scène qui charge la sienne.
+
+**Drapeaux du descripteur** : 1 sauvegarde le fond de la zone et le restaure avant chaque image ; 2 ne coupe pas le MIDI (sans lui, une lecture **bloquante** appelle `stopMusic` au départ : hypothèse) ; 4 à l'interruption, avance sans attendre jusqu'à la dernière image (sans sons ni hooks) ; 8 interruptible par clic ou touche (non répétée), **seulement en mode bloquant** ; 16 attend la fin de tous les sons lancés avant de terminer ; 32 restaure le fond à la fin ou à l'interruption. Bit 6 ignoré (rôle non établi). `interrupt()` arrête aussi les sons de l'animation.
+
+**Composition** : quand une animation a changé, le lecteur restaure les fonds sauvegardés dans l'ordre **inverse** du démarrage, puis dessine toutes les animations par `z` croissant (à égalité : ordre de démarrage). Une animation finie sans drapeau 32 laisse sa dernière image sur la surface et n'est plus redessinée : deux animations dont les zones se recouvrent et qui sauvegardent le fond doivent donc finir dans l'ordre inverse du démarrage. Une scène qui repeint le fond appelle ensuite `player.redraw()` (les fonds déjà sauvegardés ne suivent pas).
+
+**Mode bloquant sans `await`** (« jouer jusqu'au bout », `1090:111c`). La scène garde un sous-état :
+
+```ts
+enter(ctx) {
+  this.opening = scr.playBlocking(archive, 1000, { flags: SCR_FLAG.saveBackground | SCR_FLAG.interruptible },
+    () => ctx.scenes.request(SceneId.bowling));      // suite exécutée du tick, à la fin ou à l'interruption
+}
+tick(ctx) {
+  if (this.opening?.state === "running") return;     // état « lecture » : rien d'autre ne tourne
+  …
+}
+```
+
+Pendant la lecture, gadgets et pointeur sont gelés ; un clic ou une touche interrompt si le drapeau 8 est posé (et n'atteint pas les gadgets : le tick suivant les retrouve libres). Hors mode bloquant (animations d'ambiance du hub, quilles du Bowling, Poly), `start` sans `blocking` : la scène continue de tourner et lit `handle.state` quand elle en a besoin.
+
+### Gadgets (`gadgets.ts`, `GADGETS`)
+
+`GadgetManager.addGroup({ records, onActivate(index, record, activation), active, exclusive, activateOn })` (10 groupes au plus, message d'origine « too many graphic button groups »). Enregistrement (`GadgetSpec`) : `rect` (`rectFromEdges(gauche, haut, droite, bas)` pour les tables des fiches, bords `[gauche, droite[`), `shapes` (id `SHAP` par état), `shapeX/Y`, `pressSound` (id ou fonction qui tire), `hidden`, `disabled`, `selected`, `toggle`, `focusable`, `hit` (test au pixel), `blinkPeriod`. `group.record(i)` donne l'enregistrement d'indice 1 à n ; ses drapeaux `hidden` / `disabled` / `selected` sont modifiables à chaud, `group.active` de même (bit 0 des drapeaux de groupe).
+
+- **Ordre de test** : groupes dans l'ordre d'ajout, enregistrements dans l'ordre du groupe, le premier touché gagne ; masqués, désactivés et groupes inactifs sont transparents (le plein écran du hub n'est actif que dans certains états). Hub : groupe 0 = les 14 enregistrements `DS:0c70`, groupe 1 = pupitre, etc.
+- **États** : `normal`, `hover` (survol ou focus clavier), `pressed`, `selected`, `disabled` (+ `hidden`). Priorité : désactivé > Entrée clignotant > enfoncé (et souris dessus) > sélectionné > survol / focus > clignotement. Formes avec repli : pressed → selected → hover → normal ; selected → pressed → normal ; hover et disabled → normal. Pas de forme pour `normal` : la forme est cuite dans le décor.
+- **Souris** : `updatePointer` suit le survol à chaque tick (pas de `mousemove`) ; `handleButton(event)` traite les événements dans l'ordre. L'appui enfonce, le **relâchement sur le même enregistrement** active (`activateOn: "release"`, défaut ; `"press"` active à l'appui : hypothèse sur l'instant exact, l'original n'est pas tranché) ; un relâchement ailleurs annule ; les trois boutons de souris font la même chose. Son d'appui joué à l'appui via `playSound(soundId)` (configuré par `useArchive`).
+- **Clavier** (`handleKey`, gestionnaire `before`) : Tab / Maj+Tab parcourent les enregistrements actifs et focalisables (ordre des groupes, puis des enregistrements ; focus affiché comme survol), Entrée active le **survol, sinon le focus**, et garde l'aspect enfoncé 30 ticks (`KEYBOARD_FLASH_TICKS` ; le rappel part tout de suite : hypothèse). Ctrl / Alt : non consommé.
+- `toggle` bascule `selected` à chaque activation (Click & Stick Mouse) ; `exclusive` (opérations du Bowling) sélectionne le touché et désélectionne les autres du groupe.
+- **Dessin** : `captureBackground(surface)` après le décor, `draw(surface)` ne redessine que les enregistrements dont l'état a changé (restauration du fond puis forme de l'état) et dit s'il faut présenter ; `invalidate()` après un repeint du décor.
+- `HotspotTable.fromEdges([[g, h, d, b], …])` : tables de rectangles simples (survol / aide `DS:1050` du hub, aides « ? » du Rhythm Shop et de Rockets) ; `hit(x, y)` rend l'indice 1-based (0 = aucune). `helpCursorAt(table, x, y, 3)` : `help` à partir de la zone 3 (les zones 1 et 2, Poly, gardent la flèche), sinon `arrow`.
+
+### Pointeur (`pointer.ts`, `POINTER`)
+
+`PointerService` : prise et dépose de pièces. Mode relu à chaque prise : `roster.clickAndStick` → `clickAndStick` (défaut), sinon `drag`.
+
+- La scène donne `pointer.source = { pick(x, y, event) }` (rend `{ item, x, y, width, height, grab? }` ou `null` ; l'ordre « pièce du dessus d'abord » et le test, rectangle englobant, cellule ou pixel, sont les siens : `pickTopmost`, `hitShapeAt`) et `pointer.listener = { onPick, onMove, onDrop }` (la scène joue les sons 5012 / 5013, remonte la pièce, redessine). `pointer.carry(result, button, x, y)` démarre un port sans passer par `source` ; `drop()`, `cancel()`, `reset()`, `bounds` (zone où la pièce reste entièrement, toute la zone de jeu par défaut).
+- **Cliquer-poser** : un clic (n'importe quel bouton) sur une pièce la prend ; elle suit la souris sans bouton tenu ; le clic suivant **n'importe où** la dépose ; la pièce portée **capte tous les clics** (les gadgets ne les voient pas). Le relâchement du clic de prise est ignoré.
+- **Glisser** : l'appui prend, la pièce suit tant que **ce bouton** est tenu, son relâchement dépose ; un bouton perdu sans événement (perte du focus, `Input.reset`) dépose sur place au tick suivant. Une prise programmatique (`carry`) n'est pas liée au bouton.
+- Suivi **par tick** (`Input.mouseX/Y`, jamais sur `mousemove`) ; la pièce garde le décalage de prise (`grab` : `{x, y}`, ou `"center"` pour Puzzle Patterns où le centre suit le curseur), ramenée dans `bounds` (`clampToBounds`). `onMove` seulement si la position change ; à la dépose la pièce est replacée à la position de l'événement.
+- Écarts assumés : pendant un port, **tous** les boutons sont pris par le pointeur (même un autre bouton en glisser) ; un appui et un relâchement dans le même tick donnent une prise suivie d'une dépose sur place.
+- **Curseurs** : `pointer.cursor` (`CursorController`) : `setBase(kind)` (curseur de la scène, `hidden` pour qui dessine le sien), `setHelpHover(bool)` (mode aide), `hideWhileCarrying` ; il appelle `ctx.setCursor` seulement sur changement ; le moteur impose `busy` pendant un chargement. Bitmaps `CURS` : voir formats.md « CURS » ; `loadCursorImages(milkyway)` + `cssCursor(image, fallback)` pour l'hôte navigateur (G2 : ouvrir `MILKYWAY.DAT` en `persistent` au démarrage, appliquer `busy` / `help` aux `setCursor` correspondants, `arrow` et `hidden` restant CSS).
+
+### Écarts, hypothèses, points ouverts
+
+- Pas de crochet moteur de sortie de scène : `endScene()` est à appeler par chaque scène dans `leave`.
+- Le déclenchement des gadgets au relâchement, l'aspect « enfoncé » de 30 ticks et la focalisation affichée comme survol sont des choix (l'original est décrit au niveau des tables de fonctions, pas de la logique visuelle des boutons `10a0:001b`).
+- Avance rapide (drapeau 4, `fastForward`) : état de la dernière image dessinée, sans sons ni hooks (le comportement exact de `1090:0432` n'est pas relu).
+- Animations qui se recouvrent avec sauvegarde de fond : fin en ordre inverse du démarrage (voir plus haut).
+- Rien de visible pour le joueur n'est écrit ici (aucune copy).

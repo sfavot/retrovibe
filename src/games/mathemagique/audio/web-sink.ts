@@ -3,8 +3,11 @@
  *
  * - Le contexte n'est créé qu'au premier `unlock()` (geste de l'utilisateur). Avant, `now()` vaut 0 et rien ne sort.
  * - WAVE : un `AudioBufferSourceNode` par voix (plusieurs en même temps, boucle, détection de fin par `onended`).
- * - MIDI : le synthétiseur (`WorkletSynthesizer`) est créé après `unlock()` ; la soundfont réduite se charge en tâche de fond
- *   (`scripts/mathemagique/soundfont.mts`). Tant qu'il n'est pas prêt, les messages MIDI sont ignorés sans erreur.
+ * - MIDI : le synthétiseur (`WorkletSynthesizer`) est créé quand `unlock()` a eu lieu **et** que `startMidiLoading()` a été demandé
+ *   (l'app attend la première image pour ne pas concurrencer le chargement du jeu) ; la soundfont réduite (18 Mo) se charge en tâche
+ *   de fond (`scripts/mathemagique/soundfont.mts`). Tant qu'il n'est pas prêt, les messages MIDI sont ignorés sans erreur ;
+ *   `onReady` signale le moment où il le devient.
+ * - `close()` libère tout (voix, synthétiseur, contexte) quand la page est quittée.
  * - Les messages MIDI datés partent vers le worklet au plus `FLUSH_WINDOW_MS` avant leur heure : le worklet ne sait pas
  *   annuler un message planifié, alors que `reset()` doit pouvoir couper net ce que le séquenceur a planifié d'avance.
  * - Muet = gain maître à 0 (WAVE et MIDI) ; la lecture continue, comme le moteur l'attend.
@@ -48,6 +51,9 @@ export class WebAudioSink implements AudioSink {
   private synth: WorkletSynthesizer | null = null;
   private midiReady = false;
   private midiStarted = false;
+  private midiWanted = false;
+  private closed = false;
+  private readonly readyListeners = new Set<() => void>();
   private queue: QueuedMessage[] = [];
   private flushTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -59,6 +65,7 @@ export class WebAudioSink implements AudioSink {
   constructor(private readonly options: WebAudioSinkOptions = {}) {}
 
   unlock(): void {
+    if (this.closed) return;
     if (!this.ctx) {
       this.ctx = this.options.createContext?.() ?? new AudioContext();
       this.master = this.ctx.createGain();
@@ -66,10 +73,40 @@ export class WebAudioSink implements AudioSink {
       this.master.connect(this.ctx.destination);
     }
     if (this.ctx.state === "suspended" && !this.suspended) this.startResume(this.ctx);
-    if (!this.midiStarted) {
-      this.midiStarted = true;
-      void this.startMidi(this.ctx, this.master!);
+    this.tryStartMidi();
+  }
+
+  /**
+   * Demande le chargement du synthétiseur et de la soundfont. Sans effet répété ; si le son n'est pas encore débloqué, le chargement
+   * démarre à l'`unlock()`.
+   */
+  startMidiLoading(): void {
+    this.midiWanted = true;
+    this.tryStartMidi();
+  }
+
+  /** Le synthétiseur est chargé : les messages MIDI sont joués. */
+  get ready(): boolean {
+    return this.midiReady;
+  }
+
+  /**
+   * `listener` est appelé une fois, quand le synthétiseur devient prêt (tout de suite s'il l'est déjà). Ne l'est jamais en cas d'échec
+   * du chargement. Renvoie la fonction qui retire l'écouteur.
+   */
+  onReady(listener: () => void): () => void {
+    if (this.midiReady) {
+      listener();
+      return () => {};
     }
+    this.readyListeners.add(listener);
+    return () => this.readyListeners.delete(listener);
+  }
+
+  private tryStartMidi(): void {
+    if (this.closed || !this.midiWanted || this.midiStarted || !this.ctx || !this.master) return;
+    this.midiStarted = true;
+    void this.startMidi(this.ctx, this.master);
   }
 
   now(): number {
@@ -131,17 +168,29 @@ export class WebAudioSink implements AudioSink {
   private async startMidi(ctx: AudioContext, output: AudioNode): Promise<void> {
     try {
       await ctx.audioWorklet.addModule(processorUrl);
+      if (this.closed) return;
       const synth = new WorkletSynthesizer(ctx);
-      synth.connect(output);
-      const response = await fetch(this.options.soundfontUrl ?? SOUNDFONT_URL);
-      if (!response.ok) throw new Error(`soundfont : HTTP ${response.status}`);
-      await synth.soundBankManager.addSoundBank(await response.arrayBuffer(), "main");
-      await synth.isReady;
+      try {
+        synth.connect(output);
+        const response = await fetch(this.options.soundfontUrl ?? SOUNDFONT_URL);
+        if (!response.ok) throw new Error(`soundfont : HTTP ${response.status}`);
+        const bank = await response.arrayBuffer();
+        if (this.closed) throw new Error("fermé");
+        await synth.soundBankManager.addSoundBank(bank, "main");
+        await synth.isReady;
+        if (this.closed) throw new Error("fermé");
+      } catch (error) {
+        synth.destroy();
+        throw error;
+      }
       this.synth = synth;
       this.midiReady = true;
+      const listeners = [...this.readyListeners];
+      this.readyListeners.clear();
+      for (const listener of listeners) listener();
     } catch (error) {
-      // Le jeu reste jouable sans musique MIDI.
-      console.warn("Mathémagique : synthétiseur MIDI indisponible", error);
+      // Le jeu reste jouable sans musique MIDI (et rien à signaler si la page a été quittée pendant le chargement).
+      if (!this.closed) console.warn("Mathémagique : synthétiseur MIDI indisponible", error);
     }
   }
 
@@ -207,6 +256,30 @@ export class WebAudioSink implements AudioSink {
   }
 
   /** Exécute `op` tout de suite si aucune transition n'est en cours, sinon à la suite : le dernier appel gagne. */
+  /**
+   * Libère toute la sortie (page quittée) : voix WAVE arrêtées, MIDI coupé, synthétiseur détruit, contexte fermé. Définitif et
+   * idempotent ; `unlock()` ne fait plus rien ensuite.
+   */
+  close(): void {
+    if (this.closed) return;
+    this.resetMidi();
+    this.closed = true;
+    this.readyListeners.clear();
+    for (const handle of [...this.voices.keys()]) this.stopWave(handle);
+    const { synth, ctx } = this;
+    this.synth = null;
+    this.midiReady = false;
+    this.master = null;
+    this.ctx = null;
+    try {
+      synth?.destroy();
+    } catch {
+      // déjà libéré
+    }
+    // Derrière les transitions suspend / resume en cours : fermer un contexte en pleine transition lèverait.
+    if (ctx) void this.enqueue(() => (ctx.state === "closed" ? undefined : ctx.close()));
+  }
+
   private enqueue(op: () => Promise<void> | undefined): Promise<unknown> {
     const run = (): Promise<unknown> => Promise.resolve(op()).catch(() => undefined);
     this.transitions++;

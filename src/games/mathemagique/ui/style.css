@@ -1,0 +1,68 @@
+/* Math Workshop (Mathémagique) : écran du jeu, canvas 640×480 à l'échelle entière, pixels nets. */
+
+.mw {
+  /* Pleine largeur : l'échelle du canvas se calcule sur la largeur de ce conteneur. */
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.mw-stage {
+  background: #000;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px #0009;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.mw-canvas {
+  display: block;
+  background: #000;
+  image-rendering: pixelated;
+  /* Le curseur vient de l'hôte (`BrowserHost.setCursor`) ; pas de défilement ni de zoom tactile sur l'écran. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Anneau de focus à l'intérieur de l'écran (le cadre `.mw-stage` rogne ce qui déborde). */
+.mw-canvas:focus-visible {
+  outline: 3px solid var(--focus, #f6d27a);
+  outline-offset: -3px;
+}
+
+.mw-footer {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  max-width: 100%;
+}
+
+.mw-toggles {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.mw-status,
+.mw-error {
+  margin: 0;
+  max-width: 36rem;
+}
+
+.mw-status[hidden],
+.mw-error:empty {
+  display: none;
+}
+
+/* Écran de présentation : l'image du jeu est en 4:3 (le composant commun la suppose carrée). */
+.mw-title-picture {
+  aspect-ratio: 4 / 3;
+}

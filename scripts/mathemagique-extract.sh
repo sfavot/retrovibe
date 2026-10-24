@@ -8,7 +8,8 @@
 # sont substitués d'un bloc en fin de script, seulement si tout a réussi.
 # L'ISO est lu par notre propre analyseur ISO 9660 : bsdtar et hdiutil le refusent, et 7zz oublie des fichiers.
 # Les vidéos QuickTime du guide des parents (QTW/*.MOV) ne sont pas gardées : le jeu ne les lit pas.
-# La soundfont réduite (mathemagique-gm.sf2) et sa licence, produites par scripts/mathemagique/soundfont.mts, sont conservées.
+# La soundfont réduite (mathemagique-gm.sf2) et sa licence, produites par scripts/mathemagique/soundfont.mts, ainsi que la jaquette
+# COVER.png (scripts/mathemagique/cover.mts), sont conservées.
 # Outils requis : unzip, python3.
 set -euo pipefail
 
@@ -42,8 +43,9 @@ echo "Fichiers utiles..."
 mkdir "$tmp/out"
 py copier "$tmp/cd" "$tmp/out" "$tmp/stats.json"
 
-# La soundfont réduite et sa licence (scripts/mathemagique/soundfont.mts) ne viennent pas du CD : conservées telles quelles.
-for fichier in mathemagique-gm.sf2 mathemagique-gm-LICENSE.txt; do
+# La soundfont réduite et sa licence (scripts/mathemagique/soundfont.mts) et la jaquette (scripts/mathemagique/cover.mts) ne viennent
+# pas du CD : conservées telles quelles.
+for fichier in mathemagique-gm.sf2 mathemagique-gm-LICENSE.txt COVER.png; do
   if [ -f "$sortie/$fichier" ]; then cp "$sortie/$fichier" "$tmp/out/$fichier"; fi
 done
 

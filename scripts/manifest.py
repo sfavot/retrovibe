@@ -1,8 +1,8 @@
-"""Génère original/teleportaschtroumpf/files.json : liste triée des fichiers extraits.
+"""Génère files.json dans un dossier original/<jeu>/ : liste triée des fichiers extraits.
 
-Usage : python3 -I manifest.py <dossier original/teleportaschtroumpf>
+Usage : python3 -I manifest.py <dossier original/<jeu>>
 Chaque entrée : {"path": chemin relatif au dossier (séparateur /), "size": octets}.
-Lu par src/games/teleportaschtroumpf/data/files.ts (résolution de noms insensible à la casse).
+Partagé par les scripts d'extraction ; pour le Téléportaschtroumpf, lu par src/games/teleportaschtroumpf/data/files.ts (résolution de noms insensible à la casse).
 """
 import json
 import os

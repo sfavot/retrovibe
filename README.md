@@ -10,6 +10,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | Indiana Jones and his Desktop Adventures | jouable |
 | Lost in Time (Coktel Vision, 1993) | jouable (en cours de validation) |
 | Le Téléportaschtroumpf (Infogrames Multimedia, 1995) | jouable (en cours de validation) |
+| Math Workshop / Mathémagique (Broderbund, 1994) | rétro-ingénierie en cours |
 
 ## Déploiement
 
@@ -109,6 +110,22 @@ Avec `npm run dev` : `src/games/teleportaschtroumpf/ui/asset-viewer.html` est un
 ### Documentation
 
 `docs/teleportaschtroumpf/` : plan (`plan.md`), formats de fichiers, rétro-ingénierie (`re-index.md`, `engine.md`), règles (`rules.md`), écrans (`screens-*.md`) et mini-jeux (`minigames/`).
+
+## Math Workshop (Mathémagique)
+
+*Math Workshop* (Broderbund, 1994, CD pour Windows 3.x ; *Mathémagique* en français). Le moteur (« Mohawk » de Broderbund) et ses activités sont compilés dans l'exécutable 16 bits `MATH` : ils sont reconstitués par rétro-ingénierie avec Ghidra. Les lecteurs de données sont faits, le jeu n'est pas encore jouable.
+
+### Fichiers de données
+
+Ils viennent de l'image ISO du CD : `scripts/mathemagique-extract.sh [archive.zip]` lit l'archive placée dans `archives/` (non versionnée), extrait le CD complet dans `archives/mathemagique/cd/` (pour la rétro-ingénierie) et ne garde que les fichiers utiles dans `original/mathemagique/`. Ce dossier contient `MATH` (l'exécutable du jeu), les archives Mohawk `*.DAT` (sauf `MIDIMAC.DAT`, le jeu MIDI pour Mac) et `MPC/PVG.MHK`, les images `*.WMF`, les polices `*.TTF` et `*.FON`, les quatre vidéos QuickTime du CD converties en `QTW/*.mp4` (H.264 + AAC) et `files.json` (liste des fichiers). Le script régénère aussi l'inventaire `docs/mathemagique/files.md`.
+
+### Pages de développement
+
+Avec `npm run dev` : `src/games/mathemagique/ui/asset-viewer.html` est une visionneuse des ressources des archives Mohawk (images `SHAP` et `tBMP`, palettes, animations `\0SCR` avec leurs sons, `WAVE`, MIDI à télécharger, listes de chaînes).
+
+### Documentation
+
+`docs/mathemagique/` : inventaire (`files.md`), formats (`formats.md`, `shap.md`, `scr.md`), rétro-ingénierie (`re-index.md`, régénérée par `scripts/mathemagique/re/run.sh` ; `engine.md`), écrans et activités (`screens/`) et transcription du manuel de la version de 1997 (`manual-en.md`).
 
 ## Ce qui a été reconstitué
 

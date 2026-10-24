@@ -1,4 +1,4 @@
-/** Lecteur binaire little-endian séquentiel. */
+/** Lecteur binaire séquentiel : little-endian par défaut, variantes `*be` pour le big-endian (Mohawk). */
 export class BinaryReader {
   private readonly view: DataView;
   private readonly bytes: Uint8Array;
@@ -41,6 +41,24 @@ export class BinaryReader {
 
   i32(): number {
     const v = this.view.getInt32(this.offset, true);
+    this.offset += 4;
+    return v;
+  }
+
+  u16be(): number {
+    const v = this.view.getUint16(this.offset, false);
+    this.offset += 2;
+    return v;
+  }
+
+  i16be(): number {
+    const v = this.view.getInt16(this.offset, false);
+    this.offset += 2;
+    return v;
+  }
+
+  u32be(): number {
+    const v = this.view.getUint32(this.offset, false);
     this.offset += 4;
     return v;
   }

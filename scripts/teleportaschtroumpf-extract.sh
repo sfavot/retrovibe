@@ -77,7 +77,7 @@ if [ "$manuel_ok" = 0 ]; then
   fi
 fi
 
-python3 -I "$racine/scripts/teleportaschtroumpf/manifest.py" "$tmp/out"
+python3 -I "$racine/scripts/manifest.py" "$tmp/out"
 rm -rf "$sortie"
 mv "$tmp/out" "$sortie"
 

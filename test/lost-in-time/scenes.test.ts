@@ -128,3 +128,36 @@ describe.skipIf(!hasOriginalFiles)("scènes jouées (partie 4)", { timeout: 60_0
     expect(changed[1]).toBeGreaterThan(3000);
   });
 });
+
+describe.skipIf(!hasOriginalFiles)("enchaînement des parties", { timeout: 120_000 }, () => {
+  it("fin de la partie 2 : la partie 3 repart de l'état CAT3.INF (MENU neuf), pas des variables de la partie 2", async () => {
+    // Partie 2 (PARTIE1.ITK masqué), puis la cinématique de fin (EMAM1102) enchaîne seule sur EMAM1104.
+    // MENU.TOT ne lit CAT3.INF qu'à son démarrage : sans redémarrage, v8[8256] (choix de PARTIE1/3.ITK) et
+    // v8[12666] (pince sur le taquet, EMAM1019) gardent leurs valeurs de la partie 2.
+    const ctx = makeFullGame(["PARTIE1.ITK"]);
+    const v = () => ctx.game.inter.vars;
+    const before: number[] = [];
+    const esc: Step[] = Array.from({ length: 12 }, () => [{ key: 0x011b }, { wait: 150 }] as Step[]).flat();
+    await drive(ctx, {
+      skipUntilFrame: SKIP_FRAMES,
+      steps: [
+        { wait: 200 },
+        {
+          run: () => {
+            before.push(v().readOff8(8256), v().readOff8(12666), v().readOff8(13433));
+            v().writeString(4532, "EMAM1102");
+            ctx.game.totToLoad = "EMAM1102.tot";
+            ctx.game.inter.terminate = 1;
+          },
+        },
+        ...esc,
+        { wait: 600 },
+      ],
+    });
+    expect(before).toEqual([0, 1, 1]); // état CAT2.INF
+    expect([v().readOff8(8256), v().readOff8(12666), v().readOff8(13433)]).toEqual([1, 255, 2]); // état CAT3.INF
+    expect(ctx.game.sessionPart).toBe("CAT3.INF");
+    expect(ctx.game.files.archiveNames).toContain("PARTIE3.ITK");
+    expect(ctx.game.files.archiveNames).not.toContain("PARTIE1.ITK");
+  });
+});

@@ -2,6 +2,7 @@ import { Archive } from "../data/archive";
 import type { Language } from "../data/tot";
 import { FrameTimer, MOUSE_NONE, type Host, type Subsystems, type VmContext } from "./host";
 import { Interpreter } from "./interpreter";
+import { PART_STARTS } from "./parts";
 import { loadResources, type FileSource, type Resources } from "./resources";
 import { Script } from "./script";
 import type { Variables } from "./variables";
@@ -115,6 +116,10 @@ export class Game implements VmContext {
   cursorHotspotYVar = -1;
   animDataSize = 0;
   quit = false;
+  /** Partie dont l'état (CATn.INF ou sauvegarde) est en mémoire ; null si inconnue (voir parts.ts). */
+  sessionPart: string | null = null;
+  /** Pendant le redémarrage de MENU sur une partie : les PARTIEn.ITK de numéro inférieur sont absents. */
+  partFloor = 0;
   soundFlags = DEFAULT_SOUND_FLAGS;
   fakeVideoMode = 0x14;
   readonly startTot: string;
@@ -267,6 +272,8 @@ export class Game implements VmContext {
   async totSub(flags: number, totFile: string): Promise<void> {
     flags = (flags << 24) >> 24;
     if (flags === 16 || flags === 17) return;
+    if (this.relaunchForPart(totFile)) return;
+    this.partFloor = 0; // la détection des parties (début de MENU) est passée
     if (this.numEnvironments >= ENVIRONMENT_COUNT) throw new Error("totSub : trop d'environnements imbriqués");
 
     this.envSet(this.numEnvironments);
@@ -326,6 +333,26 @@ export class Game implements VmContext {
       this.sys.sound.restoreSlots(this.numEnvironments);
     }
     this.animDataSize = this.script.animDataSize;
+  }
+
+  /**
+   * MENU.TOT lit CAT2/3/4.INF (état initial de la partie) seulement à son démarrage, après avoir détecté
+   * la partie d'après les PARTIEn.ITK présents (la plus basse gagne). Quand la boucle de MENU lance la scène
+   * de départ d'une autre partie que celle en mémoire (cinématique de fin qui enchaîne seule, ex. EMAM1102
+   * puis EMAM1104), aucun script ne relit cet état : on repart d'un MENU neuf, comme à l'insertion du CD
+   * suivant, en masquant le temps de la détection les PARTIEn.ITK des parties précédentes (`partFloor`).
+   * Sans cela la partie 3 démarre avec les variables de la partie 2.
+   */
+  private relaunchForPart(scene: string): boolean {
+    const wanted = PART_STARTS[scene.toUpperCase()];
+    if (!wanted || this.numEnvironments !== 0 || !this.sessionPart || this.sessionPart === wanted.file) return false;
+    if (!this.inter.variables) return false;
+    this.sessionPart = null;
+    this.partFloor = wanted.part;
+    this.inter.vars.writeVar32(58, 0);
+    this.totToLoad = "MENU.TOT";
+    this.inter.terminate = 1;
+    return true;
   }
 
   /** Exécute une fonction d'un environnement déjà empilé (`index` relatif, 0 = l'appelant). */

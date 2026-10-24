@@ -26,6 +26,7 @@ import {
   type ExprEnv,
   type Script,
 } from "./script";
+import { isPartStateFile, partOfItk, partOfVariables } from "./parts";
 import { Variables, bytesToString, stringToBytes } from "./variables";
 
 /** Levée quand le moteur dépasse le nombre d'instructions autorisé (garde-fou des tests). */
@@ -1184,7 +1185,7 @@ const HANDLERS: Record<string, Handler> = {
     const g = it.game;
     const mode = g.sys.saves.getSaveMode(file);
     let size = -1;
-    if (mode === "none") size = await g.files.sizeOf(file);
+    if (mode === "none") size = partOfItk(file) < g.partFloor ? -1 : await g.files.sizeOf(file);
     else if (mode === "save") size = g.sys.saves.getSize(file);
     else if (mode === "exists") size = 23;
     it.vars.writeOff32(dest, size === -1 ? -1 : 50);
@@ -1282,7 +1283,11 @@ const HANDLERS: Record<string, Handler> = {
     const mode = g.sys.saves.getSaveMode(file);
     if (mode === "save") {
       v.writeVar32(1, 1);
-      if (await g.sys.saves.load(file, dataVar, size, offset)) v.writeVar32(1, 0);
+      if (await g.sys.saves.load(file, dataVar, size, offset)) {
+        v.writeVar32(1, 0);
+        // sauvegarde chargée en entier : l'image des variables est celle de sa partie
+        if (size === 0) g.sessionPart = partOfVariables(v);
+      }
       return;
     }
     if (mode === "ignore") return;
@@ -1309,6 +1314,8 @@ const HANDLERS: Record<string, Handler> = {
       retSize = chunk.length;
     }
     if (retSize === size) v.writeVar32(1, 0);
+    // état initial d'une partie lu par MENU.TOT : mémorisé pour détecter un enchaînement sur une autre partie
+    if (retSize > 0 && dataVar === 0 && isPartStateFile(file)) g.sessionPart = partOfVariables(v);
   },
 
   async o2_writeData(it, a) {

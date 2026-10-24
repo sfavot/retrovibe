@@ -233,29 +233,12 @@ async function toHub(game: Game): Promise<HubScene> {
   return hub;
 }
 
-/** Au repos, une scène activité demandée par le hub (placeholder) est atteinte. */
+/** Clique sur un objet du hub et renvoie la scène atteinte. */
 async function launches(game: Game, x: number, y: number): Promise<SceneId | undefined> {
   game.host.click(x, y);
   await runFor(game.engine, game.host, 6000);
   return sceneOf(game);
 }
-
-describe("registerScenes", () => {
-  it("les activités pas encore branchées (Bowling, Rhythm Shop, Pattern Windows) ont un substitut qui ramène au hub", () => {
-    const host = new TestHost();
-    const engine = new Engine(host, { seed: 1 });
-    const services = installServices(engine);
-    registerScenes(engine, services);
-    for (const id of [SceneId.bowling, SceneId.rhythm, SceneId.patternWindows]) {
-      engine.scenes.request(id);
-      for (let i = 0; i < 3; i++) {
-        host.time += 100;
-        engine.frame(host.time);
-      }
-      expect(engine.scenes.currentId).toBe(id);
-    }
-  });
-});
 
 describe.skipIf(!hasOriginalFiles)("titre", () => {
   it("montre le logo à la première entrée seulement, puis le titre avec sa porte", async () => {
@@ -399,19 +382,7 @@ describe.skipIf(!hasOriginalFiles)("hub : activités", () => {
     expect(sceneOf(game)).toBe(SceneId.hub);
   });
 
-  it("le placeholder des activités manquantes ramène au hub au premier clic, rideau refermé", async () => {
-    const game = boot();
-    await toHub(game);
-    signIn(game);
-    expect(await launches(game, 330, 280)).toBe(SceneId.bowling);
-    game.host.click(10, 10);
-    await runUntil(game.engine, game.host, () => sceneOf(game) === SceneId.hub, 20_000);
-    await runFor(game.engine, game.host, 300);
-    // Retour du Bowling : le rideau se referme (SCR 1100).
-    expect(isRunning(game, 1100)).toBe(true);
-  });
-
-  it("une fabrique fournie à registerScenes remplace le placeholder", async () => {
+  it("une fabrique fournie à registerScenes remplace celle de la table", async () => {
     let created = 0;
     const custom: Scene = {
       enter: (ctx) => ctx.requestPresent(),

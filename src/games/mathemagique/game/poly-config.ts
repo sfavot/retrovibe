@@ -23,7 +23,7 @@
 import type { RosterFieldName } from "../engine/roster";
 import type { MsvcRandom } from "../engine/rng";
 
-export type PolyActivityId = "hidden" | "patterns" | "sticklers" | "bowling" | "patternWindows" | "rockets";
+export type PolyActivityId = "hidden" | "patterns" | "sticklers" | "bowling" | "patternWindows" | "rockets" | "rhythm";
 
 /** Archive qui contient les scripts d'aide. `POLLY.DAT` est ouverte temporairement (puis libérée) ; les deux autres sont celles de la scène. */
 export type PolyArchiveName = "POLLY.DAT" | "PATFILL.DAT" | "NIM.DAT";
@@ -318,7 +318,8 @@ export const ROCKETS_POLY: PolyConfig = {
   doc: "screens/rockets.md §1.8, §3",
 };
 
-export const POLY_CONFIGS: Readonly<Record<PolyActivityId, PolyConfig>> = {
+/** Les configurations de `POLLY.DAT` / `PATFILL.DAT` / `NIM.DAT` ; celle du Rhythm Shop (`RSHELP.DAT`) est dans `rhythm/help-config.ts` (`RHYTHM_POLY`). */
+export const POLY_CONFIGS: Readonly<Record<Exclude<PolyActivityId, "rhythm">, PolyConfig>> = {
   hidden: HIDDEN_POLY,
   patterns: PATTERNS_POLY,
   sticklers: STICKLERS_POLY,

@@ -1,18 +1,18 @@
 /**
- * Registre des scènes de Math Workshop : une fabrique par `SceneId`, chaque scène de la table ci-dessous ; celles qui ne sont pas encore
- * écrites sont remplacées par `createPlaceholderScene` (écran noir, un clic ou une touche ramène au hub) pour que le hub ne soit
- * jamais une impasse.
- *
- * Brancher une scène écrite à part = une ligne dans `SCENE_FACTORIES` (ou, de l'extérieur, `options.factories`).
+ * Registre des scènes de Math Workshop : une fabrique par `SceneId` (table `SCENE_FACTORIES`, complète : le typage l'impose).
+ * `options.factories` permet d'en remplacer une de l'extérieur (tests).
  */
 import type { Engine } from "../engine/engine";
-import { SceneId, type Scene, type SceneContext, type SceneFactory } from "../engine/scene";
+import { SceneId, type Scene, type SceneFactory } from "../engine/scene";
 import type { MathServices } from "../engine/services";
+import { createBowlingScene } from "./bowling";
 import { createCreditsScene } from "./credits";
 import type { CertificateEnvironment, CertificatePort } from "./certificate";
 import { createHiddenScene } from "./hidden";
 import { createHubScene, type HubOptions } from "./hub";
 import { createPatternsScene } from "./patterns";
+import { createPatternWindowsScene } from "./pattern-windows";
+import { createRhythmScene } from "./rhythm";
 import { createRocketsScene } from "./rockets";
 import { createSticklersScene } from "./sticklers";
 import { createTitleScene } from "./title";
@@ -30,16 +30,16 @@ export interface RegisterScenesOptions extends HubOptions {
 /** Fabrique d'une scène à partir des services et des options. */
 type SceneBuilder = (services: MathServices, options: RegisterScenesOptions, engine: Engine) => Scene;
 
-/**
- * Une ligne par scène écrite. Les scènes absentes de la table ont le substitut noir.
- * Exemple d'ajout : `[SceneId.rockets]: (services) => createRocketsScene(services),`.
- */
-const SCENE_FACTORIES: Partial<Record<SceneId, SceneBuilder>> = {
+/** Une ligne par scène. */
+const SCENE_FACTORIES: Record<SceneId, SceneBuilder> = {
   [SceneId.title]: (services) => createTitleScene(services),
   [SceneId.credits]: (services) => createCreditsScene(services),
   [SceneId.hub]: (services, options) => createHubScene(services, options),
+  [SceneId.rhythm]: (services) => createRhythmScene(services),
+  [SceneId.bowling]: (services, options) => createBowlingScene(services, { textInput: options.textInput }),
   [SceneId.hidden]: (services) => createHiddenScene(services),
   [SceneId.patterns]: (services) => createPatternsScene(services),
+  [SceneId.patternWindows]: (services, options) => createPatternWindowsScene(services, { download: options.certificates, textInput: options.textInput }),
   [SceneId.sticklers]: (services) => createSticklersScene(services),
   [SceneId.rockets]: (services) => createRocketsScene(services),
   [SceneId.trophy]: (services, options, engine) =>
@@ -55,39 +55,11 @@ function trophyExit(from: SceneId | undefined): SceneId {
   return from === undefined || from === SceneId.title || from === SceneId.credits || from === SceneId.trophy ? SceneId.hub : from;
 }
 
-/**
- * Scène provisoire des activités pas encore branchées : écran noir, rien à faire, un clic ou une touche ramène au hub.
- * La palette reste noire (le hub a fondu vers le noir avant de partir).
- */
-class PlaceholderScene implements Scene {
-  constructor(private readonly services: MathServices) {}
-
-  enter(ctx: SceneContext): void {
-    this.services.graphics.screen.fill(0);
-    ctx.setCursor("arrow");
-    ctx.requestPresent();
-  }
-
-  leave(): void {
-    this.services.endScene();
-  }
-
-  tick(ctx: SceneContext): void {
-    const input = ctx.input;
-    if (input.buttonEvents.some((e) => e.down) || input.keyEvents.some((e) => !e.repeat)) ctx.scenes.request(SceneId.hub);
-  }
-}
-
-export function createPlaceholderScene(services: MathServices): Scene {
-  return new PlaceholderScene(services);
-}
-
 /** Enregistre les 11 scènes dans le moteur (le titre est la première : `engine.start()` la lance). */
 export function registerScenes(engine: Engine, services: MathServices, options: RegisterScenesOptions = {}): void {
   for (const id of Object.values(SceneId)) {
-    const override = options.factories?.[id];
     const builder = SCENE_FACTORIES[id];
-    const factory: SceneFactory = override ?? (builder ? () => builder(services, options, engine) : () => createPlaceholderScene(services));
+    const factory: SceneFactory = options.factories?.[id] ?? (() => builder(services, options, engine));
     engine.register(id, factory);
   }
 }

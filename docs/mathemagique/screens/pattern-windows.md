@@ -362,3 +362,34 @@ Lecteur `\0SCR` avec zone d'écrêtage et sons synchronisés ; sauvegarde/restau
 - §5.3 : en plus de `x/X/z/Z`, les touches sont ignorées en mode aide et redirigées vers la saisie du nom quand `2d60 == 1`.
 - §9 : « `PTRN` 10, `STRL` 40000 (10 noms) » exact ; « sauvegarde 5262 octets » exact ; ajouter que `PTRN` fait exactement 100 octets.
 - §1.5 : les zones 2–5 du hub mènent bien à la scène 3.
+
+## Implémentation
+
+Code : `src/games/mathemagique/scenes/pattern-windows-logic.ts` (règles pures : `PTRN` → cellules, codec de quartets, peinture, Robinet, Yuck !, `isColorful`, `rotatePalette`, PNG) et `scenes/pattern-windows.ts` (`createPatternWindowsScene(services, { download?, textInput? })`, enregistrée dans `scenes/index.ts` avec `options.certificates` comme port de téléchargement, comme le Hall of Fame). Tests : `test/mathemagique/pattern-windows.test.ts` (la partie « scène » lit `PATFILL.DAT` et `MAINSCRN.DAT`, ignorée sans `original/mathemagique/`).
+
+### Ce qui est jouable
+
+- Entrée : fond 40000, palettes 40000 / 40200 / 999, fondu d'entrée de 30 ticks, jingle 3110 **attendu** (scène inerte), puis musique 1001 (Ambient) et flèches de motif clignotantes (12 ticks, jusqu'au premier clic ou bouton). Ctrl enfoncé à l'entrée : modes cachés du Robinet.
+- Dessin : les 524 cellules sont des masques 1 bit teintés `180 + c` ; le canevas (fond, nom, titre, cellules, cadre de couleur puis panneau 40001 transparent) est séparé de l'écran (gadgets par-dessus). Une cellule peinte n'est redessinée que dans son rectangle. Le dessin des cellules est **écrêté au verre** `[52, 393[ × [46, 387[` (les motifs 1 à 8 ont des tuiles qui débordent : sans écrêtage, des pixels coloriés apparaissent sur le bois ; clip supposé dans l'original, non vu dans la décompilation).
+- Peinture : appui gauche dans la fenêtre puis sondage à chaque tick tant que le bouton est tenu (indépendant du mode cliquer-poser / glisser du roster). La 1re cellule touchée décide peinture / effacement ; instantané pris à l'entrée, à chaque changement de couleur, de version, de motif, avant un Robinet, et au début d'un geste quand Yuck ! était actif. Quartet du stockage mis à jour à chaque cellule (vue directe sur le roster).
+- Boutons : couleurs (sons 3039, instantané), touches `x/X/z/Z` (sans son, ignorées pendant l'aide), versions 1 à 3 (3041, version retenue par motif), flèches (3040, circulaire), Robinet (3038 ; modes 1 à 7 via `faucetMode` selon le point du clic, Ctrl à l'entrée), Yuck ! (3053, bascule annuler / rétablir), Kaléidoscope (`PaletteCycler` 180–194, un cran / 8 ticks, 300 ticks, palette restaurée ; tout autre bouton l'arrête ; recliquer relance), Aide (3012 / 3013 à 50 %), Sortie (roster enregistré, fondu 30 ticks, hub). Tous les rappels commencent par arrêter le kaléidoscope et le clignotement.
+- Aide de Poly : `PolyHelper` + `PATTERN_WINDOWS_POLY` (zones `DS:24ce`, 28 SCR), musique coupée à l'ouverture et relancée à la fermeture, groupes et peinture gelés, main « stop » (40003, en (337, 396)) dessinée à la fin de la présentation, compliment 1800 si l'image est « variée » (`isColorful`, seuil `⌊n/3⌋ × 2`).
+- Roster : motif (137), versions (139), vitrail (149, 5 262 octets), couleur (5411), drapeau de Poly (5412), écrits au fil de l'eau en mémoire, `roster.save()` à l'ouverture du dialogue de nom, à l'impression et à la sortie. Sans joueur connecté, copie locale pour la visite.
+- Imprimer : le rectangle `(51, 45, 394, 388)` du canevas (donc cadre + cellules teintées, sans gadgets ni Poly) est encodé en PNG à palette (`encodeIndexedPng`, blocs zlib « stockés », ~118 Ko, synchrone, sans dépendance) et remis à `CertificatePort.download(blob, "vitrail-<motif>.png")`. Sans port, le bouton est désactivé. Pas de mémoire minimale ni de musique coupée (sans objet).
+- Pastille de nom : `MonitorOverlay` en vue « signin » (`hub: false`) ; la scène ouvre `MAINSCRN.DAT` (facultative : sans elle la pastille est inerte) et `NCSCLB10.FON` ; à la fermeture le joueur courant est relu (motif, versions, couleur, vitrail).
+
+### Écarts et hypothèses
+
+- **Sondage par pixel** : l'original sonde la souris à chaque tour de boucle (bien plus vite qu'un tick) ; ici chaque tick parcourt le segment depuis la dernière position, un point par pixel, pour qu'un geste rapide ne saute aucune cellule. Un appui et un relâchement dans le même tick peignent quand même la cellule cliquée.
+- **Palette du moniteur** : le moniteur dessine avec les couleurs du hub (10, 184, 201 et les formes de `SHPL 50000`) ; pendant le dialogue la scène charge la `SHPL 100` de `MAINSCRN.DAT` (entrées 10 à 208) puis rend sa palette. Le fond de bois change donc de couleurs pendant le dialogue (dette visuelle ; l'original dessinait son dialogue avec d'autres moyens, non étudiés).
+- **Joueur neuf** : ses variables sont à zéro, pas à `0x77` (le défaut `1060:0d65` n'est appelé par aucun chemin de création de joueur ici) ; un stockage entièrement nul est donc rempli de `0x77` à l'entrée. Conséquence : un joueur qui aurait colorié en blanc (0) les 30 vitraux serait réinitialisé.
+- Quartet 15 du stockage (jamais écrit) lu comme 7.
+- Cellules au-delà du nombre du motif (motifs 5 et 8 : 1 octet de marge) : lues et réécrites telles quelles, comptées par `isColorful` comme l'original.
+- Impression : PNG téléchargé à la place de la boîte d'impression Windows ; rendu = l'écran (palette logique courante), pas le document « Stained Glass » de l'original.
+- Modes cachés du Robinet : le point du clic est la position de la souris au relâchement ; au clavier (Entrée) le mode est toujours 0.
+- Arrêt du kaléidoscope : seuls les boutons des groupes 0 et 1 (versions, actions) l'arrêtent, comme l'original (les pastilles de couleur et la fenêtre ne l'arrêtent pas).
+
+### Copy à valider
+
+- Nom de fichier du PNG remis au joueur : `vitrail-<motif>.png` (motif = nom `STRL` 40000 en minuscules ASCII, mots reliés par `-`, ex. `vitrail-turtle-shell.png`).
+- Aucun autre texte : les noms de motifs (`STRL` 40000, anglais) et le nom du joueur sont ceux de l'original ; tout le reste est image ou voix.

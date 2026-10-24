@@ -6,6 +6,7 @@
  * bits u8, canaux u8, codage u16 (0 = PCM brut non signé), nombre de boucles u16 (0xFFFF = boucle),
  * début de boucle u32, fin de boucle u32, puis les échantillons.
  */
+import { u8ToFloat32 } from "../../../audio/pcm";
 import { BinaryReader } from "../../../data/reader";
 
 export interface CuePoint {
@@ -79,9 +80,7 @@ export function parseWave(bytes: Uint8Array): Wave {
 
 /** PCM 8 bits non signé → flottants dans [-1, 1[ pour Web Audio (0x80 = 0). */
 export function waveToFloat32(wave: Wave): Float32Array {
-  const out = new Float32Array(wave.samples.length);
-  for (let i = 0; i < out.length; i++) out[i] = (wave.samples[i] - 128) / 128;
-  return out;
+  return u8ToFloat32(wave.samples);
 }
 
 /** Durée en secondes. */

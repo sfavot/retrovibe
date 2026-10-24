@@ -15,6 +15,7 @@
 import { WorkletSynthesizer } from "spessasynth_lib";
 // Le processeur du worklet est un fichier à part : `?url` le fait copier par Vite dans les assets (chemin relatif à `base`).
 import processorUrl from "spessasynth_lib/dist/spessasynth_processor.min.js?url";
+import { createMonoBuffer } from "../../../audio/pcm";
 import type { AudioSink, MidiSink, PcmSound, WaveHandle } from "./sink";
 
 /** Soundfont réduite, servie par `publicDir` (`original/mathemagique/`). */
@@ -150,9 +151,7 @@ export class WebAudioSink implements AudioSink {
   private bufferOf(ctx: AudioContext, sound: PcmSound): AudioBuffer {
     let buffer = this.buffers.get(sound);
     if (!buffer) {
-      // `createBuffer` exige au moins 3000 Hz.
-      buffer = ctx.createBuffer(1, sound.samples.length, Math.max(3000, sound.sampleRate));
-      buffer.copyToChannel(sound.samples as Float32Array<ArrayBuffer>, 0);
+      buffer = createMonoBuffer(ctx, sound.samples, sound.sampleRate);
       this.buffers.set(sound, buffer);
     }
     return buffer;

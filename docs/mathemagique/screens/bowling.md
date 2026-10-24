@@ -85,7 +85,7 @@ Règle : dans un niveau, le sous-type passe au suivant quand `4d0e` (strikes) at
 | × | 32, 21, 65, 25, 90, 47, 71, 143, 255, 215 |
 | ÷ | 47, 48, 107, 56, 44, 82, 255, 255 |
 | = | 35, 35, 25, 97, 57, 255, 143, 143, 143, 143, 107, 107, 107 |
-| ≈ | recalculé à l'entrée par `1010:306c` : **182, 154, 142, 191** (niveaux 1–4 ; 191 est la valeur de repli du segment) |
+| ≈ | recalculé à l'entrée par `1010:306c` : **182, 154, 142, 190** (niveaux 1–4 ; le segment contient 191 en repli, voir la correction n° 1 de « Implémentation (logique) ») |
 
 Tirage (`1010:0f18`, partie « problème neuf », `4c5c == −1`) :
 ```
@@ -202,10 +202,10 @@ Ressources chargées une fois à l'entrée par `1010:306c` pour 3 catégories `k
 Précalcul (`1010:306c`) :
 1. Enregistrements `(n° objet 1-based, colonne, valeur)` triés par valeur croissante (`qsort` MSC `1000:7376` ; **ordre des ex æquo non reproduit**, sans effet sur les réponses). Longueurs : un enregistrement par valeur **non nulle** des 3 colonnes (colonne = long/tall/wide) ; durées : colonne = 2e u32 (1–5, choix de la phrase) ; poids : un par objet.
 2. Pour chaque unité `q` de valeur `U` et chaque **bande** `j` = 0–3 (= niveau 1–4) : multiplicateurs `lo = [1,5,20,20]`, `hi = [20,50,100,9999]` (mots à `1108:0ab3`/`0abb`) : `lo_idx` = nombre de cibles `< U·lo[j]` ; `hi_idx` = (premier indice de cible `≥ U·hi[j] + U/2`, recherche entamée en `lo_idx−1`) `− 1` ; effectif `cnt[q][j] = hi_idx − lo_idx + 1`, **forcé à 0** pour les longueurs si (`q<9` et `j=3`) ou (`q>8` et `j<2`) et pour les poids si (`q<6` et `j=3`) ou (`q>5` et `j<2`).
-3. `T[j][k] = Σ_q cnt[q][j]` : longueurs `465 321 267 141`, durées `55 34 15 65`, poids `98 57 67 77` (j = 0…3) ; `CNT[5][j] = Σ_k min(T[j][k], 64) − 1` = **182, 154, 142, 191**.
+3. `T[j][k] = Σ_q cnt[q][j]` : longueurs `465 321 267 141`, durées `55 34 15 63`, poids `98 57 67 77` (j = 0…3) ; `CNT[5][j] = Σ_k min(T[j][k], 64) − 1` = **182, 154, 142, 190**.
 
 Problème (`1010:1486` cas 5, sous-type = bande `j`) : parcourir `k = 0,1,2` en cumulant `min(T[j][k],64)` jusqu'à dépasser `N` ; indice local `idx = N − cumul_précédent` (si le quota est plafonné à 64 : `idx = ((N − cumul) × T[j][k]) >> 6`) ; parcourir les unités en cumulant `cnt[q][j]` jusqu'à dépasser `idx` ; `e0 = q`, `e1 = lo_idx[q][j] + (idx − cumul_avant_q)` (indice dans la liste triée), `e2 = k`. Bonne réponse : `ans = (valeur + U/2) div U` et `e3 = min(3, ⌊log_M ans⌋)` (`−1` si `ans = 0`) avec `M[k] = [4, 6, 4]` (mots `1108:033a`). Distracteurs (« erreurs d'ordre de grandeur ») : `s = (e3 + i) & 3` ; `ans[i] = ans[0]` multiplié par `M[k]` (si `e3 < s`, `s − e3` fois) ou **divisé** (si `s < e3`, `e3 − s` fois) ; rejetés si égaux ou > 19 999.
-Exemples : `(≈, bande 0, N=0)` → « combien de *pinheads* de large mesure *a toothpick* » : réponse **1** ; `(bande 3, N=190)` → « combien de *kilograms* pèse *a cow* » : **686**.
+Exemples : `(≈, bande 0, N=0)` → « combien de *pinheads* de large mesure *a toothpick* » : réponse **1** ; `(bande 3, N=189)` → « combien de *kilograms* pèse *a cow* » : **686**.
 
 ### 1.9 Strike et fin de niveau (`1010:28b9`, `29b1`)
 
@@ -350,8 +350,8 @@ Lecture `SCR`/`SNDL` avec jeu de descripteurs (10 pour les quilles, 1 pour Gus/s
 1. RNG : graine 1 → `rand(9)` ×5 = `[1,5,4,8,7]` ; graine 0 → `rand1(4)` ×5 = `[2,3,2,1,3]` ; `rand(0) = 0` sans avancer l'état.
 2. Opérandes (aucun aléa) : `(+,0,N=39) = [9,9]` ; `(+,6,63) = [4,8,9]` ; `(+,8,5) = [357,505]` ; `(+,8,255) = [348,542]` ; `(−,4,59) = [49,6]` → 43 ; `(−,10,0) = [500,100]` → 400 ; `(×,5,47) = [10,24,1]` → 240 ; `(×,9,215) = [7,8,9]` → 504 ; `(÷,0,10) → dividende 2, diviseur 1, rép. 2` ; `(÷,2,0) → 100 ÷ 1 = 100` ; `(÷,2,107) → 144 ÷ 12 = 12` ; `(=,2,12)` : `e = [0xF0, 4, 4]` (masque 8 bits, k=4, r=4) ; la bonne réponse est un masque de 4 bits de rotation ≠ 4 (graine 1 : 0x1E) ; `(=,10,35)` : `e = [11,10,9]`, k=10, graine 9, masque 24 cellules `mask(24,10,9)`.
 3. Plages : pour chaque (op, sub) et tout `N ≤ CNT`, 4 réponses distinctes, toutes ≤ 19 999, exactement une bonne ; soustraction jamais négative ; division exacte (`dividende mod diviseur = 0`).
-4. Tables : `COUNTS` et `THRESHOLDS` ci-dessus ; nombre de sous-types `[9,11,10,8,13,4]` ; `CNT[5] = [182,154,142,191]` calculé depuis les ressources ; `T = [[465,55,98],[321,34,57],[267,15,67],[141,65,77]]`.
-5. Estimation : `(bande 0, N=0)` → unité « pinheads », objet n° 4 « a toothpick » col. 2 (valeur 6) → réponse 1 ; `(bande 3, N=190)` → « kilograms », « a cow » (24 000 000) → 686 ; `e3` et distracteurs ×/÷ 4 ou 6.
+4. Tables : `COUNTS` et `THRESHOLDS` ci-dessus ; nombre de sous-types `[9,11,10,8,13,4]` ; `CNT[5] = [182,154,142,190]` calculé depuis les ressources ; `T = [[465,55,98],[321,34,57],[267,15,67],[141,63,77]]`.
+5. Estimation : `(bande 0, N=0)` → unité « pinheads », objet n° 4 « a toothpick » col. 2 (valeur 6) → réponse 1 ; `(bande 3, N=189)` → « kilograms », « a cow » (24 000 000) → 686 (N=190 : « a small car » → 914) ; `e3` et distracteurs ×/÷ 4 ou 6.
 6. Progression : `rank(0) = 1`, `rank(tous les bits de niveau) = 25`, bits bonus ignorés ; `29b1` : fin de niveau 4 sans les 3 autres bits → niveau 1 ; avec → bonus ; bonus fini → niveau 1 ; seuils (+ niveau 4 : sous-type 6/7/8 à 0/3/6 strikes) ; `recomputeSubIndex(+, 3, 3) = 7`.
 7. File de reprise : après une erreur le problème revient entre 3 et 6 questions plus tard ; la bonne réponse n'est jamais dans la case cliquée ; pop sur bonne réponse.
 8. Barre de temps : `barHalfWidth` vaut 0 au début, 121 à `total`.
@@ -378,3 +378,89 @@ Lecture `SCR`/`SNDL` avec jeu de descripteurs (10 pour les quilles, 1 pour Gus/s
 5. engine.md §5.3 : touches 1–4 actives **seulement pendant une partie**.
 6. formats.md `TARG/UNIT` : « tableaux de u32 big-endian » précisé (§3) ; `STRL 1016` n'est pas utilisée.
 7. scr.md : confirme `3adc` ; la `SNDL` d'un jeu contient un seul son (14300–14320 / 14442–14451).
+
+## Implémentation (logique)
+
+Tâche I1a : logique pure du Bowling, sans scène ni rendu, dans `src/games/mathemagique/game/bowling/` (`index.ts` ré-exporte tout). Tests : `test/mathemagique/bowling-logic.test.ts` (tous les vecteurs de §8.4 ; les tests qui lisent `BOWLING.DAT` sont `describe.skipIf(!hasOriginalFiles)`). Vérification croisée : les 10 854 problèmes de tous les (opération, sous-type, indice) × 2 graines sortent identiques (opérandes, 4 réponses, case, état final du hasard) du port Python de l'étude, corrigé des débordements 32 bits de la correction n° 1.
+
+### Fichiers
+
+| Fichier | Contenu |
+|---|---|
+| `tables.ts` | constantes copiées du segment : `SUBTYPE_COUNTS`, `STRIKE_THRESHOLDS`, `PROBLEM_MAX`, tables d'octets de × et ÷, bandes d'images, multiplicateurs d'estimation |
+| `data.ts` | `loadBowlingData(archive)` : unités, cibles, objets (`STRL`/`UNIT`/`TARG` 1000–1007) et les 25 rangs (`STRL 5000`) ; `parseU32Table` |
+| `estimation.ts` | `EstimationTables.build(data)` (précalcul de `1010:306c`), `operands`, `answer`, `prompt`, `problemMax`, `formatEstimationPrompt` |
+| `equivalence.ts` | `contiguousMask`, `scatteredMask`, `popcount`, `rotateMask12`, `simplifyFraction` |
+| `operands.ts` | `buildOperands` (`1010:1486`) |
+| `questions.ts` | `buildQuestion` (`1010:108d` + `1010:2150`), types `BowlingQuestion`, `Choice`, `Prompt` |
+| `picker.ts` | `QuestionPicker` (`1010:0f18` : sous-type, historique, file de reprise) |
+| `progress.ts` | `BowlingProgress` (variables du roster, strikes, niveaux, masque, rang), `GameTimer`, `backgroundMusicId`, `pickPinSet`, `pinAnimationId`, `gusTimeUpReaction` |
+
+### API pour la scène
+
+```
+const data = loadBowlingData(MohawkArchive.parse(bowlingDat));           // une fois à l'entrée
+const estimation = EstimationTables.build(data);
+const picker = new QuestionPicker(estimation);
+const progress = BowlingProgress.load(roster, playerId);                 // sous-types recalculés (1010:2aef)
+const timer = GameTimer.fromRoster(roster);                               // 10 800 ticks par défaut
+```
+
+- **Choix d'opération / de niveau** : `progress.selectOperation(op)`, `progress.selectLevel(l)` (renvoie faux pour le bonus tant que `bonusUnlocked(op)` est faux), puis `picker.reset()` (= `1010:0e23`). Pas de `reset` au GO!, au STOP ni au temps écoulé.
+- **GO!** : `progress.startRound()`, `timer.start(clock.ticks)`, `backgroundMusicId(progress.level, rng)`, `pickPinSet(rng)` pour les quilles (`pinAnimationId(jeu, nᵒ de bonne réponse)` = id du `SCR`), puis la question.
+- **Question** : `picker.next({ operation: progress.operation, level: progress.level, subType: progress.subType }, rng)` renvoie un `BowlingQuestion` : `prompt` (`arithmetic` avec `operator`, `operands` et `text` ; `estimation` avec `text` et `parts` ; `picture` = image ou masque de 8/12/24 cellules), `choices[4]` (`number` | `image` | `mask` | `fraction` avec `text`), `correctSlot`, `retry`. `picker.pick(...)` + `buildQuestion(...)` séparément si la scène veut le détail.
+- **Réponse** (case cliquée `slot`, touche 1–4 = case 0–3) : `correct = slot === question.correctSlot` ; `picker.answered(correct, slot)` ; si bonne : `timer.suspended = true` pendant l'animation, `progress.correctAnswer()` (vrai au 10ᵉ → `progress.strike(rng)` → `StrikeResult` : `animation` (indice 0–68 de la table de 70 scripts `1108:0974`), `levelCompleted`, `maskBit`, `level`, `gusCheer`) ; si fausse : surbrillance, 90 ticks, nouvelle question.
+- **Temps** : `timer.expired(tick)` à chaque tick, `timer.barHalfWidth(tick)` pour la barre (0 à 121).
+- **Persistance** : `progress.save(roster, playerId)` puis l'enregistrement du roster par l'hôte (à la fin d'un niveau, à la sortie).
+- **Rang** : `progress.rank` (1 à 25) ; le nom est `data.ranks[progress.rank - 1]`.
+- **Textes** : aucun texte nouveau. Les nombres sont formatés `"%d"` ; le signe ÷ est le caractère `÷` (la fonte du jeu l'encode `0xD6`, `encodeText`) ; les gabarits d'estimation (`ESTIMATION_FORMATS`) sont ceux de l'exécutable.
+
+### Corrections de l'étude
+
+1. **Estimation, bornes sur 32 bits** (`1010:3592`–`3602` : `IMUL EDX,EAX`, comparaisons non signées `JC`) : `U × multiplicateur (+ U/2)` perd sa retenue au-delà de 2³². Seule la borne haute de la bande 4 déborde (mois et années) : le total des durées de la bande 4 est **63** (et non 65), donc `CNT[5] = [182, 154, 142, 190]` (et non 191), et le vecteur « vache » devient `(bande 3, N=189)` → « a cow » → 686 (N=190 : « a small car » → 914). Les valeurs 182/154/142 et les autres totaux sont inchangés.
+2. **Effectifs en octets signés** : `lo`/`hi` sont des octets et l'effectif `hi − lo + 1` est un octet signé (`SUB AL`, `INC AL`, `CBW`). Les effectifs réels (≤ 102) n'atteignent pas 128 : aucun effet, mais une extension à de nouvelles données devra le garder en tête.
+3. **Simplification des fractions** (`1018:064d(3, …)`, `1010:12ad`) : réduction par 2 (tant que numérateur et dénominateur sont pairs) puis par 3 ; `k/n` égaux donnent « 1 » ; texte affiché `k` seul si `k = 0` ou `k = n` après réduction (sous-types 9, 11, 12 seulement), sinon `k/n` ; les sous-types 4, 5, 8, 10 affichent toujours `k/n` (« 0/8 », « 8/8 »).
+4. **Équivalence, sous-type 6** : la bonne réponse est la question tournée de 4 ou 8 cellules (rotation circulaire sur 12 bits) ; les sous-types 3, 6, 7 (masques éparpillés, 8 puis 12 cellules) tirent leurs distracteurs sur `popcount(8, rand1(256))` / `popcount(12, rand1(144))` (le second, ≤ 144, est lu dans le désassemblage).
+
+### Écarts assumés
+
+- **Historique anti-répétition** : l'original boucle indéfiniment si tous les indices de `0..CNT` sont déjà marqués alors que le compteur n'a pas dépassé `CNT` (possible avec les marques posées par les reprises ou par un autre sous-type au bonus). Ici l'historique est vidé dans ce cas ; tout le reste (indice partagé entre sous-types, remise à zéro quand `CNT < compteur`) est reproduit.
+- **File vide** : l'original tire `rand(compteur périmé)` même sans problème en attente, sans effet visible hormis la consommation du hasard ; non reproduit.
+- **Sous-types au chargement** : `BowlingProgress.load` recalcule le sous-type de toutes les opérations (l'original ne le fait que pour l'opération restaurée) ; les valeurs sont identiques pour un roster cohérent.
+- **Hasard** : le générateur du jeu est `MsvcRandom` (graine injectée) ; les masques éparpillés utilisent un générateur local réamorcé sur `signext16(graine)` (équivalent de la sauvegarde / restauration de l'état global).
+- **Boucles de rejet** : plafonnées (5 000 essais pour les distracteurs, 100 000 pour les masques) avec une erreur explicite ; jamais atteintes sur tout l'espace testé.
+
+### Questions ouvertes pour la scène
+
+- Table de 70 ids `SCR` des strikes (`1108:0974`) : `StrikeResult.animation` n'en donne que l'indice (0–68, voir §1.9) ; la table elle-même reste à extraire.
+- Réaction de Gus au départ (`1010:0934`, `rand(0..14)`) et au clic : non couvertes ici (sans lien avec les règles).
+
+## Implémentation (scène)
+
+Tâche I1b : `src/games/mathemagique/scenes/bowling.ts` (`createBowlingScene(services, { textInput? })`, enregistrée pour `SceneId.bowling`) et `scenes/bowling-view.ts` (rectangles, ids de ressources, dessin pur). Tests : `test/mathemagique/bowling-scene.test.ts` (vrais `.DAT`). La table des 69 strikes est dans `game/bowling/strike-scripts.ts` (`STRIKE_SCRIPTS`, `strikeScriptId`), lue dans le segment de données de `MATH` (NE 34, `0974`, suivie du mot `0xFFFF`).
+
+### Architecture
+
+- Les attentes bloquantes de l'original sont une file d'étapes (`Step`) : animation de quilles, fanfare, bannière, réaction de Gus, 90 ticks après une erreur. Pendant la file, les groupes de gadgets sont inactifs, les touches 1 à 4 ignorées et le test de temps suspendu (`4d32`).
+- Dessin : `base` (fond `SHAP 101`, Gus `SHAP 970`, étiquette `SHAP 990`, formes de niveau au repos) ; `canvas` = `base` + nom, rang, pions, barre, cases, question, œil ; l'écran reçoit des rectangles de `canvas` (les quilles et animations ne sont jamais écrasées). Après une animation plein écran : `repaintAll`.
+- Gadgets : opérations (exclusif, forme « active » `1031 + 2i`), niveaux (formes de repos dans `base`, active `1011 + 2k`, bonus désactivé tant que les 4 bits manquent), commandes (GO / STOP à la même zone, aide, EXIT ; GO clignote toutes les 20 ticks au repos), nom / trophée / Gus, 4 réponses (actives seulement en partie). Sons d'appui : 1001 à 1006, 1007, 1008, 1009, 1010.
+
+### Faits établis pendant l'étude de la scène
+
+- **Table d'aide de Polly** (`DS:08f8`, 14 rectangles) : Polly `(420,272,516,432)` puis les 13 sujets dans l'ordre `subject1` à `subject13` = réponses, nom, tunnel, fenêtre du problème, GO / STOP, niveaux, rang, opérations, strike zone, trophée, **Gus (sujet 11, `SCR 21000`)**, EXIT, barre de temps. Les ids `20500 + 50k` de `BOWLING_POLY` sont confirmés (l'animation 21000 est bien dans la zone de Gus). `helpZoneAt` les expose.
+- **Formes** : `SHPL 998` GO (998 repos, 999 clair), STOP (1000, 1001) ; `1002/1003` visage (repos / bouche ouverte), `1004/1005` EXIT (rouge / vert) ; niveaux : forme sombre au repos (22×22) et claire plus grande en actif ; opérations : `1030 + 2i` repos (déjà dans le fond), `1031 + 2i` actif ; `SHAP 1008` barre pleine, `1009` barre éteinte (dessinée aux deux extrémités sur la demi-largeur masquée) ; `SHPL 980` : 980 paupière, 981 yeux (état 2 = ouvert, 7 ticks à l'état 1, puis `120 + rand(0..180)`).
+- **`SHPL 1044` = lumières de bannière** (pas du texte) : 1044 (312×141) en `(128,62)`, 1046 en `(420,66)`, 1048 en `(38,66)`, tous peints dans les 8 entrées 218 à 225. Fanfare / bannière (`1010:42a2`) : entrées mises à la couleur 27 (crème), formes posées, puis couleurs arc-en-ciel d'origine tournées toutes les 8 ticks tant que le son (1020 ou 1021) joue.
+- **Strike** (`1010:28b9`, `407a`, `397f`) : palette de la `SHPL` du strike chargée, fanfare 1020 avec lumières, `SCR 18000` (Gus se prépare), le strike, `SCR 18050` (pose finale) sauf pour `12800`, son 1011, pions, puis (niveau terminé) bannière « LEVEL n » du **nouveau** niveau ou « BONUS ROUND » (non dessinée ici, voir copy), puis réaction de Gus. `SCR 18100` (clip depuis `x = 0`, son 14440) est vraisemblablement l'entrée de Gus.
+- **Mise en page de l'équivalence** (`1010:2bb0`, arguments `(y, x, valeur)`) : image = `SHAP 1800 + n` ; 8 cellules : disque `1836`, parts `1837 + k` aux décalages `x = [23,23,23,23,7,0,0,7]`, `y = [0,7,23,23,23,23,7,0]`, quadrillage `1845`, demi-traits `1846 + j` ; 12 cellules (beignets, 3 colonnes × 4 lignes, pas 19 × 8) : boîte `1850`, saveur `1852 + (bit haut mod 5)`, étiquette `1851` ; 24 cellules (8 colonnes × 3 lignes, pas 14 × 13) : cadre `1858`, cube `1857`, traits `1859`. Fonte : `NCSclB14` pour opérations et réponses, `NCSclB12` pour l'estimation (`4a14`), `NCSclB10` pour le nom et le rang (`4a10`, la doc d'engine.md « `4a10` = B10 » est confirmée par `1010:3ee4` / `3f39`).
+
+### Écarts et hypothèses
+
+- **Entrée de Gus non jouée** (`SCR 18100` supposé) : Gus est peint au repos dès l'entrée ; le drapeau « retour du Hall of Fame » (`4dfc`) n'a donc pas d'objet.
+- Strike, bannière et réactions de Gus sont **interruptibles par un clic** (drapeau 8) ; les flags exacts du descripteur ne sont pas établis. La fanfare et la bannière attendent la fin du son (plafonné à 600 ticks).
+- Mauvaise réponse : la bonne case est mise en évidence tout de suite (comme `3923`), pas de flash de la case cliquée ; l'attente de 90 ticks est interrompue par un clic.
+- Réaction de Gus au clic : `457a(4|10|20)` tirée au hasard, Ctrl + Maj + clic : 15. Réaction de sortie : `NoRepeatPool(15)` (`1010:0934`, `10a8:13af`).
+- Barre de temps redessinée en entier à chaque changement de demi-largeur (l'original ne repeint que la bande nouvellement masquée).
+- Opération et niveau au GO : l'opération restaurée est toujours `+` à l'entrée (le roster ne la sauvegarde pas).
+- L'aide de Polly passe par `PolyHelper` / `BOWLING_POLY` (sans la main « stop » : non documentée pour le Bowling). Le trophée revient au Bowling (`trophyExit`).
+- Le nom (étiquette) ouvre le moniteur en mode connexion (palette du hub le temps du dialogue) ; à la fermeture le joueur est rechargé.
+- Pas de nouvelle copy : « LEVEL n » / « BONUS ROUND » (`1010:4140`) ne sont **pas** affichés (la bannière ne montre que les lumières) : **Copy à valider** si on veut les reproduire dans la fenêtre du problème.

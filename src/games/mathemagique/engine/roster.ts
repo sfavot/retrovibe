@@ -100,15 +100,31 @@ export type RosterFieldName = keyof typeof ROSTER_FIELDS;
 
 // --- Noms de joueur (screens/common.md §3.4) ---
 
-/** Caractères de saisie : lettres, chiffres, espace et point. Le premier doit être une lettre ou un chiffre. */
+/** Longueur maximale d'un nom (`SI < 0x1c`). */
 export const NAME_MAX_LENGTH = 28;
 
-const isLetter = (c: string): boolean => /^[A-Za-z]$/.test(c);
-const isDigit = (c: string): boolean => /^[0-9]$/.test(c);
+/**
+ * Lettres admises dans un nom. L'original n'accepte que `A–Z a–z` (`ASCII_NAME_RULES`, défaut partout) ; la vague H autorise aussi les lettres
+ * accentuées du Latin-1 (`LATIN1_NAME_RULES`, décision de `plan.md`). Le stockage reste d'un octet par caractère (Windows-1252 = Latin-1 sur
+ * ces lettres) : `isLetter` ne doit jamais accepter un caractère au-delà de U+00FF (`isNameChar` le refuse de toute façon). Une couche
+ * d'affichage plus étroite (police sans certains glyphes) peut fournir ses propres règles, sous-ensemble du Latin-1.
+ */
+export interface NameRules {
+  isLetter(c: string): boolean;
+}
 
-/** Caractère accepté en cours de saisie (`1080:05a1`–`05e8`). */
-export function isNameChar(c: string): boolean {
-  return c.length === 1 && (isLetter(c) || isDigit(c) || c === " " || c === ".");
+const isAsciiLetter = (c: string): boolean => /^[A-Za-z]$/.test(c);
+const isDigit = (c: string): boolean => /^[0-9]$/.test(c);
+/** Lettres Latin-1 : `À`–`ÿ` sauf `×` (U+00D7) et `÷` (U+00F7). */
+const isLatin1Letter = (c: string): boolean => c.length === 1 && c >= "\u00c0" && c <= "\u00ff" && c !== "\u00d7" && c !== "\u00f7";
+
+export const ASCII_NAME_RULES: NameRules = { isLetter: isAsciiLetter };
+export const LATIN1_NAME_RULES: NameRules = { isLetter: (c) => isAsciiLetter(c) || isLatin1Letter(c) };
+
+/** Caractère accepté en cours de saisie (`1080:05a1`–`05e8`) : lettre selon `rules`, chiffre, espace, point ; jamais au-delà de U+00FF. */
+export function isNameChar(c: string, rules: NameRules = ASCII_NAME_RULES): boolean {
+  if (c.length !== 1 || c.charCodeAt(0) > 0xff) return false;
+  return rules.isLetter(c) || isDigit(c) || c === " " || c === ".";
 }
 
 /**
@@ -116,29 +132,35 @@ export function isNameChar(c: string): boolean {
  * si `fitsWidth` est fourni, largeur du texte résultant < 110 px en police `NCSclB10` (mesure fournie par la couche graphique,
  * le roster n'en connaît pas).
  */
-export function canAppendNameChar(current: string, c: string, fitsWidth?: (text: string) => boolean): boolean {
-  if (!isNameChar(c)) return false;
-  if (current.length === 0 && !(isLetter(c) || isDigit(c))) return false;
+export function canAppendNameChar(current: string, c: string, fitsWidth?: (text: string) => boolean, rules: NameRules = ASCII_NAME_RULES): boolean {
+  if (!isNameChar(c, rules)) return false;
+  if (current.length === 0 && !(rules.isLetter(c) || isDigit(c))) return false;
   if (current.length >= NAME_MAX_LENGTH) return false;
   return fitsWidth ? fitsWidth(current + c) : true;
 }
 
+/** Majuscule d'une lettre, si elle reste un caractère d'un octet (`ÿ` → `Ÿ` sort du Latin-1, `ß` → `SS` : inchangés). */
+function upperLetter(c: string, rules: NameRules): string {
+  const up = c.toUpperCase();
+  return up.length === 1 && up.charCodeAt(0) <= 0xff && rules.isLetter(up) ? up : c;
+}
+
 /** Mise en forme à la validation (`1c31`) : 1re lettre et lettre après une espace en majuscule ; pas de rognage des espaces. */
-export function formatPlayerName(raw: string): string {
+export function formatPlayerName(raw: string, rules: NameRules = ASCII_NAME_RULES): string {
   let out = "";
   let upper = true;
   for (const c of raw) {
-    out += upper && isLetter(c) ? c.toUpperCase() : c;
+    out += upper && rules.isLetter(c) ? upperLetter(c, rules) : c;
     upper = c === " ";
   }
   return out;
 }
 
 /** Nom conforme aux règles de saisie (longueur 1 à 28, caractères permis, 1er caractère lettre ou chiffre). */
-export function isValidPlayerName(name: string): boolean {
+export function isValidPlayerName(name: string, rules: NameRules = ASCII_NAME_RULES): boolean {
   if (name.length === 0 || name.length > NAME_MAX_LENGTH) return false;
-  if (!(isLetter(name[0]!) || isDigit(name[0]!))) return false;
-  return [...name].every(isNameChar);
+  if (!(rules.isLetter(name[0]!) || isDigit(name[0]!))) return false;
+  return [...name].every((c) => isNameChar(c, rules));
 }
 
 // --- Masque de réussites et grade (common.md §3.6, engine.md §7.1) ---
@@ -190,11 +212,12 @@ export class RosterFormatError extends Error {
   }
 }
 
-/** Compare deux noms pour l'affichage : alphabétique insensible à la casse (hypothèse : `1080:1ab8` n'a pas été relu), puis ordre exact. */
+/** Ordre des noms à l'écran : langue fixe (le résultat ne dépend pas du navigateur), accents et casse ignorés. */
+const NAME_COLLATOR = new Intl.Collator("fr", { sensitivity: "base" });
+
+/** Compare deux noms pour l'affichage : alphabétique sans tenir compte des accents ni de la casse, puis ordre exact, puis numéro. */
 function compareNames(a: PlayerInfo, b: PlayerInfo): number {
-  const la = a.name.toLowerCase();
-  const lb = b.name.toLowerCase();
-  return la < lb ? -1 : la > lb ? 1 : a.name < b.name ? -1 : a.name > b.name ? 1 : a.id - b.id;
+  return NAME_COLLATOR.compare(a.name, b.name) || (a.name < b.name ? -1 : a.name > b.name ? 1 : a.id - b.id);
 }
 
 export class Roster {
@@ -300,7 +323,7 @@ export class Roster {
     const start = this.entryOffset(id) + E_NAME;
     const field = this.bytes.subarray(start, start + NAME_FIELD_SIZE);
     const end = field.indexOf(0);
-    // Windows-1252 : les noms de la saisie d'origine sont ASCII ; tout autre octet est lu tel quel.
+    // Un octet par caractère : ASCII, ou lettre Latin-1 (identique à Windows-1252 sur ces lettres) de `LATIN1_NAME_RULES`.
     return String.fromCharCode(...(end === -1 ? field : field.subarray(0, end)));
   }
 
@@ -333,10 +356,10 @@ export class Roster {
    * Crée un joueur (`1c31`) : mise en forme du nom, refus du nom vide, invalide, déjà pris (`strcmp` exact, donc sensible à la casse,
    * sur le nom mis en forme) ou de la 41e entrée. Premier emplacement libre, masque et variables de scènes remis à zéro.
    */
-  addPlayer(raw: string): AddPlayerResult {
+  addPlayer(raw: string, rules: NameRules = ASCII_NAME_RULES): AddPlayerResult {
     if (raw.length === 0) return { ok: false, reason: "empty" };
-    const name = formatPlayerName(raw);
-    if (!isValidPlayerName(name)) return { ok: false, reason: "invalid" };
+    const name = formatPlayerName(raw, rules);
+    if (!isValidPlayerName(name, rules)) return { ok: false, reason: "invalid" };
     if (this.findByName(name)) return { ok: false, reason: "duplicate" };
     let id = 1;
     while (id <= MAX_PLAYERS && this.isUsed(id)) id++;
@@ -363,11 +386,11 @@ export class Roster {
   }
 
   /** Renomme un joueur avec les mêmes règles que la création (le nom actuel n'est pas un doublon de lui-même). */
-  renamePlayer(id: number, raw: string): RenamePlayerResult {
+  renamePlayer(id: number, raw: string, rules: NameRules = ASCII_NAME_RULES): RenamePlayerResult {
     if (!this.isUsed(id)) return { ok: false, reason: "unknown" };
     if (raw.length === 0) return { ok: false, reason: "empty" };
-    const name = formatPlayerName(raw);
-    if (!isValidPlayerName(name)) return { ok: false, reason: "invalid" };
+    const name = formatPlayerName(raw, rules);
+    if (!isValidPlayerName(name, rules)) return { ok: false, reason: "invalid" };
     if (this.findByName(name, id)) return { ok: false, reason: "duplicate" };
     this.writeName(id, name);
     return { ok: true, name };

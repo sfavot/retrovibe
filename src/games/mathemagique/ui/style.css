@@ -12,6 +12,7 @@
 }
 
 .mw-stage {
+  position: relative;
   background: #000;
   border-radius: var(--radius);
   box-shadow: 0 20px 60px #0009;
@@ -65,4 +66,18 @@
 /* Écran de présentation : l'image du jeu est en 4:3 (le composant commun la suppose carrée). */
 .mw-title-picture {
   aspect-ratio: 4 / 3;
+}
+
+/* Champ invisible qui fait monter le clavier virtuel pendant la saisie du nom (`text-input.ts`). 16 px : iOS ne zoome pas dessus. */
+.mw-text-input {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  font-size: 16px;
 }

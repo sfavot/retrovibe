@@ -304,3 +304,33 @@ Cible : `src/games/mathemagique/screens/hidden/` (ou équivalent selon l'agent U
 - §9 : `PUZZ` = « 8 pièces × 15 » : de 7 à 9 pièces, `1 + 15 n` octets (106, 121 ou 136).
 - §7.1 en-tête : `DS:02b8` est la préférence de **mode de la souris** (clic-clic / glisser) et `DS:2d64` la préférence **musique** (jouée via `SND` 100), pas seulement un indicateur de phrases d'attente de Poly.
 - §10 q. 12 : Hidden n'a ni difficulté adaptative ni score ; hasard = découpage sans remise + dispersion + jingle.
+
+## Implémentation
+
+Code : `src/games/mathemagique/scenes/hidden.ts` (`createHiddenScene(services)`, enregistré par la vague d'intégration sous `SceneId.hidden`) et `scenes/hidden-view.ts` (constantes, bordures et dessin, purs). Tests : `test/mathemagique/hidden-scene.test.ts` (scène sur les vraies données, avec un solveur de pavage qui pose les pièces par de vrais clics dans les deux modes de souris). Règles : `game/puzzle-kit.ts` ; aide : `game/poly.ts` (voir [game-kit.md](../game-kit.md)). **Aucune copy** : tout est dessin et audio.
+
+### Machine d'états
+
+`welcome` (SCR 2000 bloquant, drapeaux `saveBackground | waitSounds`) → `menu` → `launching` (SND 5011 joué en entier) → `transition` (stores vénitiens) → `playing` → `jingle` (musique coupée, SND 5020–5023 en entier, pièces désactivées) → `reward` (SCR 5100 + 900·niveau + 100·k, bloquant, non interruptible) → `solved` (la télé rejoue). `resetting` (SND 5004, 30 ticks, nouvelle dispersion du **même** découpage, stores 30 ticks) et `leaving` (fondu au noir de 30 ticks puis `scenes.request(hub)`) complètent. L'aide de Poly est orthogonale (`PolyHelper.active`) et s'ouvre au menu, en jeu et une fois fini. Exposé en lecture (`phase`, `level`, `puzzle`, `board`, `rewardScr`, `jingleSnd`, `poly`) pour les tests.
+
+Groupes de gadgets : boutons (7 : formes 5000, repos/appui ; sons d'appui 5000–5003 pour les visages et l'aide), vignettes (9, actif au menu), télé (actif une fois fini), aide (Poly, pièces, boutons, télé : dans cet ordre, actif pendant l'aide). L'activation est recalculée à chaque tick d'après la phase (`applyActivation`) : un seul endroit remplace les bits `31ce` / `3200` / `3210`. Les pièces passent par `attachBoard` ; la prise est filtrée par la phase (jeu, hors aide). Curseur « occupé » hors des phases interactives.
+
+Ordre des tirages à graine fixe, comme l'original : découpage (`HiddenSelection`, sans remise par niveau pour la durée de la scène), jingle `5020 + rand1(4)`, puis dispersion. Reset ne tire que la dispersion.
+
+### Rendu
+
+- Le fond `SHPL` 102 est gardé dans une surface `backdrop` (les gadgets y sauvegardent leur fond) ; chaque changement **recompose** toute la surface de jeu : fond, menu ou plateau, boutons, puis la pièce tenue par-dessus tout. Les transitions composent l'écran cible dans une seconde surface (boutons de repos compris) et le révèlent par `Blinds` ; un clic (pas celui qui l'a lancée) l'achève.
+- Pièce non posée : aplat 86 / 61 / 140 sur chaque cellule, puis bordures de `SHPL` 5030 (côtés et coins recalculés d'après la forme courante, §2.4, positions `(0,0)`, `(c−5,0)`, `(0,c−5)`, `(c−5,c−5)`). Pièces posées : photo écrêtée par un `ClipMask` (union des cellules rétrécies de 5 px sur chaque côté exposé) puis leurs bordures. La photo est celle de `SHPL` 5070 + 9·niveau + k à `(54, 51)`.
+- Menu : vignettes `SHPL` 7800 + 10·niveau, forme 10 (80×80, masque 1 bit) en cadre de survol de couleur 141 / 139 / 140 (74 à l'appui), son 5010 au changement de vignette survolée.
+- Palettes : fond (10–245) à l'entrée avec fondu de 30 ticks, menu 7800+, puis photo 5070+ chargée à la fin de la transition (l'écran affiché pendant les stores garde l'ancienne palette), palette de la `SHPL` de l'animation au début de la récompense.
+- Fin : la photo entière est reposée sur la télé **sans bordures** (hypothèse : l'original ne détaille pas ce qui précède la première image de l'animation) puis l'animation démarre ; sa dernière image reste affichée. Rejouer redessine d'abord la photo propre.
+
+### Écarts et hypothèses
+
+- Les pièces libres sont toujours dessinées au-dessus des pièces posées (l'original suit l'ordre du tableau) ; la fiche (§3.1) cite des « bandes autour de la télé rejouées au-dessus des pièces » dont les rectangles contredisent la pile de droite : **non reproduites**, une pièce qui déborde de la télé reste entière.
+- Le bouton enfoncé est dessiné au coin du bouton (le gestionnaire de gadgets ne décale pas la forme d'appui de (+2, +1)).
+- La rotation d'une pièce **tenue** reprend le port (`pointer.carry`) avec un décalage de prise recalculé, sinon elle sauterait au mouvement suivant ; le son de prise est alors supprimé.
+- La musique de fond (SND 100, MIDI bouclé, soumise à « Ambient Sounds ») démarre **après** l'accueil : une animation bloquante coupe le MIDI (drapeau « garder le MIDI » absent du descripteur 2000) ; elle est coupée pour le jingle et relancée après la récompense, après l'aide et après Reset. L'aide garde le MIDI (drapeau posé par les ports de Poly).
+- Le drapeau « Poly a présenté le jeu » (offset 5414) est posé à l'ouverture et enregistré (`roster.save()`) à la sortie de la scène.
+- Entrée / Tab parcourent boutons et vignettes (gadgets) ; Espace tourne la dernière pièce prise (ignoré et non consommé pendant l'aide ou quand les pièces sont désactivées ; les répétitions automatiques de la touche sont consommées sans effet).
+- Non fait : préchargement asynchrone de la récompense (aucune latence de CD ici), mode à deux joueurs (absent de la v1).

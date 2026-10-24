@@ -1,33 +1,38 @@
 /**
  * Texte bitmap dans une police `.FON` (`fon.ts`) : `NCSclB10` / `12` / `14` / `18` / `24` (`docs/mathemagique/engine.md` §4.7).
  *
- * Les chaînes du jeu sont des octets Windows-1252. Une chaîne JavaScript est convertie par `encodeText` ; les codes passent ensuite
- * tels quels au glyphe de même code dans la police. **Le `÷` est le glyphe 0xD6 de la police elle-même** (vérifié : 0xD6 dessine « ÷ »,
- * alors qu'il vaut « Ö » en Windows-1252 ; le glyphe 0xF7, « ÷ » en Windows-1252, n'est pas un signe de division). `encodeText` envoie donc
- * `÷` (U+00F7) vers 0xD6 ; un `Ö` écrit tel quel prend lui aussi le glyphe ÷, comme dans l'original (`%d Ö %d =`).
+ * **Les polices du jeu sont codées en Mac Roman** (glyphe 0x8E = « é », 0xCB = « À », 0xD6 = « ÷ » ; en Windows-1252, 0xD6 serait « Ö »).
+ * `encodeText` convertit une chaîne JavaScript (Unicode, donc Latin-1 compris) en codes de glyphe Mac Roman ; ces codes passent ensuite
+ * tels quels au glyphe de même code dans la police. Un caractère sans glyphe donne `?`. Les chaînes d'origine écrites en octets
+ * (`%d Ö %d =` : le 0xD6 est déjà le code du glyphe ÷) se passent sous forme de `Uint8Array`, sans conversion.
  *
  * Largeur d'un texte = somme des avances des glyphes (police bitmap sans crénage : `GetTextExtent`). Position `y` = haut de la cellule.
  */
 import type { FonFont } from "./fon";
 import type { Surface } from "./surface";
 
-/** Windows-1252 : caractères Unicode des codes 0x80 à 0x9f (hors de ce bloc, le code est égal au point de code Latin-1). */
-const CP1252_HIGH = "€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ";
+/** Mac Roman : caractères Unicode des codes 0x80 à 0xFF (0xCA = espace insécable, 0xF0 = pomme, réservée). */
+const MAC_ROMAN_HIGH =
+  "ÄÅÇÉÑÖÜáàâäãåçéè" +
+  "êëíìîïñóòôöõúùûü" +
+  "†°¢£§•¶ß®©™´¨≠ÆØ" +
+  "∞±≤≥¥µ∂∑∏π∫ªºΩæø" +
+  "¿¡¬√ƒ≈∆«»…\u00a0ÀÃÕŒœ" +
+  "–—“”‘’÷◊ÿŸ⁄€‹›ﬁﬂ" +
+  "‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔ" +
+  "\uf8ffÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ";
 
-/** Convertit une chaîne en octets Windows-1252 (`?` pour un caractère inconnu), `÷` → 0xD6 (glyphe de la police). */
+const MAC_ROMAN_CODE = new Map<string, number>([...MAC_ROMAN_HIGH].map((char, i) => [char, 0x80 + i]));
+// Signe monétaire d'avant l'euro, même code 0xDB.
+MAC_ROMAN_CODE.set("¤", 0xdb);
+
+/** Convertit une chaîne en codes de glyphe Mac Roman (`?` pour un caractère qui n'y est pas) ; `÷` donne 0xD6. */
 export function encodeText(text: string): Uint8Array {
   const out = new Uint8Array(text.length);
   let n = 0;
   for (const char of text) {
     const code = char.codePointAt(0)!;
-    let byte: number;
-    if (code === 0xf7) byte = 0xd6;
-    else if (code < 0x80 || (code >= 0xa0 && code <= 0xff)) byte = code;
-    else {
-      const high = CP1252_HIGH.indexOf(char);
-      byte = high >= 0 ? 0x80 + high : 0x3f;
-    }
-    out[n++] = byte;
+    out[n++] = code < 0x80 ? code : (MAC_ROMAN_CODE.get(char) ?? 0x3f);
   }
   return out.subarray(0, n);
 }

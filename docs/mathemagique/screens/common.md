@@ -739,3 +739,75 @@ Il n'y a ni boîte « Voulez-vous quitter ? » ni sauvegarde automatique : la co
 10. **`1080:0000` appelé depuis le Bowling (`1010:0bc5(1)`) et Pattern Windows (`1060:03d5`)** : mêmes vues mais fond différent (le moniteur est dessiné sur l'écran courant) ; comportement du fond sauvegardé et des gadgets de ces scènes à documenter par leurs études.
 11. **Hover des enregistrements 3 à 5 du hub** en mode normal : aucun retour visuel identifié (les images 200–205 changent à l'appui seulement ?).
 12. **Pertinence du mode sans animations** (`874a`) : lien avec le profil de machine ?
+
+---
+
+## Implémentation (moniteur)
+
+Code : `src/games/mathemagique/scenes/monitor/` (`monitor-overlay.ts`, `name-text.ts`, `text-input.ts`, `index.ts`). Tests : `test/mathemagique/monitor.test.ts` (les parties qui lisent `MAINSCRN.DAT` sont ignorées sans `original/mathemagique/`). Le moniteur de §3 et la Math Trivia de §4.2 sont un composant `MonitorOverlay` posé sur la scène courante (accueil, plus tard Bowling et Pattern Windows).
+
+### Brancher le moniteur dans une scène
+
+```ts
+const overlay = new MonitorOverlay({ ctx, services, archive /* MAINSCRN.DAT */, font /* loadMonitorFont(host) */, textInput, sceneGroups: () => [mesGroupes], hub: true });
+overlay.open("signin" | "roster" | "preferences" | "trivia", (result) => { … }, { secretPhoto?: 301…320 });
+```
+
+Dans la scène : `tick()` du moniteur dans `Scene.tick` (après le crochet des services), `key(event)` dans `Scene.key` (vrai = consommée ; Ctrl + touche n'est jamais consommé, Ctrl+Q reste global), `dispose()` dans `Scene.leave`. `isOpen`, `ready`, `typedName` sont lisibles.
+
+- **Modes** : `signin` = §3.2 mode 1 ; `roster` = mode 2 ; `preferences` = mode 3 (Ctrl + clic sur Sign-in, appui long de 500 ms sur tactile : à la charge du hub) ; `trivia` = mode 4. Roster vide en `signin` : saisie d'un nom tout de suite ; un seul joueur : présélectionné. Les vues passent de l'une à l'autre par les boutons Roster / Preferences comme dans l'original.
+- **Archive** : le moniteur lit `MAINSCRN.DAT` (formes `SHPL 50000`, dessins 400–418, photos 301–320, sons 3044–3052, `SCR` de Poly 2600, 5900, 6200–8000, 8500–8700) quelle que soit la scène : le Bowling devra la charger (portée `persistent` ou `scene`). La palette à l'écran doit être celle du hub (couleurs 10, 184 et 201 pour le texte, le survol et le fond de l'écran).
+- **Groupes de gadgets** : le gestionnaire teste les groupes dans l'ordre d'ajout ; le moniteur s'ajoute donc en dernier et neutralise (`active = false`) les groupes donnés par `sceneGroups()` le temps de l'ouverture, puis rétablit leur état d'avant. `GadgetManager` n'expose pas la liste de ses groupes : un accès public (ou un mode « modal ») évitera à chaque scène de les fournir.
+- **Fond** : le rectangle (244, 240)–(492, 432) est sauvegardé à l'ouverture et restauré à chaque tick (avant de tout redessiner) et à la fermeture : la scène ne doit pas animer sous le moniteur. Le glissement fait 15 px tous les 2 ticks (13 pas, 0,44 s : hypothèse, l'original n'est connu que par ses sons de 1,1 s) ; sons 3051 / 3052 à l'ouverture, 3050 / 3049 à la fermeture.
+- **Résultat** (`onClose`, appelé quand le moniteur a fini de descendre et que le roster est enregistré) : `{ mode, playerId, previousPlayerId, createdPlayerId, ambientChanged }`. Le joueur courant est tenu à jour en direct dans `ctx.roster.currentPlayerId` (comme `1e90`). C'est à l'accueil de jouer ensuite l'introduction (`5800`) si le joueur créé n'a pas encore vu Poly, la salutation, et de couper ou relancer la musique si `ambientChanged` (`1020:1e35`).
+- **`hub: true`** : doublon → Poly joue 8500, 8600, 8700 à la suite ; liste pleine → 2600. Sinon (`false`) : son 18677 ; liste pleine : les voix 19656 à 19658 à la suite (`common.md` §3.4).
+
+### Saisie du nom et accents
+
+Le nom se tape dans le canvas (police `NCSclB10`, curseur `|` clignotant, 15 ticks) ; le champ HTML invisible n'existe que pour ouvrir le clavier virtuel : `TextInputPort` (`text-input.ts`) est une interface pure (`focus()`, `blur()`, `onText(cb)` ; `"\b"` = retour arrière, `"\n"` = Entrée), l'implémentation navigateur est dans `ui/`. Le port ne doit relayer que ce qui n'arrive pas déjà par `Input.keyDown`, sinon un caractère serait saisi deux fois. `focus()` est appelé au clic sur New Player / Add et en entrant dans les préférences (geste du joueur), `blur()` à la fin de la saisie.
+
+- Règles de `roster.ts` étendues par un paramètre **`NameRules`** (`isLetter`) passé à `isNameChar`, `canAppendNameChar`, `formatPlayerName`, `isValidPlayerName`, `Roster.addPlayer` et `renamePlayer` ; défaut `ASCII_NAME_RULES` (comportement d'origine, tests inchangés), `LATIN1_NAME_RULES` = `À`–`ÿ` sauf `×` et `÷`. Le roster garde un octet par caractère (Latin-1 = Windows-1252 sur ces lettres) : rien d'autre ne change dans le format de `MWRoster`. La mise en majuscule (`toUpperCase`) ne sort jamais du Latin-1 (`ÿ`, `ß` restent tels quels).
+- **Les polices `.FON` du jeu sont en Mac Roman, pas en Windows-1252** (le glyphe 0x8E est « é », 0xCB « À », 0xE9 « È » ; `÷` en 0xD6 y est le `÷` Mac Roman, ce que `graphics.md` notait comme une particularité). `encodeText` (`graphics/text.ts`) convertit vers Mac Roman (tâche H7) ; le moniteur passe directement ses chaînes à `drawText` / `measureText`. Les règles du moniteur (`MONITOR_NAME_RULES`, déduites de la table de `encodeText`) sont le sous-ensemble du Latin-1 dont la police a le glyphe : sans `Ð ð Þ þ Ý ý`, `×`, `÷`. `NCSCLB10` et `NCSCLB12` ont les glyphes ; `0xCA` (espace insécable) est vide.
+- Touches : `canAppendNameChar` (28 caractères, puis largeur < 110 px mesurée par `measureText` sur les codes de glyphe) ; Retour arrière ; Entrée = OK ; hors saisie, 1 à 3 sélectionnent les lignes, flèches haut / bas font défiler. Dans la vue préférences, seuls les chiffres comptent (3 au plus, « 0 » initial remplacé par le 1er chiffre).
+- **Entrée = OK**, même si la souris est restée sur New Player ou une bascule : seul un bouton qui a le focus clavier (Tab) est activé par Entrée. Sans cela l'Entrée du gestionnaire de gadgets (qui active le survol) créerait le joueur puis recommencerait une saisie.
+- **Doublon** : le joueur n'est pas créé, la saisie reste ouverte avec le nom tapé (le joueur peut corriger ; l'original ne dit pas si le moniteur reste ouvert : hypothèse) ; un nom qui ne diffère que par un accent n'est pas un doublon. Nom vide : la saisie s'arrête sans créer. 40 joueurs : New Player / Add ne démarrent pas de saisie.
+
+### Roster, préférences, trivia
+
+- **Enregistrement** : `ctx.roster.save()` à chaque création, suppression et fermeture (et à `dispose`). Les bascules Ambient Sounds et Click & Stick s'écrivent tout de suite dans l'en-tête du roster, donc agissent en direct (le son relit `roster.ambient` à chaque demande, le pointeur `roster.clickAndStick` à chaque prise ; décocher Ambient appelle `stopAmbient`) ; elles ne sont écrites en stockage qu'à la fermeture. Le timer est lu **à la fermeture** (ou en quittant la vue) : pris s'il vaut 1 à 999 s, sinon l'ancienne valeur reste (comme `1080:08fe`) ; le Bowling le lit dans `roster.bowlingTicks`.
+- **Sélection** : un clic sur un nom fixe le joueur courant (son 3044) ; un second clic sur la même ligne dans les 15 ticks vaut OK, sauf si le moniteur a été ouvert sur les préférences (`8357`). Delete sans joueur sélectionné : sans effet.
+- **Math Trivia** : `SCR 5900` (non bloquant pour le moniteur : lecteur en mode bloquant avant la montée, interruptible par un clic), puis tirage sans remise parmi 19 (`NoRepeatPool`, mémoire tenue par l'instance du moniteur) : dessin `SHAP 399 + n` dans l'écran, histoire `SCR 6100 + 100 n` en voix. Un clic sur l'écran ou Poly rejoue l'histoire ; avec Ctrl, trivia suivante du cycle 1…19. `secretPhoto` (301 à 320) affiche la photo avec sa palette en 216–233 (rendue à la sortie) et aucune histoire ; l'historique de touches et l'appel sont à la charge de la scène.
+- Son d'OK : 3045 avec 5 % de chances, sinon 3046 (lecture de « 5 % / 95 % » du §3.1 : hypothèse).
+
+### Écarts, hypothèses, points ouverts
+
+- Ordre alphabétique : `Roster.players()` compare les points de code en minuscules, donc les noms accentués (`Élodie`) passent après `Z`. Une comparaison par `localeCompare` ou sur la lettre de base serait mieux ; non faite (hors du changement de `roster.ts` demandé).
+- Pas de hover visuel dans l'original : les boutons prennent leur forme enfoncée au survol et au focus clavier, une ligne de nom survolée est cernée en bleu clair.
+- Mobile : pas d'équivalent tactile du Ctrl + clic fait ici (`open("preferences")` est à appeler par la scène sur l'appui long) ; le champ invisible est à brancher dans `ui/`.
+- Aucune copy nouvelle : tout vient des images et des polices de `MAINSCRN.DAT`.
+
+---
+
+## 13. Implémentation (tâche H1 : titre, crédits, hub)
+
+Code : `src/games/mathemagique/scenes/{title,credits,hub,hub-logic,index}.ts` ; tests : `test/mathemagique/scenes-common.test.ts`. `ui/app.ts` enregistre tout par `registerScenes(engine, services, opts)` (le titre est lancé par `engine.start()`).
+
+**Fait**
+- **Titre** : logo à la première entrée seulement (300 ticks, un clic ou une touche le passe), fondus de 30 ticks, fond `SHPL 105`, horloge système (`SCR` 500 posé une fois), 9 animations en boucle, musique `\0SND` 1000 ; porte (258, 266, 320, 344) ou fin de la musique → `SCR` 10000 (bloquant) → fondu → hub ; plaque (117, 329, 150, 353) → musique coupée → crédits.
+- **Crédits** : 4 pages toutes les 20 s, effacement et révélation par le balayage à 4 directions (30 ticks, pause de 30 ticks), clic = effacement immédiat, étincelle `SCR` 2000, EXIT → titre (sans logo), MIDI 65000 si « Ambient Sounds ».
+- **Hub** : 14 objets du décor (`DS:0c70`), pupitre (Quit / Help / Sign-in), 9 jouets (`DS:0e20`, leviers qui gèlent la verrière, le papillon, le chevalet et la télé), 5 boucles d'ambiance + toile du chevalet tirée + papillon, MIDI 65000 (bouclé : repères `setup end` / `loop end`), clips d'attente (240–480 ticks, sans répétition) et phrases d'attente (180–360 ticks, 4 tirées sur 24, « Ambient Sounds »), accueil de Poly à la première entrée puis moniteur de connexion, animation de départ + fondu + `ctx.scenes.request` vers les activités, animations de retour (rideau 1100, engrenage 1300), mode aide (zones `DS:1050`, chaînes de clips où un clic passe au clip suivant, main « stop », curseur « ? » dès la zone 3, introduction rejouée après 300 ticks), invite « quitter » à deux temps (sifflet 10300 → 10100 + 10200 → `host.exit()` ; clic ailleurs : 10200 et annulation ; rappel de Poly après 240 ticks), mode sans animations (Ctrl à l'entrée), séquences secrètes (12 codes, Ctrl+A).
+- Sans joueur connecté, un clic sur une activité joue le clip 5000 puis ouvre la connexion au lieu de lancer.
+
+**Branchements restants (à faire par le lead)**
+- `opts.openMonitor(mode, detail?)` (`"signin" | "preferences" | "trivia"` ; `detail.secret` = `SHPL` 301–320 de la séquence secrète tapée) : sans lui, Sign-in, Ctrl + clic et Poly ne font rien. Le moniteur doit appeler **`hub.monitorClosed()`** (`HubScene`, `engine.scenes.current`) quand il se ferme : le décor reste inactif tant que ce n'est pas fait ; l'appel fait la finalisation `1020:1e35` (musique selon « Ambient Sounds », introduction 5800 pour un nouveau joueur, salutation 5400–5700).
+- **Appui long tactile** = `hub.longPress(x, y)` (préférences si le point est sur Sign-in) ; la détection des 500 ms est à faire côté `ui/`.
+- `SCENE_FACTORIES` (`scenes/index.ts`) : une ligne par scène écrite à part ; sans elle, substitut noir qui ramène au hub au premier clic ou touche. Le Hall of Fame (`SceneId.trophy`) ne s'ouvre que depuis le Bowling, pas depuis le hub.
+
+**Écarts et hypothèses**
+- `SCR` 500 (horloge) : image `heure × 12 + pas` (l'original compte `+ 1`, son compteur partant de 1) ; à 55 min et plus l'aiguille passe à l'heure suivante (l'original dépasse peut-être l'image 143 : non vérifié).
+- Logo : fond d'indice `0x15` (hypothèse déjà notée §1.1). Fin de la musique : `\0SND` 1000 joué **une fois** ; l'entrée auto exige aussi que sa durée théorique (moins 5 ticks) soit écoulée, pour qu'un audio non débloqué ne saute pas le titre.
+- Les animations 3000 et 4000 du titre ne sont pas synchronisées par code : mêmes durées, elles démarrent ensemble.
+- Crédits : les 4 pages tournent, l'étincelle n'apparaît que sur la première page à partir du 3e cycle (5 passages au plus) ; la rotation de direction avance toutes les 2 transitions (hypothèse). Phase exacte de `7eaa == -1` non établie.
+- Hub : les clips de Poly sont joués en effaçant d'abord la zone sous elle (rectangle `DS:0c50`), Poly au repos est redessinée à leur fin. Un clic passe un clip bloquant (drapeau 8) sans atteindre les gadgets. `0f1c` (retour d'activité) est conservé par partie, comme `874a` (mode sans animations) et `0c48` / `0c4e` (accueil, salutation).
+- Le jouet « levier » ne bascule son interrupteur qu'à la fin de son animation, et pas en mode sans animations. La télé coupée montre `SHAP` 102 (écran noir).
+- Séquences secrètes : seuls les 12 codes de deux lettres ; l'historique reçoit les touches « caractère » (ASCII, Ctrl + lettre = 1–26, flèches / F1–F12 = VK + 0x7f) quand le moniteur est fermé, et est remis à zéro après l'ouverture de Math Trivia (`keyHist(0xffff)`).

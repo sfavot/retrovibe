@@ -295,15 +295,15 @@ export class PolyHelper {
 
 // --- Archive ---
 
-/** Ouvre l'archive d'aide dans `Scene.load` (`POLLY.DAT` temporairement ; `PATFILL.DAT` / `NIM.DAT` sont celles de la scène, déjà ouvertes). */
+/**
+ * Ouvre l'archive d'aide dans `Scene.load` (`POLLY.DAT` ; `PATFILL.DAT` / `NIM.DAT` sont celles de la scène, déjà ouvertes).
+ * Portée « scène » : le moteur la libère à la bascule, sauf si la scène suivante l'a rouverte. Ne pas la libérer dans
+ * `leave`, qui s'exécute après le `load` de la scène suivante.
+ */
 export function openPolyArchive(resources: Resources, config: PolyConfig): Promise<Archive> {
   return resources.open(config.archive);
 }
 
-/** Libère `POLLY.DAT` quand la scène n'en a plus besoin (sortie de scène) ; sans effet sur l'archive propre de la scène. */
-export function releasePolyArchive(resources: Resources, config: PolyConfig): void {
-  if (config.temporaryArchive) resources.release(config.archive);
-}
 
 // --- Ports réels ---
 

@@ -4,12 +4,15 @@ import { h } from "../../../ui/dom";
 import { copy } from "../copy";
 import { fetchGameFiles } from "../data/files";
 import { Engine } from "../engine/engine";
-import { SceneId } from "../engine/scene";
 import { installServices, type MathServices } from "../engine/services";
 import { cssCursor, loadCursorImages } from "../engine/pointer";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../render/canvas-presenter";
-import { BootScene } from "./boot-scene";
+import { SceneId } from "../engine/scene";
+import { registerScenes } from "../scenes";
+import type { HubScene } from "../scenes/hub";
 import { BrowserHost, MissingFilesError, localStorageStore } from "./browser-host";
+import { createCertificateDownload } from "./certificate-download";
+import { createBrowserTextInput, type BrowserTextInput } from "./text-input";
 
 export interface AppOptions {
   /** URL du dossier des fichiers du jeu, sans barre finale (ex. `./mathemagique`). */
@@ -68,13 +71,24 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let host: BrowserHost;
   let engine: Engine;
   let services: MathServices;
+  let textInput: BrowserTextInput;
+  /** Appui long reçu de l'hôte, traité au début de l'image suivante (jamais en plein milieu d'un tick). */
+  let pendingLongPress: { x: number; y: number } | null = null;
   const canvas = h("canvas", { class: "mw-canvas", width: SCREEN_WIDTH, height: SCREEN_HEIGHT, tabindex: 0, "aria-label": copy.canvasLabel });
   try {
     // Manifeste absent, illisible ou remplacé par une page d'erreur : le jeu n'est pas installé.
     const files = await fetchGameFiles(options.base).catch((error: unknown) => {
       throw new MissingFilesError(error instanceof Error ? error.message : String(error));
     });
-    host = new BrowserHost(options.base, files, canvas, () => leave(container, options));
+    host = new BrowserHost(options.base, files, canvas, () => {
+      // Quitter enregistre les joueurs (l'original n'écrit qu'aux moments listés dans `RosterState.save`).
+      engine.ctx.roster.save();
+      leave(container, options);
+    });
+    host.onLongPress = (x, y) => {
+      pendingLongPress = { x, y };
+    };
+    textInput = createBrowserTextInput({ canvas, bindKeyboard: (target) => host.bindKeyboard(target) });
     // Débloque le son tant que l'activation du clic (« Jouer ») est valable.
     host.audio.unlock();
     engine = new Engine(host);
@@ -85,8 +99,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     host.setCursorStyle("busy", cssCursor(cursors.busy, "progress"));
     host.setCursorStyle("help", cssCursor(cursors.help, "help"));
     services.sound.loadMidiMap(midiMap);
-    // Scène provisoire à la place de l'écran titre (vague H).
-    engine.register(SceneId.title, () => new BootScene(services));
+    // Les 11 scènes (titre, crédits, hub, puis les activités ; celles qui manquent encore ont un écran noir qui ramène au hub).
+    registerScenes(engine, services, { textInput, certificates: createCertificateDownload() });
     engine.start();
   } catch (error) {
     console.error(error);
@@ -109,7 +123,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     // Clic souris (`detail` > 0) : le canvas reprend la main ; activation au clavier : le focus reste sur le bouton.
     if (event.detail > 0) canvas.focus();
   });
-  const stage = h("div", { class: "mw-stage" }, canvas);
+  const stage = h("div", { class: "mw-stage" }, canvas, textInput.element);
   const footer = h("div", { class: "mw-footer" }, back, h("div", { class: "mw-toggles" }, soundButton));
   main.prepend(stage);
   main.append(footer);
@@ -133,7 +147,16 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const onStorage = (event: StorageEvent): void => {
     if ((event.key === null || event.key === soundPrefKey(GAME_ID)) && prefs.reload()) soundButton.setAttribute("aria-pressed", String(prefs.isEnabled()));
   };
+  // Fermeture ou masquage de la page : les joueurs sont enregistrés (sur mobile `pagehide` n'est pas toujours émis, d'où le masquage).
+  const saveRoster = (): void => {
+    engine.ctx.roster.save();
+  };
+  const onHide = (): void => {
+    if (document.hidden) saveRoster();
+  };
   const listeners: [EventTarget, string, EventListener][] = [
+    [window, "pagehide", saveRoster],
+    [document, "visibilitychange", onHide],
     [window, "resize", resize],
     [window, "focus", focusCanvas],
     [window, "storage", onStorage as EventListener],
@@ -141,6 +164,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   ];
   for (const [target, type, listener] of listeners) target.addEventListener(type, listener);
   const dispose = (): void => {
+    saveRoster();
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
     stopWatchingReady();
     host.silence();
@@ -163,6 +187,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       return;
     }
     try {
+      if (pendingLongPress) {
+        // Appui long = Ctrl + clic : sur le bouton Sign-in du hub, les préférences.
+        const { x, y } = pendingLongPress;
+        pendingLongPress = null;
+        if (engine.scenes.currentId === SceneId.hub) (engine.scenes.current as HubScene).longPress(x, y);
+      }
       engine.frame(host.now());
     } catch (error) {
       fail(error);

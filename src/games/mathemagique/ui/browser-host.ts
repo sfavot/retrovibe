@@ -72,6 +72,37 @@ export function toPlayArea(clientX: number, clientY: number, rect: { left: numbe
   };
 }
 
+/** Durée d'un appui long du doigt (ms) et déplacement toléré (pixels CSS) : comme Lost in Time. */
+export const LONG_PRESS_MS = 500;
+export const LONG_PRESS_SLOP = 10;
+
+/** Suivi d'un doigt posé : appelle `onLongPress` s'il reste en place 500 ms. */
+class TouchPress {
+  readonly id: number;
+  private readonly startX: number;
+  private readonly startY: number;
+  private timer: ReturnType<typeof setTimeout> | null;
+
+  constructor(event: PointerEvent, onLongPress: (clientX: number, clientY: number) => void) {
+    this.id = event.pointerId;
+    this.startX = event.clientX;
+    this.startY = event.clientY;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      onLongPress(this.startX, this.startY);
+    }, LONG_PRESS_MS);
+  }
+
+  move(event: PointerEvent): void {
+    if (this.timer !== null && Math.hypot(event.clientX - this.startX, event.clientY - this.startY) > LONG_PRESS_SLOP) this.stop();
+  }
+
+  stop(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+  }
+}
+
 /**
  * Hôte du navigateur : fichiers par `fetch` (le cache HTTP du navigateur fait le reste ; les archives décodées sont gardées par
  * `Resources`), canvas 640×480 (`CanvasPresenter`), Web Audio + soundfont, clavier et souris du canvas.
@@ -84,6 +115,9 @@ export class BrowserHost implements Host {
   private readonly cursors: Record<CursorKind, string> = { ...DEFAULT_CURSORS };
   private cursor: CursorKind = "arrow";
   private presented = false;
+  private touch: TouchPress | null = null;
+  /** Appui long d'un doigt (position dans la zone de jeu) : l'équivalent tactile de Ctrl + clic. */
+  onLongPress: ((x: number, y: number) => void) | null = null;
 
   /**
    * `base` : URL du dossier des fichiers du jeu, sans barre finale (ex. `./mathemagique`).
@@ -159,6 +193,13 @@ export class BrowserHost implements Host {
     this.onExit();
   }
 
+  private longPress(clientX: number, clientY: number): void {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const { x, y } = toPlayArea(clientX, clientY, rect);
+    this.onLongPress?.(x, y);
+  }
+
   /** Position du pointeur dans la zone de jeu (576×432). */
   private pointer(event: PointerEvent): void {
     const rect = this.canvas.getBoundingClientRect();
@@ -171,6 +212,7 @@ export class BrowserHost implements Host {
   private bindInput(): void {
     const { canvas, input, audio } = this;
     canvas.addEventListener("pointermove", (event) => {
+      if (this.touch?.id === event.pointerId) this.touch.move(event);
       // Un doigt ne survole rien : seul un pointeur de souris (ou de stylet) qui passe sur l'écran est « dans » la zone.
       input.setPointerInside(event.pointerType !== "touch");
       this.pointer(event);
@@ -178,6 +220,7 @@ export class BrowserHost implements Host {
     canvas.addEventListener("pointerleave", () => input.setPointerInside(false));
     canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
+      if (event.pointerType === "touch" && event.isPrimary) this.touch = new TouchPress(event, (x, y) => this.longPress(x, y));
       canvas.focus();
       audio.unlock();
       const button = mouseButtonFromDom(event.button);
@@ -187,6 +230,10 @@ export class BrowserHost implements Host {
       input.mouseDown(button, { ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey });
     });
     const release = (event: PointerEvent): void => {
+      if (this.touch?.id === event.pointerId) {
+        this.touch.stop();
+        this.touch = null;
+      }
       const button = mouseButtonFromDom(event.button);
       if (!button) return;
       this.pointer(event);
@@ -196,18 +243,28 @@ export class BrowserHost implements Host {
     canvas.addEventListener("pointercancel", release);
     // Le clic droit est un bouton du jeu.
     canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-    canvas.addEventListener("keydown", (event) => {
+    this.bindKeyboard(canvas);
+    // Perdre le focus relâche tout : sinon une touche tenue au moment du clic ailleurs resterait enfoncée.
+    canvas.addEventListener("blur", () => input.reset());
+  }
+
+  /**
+   * Branche le clavier de `target` sur `input`. Le canvas l'est de base ; le champ invisible du clavier virtuel (`text-input.ts`) l'est
+   * aussi, parce que le focus y va pendant la saisie du nom : les touches d'un clavier physique doivent y arriver au jeu quand même.
+   */
+  bindKeyboard(target: HTMLElement): void {
+    const { input, audio } = this;
+    target.addEventListener("keydown", (event) => {
       audio.unlock();
       // Raccourcis du système (Cmd sur Mac) : jamais au jeu.
       if (event.metaKey) return;
       input.keyDown({ key: event.key, code: event.code, repeat: event.repeat, ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey });
       if (gameOwnsKey(event)) event.preventDefault();
     });
-    canvas.addEventListener("keyup", (event) => {
+    target.addEventListener("keyup", (event) => {
       input.keyUp(event.code, { ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey });
       if (gameOwnsKey(event)) event.preventDefault();
     });
-    // Perdre le focus relâche tout : sinon une touche tenue au moment du clic ailleurs resterait enfoncée.
-    canvas.addEventListener("blur", () => input.reset());
+    if (target !== this.canvas) target.addEventListener("blur", () => input.reset());
   }
 }

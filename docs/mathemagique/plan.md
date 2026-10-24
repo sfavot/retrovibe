@@ -10,7 +10,11 @@ Ce document sert de brief commun aux sous-agents. Les références font foi sur 
 
 - Vagues A à E terminées (commit `e56ebd4`) : extraction, lecteurs de données (`src/games/mathemagique/data/`),
   visionneuse (`ui/asset-viewer.html`), rétro-ingénierie Ghidra, études du moteur et des 8 écrans.
-- Prochaine étape : vague F.
+- Vague H terminée (câblage) : les écrans Hidden, Patterns, Sticklers, Rockets et Hall of Fame sont enregistrés ; le hub pose son
+  moniteur (`MonitorOverlay`, touches, ticks, `monitorClosed`) ; polices en Mac Roman (`encodeText`) ; tri des joueurs sans accents ;
+  hôte navigateur : champ invisible du clavier mobile (`ui/text-input.ts`), téléchargement du certificat (`ui/certificate-download.ts`),
+  appui long de 500 ms = Ctrl + clic, joueurs enregistrés en quittant et à `pagehide`. Reste : Bowling, Rhythm Shop, Pattern Windows.
+- Prochaine étape : vague I.
 
 ## Décisions
 
@@ -47,7 +51,13 @@ Ce document sert de brief commun aux sous-agents. Les références font foi sur 
 
 Chaque vague se termine par `npm run typecheck`, `npm test`, `npm run build` et, dès qu'il y a un rendu, une vérification dans le navigateur.
 
-## Décisions à prendre (vague H)
+## Décisions de la vague H (2026-10-24)
 
-Impression des certificats et vitraux ; saisie du nom (canvas ou champ HTML, accents) ; stockage des joueurs et limite de 40 ;
-équivalents tactiles de Ctrl + clic ; bouton Quitter ; séquences secrètes ; compteur de victoires de Poly dans Rockets (défaut de l'original).
+- **Impression** (certificats, vitraux) : image PNG à télécharger, composée comme l'impression d'origine (WMF rendus).
+- **Nom du joueur** : saisi dans le canvas (rendu d'origine), champ HTML invisible pour le clavier mobile ; lettres accentuées autorisées.
+- **Joueurs** : `localStorage`, 40 au maximum, sauvegarde aussi en quittant (correction d'un défaut de l'original).
+- **Quitter** (hub, après la confirmation par sifflet) : retour à l'accueil du site.
+- **Ctrl + clic** sur tactile : appui long de 500 ms (comme Lost in Time).
+- **Séquences secrètes** : les 12 décodées, au clavier ; les 7 partielles restent à retrouver.
+- **Rockets** : le compteur de victoires de Poly jamais remis à zéro est reproduit (défaut documenté).
+- **Textes du site validés** : `src/games/mathemagique/copy.ts`.

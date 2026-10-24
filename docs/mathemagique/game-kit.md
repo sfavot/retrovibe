@@ -93,7 +93,7 @@ Phases : `closed → arriving → intro → listening ⇄ explaining`, `leaving 
 
 Tirage des répliques : plain `rand1` pour les puzzles (les fiches ne parlent pas de tirage sans remise), `NoRepeatPool` pour Pattern Windows (`13af(0, 11, 20d0)`, historique conservé par l'instance du helper : le garder pour la durée de la scène). Le compliment de Pattern Windows suppose `ctx.variedImage` et `rng.range(0, 100) < 20`.
 
-`createScrPolyPorts({ config, scr, archive, surface, cursor?, onDirty? })` : chaque script en mode **bloquant** (gadgets et pointeur gelés, un clic interrompt si le drapeau 8 est posé), drapeaux `saveBackground | keepMidi | waitSounds`, canal `voice`, `offsetY` de la config ; `begin` / `end` sauvegardent et rétablissent `config.backgroundZone` ; curseur « ? » via `pointer.cursor`. Scène : `await openPolyArchive(ctx.resources, config)` dans `load`, `releasePolyArchive` à la sortie, `rosterIntroFlag(ctx.roster, config.introFlag)`, `poly.tick()` à chaque tick, `poly.abort()` + `services.endScene()` dans `leave`.
+`createScrPolyPorts({ config, scr, archive, surface, cursor?, onDirty? })` : chaque script en mode **bloquant** (gadgets et pointeur gelés, un clic interrompt si le drapeau 8 est posé), drapeaux `saveBackground | keepMidi | waitSounds`, canal `voice`, `offsetY` de la config ; `begin` / `end` sauvegardent et rétablissent `config.backgroundZone` ; curseur « ? » via `pointer.cursor`. Scène : `await openPolyArchive(ctx.resources, config)` dans `load` (portée « scène » : libérée par le moteur à la bascule, jamais dans `leave`), `rosterIntroFlag(ctx.roster, config.introFlag)`, `poly.tick()` à chaque tick, `poly.abort()` + `services.endScene()` dans `leave`.
 
 ## Écarts et contradictions
 

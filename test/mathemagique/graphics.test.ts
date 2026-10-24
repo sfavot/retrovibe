@@ -232,7 +232,8 @@ describe("polices FON", () => {
       expect(measureText(f10, "")).toBe(0);
       expect(measureText(f10, "AA")).toBe(18);
       expect(measureText(f10, "A÷A")).toBe(9 + f10.glyph(0xd6).width + 9);
-      expect(measureText(f10, "AÖA")).toBe(measureText(f10, "A÷A"));
+      expect(measureText(f10, new Uint8Array([0x41, 0xd6, 0x41]))).toBe(measureText(f10, "A÷A"));
+      expect(measureText(f10, "AÖA")).toBe(9 + f10.glyph(0x85).width + 9);
     });
 
     it("dessine un texte coloré, découpé, et le glyphe ÷ est le 0xD6 de la police", () => {
@@ -250,9 +251,20 @@ describe("polices FON", () => {
     });
   });
 
-  it("convertit les chaînes en Windows-1252", () => {
-    expect(Array.from(encodeText("Aé€÷Ö?"))).toEqual([0x41, 0xe9, 0x80, 0xd6, 0xd6, 0x3f]);
+  it("convertit les chaînes en codes de glyphe Mac Roman", () => {
+    expect(Array.from(encodeText("Aé€÷Ö?"))).toEqual([0x41, 0x8e, 0xdb, 0xd6, 0x85, 0x3f]);
+    expect(Array.from(encodeText("ÀÈÇçùÿ"))).toEqual([0xcb, 0xe9, 0x82, 0x8d, 0x9d, 0xd8]);
     expect(Array.from(encodeText("ж"))).toEqual([0x3f]);
+  });
+
+  it("la table Mac Roman couvre les codes 0x80 à 0xFF une seule fois", () => {
+    const codes = new Set<number>();
+    for (const char of "ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø¿¡¬√ƒ≈∆«»…\u00a0ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€‹›ﬁﬂ‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔ\uf8ffÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ") {
+      const [code] = encodeText(char);
+      expect(code, char).toBeGreaterThanOrEqual(0x80);
+      codes.add(code!);
+    }
+    expect(codes.size).toBe(128);
   });
 });
 

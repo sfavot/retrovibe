@@ -5,6 +5,7 @@ import type { Frame } from "../../src/games/mathemagique/engine/graphics/frame";
 import { MsvcRandom, NoRepeatPool } from "../../src/games/mathemagique/engine/rng";
 import {
   BONUS_LEVEL,
+  LATIN1_NAME_RULES,
   MAX_PLAYERS,
   ROSTER_FIELDS,
   ROSTER_RECORD_SIZE,
@@ -647,6 +648,12 @@ describe("Roster", () => {
     expect(roster.renamePlayer(1, "")).toEqual({ ok: false, reason: "empty" });
     expect(roster.renamePlayer(9, "X")).toEqual({ ok: false, reason: "unknown" });
     expect(roster.renamePlayer(1, "yann")).toEqual({ ok: true, name: "Yann" });
+  });
+
+  it("liste alphabétique : les accents ne comptent pas dans l'ordre, ils départagent seulement les noms identiques", () => {
+    const roster = Roster.createEmpty();
+    for (const name of ["Zoé", "Émile", "Eve", "Éléa", "Elea", "Fred", "Ève"]) expect(roster.addPlayer(name, LATIN1_NAME_RULES).ok, name).toBe(true);
+    expect(roster.players().map((p) => p.name)).toEqual(["Elea", "Éléa", "Émile", "Eve", "Ève", "Fred", "Zoé"]);
   });
 
   it("timer du Bowling : 1 à 999 s seulement", () => {

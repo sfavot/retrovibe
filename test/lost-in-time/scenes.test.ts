@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { drive, makeFullGame, type Step } from "./full";
-import { hasOriginalFiles } from "./helpers";
+import { hasOriginalFiles, readOriginal } from "./helpers";
 
 /**
  * Parties jouées de bout en bout (sous-systèmes réels, entrées simulées) : démarrage sur la partie 4
@@ -159,5 +159,49 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des parties", { timeout: 120_0
     expect(ctx.game.sessionPart).toBe("CAT3.INF");
     expect(ctx.game.files.archiveNames).toContain("PARTIE3.ITK");
     expect(ctx.game.files.archiveNames).not.toContain("PARTIE1.ITK");
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("gros plan d'EMAM1023 (constat 13 du rapport QA)", { timeout: 120_000 }, () => {
+  it("l'encart MAGNA ne recopie pas sa plage 16..127 (filler) sur la palette de Melkior", async () => {
+    // Partie 3 directement (CAT3.INF), scène du salon, puis clic sur le parquet : MAGNA.IMD est jouée par une clé
+    // IMD du mult (palStart 16, palEnd -1) alors que ses images n'utilisent que les index >= 128.
+    const ctx = makeFullGame(["PARTIE1.ITK", "PARTIE2.ITK"]);
+    const g = ctx.game;
+    const wanted = ctx.system.gfx.core.wanted;
+    const video = ctx.system.sys.video as unknown as { openVideo: (p: boolean, f: string, props: object) => number };
+    const open = video.openVideo.bind(video);
+    let magna = 0;
+    video.openVideo = (p, f, props) => {
+      if (f.toUpperCase().startsWith("MAGNA")) magna++;
+      return open(p, f, props);
+    };
+    let before: Uint8Array | null = null;
+    let during: Uint8Array | null = null;
+    let upper: Uint8Array | null = null;
+    await drive(ctx, {
+      skipUntilFrame: SKIP_FRAMES,
+      steps: [
+        {
+          run: () => {
+            g.inter.vars.copyFrom(0, new Uint8Array(readOriginal("CAT3.INF")));
+            g.inter.vars.writeString(4532, "EMAM1023");
+            g.inter.vars.writeOff8(13435, 0);
+            g.totToLoad = "EMAM1023.tot";
+            g.inter.terminate = 1;
+          },
+        },
+        { wait: 2500 },
+        { run: () => (before = wanted.slice(16 * 3, 128 * 3)) },
+        { click: [200, 140] },
+        { wait: 15 },
+        { run: () => (during = wanted.slice(16 * 3, 128 * 3)) },
+        { run: () => (upper = wanted.slice(128 * 3)) },
+      ],
+    });
+    expect(magna).toBeGreaterThan(0);
+    // Avant correction, la plage blanche (63,63,63) de MAGNA écrasait la palette de Melkior.
+    expect(during).toEqual(before);
+    expect(upper!.some((v) => v > 0)).toBe(true); // les index >= 128 de l'encart sont bien recopiés
   });
 });

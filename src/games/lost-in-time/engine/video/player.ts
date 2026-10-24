@@ -1,4 +1,4 @@
-import { ImdDecoder } from "../../data/imd";
+import { ImdDecoder, usedPaletteIndices } from "../../data/imd";
 import type { GraphicsSystems } from "../graphics";
 import { BACK_SURFACE, FRONT_SURFACE } from "../graphics/core";
 import { Surface } from "../graphics/surface";
@@ -95,6 +95,8 @@ interface Slot {
   soundEnabled: boolean;
   noCursorSwitch: boolean;
   needBlit: boolean;
+  /** Index de palette dessinés par le film (null : pas de restriction), voir `copyPalette`. */
+  usedPalette: Uint8Array | null;
 }
 
 /**
@@ -107,6 +109,8 @@ interface Slot {
  */
 export class VideoPlayer implements VideoSystem {
   private vm: VmContext | null = null;
+  /** Index de palette utilisés par chaque film déjà ouvert (clé : nom sans extension en minuscules + taille, deux parties pouvant partager un nom). */
+  private readonly usedPalettes = new Map<string, Uint8Array | null>();
   private readonly slots: (Slot | null)[] = new Array(VIDEO_SLOT_COUNT).fill(null);
 
   constructor(
@@ -201,9 +205,10 @@ export class VideoPlayer implements VideoSystem {
     }
 
     if (!video) {
-      const decoder = this.loadDecoder(file);
-      if (!decoder) return -1;
-      video = this.createSlot(decoder, file, primary, props);
+      const loaded = this.loadDecoder(file);
+      if (!loaded) return -1;
+      video = this.createSlot(loaded.decoder, file, primary, props);
+      video.usedPalette = loaded.used;
       this.slots[index] = video;
     }
 
@@ -232,6 +237,7 @@ export class VideoPlayer implements VideoSystem {
       soundEnabled: header.sound !== null,
       noCursorSwitch: primary && VIDEOS_WITH_CURSOR.has(base),
       needBlit: false,
+      usedPalette: null,
     };
 
     const noVideo = (props.flags & VIDEO_FLAG_NO_VIDEO) !== 0;
@@ -265,14 +271,18 @@ export class VideoPlayer implements VideoSystem {
   }
 
   /** Cherche le film dans les archives ouvertes (insensible à la casse, extension .IMD par défaut). */
-  private loadDecoder(file: string): ImdDecoder | null {
+  private loadDecoder(file: string): { decoder: ImdDecoder; used: Uint8Array | null } | null {
     const vm = this.vm!;
     const dot = file.lastIndexOf(".");
     const base = dot >= 0 ? file.slice(0, dot) : file;
     const data = vm.getFile(`${base}.IMD`);
     if (!data) return null;
     try {
-      return new ImdDecoder(data, new Surface(1, 1));
+      const decoder = new ImdDecoder(data, new Surface(1, 1));
+      // Calculé une seule fois par film (le décodage complet n'a lieu qu'à la première ouverture)
+      const key = `${base.toLowerCase()}:${data.length}`;
+      if (!this.usedPalettes.has(key)) this.usedPalettes.set(key, usedPaletteIndices(data));
+      return { decoder, used: this.usedPalettes.get(key) ?? null };
     } catch {
       return null;
     }
@@ -580,12 +590,29 @@ export class VideoPlayer implements VideoSystem {
     return true;
   }
 
-  /** Recopie la plage [palStart, palEnd] de la palette du film dans celle du jeu (6 bits dans les deux). */
+  /**
+   * Recopie la plage [palStart, palEnd] de la palette du film dans celle du jeu (6 bits dans les deux).
+   *
+   * ÉCART VOLONTAIRE avec l'original et ScummVM, qui recopient toute la plage : ici on ne recopie que
+   * les index que les images du film dessinent vraiment. Certains films (MAGNA, MAGNB, COTON, MATA..MATF
+   * de l'encart de gros plan d'EMAM1023) déclarent 16..255 mais n'utilisent que >= 128 ; leur plage
+   * 16..127 est un aplat blanc (noir pour MATE/MATF) qui écrasait la palette des sprites de Melkior,
+   * devenu une silhouette blanche ou noire (constat 13 du rapport QA). Les index utilisés restent
+   * recopiés à l'identique ; un film qui ne dessine rien (simple chargeur de palette) n'est pas restreint.
+   */
   private copyPalette(video: Slot, palStart: number, palEnd: number): void {
     if (palStart < 0) palStart = 0;
     if (palEnd < 0) palEnd = 255;
     const from = video.decoder.palette;
-    this.gfx.core.wanted.set(from.subarray(palStart * 3, (palEnd + 1) * 3), palStart * 3);
+    const to = this.gfx.core.wanted;
+    const used = video.usedPalette;
+    if (!used) {
+      to.set(from.subarray(palStart * 3, (palEnd + 1) * 3), palStart * 3);
+      return;
+    }
+    for (let i = palStart; i <= palEnd; i++) {
+      if (used[i]) to.set(from.subarray(i * 3, i * 3 + 3), i * 3);
+    }
   }
 
   /** VideoPlayer::checkAbort : Échap interrompt et se place sur la dernière image de la séquence. */

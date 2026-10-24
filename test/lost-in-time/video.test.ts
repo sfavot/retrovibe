@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ImdDecoder } from "../../src/games/lost-in-time/data/imd";
+import { ImdDecoder, usedPaletteIndices } from "../../src/games/lost-in-time/data/imd";
 import { createSurface } from "../../src/games/lost-in-time/data/surface";
 import { Game } from "../../src/games/lost-in-time/engine/game";
 import { installGraphics } from "../../src/games/lost-in-time/engine/graphics";
@@ -19,6 +19,14 @@ const ORIGINAL = resolve(import.meta.dirname, "../../original/lost-in-time");
 
 /** Position de PORTA03 dans l'image : x 45, y 48, 95 x 67. */
 const GATE = { left: 45, top: 48, right: 140, bottom: 115 };
+
+/** Palette attendue après recopie de la plage 128-255 : seuls les index dessinés par le film viennent du film (écart voulu). */
+function expectedRange(data: Uint8Array, filmPalette: Uint8Array, before: Uint8Array): Uint8Array {
+  const used = usedPaletteIndices(data)!;
+  const out = before.slice();
+  for (let i = 128; i < 256; i++) if (used[i]) out.set(filmPalette.subarray(i * 3, i * 3 + 3), i * 3);
+  return out;
+}
 
 function makeGame(extra: Record<string, Uint8Array> = {}, maxSteps = 400_000) {
   const host = new HeadlessHost({
@@ -131,8 +139,8 @@ describe.skipIf(!hasOriginalFiles)("vidéo IMD", () => {
     expect(host.now()).toBeGreaterThan(0);
 
     // La plage 128-255 vient du film, le reste de la palette du décor est intact
-    expect(gfx.core.shown.subarray(128 * 3)).toEqual(reference.palette.subarray(128 * 3));
-    expect(gfx.core.shown.subarray(0, 128 * 3)).toEqual(palBefore.subarray(0, 128 * 3));
+    // (seuls les index dessinés par le film sont recopiés, voir `copyPalette`)
+    expect(gfx.core.shown).toEqual(expectedRange(game.files.get("PORTA03.IMD")!, reference.palette, palBefore));
 
     snapshot("video-porta03-image2", composeFrame(gfx, 0, 0));
   });
@@ -192,17 +200,18 @@ describe.skipIf(!hasOriginalFiles)("vidéo IMD", () => {
     await playImd(video, args({ flags: 1, startFrame: 0, lastFrame: 0 }));
 
     const wanted = gfx.core.wanted;
-    expect(wanted.subarray(128 * 3)).toEqual(reference.palette.subarray(128 * 3));
-    expect(wanted.subarray(0, 128 * 3)).toEqual(wantedBefore.subarray(0, 128 * 3));
+    expect(wanted).toEqual(expectedRange(data, reference.palette, wantedBefore));
     // La palette affichée a rejoint la voulue (fondu terminé)
     expect(gfx.core.shown.subarray(128 * 3)).toEqual(wanted.subarray(128 * 3));
   });
 
   it("palette : flags 3 (palCmd 8) applique la palette du film tout de suite", async () => {
     const { gfx, video, game } = await scene();
-    const reference = new ImdDecoder(game.files.get("PORTA03.IMD")!);
+    const data = game.files.get("PORTA03.IMD")!;
+    const reference = new ImdDecoder(data);
+    const before = gfx.core.shown.slice();
     await playImd(video, args({ flags: 3, startFrame: 0, lastFrame: 0, palStart: 128, palEnd: 255 }));
-    expect(gfx.core.shown.subarray(128 * 3)).toEqual(reference.palette.subarray(128 * 3));
+    expect(gfx.core.shown).toEqual(expectedRange(data, reference.palette, before));
   });
 
   it("position x / y imposée : le film est dessiné ailleurs", async () => {

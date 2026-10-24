@@ -468,3 +468,36 @@ export class ImdDecoder {
     return { left, top, right: left + width, bottom: top + height };
   }
 }
+
+/**
+ * Index de palette réellement dessinés par les images d'un film (union sur toutes les images).
+ * Retourne 256 drapeaux (0/1), ou null si le film ne dessine rien ou ne se décode pas
+ * (aucune restriction possible : c'est alors un simple chargeur de palette).
+ */
+export function usedPaletteIndices(data: Uint8Array): Uint8Array | null {
+  try {
+    const decoder = new ImdDecoder(data);
+    const { pixels, width, height } = decoder.surface;
+    const used = new Uint8Array(256);
+    let any = false;
+    // Plafond : un saut arrière pourrait sinon boucler.
+    const limit = decoder.header.frameCount * 4 + 16;
+    for (let calls = 0; calls < limit; calls++) {
+      const frame = decoder.decodeNextFrame();
+      if (!frame) break;
+      const rect = frame.rect;
+      if (!rect) continue;
+      const left = Math.max(rect.left, 0);
+      const top = Math.max(rect.top, 0);
+      const right = Math.min(rect.right, width);
+      const bottom = Math.min(rect.bottom, height);
+      for (let y = top; y < bottom; y++) {
+        for (let x = left, i = y * width + left; x < right; x++, i++) used[pixels[i]] = 1;
+      }
+      any = true;
+    }
+    return any ? used : null;
+  } catch {
+    return null;
+  }
+}

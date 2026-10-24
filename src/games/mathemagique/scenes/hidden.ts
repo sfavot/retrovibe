@@ -280,6 +280,7 @@ class HiddenSceneImpl implements HiddenScene {
       return {
         rect,
         shapes: { normal: this.shapeIdOf(HIDDEN_BUTTONS_SHPL, def.shapes[0]), pressed: this.shapeIdOf(HIDDEN_BUTTONS_SHPL, def.shapes[1]) },
+        pressedRect: rectFromEdges(...def.pressedEdges),
         pressSound: i < faceSounds.length ? faceSounds[i] : undefined,
       };
     });

@@ -8,7 +8,7 @@
  */
 import { drawMask, drawShape } from "../engine/graphics/blit";
 import type { PaletteCycler } from "../engine/graphics/palette";
-import { Surface } from "../engine/graphics/surface";
+import { Surface, type Rect } from "../engine/graphics/surface";
 import { rectFromEdges, type GadgetGroup, type GadgetRecord } from "../engine/gadgets";
 import type { KeyEvent } from "../engine/input";
 import type { Archive } from "../engine/resources";
@@ -24,6 +24,7 @@ import { PolyHelper, createScrPolyPorts, openPolyArchive, rosterIntroFlag } from
 import {
   PatternsBoard,
   PuzzleSession,
+  type PuzzleMode,
   THUMB_LAYOUTS,
   attachBoard,
   patternsEndVoice,
@@ -54,9 +55,15 @@ import {
   thumbHoverMaskId,
   thumbShapeId,
 } from "./patterns-view";
+import { ScreenTransition } from "./screen-transition";
 
 /** Fondu d'entrée et de sortie (30 ticks, `1088:1b25`). */
 const FADE_TICKS = 30;
+/** Stores vénitiens de `1018:09b8` (bandes de 10 lignes) : 15 ticks sur le cadre, 30 ticks sur l'écran entier (patterns.md §3.6). */
+const FRAME_BLINDS_TICKS = 15;
+const SCREEN_BLINDS_TICKS = 30;
+const FRAME_RECT: Rect = rectFromEdges(FRAME_INNER.left, FRAME_INNER.top, FRAME_INNER.right, FRAME_INNER.bottom);
+const SCREEN_RECT: Rect = { x: 0, y: 0, w: 576, h: 432 };
 /** Garde-fou de l'attente de la voix de félicitation (la plus longue dure 3,2 s, soit 190 ticks) : un son muet ou refusé ne bloque pas. */
 const VOICE_WAIT_MAX_TICKS = 400;
 /** Drapeaux de l'animation de victoire (hypothèse : le descripteur `3292` n'est pas documenté) : coupée par un clic, avance rapide jusqu'à l'image finale, attend ses sons. */
@@ -69,6 +76,8 @@ type Flow =
   | { kind: "voice"; voice: SoundHandle | null; ticks: number }
   /** Animation de victoire en cours (bloquante : gadgets et pointeur gelés). */
   | { kind: "reward" }
+  /** Stores vénitiens en cours (`1018:0722`, bloquants : gadgets et pointeur gelés ; un clic les achève). */
+  | { kind: "transition" }
   /** Sortie : fondu au noir, puis retour au hub. */
   | { kind: "leaving"; ticks: number; requested: boolean };
 
@@ -104,7 +113,11 @@ export class PatternsScene implements Scene {
   /** Reprise d'une pièce par la rotation : pas de son de prise. */
   private recarrying = false;
 
-  constructor(private readonly services: MathServices) {}
+  private readonly transition: ScreenTransition;
+
+  constructor(private readonly services: MathServices) {
+    this.transition = new ScreenTransition(services.graphics.screen);
+  }
 
   // --- Accès pour les tests et les outils ---
 
@@ -144,6 +157,7 @@ export class PatternsScene implements Scene {
     this.puzzleShpl = null;
     this.hoverThumb = -1;
     this.flow = { kind: "free" };
+    this.transition.cancel();
     this.opening = false;
     this.openedThisTick = false;
 
@@ -191,7 +205,7 @@ export class PatternsScene implements Scene {
     });
 
     pointer.cursor.setBase("arrow");
-    this.showMenu();
+    this.showMenu(null);
     graphics.palette.fadeFromBlack(FADE_TICKS);
     // Les boutons sont posés avant l'animation d'entrée : elle sauvegarde le fond de sa zone, qui doit les contenir.
     gadgets.draw(graphics.screen);
@@ -216,6 +230,10 @@ export class PatternsScene implements Scene {
   tick(ctx: SceneContext): void {
     this.ctx = ctx;
     const flow = this.flow;
+    if (flow.kind === "transition") {
+      if (this.transition.tick(ctx.input.buttonEvents.some((event) => event.down))) ctx.requestPresent();
+      return;
+    }
     if (flow.kind === "leaving") {
       if (++flow.ticks >= FADE_TICKS && !flow.requested) {
         flow.requested = true;
@@ -247,6 +265,7 @@ export class PatternsScene implements Scene {
       records: BUTTONS.map((def) => ({
         rect: rectFromEdges(def.edges.left, def.edges.top, def.edges.right, def.edges.bottom),
         shapes: { normal: def.shapeId, pressed: def.shapeId + 1 },
+        pressedRect: rectFromEdges(def.pressedEdges.left, def.pressedEdges.top, def.pressedEdges.right, def.pressedEdges.bottom),
         pressSound: def.sound,
       })),
       onActivate: (index) => this.onButton(BUTTONS[index - 1]!.role),
@@ -290,7 +309,8 @@ export class PatternsScene implements Scene {
   private onButton(role: ButtonRole): void {
     const level = levelOfButton(role);
     if (level >= 0) {
-      if (this.session.pressLevel(level)) this.showMenu();
+      const previous = this.session.mode;
+      if (this.session.pressLevel(level)) this.showMenu(previous);
       return;
     }
     if (role === "help") this.openHelp();
@@ -301,17 +321,66 @@ export class PatternsScene implements Scene {
 
   // --- Menu et choix du puzzle ---
 
-  private showMenu(): void {
+  /** Lance une transition en stores vénitiens ; `apply` compose l'état suivant sur l'écran, `done` conclut (ou enchaîne la suivante). */
+  private blinds(rect: Rect, ticks: number, apply: () => void, done: () => void): void {
+    this.flow = { kind: "transition" };
+    this.syncGroups();
+    this.services.gadgets.updatePointer(-1, -1);
+    this.transition.begin(rect, ticks, apply, done);
+  }
+
+  private endTransition(): void {
+    this.flow = { kind: "free" };
+    this.syncGroups();
+    this.paint();
+  }
+
+  /**
+   * Menu du niveau courant. `previous` : mode d'avant (`null` à l'entrée : pas de transition). Depuis un puzzle, `1040:0809` efface d'abord
+   * le tableau (écran entier en 30 ticks si les pièces étaient actives, cadre en 15 ticks sinon : `1018:09b8` en `0809`), puis révèle les
+   * vignettes sur le cadre en 15 ticks.
+   */
+  private showMenu(previous: PuzzleMode | null): void {
     const { pointer, graphics } = this.services;
     pointer.cancel();
     this.board = null;
     this.puzzleShpl = null;
     this.hoverThumb = -1;
     this.thumbsShplId = patternsThumbsShplId(this.session.level);
-    graphics.palette.loadShpl(this.archive.shpl(this.thumbsShplId));
-    this.rebuildDecor();
-    this.syncGroups();
-    this.paint();
+    const loadPalette = () => graphics.palette.loadShpl(this.archive.shpl(this.thumbsShplId));
+    if (previous === null) {
+      loadPalette();
+      this.rebuildDecor();
+      this.syncGroups();
+      this.paint();
+      return;
+    }
+    const revealMenu = () =>
+      this.blinds(
+        FRAME_RECT,
+        FRAME_BLINDS_TICKS,
+        () => {
+          // Hypothèse : la palette change au début de la dernière transition (l'original fait un fondu `10a8:0dc4` autour d'elle).
+          loadPalette();
+          this.rebuildDecor();
+          this.paint();
+        },
+        () => this.endTransition(),
+      );
+    if (previous === "menu") {
+      revealMenu();
+      return;
+    }
+    const full = previous === "playing";
+    this.blinds(
+      full ? SCREEN_RECT : FRAME_RECT,
+      full ? SCREEN_BLINDS_TICKS : FRAME_BLINDS_TICKS,
+      () => {
+        this.rebuildDecor(true);
+        this.paint();
+      },
+      revealMenu,
+    );
   }
 
   private selectPuzzle(k: number): void {
@@ -319,23 +388,37 @@ export class PatternsScene implements Scene {
     const id = patternsPuzzId(this.session.level, k);
     const puzzle: PatternsPuzz = parsePatternsPuzz(this.archive.raw("PUZZ", id));
     this.puzzleShpl = this.archive.shpl(id);
-    // Seules les entrées 154–225 sont celles du tableau : le fond garde ses couleurs.
-    this.services.graphics.palette.loadShpl(paletteSlice(this.puzzleShpl, PUZZLE_PALETTE.first, PUZZLE_PALETTE.count));
     this.board = new PatternsBoard(puzzle);
     this.board.deal(this.ctx.rng);
     this.hoverThumb = -1;
-    this.rebuildDecor();
-    this.syncGroups();
-    this.paint();
+    // `1040:0543` : le puzzle est composé, puis révélé sur le cadre en 15 ticks ; les pièces hors du cadre apparaissent tout de suite.
+    this.blinds(
+      FRAME_RECT,
+      FRAME_BLINDS_TICKS,
+      () => {
+        // Seules les entrées 154–225 sont celles du tableau : le fond garde ses couleurs.
+        this.services.graphics.palette.loadShpl(paletteSlice(this.puzzleShpl!, PUZZLE_PALETTE.first, PUZZLE_PALETTE.count));
+        this.rebuildDecor();
+        this.paint();
+      },
+      () => this.endTransition(),
+    );
   }
 
   private reset(): void {
     if (!this.session.reset() || !this.board) return;
     this.playSound(SOUNDS.reset);
     this.services.pointer.cancel();
-    this.board.deal(this.ctx.rng);
-    this.syncGroups();
-    this.paint();
+    // `1040:0d83` : pièces redistribuées, révélées sur l'écran entier en 30 ticks.
+    this.blinds(
+      SCREEN_RECT,
+      SCREEN_BLINDS_TICKS,
+      () => {
+        this.board!.deal(this.ctx.rng);
+        this.paint();
+      },
+      () => this.endTransition(),
+    );
   }
 
   // --- Rotation ---
@@ -485,6 +568,7 @@ export class PatternsScene implements Scene {
     if (this.flow.kind === "leaving") return;
     const { scr, sound, pointer, graphics } = this.services;
     this.poly.abort();
+    this.transition.cancel();
     pointer.cancel();
     this.cycle = null;
     graphics.palette.stopCycles(false);
@@ -524,9 +608,10 @@ export class PatternsScene implements Scene {
     return this.archive.shap(id);
   }
 
-  /** Fond + vignettes du niveau (menu) ou + cadre-indice du puzzle (en jeu). */
-  private rebuildDecor(): void {
+  /** Fond + vignettes du niveau (menu) ou + cadre-indice du puzzle (en jeu) ; `blank` : le fond seul (tableau effacé avant le menu). */
+  private rebuildDecor(blank = false): void {
     this.decor.copyFrom(this.base);
+    if (blank) return;
     if (this.session.mode === "menu") {
       const layout = THUMB_LAYOUTS.patterns;
       for (let k = 0; k < 9; k++) {

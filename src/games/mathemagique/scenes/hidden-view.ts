@@ -64,6 +64,8 @@ export interface HiddenButtonDef {
   id: HiddenButtonId;
   /** `(gauche, haut, droite, bas)` de la table `DS:1994`. */
   edges: readonly [number, number, number, number];
+  /** Second rectangle de la table `DS:1994` (« appuyé », lu dans `MATH`) : la forme d'appui y est posée, pas au coin du rectangle de repos. */
+  pressedEdges: readonly [number, number, number, number];
   /** Indices (1-based) des formes de `SHPL` 5000 : repos, appui. */
   shapes: readonly [number, number];
   /** Clé de zone de l'aide de Poly (`HIDDEN_POLY.topics`). */
@@ -71,13 +73,13 @@ export interface HiddenButtonDef {
 }
 
 export const HIDDEN_BUTTONS: readonly HiddenButtonDef[] = [
-  { id: "level0", edges: [52, 308, 85, 340], shapes: [1, 2], zone: "level" },
-  { id: "level1", edges: [88, 308, 121, 340], shapes: [3, 4], zone: "level" },
-  { id: "level2", edges: [124, 308, 157, 340], shapes: [5, 6], zone: "level" },
-  { id: "help", edges: [228, 306, 261, 338], shapes: [7, 8], zone: "help" },
-  { id: "reset", edges: [52, 346, 94, 378], shapes: [9, 10], zone: "reset" },
-  { id: "rotate", edges: [265, 307, 298, 339], shapes: [11, 12], zone: "rotate" },
-  { id: "exit", edges: [116, 346, 157, 378], shapes: [13, 14], zone: "exit" },
+  { id: "level0", edges: [52, 308, 85, 340], pressedEdges: [54, 309, 85, 340], shapes: [1, 2], zone: "level" },
+  { id: "level1", edges: [88, 308, 121, 340], pressedEdges: [90, 309, 121, 340], shapes: [3, 4], zone: "level" },
+  { id: "level2", edges: [124, 308, 157, 340], pressedEdges: [126, 309, 157, 340], shapes: [5, 6], zone: "level" },
+  { id: "help", edges: [228, 306, 261, 338], pressedEdges: [230, 307, 261, 338], shapes: [7, 8], zone: "help" },
+  { id: "reset", edges: [52, 346, 94, 378], pressedEdges: [54, 348, 94, 378], shapes: [9, 10], zone: "reset" },
+  { id: "rotate", edges: [265, 307, 298, 339], pressedEdges: [267, 308, 298, 339], shapes: [11, 12], zone: "rotate" },
+  { id: "exit", edges: [116, 346, 157, 378], pressedEdges: [118, 348, 157, 378], shapes: [13, 14], zone: "exit" },
 ];
 
 /** Zone cliquable de Poly (aide) et télé (`DS:1a04`, `1a1c`). */

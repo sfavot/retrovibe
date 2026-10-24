@@ -791,9 +791,19 @@ describe.runIf(hasOriginalFiles)("données réelles de RHYTHM.DAT", () => {
       return { sink, cues, ended, complete, start, song, player };
     }
 
-    it("lecture de Fanfare : repères 1 a 2 3 b 4 à l'heure, fin unique, mesure unique", () => {
-      const { cues, ended, start, song, complete } = play(101, [72, 72]);
+    it("motif complet : Fanfare entière, non réécrite (10 repères a, fin unique à z - end)", () => {
+      const { cues, ended, complete, sink } = play(101, [72, 72]);
       expect(complete).toBe(true);
+      expect(ended).toBe(1);
+      const letters = cues.map((c) => (c.cue!.type === "slot" ? "abcdefgh"[c.cue!.slot] : ""));
+      expect(letters.filter((l) => l === "a")).toHaveLength(10);
+      expect(cues.length).toBeGreaterThan(40);
+      expect(sink.audibleNotes().length).toBeGreaterThan(play(101, [72, -72]).sink.audibleNotes().length);
+    });
+
+    it("motif incomplet : repères 1 a 2 3 b 4 à l'heure, fin unique, mesure unique", () => {
+      const { cues, ended, start, song, complete } = play(101, [72, -72]);
+      expect(complete).toBe(false);
       expect(ended).toBe(1);
       expect(cues.map((c) => (c.cue!.type === "slot" ? "abcdefgh"[c.cue!.slot] : String(c.cue!.beat)))).toEqual(["1", "a", "2", "3", "b", "4"]);
       // chaque repère est signalé à son heure (jamais en avance, à un tick du moteur près), au tempo entier du jeu
@@ -820,7 +830,7 @@ describe.runIf(hasOriginalFiles)("données réelles de RHYTHM.DAT", () => {
       const speed = 170 / (60_000_000 / 352_941);
       for (const note of half.sink.audibleNotes()) expect(note.at! - half.start).toBeLessThanOrEqual(slotB.ms / speed + 1e-6);
       // les cues sont routés quand même (la scène éclaire les pièces vides aussi : le jeu ne s'en sert que si le motif est complet)
-      expect(half.cues.map((c) => c.cue!.type)).toEqual(full.cues.map((c) => c.cue!.type));
+      expect(half.cues.map((c) => c.cue!.type)).toEqual(none.cues.map((c) => c.cue!.type));
     });
 
     it("initialisation : SYSX de MIDIMAP puis programmes du bloc Prg#", () => {
@@ -830,8 +840,18 @@ describe.runIf(hasOriginalFiles)("données réelles de RHYTHM.DAT", () => {
       expect(programChanges.length).toBeGreaterThan(0);
     });
 
+    it("rhythmPlayOptions : MIDI entier non réécrit si le motif est complet (DS:2594), une mesure réécrite sinon (1058:125e)", () => {
+      const song = songOf(101);
+      expect(rhythmPlayOptions(song, { pattern: [72, 72] }).rewrite).toBeUndefined();
+      expect(rhythmPlayOptions(song, { pattern: [72, -72] }).rewrite).toBeTypeOf("function");
+      // Fanfare entière : 10 mesures (10 repères `a`), terminée par `z - end` à 19200 ; la chorégraphie (4, 8 ou 12 mesures) boucle dessus.
+      const cues = song.events.filter((e) => e.kind === "marker" && e.metaType === 7) as MarkerEvent[];
+      expect(cues.filter((c) => c.text === "a")).toHaveLength(10);
+      expect(cues.at(-1)).toMatchObject({ text: "z - end", tick: 19200 });
+    });
+
     it("rhythmPlayOptions : tempo entier, pas de boucle par défaut", () => {
-      const options = rhythmPlayOptions(songOf(101), { pattern: [72, 72] });
+      const options = rhythmPlayOptions(songOf(101), { pattern: [72, -72] });
       expect(options.bpm).toBe(170);
       expect(options.loop).toBeUndefined();
       expect(options.rewrite).toBeTypeOf("function");

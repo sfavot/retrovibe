@@ -157,22 +157,35 @@ describe("tables du hub (hub-logic)", () => {
   });
 });
 
-describe("horloge du titre", () => {
-  it("image = heure × 12 + minute arrondie au pas de 5", () => {
-    expect(clockFrame(12, 0, 0)).toBe(0);
+describe("horloge du titre (1068:0785)", () => {
+  it("compteur = heure × 12 + minute arrondie au pas de 5 (l'original ajoute 1 à un compteur qui part de 1)", () => {
     expect(clockFrame(0, 0, 0)).toBe(0);
     expect(clockFrame(3, 0, 5)).toBe(36);
     expect(clockFrame(15, 15, 0)).toBe(39);
     expect(clockFrame(6, 32, 0)).toBe(6 * 12 + 6);
     expect(clockFrame(6, 33, 0)).toBe(6 * 12 + 7);
-    // Arrondi à la demi-minute près : 2 min 29 s reste, 2 min 30 s passe au pas suivant.
+    // Arrondi à la demi-minute près (`CMP secondes, 0x1e` / `JC`) : 2 min 29 s reste, 2 min 30 s passe au pas suivant.
     expect(clockFrame(1, 2, 29)).toBe(12);
     expect(clockFrame(1, 2, 30)).toBe(13);
+    expect(clockFrame(1, 1, 59)).toBe(12);
+    expect(clockFrame(1, 3, 0)).toBe(13);
   });
 
-  it("à 55 minutes et plus, l'aiguille passe à l'heure suivante", () => {
-    expect(clockFrame(2, 58, 0)).toBe(36);
-    expect(clockFrame(11, 59, 0)).toBe(0);
+  it("heure sur 12 : on retranche 12 au-dessus de 12 seulement (12 h reste 12)", () => {
+    expect(clockFrame(13, 0, 0)).toBe(12);
+    expect(clockFrame(23, 20, 0)).toBe(11 * 12 + 4);
+    expect(clockFrame(12, 0, 0)).toBe(144);
+    expect(clockFrame(12, 30, 0)).toBe(150);
+  });
+
+  it("à 55 minutes et plus, le pas vaut 12 sans retour à l'heure suivante (le compteur peut dépasser 143)", () => {
+    expect(clockFrame(2, 54, 29)).toBe(2 * 12 + 11);
+    expect(clockFrame(2, 54, 30)).toBe(2 * 12 + 11);
+    expect(clockFrame(2, 55, 0)).toBe(2 * 12 + 11);
+    expect(clockFrame(2, 57, 29)).toBe(2 * 12 + 11);
+    expect(clockFrame(2, 57, 30)).toBe(2 * 12 + 12);
+    expect(clockFrame(2, 58, 0)).toBe(3 * 12);
+    expect(clockFrame(11, 59, 0)).toBe(144);
   });
 });
 

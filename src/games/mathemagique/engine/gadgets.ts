@@ -20,7 +20,8 @@
  *  - états visuels : `normal`, `hover` (survol ou focus clavier), `pressed`, `selected`, `disabled`, plus `hidden` ; chaque enregistrement peut
  *    avoir une forme `SHAP` par état (repli : pressed → selected → hover → normal, selected → pressed → normal, hover / disabled → normal) ;
  *  - dessin : `draw(surface)` ne redessine que les enregistrements dont l'état a changé ; avec `captureBackground` le fond sous le bouton est
- *    restauré avant de poser la nouvelle forme (formes à fond transparent dont la forme normale est cuite dans le décor).
+ *    restauré avant de poser la nouvelle forme ; ce fond doit donc être capturé **sans** les formes des boutons (les gadgets posent aussi la forme
+ *    normale). La forme « appuyé » peut avoir sa propre origine (`pressedRect`, second rectangle de la table de l'original, `1038:01af`).
  */
 import type { Shape } from "../data/shap";
 import { drawShape } from "./graphics/blit";
@@ -99,6 +100,11 @@ export interface GadgetSpec {
   shapes?: GadgetShapes;
   shapeX?: number;
   shapeY?: number;
+  /**
+   * Second rectangle de l'original (table de 16 octets par bouton, `1038:01af`) : la forme « appuyé » est dessinée à **son** coin haut-gauche,
+   * pas à celui de la zone (forme plus petite, collée au coin bas-droit : `(+2, +1)` ou `(+2, +2)`). Absent : même origine que la forme normale.
+   */
+  pressedRect?: Rect;
   /** Son d'appui (`\0SND`), fixe ou tiré à chaque appui (Help du hub : 3012 ou 3013). */
   pressSound?: number | (() => number | undefined);
   hidden?: boolean;
@@ -121,6 +127,7 @@ export class GadgetRecord {
   readonly shapes: GadgetShapes | undefined;
   readonly shapeX: number;
   readonly shapeY: number;
+  readonly pressedRect: Rect | undefined;
   readonly pressSound: GadgetSpec["pressSound"];
   readonly toggle: boolean;
   readonly focusable: boolean;
@@ -144,6 +151,7 @@ export class GadgetRecord {
     this.shapes = spec.shapes;
     this.shapeX = spec.shapeX ?? spec.rect.x;
     this.shapeY = spec.shapeY ?? spec.rect.y;
+    this.pressedRect = spec.pressedRect;
     this.pressSound = spec.pressSound;
     this.toggle = spec.toggle ?? false;
     this.focusable = spec.focusable ?? true;
@@ -418,6 +426,18 @@ export class GadgetManager {
     return undefined;
   }
 
+  /** Forme à poser pour l'état (avec repli) et son origine : celle de `pressedRect` si c'est la forme « appuyé » qui est retenue. */
+  private placementFor(record: GadgetRecord, visual: GadgetVisual): { id: number; x: number; y: number } | undefined {
+    if (!record.shapes) return undefined;
+    for (const candidate of SHAPE_FALLBACK[visual]) {
+      const id = record.shapes[candidate];
+      if (id === undefined) continue;
+      const at = candidate === "pressed" && record.pressedRect ? record.pressedRect : { x: record.shapeX, y: record.shapeY };
+      return { id, x: at.x, y: at.y };
+    }
+    return undefined;
+  }
+
   /**
    * Mémorise le fond sous chaque bouton qui a des formes, une fois le décor peint : l'état suivant est posé sur ce fond
    * (une forme de survol plus petite que la précédente n'y laisse pas de reste). À rappeler si le décor change.
@@ -430,13 +450,14 @@ export class GadgetManager {
         let top = Infinity;
         let right = -Infinity;
         let bottom = -Infinity;
-        for (const id of Object.values(record.shapes)) {
-          const shape = this.shapeSource(id);
-          if (!shape) continue;
-          left = Math.min(left, record.shapeX);
-          top = Math.min(top, record.shapeY);
-          right = Math.max(right, record.shapeX + shape.width);
-          bottom = Math.max(bottom, record.shapeY + shape.height);
+        for (const visual of Object.keys(SHAPE_FALLBACK) as GadgetVisual[]) {
+          const placed = this.placementFor(record, visual);
+          const shape = placed && this.shapeSource(placed.id);
+          if (!placed || !shape) continue;
+          left = Math.min(left, placed.x);
+          top = Math.min(top, placed.y);
+          right = Math.max(right, placed.x + shape.width);
+          bottom = Math.max(bottom, placed.y + shape.height);
         }
         record.background = right > left ? surface.saveRect({ x: left, y: top, w: right - left, h: bottom - top }) : null;
       }
@@ -462,10 +483,10 @@ export class GadgetManager {
         }
         record.drawn = visual;
         if (visual === "hidden") continue;
-        const id = this.shapeIdFor(record, visual);
-        const shape = id === undefined ? undefined : this.shapeSource?.(id);
-        if (shape) {
-          drawShape(surface, shape, record.shapeX, record.shapeY, 8);
+        const placed = this.placementFor(record, visual);
+        const shape = placed && this.shapeSource?.(placed.id);
+        if (placed && shape) {
+          drawShape(surface, shape, placed.x, placed.y, 8);
           changed = true;
         }
       }

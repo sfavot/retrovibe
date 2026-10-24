@@ -10,6 +10,7 @@ import { rotateHiddenCells, type HiddenBoard, type HiddenPiece } from "../../src
 import { createHiddenScene, type HiddenScene } from "../../src/games/mathemagique/scenes/hidden";
 import {
   borderShapeId,
+  HIDDEN_BUTTONS,
   HIDDEN_FLAT_COLORS,
   photoRevealRects,
   pieceBorders,
@@ -244,6 +245,35 @@ describe.skipIf(!hasOriginalFiles)("Hidden : scène (vraies données)", () => {
     // Les 7 boutons sont posés (forme de repos).
     const buttons = hidden.shpl(5000).firstShapeId;
     expect(screen.get(52 + 16, 308 + 16)).toBe(hidden.shap(buttons).pixels[16 * 33 + 16]);
+  });
+
+  it("boutons enfoncés : la forme d'appui est posée au second rectangle de la table `DS:1994`, sans reste de la forme de repos", async () => {
+    const api = await boot();
+    await api.toMenu();
+    await api.run(100);
+    const hidden = new Archive("HIDDEN.DAT", MohawkArchive.parse(readOriginal("HIDDEN.DAT")));
+    const wall = hidden.shap(hidden.shpl(102).firstShapeId);
+    const first = hidden.shpl(5000).firstShapeId;
+    const screen = api.services.graphics.screen;
+    const expected = (shape: { width: number; height: number; pixels: Uint8Array }, ox: number, oy: number, x: number, y: number) => {
+      const v = x >= ox && y >= oy && x < ox + shape.width && y < oy + shape.height ? shape.pixels[(y - oy) * shape.width + (x - ox)]! : 0;
+      return v !== 0 ? v : wall.pixels[y * 576 + x]!;
+    };
+    for (const def of HIDDEN_BUTTONS) {
+      const [l, t, r, b] = def.edges;
+      const [pl, pt, pr, pb] = def.pressedEdges;
+      const normal = hidden.shap(first + def.shapes[0] - 1);
+      const pressed = hidden.shap(first + def.shapes[1] - 1);
+      expect([pr, pb, pr - pl, pb - pt]).toEqual([r, b, pressed.width, pressed.height]);
+      api.host.input.moveMouse((l + r) >> 1, (t + b) >> 1);
+      api.host.input.mouseDown("left");
+      await api.run(60);
+      for (let y = t; y < b; y++) for (let x = l; x < r; x++) expect(screen.get(x, y), `${def.id} appuyé (${x}, ${y})`).toBe(expected(pressed, pl, pt, x, y));
+      api.host.input.moveMouse(5, 5);
+      api.host.input.mouseUp("left");
+      await api.run(60);
+      for (let y = t; y < b; y++) for (let x = l; x < r; x++) expect(screen.get(x, y), `${def.id} repos (${x}, ${y})`).toBe(expected(normal, l, t, x, y));
+    }
   });
 
   it("niveau : un visage change de menu (télé seule), le même niveau ne fait rien", async () => {

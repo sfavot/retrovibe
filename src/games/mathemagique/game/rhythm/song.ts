@@ -3,7 +3,9 @@
  * temps du jeu (minuterie de 4 ms). Pur : le séquenceur (celui de `SoundService`, `playSong`) et son horloge viennent de l'appelant.
  *
  * Le morceau ne dépend pas de la variante : les 4 variantes d'un morceau changent les outils, ni le motif ni la musique. Seuls les emplacements
- * remplis du Pattern Bin comptent (`rhythmRewrite`) : les autres sont muets, la mesure est jouée une fois.
+ * remplis du Pattern Bin comptent tant que le motif est incomplet (`rhythmRewrite` : une mesure, les autres emplacements muets) ; un motif complet
+ * joue le MIDI entier, non réécrit (`1028:273a` n'appelle `1058:125e` que si `DS:2594 == 0`, et `DS:2594` vaut 1 exactement quand aucun emplacement
+ * n'est vide, `1028:079b`).
  */
 import { rhythmRewrite } from "../../audio/rhythm-rewrite";
 import { type PlayOptions, type ProgramEntry } from "../../audio/sequencer";
@@ -66,24 +68,27 @@ export interface RhythmPlayRequest {
   programs?: readonly ProgramEntry[];
   /** Un repère `a`-`x` ou `1`-`8` est atteint (à l'instant où il est entendu, à un tick du moteur près). */
   onCue?(cue: RhythmCue): void;
-  /** Fin de la mesure (pas après `stop()`). */
+  /** Fin de la lecture (pas après `stop()`). */
   onEnd?(): void;
-  /** Rejoue la mesure en boucle (hors original : le jeu la joue une fois). */
+  /** Rejoue en boucle (hors original : le jeu joue le morceau une fois). */
   loop?: boolean;
   /** Impose un tempo (défaut : le tempo entier du jeu, `songBpm`). */
   bpm?: number;
 }
 
-/** Options de lecture (`MidiPlayer.play` via `SoundService.playSong`) : réécriture (une mesure, emplacements vides muets), tempo entier, routage des repères. */
+/**
+ * Options de lecture (`MidiPlayer.play` via `SoundService.playSong`) : tempo entier, routage des repères et, pour un motif incomplet seulement,
+ * réécriture (une mesure, emplacements vides muets). Motif complet : morceau entier tel quel.
+ */
 export function rhythmPlayOptions(song: Song, request: RhythmPlayRequest): PlayOptions {
   const options: PlayOptions = {
-    rewrite: rhythmRewrite(filledSlots(request.pattern)),
     bpm: request.bpm ?? songBpm(song),
     onMarker: (marker) => {
       const cue = cueOf(marker);
       if (cue) request.onCue?.(cue);
     },
   };
+  if (!isPatternComplete(request.pattern)) options.rewrite = rhythmRewrite(filledSlots(request.pattern));
   if (request.programs) options.programs = request.programs;
   if (request.loop) options.loop = true;
   if (request.onEnd) options.onEnd = request.onEnd;

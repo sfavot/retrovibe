@@ -61,19 +61,17 @@ function sessionOf(services: MathServices): TitleSession {
 }
 
 /**
- * Image de `SCR` 500 (0 à 143, 0 = 12 h 00) qui montre l'heure : `heure12 × 12 + pas` (minute arrondie au pas de 5, `1068:0785`). L'original compte
- * `+ 1` parce que son compteur d'images présentées part de 1 ; `fastForward` d'ici compte à partir de 0.
+ * Compteur passé à `fastForward` pour la `SCR` 500 (144 images : 0 = 12 h 00 … 143 = 11 h 55) : `heure × 12 + pas`, formule de `1068:0785` sans son
+ * `+ 1` (le compteur de `1090:0432` part de 1 et s'arrête à la première image qui l'atteint ; celui de `fastForward` part de 0). L'heure (24 h)
+ * perd 12 si elle dépasse 12 (12 h reste 12, 0 h reste 0) ; la minute est arrondie au pas de 5 (`+1` si `minute % 5 > 2`, ou `= 2` avec au moins
+ * 30 s). Comme l'original, il n'y a pas de retour à 0 : à partir de 55 min (pas 12) et à 12 h, le compteur dépasse 143 et le script s'arrête sur sa
+ * dernière image (11 h 55), `fastForward` bornant à la dernière image. Hypothèse : 12 h 00 affiche donc 11 h 55 (défaut de l'original).
  */
 export function clockFrame(hours: number, minutes: number, seconds: number): number {
-  let hour = hours % 12;
+  const hour = hours > 12 ? hours - 12 : hours;
   let step = Math.floor(minutes / 5);
   const rest = minutes % 5;
-  if (rest > 2 || (rest === 2 && seconds > 29)) step++;
-  // 55 min et plus : la minute arrondie passe à l'heure suivante.
-  if (step === 12) {
-    step = 0;
-    hour = (hour + 1) % 12;
-  }
+  if (rest > 2 || (rest === 2 && seconds >= 30)) step++;
   return hour * 12 + step;
 }
 

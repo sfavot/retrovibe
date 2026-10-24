@@ -31,6 +31,7 @@ import {
   GameTimer,
   GUS_CHEERS,
   QuestionPicker,
+  BONUS,
   STRIKE_WITHOUT_EPILOGUE,
   backgroundMusicId,
   gusTimeUpReaction,
@@ -68,6 +69,8 @@ import {
   TUNNEL,
   BAR_HALF,
   WINDOW_REDRAW,
+  WINDOW_TEXT,
+  centerText,
   copyRect,
   drawChoice,
   drawEmptyChoices,
@@ -112,6 +115,17 @@ const SOUND_WAIT_MAX_TICKS = 600;
 const LIGHTS_PERIOD = 8;
 const GUS_PRELUDE = 18000;
 const GUS_EPILOGUE = 18050;
+/** Entrée de Gus (`SCR 18100`, descripteur `1108:04f8`, `1010:0000`) : marche et salut, rejoués au premier affichage de la scène. */
+const GUS_ENTRY = 18100;
+/**
+ * Drapeaux des descripteurs d'animation du Bowling (octet `+7`, tables `1108:04e0` à `0510`, lus par `1090:111c`) :
+ * `0x12` (MIDI conservé, attente des sons, ni clic ni sauvegarde du fond) pour le prélude 18000 (`04ec`), l'épilogue 18050 (`04e0`) et le script
+ * du descripteur `0504` (strike, réactions de Gus) ; `0x1e` pour l'entrée de Gus (`04f8`), la seule interruptible par un clic.
+ */
+const GUS_FLAGS = SCR_FLAG.keepMidi | SCR_FLAG.waitSounds;
+const GUS_ENTRY_FLAGS = GUS_FLAGS | SCR_FLAG.interruptible | SCR_FLAG.fastForwardOnInterrupt;
+/** Zones repeintes après la bannière (`DS:0acb`, `0ad3`, `0adb` restaurées par `1010:46fb`). */
+const BANNER_RECTS: readonly Rect[] = [rectFromEdges(127, 61, 440, 204), rectFromEdges(420, 66, 538, 148), rectFromEdges(37, 66, 152, 227)];
 const GUS_CLICK_REACTIONS = [4, 10, 20] as const;
 const GUS_SECRET_REACTION = 15;
 const EXIT_REACTIONS = 15;
@@ -189,6 +203,8 @@ export class BowlingScene implements Scene {
   private eye = EYE_OPEN;
   private eyeAt = 0;
   private gusBusy = false;
+  /** Vrai si la scène est rouverte depuis le Hall of Fame (`1108:4dfc`) : Gus est déjà là, pas d'entrée animée. */
+  private fromTrophy = false;
   private cycle: PaletteCycler | null = null;
   private rainbow: Uint8Array<ArrayBufferLike> = new Uint8Array(0);
   private hubPalette: Uint8Array | null = null;
@@ -231,8 +247,9 @@ export class BowlingScene implements Scene {
   get monitorOverlay(): MonitorOverlay | null {
     return this.monitor;
   }
+  /** Fondu terminé et entrée de Gus jouée (ou interrompue). */
   get ready(): boolean {
-    return this.phase === "normal";
+    return this.phase === "normal" && this.steps.length === 0;
   }
   get pinSetIndex(): number {
     return this.pinSet;
@@ -254,6 +271,7 @@ export class BowlingScene implements Scene {
       ctx.host.loadFile("NCSCLB14.FON").then((bytes) => parseFon(bytes)[0]!),
     ]);
     this.mainscrn = mainscrn;
+    this.fromTrophy = ctx.scenes.currentId === SceneId.trophy;
     this.data = loadBowlingData(bowling.mohawk);
     this.fonts = { small, medium, large };
   }
@@ -284,7 +302,7 @@ export class BowlingScene implements Scene {
     const { palette, screen } = graphics;
     for (const shpl of [SHPL_BACKGROUND, SHPL_GUS, SHPL_LIGHTS, SHPL_PIZZAS]) palette.loadShpl(this.archive.shpl(shpl));
     this.rainbow = palette.snapshot(LIGHTS_PALETTE.first, LIGHTS_PALETTE.count);
-    this.buildBase();
+    this.buildBase(this.fromTrophy);
     this.bind();
     this.pinSet = pickPinSet(ctx.rng);
     this.chooseMusic();
@@ -348,6 +366,7 @@ export class BowlingScene implements Scene {
     if (this.phase === "entering") {
       if (++this.phaseTicks >= FADE_TICKS) {
         this.phase = "normal";
+        if (!this.fromTrophy) this.run(...this.gusEntrySteps());
         this.syncGroups();
       }
       return;
@@ -404,12 +423,34 @@ export class BowlingScene implements Scene {
     return this.archive.shap(id);
   }
 
-  private buildBase(): void {
+  private buildBase(withGus: boolean): void {
     this.base.pixels.set(this.shape(SHAP.background).pixels);
-    drawShape(this.base, this.shape(SHAP.gus), GUS_ZONE.x, GUS_ZONE.y, 8);
+    if (withGus) this.drawGus();
     drawShape(this.base, this.shape(SHAP.label), LABEL_AT.x, LABEL_AT.y, 8);
     for (let k = 0; k < 4; k++) drawShape(this.base, this.shape(SHAP.level + 2 * k), LEVEL_SHAPES[k]!.normal[0], LEVEL_SHAPES[k]!.normal[1], 8);
     drawShape(this.base, this.shape(SHAP.bonus), LEVEL_SHAPES[4]!.normal[0], LEVEL_SHAPES[4]!.normal[1], 8);
+  }
+
+  private drawGus(): void {
+    drawShape(this.base, this.shape(SHAP.gus), GUS_ZONE.x, GUS_ZONE.y, 8);
+  }
+
+  /** Entrée de Gus (`1010:0000`, après le fondu) : `SCR 18100`, puis Gus au repos dans le décor. */
+  private gusEntrySteps(): Step[] {
+    return [
+      this.call(() => {
+        this.gusBusy = true;
+        this.services.pointer.cancel();
+      }),
+      this.play(this.archive, GUS_ENTRY, GUS_ENTRY_FLAGS, true),
+      this.call(() => {
+        this.drawGus();
+        this.composeAll();
+        this.gusBusy = false;
+        this.repaintAll();
+        this.eyeAt = this.ctx.clock.ticks + 120 + this.ctx.rng.rand(180);
+      }),
+    ];
   }
 
   /** Recompose `canvas` : décor, nom, rang, pions, barre, cases, question en cours, œil. */
@@ -566,14 +607,16 @@ export class BowlingScene implements Scene {
     };
   }
 
-  /** Joue un `SCR` en mode bloquant (gadgets et pointeur gelés ; un clic l'interrompt si `interruptible`). */
-  private play(archive: Archive, id: number, flags: number, voice = false, interruptible = true): Step {
+  /** Joue un `SCR` en mode bloquant (gadgets et pointeur gelés ; un clic l'interrompt si `flags` contient `interruptible`). */
+  private play(archive: Archive, id: number, flags: number, voice = false): Step {
     let handle: AnimationHandle | null = null;
     return {
       start: () => {
         this.played.push(id);
         handle = this.services.scr.start(archive, id, {
-          flags: flags | (interruptible ? SCR_FLAG.interruptible : 0),
+          flags,
+          // Les descripteurs d'animation du Bowling ont `+8 = *4cac` (`1010:0dc5`) : fond propre recopié avant chaque image.
+          background: this.canvas,
           blocking: true,
           soundChannel: voice ? "voice" : "effect",
         });
@@ -598,10 +641,10 @@ export class BowlingScene implements Scene {
         this.gusBusy = true;
         this.services.pointer.cancel();
       }),
-      this.play(this.gus, id, SCR_FLAG.saveBackground | SCR_FLAG.restoreBackground | SCR_FLAG.waitSounds, true),
+      this.play(this.gus, id, GUS_FLAGS, true),
       this.call(() => {
         this.gusBusy = false;
-        this.blit(GUS_ZONE);
+        this.repaintAll();
         this.eyeAt = this.ctx.clock.ticks + 120 + this.ctx.rng.rand(180);
       }),
     ];
@@ -718,7 +761,7 @@ export class BowlingScene implements Scene {
     if (correct) {
       const n = this.progress.roundCorrect;
       this.run(
-        this.play(this.archive, pinAnimationId(this.pinSet, n), 0, false, false),
+        this.play(this.archive, pinAnimationId(this.pinSet, n), 0),
         this.call(() => {
           if (this.progress.correctAnswer()) this.beginStrike();
           else {
@@ -783,9 +826,9 @@ export class BowlingScene implements Scene {
         palette.loadShpl(this.archive.shpl(scrId));
       }),
       ...this.lightsSteps(SOUND.fanfare, [{ shape: 1, x: 128, y: 62 }], cream),
-      this.play(this.archive, GUS_PRELUDE, SCR_FLAG.waitSounds, true),
-      this.play(this.archive, scrId, SCR_FLAG.waitSounds, false),
-      ...(scrId === STRIKE_WITHOUT_EPILOGUE ? [] : [this.play(this.archive, GUS_EPILOGUE, 0)]),
+      this.play(this.archive, GUS_PRELUDE, GUS_FLAGS, true),
+      this.play(this.archive, scrId, GUS_FLAGS),
+      ...(scrId === STRIKE_WITHOUT_EPILOGUE ? [] : [this.play(this.archive, GUS_EPILOGUE, GUS_FLAGS)]),
       this.call(() => {
         palette.restore(saved, MAIN_PALETTE_FIRST);
         this.gusBusy = false;
@@ -827,6 +870,7 @@ export class BowlingScene implements Scene {
           { shape: 5, x: 38, y: 66 },
         ],
         cream,
+        this.progress.level === BONUS ? "BONUS ROUND" : `LEVEL ${this.progress.level + 1}`,
       ),
     ];
   }
@@ -840,7 +884,7 @@ export class BowlingScene implements Scene {
   }
 
   /** Fanfare ou bannière (`1010:42a2`) : lumières peintes en crème puis colorées et tournées toutes les 8 ticks pendant que le son joue. */
-  private lightsSteps(soundId: number, overlays: { shape: number; x: number; y: number }[], cream: Uint8Array): Step[] {
+  private lightsSteps(soundId: number, overlays: { shape: number; x: number; y: number }[], cream: Uint8Array, text?: string): Step[] {
     const { palette, screen } = this.services.graphics;
     let handle: SoundHandle | null = null;
     let ticks = 0;
@@ -849,6 +893,8 @@ export class BowlingScene implements Scene {
         start: () => {
           palette.restore(cream, LIGHTS_PALETTE.first);
           for (const o of overlays) drawShape(screen, this.shape(SHPL_LIGHTS + o.shape - 1), o.x, o.y, 8);
+          // « LEVEL n » / « BONUS ROUND » (`1010:4140`) : fonte `4a20` (NCSclB14), centré dans la fenêtre du problème (`DS:0524`, drapeaux `0x22`).
+          if (text !== undefined) centerText(screen, this.fonts.large, text, WINDOW_TEXT);
           this.ctx.requestPresent();
           palette.restore(this.rainbow, LIGHTS_PALETTE.first);
           this.cycle = palette.startCycle({ first: LIGHTS_PALETTE.first, count: LIGHTS_PALETTE.count, period: LIGHTS_PERIOD });
@@ -859,9 +905,13 @@ export class BowlingScene implements Scene {
           this.cycle?.stop(false);
           this.cycle = null;
           palette.restore(this.rainbow, LIGHTS_PALETTE.first);
-          for (const o of overlays) {
-            const s = this.shape(SHPL_LIGHTS + o.shape - 1);
-            this.blit({ x: o.x, y: o.y, w: s.width, h: s.height });
+          // La bannière restaure tout son cadre (`1010:46fb`), texte compris ; la fanfare seulement ses lumières.
+          if (text !== undefined) this.blit(...BANNER_RECTS);
+          else {
+            for (const o of overlays) {
+              const s = this.shape(SHPL_LIGHTS + o.shape - 1);
+              this.blit({ x: o.x, y: o.y, w: s.width, h: s.height });
+            }
           }
         },
       },

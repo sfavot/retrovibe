@@ -294,17 +294,12 @@ export class BrowserHost implements Host {
     const { canvas, input, audio } = this;
     canvas.addEventListener("pointermove", (event) => {
       if (this.touch?.id === event.pointerId) this.touch.move(event);
-      // Un doigt ne survole rien : seul un pointeur de souris (ou de stylet) qui passe sur l'écran est « dans » la zone.
-      input.setPointerInside(event.pointerType !== "touch");
       this.pointer(event);
     });
     // Glisser une pièce au doigt ne fait pas défiler la page (en plus de `touch-action: none`, pour les navigateurs qui l'ignorent).
     canvas.addEventListener("touchmove", (event) => event.preventDefault(), {
       passive: false,
     });
-    canvas.addEventListener("pointerleave", () =>
-      input.setPointerInside(false),
-    );
     canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       if (event.pointerType === "touch" && event.isPrimary)

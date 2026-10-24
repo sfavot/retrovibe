@@ -138,6 +138,8 @@ describe.skipIf(!hasOriginalFiles)("Rhythm Shop : scène (vraies données)", () 
       // Un seul séquenceur : la lecture passe par le SoundService (poignée de musique), pas par un lecteur propre à la scène.
       expect(api.services.sound.musicPlaying).toBe(true);
       expect(api.engine.ctx.roster.roster.getVar(api.playerId, "rhythmVariant", 0)).toBe(1);
+      // MIDI entier (1028:273a, DS:2594) : la danse avance d'une mesure à chaque repère `a`, les 10 de Fanfare (et non une seule mesure rejouée).
+      await api.until(() => api.scene.inspect().measuresPlayed >= 10);
       await api.until(() => api.scene.inspect().state === "finale");
       expect(api.scene.inspect().reaction).not.toBeNull();
       await api.idle();

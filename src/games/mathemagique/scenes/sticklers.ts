@@ -15,6 +15,7 @@ import type { Archive } from "../engine/resources";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
+import { ScreenTransition } from "./screen-transition";
 import type { KeyEvent } from "../engine/input";
 import { PUZZLES_PER_LEVEL, parseSticklersPuzz, puzzId, rewardId, sticklersMenuShplId } from "../game/puzz";
 import { PolyHelper, createScrPolyPorts, openPolyArchive, rosterIntroFlag } from "../game/poly";
@@ -22,6 +23,7 @@ import { POLY_ZONE, STICKLERS_POLY } from "../game/poly-config";
 import {
   type CarriableBoard,
   PuzzleSession,
+  type PuzzleMode,
   SticklersBoard,
   THUMB_LAYOUTS,
   attachBoard,
@@ -42,7 +44,7 @@ import {
   INTRO_SCR,
   MINIATURE_AT,
   MUSIC_SND,
-  PRESSED_OFFSET,
+  BUTTON_PRESSED_EDGES,
   SCATTER,
   SND,
   buttonShapeId,
@@ -69,6 +71,8 @@ export interface SticklersSnapshot {
   /** Ids des scripts de Poly lancés pendant cette visite. */
   polyPlayed: readonly number[];
   hoverThumb: number;
+  /** Stores vénitiens en cours (gadgets et fragments gelés). */
+  transitioning: boolean;
 }
 
 export interface SticklersScene extends Scene {
@@ -76,6 +80,9 @@ export interface SticklersScene extends Scene {
 }
 
 const FULL: Rect = { x: 0, y: 0, w: 576, h: 432 };
+/** Stores vénitiens de `1018:09b8` (bandes de 10 lignes) : 15 ticks sur le chevalet (`1df8`), 30 ticks sur l'écran entier (`8bce`). */
+const EASEL_BLINDS_TICKS = 15;
+const SCREEN_BLINDS_TICKS = 30;
 const INTRO_FLAGS = SCR_FLAG.saveBackground | SCR_FLAG.restoreBackground;
 /** Récompense : fond sauvegardé, interruptible par un clic (avance rapide jusqu'à la dernière image), attend la fin des sons. */
 const REWARD_FLAGS = SCR_FLAG.saveBackground | SCR_FLAG.interruptible | SCR_FLAG.fastForwardOnInterrupt | SCR_FLAG.waitSounds;
@@ -109,6 +116,7 @@ export function createSticklersScene(services: MathServices): SticklersScene {
   let sceneSnapshot: Uint8Array | null = null;
   let leaving = false;
   let rewardPending = false;
+  const transition = new ScreenTransition(screen);
 
   // --- Formes ---
   const shapeOf = (piece: StickPiece) => archive.shap(shplFirst + piece.shapeBase + piece.rotation);
@@ -189,13 +197,13 @@ export function createSticklersScene(services: MathServices): SticklersScene {
 
   // --- Groupes ---
   function syncGroups(): void {
-    const open = !(poly?.active ?? false);
+    const open = !(poly?.active ?? false) && !transition.active;
     buttonsGroup.active = open;
     thumbsGroup.active = open && session.mode === "menu";
     replayGroup.active = open && session.mode === "solved";
   }
 
-  const piecesActive = () => board !== null && session.piecesEnabled && !(poly?.active ?? false) && !scr.blocking;
+  const piecesActive = () => board !== null && session.piecesEnabled && !(poly?.active ?? false) && !scr.blocking && !transition.active;
 
   // --- Puzzle ---
   function restoreScenePalette(): void {
@@ -210,19 +218,72 @@ export function createSticklersScene(services: MathServices): SticklersScene {
     return board ? board.pieces.map(pieceRect) : [];
   }
 
-  function showMenu(): void {
+  /**
+   * Lance des stores vénitiens sur `rect` : `apply` compose l'état suivant sur l'écran (boutons redessinés compris, ils sont dans la zone de
+   * l'écran entier), `done` conclut ou enchaîne la transition suivante. Gadgets et fragments sont gelés tant qu'elle dure.
+   */
+  function blinds(rect: Rect, ticks: number, apply: () => void, done: () => void): void {
+    gadgets.updatePointer(-1, -1);
+    transition.begin(
+      rect,
+      ticks,
+      () => {
+        apply();
+        gadgets.invalidate();
+        gadgets.draw(screen);
+      },
+      done,
+    );
+    syncGroups();
+  }
+
+  function endTransition(): void {
+    syncGroups();
+    gadgets.invalidate();
+    ctx.requestPresent();
+  }
+
+  /**
+   * Menu du niveau courant (`1048:0816`). Depuis un puzzle, le chevalet est d'abord effacé (écran entier en 30 ticks si les fragments étaient
+   * actifs ou si le niveau quitté est le rouge, dont la miniature est dans la zone de dispersion ; chevalet en 15 ticks sinon), puis les
+   * vignettes sont révélées sur le chevalet en 15 ticks. Depuis le menu (autre niveau) : seulement les vignettes.
+   */
+  function showMenu(previous: PuzzleMode, previousLevel: number): void {
     rewardPending = false;
     const old = dirtyOfPieces();
     pointer.cancel();
     stopReward();
-    restoreScenePalette();
     board = null;
     hoverPiece = null;
     heldRect = null;
     hoverThumb = -1;
-    paintMenuBase();
-    syncGroups();
-    composeAll(old);
+    const revealMenu = () =>
+      blinds(
+        EASEL,
+        EASEL_BLINDS_TICKS,
+        () => {
+          // Hypothèse : la palette change au début de la dernière transition (l'original fait un fondu `10a8:0dc4` autour d'elle).
+          restoreScenePalette();
+          paintMenuBase();
+          composeAll(old);
+        },
+        endTransition,
+      );
+    if (previous === "menu") {
+      revealMenu();
+      return;
+    }
+    const full = previous === "playing" || previousLevel >= 2;
+    blinds(
+      full ? FULL : EASEL,
+      full ? SCREEN_BLINDS_TICKS : EASEL_BLINDS_TICKS,
+      () => {
+        resetBase(EASEL);
+        resetBase(SCATTER);
+        composeAll(old);
+      },
+      revealMenu,
+    );
   }
 
   function startPuzzle(k: number): void {
@@ -236,7 +297,6 @@ export function createSticklersScene(services: MathServices): SticklersScene {
     hoverThumb = -1;
     hoverPiece = null;
     heldRect = null;
-    paintPuzzleBase(id, puzz);
     attachBoard<StickPiece>(pointer, gate(board), {
       picked(piece) {
         if (!regrabbing) play(SND.grab);
@@ -258,8 +318,16 @@ export function createSticklersScene(services: MathServices): SticklersScene {
         if (outcome.complete) win();
       },
     });
-    syncGroups();
-    composeAll();
+    // `1048:0556` : le puzzle est composé puis révélé sur le chevalet en 15 ticks ; la zone de dispersion apparaît tout de suite.
+    blinds(
+      EASEL,
+      EASEL_BLINDS_TICKS,
+      () => {
+        paintPuzzleBase(id, puzz);
+        composeAll();
+      },
+      endTransition,
+    );
   }
 
   /** Le plateau, sans prise tant que l'aide est ouverte, qu'une animation bloque ou que le puzzle est fini. */
@@ -322,17 +390,24 @@ export function createSticklersScene(services: MathServices): SticklersScene {
     pointer.cancel();
     stopReward();
     session.reset();
-    if (wasSolved) {
-      restoreScenePalette();
-      palette.loadShpl(partialShpl(archive.shpl(puzzId(session.level, session.puzzle ?? 0))));
-    }
-    const old = dirtyOfPieces();
-    hysteresis.reset();
-    board.scatter(ctx.rng);
     hoverPiece = null;
     heldRect = null;
-    syncGroups();
-    composeAll([...old, ...dirtyOfPieces()]);
+    // `1048:0cf8` : fragments redispersés, révélés sur l'écran entier en 30 ticks.
+    blinds(
+      FULL,
+      SCREEN_BLINDS_TICKS,
+      () => {
+        if (wasSolved) {
+          restoreScenePalette();
+          palette.loadShpl(partialShpl(archive.shpl(puzzId(session.level, session.puzzle ?? 0))));
+        }
+        const old = dirtyOfPieces();
+        hysteresis.reset();
+        board!.scatter(ctx.rng);
+        composeAll([...old, ...dirtyOfPieces()]);
+      },
+      endTransition,
+    );
   }
 
   /** Espace / Rotate (`1048:1509`) : le fragment tenu, sinon le dernier saisi, s'il n'est pas collé. */
@@ -369,7 +444,11 @@ export function createSticklersScene(services: MathServices): SticklersScene {
       case "level1":
       case "level2":
       case "level3":
-        if (session.pressLevel(Number(role.slice(5)) - 1)) showMenu();
+        {
+          const previous = session.mode;
+          const previousLevel = session.level;
+          if (session.pressLevel(Number(role.slice(5)) - 1)) showMenu(previous, previousLevel);
+        }
         break;
       case "help":
         openHelp();
@@ -446,6 +525,7 @@ export function createSticklersScene(services: MathServices): SticklersScene {
       polly = c.resources.require(STICKLERS_POLY.archive);
       leaving = false;
       rewardPending = false;
+      transition.cancel();
       session.level = 0;
       session.puzzle = null;
       session.mode = "menu";
@@ -459,21 +539,19 @@ export function createSticklersScene(services: MathServices): SticklersScene {
       services.useArchive(archive);
       pointer.cursor.setBase("arrow");
 
-      // Fond, boutons (formes « normal » dessinées dans le décor, les formes « appuyé » viennent des gadgets), menu du niveau vert.
+      // Fond, menu du niveau vert. Les boutons (formes « normal » et « appuyé ») sont posés par les gadgets sur le fond vide.
       background.fill(0);
       drawShape(background, archive.shap(BACKGROUND_SHPL), 0, 0, 0);
       palette.loadShpl(archive.shpl(BACKGROUND_SHPL));
       base.copyFrom(background);
-      BUTTON_EDGES.forEach((edges, i) => drawShape(base, archive.shap(buttonShapeId(i, false)), edges[0], edges[1], 8));
       paintMenuBase();
 
       buttonsGroup = gadgets.addGroup({
         id: "buttons",
         records: BUTTON_EDGES.map((edges, i) => ({
           rect: edgesRect(edges),
-          shapes: { pressed: buttonShapeId(i, true) },
-          shapeX: edges[0] + PRESSED_OFFSET.x,
-          shapeY: edges[1] + PRESSED_OFFSET.y,
+          shapes: { normal: buttonShapeId(i, false), pressed: buttonShapeId(i, true) },
+          pressedRect: edgesRect(BUTTON_PRESSED_EDGES[i]!),
           pressSound: SND.buttons[i],
         })),
         onActivate: (index) => onButton(index),
@@ -502,6 +580,8 @@ export function createSticklersScene(services: MathServices): SticklersScene {
       // Tout l'écran : la surface partagée garde l'image de la scène précédente (le hub), seul le décor de la SHPL 104 la remplace.
       compose(FULL);
       gadgets.captureBackground(screen);
+      // Les boutons sont posés avant l'animation d'entrée : elle sauvegarde le fond de sa zone, qui doit les contenir.
+      gadgets.draw(screen);
       palette.fadeFromBlack(30);
       startMusic();
       scr.start(archive, INTRO_SCR, { flags: INTRO_FLAGS });
@@ -510,6 +590,7 @@ export function createSticklersScene(services: MathServices): SticklersScene {
 
     leave(c) {
       poly?.abort();
+      transition.cancel();
       services.endScene();
       if (poly?.firstIntroThisVisit) c.roster.save();
       poly = null;
@@ -519,6 +600,10 @@ export function createSticklersScene(services: MathServices): SticklersScene {
 
     tick() {
       if (!poly) return;
+      if (transition.active) {
+        if (transition.tick(ctx.input.buttonEvents.some((event) => event.down))) ctx.requestPresent();
+        return;
+      }
       if (rewardPending) {
         rewardPending = false;
         startReward();
@@ -578,6 +663,7 @@ export function createSticklersScene(services: MathServices): SticklersScene {
         polyPhase: poly?.phase ?? "closed",
         polyPlayed: poly?.played ?? [],
         hoverThumb,
+        transitioning: transition.active,
       };
     },
   };

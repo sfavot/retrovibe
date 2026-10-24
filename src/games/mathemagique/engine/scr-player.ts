@@ -96,6 +96,12 @@ export interface ScrStartOptions {
   onEnd?: (animation: AnimationHandle) => void;
   /** Ne pas exécuter la première étape tout de suite. */
   deferFirstStep?: boolean;
+  /**
+   * Fond propre de la scène : la zone en est recopiée avant chaque image (pas de traînées), sans le drapeau 1. Équivaut au tampon que
+   * `1010:0dc5` place à `+8` du descripteur (`*DAT_4cac`) et que le Bowling donne à toutes ses animations ; ce drapeau 1, lui, fait en plus
+   * sauvegarder le fond à l'instant du démarrage (`1090:06fa`, `10a8:0eb8`).
+   */
+  background?: Surface;
 }
 
 export interface AnimationHandle {
@@ -426,11 +432,15 @@ class ScrAnimation implements AnimationHandle {
 
   /** Rétablit le fond sauvegardé (avant de redessiner, ou à la fin avec le drapeau 32). */
   restoreBackground(surface: Surface): void {
-    if (this.saved) surface.restoreRect(this.saved);
+    const clean = this.options.background;
+    if (clean) {
+      const zone = this.zone;
+      surface.copyFrom(clean, zone, zone.x, zone.y);
+    } else if (this.saved) surface.restoreRect(this.saved);
   }
 
   get restoresEachFrame(): boolean {
-    return (this.flags & SCR_FLAG.saveBackground) !== 0;
+    return (this.flags & SCR_FLAG.saveBackground) !== 0 || this.options.background !== undefined;
   }
 
   draw(surface: Surface): void {

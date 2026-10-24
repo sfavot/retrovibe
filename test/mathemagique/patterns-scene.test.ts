@@ -10,6 +10,7 @@ import { PATTERNS, THUMB_LAYOUTS, dealPatterns, patternsRect, thumbRect, type Pa
 import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
 import { PatternsScene, createPatternsScene } from "../../src/games/mathemagique/scenes/patterns";
 import {
+  BACKGROUND_ID,
   BUTTONS,
   CYCLE_PERIOD,
   REWARD_CYCLES,
@@ -23,6 +24,7 @@ import {
 import { FRAME_MS, TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 import { MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
+import { Archive } from "../../src/games/mathemagique/engine/resources";
 import { parseShpl } from "../../src/games/mathemagique/data/shpl";
 
 // =====================================================================================================================================
@@ -152,6 +154,8 @@ async function boot(options: { clickAndStick?: boolean; player?: boolean } = {})
     async click(x, y) {
       host.click(x, y);
       await rig.tick(3);
+      // Les stores vénitiens (15 ou 30 ticks, éventuellement deux à la suite) sont bloquants.
+      await rig.until(() => rig.scene.flowKind !== "transition");
     },
     async clickButton(role) {
       await rig.click(...buttonCenter(role));
@@ -372,6 +376,88 @@ real("Puzzle Patterns : scène complète sur PATTERNS.DAT", () => {
     // Bas du rectangle ≤ 354 ou gauche ≥ 351 : plus dans le cartouche (0, 354, 351, 432).
     const r = patternsRect(piece);
     expect(r.bottom <= 354 || r.left >= 351).toBe(true);
+  });
+
+  it("boutons enfoncés : la forme appuyée est posée au second rectangle de la table, sans reste de la forme au repos", async () => {
+    const rig = await boot();
+    // L'animation d'entrée passe sur le décor et le restaure à la fin : on attend qu'elle soit finie.
+    await rig.until(() => rig.services.scr.running.length === 0);
+    await rig.tick(3);
+    const archive = new Archive("PATTERNS.DAT", MohawkArchive.parse(readOriginal("PATTERNS.DAT")));
+    const wall = archive.shap(BACKGROUND_ID);
+    const screen = rig.services.graphics.screen;
+    const expected = (shape: { width: number; height: number; pixels: Uint8Array }, ox: number, oy: number, x: number, y: number) => {
+      const v = x >= ox && y >= oy && x < ox + shape.width && y < oy + shape.height ? shape.pixels[(y - oy) * shape.width + (x - ox)]! : 0;
+      return v !== 0 ? v : wall.pixels[y * 576 + x]!;
+    };
+    for (const def of BUTTONS) {
+      const { left, top, right, bottom } = def.edges;
+      const normal = archive.shap(def.shapeId);
+      const pressed = archive.shap(def.shapeId + 1);
+      // Table `DS:1c1c` : le rectangle appuyé garde les bords droit et bas de celui du repos.
+      expect(def.pressedEdges.right).toBe(right);
+      expect(def.pressedEdges.bottom).toBe(bottom);
+      expect(def.pressedEdges.right - def.pressedEdges.left).toBe(pressed.width);
+      expect(def.pressedEdges.bottom - def.pressedEdges.top).toBe(pressed.height);
+      const [cx, cy] = buttonCenter(def.role);
+      rig.host.input.moveMouse(cx, cy);
+      rig.host.input.mouseDown("left");
+      await rig.tick(3);
+      if (def.role === "reset") {
+        // Désactivé au menu : l'appui ne l'enfonce pas.
+        rig.host.input.mouseUp("left");
+        continue;
+      }
+      for (let y = top; y < bottom; y++) {
+        for (let x = left; x < right; x++) {
+          expect(screen.get(x, y), `${def.role} appuyé (${x}, ${y})`).toBe(expected(pressed, def.pressedEdges.left, def.pressedEdges.top, x, y));
+        }
+      }
+      rig.host.input.moveMouse(5, 5);
+      rig.host.input.mouseUp("left");
+      await rig.tick(3);
+      for (let y = top; y < bottom; y++) {
+        for (let x = left; x < right; x++) expect(screen.get(x, y), `${def.role} repos (${x}, ${y})`).toBe(expected(normal, left, top, x, y));
+      }
+    }
+  });
+
+  it("stores vénitiens : 15 ticks vers un autre menu ou un puzzle, 30 puis 15 depuis un puzzle actif et 30 au Reset ; un clic les achève", async () => {
+    const rig = await boot();
+    await rig.until(() => rig.scene.flowKind === "free");
+    const between = (n: number, min: number, max: number) => {
+      expect(n).toBeGreaterThanOrEqual(min);
+      expect(n).toBeLessThanOrEqual(max);
+    };
+    /** Nombre de ticks de transition déclenchés par un clic. */
+    const blinds = async (x: number, y: number) => {
+      rig.host.click(x, y);
+      let n = 0;
+      await rig.tick(1);
+      while (rig.scene.flowKind === "transition" && n < 200) {
+        await rig.tick(1);
+        n++;
+      }
+      return n;
+    };
+    const [gx, gy] = buttonCenter("orange");
+    between(await blinds(gx, gy), 13, 18);
+    const t = thumbRect(THUMB_LAYOUTS.patterns, 0);
+    between(await blinds(t.x + 36, t.y + 36), 13, 18);
+    expect(rig.scene.puzzleSession.mode).toBe("playing");
+    const [rx, ry] = buttonCenter("reset");
+    between(await blinds(rx, ry), 28, 33);
+    const [vx, vy] = buttonCenter("green");
+    between(await blinds(vx, vy), 43, 50);
+    expect(rig.scene.puzzleSession).toMatchObject({ mode: "menu", level: 0 });
+    // Un clic pendant la transition la termine d'un coup.
+    rig.host.click(gx, gy);
+    await rig.tick(4);
+    expect(rig.scene.flowKind).toBe("transition");
+    rig.host.click(200, 200);
+    await rig.tick(3);
+    expect(rig.scene.flowKind).toBe("free");
+    expect(rig.scene.puzzleSession.level).toBe(1);
   });
 
   it("Reset : nouveau mélange du même puzzle, son 6505 ; sans effet dans le menu", async () => {

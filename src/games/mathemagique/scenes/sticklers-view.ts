@@ -69,6 +69,20 @@ export const BUTTON_EDGES = [
   [122, 333, 163, 365],
 ] as const;
 
+/**
+ * Second rectangle de chaque entrée de la table `DS:3216`-source (16 octets : repos puis « appuyé », vérifié dans `MATH`) : la forme « appuyé »
+ * est dessinée à son coin haut-gauche (`1038:01af` : la forme d'état `i` va au rectangle `i` de la table), coins bas-droits communs.
+ */
+export const BUTTON_PRESSED_EDGES = [
+  [47, 292, 78, 323],
+  [82, 292, 113, 323],
+  [117, 292, 148, 323],
+  [202, 292, 233, 323],
+  [171, 335, 211, 365],
+  [252, 292, 283, 323],
+  [124, 335, 163, 365],
+] as const;
+
 /** `[gauche, haut, droite, bas]` des fiches → `Rect`. */
 export const edgesRect = (e: readonly number[]): Rect => rectFromEdges(e[0]!, e[1]!, e[2]!, e[3]!);
 
@@ -80,9 +94,8 @@ export function polyZoneOfButton(role: ButtonRole): string {
   return role.startsWith("level") ? "level" : role;
 }
 
-/** Forme du bouton `i` (0 à 6) : normal = `2000 + 2i`, appuyé = `2001 + 2i`, posé à `(+2, +1)` (rectangle « appuyé » de la table, sticklers.md §3.2). */
+/** Forme du bouton `i` (0 à 6) : normal = `2000 + 2i` (posée au rectangle de repos), appuyé = `2001 + 2i` (posée au rectangle « appuyé », `BUTTON_PRESSED_EDGES`). */
 export const buttonShapeId = (i: number, pressed: boolean) => BUTTONS_SHAP + 2 * i + (pressed ? 1 : 0);
-export const PRESSED_OFFSET = { x: 2, y: 1 } as const;
 
 // --- Fragments ---
 

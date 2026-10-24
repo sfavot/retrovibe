@@ -11,6 +11,7 @@ import { STICKLERS, thumbRect, THUMB_LAYOUTS, type StickPiece } from "../../src/
 import { createSticklersScene } from "../../src/games/mathemagique/scenes/sticklers";
 import {
   BUTTON_EDGES,
+  BUTTON_PRESSED_EDGES,
   HYSTERESIS,
   HitHysteresis,
   INK_HOVER,
@@ -129,9 +130,15 @@ const buttonCenter = (i: number) => {
   return { x: (l + r) >> 1, y: (t + b) >> 1 };
 };
 
+/** Laisse finir les stores vénitiens en cours (15 ou 30 ticks, éventuellement deux à la suite). */
+async function settle(rig: Rig) {
+  for (let guard = 0; guard < 200 && rig.scene.inspect().transitioning; guard++) await frames(rig, 1);
+}
+
 async function clickAt(rig: Rig, p: { x: number; y: number }, n = 4) {
   rig.host.click(p.x, p.y);
   await frames(rig, n);
+  await settle(rig);
 }
 
 async function chooseLevel(rig: Rig, level: number) {
@@ -516,6 +523,74 @@ real("Super Sticklers : puzzle", () => {
     await clickAt(rig, buttonCenter(5));
     expect(rig.scene.inspect().mode).toBe("menu");
   }, 60_000);
+
+  it("boutons enfoncés : la forme « appuyé » est posée à son rectangle, sans reste de la forme normale", async () => {
+    const rig = await boot();
+    // L'animation d'accueil passe sur le décor et le restaure à la fin : on attend qu'elle soit finie.
+    await runUntil(rig.engine, rig.host, () => rig.services.scr.running.length === 0);
+    await frames(rig, 3);
+    const wall = rig.archive.shap(104);
+    const screen = rig.services.graphics.screen;
+    for (let i = 0; i < BUTTON_EDGES.length; i++) {
+      const [l, t, r, b] = BUTTON_EDGES[i]!;
+      const [pl, pt] = BUTTON_PRESSED_EDGES[i]!;
+      const pressed = rig.archive.shap(2001 + 2 * i);
+      const normal = rig.archive.shap(2000 + 2 * i);
+      // Attendu : le mur, la forme dessinée par-dessus (0 = transparent), sans jamais mélanger les deux formes.
+      const expected = (shape: typeof pressed, ox: number, oy: number, x: number, y: number) => {
+        const v = x >= ox && y >= oy && x < ox + shape.width && y < oy + shape.height ? shape.pixels[(y - oy) * shape.width + (x - ox)]! : 0;
+        return v !== 0 ? v : wall.pixels[y * 576 + x]!;
+      };
+      const c = buttonCenter(i + 1);
+      rig.host.input.moveMouse(c.x, c.y);
+      rig.host.input.mouseDown("left");
+      await frames(rig, 3);
+      for (let y = t; y < b; y++) for (let x = l; x < r; x++) expect(screen.get(x, y), `bouton ${i + 1} appuyé (${x}, ${y})`).toBe(expected(pressed, pl, pt, x, y));
+      // Relâché hors du bouton : rien n'est déclenché, la forme normale revient sur le mur.
+      rig.host.input.moveMouse(5, 5);
+      rig.host.input.mouseUp("left");
+      await frames(rig, 3);
+      for (let y = t; y < b; y++) for (let x = l; x < r; x++) expect(screen.get(x, y), `bouton ${i + 1} repos (${x}, ${y})`).toBe(expected(normal, l, t, x, y));
+    }
+    expect(rig.scene.inspect().transitioning).toBe(false);
+  });
+
+  it("stores vénitiens : 15 ticks entre deux menus, 30 puis 15 depuis un puzzle actif, un clic les achève", async () => {
+    const rig = await boot();
+    const run = async (click: { x: number; y: number }) => {
+      rig.host.click(click.x, click.y);
+      let n = 0;
+      await frames(rig, 1);
+      while (rig.scene.inspect().transitioning && n < 200) {
+        await frames(rig, 1);
+        n++;
+      }
+      return n;
+    };
+    // Menu → menu d'un autre niveau : une seule révélation du chevalet, 15 ticks.
+    const menuToMenu = await run(buttonCenter(2));
+    expect(menuToMenu).toBeGreaterThanOrEqual(13);
+    expect(menuToMenu).toBeLessThanOrEqual(18);
+    expect(rig.scene.inspect()).toMatchObject({ mode: "menu", level: 1 });
+    // Vignette → puzzle : 15 ticks sur le chevalet, fragments gelés pendant ce temps.
+    const toPuzzle = await run(thumbCenter(0));
+    expect(toPuzzle).toBeGreaterThanOrEqual(13);
+    expect(toPuzzle).toBeLessThanOrEqual(18);
+    expect(rig.scene.inspect().mode).toBe("playing");
+    // Puzzle actif → autre niveau : effacement sur l'écran entier (30 ticks) puis vignettes (15 ticks).
+    const back = await run(buttonCenter(1));
+    expect(back).toBeGreaterThanOrEqual(43);
+    expect(back).toBeLessThanOrEqual(50);
+    expect(rig.scene.inspect()).toMatchObject({ mode: "menu", level: 0 });
+    // Un clic pendant la transition la termine d'un coup.
+    rig.host.click(buttonCenter(3).x, buttonCenter(3).y);
+    await frames(rig, 4);
+    expect(rig.scene.inspect().transitioning).toBe(true);
+    rig.host.click(300, 200);
+    await frames(rig, 3);
+    expect(rig.scene.inspect().transitioning).toBe(false);
+    expect(rig.scene.inspect()).toMatchObject({ mode: "menu", level: 2 });
+  });
 
   it("Exit rend la main au hub", async () => {
     const rig = await boot();

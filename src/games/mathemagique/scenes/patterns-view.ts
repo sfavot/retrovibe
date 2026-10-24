@@ -36,6 +36,8 @@ export interface ButtonDef {
   role: ButtonRole;
   /** Rectangle au repos `(gauche, haut, droite, bas)`, semi-ouvert (§3.2). */
   edges: Edges;
+  /** Second rectangle de la table (« appuyé », lu dans `MATH` : `(+2, +1)` ou `(+2, +2)`, mêmes bords droit et bas) : la forme enfoncée y est posée. */
+  pressedEdges: Edges;
   /** `SHAP` au repos ; l'enfoncé est le suivant. */
   shapeId: number;
   sound?: number;
@@ -44,6 +46,8 @@ export interface ButtonDef {
 const button = (role: ButtonRole, l: number, t: number, r: number, b: number, form: number, sound?: number): ButtonDef => ({
   role,
   edges: edges(l, t, r, b),
+  // Repos 33 × 32 → appuyé 31 × 31 ; Reset / Exit : 42 × 32 → 40 × 30 et 41 × 32 → 39 × 30 (sinon décalage de 1 en y).
+  pressedEdges: edges(l + 2, t + (r - l >= 41 ? 2 : 1), r, b),
   shapeId: BUTTONS_SHPL + form - 1,
   ...(sound === undefined ? {} : { sound }),
 });

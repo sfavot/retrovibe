@@ -46,6 +46,7 @@ import {
   FONT_MEDIUM,
   FONT_SMALL,
   GLUE_FRAMES,
+  GLUE_RESULT_FRAME,
   GLUE_SOUND_FRAME,
   HELP_PALETTE_SHPL,
   HELP_SOUND_THRESHOLD,
@@ -161,8 +162,7 @@ interface PlayRun {
   mode: "parts" | "pattern";
   /** Victoire : la lecture est suivie de l'animation finale. */
   victory: boolean;
-  /** Mesures à jouer (une seule sans danse). */
-  loops: number;
+  /** Repères `a` (début de mesure) entendus depuis le départ : mesures du morceau commencées (`DS:5046` de l'original). */
   played: number;
   startedAt: number;
   /** Play Parts : début des pièces en ms depuis le départ, prochaine impulsion, fin. */
@@ -493,14 +493,17 @@ export function createRhythmScene(services: MathServices): RhythmScene {
       count: tool.kind === "cut" ? tool.n : result.removed.length,
       handle: null,
     };
-    // Pendant l'animation, le Fractionator montre les pièces d'avant.
-    paintBin("fractionator", before);
     setState("animating");
     if (tool.kind === "meld") {
+      // Hook 0 de la `SCR` 20000 (`1028:354a`, argument 0, tick 7) : le Fractionator est vidé pendant la fusion. Le hook 1 (résultat, tick 126 sur
+      // 175) n'est pas rejoué : le fond sauvegardé du lecteur ne peut pas être repeint en cours de route (le résultat paraît à la fin).
+      refreshBin("fractionator", []);
       toolAnim.handle = scr.playBlocking(archive, MELD_SCR, { flags: MELD_FLAGS }, () => finishToolAnimation());
       ctx.requestPresent();
       return;
     }
+    // Coupe et collage : le Fractionator montre les pièces d'avant (le collage montre le résultat à l'image 17, `1028:364e`).
+    paintBin("fractionator", before);
     if (tool.kind === "cut") play(SND.cutStart);
     drawToolFrame();
   }
@@ -512,6 +515,7 @@ export function createRhythmScene(services: MathServices): RhythmScene {
     if (anim.kind === "cut") sprites = cutSprites(anim.frame, anim.count, anim.size);
     else if (anim.kind === "glue") {
       if (anim.frame === GLUE_SOUND_FRAME) play(SND.gluing);
+      if (anim.frame === GLUE_RESULT_FRAME) paintBin("fractionator");
       sprites = glueSprites(anim.frame, anim.count, anim.size);
     }
     screen.copyFrom(base, WORK_ZONE, WORK_ZONE.x, WORK_ZONE.y);
@@ -531,7 +535,7 @@ export function createRhythmScene(services: MathServices): RhythmScene {
     anim.ticks = 0;
     anim.frame++;
     const frames = anim.kind === "cut" ? CUT_FRAMES : GLUE_FRAMES;
-    if (anim.frame >= frames || (anim.kind === "glue" && anim.frame >= GLUE_FRAMES - 1)) {
+    if (anim.frame >= frames) {
       if (anim.kind === "cut") play(SND.cutEnd);
       finishToolAnimation();
       return;
@@ -647,15 +651,19 @@ export function createRhythmScene(services: MathServices): RhythmScene {
     }
     sound.stopMusic();
     const complete = board.complete;
-    run = { mode: "pattern", victory, loops: complete && plan ? plan.measures : 1, played: 0, startedAt: audioNow(), starts: [], next: 0, endMs: 0, fresh: true };
+    run = { mode: "pattern", victory, played: 0, startedAt: audioNow(), starts: [], next: 0, endMs: 0, fresh: true };
     dancing = complete;
     danceAnchor = { step: 0, at: audioNow() };
     setState("playing");
-    launchMeasure(data);
+    launchSong(data);
   }
 
-  /** Joue une fois la mesure (réécrite : emplacements vides muets) ; la fin de la mesure enchaîne la suivante ou termine la lecture. */
-  function launchMeasure(data: SongData): void {
+  /**
+   * Joue le morceau une fois (`1028:1c54` mode 2). Motif complet (`DS:2594`) : MIDI entier, non réécrit (`1028:273a` n'appelle `1058:125e` que si
+   * `DS:2594 == 0`), la danse avance d'une mesure à chaque repère `a` (`1028:22ac`) et boucle sur la chorégraphie (`1028:2ab4`). Sinon : une seule
+   * mesure réécrite, emplacements vides muets. La fin du morceau termine la lecture.
+   */
+  function launchSong(data: SongData): void {
     const current = run;
     if (!current) return;
     playRhythmSong(sound, data.song, {
@@ -664,9 +672,7 @@ export function createRhythmScene(services: MathServices): RhythmScene {
       onCue: onCue,
       onEnd: () => {
         if (run !== current) return;
-        current.played++;
-        if (current.played < current.loops) launchMeasure(data);
-        else finishPlay(false);
+        finishPlay(false);
       },
     });
   }
@@ -674,12 +680,16 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   function onCue(cue: RhythmCue): void {
     if (!run || run.mode !== "pattern") return;
     if (cue.type === "slot") {
+      if (cue.slot === 0 && dancing) {
+        run.played++;
+        danceAnchor = { step: 0, at: audioNow() };
+      }
       if (cue.slot < board.pattern.length && board.pattern[cue.slot]! > 0) lightUp({ bin: "pattern", index: cue.slot });
       return;
     }
     if (dancing) {
       const beats = Math.max(1, songBeats(songData(songs[songIndex(level, slot)]!)!.song));
-      danceAnchor = { step: run.played * stepsPerMeasure + Math.round(((cue.beat - 1) * stepsPerMeasure) / beats), at: audioNow() };
+      danceAnchor = { step: Math.round(((cue.beat - 1) * stepsPerMeasure) / beats), at: audioNow() };
     }
   }
 
@@ -694,7 +704,6 @@ export function createRhythmScene(services: MathServices): RhythmScene {
     run = {
       mode: "parts",
       victory: false,
-      loops: 1,
       played: 0,
       startedAt: ctx.host.now(),
       starts: timeline.map((entry) => ({ index: entry.index, atMs: entry.startTick * GAME_TICK_MS })),
@@ -718,11 +727,10 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   }
 
   function stepDance(): void {
-    if (!dancing || !plan || !run) return;
+    if (!dancing || !plan || !run || run.played === 0) return;
     const stepMs = 15000 / (songBpm(songData(songs[songIndex(level, slot)]!)!.song));
-    const global = danceAnchor.step + Math.max(0, Math.floor((audioNow() - danceAnchor.at) / stepMs));
-    const measure = Math.min(run.loops - 1, Math.floor(global / stepsPerMeasure));
-    const pose = dancePoses(plan, measure, stepsPerMeasure)[global % stepsPerMeasure]!;
+    const step = Math.min(stepsPerMeasure - 1, danceAnchor.step + Math.max(0, Math.floor((audioNow() - danceAnchor.at) / stepMs)));
+    const pose = dancePoses(plan, run.played - 1, stepsPerMeasure)[step]!;
     const shape = poseShapeId(pose);
     if (shape !== poseShape) setPose(shape);
   }

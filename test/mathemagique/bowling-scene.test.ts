@@ -53,6 +53,8 @@ interface Rig {
   services: MathServices;
   scene: BowlingScene;
   sounds: { id: number; options?: PlaySoundOptions }[];
+  /** Drapeaux de chaque animation `SCR` lancée (id → drapeaux). */
+  scrFlags: Map<number, number>;
   tick(n?: number): Promise<void>;
   until(done: () => boolean, limitMs?: number): Promise<void>;
   click(x: number, y: number): Promise<void>;
@@ -81,6 +83,12 @@ async function boot(options: { seconds?: number; player?: boolean; real?: boolea
     sounds.push({ id, options: opts });
     return play(archive, id, opts);
   };
+  const scrFlags = new Map<number, number>();
+  const start = services.scr.start.bind(services.scr);
+  services.scr.start = (archive, id, opts) => {
+    scrFlags.set(id, opts?.flags ?? 0);
+    return start(archive, id, opts);
+  };
   let scene!: BowlingScene;
   if (options.real) {
     registerScenes(engine, services, { factories: { [SceneId.bowling]: () => (scene = createBowlingScene(services) as BowlingScene) } });
@@ -98,6 +106,7 @@ async function boot(options: { seconds?: number; player?: boolean; real?: boolea
       return scene;
     },
     sounds,
+    scrFlags,
     tick: (n = 1) => runFor(engine, host, FRAME_MS * n),
     until: (done, limitMs = LONG) => runUntil(engine, host, done, limitMs),
     async click(x, y) {
@@ -126,6 +135,28 @@ real("Bowling : scène complète sur BOWLING.DAT", () => {
     expect(scene.progressState.level).toBe(0);
     expect(scene.progressState.rank).toBe(1);
     expect(scene.currentQuestion).toBeNull();
+  });
+
+  it("entrée : Gus entre par SCR 18100 (drapeaux 0x1e du descripteur 04f8), seule animation interruptible", async () => {
+    const rig = await boot();
+    expect(rig.scene.played[0]).toBe(18100);
+    expect(rig.scrFlags.get(18100)).toBe(0x1e);
+  });
+
+  it("strike et réactions de Gus : drapeaux 0x12 (MIDI conservé, attente des sons), sans clic ni sauvegarde du fond", async () => {
+    const rig = await boot();
+    const { scene } = rig;
+    await rig.click(...GO);
+    for (let i = 0; i < 10; i++) await rig.answerRight();
+    for (const id of [18000, strikeScriptId(scene.lastStrike!.animation), ...(scene.lastStrike!.animation === 0 ? [] : [18050])]) {
+      if (id === 12800) continue;
+      expect(rig.scrFlags.get(id), `SCR ${id}`).toBe(0x12);
+    }
+    await rig.click(150, 330);
+    await rig.until(() => !scene.busy);
+    const reaction = [...rig.scrFlags].filter(([id]) => (id >= 30000 && id < 32000) || (id >= 24950 && id < 26000));
+    expect(reaction.length).toBeGreaterThan(0);
+    for (const [, flags] of reaction) expect(flags).toBe(0x12);
   });
 
   it("choix de l'opération (×) et du niveau (2) ; le bonus est refusé tant que les 4 niveaux ne sont pas faits", async () => {
@@ -256,6 +287,28 @@ real("Bowling : scène complète sur BOWLING.DAT", () => {
     expect(scene.progressState.level).toBe(1);
     // Un joueur de plus aurait gardé ses variables : le roster contient le niveau courant.
     expect(roster.roster.getVarArray(roster.currentPlayerId, "bowlingLevel")[0]).toBe(1);
+  });
+
+  it("niveau terminé : « LEVEL 2 » est écrit dans la fenêtre du problème pendant la bannière, puis effacé", async () => {
+    const rig = await boot();
+    const { scene, services } = rig;
+    for (let i = 0; i < 9; i++) scene.progressState.strike(rig.engine.ctx.rng);
+    const ink = () => {
+      const { screen } = services.graphics;
+      let n = 0;
+      for (let y = 81; y < 122; y++) for (let x = 170; x < 401; x++) if (screen.pixels[y * screen.width + x] === 0) n++;
+      return n;
+    };
+    const rest = ink();
+    await rig.click(...GO);
+    for (let i = 0; i < 10; i++) {
+      await rig.clickAnswer(scene.currentQuestion!.correctSlot);
+      if (i < 9) await rig.until(() => !scene.busy);
+    }
+    while (!rig.sounds.some((s) => s.id === 1021)) await rig.tick();
+    expect(ink()).toBeGreaterThan(rest + 40);
+    await rig.until(() => !scene.busy);
+    expect(ink()).toBe(rest);
   });
 
   it("aide : Polly arrive, un clic sur elle la renvoie", async () => {

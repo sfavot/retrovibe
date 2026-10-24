@@ -72,8 +72,6 @@ export class Input {
   /** Position du pointeur dans la zone de jeu (576×432), arrondie ; peut sortir de la zone (négatif ou au-delà). */
   mouseX = 0;
   mouseY = 0;
-  /** Le pointeur survole la zone de jeu (l'hôte le tient à jour). */
-  pointerInside = false;
 
   private readonly down = new Set<MouseButton>();
   private readonly held = new Set<string>();
@@ -89,10 +87,6 @@ export class Input {
   moveMouse(x: number, y: number): void {
     this.mouseX = Math.round(x);
     this.mouseY = Math.round(y);
-  }
-
-  setPointerInside(inside: boolean): void {
-    this.pointerInside = inside;
   }
 
   mouseDown(button: MouseButton, mods?: Partial<Modifiers>): void {

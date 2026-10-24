@@ -341,6 +341,15 @@ export class Robot {
     this.host.input.mouseDown("left", mods);
     this.host.input.mouseUp("left", mods);
     await this.run(ms);
+    // Les stores vénitiens (Patterns, Sticklers) gèlent boutons et pièces pendant 15 à 30 ticks : attendre leur fin.
+    for (let i = 0; i < 200 && this.inTransition(); i++) await this.run(17);
+  }
+
+  private inTransition(): boolean {
+    const scene = this.engine.scenes.current as
+      | { flowKind?: string; inspect?: () => { transitioning?: boolean } }
+      | undefined;
+    return scene?.flowKind === "transition" || scene?.inspect?.().transitioning === true;
   }
 
   async clickRight(x: number, y: number, ms = 100): Promise<void> {

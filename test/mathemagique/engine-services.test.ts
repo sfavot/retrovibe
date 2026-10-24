@@ -257,6 +257,17 @@ describe("ScrPlayer (scripts synthétiques)", () => {
     expect(player.running).toHaveLength(0);
   });
 
+  it("avec un fond propre (descripteur `+8`, Bowling) : aucune traînée sans le drapeau 1, le fond vient de la scène", () => {
+    const { surface, player, archive } = setup();
+    const clean = new Surface();
+    clean.fill(3);
+    player.start(archive, 100, { background: clean });
+    expect(surface.get(60, 120)).toBe(5);
+    tick(player, 14); // image 2 : la cellule a bougé
+    expect(surface.get(80, 120)).toBe(5);
+    expect(surface.get(60, 120)).toBe(3); // ancienne position restaurée depuis le fond propre, pas depuis un instantané
+  });
+
   it("sans le drapeau 1, l'ancienne image n'est pas effacée", () => {
     const { surface, player, archive } = setup();
     player.start(archive, 100);
@@ -1058,6 +1069,35 @@ describe("GadgetManager", () => {
     expect(manager.draw(surface)).toBe(true);
     manager.invalidate();
     expect(manager.draw(surface)).toBe(true);
+  });
+
+  it("forme « appuyé » à l'origine du second rectangle (`1038:01af`), sans reste de la forme normale", () => {
+    // Repos 8×8 en (20, 20), appuyé 6×6 posé en (22, 22) : bords droit et bas communs avec le repos.
+    const shapes = new Map([
+      [1, shapeOf(8, 8, 4)],
+      [2, shapeOf(6, 6, 6)],
+    ]);
+    const manager = new GadgetManager({ shape: (id) => shapes.get(id) });
+    manager.addGroup({ records: [{ rect: { x: 20, y: 20, w: 8, h: 8 }, shapes: { normal: 1, pressed: 2 }, pressedRect: { x: 22, y: 22, w: 6, h: 6 } }] });
+    const surface = new Surface();
+    surface.fill(3);
+    manager.captureBackground(surface);
+    expect(manager.draw(surface)).toBe(true); // la forme normale est posée par les gadgets
+    expect(surface.get(20, 20)).toBe(4);
+    manager.updatePointer(24, 24);
+    manager.handleButton(press(24, 24));
+    expect(manager.draw(surface)).toBe(true);
+    expect(surface.get(22, 22)).toBe(6);
+    expect(surface.get(27, 27)).toBe(6);
+    // Le fond est restauré sous la forme normale : ni colonne ni ligne de repos autour de la forme appuyée.
+    expect(surface.get(20, 20)).toBe(3);
+    expect(surface.get(21, 27)).toBe(3);
+    expect(surface.get(27, 21)).toBe(3);
+    manager.handleButton(release(100, 100));
+    manager.updatePointer(100, 100);
+    manager.draw(surface);
+    expect(surface.get(20, 20)).toBe(4);
+    expect(surface.get(27, 27)).toBe(4);
   });
 
   it("clear et removeGroup oublient survol, appui et focus", () => {

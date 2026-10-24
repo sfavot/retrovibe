@@ -8,7 +8,7 @@ import type { FonFont } from "../engine/graphics/fon";
 import { Surface, type Rect } from "../engine/graphics/surface";
 import { drawText, measureText } from "../engine/graphics/text";
 import { rectFromEdges } from "../engine/gadgets";
-import { BIN_EDGES, PIECE_HEIGHT, type BinId, type Tool, ghostShapeId, pieceShapeId, pieceSpan, reduceFraction } from "../game/rhythm/pieces";
+import { BIN_EDGES, MEASURE, PIECE_HEIGHT, type BinId, type Tool, ghostShapeId, pieceShapeId, pieceSpan, reduceFraction } from "../game/rhythm/pieces";
 
 // --- Ressources ---
 
@@ -249,20 +249,38 @@ export function cutSprites(frame: number, n: number, size: number): Sprite[] {
   return sprites;
 }
 
-/** Collage (`1028:364e`) : 18 images, le pistolet à colle (`SHAP` 30086 à 30102) passe sur chaque joint ; la dernière image montre le résultat. */
+/**
+ * Collage (`1028:364e`, relu à l'octet) : 18 images `a` = 1 à 18 de 30 unités de la minuterie. Chaque image pose des formes de 45 × 82 en `y = 109`
+ * (`0x6d`), aux joints du Fractionator : abscisse `0xa6 + k × 2 × taille` pour le joint `k` (1 à `144 / taille - 1`).
+ * - images 1 à 17 : le pistolet animé (`SHAP` 30086 + `a`) sur chacun des `n - 1` joints des pièces collées ;
+ * - hors image 17 : le pistolet au repos (`SHAP` 30086) sur les autres joints de la barre (joints `n` et suivants avant l'image 12, tous à partir
+ *   de l'image 12, ce qui recouvre les pistolets animés) ;
+ * - image 4 : son ; image 17 : le Fractionator est redessiné avec le résultat (`0592` mode 2) ; image 18 : résultat et pistolets au repos.
+ */
 export const GLUE_FRAMES = 18;
 export const GLUE_SOUND_FRAME = 4;
+/** Indice (de 0) de l'image où le Fractionator montre le résultat (`a == 0x11`). */
+export const GLUE_RESULT_FRAME = 16;
 const GLUE_BASE = 30086;
-const GLUE_GUN_W = 45;
+const GLUE_X0 = 0xa6;
+const GLUE_Y = 109;
+/** Dernière image où le pistolet animé est posé (`a < 0x12`) et image sans pistolet au repos (`a == 0x11`). */
+const GLUE_LAST_ANIMATED = 17;
+const GLUE_REST_GUNS_ALL_FROM = 12;
+const GLUE_NO_REST_FRAME = 17;
 
-/** Formes de l'image `frame` (0 à 16) d'un collage de `count` pièces de taille `size` ; vide pour la dernière image. */
+/** Formes de l'image `frame` (0 à 17) d'un collage de `count` pièces de taille `size`. */
 export function glueSprites(frame: number, count: number, size: number): Sprite[] {
-  if (frame > GLUE_FRAMES - 2) return [];
+  const a = frame + 1;
+  if (a < 1 || a > GLUE_FRAMES || size <= 0) return [];
   const width = size * 2;
+  const joints = Math.trunc(MEASURE / size) - 1;
   const sprites: Sprite[] = [];
-  for (let i = 0; i < count - 1; i++) {
-    const joint = BIN_EDGES.fractionator[0] + 2 + (i + 1) * width;
-    sprites.push({ id: GLUE_BASE + frame, x: joint - Math.floor(GLUE_GUN_W / 2), y: 109 });
+  if (a <= GLUE_LAST_ANIMATED) {
+    for (let k = 1; k < count; k++) sprites.push({ id: GLUE_BASE + a, x: GLUE_X0 + k * width, y: GLUE_Y });
+  }
+  if (a !== GLUE_NO_REST_FRAME) {
+    for (let k = a < GLUE_REST_GUNS_ALL_FROM ? count : 1; k <= joints; k++) sprites.push({ id: GLUE_BASE, x: GLUE_X0 + k * width, y: GLUE_Y });
   }
   return sprites;
 }

@@ -1,7 +1,8 @@
 import { copy as shared } from "./copy";
 import { h } from "./dom";
 import { MissingFilesError } from "./files";
-import { createFullscreen, isRotated } from "./fullscreen";
+import { createFullscreen } from "./fullscreen";
+import { isRotated, trackTouchLayout } from "./touch-layout";
 
 /** Textes de la page du jeu (propres à chaque jeu ; la copy partagée reste dans `ui/copy.ts`). */
 export interface GameShellCopy {
@@ -195,6 +196,8 @@ export function mountGameShell(options: GameShellOptions): GameShell {
   const back = options.backLabel ? h("a", { class: "back-link", href: "#/" }, options.backLabel) : null;
   const main = h("main", { class: join(`game-shell game-shell--${sized ? "sized" : "css"}`, classes.root) }, status, errors);
   container.replaceChildren(main);
+  // Disposition tactile paysage posée avant le premier affichage (la feuille de style ne connaît que cette classe).
+  const untrackLayout = trackTouchLayout(main);
   const canvas = h("canvas", {
     class: join("game-shell-canvas", classes.canvas),
     width: logicalWidth,
@@ -213,6 +216,7 @@ export function mountGameShell(options: GameShellOptions): GameShell {
     if (canvasMayTakeFocus(document.activeElement, document.body, canvas)) canvas.focus();
   };
   const dispose = (): void => {
+    untrackLayout();
     const run = disposeRun;
     disposeRun = null;
     run?.();

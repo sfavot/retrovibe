@@ -14,6 +14,7 @@ import { copy } from "../copy";
 import { copy as shared } from "../../../ui/copy";
 import { h } from "../../../ui/dom";
 import { createFullscreen, type Fullscreen } from "../../../ui/fullscreen";
+import { trackTouchLayout } from "../../../ui/touch-layout";
 import { titleScreen } from "../../../ui/title-screen";
 import { GameView } from "./game-view";
 import { nearestPreset, nextPreset, speedSetting } from "./game-speed";
@@ -124,6 +125,8 @@ export class App {
       h("div", { class: "play-column" }, this.view.element, touchBar, back),
       this.sidebar.element,
     );
+    // Disposition tactile paysage (classe `is-touch-landscape`) posée avant le premier affichage.
+    trackTouchLayout(this.gameScreen);
     // Toute la page du jeu (écran, boutons tactiles, panneau) passe en plein écran, en paysage sur écran tactile.
     this.fullscreen = createFullscreen(this.gameScreen, { label: shared.fullscreen, landscape: true });
     this.sidebar.addCommand(this.fullscreen.button);

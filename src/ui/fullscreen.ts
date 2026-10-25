@@ -1,4 +1,7 @@
 import { h } from "./dom";
+import { isRotated, ROTATED_CLASS, syncTouchLayout } from "./touch-layout";
+
+export { isRotated, ROTATED_CLASS };
 
 export interface FullscreenOptions {
   /** Libellé du bouton (l'état se lit dans `aria-pressed`). */
@@ -24,14 +27,6 @@ export interface Fullscreen {
 const FALLBACK_MS = 1000;
 
 type LockableOrientation = ScreenOrientation & { lock?(orientation: string): Promise<void> };
-
-/** Classe de l'élément pivoté de 90° en plein écran (la feuille de style le dimensionne à la fenêtre tournée). */
-export const ROTATED_CLASS = "is-rotated";
-
-/** L'élément est-il dans un plein écran pivoté ? Les coordonnées de la page n'y sont plus alignées sur celles de l'élément. */
-export function isRotated(element: Element): boolean {
-  return element.closest(`.${ROTATED_CLASS}`) !== null;
-}
 
 export interface RotationState {
   /** Écran tactile et jeu demandant le paysage. */
@@ -80,6 +75,7 @@ export function createFullscreen(target: HTMLElement, options: FullscreenOptions
     if (!on) lockOk = false;
     target.classList.toggle("is-fullscreen", on);
     target.classList.toggle(ROTATED_CLASS, shouldRotate({ coarse: wantsLandscape(), portrait: isPortrait(), lockOk, covering }));
+    syncTouchLayout(target);
     document.documentElement.classList.toggle("has-fullscreen", on);
     button.setAttribute("aria-pressed", String(on));
   };
@@ -162,6 +158,7 @@ export function createFullscreen(target: HTMLElement, options: FullscreenOptions
       exit();
       covering = false;
       target.classList.remove("is-fullscreen", ROTATED_CLASS);
+      syncTouchLayout(target);
       document.documentElement.classList.remove("has-fullscreen");
     },
   };

@@ -1152,122 +1152,6 @@ a.button:hover {
   justify-content: center;
 }
 
-/* Écran tactile en paysage : l'écran au centre sur toute la hauteur ; de part et d'autre, les deux groupes de la barre tactile
-   (premier à gauche, dernier à droite) et, en bas, le lien de retour (à gauche) et les boutons Son / Plein écran (à droite). */
-@media (pointer: coarse) and (orientation: landscape) {
-  .game-shell {
-    --game-shell-aside: clamp(6.5rem, calc(var(--view-w, 100vw) * 0.16), 9rem);
-    display: grid;
-    grid-template-columns: var(--game-shell-aside) auto var(--game-shell-aside);
-    grid-template-rows: 1fr auto;
-    justify-content: center;
-    align-content: center;
-    gap: 8px;
-    min-height: var(--view-h, 100dvh);
-    padding: 8px;
-  }
-
-  .game-shell > .game-shell-stage {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    align-self: center;
-  }
-
-  .game-shell > .touch-bar,
-  .game-shell > .game-shell-footer {
-    display: contents;
-  }
-
-  .game-shell > .touch-bar > * {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 8px;
-    align-self: center;
-    min-width: 0;
-  }
-
-  .game-shell > .touch-bar > :first-child {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .game-shell > .touch-bar > :last-child {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .game-shell-footer > .back-link {
-    grid-column: 1;
-    grid-row: 2;
-    align-self: end;
-    font-size: 0.9rem;
-  }
-
-  .game-shell-toggles {
-    grid-column: 3;
-    grid-row: 2;
-    flex-direction: column;
-    align-self: end;
-    margin: 0;
-  }
-
-  .game-shell-status,
-  .game-shell-error {
-    grid-column: 1 / -1;
-  }
-}
-
-/* Indy sur écran tactile en paysage : l'écran (carré) sur toute la hauteur, les boutons Attaquer / Utiliser et le lien de retour
-   à sa gauche, le panneau à droite, qui défile s'il dépasse. */
-@media (pointer: coarse) and (orientation: landscape) {
-  .game-screen {
-    --stage: min(576px, calc(var(--view-h, 100dvh) - 16px));
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 8px;
-    min-height: var(--view-h, 100dvh);
-    padding: 8px;
-  }
-
-  .play-column {
-    display: grid;
-    grid-template-columns: 6.5rem auto;
-    grid-template-rows: 1fr auto;
-    gap: 8px;
-  }
-
-  .play-column > .stage {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-  }
-
-  .play-column > .touch-bar {
-    grid-column: 1;
-    grid-row: 1;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .play-column > .touch-bar button {
-    flex: none;
-  }
-
-  .play-column > .back-link {
-    grid-column: 1;
-    grid-row: 2;
-    font-size: 0.9rem;
-  }
-
-  .game-screen > .sidebar {
-    flex: 0 1 300px;
-    width: auto;
-    min-width: 0;
-    max-height: calc(var(--view-h, 100dvh) - 16px);
-    overflow-y: auto;
-  }
-}
-
 /* Plein écran pivoté (appareil tenu en portrait, sans verrou d'orientation : `ui/fullscreen.ts`) : l'élément a la taille de la fenêtre
    tournée d'un quart de tour (largeur = hauteur de la fenêtre) et pivote autour de son coin haut gauche, puis se replace. Les règles
    de dimensions en `dvh` / `vw` passent par `--view-h` / `--view-w`, qui valent alors la hauteur et la largeur de l'élément. */
@@ -1284,8 +1168,12 @@ a.button:hover {
   transform: translate(calc(100dvw - var(--safe-r)), var(--safe-t)) rotate(90deg);
 }
 
-/* Mêmes dispositions que les deux blocs précédents pour le plein écran pivoté : la fenêtre est alors en portrait, la requête de média ne s'y applique pas. */
-.game-shell.is-rotated {
+/* Disposition tactile paysage, posée par `ui/touch-layout.ts` (classe `is-touch-landscape`) : écran tactile en paysage, ou plein écran
+   pivoté sur un téléphone en portrait (une requête de média ne s'y appliquerait pas). */
+
+/* L'écran au centre sur toute la hauteur ; de part et d'autre, les deux groupes de la barre tactile (premier à gauche, dernier à
+   droite) et, en bas, le lien de retour (à gauche) et les boutons Son / Plein écran (à droite). */
+.game-shell.is-touch-landscape {
   --game-shell-aside: clamp(6.5rem, calc(var(--view-w, 100vw) * 0.16), 9rem);
   display: grid;
   grid-template-columns: var(--game-shell-aside) auto var(--game-shell-aside);
@@ -1297,18 +1185,18 @@ a.button:hover {
   padding: 8px;
 }
 
-.game-shell.is-rotated > .game-shell-stage {
+.game-shell.is-touch-landscape > .game-shell-stage {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
 }
 
-.game-shell.is-rotated > .touch-bar,
-.game-shell.is-rotated > .game-shell-footer {
+.game-shell.is-touch-landscape > .touch-bar,
+.game-shell.is-touch-landscape > .game-shell-footer {
   display: contents;
 }
 
-.game-shell.is-rotated > .touch-bar > * {
+.game-shell.is-touch-landscape > .touch-bar > * {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1317,24 +1205,24 @@ a.button:hover {
   min-width: 0;
 }
 
-.game-shell.is-rotated > .touch-bar > :first-child {
+.game-shell.is-touch-landscape > .touch-bar > :first-child {
   grid-column: 1;
   grid-row: 1;
 }
 
-.game-shell.is-rotated > .touch-bar > :last-child {
+.game-shell.is-touch-landscape > .touch-bar > :last-child {
   grid-column: 3;
   grid-row: 1;
 }
 
-.is-rotated .game-shell-footer > .back-link {
+.is-touch-landscape .game-shell-footer > .back-link {
   grid-column: 1;
   grid-row: 2;
   align-self: end;
   font-size: 0.9rem;
 }
 
-.is-rotated .game-shell-toggles {
+.is-touch-landscape .game-shell-toggles {
   grid-column: 3;
   grid-row: 2;
   flex-direction: column;
@@ -1342,12 +1230,14 @@ a.button:hover {
   margin: 0;
 }
 
-.is-rotated .game-shell-status,
-.is-rotated .game-shell-error {
+.is-touch-landscape .game-shell-status,
+.is-touch-landscape .game-shell-error {
   grid-column: 1 / -1;
 }
 
-.game-screen.is-rotated {
+/* Indy : l'écran (carré) sur toute la hauteur, les boutons Attaquer / Utiliser et le lien de retour à sa gauche, le panneau à droite,
+   qui défile s'il dépasse. */
+.game-screen.is-touch-landscape {
   --stage: min(576px, calc(var(--view-h, 100dvh) - 16px));
   flex-wrap: nowrap;
   align-items: center;
@@ -1356,36 +1246,36 @@ a.button:hover {
   padding: 8px;
 }
 
-.is-rotated .play-column {
+.is-touch-landscape .play-column {
   display: grid;
   grid-template-columns: 6.5rem auto;
   grid-template-rows: 1fr auto;
   gap: 8px;
 }
 
-.is-rotated .play-column > .stage {
+.is-touch-landscape .play-column > .stage {
   grid-column: 2;
   grid-row: 1 / span 2;
 }
 
-.is-rotated .play-column > .touch-bar {
+.is-touch-landscape .play-column > .touch-bar {
   grid-column: 1;
   grid-row: 1;
   flex-direction: column;
   justify-content: center;
 }
 
-.is-rotated .play-column > .touch-bar button {
+.is-touch-landscape .play-column > .touch-bar button {
   flex: none;
 }
 
-.is-rotated .play-column > .back-link {
+.is-touch-landscape .play-column > .back-link {
   grid-column: 1;
   grid-row: 2;
   font-size: 0.9rem;
 }
 
-.game-screen.is-rotated > .sidebar {
+.game-screen.is-touch-landscape > .sidebar {
   flex: 0 1 300px;
   width: auto;
   min-width: 0;

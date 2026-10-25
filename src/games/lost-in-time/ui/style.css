@@ -63,10 +63,8 @@
 }
 
 /* Paysage tactile : l'écran prend toute la hauteur, entre les colonnes de boutons (deux colonnes, leurs gouttières et les marges). */
-@media (pointer: coarse) and (orientation: landscape) {
-  .lit-stage {
-    width: min(calc(100vw - 2 * var(--game-shell-aside) - 32px), calc((100dvh - 16px) * 4 / 3));
-  }
+.is-touch-landscape .lit-stage {
+  width: min(calc(var(--view-w, 100vw) - 2 * var(--game-shell-aside) - 32px), calc((var(--view-h, 100dvh) - 16px) * 4 / 3));
 }
 
 /* Champ de saisie invisible : il ne sert qu'à ouvrir le clavier virtuel (16px évite le zoom d'iOS au focus). */

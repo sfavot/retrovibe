@@ -1188,12 +1188,12 @@ a.button:hover {
    pivoté sur un téléphone en portrait (une requête de média ne s'y appliquerait pas). */
 
 /* L'écran au centre sur toute la hauteur ; de part et d'autre, les deux groupes de la barre tactile (premier à gauche, dernier à
-   droite) et, en bas, le lien de retour (à gauche) et les boutons Son / Plein écran (à droite). */
+   droite) ; à droite, le retour (croix) en haut et les boutons Son / Plein écran en bas. */
 .game-shell.is-touch-landscape {
   --game-shell-aside: clamp(6.5rem, calc(var(--view-w, 100vw) * 0.16), 9rem);
   display: grid;
   grid-template-columns: var(--game-shell-aside) auto var(--game-shell-aside);
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto 1fr auto;
   justify-content: center;
   align-content: center;
   gap: 8px;
@@ -1203,7 +1203,7 @@ a.button:hover {
 
 .game-shell.is-touch-landscape > .game-shell-stage {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   align-self: center;
 }
 
@@ -1223,24 +1223,25 @@ a.button:hover {
 
 .game-shell.is-touch-landscape > .touch-bar > :first-child {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
 }
 
 .game-shell.is-touch-landscape > .touch-bar > :last-child {
   grid-column: 3;
-  grid-row: 1;
+  grid-row: 2;
 }
 
 .is-touch-landscape .game-shell-footer > .back-link {
-  grid-column: 1;
-  grid-row: 2;
-  align-self: end;
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  justify-self: end;
   font-size: 0.9rem;
 }
 
 .is-touch-landscape .game-shell-toggles {
   grid-column: 3;
-  grid-row: 2;
+  grid-row: 3;
   flex-direction: column;
   align-self: end;
   margin: 0;

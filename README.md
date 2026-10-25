@@ -194,5 +194,5 @@ Référence : [WebFun](https://codeberg.org/cyco/WebFun) (MIT), réimplémentati
 ## Licence
 
 Le code est sous [GPL v3 ou ultérieure](LICENSE) : le moteur de Lost in Time est porté de [ScummVM](https://www.scummvm.org/) (GPL v3+),
-y compris l'émulateur OPL (MAME) utilisé pour la musique AdLib. Les fichiers des jeux de `original/` ne sont pas couverts
+y compris l'émulateur OPL (MAME, `src/audio/opl2.ts`) utilisé pour la musique AdLib de Lost in Time et d'Armaeth. Les fichiers des jeux de `original/` ne sont pas couverts
 par cette licence : ils restent la propriété de leurs ayants droit.

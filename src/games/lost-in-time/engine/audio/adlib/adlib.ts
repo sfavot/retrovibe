@@ -8,7 +8,7 @@
  * Écarts : pas de mutex (tout tourne dans un seul fil), voix hors bornes ignorées (comportement
  * indéfini en C++), volume de musique fixé à la valeur par défaut de ScummVM (192/256).
  */
-import { Opl2 } from "./opl2";
+import { Opl2 } from "../../../../../audio/opl2";
 
 // Paramètres d'opérateur
 export const PARAM_KEY_SCALE_LEVEL = 0;

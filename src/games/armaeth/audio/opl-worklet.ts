@@ -3,7 +3,7 @@
  * au rythme de la carte son, et reçoit les écritures horodatées par tick (`OplStream`). Compilé à part par Vite
  * (import `?worker&url` dans web-opl.ts).
  */
-import { Opl2 } from "../../lost-in-time/engine/audio/adlib/opl2";
+import { Opl2 } from "../../../audio/opl2";
 import { OplStream, type OplMessage } from "./opl-stream";
 
 declare const sampleRate: number;

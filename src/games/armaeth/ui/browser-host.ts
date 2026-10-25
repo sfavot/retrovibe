@@ -2,9 +2,10 @@ import type { HostStorage } from "../../../engine/storage";
 import { IndexedPresenter } from "../../../ui/indexed-canvas";
 import { bindCanvasPointer, bindKeyboard } from "../../../ui/pointer";
 import { WebOpl } from "../audio/web-opl";
-import type { ArmaethFrame, ArmaethHost, ArmaethStorage, HostInput } from "../engine/host";
+import type { ArmaethFrame, ArmaethHost, ArmaethStorage, HostInput, HostKey } from "../engine/host";
 import { InputQueue, SCREEN_HEIGHT, SCREEN_WIDTH, buttonMask, mapKey } from "./input";
 import { createSaveStorage } from "./saves";
+import { HoldToggle, snapTouchTarget } from "./touch";
 
 /**
  * Hôte du navigateur : fichiers préchargés en mémoire (le moteur les lit en synchrone), canvas 320×200 en couleurs indexées, musique
@@ -13,6 +14,8 @@ import { createSaveStorage } from "./saves";
 export class BrowserHost implements ArmaethHost {
   readonly opl: WebOpl;
   readonly storage: ArmaethStorage;
+  /** « Tenir » de la barre tactile : le prochain toucher du doigt compte comme Ctrl + clic. */
+  readonly hold = new HoldToggle();
   private readonly presenter: IndexedPresenter;
   private readonly input = new InputQueue();
   private readonly detach: (() => void)[] = [];
@@ -59,6 +62,11 @@ export class BrowserHost implements ArmaethHost {
     this.onQuit();
   }
 
+  /** Touche venue de la barre tactile ou du champ de saisie caché (même file que le clavier). */
+  pressKey(key: HostKey): void {
+    this.input.key(key);
+  }
+
   /** Débloque le son : à appeler depuis un geste de l'utilisatrice. */
   unlock(): void {
     this.opl.unlock();
@@ -86,10 +94,17 @@ export class BrowserHost implements ArmaethHost {
         { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
         {
           // Souris et stylet : boutons du jeu (gauche / droit). Doigt : `tap` (toucher = clic gauche, appui long = clic droit).
-          move: (x, y, event) => input.move(x, y, event?.ctrlKey ?? false),
+          // `event` nul = geste du doigt : la cible est attirée vers la case d'icône ou d'inventaire voisine (souris et stylet : exacts).
+          move: (x, y, event) => {
+            if (event) input.move(x, y, event.ctrlKey);
+            else {
+              const target = snapTouchTarget(x, y);
+              input.move(target.x, target.y, false);
+            }
+          },
           down: (button, x, y, event) => input.down(buttonMask(button), x, y, event.ctrlKey),
           up: (button, x, y, event) => input.up(buttonMask(button), x, y, event.ctrlKey),
-          tap: (button) => input.tap(buttonMask(button)),
+          tap: (button) => input.tap(buttonMask(button), this.hold.consume()),
         },
         { onGesture: unlock },
       ),

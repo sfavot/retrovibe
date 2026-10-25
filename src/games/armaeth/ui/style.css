@@ -123,3 +123,41 @@
 .aeth.is-fullscreen:fullscreen {
   position: relative;
 }
+
+/* Champ de saisie invisible : il ne sert qu'à ouvrir le clavier virtuel (16px évite le zoom d'iOS au focus). */
+.aeth-text-field {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  font-size: 16px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Barre tactile (Clavier, Tenir ; pendant une saisie : Échap et Entrée) : les groupes ne forment qu'une rangée, de la largeur de l'écran
+   (portrait) ; en paysage tactile, le shell les range de part et d'autre de l'écran (`ui/style.css`). */
+.aeth-touch-group {
+  display: contents;
+}
+
+@media (pointer: coarse) {
+  .aeth-touch-bar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    width: var(--aeth-screen-width, 100%);
+  }
+
+  .aeth-touch-bar button {
+    padding-inline: 0.5rem;
+  }
+
+  .aeth-touch-bar button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--bg);
+  }
+}

@@ -30,13 +30,13 @@ bash scripts/mathemagique/re/run.sh
 | `project/` | projet Ghidra (`mathemagique`), ouvrable dans l'interface (`ghidraRun`) |
 | `run.log` | journal complet de Ghidra |
 
-Les scripts sont dans `scripts/mathemagique/re/` : `ne_dump.py` + `ne.py` (exports et ressources, Python), `ExportStrings.java`, `ExportImports.java`, `ExportTags.java`, `ExportDecompiled.java`, `SeedFunctions.java` (amorçage des fonctions, lancé avant les exports), `ExportDisasm.java`, l'utilitaire `ReCommon.java` et `make_index.py` (met à jour ce document). Ils reprennent la structure de `scripts/teleportaschtroumpf/re/`, sans `SetDS` ni `IdentifyLibs` (propres au DOS : le loader NE gère les segments et les relocations). `SeedFunctions.java` est repris dans son principe mais réécrit : voir « Amorçage des fonctions ».
+Les scripts propres au jeu sont dans `scripts/mathemagique/re/` : `ne_dump.py` + `ne.py` (exports et ressources, Python), `ExportImports.java`, `ExportTags.java`, `SeedFunctions.java` (amorçage des fonctions, lancé avant les exports) et `make_index.py` (met à jour ce document). Ils s'appuient sur le socle commun `scripts/re/` (`run-lib.sh`, `ReCommon.java` en mode NE, `ExportStrings.java`, `ExportDecompiled.java`, `ExportDisasm.java`, `make_index_lib.py`), partagé avec le Téléportaschtroumpf et Armaeth, sans `SetDS` ni `IdentifyLibs` (propres au DOS : le loader NE gère les segments et les relocations). `SeedFunctions.java` est repris dans son principe mais réécrit : voir « Amorçage des fonctions ».
 
 ## Statistiques
 
 <!-- GEN:stats -->
 - Outils : ghidra 12.2 ; JDK : openjdk version "25.0.5" 2026-10-20.
-- Durée de la dernière régénération (6 programmes) : 79 s.
+- Durée de la dernière régénération (6 programmes) : 92 s.
 
 | Programme | Octets | Fonctions | Octets de code | Décomp. ok | Partielle | Erreur | Taux ok | Chaînes (référencées) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

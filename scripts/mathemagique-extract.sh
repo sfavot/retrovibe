@@ -21,14 +21,12 @@ cd_complet="$racine/archives/mathemagique/cd"
 doc="$racine/docs/mathemagique/files.md"
 utils="$racine/scripts/mathemagique/extract_utils.py"
 
-for outil in unzip python3; do
-  command -v "$outil" >/dev/null || { echo "Outil manquant : $outil" >&2; exit 1; }
-done
+# shellcheck source=lib/extract-common.sh
+source "$racine/scripts/lib/extract-common.sh"
+ec_verifier_outils unzip python3
 [ -f "$archive" ] || { echo "Archive introuvable : $archive" >&2; exit 1; }
 
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-py() { python3 -I "$utils" "$@"; }
+ec_init_tmp
 
 echo "Extraction de l'archive..."
 mkdir "$tmp/zip"
@@ -42,22 +40,18 @@ rm -rf "$tmp/zip"
 
 echo "Fichiers utiles..."
 mkdir "$tmp/out"
-py copier "$tmp/cd" "$tmp/out" "$tmp/stats.json"
+py copier "$tmp/cd" "$tmp/out"
 
 # La soundfont réduite et sa licence (scripts/mathemagique/soundfont.mts), la jaquette (scripts/mathemagique/cover.mts), le manuel
 # MANUEL.html et ses illustrations manuel/ (scripts/mathemagique/manual-images.mts) ne viennent pas du CD : conservés tels quels.
-for fichier in mathemagique-gm.sf2 mathemagique-gm-LICENSE.txt COVER.png MANUEL.html; do
-  if [ -f "$sortie/$fichier" ]; then cp "$sortie/$fichier" "$tmp/out/$fichier"; fi
-done
+ec_conserver "$sortie" "$tmp/out" mathemagique-gm.sf2 mathemagique-gm-LICENSE.txt COVER.png MANUEL.html
 if [ -d "$sortie/manuel" ]; then cp -R "$sortie/manuel" "$tmp/out/manuel"; fi
 
-python3 -I "$racine/scripts/manifest.py" "$tmp/out"
-
-# Substitution d'un bloc, seulement maintenant que tout a réussi.
+# Substitution d'un bloc, seulement maintenant que tout a réussi (files.json est généré avant).
 mkdir -p "$(dirname "$cd_complet")"
-rm -rf "$sortie" "$cd_complet"
-mv "$tmp/out" "$sortie"
+rm -rf "$cd_complet"
+ec_publier "$tmp/out" "$sortie"
 mv "$tmp/cd" "$cd_complet"
 
-py inventaire "$sortie" "$cd_complet" "$tmp/stats.json" "$doc"
+py inventaire "$sortie" "$doc"
 echo "Terminé : $sortie ($(du -sh "$sortie" | cut -f1)) ; CD complet : $cd_complet ; inventaire : $doc"

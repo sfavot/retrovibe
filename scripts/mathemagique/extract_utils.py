@@ -3,17 +3,16 @@
 Lancé avec `python3 -I` : les données extraites ne sont pas de confiance (rien n'en est exécuté).
 Sous-commandes :
   iso <iso> <dest>                    -> extrait tout l'ISO 9660 (analyse faite ici : 7zz oublie des fichiers)
-  copier <cd> <dest> <stats_json>     -> copie dans <dest> les fichiers utiles au jeu ; stats JSON
-  inventaire <dest> <cd> <stats> <sortie_md>
+  copier <cd> <dest>                  -> copie dans <dest> les fichiers utiles au jeu
+  inventaire <dest> <sortie_md>
 """
-import json
 import os
-import re
 import shutil
 import struct
 import sys
 
-SECTEUR = 2048
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'lib'))  # -I : pas de PYTHONPATH
+import extract_common as ec  # noqa: E402
 
 # Fichiers du CD qu'on garde pour le jeu (le reste ne reste que dans archives/mathemagique/cd/).
 EXT_RACINE = {'.DAT', '.WMF', '.TTF', '.FON'}
@@ -35,72 +34,8 @@ POURQUOI_EXCLUS = [
 ]
 
 
-def nom_sur(nom):
-    if not nom or nom in ('.', '..') or '/' in nom or '\\' in nom or '\0' in nom:
-        sys.exit('Nom de fichier ISO refusé : %r' % nom)
-    return nom
-
-
 def cmd_iso(iso, dest):
-    taille = os.path.getsize(iso)
-    f = open(iso, 'rb')
-
-    def secteurs(n, c):
-        f.seek(n * SECTEUR)
-        return f.read(SECTEUR * c)
-
-    pvd = secteurs(16, 1)
-    if pvd[1:6] != b'CD001':
-        sys.exit('Pas un ISO 9660')
-    nb = [0]
-
-    def parcourir(lba, ln, cible):
-        os.makedirs(cible, exist_ok=True)
-        data = secteurs(lba, (ln + SECTEUR - 1) // SECTEUR)
-        i = 0
-        while i < ln:
-            l = data[i]
-            if l == 0:
-                i = (i // SECTEUR + 1) * SECTEUR
-                continue
-            r = data[i:i + l]
-            i += l
-            elba, = struct.unpack('<I', r[2:6])
-            el, = struct.unpack('<I', r[10:14])
-            nl = r[32]
-            brut = r[33:33 + nl]
-            if brut in (b'\x00', b'\x01'):
-                continue
-            nom = nom_sur(brut.decode('latin-1').split(';')[0])
-            chemin = os.path.join(cible, nom)
-            if r[25] & 2:
-                parcourir(elba, el, chemin)
-            else:
-                if elba * SECTEUR + el > taille:
-                    sys.exit('Fichier hors de l\'ISO : %s' % chemin)
-                f.seek(elba * SECTEUR)
-                with open(chemin, 'wb') as o:
-                    restant = el
-                    while restant:
-                        morceau = f.read(min(restant, 1 << 20))
-                        if not morceau:
-                            sys.exit('ISO tronqué : %s' % chemin)
-                        o.write(morceau)
-                        restant -= len(morceau)
-                nb[0] += 1
-
-    racine = pvd[156:190]
-    elba, = struct.unpack('<I', racine[2:6])
-    el, = struct.unpack('<I', racine[10:14])
-    parcourir(elba, el, dest)
-    print('%d fichiers extraits de l\'ISO' % nb[0])
-
-
-def liste_fichiers(racine):
-    for dossier, _, noms in os.walk(racine):
-        for n in sorted(noms):
-            c = os.path.join(dossier, n)
-            yield c, os.path.relpath(c, racine).replace(os.sep, '/')
+    print('%d fichiers extraits de l\'ISO' % ec.extraire_iso(iso, dest))
 
 
 def est_garde(rel):
@@ -115,17 +50,13 @@ def est_garde(rel):
     return rel.startswith('PVGWMF/') and ext == '.WMF'
 
 
-def cmd_copier(cd, dest, stats_json):
-    gardes = []
-    for chemin, rel in liste_fichiers(cd):
-        taille = os.path.getsize(chemin)
-        if est_garde(rel):
-            cible = os.path.join(dest, rel)
-            os.makedirs(os.path.dirname(cible), exist_ok=True)
-            shutil.copyfile(chemin, cible)
-            gardes.append({'rel': rel, 'taille': taille})
-    with open(stats_json, 'w') as o:
-        json.dump({'gardes': gardes}, o)
+def classer(chemin, rel, nom):
+    """(catégorie, gardé) d'un fichier du CD ; `rel` porte le séparateur de l'OS."""
+    return os.path.splitext(nom)[1].upper(), est_garde(rel.replace(os.sep, '/'))
+
+
+def cmd_copier(cd, dest):
+    ec.copier_filtre(cd, dest, classer)
 
 
 def mohawk(chemin):
@@ -143,19 +74,18 @@ def mohawk(chemin):
     return types
 
 
+def mo(n):
+    return ec.mo(n, ko=True)
+
+
 def echappe(tag):
     return ''.join(chr(b) if 32 <= b < 127 else '\\x%02x' % b for b in tag)
 
 
-def mo(n):
-    return '%.1f Mo' % (n / 1048576) if n >= 1048576 else '%.1f Ko' % (n / 1024)
-
-
-def cmd_inventaire(dest, cd, stats_json, sortie):
-    gardes = json.load(open(stats_json))['gardes']
+def cmd_inventaire(dest, sortie):
     total, par_groupe = 0, {}
     tailles = {}
-    for chemin, rel in liste_fichiers(dest):
+    for chemin, rel in ec.liste_fichiers(dest):
         if rel == 'files.json':
             continue
         t = os.path.getsize(chemin)
@@ -168,36 +98,31 @@ def cmd_inventaire(dest, cd, stats_json, sortie):
         e = par_groupe.setdefault(cle, [0, 0])
         e[0] += 1
         e[1] += t
-    L = ['# Inventaire des fichiers de Math Workshop (Mathémagique)', '',
-         'Généré par `scripts/mathemagique-extract.sh` (ne pas éditer à la main).', '',
-         '## Taille', '',
-         '- Total versionné (`original/mathemagique/`) : **%s** (%d octets), %d fichiers' % (mo(total), total, len(tailles)),
-         '', '## Par groupe de fichiers', '',
-         '| Extension | Fichiers | Taille |', '|---|---:|---:|']
-    for k in sorted(par_groupe):
-        L.append('| %s | %d | %s |' % (k, par_groupe[k][0], mo(par_groupe[k][1])))
-    L += ['', '## Archives Mohawk', '',
-          'Types de ressources (tag de 4 octets : nombre de ressources). Les octets non imprimables sont échappés.', '']
     mhk = sorted(r for r in tailles if os.path.splitext(r)[1].upper() in ('.DAT', '.MHK'))
-    L += ['| Fichier | Taille | Types de ressources |', '|---|---:|---|']
+    lignes_mhk = []
     for rel in mhk:
         types = mohawk(os.path.join(dest, rel))
         if types is None:
-            L.append('| `%s` | %s | pas une archive Mohawk |' % (rel, mo(tailles[rel])))
+            lignes_mhk.append(('`%s`' % rel, mo(tailles[rel]), 'pas une archive Mohawk'))
         else:
-            L.append('| `%s` | %s | %s |' % (rel, mo(tailles[rel]),
-                                           ', '.join('`%s` : %d' % (echappe(t), c) for t, c in types)))
-    L.append('')
-    L += ['## Gardé uniquement dans `archives/mathemagique/cd/`', '']
-    for nom, raison in POURQUOI_EXCLUS:
-        L.append('- %s : %s' % (nom, raison))
-    L += ['', 'Le CD complet est extrait dans `archives/mathemagique/cd/` (non versionné).', '',
-          '## Régénérer', '', '```', 'bash scripts/mathemagique-extract.sh [archive.zip]', '```', '',
-          'Archive par défaut : `archives/mathemagique/Math-Workshop_Win_EN_ISO-Version.zip` (non versionnée). '
-          'Outils requis : `unzip`, `python3`.', '']
-    os.makedirs(os.path.dirname(sortie), exist_ok=True)
-    with open(sortie, 'w') as o:
-        o.write('\n'.join(L))
+            lignes_mhk.append(('`%s`' % rel, mo(tailles[rel]),
+                               ', '.join('`%s` : %d' % (echappe(t), c) for t, c in types)))
+    ec.rendre_inventaire(sortie, 'Inventaire des fichiers de Math Workshop (Mathémagique)',
+                         'scripts/mathemagique-extract.sh', [
+        ('Taille', [
+            '- Total versionné (`original/mathemagique/`) : **%s** (%d octets), %d fichiers' % (mo(total), total, len(tailles))]),
+        ('Par groupe de fichiers', ec.tableau(['Extension', 'Fichiers', 'Taille'],
+                                              [(k, par_groupe[k][0], mo(par_groupe[k][1])) for k in sorted(par_groupe)],
+                                              droite=(1, 2))),
+        ('Archives Mohawk', [
+            'Types de ressources (tag de 4 octets : nombre de ressources). Les octets non imprimables sont échappés.', '']
+            + ec.tableau(['Fichier', 'Taille', 'Types de ressources'], lignes_mhk, droite=(1,))),
+        ('Gardé uniquement dans `archives/mathemagique/cd/`', ec.pourquoi_exclus(POURQUOI_EXCLUS) + [
+            '', 'Le CD complet est extrait dans `archives/mathemagique/cd/` (non versionné).']),
+        ('Régénérer', ['```', 'bash scripts/mathemagique-extract.sh [archive.zip]', '```', '',
+            'Archive par défaut : `archives/mathemagique/Math-Workshop_Win_EN_ISO-Version.zip` (non versionnée). '
+            'Outils requis : `unzip`, `python3`.']),
+    ])
 
 
 if __name__ == '__main__':

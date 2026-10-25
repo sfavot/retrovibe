@@ -80,7 +80,7 @@ public class SeedFunctions extends GhidraScript {
 
         // 2. pointeurs lointains des blocs de données
         List<Address> candidates = new ArrayList<>();
-        for (MemoryBlock b : ReCommon.dataBlocks(currentProgram)) {
+        for (MemoryBlock b : ReCommon.neDataBlocks(currentProgram)) {
             long n = b.getSize();
             for (long p = 0; p + 3 < n; p++) {
                 Address cell = b.getStart().add(p);
@@ -120,7 +120,7 @@ public class SeedFunctions extends GhidraScript {
                 + " (scène=" + sceneSeeds + ", pointeurs=" + (ptrSeeds + ptrSeeds2) + ") déjà présentes=" + existingSet.size()
                 + " handlers nommés=" + named);
         // résumé lu par make_index.py : clé<TAB>valeur
-        ReCommon.write(new java.io.File(ReCommon.outDir(currentProgram), "seed.tsv"),
+        ReCommon.write(new java.io.File(ReCommon.outDir(), "seed.tsv"),
                 "avant\t" + before + "\napres\t" + after + "\nscene\t" + sceneSeeds + "\nscene_handlers\t" + names.size()
                 + "\npointeurs\t" + (ptrSeeds + ptrSeeds2) + "\ncandidats\t" + candidates.size() + "\nnommes\t" + named
                 + "\nignorees\t" + skippedAt.size() + "\n");
@@ -135,7 +135,7 @@ public class SeedFunctions extends GhidraScript {
     private void skip(String why) { skipped.merge(why, 1, Integer::sum); }
 
     private void skipAt(Address a, String why) {
-        if (skippedAt.add(ReCommon.addr(a) + " (" + why + ")")) skip(why); // une cible pointée plusieurs fois compte une fois
+        if (skippedAt.add(ReCommon.addr(currentProgram, a) + " (" + why + ")")) skip(why); // une cible pointée plusieurs fois compte une fois
     }
 
     /** Pointeur lointain (offset, sélecteur) vers un bloc de données ; null si nul ou invalide. */

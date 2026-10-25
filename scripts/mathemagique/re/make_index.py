@@ -7,14 +7,16 @@ contenu des blocs
   <!-- GEN:imports --> ... <!-- /GEN:imports -->
   <!-- GEN:dats --> ... <!-- /GEN:dats -->
   <!-- GEN:resources --> ... <!-- /GEN:resources -->
-(le reste du document est écrit à la main et n'est pas touché). Bibliothèque standard seulement.
+(le reste du document est écrit à la main et n'est pas touché). Bibliothèque standard seulement
+(briques communes : scripts/re/make_index_lib.py).
 """
 import os
 import re
-import shutil
-import subprocess
 import sys
 from collections import Counter, defaultdict
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "re"))  # -I : pas de PYTHONPATH
+import make_index_lib as lib  # noqa: E402  (outillage commun : scripts/re/)
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
 OUT = os.path.join(ROOT, "archives/mathemagique/re")
@@ -26,37 +28,10 @@ MAX_LIST = 12
 
 
 def tsv(prog, name):
-    rows = []
-    path = os.path.join(OUT, prog, name)
-    if not os.path.exists(path):
-        return rows
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            if line.startswith("#") or not line.strip():
-                continue
-            rows.append(line.rstrip("\n").split("\t"))
-    return rows
-
-
-def md(s):
-    return s.replace("|", "\\|").replace("`", "'")
-
-
-def tool_versions():
-    ghidra = jdk = "?"
-    try:
-        b = shutil.which("brew")
-        if b:
-            ghidra = subprocess.run([b, "list", "--versions", "ghidra"], capture_output=True, text=True).stdout.strip() or "?"
-    except Exception:
-        pass
-    java = os.path.join(os.environ.get("JAVA_HOME", ""), "bin", "java")
-    try:
-        if os.path.exists(java):
-            jdk = subprocess.run([java, "-version"], capture_output=True, text=True).stderr.splitlines()[0]
-    except Exception:
-        pass
-    return ghidra, jdk
+    """Lignes d'un TSV de OUT/<programme>, ou aucune si le fichier n'existe pas."""
+    if not os.path.exists(os.path.join(OUT, prog, name)):
+        return []
+    return lib.tsv(os.path.join(OUT, prog), name)
 
 
 data = {}
@@ -73,7 +48,7 @@ for prog, fname in PROGRAMS:
 
 
 def render_stats():
-    ghidra, jdk = tool_versions()
+    ghidra, jdk = lib.tool_versions()
     L = ["- Outils : %s ; JDK : %s." % (ghidra, jdk),
          "- Durée de la dernière régénération (6 programmes) : %s s." % os.environ.get("RE_DURATION_S", "?"),
          "",
@@ -204,17 +179,10 @@ def render_resources():
     return "\n".join(L)
 
 
-def replace_block(text, name, body):
-    pat = re.compile(r"(<!-- GEN:%s -->\n)(?:.*?\n)?(<!-- /GEN:%s -->)" % (name, name), re.S)
-    if not pat.search(text):
-        raise SystemExit("bloc <!-- GEN:%s --> absent de %s" % (name, DOC))
-    return pat.sub(lambda m: m.group(1) + body + "\n" + m.group(2), text)
-
-
 with open(DOC, encoding="utf-8") as f:
     doc = f.read()
 for name, fn_ in (("stats", render_stats), ("imports", render_imports), ("dats", render_dats), ("resources", render_resources)):
-    doc = replace_block(doc, name, fn_())
+    doc = lib.replace_block(doc, name, fn_(), DOC)
 with open(DOC, "w", encoding="utf-8") as f:
     f.write(doc)
 print("[re] %s mis à jour" % os.path.relpath(DOC, ROOT))

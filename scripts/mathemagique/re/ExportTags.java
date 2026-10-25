@@ -66,7 +66,7 @@ public class ExportTags extends GhidraScript {
 
         for (Function f : currentProgram.getFunctionManager().getFunctions(true)) {
             if (!ReCommon.isCode(currentProgram, f.getEntryPoint())) continue;
-            String fa = ReCommon.addr(f.getEntryPoint());
+            String fa = ReCommon.addr(currentProgram, f.getEntryPoint());
             names.put(fa, f.getName());
             List<Instruction> ins = new ArrayList<>();
             for (Instruction i : currentProgram.getListing().getInstructions(f.getBody(), true)) ins.add(i);
@@ -79,7 +79,7 @@ public class ExportTags extends GhidraScript {
                     long hi = v >>> 16, lo = v & 0xffff;
                     for (int k = 0; k < ins.size(); k++) {
                         if (sc.get(k).contains(v)) {
-                            add(rows, seen, fa, "tag", show(t), ord + " 32 bits @" + ReCommon.addr(ins.get(k).getAddress()));
+                            add(rows, seen, fa, "tag", show(t), ord + " 32 bits @" + ReCommon.addr(currentProgram, ins.get(k).getAddress()));
                             continue;
                         }
                         // deux moitiés : hi puis lo (ou lo puis hi) dans les 8 instructions suivantes
@@ -88,8 +88,8 @@ public class ExportTags extends GhidraScript {
                             if (!sc.get(k).contains(first)) continue;
                             for (int j = k + 1; j < Math.min(ins.size(), k + 8); j++) {
                                 if (sc.get(j).contains(second)) {
-                                    add(rows, seen, fa, "tag", show(t), ord + " 16+16 bits @" + ReCommon.addr(ins.get(k).getAddress())
-                                        + "," + ReCommon.addr(ins.get(j).getAddress()));
+                                    add(rows, seen, fa, "tag", show(t), ord + " 16+16 bits @" + ReCommon.addr(currentProgram, ins.get(k).getAddress())
+                                        + "," + ReCommon.addr(currentProgram, ins.get(j).getAddress()));
                                     break;
                                 }
                             }
@@ -100,7 +100,7 @@ public class ExportTags extends GhidraScript {
         }
 
         // tags en clair dans les segments de données, référencés par une fonction
-        for (MemoryBlock b : ReCommon.dataBlocks(currentProgram)) {
+        for (MemoryBlock b : ReCommon.neDataBlocks(currentProgram)) {
             byte[] d = ReCommon.bytes(b);
             for (String t : TAGS) {
                 byte[] pat = t.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
@@ -111,14 +111,14 @@ public class ExportTags extends GhidraScript {
                     Address da = b.getStart().add(i);
                     for (Reference r : currentProgram.getReferenceManager().getReferencesTo(da)) {
                         Function f = currentProgram.getFunctionManager().getFunctionContaining(r.getFromAddress());
-                        if (f != null) add(rows, seen, ReCommon.addr(f.getEntryPoint()), "data", show(t), "@" + ReCommon.addr(da));
+                        if (f != null) add(rows, seen, ReCommon.addr(currentProgram, f.getEntryPoint()), "data", show(t), "@" + ReCommon.addr(currentProgram, da));
                     }
                 }
             }
         }
 
         // noms de fichiers DAT : relus depuis strings.tsv (écrit par ExportStrings, qui précède ce script)
-        File sf = new File(ReCommon.outDir(currentProgram), "strings.tsv");
+        File sf = new File(ReCommon.outDir(), "strings.tsv");
         if (sf.exists()) {
             for (String line : java.nio.file.Files.readAllLines(sf.toPath())) {
                 if (line.startsWith("#")) continue;
@@ -142,7 +142,7 @@ public class ExportTags extends GhidraScript {
                 sb.append(e.getKey()).append('\t').append(names.getOrDefault(e.getKey(), "?")).append('\t').append(r).append('\n');
                 n++;
             }
-        ReCommon.write(new File(ReCommon.outDir(currentProgram), "tags.tsv"), sb.toString());
+        ReCommon.write(new File(ReCommon.outDir(), "tags.tsv"), sb.toString());
         println("[re] références de tags / .dat : " + n + " dans " + rows.size() + " fonctions");
     }
 

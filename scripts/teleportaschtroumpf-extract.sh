@@ -7,7 +7,8 @@
 # (original/teleportaschtroumpf/COVER.webp), qui ne vient pas du CD et est conservée telle quelle.
 # La notice d'origine (« Lisez moi.doc » à la racine du CD) est convertie en MANUEL.pdf : textutil (macOS) la lit en
 # HTML, Chrome en mode headless l'imprime. En cas d’échec ou sans l’un des deux, l’éventuel MANUEL.pdf existant est conservé.
-# Outils requis : bsdtar (7zz ne sait pas lire ce RAR), 7zz, python3.
+# Briques communes : scripts/lib/ (extraction ISO 9660, inventaire, remplacement atomique).
+# Outils requis : bsdtar (7zz ne sait pas lire ce RAR), python3.
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,14 +18,12 @@ doc="$racine/docs/teleportaschtroumpf/files.md"
 utils="$racine/scripts/teleportaschtroumpf/extract_utils.py"
 chrome="${CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 
-for outil in bsdtar 7zz python3; do
-  command -v "$outil" >/dev/null || { echo "Outil manquant : $outil" >&2; exit 1; }
-done
+# shellcheck source=lib/extract-common.sh
+source "$racine/scripts/lib/extract-common.sh"
+ec_verifier_outils bsdtar python3
 [ -f "$archive" ] || { echo "Archive introuvable : $archive" >&2; exit 1; }
 
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-py() { python3 -I "$utils" "$@"; }
+ec_init_tmp
 
 echo "Extraction de l'archive..."
 mkdir "$tmp/rar"
@@ -38,15 +37,13 @@ nb_iso="$(py pistes "$cue")"
 
 echo "Piste 1 -> ISO -> fichiers..."
 py iso "$bin" "$tmp/data.iso" "$nb_iso"
-mkdir "$tmp/iso"
-7zz x -y -bso0 -bsp0 "-o$tmp/iso" "$tmp/data.iso"
+py extraire "$tmp/data.iso" "$tmp/iso"
 
 # Tout est construit dans $tmp/out ; original/ n'est remplacé qu'à la fin, une fois files.json généré.
-[ -f "$sortie/COVER.webp" ] && cp "$sortie/COVER.webp" "$tmp/COVER.webp"
 [ -f "$sortie/MANUEL.pdf" ] && cp "$sortie/MANUEL.pdf" "$tmp/MANUEL.old.pdf"
 mkdir "$tmp/out"
 py copier "$tmp/iso" "$tmp/out" "$tmp/stats.json"
-[ -f "$tmp/COVER.webp" ] && cp "$tmp/COVER.webp" "$tmp/out/COVER.webp"
+ec_conserver "$sortie" "$tmp/out" COVER.webp
 
 # Notice d'origine -> MANUEL.pdf (le nom de fichier du CD contient une espace et la casse varie).
 # Le PDF est produit dans $tmp ; en cas d'échec, l'ancien est conservé.
@@ -77,9 +74,7 @@ if [ "$manuel_ok" = 0 ]; then
   fi
 fi
 
-python3 -I "$racine/scripts/manifest.py" "$tmp/out"
-rm -rf "$sortie"
-mv "$tmp/out" "$sortie"
+ec_publier "$tmp/out" "$sortie"
 
 py inventaire "$sortie" "$tmp/stats.json" "$doc"
 echo "Terminé : $sortie ($(du -sh "$sortie" | cut -f1)) ; inventaire : $doc"

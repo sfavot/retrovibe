@@ -4,7 +4,7 @@ Généré par `scripts/mathemagique-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/mathemagique/`) : **70.0 Mo** (73398573 octets), 68 fichiers
+- Total versionné (`original/mathemagique/`) : **89.2 Mo** (93538753 octets), 85 fichiers
 
 ## Par groupe de fichiers
 
@@ -13,8 +13,12 @@ Généré par `scripts/mathemagique-extract.sh` (ne pas éditer à la main).
 | (sans extension) | 1 | 381.5 Ko |
 | .DAT | 18 | 68.2 Mo |
 | .FON | 5 | 50.0 Ko |
+| .HTML | 1 | 38.9 Ko |
 | .MHK (MPC/) | 1 | 816.0 Ko |
+| .PNG | 14 | 997.8 Ko |
+| .SF2 | 1 | 18.2 Mo |
 | .TTF | 7 | 241.2 Ko |
+| .TXT | 1 | 2.3 Ko |
 | .WMF | 6 | 109.3 Ko |
 | .WMF (PVGWMF/) | 30 | 218.3 Ko |
 

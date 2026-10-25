@@ -5,14 +5,15 @@ Lit archives/teleportaschtroumpf/re/{strings,functions,libfuncs}.tsv et
 original/teleportaschtroumpf/DATA/DESCRIPT.ION, puis remplace le contenu des blocs
   <!-- GEN:stats --> ... <!-- /GEN:stats -->
   <!-- GEN:scenes --> ... <!-- /GEN:scenes -->
-(le reste du document est écrit à la main et n'est pas touché). Bibliothèque standard seulement.
+(le reste du document est écrit à la main et n'est pas touché). Bibliothèque standard seulement (briques communes : scripts/re/make_index_lib.py).
 """
 import os
 import re
-import shutil
-import subprocess
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "re"))
+import make_index_lib as lib  # noqa: E402  (outillage commun : scripts/re/)
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
 OUT = os.path.join(ROOT, "archives/teleportaschtroumpf/re")
@@ -23,41 +24,13 @@ MAX_FILES = 10      # fichiers/motifs listés par fonction
 MAX_OTHERS = 30     # autres fonctions du module listées
 
 
-def tsv(name):
-    rows = []
-    with open(os.path.join(OUT, name), encoding="utf-8") as f:
-        for line in f:
-            if line.startswith("#") or not line.strip():
-                continue
-            rows.append(line.rstrip("\n").split("\t"))
-    return rows
-
-
-def unesc(s):
-    return s.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r").replace("\\\\", "\\")
-
-
-def md_cell(s):
-    return s.replace("|", "\\|").replace("`", "'")
-
-
 # --- données --------------------------------------------------------------------------------------
-functions = {}
-for r in tsv("functions.tsv"):
-    functions[r[0]] = {"name": r[1], "kind": r[2], "size": int(r[3]), "ins": int(r[4]),
-                       "status": r[7], "file": r[8]}
-strings = []
-for r in tsv("strings.tsv"):
-    refs = []
-    if len(r) > 3 and r[3]:
-        for x in r[3].split(";"):
-            fa, kind = x.split("/")
-            refs.append((fa, kind))
-    strings.append({"addr": r[0], "len": int(r[1]), "text": unesc(r[2]), "refs": refs})
-libs = tsv("libfuncs.tsv")
+functions = lib.load_functions(OUT)
+strings = lib.load_strings(OUT)
+libs = lib.tsv(OUT, "libfuncs.tsv")
 entries = {}  # scène -> fonction principale (dispatcher du plateau 1a3c:002a)
 if os.path.exists(os.path.join(OUT, "scene_entries.tsv")):
-    for r in tsv("scene_entries.tsv"):
+    for r in lib.tsv(OUT, "scene_entries.tsv"):
         if r[2] != "-":
             entries[int(r[0])] = r[2]
 
@@ -127,7 +100,7 @@ def render_scenes():
             extra = " (+%d)" % (len(names) - MAX_FILES) if len(names) > MAX_FILES else ""
             nm = "" if f["name"].startswith("FUN_") else " %s" % f["name"]
             out.append("| `%s`%s | %d | %s | %s%s |" % (
-                fa, nm, f["size"], f["status"], md_cell(", ".join(shown)), extra))
+                fa, nm, f["size"], f["status"], lib.md_cell(", ".join(shown)), extra))
         shared = sorted({n for s in segs for n in seg_scenes[s]} - {num})
         if shared:
             out.append("\nSegment partagé avec %s%s : module commun à plusieurs scènes, la liste ci-dessus est plus "
@@ -148,74 +121,10 @@ def render_scenes():
     return "\n".join(head + out)
 
 
-def tool_versions():
-    ghidra = jdk = "?"
-    try:
-        b = shutil.which("brew")
-        if b:
-            ghidra = subprocess.run([b, "list", "--versions", "ghidra"], capture_output=True, text=True).stdout.strip() or "?"
-    except Exception:
-        pass
-    java = os.path.join(os.environ.get("JAVA_HOME", ""), "bin", "java")
-    try:
-        if os.path.exists(java):
-            jdk = subprocess.run([java, "-version"], capture_output=True, text=True).stderr.splitlines()[0]
-    except Exception:
-        pass
-    return ghidra, jdk
-
-
-def render_stats():
-    n = len(functions)
-    status = Counter(f["status"] for f in functions.values())
-    kinds = Counter(f["kind"] for f in functions.values())
-    sizes = sum(f["size"] for f in functions.values())
-    with open(EXE, "rb") as f:
-        raw = f.read()
-    hdr = int.from_bytes(raw[8:10], "little") * 16
-    dg = int(strings[0]["addr"].split(":")[0], 16) if strings else 0
-    code_bytes = dg * 16 - 0x10000
-    referenced = sum(1 for s in strings if s["refs"])
-    kinds_refs = Counter(k for s in strings for _, k in s["refs"])
-    named = [r for r in libs if r[4] == "certain"]
-    probable = [r for r in libs if r[4] != "certain"]
-    ghidra, jdk = tool_versions()
-    dur = os.environ.get("RE_DURATION_S", "?")
-    ok = status.get("ok", 0)
-    L = []
-    L.append("- Outils : %s ; JDK : %s." % (ghidra, jdk))
-    L.append("- Durée de la dernière régénération : %s s." % dur)
-    L.append("- Fonctions : %d (code Ghidra), %d octets (%.1f %% des %d octets de code avant DGROUP)." % (
-        n, sizes, 100.0 * sizes / code_bytes if code_bytes else 0, code_bytes))
-    L.append("- Types : %s." % ", ".join("%s %d" % (k, v) for k, v in sorted(kinds.items())))
-    L.append("- Décompilation : %d ok (%.1f %%), %d partielle (code illisible pour Ghidra par endroits), %d en erreur." % (
-        ok, 100.0 * ok / n if n else 0, status.get("partielle", 0), status.get("erreur", 0) + status.get("timeout", 0)))
-    L.append("- Fonctions de bibliothèque nommées avec certitude : %d (+ %d probable, non renommée). "
-             "%d fonctions du segment `1000` restent du code Borland non identifié (type `rtl`)." % (
-                 len(named), len(probable), kinds.get("rtl", 0)))
-    L.append("- Chaînes dans DGROUP : %d ; référencées par au moins une fonction : %d. "
-             "Références heuristiques par type : %s." % (len(strings), referenced, ", ".join("%s %d" % (k, v) for k, v in sorted(kinds_refs.items()))))
-    bad = sorted(fa for fa, f in functions.items() if f["status"] in ("erreur", "timeout"))
-    part = sorted((fa for fa, f in functions.items() if f["status"] == "partielle"), key=lambda a: -functions[a]["size"])
-    if bad:
-        L.append("- Décompilation en erreur (utiliser `disasm.txt`) : %s." % ", ".join("`%s`" % a for a in bad))
-    if part:
-        L.append("- Décompilation partielle : %s." % ", ".join("`%s`" % a for a in part))
-    L.append("- Image : %d octets, en-tête %d octets, DGROUP = segment `%04x`." % (len(raw), hdr, dg))
-    return "\n".join(L)
-
-
-def replace_block(text, name, body):
-    pat = re.compile(r"(<!-- GEN:%s -->\n).*?(\n<!-- /GEN:%s -->)" % (name, name), re.S)
-    if not pat.search(text):
-        raise SystemExit("bloc <!-- GEN:%s --> absent de %s" % (name, DOC))
-    return pat.sub(lambda m: m.group(1) + body + m.group(2), text)
-
-
 with open(DOC, encoding="utf-8") as f:
     doc = f.read()
-doc = replace_block(doc, "stats", render_stats())
-doc = replace_block(doc, "scenes", render_scenes())
+doc = lib.replace_block(doc, "stats", lib.render_stats(functions, strings, libs, EXE, rtl_seg="1000", rtl_label="Borland"), DOC)
+doc = lib.replace_block(doc, "scenes", render_scenes(), DOC)
 with open(DOC, "w", encoding="utf-8") as f:
     f.write(doc)
 print("[re] %s mis à jour" % os.path.relpath(DOC, ROOT))

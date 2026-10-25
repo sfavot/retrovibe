@@ -112,4 +112,4 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 bash scripts/teleportaschtroumpf-extract.sh [archive.rar]
 ```
 
-Archive par défaut : `archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar` (non versionnée). Outils requis : `bsdtar`, `7zz`, `python3` ; pour la notice, `textutil` et Google Chrome (macOS).
+Archive par défaut : `archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar` (non versionnée). Outils requis : `bsdtar`, `python3` ; pour la notice, `textutil` et Google Chrome (macOS).

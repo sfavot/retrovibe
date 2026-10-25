@@ -8,7 +8,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { deflateSync } from "node:zlib";
 import {
   MohawkArchive,
   TAG_SHAP,
@@ -29,6 +28,7 @@ import {
   type ScrScript,
 } from "../../src/games/mathemagique/data/scr";
 import { TAG_SCR, TAG_SNDL } from "../../src/games/mathemagique/data/mohawk";
+import { encodePng } from "../lib/png.mjs";
 
 const original = resolve(import.meta.dirname, "../../original/mathemagique");
 const args = process.argv.slice(2);
@@ -71,45 +71,6 @@ const pvgSamples = [
   { name: "pvg-tbmp0-bright", bitmap: 0, palette: 1, adjust: true },
 ];
 
-function crc32(buf: Uint8Array): number {
-  let c = ~0;
-  for (const b of buf) {
-    c ^= b;
-    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
-  }
-  return ~c >>> 0;
-}
-
-function chunk(type: string, body: Buffer): Buffer {
-  const buf = Buffer.alloc(12 + body.length);
-  buf.writeUInt32BE(body.length, 0);
-  buf.write(type, 4, "latin1");
-  body.copy(buf, 8);
-  buf.writeUInt32BE(crc32(buf.subarray(4, 8 + body.length)), 8 + body.length);
-  return buf;
-}
-
-function encodePng(width: number, height: number, rgb: Uint8Array): Buffer {
-  const raw = Buffer.alloc((width * 3 + 1) * height);
-  for (let y = 0; y < height; y++) {
-    raw.set(
-      rgb.subarray(y * width * 3, (y + 1) * width * 3),
-      y * (width * 3 + 1) + 1,
-    );
-  }
-  const head = Buffer.alloc(13);
-  head.writeUInt32BE(width, 0);
-  head.writeUInt32BE(height, 4);
-  head[8] = 8;
-  head[9] = 2; // RGB
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk("IHDR", head),
-    chunk("IDAT", deflateSync(raw, { level: 9 })),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
-}
-
 function render(name: string, shape: Shape, palette: Palette): void {
   const rgb = new Uint8Array(shape.width * shape.height * 3);
   for (let i = 0; i < shape.pixels.length; i++) {
@@ -124,7 +85,7 @@ function render(name: string, shape: Shape, palette: Palette): void {
     );
   }
   const path = resolve(outDir, `${name}.png`);
-  writeFileSync(path, encodePng(shape.width, shape.height, rgb));
+  writeFileSync(path, encodePng(shape.width, shape.height, { rgb }));
   console.log(`${path} (${shape.width}x${shape.height})`);
 }
 
@@ -245,7 +206,7 @@ function renderScr(file: string, scrId: number): void {
   });
   const name = `scr-${file.replace(/\.DAT$/i, "").toLowerCase()}-${scrId}`;
   const path = resolve(outDir, `${name}.png`);
-  writeFileSync(path, encodePng(stripW, h, rgb));
+  writeFileSync(path, encodePng(stripW, h, { rgb }));
   console.log(
     `${path} (${picked.length}/${count} images, ${script.duration} ticks, ${w}x${h} par image)`,
   );

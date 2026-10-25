@@ -78,7 +78,7 @@ public class ExportImports extends GhidraScript {
                     for (Reference r : currentProgram.getReferenceManager().getReferencesTo(ta)) {
                         refs++;
                         Function f = currentProgram.getFunctionManager().getFunctionContaining(r.getFromAddress());
-                        callers.add(f != null ? ReCommon.addr(f.getEntryPoint()) : ReCommon.addr(r.getFromAddress()) + "(hors fonction)");
+                        callers.add(f != null ? ReCommon.addr(currentProgram, f.getEntryPoint()) : ReCommon.addr(currentProgram, r.getFromAddress()) + "(hors fonction)");
                     }
                 }
                 total++;
@@ -88,7 +88,7 @@ public class ExportImports extends GhidraScript {
                   .append(callers.size()).append('\t').append(String.join(",", callers)).append('\n');
             }
         }
-        ReCommon.write(new File(ReCommon.outDir(currentProgram), "imports.tsv"), sb.toString());
+        ReCommon.write(new File(ReCommon.outDir(), "imports.tsv"), sb.toString());
         println("[re] imports : " + total + " ; nommés : " + named + " (dont via DLL : " + fromDll + ") ; références : " + calls);
     }
 }

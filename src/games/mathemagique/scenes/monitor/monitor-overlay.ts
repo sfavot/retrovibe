@@ -29,7 +29,7 @@ import { drawText, measureText } from "../../engine/graphics/text";
 import type { Host } from "../../engine/host";
 import type { KeyEvent } from "../../engine/input";
 import { NoRepeatPool } from "../../engine/rng";
-import { MAX_PLAYERS, canAppendNameChar, type PlayerInfo } from "../../engine/roster";
+import { MAX_PLAYERS, canAppendNameChar, formatPlayerName, type PlayerInfo } from "../../engine/roster";
 import type { AnimationHandle } from "../../engine/scr-player";
 import { SCR_FLAG } from "../../engine/scr-player";
 import type { SceneContext } from "../../engine/scene";
@@ -171,7 +171,7 @@ const VIEW_RECORDS: Record<View, readonly number[]> = {
   prefs: [R.ok, R.roster, R.ambient, R.click, R.timer],
   trivia: [R.ok, R.screen, R.polyHead, R.polyBody],
 };
-/** Pendant la saisie d'un nom : plus de liste ni de flèches ; New Player / Add valident et enchaînent. */
+/** Pendant la saisie d'un nom : plus de liste ni de flèches ; New Player / Add valident le nom et ramènent la liste. */
 const EDITING_RECORDS: Record<"list" | "edit", readonly number[]> = {
   list: [R.ok, R.newPlayer],
   edit: [R.ok, R.prefs, R.add],
@@ -576,20 +576,22 @@ export class MonitorOverlay {
     this.textInput.focus();
   }
 
-  /** New Player / Add : commence la saisie d'un nom ; pendant une saisie, valide le nom puis en commence un autre. */
+  /**
+   * New Player / Add : commence la saisie d'un nom ; pendant une saisie, valide le nom et ramène la liste, le nouveau joueur sélectionné.
+   * Enchaîner sur une saisie vide ferait disparaître le nom tapé sans montrer le joueur créé (la liste est masquée pendant la saisie).
+   */
   private pressNew(): void {
     this.play(SND_CLICK);
     if (this.editing) {
-      const outcome = this.commitName();
-      if (outcome === "refused") return;
-      if (outcome === "none") return;
+      this.commitName();
+      return;
     }
     this.beginEditing();
   }
 
   /**
    * Valide le nom saisi (`1c31`). `created` : joueur créé et sélectionné ; `none` : nom vide, la saisie s'arrête ; `refused` : doublon,
-   * le joueur n'est pas créé, le nom reste à corriger.
+   * le joueur n'est pas créé ; ailleurs que dans le hub, le nom reste à corriger, dans le hub la liste revient (`showExisting`).
    */
   private commitName(): "created" | "none" | "refused" {
     const result = this.ctx.roster.roster.addPlayer(this.buffer, MONITOR_NAME_RULES);
@@ -605,6 +607,8 @@ export class MonitorOverlay {
     }
     if (result.reason === "duplicate") {
       this.reportDuplicate();
+      // Dans le hub, Poly demande de cliquer sur son nom dans la liste : la saisie s'arrête pour la montrer, ce nom en vue.
+      if (this.hub) this.showExisting(this.buffer);
       return "refused";
     }
     if (result.reason === "full") this.reportFull();
@@ -612,6 +616,16 @@ export class MonitorOverlay {
     this.buffer = "";
     this.textInput.blur();
     return "none";
+  }
+
+  /** Arrête la saisie et fait défiler la liste jusqu'au joueur qui porte déjà ce nom (sans le sélectionner : c'est au joueur de cliquer). */
+  private showExisting(raw: string): void {
+    const name = formatPlayerName(raw, MONITOR_NAME_RULES);
+    const existing = this.list().find((player) => player.name === name);
+    this.editing = false;
+    this.buffer = "";
+    this.textInput.blur();
+    if (existing) this.ensureVisible(existing.id);
   }
 
   private fitsWidth = (text: string): boolean => measureText(this.font, text) < NAME_MAX_WIDTH;

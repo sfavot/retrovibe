@@ -469,6 +469,23 @@ export class GadgetManager {
     for (const group of this.groups) for (const record of group.records) record.drawn = null;
   }
 
+  /**
+   * Pose l'état courant de chaque enregistrement sur `surface`, sans rien mémoriser (ni état dessiné, ni fond sauvé) : pour un fond
+   * qu'une animation recopie avant chaque image, où les boutons doivent rester visibles.
+   */
+  paint(surface: Surface): void {
+    for (const group of this.groups) {
+      for (const record of group.records) {
+        if (!record.shapes) continue;
+        const visual = this.visualOf(record);
+        if (visual === "hidden") continue;
+        const placed = this.placementFor(record, visual);
+        const shape = placed && this.shapeSource?.(placed.id);
+        if (placed && shape) drawShape(surface, shape, placed.x, placed.y, 8);
+      }
+    }
+  }
+
   /** Redessine les enregistrements dont l'état a changé. Renvoie vrai si la surface a changé (la scène demande une présentation). */
   draw(surface: Surface): boolean {
     let changed = false;

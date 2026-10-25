@@ -290,6 +290,20 @@ describe.runIf(hasOriginalFiles)("MonitorOverlay (MAINSCRN.DAT réel)", () => {
     expect(t.stored().players().map((p) => p.name)).toEqual(["Alice", "Zoé Çt"]);
   });
 
+  it("roster vide : le nom tapé puis New Player crée le joueur, le sélectionne et ramène la liste (pas de nouvelle saisie vide)", async () => {
+    const t = await boot();
+    await t.open("signin");
+    await t.type("suz");
+    await t.click(AT.newPlayer);
+    expect(t.roster().roster.players().map((p) => p.name)).toEqual(["Suz"]);
+    expect(t.roster().currentPlayer?.name).toBe("Suz");
+    expect(t.scene.overlay.typedName).toBeNull();
+    expect(t.textInput.focused).toBe(false);
+    // Un nouveau clic commence bien la saisie d'un autre joueur.
+    await t.click(AT.newPlayer);
+    expect(t.scene.overlay.typedName).toBe("");
+  });
+
   it("refuse les caractères hors règles (ponctuation, lettres sans glyphe, 1er caractère non alphanumérique)", async () => {
     const t = await boot({ players: ["Alice"] });
     await t.open("signin");
@@ -331,6 +345,9 @@ describe.runIf(hasOriginalFiles)("MonitorOverlay (MAINSCRN.DAT réel)", () => {
     await t.type("alice");
     await t.press("Enter");
     expect(t.roster().roster.playerCount).toBe(1);
+    // Poly demande de cliquer sur son nom dans la liste : la saisie s'arrête pour la montrer, sans changer de joueur.
+    expect(t.scene.overlay.typedName).toBeNull();
+    expect(t.scene.overlay.isOpen).toBe(true);
     await runUntil(t.engine, t.host, () => started.length >= 3, 120_000);
     expect(started.slice(0, 3)).toEqual([8500, 8600, 8700]);
   });

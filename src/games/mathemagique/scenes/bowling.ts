@@ -115,6 +115,9 @@ const SOUND_WAIT_MAX_TICKS = 600;
 const LIGHTS_PERIOD = 8;
 const GUS_PRELUDE = 18000;
 const GUS_EPILOGUE = 18050;
+/** Zone des yeux de Gus (`SHPL 980`, formes de 25×20). */
+const EYE_RECT = { x: EYE_AT.x, y: EYE_AT.y, w: 25, h: 20 } as const;
+
 /** Entrée de Gus (`SCR 18100`, descripteur `1108:04f8`, `1010:0000`) : marche et salut, rejoués au premier affichage de la scène. */
 const GUS_ENTRY = 18100;
 /**
@@ -186,6 +189,8 @@ export class BowlingScene implements Scene {
   private answers!: GadgetGroup;
   private readonly base = new Surface();
   private readonly canvas = new Surface();
+  /** Fond des animations : `canvas` et les boutons (`animationBackground`). */
+  private readonly animationCanvas = new Surface();
 
   private progress = BowlingProgress.empty();
   private picker!: QuestionPicker;
@@ -203,6 +208,8 @@ export class BowlingScene implements Scene {
   private eye = EYE_OPEN;
   private eyeAt = 0;
   private gusBusy = false;
+  /** Gus au repos est dans le décor (`buildBase`) : ses yeux ne se dessinent et ne clignent que dans ce cas. */
+  private gusAtRest = false;
   /** Vrai si la scène est rouverte depuis le Hall of Fame (`1108:4dfc`) : Gus est déjà là, pas d'entrée animée. */
   private fromTrophy = false;
   private cycle: PaletteCycler | null = null;
@@ -425,6 +432,7 @@ export class BowlingScene implements Scene {
 
   private buildBase(withGus: boolean): void {
     this.base.pixels.set(this.shape(SHAP.background).pixels);
+    this.gusAtRest = withGus;
     if (withGus) this.drawGus();
     drawShape(this.base, this.shape(SHAP.label), LABEL_AT.x, LABEL_AT.y, 8);
     for (let k = 0; k < 4; k++) drawShape(this.base, this.shape(SHAP.level + 2 * k), LEVEL_SHAPES[k]!.normal[0], LEVEL_SHAPES[k]!.normal[1], 8);
@@ -433,6 +441,16 @@ export class BowlingScene implements Scene {
 
   private drawGus(): void {
     drawShape(this.base, this.shape(SHAP.gus), GUS_ZONE.x, GUS_ZONE.y, 8);
+  }
+
+  /**
+   * Gus au repos dans le décor (`base`, donc `canvas`) ou non. Ses animations (prélude, strike, épilogue, réactions) recopient `canvas`
+   * avant chaque image et y dessinent Gus en entier : le Gus au repos doit en être retiré pendant qu'elles jouent, sinon il reste
+   * derrière celui qui lance. N'agit pas sur l'écran : l'animation, puis `repaintAll`, le mettent à jour.
+   */
+  private setGusAtRest(atRest: boolean): void {
+    this.buildBase(atRest);
+    this.composeAll();
   }
 
   /** Entrée de Gus (`1010:0000`, après le fondu) : `SCR 18100`, puis Gus au repos dans le décor. */
@@ -444,8 +462,7 @@ export class BowlingScene implements Scene {
       }),
       this.play(this.archive, GUS_ENTRY, GUS_ENTRY_FLAGS, true),
       this.call(() => {
-        this.drawGus();
-        this.composeAll();
+        this.setGusAtRest(true);
         this.gusBusy = false;
         this.repaintAll();
         this.eyeAt = this.ctx.clock.ticks + 120 + this.ctx.rng.rand(180);
@@ -467,8 +484,15 @@ export class BowlingScene implements Scene {
     this.drawEye();
   }
 
+  /**
+   * Yeux de Gus (`SHPL 980`) sur sa tête au repos : la tête est d'abord reprise du décor (la paupière déborde des yeux ouverts), puis
+   * les yeux posés en transparence (le fond noir de leur forme ferait un carré). Sans Gus dans le décor (avant son entrée, pendant ses
+   * animations), rien n'est dessiné.
+   */
   private drawEye(): void {
-    drawShape(this.canvas, this.shape(SHAP.eyes + this.eye - 1), EYE_AT.x, EYE_AT.y, 0);
+    if (!this.gusAtRest) return;
+    copyRect(this.canvas, this.base, EYE_RECT);
+    drawShape(this.canvas, this.shape(SHAP.eyes + this.eye - 1), EYE_AT.x, EYE_AT.y, 8);
   }
 
   private drawQuestion(): void {
@@ -616,13 +640,24 @@ export class BowlingScene implements Scene {
         handle = this.services.scr.start(archive, id, {
           flags,
           // Les descripteurs d'animation du Bowling ont `+8 = *4cac` (`1010:0dc5`) : fond propre recopié avant chaque image.
-          background: this.canvas,
+          background: this.animationBackground(),
           blocking: true,
           soundChannel: voice ? "voice" : "effect",
         });
       },
       done: () => handle === null || handle.done,
     };
+  }
+
+  /**
+   * Fond propre d'une animation : `canvas` (le décor, sans Gus au repos pendant ses animations) et les boutons dans leur état du
+   * moment. Sans les boutons, une animation qui passe dessus (Gus qui salue en partant, sur EXIT) les effacerait.
+   */
+  private animationBackground(): Surface {
+    const background = this.animationCanvas;
+    background.copyFrom(this.canvas);
+    this.services.gadgets.paint(background);
+    return background;
   }
 
   /** Joue un son et attend sa fin (plafonné). */
@@ -640,10 +675,12 @@ export class BowlingScene implements Scene {
       this.call(() => {
         this.gusBusy = true;
         this.services.pointer.cancel();
+        this.setGusAtRest(false);
       }),
       this.play(this.gus, id, GUS_FLAGS, true),
       this.call(() => {
         this.gusBusy = false;
+        this.setGusAtRest(true);
         this.repaintAll();
         this.eyeAt = this.ctx.clock.ticks + 120 + this.ctx.rng.rand(180);
       }),
@@ -824,6 +861,7 @@ export class BowlingScene implements Scene {
       this.call(() => {
         this.gusBusy = true;
         palette.loadShpl(this.archive.shpl(scrId));
+        this.setGusAtRest(false);
       }),
       ...this.lightsSteps(SOUND.fanfare, [{ shape: 1, x: 128, y: 62 }], cream),
       this.play(this.archive, GUS_PRELUDE, GUS_FLAGS, true),
@@ -833,6 +871,7 @@ export class BowlingScene implements Scene {
         palette.restore(saved, MAIN_PALETTE_FIRST);
         this.gusBusy = false;
         void sound.playSound(this.archive, SOUND.afterStrike);
+        this.setGusAtRest(true);
         drawPegs(this.canvas, this.base, this.archive, result.strikes);
         this.repaintAll();
       }),
@@ -957,11 +996,11 @@ export class BowlingScene implements Scene {
   // --- Yeux de Gus ---
 
   private tickEye(): void {
-    if (this.gusBusy || this.ctx.clock.ticks < this.eyeAt) return;
+    if (this.gusBusy || !this.gusAtRest || this.ctx.clock.ticks < this.eyeAt) return;
     this.eye ^= 3;
     this.eyeAt = this.ctx.clock.ticks + (this.eye === 1 ? EYE_BLINK_TICKS : 120 + this.ctx.rng.rand(180));
     this.drawEye();
-    this.blit({ x: EYE_AT.x, y: EYE_AT.y, w: 25, h: 20 });
+    this.blit(EYE_RECT);
   }
 
   // --- Nom (moniteur de connexion) ---

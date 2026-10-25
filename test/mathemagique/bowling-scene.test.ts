@@ -7,6 +7,8 @@ import type { PlaySoundOptions } from "../../src/games/mathemagique/engine/sound
 import { STRIKE_SCRIPTS, STRIKE_WITHOUT_EPILOGUE, strikeScriptId } from "../../src/games/mathemagique/game/bowling";
 import { BowlingScene, createBowlingScene, gusExitId, gusReactionId, helpZoneAt } from "../../src/games/mathemagique/scenes/bowling";
 import { registerScenes } from "../../src/games/mathemagique/scenes";
+import type { Surface } from "../../src/games/mathemagique/engine/graphics/surface";
+import { EXIT_RECT, GUS_ZONE } from "../../src/games/mathemagique/scenes/bowling-view";
 import { FRAME_MS, TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 
@@ -65,6 +67,30 @@ interface Rig {
 }
 
 const GO: [number, number] = [463, 130];
+
+/** Pixels de la zone de Gus (`GUS_ZONE`) d'une surface. */
+function gusZone(surface: Surface): Uint8Array {
+  const { x, y, w, h } = GUS_ZONE;
+  const out = new Uint8Array(w * h);
+  for (let row = 0; row < h; row++) out.set(surface.pixels.subarray((y + row) * surface.width + x, (y + row) * surface.width + x + w), row * w);
+  return out;
+}
+
+/** Pixels d'un rectangle d'une surface. */
+function rectBytes(surface: Surface, rect: { x: number; y: number; w: number; h: number }): number[] {
+  const out: number[] = [];
+  for (let row = 0; row < rect.h; row++) out.push(...surface.pixels.subarray((rect.y + row) * surface.width + rect.x, (rect.y + row) * surface.width + rect.x + rect.w));
+  return out;
+}
+
+/** Nombre de pixels qui diffèrent : Gus entier en change des milliers, l'œil qui cligne quelques dizaines. */
+function diffCount(a: Uint8Array, b: Uint8Array): number {
+  let n = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++;
+  return n;
+}
+
+const GUS_PIXELS = 2000;
 
 async function boot(options: { seconds?: number; player?: boolean; real?: boolean } = {}): Promise<Rig> {
   const host = new TestHost();
@@ -157,6 +183,29 @@ real("Bowling : scène complète sur BOWLING.DAT", () => {
     const reaction = [...rig.scrFlags].filter(([id]) => (id >= 30000 && id < 32000) || (id >= 24950 && id < 26000));
     expect(reaction.length).toBeGreaterThan(0);
     for (const [, flags] of reaction) expect(flags).toBe(0x12);
+  });
+
+  it("strike et réactions : le Gus au repos est retiré du fond pendant l'animation (pas de second Gus derrière), puis remis", async () => {
+    const rig = await boot();
+    const { scene, services } = rig;
+    // Zone de Gus du fond passé à chaque animation, copiée au démarrage (le fond est le `canvas` de la scène, modifié ensuite).
+    const zones = new Map<number, Uint8Array>();
+    const start = services.scr.start.bind(services.scr);
+    services.scr.start = (archive, id, opts) => {
+      if (opts?.background) zones.set(id, gusZone(opts.background));
+      return start(archive, id, opts);
+    };
+    // Après l'entrée, Gus au repos est dans le décor.
+    const atRest = gusZone((scene as unknown as { canvas: Surface }).canvas);
+    await rig.click(...GO);
+    for (let i = 0; i < 10; i++) await rig.answerRight();
+    const strikeId = strikeScriptId(scene.lastStrike!.animation);
+    for (const id of [18000, strikeId]) {
+      expect(zones.get(id), `SCR ${id}`).toBeDefined();
+      expect(diffCount(zones.get(id)!, atRest), `SCR ${id} : Gus au repos dans le fond`).toBeGreaterThan(GUS_PIXELS);
+    }
+    // Strike fini : Gus revient au repos.
+    expect(diffCount(gusZone((scene as unknown as { canvas: Surface }).canvas), atRest)).toBeLessThan(GUS_PIXELS);
   });
 
   it("choix de l'opération (×) et du niveau (2) ; le bonus est refusé tant que les 4 niveaux ne sont pas faits", async () => {
@@ -326,6 +375,25 @@ real("Bowling : scène complète sur BOWLING.DAT", () => {
     await rig.click(86, 246);
     await rig.until(() => engine.scenes.currentId === SceneId.hub);
     expect(scene.played.some((id) => id >= 22000 && id <= 23400)).toBe(true);
+  });
+
+  it("sortie : pendant l'au revoir de Gus, le bouton EXIT reste dans le fond de l'animation (pas effacé)", async () => {
+    const rig = await boot();
+    const { services, engine } = rig;
+    // Partie d'EXIT hors de la zone de Gus (le Gus au repos, retiré du fond, passe sous le reste du bouton).
+    const exitPart = { x: EXIT_RECT.x, y: EXIT_RECT.y, w: GUS_ZONE.x - EXIT_RECT.x, h: EXIT_RECT.h };
+    let compared = false;
+    const start = services.scr.start.bind(services.scr);
+    services.scr.start = (archive, id, opts) => {
+      if (id >= 22000 && id <= 23400 && opts?.background) {
+        expect(rectBytes(opts.background, exitPart)).toEqual(rectBytes(services.graphics.screen, exitPart));
+        compared = true;
+      }
+      return start(archive, id, opts);
+    };
+    await rig.click(86, 246);
+    await rig.until(() => engine.scenes.currentId === SceneId.hub);
+    expect(compared).toBe(true);
   });
 
   it("trophée : Hall of Fame, puis retour au Bowling", async () => {

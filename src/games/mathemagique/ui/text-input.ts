@@ -57,6 +57,17 @@ export function createBrowserTextInput(host: TextInputHost): BrowserTextInput {
   host.canvas.addEventListener("pointerup", () => {
     if (wanted) element.focus({ preventScroll: true });
   });
+  // iOS : après `touchend`, Safari rejoue l'appui en clic souris, qui rend le focus au canvas et referme aussitôt le clavier. Pendant
+  // la saisie, ce clic est annulé (le jeu ne s'en sert pas : il lit les `pointer*`) et le champ reprend le focus, `touchend` étant un geste.
+  host.canvas.addEventListener(
+    "touchend",
+    (event) => {
+      if (!wanted) return;
+      event.preventDefault();
+      element.focus({ preventScroll: true });
+    },
+    { passive: false },
+  );
 
   return {
     element,

@@ -182,7 +182,7 @@ export function stele(kit: NpcKit): BehaviorHandler {
 const ROOM_STELE_OUTSIDE = 5;
 
 /** Générateur de la dalle et de la herse de granite : même ossature, axe Y, `Tim` tics (posé par le verbe ou l'événement). */
-function verticalSlider(kit: NpcKit, flag: number, award: readonly [number, number]): BehaviorHandler {
+function verticalSlider(kit: NpcKit, flag: number, award: readonly [number, number], placeMode = 0xff): BehaviorHandler {
   return (obj, ctx) => {
     let ego = obj.ego;
     if (ego === 0 || ego === 3) {
@@ -201,7 +201,9 @@ function verticalSlider(kit: NpcKit, flag: number, award: readonly [number, numb
     obj.tim = Math.max(0, obj.tim - 1);
     if (obj.tim !== 0) return UPDATE_OK;
     ctx.score.award(award[0], award[1]);
-    kit.setEgo(ctx, obj, ego, 0);
+    // dalle : `1a37:003a` (mode déduit de la présence) ; herse : `1a37:007f(2, 1, 0, 0)` (mode 2, aucune recherche de position : la
+    // herse relevée reste en haut au lieu d'être reposée sur le sol)
+    kit.setState(ctx, obj, placeMode === 2 ? { ego, fig: 0, dep: 1, txt: 0 } : { ego, fig: 0 }, placeMode);
     ctx.rooms.refreshPlanes(); // `147f:000a`
     cancelRoomPaths(kit, ctx);
     // lacune (characters.md § 10.2) : `147f:0352`, messages `S` et script `CM3` (voir `finishPassage`).
@@ -214,7 +216,7 @@ function verticalSlider(kit: NpcKit, flag: number, award: readonly [number, numb
 export const slab = (kit: NpcKit): BehaviorHandler => verticalSlider(kit, SECRET_FLAG.slab, [1, 6]);
 
 /** `29fd:0000` (`Num 207`) : la herse de granite des salles 202 et 305 (même mouvement, `Tim = 0x22`). */
-export const portcullis = (kit: NpcKit): BehaviorHandler => verticalSlider(kit, SECRET_FLAG.portcullis, [2, 2]);
+export const portcullis = (kit: NpcKit): BehaviorHandler => verticalSlider(kit, SECRET_FLAG.portcullis, [2, 2], 2);
 
 /** Pas (unités d'X) et durée de la grille du cachot : 9 images, 2 pixels par image (`2846:000a`). */
 const GRILLE_STEPS = 9;

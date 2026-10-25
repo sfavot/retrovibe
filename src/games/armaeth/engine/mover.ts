@@ -357,9 +357,10 @@ export function moveObject(body: MoverBody, env: MoverEnv): MoveResult {
         body.speedY = 1;
         if (body.speedX !== 0 || body.speedP !== 0) env.animate?.(body, 7);
       }
+      // `179d:05ba` : après un placement réussi la chute passe directement au contrôle des bords (`179d:07b8`) : ni contact
+      // (`1a50:0006`) ni collision de terrain (`1c96:0102`), la position écrite par `gm_object_behavior_main` fait foi
       ground = body.ground;
       plane = body.plane;
-      ok = apply(body.x, body.y, body.p, plane);
       break;
     }
     default:

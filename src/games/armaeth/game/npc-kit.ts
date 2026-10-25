@@ -59,7 +59,7 @@ export function createAnimations(resources: (ctx: BehaviorContext) => AnimationR
         mob: p.mob ?? 1,
         ego: p.ego ?? obj.ego,
         hor: p.hor ?? 0,
-        ver: p.ver ?? 0,
+        ver: p.ver ?? 1, // `16f5:0132` : `Ver = 1` à tous les appels sauf le premier du roi (`2caf:000e`) ; sans lui l'animation ne passe pas à l'image suivante
         prf: p.prf ?? 0,
         partner: p.partner ?? null,
         audible: obj.room !== null && obj.room === ctx.room,

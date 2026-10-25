@@ -176,7 +176,8 @@ describe.skipIf(!hasOriginalFiles)("accessibilité à pied des objets et des sor
       const engine = internals(p.engine);
       // les autres mobiles (nains, ours, pie...) quittent la salle : ils coupent la marche du héros (face-à-face, contact) et ce
       // test ne porte que sur la géométrie des trajets
-      for (const obj of [...room.listA]) if (obj.mob === 2 && obj !== hero0) p.state.moveToRoom(obj, p.state.rooms[0]!);
+      // (les nains, qui peuvent être en plein duel à l'arrivée du héros, partent aussi : un duel prend le héros, `Ego 6`)
+      for (const obj of [...room.listA]) if ((obj.mob === 2 || (obj.num >= 201 && obj.num <= 204) || obj.num === 301) && obj !== hero0) p.state.moveToRoom(obj, p.state.rooms[0]!);
       normalizeHero(p, hero0);
       p.engine.snapshot("save");
       const start = { x: hero0.x, y: hero0.y, p: hero0.p, plane: hero0.plane };

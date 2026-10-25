@@ -9,6 +9,7 @@ import {
 import { EventOp, type EventTarget } from "../engine/events";
 import { type BehaviorContext, type BehaviorHandler, type EventHandler, FAMILY, type HandlerRegistry } from "../engine/handlers";
 import { FOLLOW_WALKING } from "../engine/paths";
+import { SEARCH_FREE } from "../engine/placement";
 import { type GameObject, type GameRoom, type WorldState, rawU16, rawU8, setRawU16, setRawU8 } from "../engine/state";
 import { EngineAbort, UPDATE_OK } from "../engine/update";
 
@@ -460,9 +461,14 @@ function enterFall(h: H, fig: number, message?: number | [string, number]): numb
   o.p += o.stepP * sgn(o.speedP);
   o.y += 4;
   o.ground = 0;
+  // `25ea:03ca` : recherche de la position valide la plus proche (bornes P 8, Y 10 vers le bas, signe de `Prf`), puis sans bornes ;
+  // sans elle le héros, qui chevauche encore une case de sol au bord du vide, ne descendrait jamais (`Err 2` à chaque tic)
+  const sideP = sgn(o.speedP);
+  const near = { ...SEARCH_FREE, tolP: 8, signP: sideP, tolY: 10, signY: 1 };
+  const placed = (r: number) => r === 0 || r === 0x11;
+  if (!placed(h.ctx.motion.search(o, near)) && !placed(h.ctx.motion.search(o, { ...SEARCH_FREE, signP: sideP, signY: 1 }))) return enterKO(h);
   o.tim = 0;
   o.err = 0;
-  // hypothèse : la recherche de position `gm_object_behavior_main` de l'entrée est laissée au déplacement `Dep 3`
   if (message !== undefined) typeof message === "number" ? say(h, "G", message) : say(h, message[0], message[1]);
   return UPDATE_OK;
 }
@@ -507,6 +513,13 @@ function enterClimb(h: H): number {
   halt(o);
   setState(h, { mob: 2, ego: EGO.climb, dep: entry.dep, fig: entry.fig, flag: 2 });
   o.speedY = entry.v; // hypothèse : la direction verticale de la table est la valeur de `Ver`
+  // `25ea:0008` : puis placement sur les zones (le héros est en `Dep 2` ou `4`) : bornes P 8 et Y `Hau / 2` dans le sens de la table
+  // (sauf cases 40 à 43, sens 0), sinon placement libre. C'est lui qui pose le héros sur la corde ou l'échelle (zone) depuis la
+  // margelle d'un puits ; sans lui `Dep 4` ne trouve aucune zone sous les pieds et le héros « perd prise » aussitôt.
+  const placed = (r: number) => r === 0 || r === ERR.placed;
+  let r = -1;
+  if (entry.v !== 0) r = h.ctx.motion.search(o, { ...SEARCH_FREE, tolP: 8, tolY: o.height >> 1, signY: entry.v });
+  if (entry.v === 0 || !placed(r)) h.ctx.motion.search(o, SEARCH_FREE);
   return UPDATE_OK;
 }
 
@@ -940,7 +953,12 @@ export function createHeroBehavior(services: HeroServices = {}): BehaviorHandler
       case EGO.animation: {
         const id = tickAnimation(h);
         if (id !== 0) return finishAnimation(h, id);
-        if (obj.animId === 0) return enterWalk(h); // hypothèse : animation résolue par le partenaire, reprise de la marche
+        if (obj.animId === 0) {
+          // spectateur d'une animation à deux (duel d'un nain, Prytwen, Minas Thyl) : le héros reste pris (`Ego 6`) tant que le
+          // partenaire (`Bag`, +0x3A) joue encore son animation ; c'est lui qui rend la marche (`246c:0240`, `AL = 7`) ou tue le héros
+          // en fin de duel. Sans partenaire en animation, le héros reprend la marche.
+          return h.ctx.state.findBySerial(rawU16(obj, 0x3a))?.animId ? UPDATE_OK : enterWalk(h);
+        }
         return UPDATE_OK;
       }
       case EGO.brambles:

@@ -291,8 +291,9 @@ export class EngineTokenHost implements TokenHost {
 
   // --- affichage et son ---
   setLight(level: number, aux: number): void {
-    // `lum a b` : `b` absent (0xFFFF non signé) = pas de plafond.
-    this.engine.setLight(level, aux === -1 ? undefined : aux);
+    // `lum a b` : `b` absent vaut 0xFFFF et `197e:0008` compare `4ae4` en entier signé (`if (4ae4 < L) L = 4ae4`) : le plafond est -1, la
+    // lumière ne dépasse jamais d'un cran la palette normale (sans plafond, une torche dans une salle éclairée blanchit l'écran)
+    this.engine.setLight(level, aux);
   }
 
   shiftPalette(r: number, v: number, b: number): void {

@@ -346,7 +346,8 @@ const PORTCULLIS_TICKS = 0x22;
 
 /** `29fd:017a(herse, mode)` : lance le coulissement (1 monte, 2 redescend) ; la procédure `Fct` de la herse le termine. */
 function movePortcullis(ctx: HandlerContext, portcullis: GameObject, open: boolean): void {
-  setState(ctx, portcullis, { gst: 7, mob: 1, ego: open ? 1 : 2 });
+  // `29fd:017a` appelle `1a37:007f(2, 1, 0, 0)` : mode de `placer` 2 (présence seule, aucune recherche de position) et `Dep 1`
+  setState(ctx, portcullis, { gst: 7, mob: 1, ego: open ? 1 : 2, dep: 1, txt: 0, fig: 0 }, 2);
   portcullis.tim = PORTCULLIS_TICKS; // hypothèse (characters.md §10.2) : comme la dalle `27ed:01e0`
 }
 

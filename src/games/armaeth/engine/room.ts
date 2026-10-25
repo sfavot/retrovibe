@@ -157,6 +157,22 @@ export function activePlanes(state: WorldState, roomId: number, filePlanes: numb
   }
 }
 
+/**
+ * Lumière de la salle 101 (`147f:000a`, `iVar4 == 0x65`) : tant que la stèle (`2500:0650`, `Num 16` à `Ego 4`) est ouverte, la salle est
+ * un extérieur (`+4 = 7`) éclairé par le jour moins 32 (`+2 = -32`) ; fermée, elle est dans le noir (`+4 = 0`, `+2 = 0`). Rend vrai si
+ * la salle a changé (palette à recalculer, `4ae6 = 7`).
+ */
+export function applyRoomLight(state: WorldState, room: { id: number; outdoor: number; lightOffset: number }): boolean {
+  if (room.id !== 101) return false;
+  const open = state.findByNum(16)?.ego === 4;
+  const outdoor = open ? 7 : 0;
+  const offset = open ? -32 : 0;
+  const changed = room.outdoor !== outdoor || room.lightOffset !== offset;
+  room.outdoor = outdoor;
+  room.lightOffset = offset;
+  return changed;
+}
+
 /** Code d'arrêt quand la salle voulue est la salle chargée mais que le héros n'y entre pas (`abort(0x101)`). */
 export const ABORT_HERO_PLACEMENT = 0x101;
 

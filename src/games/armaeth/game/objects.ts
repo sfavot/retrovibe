@@ -312,7 +312,8 @@ function steleAction(ctx: HandlerContext, slab: GameObject): number {
     if (!held) return refuse(ctx, 1, 13);
     if (walker.ground !== GROUND.steleLever) return refuse(ctx, 4, 64);
     if (busy) return refuse(ctx, 4, 93);
-    setState(ctx, slab, { ego: STELE.opening });
+    // `2500:04f3` : `Gst 7, Mob 1, Ego 2` (sans quoi la procédure `2500:0008` ne tourne pas et la stèle ne coulisse jamais)
+    setState(ctx, slab, { gst: 7, mob: 1, ego: STELE.opening, fig: 0 });
     return done(ctx, 63, OK);
   };
 
@@ -325,7 +326,7 @@ function steleAction(ctx: HandlerContext, slab: GameObject): number {
         setState(ctx, slab, { gst: 7, mob: 1, ego: STELE.opening, fig: 0 });
         return done(ctx, 61, OK);
       }
-      setState(ctx, slab, { ego: STELE.jammed });
+      setState(ctx, slab, { gst: 0, mob: 0, ego: STELE.jammed, fig: 0 }); // `2500:0438`
       slab.x += 2;
       award(ctx, 0, 2);
       return done(ctx, 60, OK);
@@ -345,7 +346,7 @@ function steleAction(ctx: HandlerContext, slab: GameObject): number {
     if (kind === "G" && held) {
       if (!lockPosition()) return refuse(ctx, 4, 57);
       if (busy) return refuse(ctx, 4, 93);
-      setState(ctx, slab, { ego: STELE.closing });
+      setState(ctx, slab, { gst: 7, mob: 1, ego: STELE.closing, fig: 0 }); // `2500:0590`
       return done(ctx, 61, OK);
     }
     if (kind === "K") return held ? refuse(ctx, 4, 82) : refuse(ctx, 1, 13);

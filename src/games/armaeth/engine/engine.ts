@@ -73,10 +73,12 @@ import {
   type ContactResult,
   type PlaceBody,
   type PlaceEnv,
+  type SearchArgs,
   PLACE_OK,
   PLACE_TYPE_CHANGED,
   createPlacementMemory,
   placeObject,
+  searchPosition,
 } from "./placement";
 import {
   type ParsedCommand,
@@ -88,7 +90,7 @@ import {
   parseCommand,
   resolveNoun,
 } from "./parser";
-import { type ExitResult, type MusicKey, activePlanes, completeHeroTransit, enterRoom, exitRoom, loadRoom, onFirstDisplay, planRoomLoad } from "./room";
+import { type ExitResult, type MusicKey, activePlanes, applyRoomLight, completeHeroTransit, enterRoom, exitRoom, loadRoom, onFirstDisplay, planRoomLoad } from "./room";
 import { loadWorldState, serializeWorld } from "./save";
 import { ScriptRunner, type ScriptSet } from "./scripts";
 import { type GameObject, type GameRoom, WorldState, rawU8, setRawU8 } from "./state";
@@ -696,8 +698,17 @@ export class ArmaethEngine implements TokenHostEngine {
 
   /** `placer(o, mode)` (`1aba:000e`). */
   place(obj: GameObject, mode: number): number {
+    // `1aba:000e` commence par `1833:01fc` (`loadObjectSprite`) : `dpP` revient à 1 et la séquence repart du pas 1. C'est ce qui rend
+    // au héros la marche en profondeur après un KO (`26ab:0134` met `dpP` à 0) ; `1a37:007f` (changement d'état) y passe toujours.
+    loadObjectSprite(obj, this.sprites);
     if (!this.terrain) return 0;
     return placeObject(obj, mode, this.placeEnv(obj, false));
+  }
+
+  /** `gm_object_behavior_main(...)` (`1b11:000c`) : recherche de la position valide la plus proche avec les bornes `args`. */
+  search(obj: GameObject, args: SearchArgs): number {
+    if (!this.terrain) return 0;
+    return searchPosition(obj, this.placeEnv(obj, false), args);
   }
 
   pathTo(obj: GameObject, x: number, y: number, p: number, plane: number): boolean {
@@ -1379,6 +1390,7 @@ export class ArmaethEngine implements TokenHostEngine {
       motion: {
         reset: (obj) => engine.resetMotion(obj),
         place: (obj, mode) => engine.place(obj, mode),
+        search: (obj, args) => engine.search(obj, args),
         followPath: (obj) => engine.followHeroPath(obj),
         pathTo: (obj, x, y, p, plane) => engine.pathTo(obj, x, y, p, plane),
         pathEnd: (obj, result) => engine.pathEnd(obj, result),
@@ -1621,6 +1633,7 @@ export class ArmaethEngine implements TokenHostEngine {
       const loaded = loadRoom(state, scene, { sprites: this.sprites, rand: () => this.rng.next(), resetMotion: (o) => this.resetMotion(o) });
       this.scene = scene;
       this.terrain = createTerrain(scene, activePlanes(state, state.loadedRoom!.id, scene.header.planeCount));
+      if (applyRoomLight(state, state.loadedRoom!)) this.lastLevel = Number.NaN;
       this.origin = loaded.origin;
       this.compositor.setFrame(this.frameScene);
       this.compositor.drawScene(scene);
@@ -1668,6 +1681,7 @@ export class ArmaethEngine implements TokenHostEngine {
   refreshPlanes(): void {
     const room = this.state?.loadedRoom;
     if (this.state && room && this.terrain && this.scene) this.terrain.planes = Math.min(activePlanes(this.state, room.id, this.scene.header.planeCount), MAX_PLANES);
+    if (this.state && room && applyRoomLight(this.state, room)) this.lastLevel = Number.NaN;
   }
 
   /** Placement d'arrivée (`1aba:0310`) : vitesse dans le sens de la sortie, recherche contre le côté d'arrivée (mode 10). */
@@ -1939,8 +1953,10 @@ export class ArmaethEngine implements TokenHostEngine {
    * deux a `Txt != 0`, sinon 8. `mutate` : l'autre objet reçoit aussi son `Err` (déplacement), pas pendant une recherche.
    */
   private contact(body: PlaceBody, mutate: boolean): ContactResult {
-    const room = this.state?.loadedRoom;
     const self = body as unknown as GameObject;
+    // `1a50:0006` parcourt la liste du conteneur de l'objet (`+0x5C`, tête en `+0x22`), pas celle de la salle chargée : un objet
+    // d'une salle non chargée (Sarhûl, nain, ours...) ne heurte pas les objets de la salle où se trouve le héros
+    const room = self.location === 1 ? self.room : null;
     if (!room) return { err: 0, col: 0 };
     const inRoom = this.isInLoadedRoom(self);
     let result: ContactResult = { err: 0, col: 0 };

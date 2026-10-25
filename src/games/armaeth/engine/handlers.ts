@@ -4,6 +4,7 @@ import type { DeferredEvent } from "../data/world";
 import type { SpriteLibrary } from "./animation";
 import type { EventOpCode, EventTarget } from "./events";
 import { FOLLOW_WALKING } from "./paths";
+import type { SearchArgs } from "./placement";
 import type { ExitResult } from "./room";
 import type { GameObject, GameRoom, ScoreAward, WorldState } from "./state";
 import { UPDATE_OK } from "./update";
@@ -115,6 +116,8 @@ export interface HandlerMotion {
   reset(obj: GameObject): void;
   /** `placer(o, mode)` (`1aba:000e`) : `Err` de l'objet (0, 0x11 ou un échec). */
   place(obj: GameObject, mode: number): number;
+  /** `gm_object_behavior_main` (`1b11:000c`) avec des bornes explicites : `Err` de l'objet (0, 0x11 ou un échec de la recherche). */
+  search(obj: GameObject, args: SearchArgs): number;
   /** Suivi du trajet (`30d9:0006`) : `FOLLOW_*` de `paths.ts`. */
   followPath(obj: GameObject): number;
   /** Trajet vers un point de la salle chargée (`gm_compute_path`) : faux si aucun chemin. */

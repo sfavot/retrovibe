@@ -147,17 +147,18 @@ export function shellScale(metrics: ShellMetrics, logicalWidth: number, logicalH
 }
 
 /**
- * Marges du paysage tactile (hors plein écran pivoté) : les marges intérieures du conteneur en largeur ; sous l'écran, la zone sûre
- * du bas (indicateur d'accueil), et celle du haut en plein écran, où le conteneur fixé commence sous elle alors que `mainTop` vaut 0.
- * Les zones sûres se lisent sur les marges intérieures du `body`, qui les réservent.
+ * Marges du paysage tactile : les marges intérieures du conteneur en largeur ; en hauteur, ce que la fenêtre a de plus que le cadre
+ * du jeu, c'est-à-dire ses zones sûres (lues sur les marges intérieures du `body`, qui les réservent). En paysage, la zone sûre du bas
+ * (indicateur d'accueil), et celle du haut en plein écran, où le conteneur fixé commence sous elle alors que `mainTop` vaut 0. En plein
+ * écran pivoté, la hauteur disponible est la largeur de la fenêtre, dont le cadre exclut les zones sûres de gauche et de droite : le
+ * même calcul que le paysage, pour que l'écran garde sa taille quand on tourne le téléphone.
  */
-function landscapeMargins(style: CSSStyleDeclaration, fixedToViewport: boolean): { horizontal: number; bottom: number } {
+function landscapeMargins(style: CSSStyleDeclaration, fixedToViewport: boolean, rotated: boolean): { horizontal: number; bottom: number } {
   const body = getComputedStyle(document.body);
-  const safeTop = parseFloat(body.paddingTop) || 0;
-  const safeBottom = parseFloat(body.paddingBottom) || 0;
+  const safe = (side: "Top" | "Right" | "Bottom" | "Left"): number => parseFloat(body[`padding${side}`]) || 0;
   return {
     horizontal: parseFloat(style.paddingLeft) + parseFloat(style.paddingRight),
-    bottom: safeBottom + (fixedToViewport ? safeTop : 0),
+    bottom: rotated ? safe("Left") + safe("Right") : safe("Bottom") + (fixedToViewport ? safe("Top") : 0),
   };
 }
 
@@ -345,7 +346,7 @@ export function mountGameShell(options: GameShellOptions): GameShell {
             stageHeight: stage.offsetHeight,
             viewportHeight: rotated ? window.innerWidth : window.innerHeight,
             asideWidth: aside,
-            margins: aside && !rotated ? landscapeMargins(style, fixedToViewport) : undefined,
+            margins: aside ? landscapeMargins(style, fixedToViewport, rotated) : undefined,
           },
           logicalWidth,
           logicalHeight,

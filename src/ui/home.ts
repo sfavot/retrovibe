@@ -1,6 +1,7 @@
 import type { GameDefinition } from "../games/types";
 import { copy } from "./copy";
 import { h } from "./dom";
+import { currentDisplayState, shouldSuggestInstall } from "./standalone";
 
 export function renderHome(container: HTMLElement, games: readonly GameDefinition[]): void {
   container.replaceChildren(
@@ -36,6 +37,7 @@ export function renderHome(container: HTMLElement, games: readonly GameDefinitio
           ),
         ),
       ),
+      shouldSuggestInstall(navigator.userAgent, currentDisplayState()) ? h("p", { class: "home-hint" }, copy.installHintIPhone) : null,
     ),
   );
   container.querySelector<HTMLElement>(".game-card")?.focus();

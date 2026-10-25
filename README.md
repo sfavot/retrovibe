@@ -18,6 +18,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 Chaque push sur `main` lance [le workflow GitHub Actions](.github/workflows/deploy.yml) (tests, build, publication sur Pages).
 Prérequis : dans les réglages du dépôt, Pages > Source = « GitHub Actions ». Les chemins sont relatifs (`base: "./"`)
 et le routage se fait par hash, donc le site marche sous n'importe quel sous-dossier.
+Le site est installable (manifeste et icônes de `src/ui/pwa/`, icônes régénérées par `npx vite-node scripts/site-icons.mts`) : sur iPhone, Partager puis « Sur l'écran d'accueil » l'ouvre sans les barres de Safari.
 
 ## Lancer en local
 

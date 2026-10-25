@@ -7,4 +7,5 @@ export const copy = {
   play: "Jouer",
   backToGames: "← Tous les jeux",
   fullscreen: "Plein écran",
+  installHintIPhone: "Sur iPhone, pour jouer en plein écran : Partager, puis « Sur l'écran d'accueil ».",
 };

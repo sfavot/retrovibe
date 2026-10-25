@@ -16,6 +16,15 @@
   --bubble-ink: #1e1a14;
   --radius: 10px;
   --stage: min(576px, calc(100vw - 32px));
+  /* Zones sûres (encoche, barre d'état translucide, indicateur d'accueil) : `viewport-fit=cover` laisse la page passer dessous.
+     Nulles sur ordinateur et dans un navigateur à barres classiques. Le `body` les réserve ; les plein écrans, fixes, les reprennent. */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  /* Taille utile de la fenêtre pour les mises en page plein écran des jeux (le plein écran pivoté la redéfinit). */
+  --view-w: calc(100vw - var(--safe-l) - var(--safe-r));
+  --view-h: calc(100dvh - var(--safe-t) - var(--safe-b));
   color-scheme: dark;
   font-family: ui-rounded, "Segoe UI", system-ui, -apple-system, sans-serif;
 }
@@ -26,6 +35,7 @@
 
 body {
   margin: 0;
+  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
   min-height: 100vh;
   background: radial-gradient(ellipse at top, #2a1f15, var(--bg) 70%) fixed;
   color: var(--text);
@@ -118,6 +128,12 @@ a.button:hover {
   max-width: 44rem;
   margin: 0 auto;
   padding: 56px 16px;
+}
+
+.home-hint {
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .home h1 {
@@ -1121,7 +1137,8 @@ a.button:hover {
 
 .is-fullscreen:not(:fullscreen) {
   position: fixed;
-  inset: 0;
+  /* dans les zones sûres (le fond de la page, de même teinte, continue dessous) */
+  inset: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
   z-index: 100;
 }
 
@@ -1131,7 +1148,7 @@ a.button:hover {
 }
 
 .game-shell.is-fullscreen {
-  min-height: 100dvh;
+  min-height: var(--view-h);
   justify-content: center;
 }
 
@@ -1255,14 +1272,16 @@ a.button:hover {
    tournée d'un quart de tour (largeur = hauteur de la fenêtre) et pivote autour de son coin haut gauche, puis se replace. Les règles
    de dimensions en `dvh` / `vw` passent par `--view-h` / `--view-w`, qui valent alors la hauteur et la largeur de l'élément. */
 .is-fullscreen.is-rotated {
-  --view-w: 100dvh;
-  --view-h: 100dvw;
+  /* Le cadre occupe les zones sûres de la fenêtre, tournées d'un quart de tour : sa largeur est la hauteur utile de la fenêtre, sa
+     hauteur sa largeur utile. Son coin haut gauche, d'où part la rotation, se place au coin haut droit de la zone sûre. */
+  --view-w: calc(100dvh - var(--safe-t) - var(--safe-b));
+  --view-h: calc(100dvw - var(--safe-l) - var(--safe-r));
   inset: 0 auto auto 0;
-  width: 100dvh;
-  height: 100dvw;
+  width: var(--view-w);
+  height: var(--view-h);
   min-height: 0;
   transform-origin: 0 0;
-  transform: translateX(100dvw) rotate(90deg);
+  transform: translate(calc(100dvw - var(--safe-r)), var(--safe-t)) rotate(90deg);
 }
 
 /* Mêmes dispositions que les deux blocs précédents pour le plein écran pivoté : la fenêtre est alors en portrait, la requête de média ne s'y applique pas. */

@@ -2,9 +2,17 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>retrovibe</title>
     <link rel="icon" type="image/svg+xml" href="/src/ui/favicon.svg" />
+    <!-- Application installable (écran d'accueil) : manifeste et icônes émis par le plugin de `vite.config.ts`, en chemins relatifs. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#17120d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="retrovibe" />
     <link rel="stylesheet" href="/src/ui/style.css" />
   </head>
   <body>

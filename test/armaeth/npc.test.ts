@@ -378,5 +378,6 @@ describe.skipIf(!hasOriginalFiles)("passage de 3000 tics dans chaque salle peupl
     expect(visited).toBeGreaterThan(5);
     const missing = [...engine.missing].filter((m) => m.startsWith("2:") || m.startsWith("7:"));
     expect(missing).toEqual([]);
-  });
+    // Lourd (3000 tics par salle) : le délai par défaut de 5 s ne suffit pas sur les machines de l'intégration continue.
+  }, 60000);
 });

@@ -332,8 +332,10 @@ describe.skipIf(!hasOriginalFiles)("liste de dessin des salles du jeu", () => {
     const drawn = applyDrawCommands(c, drawList(state, "all"), library, loaded.origin);
     expect(drawn).toBeGreaterThan(5);
     c.present();
+    // Image de contrôle écrite seulement si `ARMAETH_PNG_DIR` est défini (comme `engine.test.ts`).
+    const dir = process.env.ARMAETH_PNG_DIR;
+    if (!dir) return;
     const palette = vga6ToRgb8(readDefaultPalette(readOriginal("AM1.EXE")));
-    const dir = "/private/tmp/claude-501/-Users-suzy--claude-spares-spare-2tiAGT/a713d93d-24cf-4b57-9cd4-8e9b5233ffac/scratchpad/h1";
     mkdirSync(dir, { recursive: true });
     writeFileSync(`${dir}/room8.png`, encodePng(320, 200, { indexed: c.screen.pixels, palette }));
   });

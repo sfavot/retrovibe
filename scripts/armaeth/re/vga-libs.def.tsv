@@ -1,0 +1,2 @@
+# adresse	nom	taille	confiance	preuve (certain = comportement vérifié ; probable = fonction attendue de la bibliothèque, appelants cohérents)
+1000:1dae	lib__astart	203	certain	Point d'entrée MZ (CS:IP = 0000:1DAE) : INT 21h AH=30h (DOS >= 2), SS = DGROUP, INT 21h AH=4Ah, efface le BSS, appelle main (1000:0000)

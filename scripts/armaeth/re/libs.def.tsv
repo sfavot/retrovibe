@@ -1,0 +1,73 @@
+# adresse	nom	taille	confiance	preuve (certain = comportement vérifié ; probable = fonction attendue de la bibliothèque, appelants cohérents)
+3938:001a	lib__astart	203	certain	Point d'entrée MZ : INT 21h AH=30h (version DOS >= 2), SS=DGROUP, INT 21h AH=4Ah, efface le BSS (rep stosw depuis DGROUP:763c), appelle main (1000:0000)
+3938:011a	lib__cinit	197	probable	INT 21h AX=3500h/2500h (vecteur 0), cherche « _C_FILE_INFO= » dans l'environnement
+3938:01df	lib_exit	7	probable	Appelée avec le code de sortie par 1ee6:0008 (0) et 34b4:0000 (1)
+3938:01f8	lib__exit	106	certain	INT 21h AH=4Ch après restauration des vecteurs
+3938:0262	lib__restore_vectors	45	probable	INT 21h AX=2500h, appelée par _exit
+3938:02a2	lib_fclose	198	certain	Teste les drapeaux FILE (0x83, 0x40), vide le tampon, ferme le handle (22c6) et supprime le fichier temporaire (remove)
+3938:0368	lib__fsopen	51	probable	Alloue un FILE (getstream) et appelle _openfile
+3938:039c	lib_fopen	27	certain	Appelée par le fopen du jeu (348a:01ae) avec nom et mode ; enchaîne 0368 puis 1ae8
+3938:03b8	lib_fread	161	certain	fread(buf far, taille, nombre, FILE far) : 17 appelants, tous des chargeurs de données
+3938:052a	lib_fwrite	161	certain	fwrite(buf, taille, nombre, FILE) : utilisée par puts et les sauvegardes
+3938:06ce	lib_free	19	certain	Libère un bloc du tas (realloc avec taille 0 l'appelle ; gm_free l'appelle pour les petits blocs)
+3938:06e1	lib_malloc	125	certain	Alloue dans le tas (realloc avec pointeur NULL l'appelle ; gm_alloc l'appelle quand la taille tient sur 16 bits)
+3938:075e	lib_strcat	70	certain	strlen de la destination puis copie
+3938:07a4	lib_strcpy	54	certain	Copie avec le NUL, renvoie la destination
+3938:07da	lib_strcmp	41	certain	Compare strlen(s2)+1 octets
+3938:0804	lib_strlen	23	certain	repne scasb
+3938:081c	lib_strncpy	42	certain	Copie au plus n octets puis complète par des zéros
+3938:0846	lib_strncmp	59	certain	Compare au plus n octets ou jusqu'au NUL
+3938:0882	lib_atoi_thunk	3	probable	Saute vers 277e (atoi) ; utilisée pour lire les compteurs des fichiers MSG* et les nombres des commandes
+3938:08ae	lib_toupper	22	certain	Soustrait 0x20 si le bit 2 de _ctype (DGROUP:6781, index = caractère) est positionné
+3938:08c4	lib_int86	137	certain	Construit « CD nn CB » sur la pile (INT nn ; RETF), charge/sauve AX BX CX DX SI DI et le drapeau C dans une structure REGS ; 15 appelants (souris INT 33h, vidéo INT 10h, clavier INT 16h, driver VGA INT 16h)
+3938:0982	lib_fgets	121	probable	Lit une ligne dans un tampon (utilisée par 351f:0002 pour MSGINT/MSGHRD)
+3938:09fc	lib_fseek	128	certain	origine 0..2, SEEK_CUR via ftell (2800), puis lseek DOS (22e6)
+3938:0a7e	lib_puts	135	certain	strlen, fwrite sur stdout (DGROUP:68de), ajoute « \n »
+3938:0b08	lib_sprintf	106	certain	Appelée seulement par 1265:0008 avec un tampon et des formats « Num %4d ... » ; moteur _output (1d8e)
+3938:0b74	lib_realloc	134	certain	ptr NULL -> malloc, taille 0 -> free, sinon agrandit sur place ou alloue/copie/libère
+3938:0bfa	lib_hfree	12	probable	INT 21h AH=49h ; appelée par gm_free (1ff8:006a) pour les blocs de plus de 64 Ko
+3938:0c06	lib_halloc	178	probable	3 paramètres (nombre long, taille) ; INT 21h AH=48h ; appelée par gm_alloc quand DX != 0
+3938:0cb8	lib_int86x	154	certain	Même stub « INT nn ; RETF » qu'int86, plus une structure de registres de segment (4e paramètre)
+3938:0d60	lib_time	85	probable	INT 21h AH=2Ah et 2Ch ; appelée par main avant srand
+3938:0db6	lib_strchr	45	certain	Cherche un caractère, renvoie NULL sinon
+3938:0de4	lib_stricmp	69	certain	Compare en repliant les majuscules
+3938:0e2a	lib_strlwr	36	certain	Minuscules
+3938:0e4e	lib_strupr	36	certain	Majuscules
+3938:0e72	lib_strtok	169	certain	Appelée en boucle avec (chaîne, délimiteurs) puis (NULL, délimiteurs)
+3938:0f1c	lib_strstr	103	probable	Recherche d'une sous-chaîne (analyseur de jetons 109a:0002)
+3938:0f84	lib_memmove	202	certain	Copie avec détection du recouvrement et passage de segment (pointeurs huge)
+3938:104e	lib_memcpy	94	certain	Copie rep movsw avec retenue de segment (+0x1000 par 64 Ko) ; utilisée par les décompresseurs
+3938:10ac	lib_memset	72	certain	Remplit avec un octet (aligne puis rep stosw)
+3938:10f4	lib_abs	13	certain	(x ^ s) - s
+3938:1102	lib_srand	17	certain	Écrit la graine DGROUP:6886 ; appelée par main avec time()
+3938:113c	lib__rotl	13	certain	Rotation 16 bits
+3938:1114	lib_rand	40	certain	graine * 0x000343FD + 0x00269EC3, renvoie (graine >> 16) & 0x7FFF (LCG de Microsoft C) ; 19 appelants
+3938:114a	lib__makepath	236	certain	Assemble lecteur « : », répertoire (ajoute « \ »), nom, extension (ajoute « . »)
+3938:1278	lib_getcwd	24	probable	Enveloppe de _getdcwd(0, ...)
+3938:1290	lib__getdcwd	259	certain	Construit « X:\ » puis INT 21h AH=47h
+3938:13a1	lib__dos_findfirst	51	probable	INT 21h AH=2Fh/1Ah (DTA) puis recherche
+3938:13d4	lib__dos_getdrive	20	probable	INT 21h AH=19h
+3938:13e8	lib__harderr	35	certain	Installe le vecteur INT 24h (AL=24h, AH=25h) vers 3938:140b ; le gestionnaire du jeu est 348a:022c
+3938:1437	lib__hardretn	8	probable	Retour du gestionnaire INT 24h
+3938:1440	lib__hardresume	69	probable	Reprise du gestionnaire INT 24h
+3938:1486	lib__dos_setdrive	23	probable	INT 21h AH=0Eh
+3938:149e	lib__aFldiv	154	certain	Division 32 bits signée (aide du compilateur)
+3938:1538	lib__aFlmul	50	certain	Multiplication 32 bits (aide du compilateur)
+3938:189b	lib__nmsg_write	54	probable	INT 21h AH=40h ; messages « R6000 - stack overflow », « run-time error »
+3938:19c4	lib__flsbuf	235	certain	Vide/remplit le tampon d'un FILE (appelée par puts quand le compteur devient négatif)
+3938:1ae8	lib__openfile	244	certain	Analyse le mode (r=0, w=0x301, a=0x109, + t b) et ouvre via 3772/378c
+3938:1d8e	lib__output	1044	certain	Moteur de printf (1044 octets) appelé uniquement par sprintf
+3938:22c6	lib__close	32	certain	INT 21h AH=3Eh
+3938:22e6	lib__lseek	122	certain	INT 21h AX=4200h/4201h/4202h
+3938:2360	lib__read	254	certain	INT 21h AH=3Fh
+3938:245e	lib__write	192	probable	INT 21h AH=40h avec traduction LF -> CRLF (251e)
+3938:2278	lib__getstream	78	probable	Cherche un FILE libre
+3938:26c9	lib__dos_setblock	80	probable	INT 21h AH=4Ah
+3938:273a	lib__dos_allocmem	67	probable	INT 21h AH=48h
+3938:277e	lib_atoi	86	probable	Conversion décimale (saute les blancs via _ctype bit 8)
+3938:2800	lib_ftell	406	probable	Position courante (appelée par fseek SEEK_CUR)
+3938:2a88	lib_intdosx	97	probable	Appelle INT 21h avec registres d'une structure (AH fourni par l'appelant)
+3938:2c76	lib_remove	15	certain	INT 21h AH=41h
+3938:378c	lib__open	417	probable	INT 21h AH=3Dh/3Ch/3Eh/43h/42h/44h... (open avec drapeaux O_*, table des handles DGROUP:6751)
+3dff:01f8	lib__emu_init_vectors	72	probable	INT 21h AX=3534h/2534h : installe l'émulateur 8087 (INT 34h-3Dh) ; message « floating-point support not loaded »
+3dff:0f26	lib__emu_core	2545	probable	Cœur de l'émulateur 8087 (2545 octets, appelé par les INT 34h-3Dh)

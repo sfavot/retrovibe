@@ -1,0 +1,125 @@
+/* Armaeth : écran du jeu (canvas 320×200 à l'échelle entière, pixels nets), écran de présentation et page d'aide. */
+
+.aeth-canvas {
+  /* Le curseur est dessiné par le jeu. */
+  cursor: none;
+}
+
+/* Jaquette de l'écran de présentation : 320×200, pixel art. */
+.aeth-title-picture {
+  width: min(480px, calc(100vw - 32px));
+  aspect-ratio: 8 / 5;
+}
+
+.aeth-title-note {
+  margin: 0;
+}
+
+.aeth-title-controls {
+  margin: 0.4rem 0 0;
+  font-size: 1rem;
+}
+
+.aeth-error:empty {
+  display: none;
+}
+
+.aeth-error {
+  margin: 0;
+  color: var(--danger, #e8836b);
+}
+
+/* Page d'aide. */
+.aeth-help,
+.aeth-help-status {
+  box-sizing: border-box;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+.aeth-help-bar h1 {
+  margin: 12px 0 4px;
+  font-size: 1.6rem;
+  color: var(--accent);
+}
+
+.aeth-help-bar p {
+  margin: 0 0 4px;
+}
+
+.aeth-help-trail ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 20px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.aeth-help-trail li + li::before {
+  content: "›";
+  margin-right: 8px;
+  color: var(--muted);
+}
+
+.aeth-help-trail .link {
+  all: unset;
+  cursor: pointer;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.aeth-help-trail .link:focus-visible {
+  outline: 3px solid var(--focus, #f6d27a);
+  outline-offset: 2px;
+}
+
+.aeth-help-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.aeth-help-options button {
+  width: 100%;
+  text-align: left;
+}
+
+.aeth-help-hint h3 {
+  margin: 16px 0 4px;
+  font-size: 1rem;
+  color: var(--accent);
+}
+
+.aeth-help-text {
+  margin: 0 0 16px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.aeth-help-hint-next {
+  margin: 8px 8px 8px 0;
+}
+
+/* Aide ouverte par-dessus le jeu : la page du jeu est masquée, pas démontée. */
+.aeth-help-overlay {
+  min-height: 100dvh;
+}
+
+/* Aide ouverte en plein écran : elle couvre la page du jeu ; son bouton « Retour au jeu » ramène à l'écran, toujours en plein écran. */
+.aeth-help-overlay.is-inside {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: auto;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.aeth.is-fullscreen:fullscreen {
+  position: relative;
+}

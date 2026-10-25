@@ -1,0 +1,63 @@
+62
+ 1 Placer la disquette INSTAL-1 dans un lecteur puis presser [Entrer]
+ 2 Contr“le du tableau num‚rique (voir documentation)
+ 3 Ligne
+ 4 Colonne
+ 5 Nombre ?
+ 6 R‚ponse non valable, seconde tentative
+ 7 R‚ponse non valable, abandon
+ 8 Driver vid‚o non disponible
+ 9 Driver vid‚o non accessible
+10 Programme de contr“le non accessible
+11 Disquette clef non acceptable
+12 Contr“le num‚rique non acceptable
+13 D‚verrouillage non effectu‚
+14 Violation de protection
+15 Erreur d'interface
+16 .
+17 .
+18 .
+19 .
+20 .
+21 Ce programme requiert un paramŠtre identifiant le jeu
+22 Fichier de configuration non accessible
+23 Installation abandonn‚e
+24 Installation termin‚e
+25 Erreur sur le fichier d'installation
+26 Installation du jeu :
+27 Type de disquette non reconnu
+28 Pour d‚marrer le jeu utilisez les commandes suivantes 
+29 (depuis le disque d'installation DISK-1)
+30 (depuis le disque dur d'installation)
+31 Appuyez sur une touche ...
+32 .
+33 .
+34 Ce programme requiert un paramŠtre identifiant la version
+35 Contr“le positif
+36 R‚pertoire non existant
+37 Installation non disponible
+38 M‚moire insuffisante
+39 Choisissez un mode d'installation ci-dessous puis pressez [Entrer]
+40 Identifiez votre disque dur :
+41 Identification invalide
+42 Erreur hardware
+43 Echec en cr‚ation de r‚pertoire
+44 Espace libre insuffisant sur ce disque
+45 Copie de fichiers sur le disque
+46 Erreur en liste de fichiers
+47 Placez une disquette vierge et formatt‚e dans le lecteur
+48 Erreur en cr‚ation de fichier
+49 Erreur en cr‚ation de label de disquette
+50 Erreur en ouverture de fichier
+51 Erreur en lecture de fichier
+52 Erreur en ‚criture de fichier
+53 Fichier source introuvable
+54 Fichier source illisible
+55 Erreur : la disquette n'est pas vierge ou possŠde un label
+56 Veuillez retirer votre disquette du lecteur et y apposer le nom :
+57 Programme d'aide et de recherche de solutions par menus hi‚archis‚s
+58 Choisir avec  ,  S‚lectionner avec : Entrer,  Retour avec : Echap
+59 Aide nø
+60 Aide non disponible
+61 Menu de plus de 20 options
+62 Fichier d'installation invalide

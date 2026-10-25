@@ -1,0 +1,18 @@
+@import "../../../ui/asset-viewer/shell.css";
+
+/* Règles propres à Armaeth. */
+table { border-collapse: collapse; margin: 4px 0 12px; }
+th, td { text-align: left; padding: 1px 10px 1px 0; vertical-align: top; }
+th { color: #7f8696; font-weight: normal; position: sticky; top: -16px; background: #15161a; }
+td.text, td.hex { white-space: pre-wrap; word-break: break-word; }
+td.hex { color: #7f8696; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.layers { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.layers figure { margin: 0; }
+.sheet figure { cursor: pointer; }
+.sheet figure[aria-current="true"] canvas { outline: 2px solid #6aa2ff; }
+.zoom { margin: 8px 0; min-height: 8px; }
+details.resource { margin: 4px 0; }
+details.resource > summary { color: #9aa1b2; }
+.sample { margin: 8px 0; padding: 8px; background: #0b0b0d; overflow-x: auto; }
+@media (max-width: 800px) { td.text, td.hex { min-width: 0; } }

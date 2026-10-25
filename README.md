@@ -11,6 +11,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | Lost in Time (Coktel Vision, 1993) | jouable (en cours de validation) |
 | Le Téléportaschtroumpf (Infogrames Multimedia, 1995) | jouable (en cours de validation) |
 | Math Workshop / Mathémagique (Broderbund, 1994) | jouable (en cours de validation) |
+| Armaeth (Grandslam Video, 1994) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -140,6 +141,38 @@ Avec `npm run dev` : `src/games/mathemagique/ui/dev.html` lance le jeu seul, san
 ### Documentation
 
 `docs/mathemagique/` : inventaire (`files.md`), formats (`formats.md`, `shap.md`, `scr.md`), rétro-ingénierie (`re-index.md`, régénérée par `scripts/mathemagique/re/run.sh` ; `engine.md`), écrans et activités (`screens/`) et transcription du manuel de la version de 1997 (`manual-en.md`).
+
+## Armaeth
+
+*Armaeth* (Grandslam Video, 1994, CD pour DOS adapté par Rob Northen Computing) : jeu d'action et d'aventure en vue de côté, où l'on tape aussi des commandes. Le moteur `AM1.EXE` (Microsoft C, mode réel) et son pilote vidéo résident `VGA.EXE` sont reconstitués par rétro-ingénierie avec Ghidra. Le moteur est réécrit en TypeScript et le jeu est jouable dans le navigateur (en cours de validation) : musique AdLib (OPL2), souris, clavier et écran tactile, sauvegarde dans le navigateur (F2 / F3), et une page d'aide (les indices de `SOS.EXE`, dévoilés un par un) depuis l'écran de présentation.
+
+### Lancer le jeu
+
+Avec `npm run dev`, le jeu est sur la page d'accueil (carte *Armaeth*) ; `src/games/armaeth/ui/dev.html` le lance seul, sans la page d'accueil, et expose `window.__armaeth` (`engine`, `host`) pour la console.
+
+### Fichiers de données
+
+Ils viennent de l'image ISO du CD : `scripts/armaeth-extract.sh [archive.7z]` lit l'archive placée dans `archives/armaeth/` (non versionnée), extrait le CD complet (versions anglaise, française et allemande) dans `archives/armaeth/cd/` et ne garde que la version française dans `original/armaeth/` : les archives d'images `A1F*.VGA`, les données `A1F*.SYS`, l'état de départ (`SVG001.STD`, `A1FTMP.*`), les messages `MSG*`, `AM1.EXE` (pour la palette et les tables du pilote son) et `files.json`. Le script régénère aussi l'inventaire `docs/armaeth/files.md`.
+
+### Architecture
+
+- `src/games/armaeth/data/` — lecteurs : archives VGA, sprites, scènes (décor et masque de profondeur), palette, textes et dictionnaire, scripts de commandes, police, monde (salles et objets), tables, son (`A1FMIX.SYS`).
+- `src/games/armaeth/engine/` — le moteur (`ArmaethEngine`, un `tick()` par image à 50 Hz) et sa frontière avec l'environnement (`host.ts`) ; `audio/` — pilote et séquenceur OPL2, `web-opl.ts` pour le navigateur.
+- `src/games/armaeth/ui/` — l'hôte du navigateur (`browser-host.ts` : fichiers préchargés, clavier DOS, souris et doigt, sauvegardes en base64), la page du jeu (`app.ts`), l'écran de présentation (`title.ts`) et la page d'aide (`help.ts`).
+- `src/games/armaeth/ui/asset-viewer.html` — visionneuse des ressources (avec `npm run dev`).
+
+### Documentation
+
+`docs/armaeth/` : inventaire (`files.md`), formats (`formats.md`, `graphics.md`, `audio.md`), rétro-ingénierie (`re-index.md`, régénérée par `scripts/armaeth/re/run.sh`), moteur (`engine.md`), analyseur de commandes (`parser.md`), écrans (`screens.md`) et plan (`plan.md`).
+
+## Code commun aux jeux
+
+- `src/data/` — lecture binaire (`reader.ts`), page de code 437, liste des fichiers d'un jeu (`game-files.ts`), fichiers RIFF WAVE (`riff-wave.ts`), vidéos Smacker (`smacker.ts`).
+- `src/audio/` — conversion PCM et création des `AudioBuffer` (`pcm.ts`), lecture en flux des pistes de musique (`track-player.ts`).
+- `src/ui/` — page d'accueil, écran titre, chargement des fichiers (`files.ts`), images indexées et palettes VGA (`indexed-canvas.ts`), coquille des visionneuses de ressources (`asset-viewer/`).
+- `scripts/lib/` — extraction des CD (images BIN/CUE et pistes audio, lecture ISO 9660, inventaire `files.md`, remplacement atomique de `original/<jeu>/`) et encodeur PNG ; `scripts/manifest.py` écrit `files.json`.
+- `scripts/re/` — socle Ghidra headless (recherche de Ghidra et du JDK, exports, génération des index) ; chaque jeu garde ses scripts dans `scripts/<jeu>/re/`.
+- `test/support/original.ts` — accès aux fichiers d'origine dans les tests, ignorés quand ils sont absents.
 
 ## Ce qui a été reconstitué
 

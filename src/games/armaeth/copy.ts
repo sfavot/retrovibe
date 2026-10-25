@@ -5,7 +5,7 @@
 export const copy = {
   title: "Armaeth",
   description:
-    "L'aventure en vue de côté de Grandslam (1994) : on se déplace à la souris et au clavier, et on tape ses commandes en français. Jouable, en cours de validation.",
+    "L'aventure en vue de côté de Grandslam (1994) : on se déplace à la souris, au clavier ou au doigt, et on tape ses commandes en français.",
   coverAlt: "Écran titre d'Armaeth : un paysage de montagnes au coucher du soleil, encadré de quatre portraits (Killian, Armaeth, Minas et Prytwen).",
   play: "Jouer",
   sound: "Son",

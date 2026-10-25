@@ -5,7 +5,7 @@
 export const copy = {
   title: "Math Workshop (Mathémagique)",
   description:
-    "Les ateliers de maths de Broderbund (1994) : bowling, rythmes, motifs et fusées. En cours de réimplémentation.",
+    "Les ateliers de maths de Broderbund (1994) : bowling, rythmes, motifs et fusées.",
   coverAlt: "Écran titre de Math Workshop (Mathémagique)",
   play: "Jouer",
   sound: "Son",

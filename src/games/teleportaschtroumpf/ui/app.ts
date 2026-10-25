@@ -21,7 +21,7 @@ const localStorageStore = createLocalStorageStore();
  */
 export const copy = {
   title: "Le Téléportaschtroumpf",
-  description: "Le jeu de plateau et de mini-jeux des Schtroumpfs, en cours de réimplémentation.",
+  description: "Le jeu de plateau et de mini-jeux des Schtroumpfs (Infogrames Multimedia, 1995).",
   // Écran de présentation et carte de l'accueil.
   coverAlt: "Jaquette du Téléportaschtroumpf : la Schtroumpfette sortant du téléporteur, devant le Grand Schtroumpf et un Schtroumpf.",
   play: "Jouer",

@@ -2,6 +2,7 @@ import { copy as shared } from "./copy";
 import { h } from "./dom";
 import { MissingFilesError } from "./files";
 import { createFullscreen } from "./fullscreen";
+import { withIcons } from "./icons";
 import { isRotated, trackTouchLayout } from "./touch-layout";
 
 /** Textes de la page du jeu (propres à chaque jeu ; la copy partagée reste dans `ui/copy.ts`). */
@@ -115,6 +116,11 @@ export interface ShellMetrics {
   viewportHeight: number;
   /** Largeur des colonnes de côté (paysage tactile : boutons et pied de page à gauche et à droite de l'écran, voir `asideWidth`). */
   asideWidth?: number;
+  /**
+   * Marges hors du conteneur : 32 px en largeur et `BOTTOM_MARGIN` sous l'écran par défaut. En paysage tactile, le conteneur porte
+   * déjà ses marges (comptées dans `mainWidth` / `mainHeight`) : seules restent les zones sûres de la fenêtre.
+   */
+  margins?: { horizontal: number; bottom: number };
 }
 
 /**
@@ -127,16 +133,32 @@ export function contentHeight(childHeights: readonly number[], gap: number, padd
   return total + gap * Math.max(childHeights.length - 1, 0) + paddingTop + paddingBottom;
 }
 
-/** Échelle du canvas pour les mesures données : largeur moins 32 px de marges et les colonnes de côté, hauteur moins ce qui précède, entoure l'écran, et la marge du bas. */
+/** Échelle du canvas pour les mesures données : largeur moins les marges et les colonnes de côté, hauteur moins ce qui précède, entoure l'écran, et la marge du bas. */
 export function shellScale(metrics: ShellMetrics, logicalWidth: number, logicalHeight: number, integer = true): number {
   const around = metrics.mainHeight - metrics.stageHeight;
+  const { horizontal, bottom } = metrics.margins ?? { horizontal: 32, bottom: BOTTOM_MARGIN };
   return fitScale(
-    metrics.mainWidth - 32 - (metrics.asideWidth ?? 0),
-    metrics.viewportHeight - metrics.mainTop - around - BOTTOM_MARGIN,
+    metrics.mainWidth - horizontal - (metrics.asideWidth ?? 0),
+    metrics.viewportHeight - metrics.mainTop - around - bottom,
     logicalWidth,
     logicalHeight,
     integer,
   );
+}
+
+/**
+ * Marges du paysage tactile (hors plein écran pivoté) : les marges intérieures du conteneur en largeur ; sous l'écran, la zone sûre
+ * du bas (indicateur d'accueil), et celle du haut en plein écran, où le conteneur fixé commence sous elle alors que `mainTop` vaut 0.
+ * Les zones sûres se lisent sur les marges intérieures du `body`, qui les réservent.
+ */
+function landscapeMargins(style: CSSStyleDeclaration, fixedToViewport: boolean): { horizontal: number; bottom: number } {
+  const body = getComputedStyle(document.body);
+  const safeTop = parseFloat(body.paddingTop) || 0;
+  const safeBottom = parseFloat(body.paddingBottom) || 0;
+  return {
+    horizontal: parseFloat(style.paddingLeft) + parseFloat(style.paddingRight),
+    bottom: safeBottom + (fixedToViewport ? safeTop : 0),
+  };
 }
 
 /**
@@ -193,7 +215,7 @@ export function mountGameShell(options: GameShellOptions): GameShell {
   const status = h("p", { class: "game-shell-status", role: "status" }, copy.loading);
   // Région d'erreur présente dès le départ (vide) pour que les lecteurs d'écran annoncent le message quand il arrive.
   const errors = h("p", { class: "game-shell-error", role: "alert" });
-  const back = options.backLabel ? h("a", { class: "back-link", href: "#/" }, options.backLabel) : null;
+  const back = options.backLabel ? h("a", { class: "back-link", href: "#/" }, ...withIcons(options.backLabel, "close")) : null;
   const main = h("main", { class: join(`game-shell game-shell--${sized ? "sized" : "css"}`, classes.root) }, status, errors);
   container.replaceChildren(main);
   // Disposition tactile paysage posée avant le premier affichage (la feuille de style ne connaît que cette classe).
@@ -260,7 +282,11 @@ export function mountGameShell(options: GameShellOptions): GameShell {
       let soundButton: HTMLButtonElement | null = null;
       const sound = run.sound;
       if (sound) {
-        const button = h("button", { type: "button", class: "toggle", "aria-pressed": String(sound.prefs.isEnabled()) }, copy.sound);
+        const button = h(
+          "button",
+          { type: "button", class: "toggle", "aria-pressed": String(sound.prefs.isEnabled()) },
+          ...withIcons(copy.sound, "sound-on", "sound-off"),
+        );
         button.addEventListener("click", (event) => {
           button.setAttribute("aria-pressed", String(sound.prefs.toggle()));
           sound.unlock?.();
@@ -319,6 +345,7 @@ export function mountGameShell(options: GameShellOptions): GameShell {
             stageHeight: stage.offsetHeight,
             viewportHeight: rotated ? window.innerWidth : window.innerHeight,
             asideWidth: aside,
+            margins: aside && !rotated ? landscapeMargins(style, fixedToViewport) : undefined,
           },
           logicalWidth,
           logicalHeight,

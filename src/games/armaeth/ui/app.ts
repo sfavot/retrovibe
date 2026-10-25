@@ -6,6 +6,7 @@ import { leaveGame, mountGameShell } from "../../../ui/game-shell";
 import { localStorageStore } from "../../../ui/local-storage";
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
 import { h } from "../../../ui/dom";
+import { withIcons } from "../../../ui/icons";
 import { copy } from "../copy";
 import { parseHelp } from "../data/tables";
 import { parsePlainMessages } from "../data/text";
@@ -203,7 +204,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
     applyPause();
   };
-  const helpLink = h("button", { type: "button", class: "toggle aeth-help-link", onclick: () => openHelp() }, copy.helpLink);
+  const helpLink = h(
+    "button",
+    { type: "button", class: "toggle aeth-help-link", onclick: () => openHelp() },
+    ...withIcons(copy.helpLink, "help"),
+  );
   shell.toggles.append(helpLink);
 
   shell.start({

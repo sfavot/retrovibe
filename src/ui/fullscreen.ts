@@ -1,4 +1,5 @@
 import { h } from "./dom";
+import { withIcons } from "./icons";
 import { isRotated, ROTATED_CLASS, syncTouchLayout } from "./touch-layout";
 
 export { isRotated, ROTATED_CLASS };
@@ -59,7 +60,7 @@ export function isPortrait(): boolean {
  * pas pivoter (le navigateur impose `transform: none`), on passe au repli quand le verrou manque.
  */
 export function createFullscreen(target: HTMLElement, options: FullscreenOptions): Fullscreen {
-  const button = h("button", { type: "button", class: "fullscreen-button", "aria-pressed": "false" }, options.label);
+  const button = h("button", { type: "button", class: "fullscreen-button", "aria-pressed": "false" }, ...withIcons(options.label, "expand", "shrink"));
   /** Plein écran sans l'API : l'élément couvre la fenêtre. */
   let covering = false;
   /** Verrou d'orientation obtenu pour ce plein écran. */

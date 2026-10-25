@@ -53,6 +53,12 @@ describe("shellScale (mesures de la page -> échelle)", () => {
     expect(shellScale({ ...phone, asideWidth: 256 }, 320, 200, false)).toBeCloseTo((844 - 32 - 256) / 320);
   });
 
+  it("en paysage tactile, seules les marges données comptent (celles du conteneur et la zone sûre du bas)", () => {
+    const phone = { mainWidth: 844, mainTop: 0, mainHeight: 496, stageHeight: 480, viewportHeight: 390, asideWidth: 96 };
+    expect(shellScale({ ...phone, margins: { horizontal: 16, bottom: 21 } }, 640, 480, false)).toBeCloseTo((390 - 16 - 21) / 480);
+    expect(shellScale(phone, 640, 480, false)).toBeCloseTo((390 - 16 - 16) / 480);
+  });
+
   it("plein écran : la hauteur du contenu, et non celle du conteneur étiré à la fenêtre, garde l'échelle", () => {
     // Fenêtre 804×885, écran à 2× (400 px) et pied de page de 34 px, espacement 12, marges de 16 : le conteneur étiré mesure 885.
     const content = contentHeight([400, 34], 12, 16, 16);

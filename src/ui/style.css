@@ -1122,6 +1122,18 @@ a.button:hover {
   max-width: 28rem;
 }
 
+/* Icônes des boutons (`ui/icons.ts`) : masquées par défaut, le libellé suffit ; la disposition tactile paysage les montre à sa place. */
+.icon {
+  display: none;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* Bouton « Plein écran » (`ui/fullscreen.ts`) : enfoncé tant que le jeu est en plein écran. */
 .fullscreen-button[aria-pressed="true"] {
   background: var(--accent);
@@ -1233,6 +1245,57 @@ a.button:hover {
 .is-touch-landscape .game-shell-status,
 .is-touch-landscape .game-shell-error {
   grid-column: 1 / -1;
+}
+
+/* Sans barre tactile (Mathémagique, Téléportaschtroumpf) : les colonnes de côté ne portent que les icônes du pied de page, l'écran
+   prend le reste de la largeur. */
+.game-shell.is-touch-landscape:not(:has(> .touch-bar)) {
+  --game-shell-aside: 40px;
+}
+
+/* Avec barre tactile : Son et Plein écran côte à côte sous les boutons de droite. */
+.game-shell.is-touch-landscape:has(> .touch-bar) .game-shell-toggles {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+/* Icônes du pied de page en paysage tactile : retour (croix), Son (haut-parleur, barré quand coupé), Plein écran (flèches). Le
+   libellé, masqué, reste le nom du bouton pour les lecteurs d'écran. */
+.game-shell.is-touch-landscape .game-shell-footer :is(.back-link, button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.game-shell.is-touch-landscape .game-shell-footer :is(.back-link, button):hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.game-shell.is-touch-landscape .game-shell-footer .icon-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.game-shell.is-touch-landscape .toggle[aria-pressed="true"] .icon-sound-on,
+.game-shell.is-touch-landscape .toggle[aria-pressed="false"] .icon-sound-off,
+.game-shell.is-touch-landscape .back-link .icon-close,
+.game-shell.is-touch-landscape .game-shell-footer .icon-help,
+.game-shell.is-touch-landscape .fullscreen-button[aria-pressed="false"] .icon-expand,
+.game-shell.is-touch-landscape .fullscreen-button[aria-pressed="true"] .icon-shrink {
+  display: block;
 }
 
 /* Indy : l'écran (carré) sur toute la hauteur, les boutons Attaquer / Utiliser et le lien de retour à sa gauche, le panneau à droite,

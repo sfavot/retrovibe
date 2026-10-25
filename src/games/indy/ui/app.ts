@@ -406,7 +406,11 @@ export class App {
         game.requestPlacement(this.sidebar.selected, tile.x, tile.y);
         return;
       }
-      canvas.setPointerCapture(e.pointerId);
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // pointeur déjà relâché ou événement synthétique : pas de capture, la marche suit quand même le pointeur
+      }
       this.pointerWalk = { id: e.pointerId, x: e.clientX, y: e.clientY };
     });
     canvas.addEventListener("pointermove", (e) => {

@@ -116,6 +116,16 @@ export interface ShellMetrics {
   asideWidth?: number;
 }
 
+/**
+ * Hauteur du contenu d'un conteneur en colonne flex : ses enfants affichés, les espacements entre eux et ses marges intérieures.
+ * Contrairement à `offsetHeight`, elle ne compte pas l'étirement d'un `min-height` (plein écran : `min-height: 100dvh`), qui
+ * ferait croire que l'écran est entouré de toute la hauteur de la fenêtre.
+ */
+export function contentHeight(childHeights: readonly number[], gap: number, paddingTop: number, paddingBottom: number): number {
+  const total = childHeights.reduce((sum, height) => sum + height, 0);
+  return total + gap * Math.max(childHeights.length - 1, 0) + paddingTop + paddingBottom;
+}
+
 /** Échelle du canvas pour les mesures données : largeur moins 32 px de marges et les colonnes de côté, hauteur moins ce qui précède, entoure l'écran, et la marge du bas. */
 export function shellScale(metrics: ShellMetrics, logicalWidth: number, logicalHeight: number, integer = true): number {
   const around = metrics.mainHeight - metrics.stageHeight;
@@ -272,14 +282,34 @@ export function mountGameShell(options: GameShellOptions): GameShell {
       const resize = (): void => {
         // Page masquée par le jeu (aide ouverte par-dessus) : rien à mesurer, l'échelle précédente reste.
         if (main.clientWidth === 0) return;
+        // Écran masqué (vue posée par le jeu à sa place dans le conteneur) : même chose, sa hauteur nulle fausserait la mesure.
+        if (stage.offsetHeight === 0) return;
         const style = getComputedStyle(main);
         const aside = asideWidth(style.display, style.gridTemplateColumns, style.columnGap);
+        const paddingTop = parseFloat(style.paddingTop);
+        const paddingBottom = parseFloat(style.paddingBottom);
+        // Plein écran : le conteneur est fixé dans la fenêtre, le défilement de la page n'y change rien.
+        const fixedToViewport = main.classList.contains("is-fullscreen");
         const scale = shellScale(
           {
             mainWidth: main.clientWidth,
-            mainTop: main.getBoundingClientRect().top + window.scrollY,
+            mainTop: main.getBoundingClientRect().top + (fixedToViewport ? 0 : window.scrollY),
             // En colonnes, la hauteur du conteneur suit la plus haute d'entre elles : seules ses marges entourent l'écran.
-            mainHeight: aside ? stage.offsetHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) : main.offsetHeight,
+            // Sinon, la hauteur du contenu (et non `offsetHeight`, étiré à toute la fenêtre en plein écran).
+            mainHeight: aside
+              ? stage.offsetHeight + paddingTop + paddingBottom
+              : contentHeight(
+                  // Seuls les enfants dans le flux comptent : ni les masqués, ni les superpositions (`position: absolute` / `fixed`).
+                  [...main.children]
+                    .filter((child) => {
+                      const childStyle = getComputedStyle(child);
+                      return childStyle.display !== "none" && childStyle.position !== "absolute" && childStyle.position !== "fixed";
+                    })
+                    .map((child) => (child as HTMLElement).offsetHeight),
+                  parseFloat(style.rowGap) || 0,
+                  paddingTop,
+                  paddingBottom,
+                ),
             stageHeight: stage.offsetHeight,
             viewportHeight: window.innerHeight,
             asideWidth: aside,

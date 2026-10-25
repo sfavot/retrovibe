@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asideWidth, canvasMayTakeFocus, failureMessage, fitScale, shellScale } from "../../src/ui/game-shell";
+import { asideWidth, canvasMayTakeFocus, contentHeight, failureMessage, fitScale, shellScale } from "../../src/ui/game-shell";
 import { MissingFilesError } from "../../src/ui/files";
 
 describe("fitScale (échelle entière du canvas)", () => {
@@ -51,6 +51,24 @@ describe("shellScale (mesures de la page -> échelle)", () => {
     const phone = { mainWidth: 844, mainTop: 0, mainHeight: 216, stageHeight: 200, viewportHeight: 390 };
     expect(shellScale(phone, 320, 200, false)).toBeCloseTo(1.79);
     expect(shellScale({ ...phone, asideWidth: 256 }, 320, 200, false)).toBeCloseTo((844 - 32 - 256) / 320);
+  });
+
+  it("plein écran : la hauteur du contenu, et non celle du conteneur étiré à la fenêtre, garde l'échelle", () => {
+    // Fenêtre 804×885, écran à 2× (400 px) et pied de page de 34 px, espacement 12, marges de 16 : le conteneur étiré mesure 885.
+    const content = contentHeight([400, 34], 12, 16, 16);
+    expect(content).toBe(478);
+    const fullscreen = { mainWidth: 804, mainTop: 0, stageHeight: 400, viewportHeight: 885 };
+    expect(shellScale({ ...fullscreen, mainHeight: content }, 320, 200)).toBe(2);
+    // L'ancienne mesure (`offsetHeight` étiré) faisait rapetisser l'écran à chaque recalcul.
+    expect(shellScale({ ...fullscreen, mainHeight: 885 }, 320, 200, false)).toBeLessThan(2);
+  });
+});
+
+describe("contentHeight", () => {
+  it("additionne les enfants, les espacements entre eux et les marges", () => {
+    expect(contentHeight([200, 40], 12, 16, 16)).toBe(284);
+    expect(contentHeight([200], 12, 16, 16)).toBe(232);
+    expect(contentHeight([], 12, 16, 16)).toBe(32);
   });
 });
 

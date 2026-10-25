@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <!-- Icône du site : un écran à l'ancienne, aux couleurs de la page d'accueil. -->
+  <rect x="1" y="2" width="14" height="10" rx="2" fill="#d9a441"/>
+  <rect x="3" y="4" width="10" height="6" fill="#17120d"/>
+  <rect x="5" y="5" width="2" height="2" fill="#f6d27a"/>
+  <rect x="9" y="7" width="2" height="2" fill="#f6d27a"/>
+  <rect x="6" y="12" width="4" height="2" fill="#d9a441"/>
+</svg>

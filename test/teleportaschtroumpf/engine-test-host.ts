@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import type { AudioBackend, PcmSound } from "../../src/games/teleportaschtroumpf/audio/backend";
 import { GameFiles, type GameFileEntry } from "../../src/games/teleportaschtroumpf/data/files";
 import type { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import type { Host, HostStorage } from "../../src/games/teleportaschtroumpf/engine/host";
+import type { Host } from "../../src/games/teleportaschtroumpf/engine/host";
+import { FakeStorage } from "../support/fake-host";
 import { Input } from "../../src/games/teleportaschtroumpf/engine/input";
 import { resolveGameFile } from "../../src/games/teleportaschtroumpf/engine/paths";
 
@@ -119,19 +120,8 @@ export class FakeAudio implements AudioBackend {
   }
 }
 
-export class MemoryStorage implements HostStorage {
-  readonly data = new Map<string, string>();
-  get(key: string): string | null {
-    return this.data.get(key) ?? null;
-  }
-  set(key: string, value: string): boolean {
-    this.data.set(key, value);
-    return true;
-  }
-  remove(key: string): void {
-    this.data.delete(key);
-  }
-}
+/** Stockage en mémoire (partagé : `test/support/fake-host.ts`), conservé sous ce nom pour les tests existants. */
+export { FakeStorage as MemoryStorage };
 
 export interface Presentation {
   surface: Uint8Array;
@@ -148,7 +138,7 @@ export class TestHost implements Host {
   seconds = 1_700_000_000;
   readonly input = new Input();
   readonly audio = new FakeAudio(() => this.time);
-  readonly storage = new MemoryStorage();
+  readonly storage = new FakeStorage();
   readonly presentations: Presentation[] = [];
   readonly loaded: string[] = [];
   /** Vrai après `exit()` (sortie du jeu). */

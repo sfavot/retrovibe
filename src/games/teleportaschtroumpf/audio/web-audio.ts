@@ -1,3 +1,4 @@
+import { createMonoBuffer, u8ToFloat32 } from "../../../audio/pcm";
 import type { AudioBackend, PcmSound } from "./backend";
 
 /**
@@ -59,10 +60,7 @@ export class WebAudioBackend implements AudioBackend {
   private buffer(ctx: AudioContext, sound: PcmSound): AudioBuffer {
     let buffer = this.buffers.get(sound.samples);
     if (buffer) return buffer;
-    // `createBuffer` exige au moins 3000 Hz.
-    buffer = ctx.createBuffer(1, sound.samples.length, Math.max(3000, sound.sampleRate));
-    const out = buffer.getChannelData(0);
-    for (let i = 0; i < out.length; i++) out[i] = (sound.samples[i] - 128) / 128;
+    buffer = createMonoBuffer(ctx, u8ToFloat32(sound.samples), sound.sampleRate);
     this.buffers.set(sound.samples, buffer);
     return buffer;
   }

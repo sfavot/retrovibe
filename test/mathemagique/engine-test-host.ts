@@ -4,7 +4,8 @@ import type { AudioSink, MidiSink, PcmSound, WaveHandle } from "../../src/games/
 import { GameFiles, type GameFileEntry } from "../../src/games/mathemagique/data/files";
 import type { Engine } from "../../src/games/mathemagique/engine/engine";
 import type { Frame } from "../../src/games/mathemagique/engine/graphics/frame";
-import type { CursorKind, Host, HostStorage } from "../../src/games/mathemagique/engine/host";
+import type { CursorKind, Host } from "../../src/games/mathemagique/engine/host";
+import { FakeStorage } from "../support/fake-host";
 import { Input, type MouseButton } from "../../src/games/mathemagique/engine/input";
 
 const ORIGINAL = resolve(import.meta.dirname, "../../original/mathemagique");
@@ -95,22 +96,8 @@ export class FakeAudio implements AudioSink {
   }
 }
 
-export class MemoryStorage implements HostStorage {
-  readonly data = new Map<string, string>();
-
-  get(key: string): string | null {
-    return this.data.get(key) ?? null;
-  }
-
-  set(key: string, value: string): boolean {
-    this.data.set(key, value);
-    return true;
-  }
-
-  remove(key: string): void {
-    this.data.delete(key);
-  }
-}
+/** Stockage en mémoire (partagé : `test/support/fake-host.ts`), conservé sous ce nom pour les tests existants. */
+export { FakeStorage as MemoryStorage };
 
 /** Image présentée, copiée. */
 export interface CapturedFrame {
@@ -136,7 +123,7 @@ export class TestHost implements Host {
   unix = 1_700_000_000_000;
   readonly input = new Input();
   readonly audio = new FakeAudio(() => this.time);
-  readonly storage = new MemoryStorage();
+  readonly storage = new FakeStorage();
   readonly frames: CapturedFrame[] = [];
   readonly cursors: CursorKind[] = [];
   /** Chemins demandés à `loadFile`, dans l'ordre. */

@@ -1,14 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { Archive } from "../../src/games/lost-in-time/data/archive";
+import { originalFiles } from "../support/original";
 
-const ORIGINAL = resolve(import.meta.dirname, "../../original/lost-in-time");
+const original = originalFiles("lost-in-time", "INTRO.STK");
 
 /** Les tests qui dépendent des fichiers du jeu sont ignorés si ceux-ci sont absents. */
-export const hasOriginalFiles = existsSync(resolve(ORIGINAL, "INTRO.STK"));
+export const hasOriginalFiles = original.has;
 
 export function readOriginal(name: string): Uint8Array {
-  return readFileSync(resolve(ORIGINAL, name));
+  return original.read(name);
 }
 
 const archives = new Map<string, Archive>();

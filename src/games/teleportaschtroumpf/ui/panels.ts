@@ -1,5 +1,5 @@
 import { decodeCp437, encodeCp437 } from "../../../data/cp437";
-import { extensionOf, baseName, type GameFiles } from "../data/files";
+import { extensionOf, baseName } from "../data/files";
 import { LETTER_SPACING, advance, parsePfn } from "../data/font";
 import { parseHy8, type Hy8 } from "../data/hy8";
 import { SCREEN_HEIGHT, SCREEN_WIDTH, parseMcg, parsePal } from "../data/mcg";
@@ -8,32 +8,12 @@ import { MutFlag, parseMut, parsePrc } from "../data/mut";
 import { parseDescription, parseKeyedTexts } from "../data/text";
 import { parseVoc, vocToFloat32 } from "../data/voc";
 import { boundsOf, placeFrame, placeSprite, type Bounds, type PlacedImage } from "../engine/sprites";
-import {
-  formatSize,
-  h,
-  indexedCanvas,
-  makeCanvas,
-  paintIndexed,
-  paintPlaced,
-  paletteSwatch,
-  paletteTable,
-} from "./render";
+import { formatSize, h, hexDump, paletteSwatch } from "../../../ui/asset-viewer/helpers";
+import type { Panel, PanelContext } from "../../../ui/asset-viewer/viewer";
+import { indexedCanvas, makeCanvas, paintIndexed, paintPlaced, paletteTable } from "./render";
 
-/** Ce que reçoit un panneau : le fichier ouvert et de quoi en charger d'autres. */
-export interface PanelContext {
-  files: GameFiles;
-  path: string;
-  /** Octets du fichier. */
-  bytes: Uint8Array;
-  url: string;
-  fetchBytes(path: string): Promise<Uint8Array>;
-  /** Contexte audio partagé, à n'appeler qu'après un geste de l'utilisateur. */
-  audio(): AudioContext;
-  /** Enregistre un nettoyage appelé quand un autre fichier est ouvert. */
-  onDispose(fn: () => void): void;
-}
-
-export type Panel = (ctx: PanelContext) => Promise<HTMLElement> | HTMLElement;
+/** Rendu d'un fichier : un panneau de la visionneuse est un `Render` associé à ses extensions (voir `PANELS`). */
+type Render = (ctx: PanelContext) => Promise<HTMLElement> | HTMLElement;
 
 const SCALE = 2;
 
@@ -71,7 +51,7 @@ function palettesNear(ctx: PanelContext): string[] {
   return [...candidates.filter((p) => p.startsWith(folder)), ...candidates.filter((p) => !p.startsWith(folder))];
 }
 
-const mcgPanel: Panel = (ctx) => {
+const mcgPanel: Render = (ctx) => {
   const mcg = parseMcg(ctx.bytes);
   const canvas = indexedCanvas(mcg.pixels, SCREEN_WIDTH, SCREEN_HEIGHT, paletteTable(mcg.palette, false), SCALE);
   return h(
@@ -83,12 +63,12 @@ const mcgPanel: Panel = (ctx) => {
   );
 };
 
-const palPanel: Panel = (ctx) => {
+const palPanel: Render = (ctx) => {
   const palette = parsePal(ctx.bytes);
   return h("div", {}, section("Palette", paletteSwatch(palette, 18)));
 };
 
-const hy8Panel: Panel = async (ctx) => {
+const hy8Panel: Render = async (ctx) => {
   const hy8 = parseHy8(ctx.bytes);
   const root = h("div", {});
   const palettes = palettesNear(ctx);
@@ -234,7 +214,7 @@ function animationSection(hy8: Hy8, table: Uint32Array, register: (stop: () => v
   return wrap;
 }
 
-const muxPanel: Panel = (ctx) => {
+const muxPanel: Render = (ctx) => {
   const decoder = new MuxDecoder(ctx.bytes);
   const { header } = decoder;
   const fps = header.framesPerSecond;
@@ -375,7 +355,7 @@ const muxPanel: Panel = (ctx) => {
   );
 };
 
-const vocPanel: Panel = (ctx) => {
+const vocPanel: Render = (ctx) => {
   const voc = parseVoc(ctx.bytes);
   const data = vocToFloat32(voc);
   const wave = makeCanvas(640, 80);
@@ -420,7 +400,7 @@ const vocPanel: Panel = (ctx) => {
   );
 };
 
-const pfnPanel: Panel = (ctx) => {
+const pfnPanel: Render = (ctx) => {
   const font = parsePfn(ctx.bytes);
   const input = h("input", { type: "text", value: "Schtroumpf à la Une ! 0123456789", size: "40" });
   const preview = makeCanvas(1, 1);
@@ -478,7 +458,7 @@ function flagNames(flags: number): string {
   return names.length ? names.join(", ") : "aucun";
 }
 
-const mutPanel: Panel = async (ctx) => {
+const mutPanel: Render = async (ctx) => {
   const mut = parseMut(ctx.bytes);
   const palettePath = ctx.files.resolve(baseName(ctx.path).replace(/\.[^.]+$/, ".PAL"), dir(ctx.path).split("/").pop());
   const root = h("div", {});
@@ -509,7 +489,7 @@ const mutPanel: Panel = async (ctx) => {
   return root;
 };
 
-const prcPanel: Panel = (ctx) => {
+const prcPanel: Render = (ctx) => {
   const sequence = parsePrc(ctx.bytes);
   const mutPath = ctx.files.resolve(baseName(ctx.path).replace(/\.[^.]+$/, ".MUT"), dir(ctx.path).split("/").pop());
   return h(
@@ -520,7 +500,7 @@ const prcPanel: Panel = (ctx) => {
   );
 };
 
-const textPanel: Panel = (ctx) => {
+const textPanel: Render = (ctx) => {
   const text = decodeCp437(ctx.bytes);
   const ext = extensionOf(ctx.path);
   const extra: Node[] = [];
@@ -533,18 +513,9 @@ const textPanel: Panel = (ctx) => {
   return h("div", {}, ...extra, h("pre", {}, text));
 };
 
-function hexDump(bytes: Uint8Array, max = 256): string {
-  const lines: string[] = [];
-  for (let i = 0; i < Math.min(bytes.length, max); i += 16) {
-    const row = [...bytes.subarray(i, i + 16)];
-    lines.push(`${i.toString(16).padStart(6, "0")}  ${row.map((b) => b.toString(16).padStart(2, "0")).join(" ")}`);
-  }
-  return lines.join("\n");
-}
+const rawPanel: Render = (ctx) => h("div", {}, info(["Taille", formatSize(ctx.bytes.length)]), h("pre", {}, hexDump(ctx.bytes)));
 
-const rawPanel: Panel = (ctx) => h("div", {}, info(["Taille", formatSize(ctx.bytes.length)]), h("pre", {}, hexDump(ctx.bytes)));
-
-export const PANELS: Record<string, Panel> = {
+const BY_EXTENSION: Record<string, Render> = {
   MCG: mcgPanel,
   PAL: palPanel,
   HY8: hy8Panel,
@@ -557,10 +528,14 @@ export const PANELS: Record<string, Panel> = {
   ION: textPanel,
 };
 
-/** Panneau d'un fichier ; les fichiers sans extension sont essayés comme MUX (signature 0xaa07). */
-export function panelFor(path: string, bytes: Uint8Array): Panel {
-  const ext = extensionOf(path);
-  if (PANELS[ext]) return PANELS[ext];
-  if (ext === "" && bytes.length > 4 && bytes[0] === 0x07 && bytes[1] === 0xaa) return muxPanel;
-  return rawPanel;
+/** Fichier sans extension à signature MUX (0xaa07 en petit-boutiste). */
+function isExtensionlessMux(path: string, bytes: Uint8Array): boolean {
+  return extensionOf(path) === "" && bytes.length > 4 && bytes[0] === 0x07 && bytes[1] === 0xaa;
 }
+
+/** Panneaux du Téléportaschtroumpf, du plus précis au plus général (le dernier prend tout le reste). */
+export const PANELS: Panel[] = [
+  { matches: (entry) => Object.hasOwn(BY_EXTENSION, extensionOf(entry.path)), render: (ctx) => BY_EXTENSION[extensionOf(ctx.path)](ctx) },
+  { matches: (entry, bytes) => isExtensionlessMux(entry.path, bytes), render: muxPanel },
+  { matches: () => true, render: rawPanel },
+];

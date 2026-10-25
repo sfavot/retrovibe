@@ -1,7 +1,7 @@
 import { copy } from "./app";
 import { h } from "../../../ui/dom";
 import { readSave } from "../scenes/save";
-import { localStorageStore } from "./browser-host";
+import { localStorageStore } from "../../../ui/local-storage";
 import { titleScreen } from "../../../ui/title-screen";
 
 /** Jaquette du jeu, servie depuis `original/teleportaschtroumpf/` (comme sur la carte de l'accueil). */
@@ -13,7 +13,7 @@ export const COVER_SIZE: [number, number] = [949, 949];
 
 /** Une partie interrompue peut être reprise (sauvegarde valide ; une illisible est effacée au passage). */
 export function hasSavedGame(): boolean {
-  return readSave(localStorageStore) !== null;
+  return readSave(localStorageStore()) !== null;
 }
 
 /**

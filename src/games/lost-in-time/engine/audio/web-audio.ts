@@ -1,3 +1,4 @@
+import { createMonoBuffer, s8ToFloat32 } from "../../../../audio/pcm";
 import type { SoundBackend } from "./backend";
 import { WorkletAdlibOutput } from "./adlib/worklet-output";
 import type { Mutable } from "./prefs";
@@ -67,10 +68,7 @@ export class WebAudioSoundBackend implements SoundBackend, Mutable {
   private buffer(ctx: AudioContext, pcm: Int8Array, rate: number): AudioBuffer {
     let buffer = this.buffers.get(pcm);
     if (buffer && buffer.sampleRate === rate) return buffer;
-    // AudioContext.createBuffer exige au moins 3000 Hz
-    buffer = ctx.createBuffer(1, pcm.length, Math.max(3000, rate));
-    const out = buffer.getChannelData(0);
-    for (let i = 0; i < pcm.length; i++) out[i] = pcm[i] / 128;
+    buffer = createMonoBuffer(ctx, s8ToFloat32(pcm), rate);
     this.buffers.set(pcm, buffer);
     return buffer;
   }

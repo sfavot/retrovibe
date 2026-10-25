@@ -1,3 +1,4 @@
+import type { BaseHost } from "../../../engine/host";
 import type { AudioBackend } from "../audio/backend";
 import type { Input } from "./input";
 
@@ -8,29 +9,20 @@ import type { Input } from "./input";
  * Implémentations : `ui/browser-host.ts` (navigateur) et l'hôte de test (`test/teleportaschtroumpf/engine-test-host.ts`).
  */
 
-/** Stockage clé/valeur persistant ; les erreurs (quota, mode privé) sont avalées par l'implémentation. */
-export interface HostStorage {
-  get(key: string): string | null;
-  /** Renvoie faux si l'écriture a échoué. */
-  set(key: string, value: string): boolean;
-  /** Efface la clé. */
-  remove(key: string): void;
-}
+/** Stockage clé/valeur persistant (défini dans `src/engine/storage.ts`, réexporté ici pour les hôtes du jeu). */
+export type { HostStorage } from "../../../engine/storage";
 
-export interface Host {
+export interface Host extends BaseHost {
   /**
    * Charge un fichier du jeu : nom d'origine en minuscules (`s22a001d.mcg`, `s52d0.mux`) ou chemin
    * `DATA/...`. La résolution passe par `resolveGameFile` (`engine/paths.ts`). Rejette si le fichier n'existe pas.
    */
   loadFile(name: string): Promise<Uint8Array>;
-  /** Millisecondes monotones. */
-  now(): number;
   /** Secondes Unix (horloge murale) : graine du hasard et verrou parental. */
   unixSeconds(): number;
   /** Entrées abstraites ; l'hôte les alimente depuis clavier / souris, le moteur les lit. */
   readonly input: Input;
   readonly audio: AudioBackend;
-  readonly storage: HostStorage;
   /**
    * Affiche une image : `surface` = 320×200 indices de palette (tampon de travail A),
    * `palette` = 768 octets RVB 8 bits déjà prêts pour l'écran (fondu, couleur 0 noire et quantification VGA appliqués).

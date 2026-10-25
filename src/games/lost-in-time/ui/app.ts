@@ -9,9 +9,10 @@ import { createSystem, type System } from "../engine/system";
 import { CanvasPresenter } from "../render/canvas";
 import { copy } from "../copy";
 import { copy as shared } from "../../../ui/copy";
+import { mountGameShell, type GameShell } from "../../../ui/game-shell";
 import { h } from "../../../ui/dom";
+import { bindCanvasPointer, bindKeyboard } from "../../../ui/pointer";
 import type { BrowserHost } from "./browser-host";
-import { TouchPress } from "./touch-press";
 
 /**
  * Contenu permanent du champ caché de saisie : il reste toujours un caractère à effacer, sinon le
@@ -21,13 +22,6 @@ const TEXT_SENTINEL = " ";
 
 /** Interface du jeu : un canvas mis à l'échelle (4:3), les entrées du navigateur, l'audio et l'état de fin / d'erreur. */
 export class App {
-  private readonly canvas = h("canvas", {
-    class: "lit-canvas",
-    width: 320,
-    height: 200,
-    tabindex: 0,
-    "aria-label": copy.canvasLabel,
-  });
   /** Champ invisible qui reçoit le clavier virtuel pendant une saisie (un canvas ne l'ouvre pas). */
   private readonly textField = h("input", {
     class: "lit-text-field",
@@ -40,14 +34,13 @@ export class App {
     enterkeyhint: "done",
     "aria-labelledby": "lit-keyboard",
   });
-  private readonly stage = h("div", { class: "lit-stage" }, this.canvas, this.textField);
+  private readonly shell: GameShell;
   private readonly soundBackend = new WebAudioSoundBackend();
   private readonly cdBackend: HtmlCdBackend;
   private readonly system: System;
   private readonly game: Game;
   private readonly presenter: CanvasPresenter;
   private readonly prefs: AudioPrefs;
-  private readonly soundButton: HTMLButtonElement;
   private readonly menuButton: HTMLButtonElement;
   private readonly inventoryButton: HTMLButtonElement;
   private readonly keyboardButton: HTMLButtonElement;
@@ -68,45 +61,46 @@ export class App {
       peekFile: (name) => host.peek(name),
     });
     this.game = new Game(host, this.system.sys);
-    this.presenter = new CanvasPresenter(this.canvas, this.system.gfx, host.input);
     this.prefs = new AudioPrefs(new LocalStorageStore(), [this.soundBackend, this.cdBackend]);
-    this.soundButton = this.soundToggle();
     // la zone qui affiche la barre du haut ne couvre que ses deux premières lignes : trop fine pour un doigt
     this.menuButton = this.touchButton(copy.menu, () => this.movePointerToTop(), { "aria-label": copy.menuLabel });
     this.inventoryButton = this.touchButton(copy.inventory, () => host.input.click(2), { "aria-label": copy.inventoryLabel });
     this.keyboardButton = this.touchButton(copy.keyboard, () => this.textField.focus({ preventScroll: true }), { id: "lit-keyboard", hidden: true });
     this.confirmButton = this.touchButton(copy.confirm, () => host.input.pressKey(KEY_RETURN), { hidden: true });
+    // deux groupes : en paysage tactile, l'un à gauche de l'écran, l'autre à droite (sous les pouces) ; ailleurs, une seule rangée
     const touchBar = h(
       "div",
       { class: "touch-bar lit-touch-bar" },
-      this.menuButton,
-      this.inventoryButton,
-      this.touchButton(copy.skip, () => host.input.pressKey(KEY_ESCAPE), { "aria-label": copy.skipLabel }),
-      this.keyboardButton,
-      this.confirmButton,
+      h(
+        "div",
+        { class: "lit-touch-group" },
+        this.menuButton,
+        this.touchButton(copy.skip, () => host.input.pressKey(KEY_ESCAPE), { "aria-label": copy.skipLabel }),
+        this.keyboardButton,
+      ),
+      h("div", { class: "lit-touch-group" }, this.inventoryButton, this.confirmButton),
     );
-    const footer = h(
-      "div",
-      { class: "lit-footer" },
-      h("a", { class: "back-link", href: "#/" }, shared.backToGames),
-      h("div", { class: "lit-toggles" }, this.soundButton),
-    );
-    container.replaceChildren(h("main", { class: "lit" }, this.stage, touchBar, footer));
+    this.shell = mountGameShell({
+      container,
+      logicalWidth: 320,
+      logicalHeight: 200,
+      fit: "css",
+      copy: { canvasLabel: copy.canvasLabel, sound: copy.sound },
+      backLabel: shared.backToGames,
+      classes: { stage: "lit-stage", canvas: "lit-canvas", footer: "lit-footer" },
+      stageChildren: [this.textField],
+      afterStage: [touchBar],
+    });
+    this.presenter = new CanvasPresenter(this.canvas, this.system.gfx, host.input);
     this.bindInput();
     this.bindTextField();
-    this.bindLifecycle();
     if (import.meta.env.DEV) {
       Object.assign(window, { __lit: { game: this.game, host, ...this.system } });
     }
   }
 
-  private soundToggle(): HTMLButtonElement {
-    const button = h("button", { type: "button", class: "toggle", "aria-pressed": String(this.prefs.isEnabled()) }, copy.sound);
-    button.addEventListener("click", () => {
-      button.setAttribute("aria-pressed", String(this.prefs.toggle()));
-      this.unlockAudio();
-    });
-    return button;
+  private get canvas(): HTMLCanvasElement {
+    return this.shell.canvas;
   }
 
   /**
@@ -125,38 +119,34 @@ export class App {
   }
 
   /**
+   * Lance la page, la boucle d'affichage et le jeu (INTRO.TOT) ; les erreurs s'affichent à la place de l'écran.
    * Onglet masqué : le jeu s'arrête (horloge, audio CD et effets) et repart au même point au retour,
    * pour que la musique et les scripts restent synchronisés. Autre onglet : la préférence de son suit.
    */
-  private bindLifecycle(): void {
-    const sync = (): void => {
-      const hidden = document.hidden;
-      this.host.setPaused(hidden);
-      if (hidden) {
-        this.cdBackend.suspend();
-        this.soundBackend.suspend();
-      } else {
-        this.cdBackend.resume();
-        this.soundBackend.resume();
-      }
-    };
-    document.addEventListener("visibilitychange", sync);
-    if (document.hidden) sync();
-    window.addEventListener("storage", () => {
-      if (this.prefs.reload()) this.soundButton.setAttribute("aria-pressed", String(this.prefs.isEnabled()));
-    });
-  }
-
-  /** Lance la boucle d'affichage et le jeu (INTRO.TOT) ; les erreurs s'affichent à la place de l'écran. */
   run(): void {
     // run() part du clic « Jouer » : c'est le geste qui débloque le contexte audio
     this.unlockAudio();
-    const frame = (): void => {
-      this.presenter.present();
-      this.syncTextEntry();
-      requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
+    this.shell.start({
+      sound: { prefs: this.prefs, unlock: () => this.unlockAudio() },
+      onPause: (hidden) => {
+        this.host.setPaused(hidden);
+        if (hidden) {
+          this.cdBackend.suspend();
+          this.soundBackend.suspend();
+        } else {
+          this.cdBackend.resume();
+          this.soundBackend.resume();
+        }
+      },
+      onDispose: () => {
+        this.cdBackend.suspend();
+        this.soundBackend.suspend();
+      },
+      onFrame: () => {
+        this.presenter.present();
+        this.syncTextEntry();
+      },
+    });
     this.canvas.focus();
     this.game.start().then(
       () => this.showOverlay(copy.ended, true),
@@ -168,14 +158,7 @@ export class App {
   }
 
   private showOverlay(message: string, replay: boolean): void {
-    this.stage.append(
-      h(
-        "div",
-        { class: "lit-overlay", role: "alert" },
-        h("p", {}, message),
-        replay && h("button", { type: "button", class: "primary", onclick: () => location.reload() }, copy.replay),
-      ),
-    );
+    this.shell.showOverlay(message, replay ? { label: copy.replay, onClick: () => location.reload() } : undefined);
   }
 
   /** L'audio ne démarre qu'après un geste de l'utilisateur (politique d'autoplay des navigateurs). */
@@ -184,12 +167,10 @@ export class App {
     this.cdBackend.unlock();
   }
 
-  /** Position du pointeur (coordonnées de la page) dans l'écran du jeu (320x200, ou 640x400 pour l'écran-titre). */
-  private movePointer(clientX: number, clientY: number): void {
-    const rect = this.canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    const { screenWidth: w, screenHeight: height } = this.system.gfx.core;
-    this.host.input.pointerMove(((clientX - rect.left) * w) / rect.width, ((clientY - rect.top) * height) / rect.height, w, height);
+  /** Taille logique de l'écran du jeu (320x200, ou 640x400 pour l'écran-titre). */
+  private screenSize(): { width: number; height: number } {
+    const { screenWidth, screenHeight } = this.system.gfx.core;
+    return { width: screenWidth, height: screenHeight };
   }
 
   /** Curseur au bord haut de l'écran du jeu, sans clic : le jeu affiche sa barre du haut. */
@@ -201,57 +182,32 @@ export class App {
 
   /** Souris et stylet : boutons tenus tels quels. Doigt : gestes de TouchPress (toucher, appui long, glissement). */
   private bindInput(): void {
-    const canvas = this.canvas;
     const input = this.host.input;
-    const touch = new TouchPress({
-      move: (x, y) => this.movePointer(x, y),
-      click: (button) => {
-        if (button === 2) navigator.vibrate?.(15);
-        input.click(button);
+    const move = (x: number, y: number): void => {
+      const { width, height } = this.screenSize();
+      input.pointerMove(x, y, width, height);
+    };
+    bindCanvasPointer(
+      this.canvas,
+      () => this.screenSize(),
+      {
+        move,
+        down: (button, x, y) => {
+          move(x, y);
+          input.pointerDown(button);
+        },
+        up: (button, x, y) => {
+          move(x, y);
+          input.pointerUp(button);
+        },
+        tap: (button) => {
+          if (button === 2) navigator.vibrate?.(15);
+          input.click(button);
+        },
       },
-    });
-    const isTouch = (e: PointerEvent): boolean => e.pointerType === "touch";
-    canvas.addEventListener("pointermove", (e) => {
-      if (isTouch(e)) touch.move(e.pointerId, e.clientX, e.clientY);
-      else this.movePointer(e.clientX, e.clientY);
-    });
-    canvas.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      canvas.focus();
-      canvas.setPointerCapture(e.pointerId);
-      this.unlockAudio();
-      if (isTouch(e)) {
-        touch.down(e.pointerId, e.clientX, e.clientY);
-        return;
-      }
-      this.movePointer(e.clientX, e.clientY);
-      input.pointerDown(e.button);
-    });
-    canvas.addEventListener("pointerup", (e) => {
-      // iOS ne débloque l'audio que sur certains gestes (touchend), pas au pointerdown
-      this.unlockAudio();
-      if (isTouch(e)) {
-        touch.up(e.pointerId, e.clientX, e.clientY);
-        return;
-      }
-      this.movePointer(e.clientX, e.clientY);
-      input.pointerUp(e.button);
-    });
-    canvas.addEventListener("pointercancel", (e) => {
-      if (isTouch(e)) {
-        touch.cancel(e.pointerId);
-        return;
-      }
-      this.movePointer(e.clientX, e.clientY);
-      input.pointerUp(e.button);
-    });
-    canvas.addEventListener("touchend", () => this.unlockAudio());
-    // Le clic droit est un bouton du jeu.
-    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-    canvas.addEventListener("keydown", (e) => {
-      this.unlockAudio();
-      if (input.keyDown(e)) e.preventDefault();
-    });
+      { onGesture: () => this.unlockAudio() },
+    );
+    bindKeyboard(this.canvas, { keyDown: (e) => input.keyDown(e) }, () => this.unlockAudio());
   }
 
   /**

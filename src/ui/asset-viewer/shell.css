@@ -1,0 +1,35 @@
+/* Mise en page commune des visionneuses de ressources (outil de développement) : barre latérale + panneau du fichier. */
+:root { color-scheme: dark; font: 13px/1.4 ui-monospace, Menlo, monospace; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; background: #15161a; color: #d8dae0; }
+.asset-viewer { display: grid; grid-template-columns: 320px 1fr; height: 100%; }
+.asset-viewer > aside { overflow: auto; border-right: 1px solid #2a2c33; padding: 8px; }
+.asset-viewer > main { overflow: auto; padding: 16px; }
+aside input[type="search"] { width: 100%; margin-bottom: 8px; }
+details > summary { cursor: pointer; padding: 2px 0; }
+details ul { list-style: none; margin: 0 0 4px 12px; padding: 0; }
+.file { display: block; width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: 1px 4px; cursor: pointer; font: inherit; }
+.file:hover { background: #23252c; }
+.file[aria-current="true"] { background: #2d4a7a; }
+.file .ext { color: #7f8696; margin-left: 6px; }
+h2 { margin: 0 0 8px; font-size: 15px; word-break: break-all; }
+h3 { margin: 20px 0 8px; font-size: 13px; color: #9aa1b2; }
+.info { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 0 0 12px; }
+.info dt { color: #7f8696; }
+.info dd { margin: 0; }
+canvas { image-rendering: pixelated; display: block; max-width: none; }
+canvas.alpha { background: repeating-conic-gradient(#2b2d34 0 25%, #1f2026 0 50%) 0 0 / 12px 12px; }
+.swatch { cursor: crosshair; }
+.grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.grid figure { margin: 0; }
+figcaption { color: #7f8696; font-size: 11px; margin-top: 2px; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.stage { min-height: 24px; }
+.preview { margin: 8px 0; padding: 8px; background: #0b0b0d; overflow-x: auto; }
+.error { color: #ff7b7b; white-space: pre-wrap; }
+.empty, .loading { color: #7f8696; }
+pre { white-space: pre-wrap; margin: 0; }
+button, select, input { font: inherit; background: #23252c; color: inherit; border: 1px solid #3a3d47; padding: 2px 8px; }
+button { cursor: pointer; }
+button:focus-visible, .file:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #6aa2ff; }
+@media (max-width: 800px) { .asset-viewer { grid-template-columns: 1fr; grid-template-rows: 40vh 1fr; } }

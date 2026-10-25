@@ -4,22 +4,14 @@
  * (`10a8:1473`). Un seul générateur pour tout le jeu. L'original le graine paresseusement sur l'heure système
  * (`1098:060f`) : ici la graine est injectée, donc le jeu est reproductible à graine fixe.
  *
- * Module pur : aucune dépendance au navigateur.
+ * Module pur : aucune dépendance au navigateur. Mécanique dans `Lcg` (`src/engine/rng.ts`).
  */
 
-const MULTIPLIER = 0x343fd;
-const INCREMENT = 0x269ec3;
+import { Lcg, msvcRand16 } from "../../../engine/rng";
 
-export class MsvcRandom {
-  private state: number;
-
+export class MsvcRandom extends Lcg {
   constructor(seed = 0) {
-    this.state = seed >>> 0;
-  }
-
-  /** Remplace l'état (la graine initiale est l'état de départ : le premier tirage utilise l'état suivant). */
-  seed(seed: number): void {
-    this.state = seed >>> 0;
+    super(seed, msvcRand16);
   }
 
   /** État interne (32 bits) : `seed(state)` reprend la suite des tirages exactement là. */
@@ -27,24 +19,17 @@ export class MsvcRandom {
     return this.state;
   }
 
-  /** Avance d'un pas et renvoie les 16 bits hauts (0 à 65535). */
-  private step(): number {
-    this.state = (Math.imul(this.state, MULTIPLIER) + INCREMENT) >>> 0;
-    return this.state >>> 16;
-  }
-
   /**
    * `10a8:1473(n)` : entier de 0 à `n` inclus. `n ≤ 0` renvoie 0 **sans avancer l'état** (comme l'original pour `n = 0`).
    * `n` doit rester sous 65535 (l'original divise en 16 bits non signés).
    */
   rand(n: number): number {
-    if (n <= 0) return 0;
-    return this.step() % (n + 1);
+    return this.inclusive(n);
   }
 
-  /** `10a8:14c1(n)` = `rand(n − 1)` : entier de 0 à `n − 1` (Bowling, Super Sticklers, Puzzle Patterns). `n ≤ 1` renvoie 0. */
+  /** `10a8:14c1(n)` = `rand(n − 1)` : entier de 0 à `n − 1` (Bowling, Super Sticklers, Puzzle Patterns). `n ≤ 1` renvoie 0 sans avancer. */
   rand1(n: number): number {
-    return this.rand(n - 1);
+    return this.inclusive(n - 1);
   }
 
   /** Synonyme de `rand1`, lisible là où la spec écrit « dans [0, n[ ». */

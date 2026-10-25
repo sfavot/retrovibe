@@ -1,3 +1,5 @@
+import { FixedStepClock } from "../../../engine/clock";
+
 /**
  * Durée d'un tick (ms). L'original arme `timeSetEvent((60 + 999) / 60 = 17 ms)` (engine.md §1.1 étape 6, §4.6) : le tick global
  * `1108:8722` avance donc de 17 ms, soit 58,8 ticks/s, et non de 1000/60 = 16,67 ms. On garde **17 ms** : toutes les durées du jeu
@@ -22,55 +24,20 @@ export function msToTicks(ms: number): number {
 }
 
 /**
- * Horloge à pas fixe de 17 ms alimentée par `host.now()`.
+ * Horloge à pas fixe de 17 ms alimentée par `host.now()`. Mécanique de `FixedStepClock` (`src/engine/clock.ts`) ;
+ * ajoute l'unité ms, les échéances et les chronomètres.
  *
  * Usage : `clock.update(now)` une fois par image affichée, puis `while (clock.consume()) { …un tick… }`.
  * `ticks` n'avance que dans `consume()`, donc le code d'un tick voit la valeur de ce tick.
  */
-export class Clock {
-  /** Ticks de jeu écoulés depuis le démarrage. */
-  ticks = 0;
-  private last: number | null = null;
-  /** Temps accumulé et pas encore converti en ticks (ms). */
-  private accumulator = 0;
-  /** Ticks gagnés par `update` et pas encore consommés. */
-  private pending = 0;
+export class Clock extends FixedStepClock {
+  constructor() {
+    super({ tickMs: TICK_MS, maxCatchUpTicks: MAX_CATCH_UP_TICKS });
+  }
 
   /** Temps de jeu écoulé (ms), au tick près. */
   get ms(): number {
     return this.ticks * TICK_MS;
-  }
-
-  /** Accumule le temps écoulé depuis l'appel précédent ; le premier appel ne fait que fixer l'origine. */
-  update(nowMs: number): void {
-    if (this.last === null) {
-      this.last = nowMs;
-      return;
-    }
-    const dt = Math.max(nowMs - this.last, 0);
-    this.last = nowMs;
-    this.accumulator += dt;
-    // Petite tolérance : 1000/60 ms répétés ne doivent pas perdre un tick à cause des flottants.
-    const whole = Math.floor(this.accumulator / TICK_MS + 1e-6);
-    this.accumulator = Math.max(this.accumulator - whole * TICK_MS, 0);
-    this.pending = Math.min(this.pending + whole, MAX_CATCH_UP_TICKS);
-  }
-
-  /**
-   * Oublie le temps écoulé depuis le dernier `update` (reprise après une pause) : le prochain appel ne fait que fixer
-   * une nouvelle origine, sans rattraper l'absence. Les ticks déjà gagnés mais pas consommés restent dus.
-   */
-  resync(): void {
-    this.last = null;
-    this.accumulator = 0;
-  }
-
-  /** Consomme un tick en attente : vrai si un tick vient d'être compté. */
-  consume(): boolean {
-    if (this.pending <= 0) return false;
-    this.pending--;
-    this.ticks++;
-    return true;
   }
 
   /** Échéance dans `ticks` ticks (compte à rebours de l'original, `1108:871a`…`8721`). */

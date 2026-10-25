@@ -1,3 +1,5 @@
+import { prefixedStorage, type HostStorage } from "../../../engine/storage";
+import { localStorageStore } from "../../../ui/local-storage";
 import type { SaveSystem, VmContext } from "./host";
 import type { GraphicsSystems } from "./graphics";
 import type { Variables } from "./variables";
@@ -18,57 +20,29 @@ import type { Variables } from "./variables";
 
 // --- Stockage ----------------------------------------------------------------------------------
 
-export interface KeyValueStore {
-  get(key: string): string | null;
-  /** Faux si l'écriture a échoué (stockage plein ou bloqué). */
-  set(key: string, value: string): boolean;
-  remove(key: string): void;
-}
+/** Stockage clé / valeur (partagé : `src/engine/storage.ts`). */
+export type KeyValueStore = HostStorage;
 
-export class MemoryStore implements KeyValueStore {
-  readonly data = new Map<string, string>();
+export { MemoryStorage as MemoryStore } from "../../../engine/storage";
 
-  get(key: string): string | null {
-    return this.data.get(key) ?? null;
-  }
-
-  set(key: string, value: string): boolean {
-    this.data.set(key, value);
-    return true;
-  }
-
-  remove(key: string): void {
-    this.data.delete(key);
-  }
-}
-
-/** `localStorage`, qui peut être absent ou bloqué : on échoue sans bruit. */
+/** `localStorage` (qui peut être absent ou bloqué), clés préfixées : on échoue sans bruit. */
 export class LocalStorageStore implements KeyValueStore {
-  constructor(private readonly prefix = "lost-in-time:") {}
+  private readonly store: HostStorage;
+
+  constructor(prefix = "lost-in-time:") {
+    this.store = prefixedStorage(localStorageStore(), prefix);
+  }
 
   get(key: string): string | null {
-    try {
-      return localStorage.getItem(this.prefix + key);
-    } catch {
-      return null;
-    }
+    return this.store.get(key);
   }
 
   set(key: string, value: string): boolean {
-    try {
-      localStorage.setItem(this.prefix + key, value);
-      return true;
-    } catch {
-      return false;
-    }
+    return this.store.set(key, value);
   }
 
   remove(key: string): void {
-    try {
-      localStorage.removeItem(this.prefix + key);
-    } catch {
-      // ignoré
-    }
+    this.store.remove(key);
   }
 }
 

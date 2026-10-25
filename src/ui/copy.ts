@@ -6,4 +6,5 @@ export const copy = {
   homeTitle: "Choisissez votre jeu",
   play: "Jouer",
   backToGames: "← Tous les jeux",
+  fullscreen: "Plein écran",
 };

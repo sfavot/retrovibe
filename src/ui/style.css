@@ -1019,3 +1019,77 @@ a.button:hover {
     padding: 18px 16px 22px;
   }
 }
+
+/* Bouton « Plein écran » (`ui/fullscreen.ts`) : enfoncé tant que le jeu est en plein écran. */
+.fullscreen-button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Plein écran : la page du jeu remplit l'écran, sur le fond du site. Sans l'API (iPhone), elle couvre la fenêtre et la page ne défile plus. */
+.is-fullscreen {
+  overflow: auto;
+  background: radial-gradient(ellipse at top, #2a1f15, var(--bg) 70%);
+}
+
+.is-fullscreen:not(:fullscreen) {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.has-fullscreen,
+.has-fullscreen body {
+  overflow: hidden;
+}
+
+/* Indy sur écran tactile en paysage : l'écran (carré) sur toute la hauteur, les boutons Attaquer / Utiliser et le lien de retour
+   à sa gauche, le panneau à droite, qui défile s'il dépasse. */
+@media (pointer: coarse) and (orientation: landscape) {
+  .game-screen {
+    --stage: min(576px, calc(100dvh - 16px));
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 100dvh;
+    padding: 8px;
+  }
+
+  .play-column {
+    display: grid;
+    grid-template-columns: 6.5rem auto;
+    grid-template-rows: 1fr auto;
+    gap: 8px;
+  }
+
+  .play-column > .stage {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .play-column > .touch-bar {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .play-column > .touch-bar button {
+    flex: none;
+  }
+
+  .play-column > .back-link {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 0.9rem;
+  }
+
+  .game-screen > .sidebar {
+    flex: 0 1 300px;
+    width: auto;
+    min-width: 0;
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+  }
+}

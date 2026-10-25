@@ -72,6 +72,11 @@ export class Sidebar {
     );
   }
 
+  /** Ajoute une commande après le réglage de vitesse (« Plein écran », qui vise toute la page du jeu). */
+  addCommand(button: HTMLButtonElement): void {
+    this.speedButton.after(button);
+  }
+
   /** Affiche la vitesse courante sur le bouton de réglage ; ses changements ultérieurs sont annoncés (zone live). */
   setSpeed(ms: number): void {
     const label = copy.speedButton(copy.speeds[ms] ?? String(ms));

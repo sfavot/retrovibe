@@ -11,6 +11,7 @@ import { randomSeed } from "../engine/rng";
 import { WorldSize } from "../engine/world";
 import { VIEW_TILES, tileCanvas } from "../render/zone-renderer";
 import { copy } from "../copy";
+import { copy as shared } from "../../../ui/copy";
 import { h } from "../../../ui/dom";
 import { titleScreen } from "../../../ui/title-screen";
 import { GameView } from "./game-view";
@@ -113,7 +114,14 @@ export class App {
         copy.useItem,
       ),
     );
-    this.gameScreen = h("main", { class: "game-screen" }, h("div", { class: "play-column" }, this.view.element, touchBar), this.sidebar.element);
+    // Retour à l'accueil comme dans les autres jeux ; la partie est sauvegardée avant que la page ne se recharge.
+    const back = h("a", { class: "back-link", href: "#/", onclick: () => this.autosave() }, shared.backToGames);
+    this.gameScreen = h(
+      "main",
+      { class: "game-screen" },
+      h("div", { class: "play-column" }, this.view.element, touchBar, back),
+      this.sidebar.element,
+    );
     this.root = h("div", { class: "app" });
     container.replaceChildren(this.root);
     this.bindInput();

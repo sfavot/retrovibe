@@ -8,6 +8,8 @@ import { type Sector, SectorKind, WORLD_SIZE } from "../engine/world";
 import { IndexedFrame, PaletteBlitter, VIEW_PIXELS, VIEW_TILES, cameraFor, composeView } from "../render/zone-renderer";
 import { copy } from "../copy";
 import { h } from "../../../ui/dom";
+import { isRotated } from "../../../ui/fullscreen";
+import { toLogical } from "../../../ui/pointer";
 
 /** Tuiles du plan (locator) d'Indy : [non résolu, résolu]. */
 const LOCATOR = {
@@ -106,8 +108,10 @@ export class GameView implements Presenter {
     const game = this.game;
     if (!game) return null;
     const rect = this.canvas.getBoundingClientRect();
-    const x = Math.floor(((clientX - rect.left) / rect.width) * VIEW_TILES);
-    const y = Math.floor(((clientY - rect.top) / rect.height) * VIEW_TILES);
+    // Même repère que le pointeur des autres jeux, y compris en plein écran pivoté.
+    const at = toLogical(clientX, clientY, rect, { width: VIEW_TILES, height: VIEW_TILES }, isRotated(this.canvas));
+    const x = Math.floor(at.x);
+    const y = Math.floor(at.y);
     if (x < 0 || y < 0 || x >= VIEW_TILES || y >= VIEW_TILES) return null;
     const camera = cameraFor(game.zone, game.hero);
     return { x: x + camera.x, y: y + camera.y };

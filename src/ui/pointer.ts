@@ -3,6 +3,8 @@
  * droit réservé au jeu, appui long du doigt, et clavier. Chaque jeu garde sa propre traduction vers son moteur (`Input`).
  */
 
+import { isRotated } from "./fullscreen";
+
 /** Taille logique de l'écran du jeu (pixels du canvas, pas pixels CSS). */
 export interface LogicalSize {
   width: number;
@@ -12,13 +14,26 @@ export interface LogicalSize {
 /** Taille logique fixe, ou lue à chaque événement (Lost in Time passe de 320×200 à 640×400 selon l'écran). */
 export type LogicalSizeSource = LogicalSize | (() => LogicalSize);
 
-/** Position d'un point de la page (`clientX`, `clientY`) dans l'écran logique du jeu : tient compte de l'échelle et du décalage du canvas. */
+/**
+ * Position d'un point de la page (`clientX`, `clientY`) dans l'écran logique du jeu : tient compte de l'échelle et du décalage du canvas.
+ *
+ * `rotated` : la page est pivotée de 90° dans le sens horaire (plein écran en paysage sur un appareil tenu en portrait,
+ * `fullscreen.ts`). `rect` est alors le rectangle englobant du canvas pivoté : sa largeur est la hauteur du canvas, sa hauteur
+ * en est la largeur ; le haut du jeu est à droite de l'écran, sa gauche en haut.
+ */
 export function toLogical(
   clientX: number,
   clientY: number,
   rect: { left: number; top: number; width: number; height: number },
   size: LogicalSize,
+  rotated = false,
 ): { x: number; y: number } {
+  if (rotated) {
+    return {
+      x: ((clientY - rect.top) * size.width) / rect.height,
+      y: ((rect.left + rect.width - clientX) * size.height) / rect.width,
+    };
+  }
   return {
     x: ((clientX - rect.left) * size.width) / rect.width,
     y: ((clientY - rect.top) * size.height) / rect.height,
@@ -184,7 +199,7 @@ export function bindCanvasPointer(
   const locate = (clientX: number, clientY: number): { x: number; y: number } | null => {
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return null;
-    return toLogical(clientX, clientY, rect, size());
+    return toLogical(clientX, clientY, rect, size(), isRotated(canvas));
   };
   const gesturesOnly = handlers.tap !== undefined;
   const isTouch = (event: PointerEvent): boolean => event.pointerType === "touch";

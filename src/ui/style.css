@@ -1139,14 +1139,14 @@ a.button:hover {
    (premier à gauche, dernier à droite) et, en bas, le lien de retour (à gauche) et les boutons Son / Plein écran (à droite). */
 @media (pointer: coarse) and (orientation: landscape) {
   .game-shell {
-    --game-shell-aside: clamp(6.5rem, 16vw, 9rem);
+    --game-shell-aside: clamp(6.5rem, calc(var(--view-w, 100vw) * 0.16), 9rem);
     display: grid;
     grid-template-columns: var(--game-shell-aside) auto var(--game-shell-aside);
     grid-template-rows: 1fr auto;
     justify-content: center;
     align-content: center;
     gap: 8px;
-    min-height: 100dvh;
+    min-height: var(--view-h, 100dvh);
     padding: 8px;
   }
 
@@ -1205,11 +1205,11 @@ a.button:hover {
    à sa gauche, le panneau à droite, qui défile s'il dépasse. */
 @media (pointer: coarse) and (orientation: landscape) {
   .game-screen {
-    --stage: min(576px, calc(100dvh - 16px));
+    --stage: min(576px, calc(var(--view-h, 100dvh) - 16px));
     flex-wrap: nowrap;
     align-items: center;
     gap: 8px;
-    min-height: 100dvh;
+    min-height: var(--view-h, 100dvh);
     padding: 8px;
   }
 
@@ -1246,7 +1246,130 @@ a.button:hover {
     flex: 0 1 300px;
     width: auto;
     min-width: 0;
-    max-height: calc(100dvh - 16px);
+    max-height: calc(var(--view-h, 100dvh) - 16px);
     overflow-y: auto;
   }
+}
+
+/* Plein écran pivoté (appareil tenu en portrait, sans verrou d'orientation : `ui/fullscreen.ts`) : l'élément a la taille de la fenêtre
+   tournée d'un quart de tour (largeur = hauteur de la fenêtre) et pivote autour de son coin haut gauche, puis se replace. Les règles
+   de dimensions en `dvh` / `vw` passent par `--view-h` / `--view-w`, qui valent alors la hauteur et la largeur de l'élément. */
+.is-fullscreen.is-rotated {
+  --view-w: 100dvh;
+  --view-h: 100dvw;
+  inset: 0 auto auto 0;
+  width: 100dvh;
+  height: 100dvw;
+  min-height: 0;
+  transform-origin: 0 0;
+  transform: translateX(100dvw) rotate(90deg);
+}
+
+/* Mêmes dispositions que les deux blocs précédents pour le plein écran pivoté : la fenêtre est alors en portrait, la requête de média ne s'y applique pas. */
+.game-shell.is-rotated {
+  --game-shell-aside: clamp(6.5rem, calc(var(--view-w, 100vw) * 0.16), 9rem);
+  display: grid;
+  grid-template-columns: var(--game-shell-aside) auto var(--game-shell-aside);
+  grid-template-rows: 1fr auto;
+  justify-content: center;
+  align-content: center;
+  gap: 8px;
+  min-height: var(--view-h, 100dvh);
+  padding: 8px;
+}
+
+.game-shell.is-rotated > .game-shell-stage {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.game-shell.is-rotated > .touch-bar,
+.game-shell.is-rotated > .game-shell-footer {
+  display: contents;
+}
+
+.game-shell.is-rotated > .touch-bar > * {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  align-self: center;
+  min-width: 0;
+}
+
+.game-shell.is-rotated > .touch-bar > :first-child {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.game-shell.is-rotated > .touch-bar > :last-child {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.is-rotated .game-shell-footer > .back-link {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: end;
+  font-size: 0.9rem;
+}
+
+.is-rotated .game-shell-toggles {
+  grid-column: 3;
+  grid-row: 2;
+  flex-direction: column;
+  align-self: end;
+  margin: 0;
+}
+
+.is-rotated .game-shell-status,
+.is-rotated .game-shell-error {
+  grid-column: 1 / -1;
+}
+
+.game-screen.is-rotated {
+  --stage: min(576px, calc(var(--view-h, 100dvh) - 16px));
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--view-h, 100dvh);
+  padding: 8px;
+}
+
+.is-rotated .play-column {
+  display: grid;
+  grid-template-columns: 6.5rem auto;
+  grid-template-rows: 1fr auto;
+  gap: 8px;
+}
+
+.is-rotated .play-column > .stage {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.is-rotated .play-column > .touch-bar {
+  grid-column: 1;
+  grid-row: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.is-rotated .play-column > .touch-bar button {
+  flex: none;
+}
+
+.is-rotated .play-column > .back-link {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 0.9rem;
+}
+
+.game-screen.is-rotated > .sidebar {
+  flex: 0 1 300px;
+  width: auto;
+  min-width: 0;
+  max-height: calc(var(--view-h, 100dvh) - 16px);
+  overflow-y: auto;
 }

@@ -1,7 +1,7 @@
 import { copy as shared } from "./copy";
 import { h } from "./dom";
 import { MissingFilesError } from "./files";
-import { createFullscreen } from "./fullscreen";
+import { createFullscreen, isRotated } from "./fullscreen";
 
 /** Textes de la page du jeu (propres à chaque jeu ; la copy partagée reste dans `ui/copy.ts`). */
 export interface GameShellCopy {
@@ -290,10 +290,12 @@ export function mountGameShell(options: GameShellOptions): GameShell {
         const paddingBottom = parseFloat(style.paddingBottom);
         // Plein écran : le conteneur est fixé dans la fenêtre, le défilement de la page n'y change rien.
         const fixedToViewport = main.classList.contains("is-fullscreen");
+        // Plein écran pivoté : le conteneur se mesure dans son repère (largeur = hauteur de la fenêtre), la hauteur disponible est la largeur de la fenêtre.
+        const rotated = isRotated(main);
         const scale = shellScale(
           {
             mainWidth: main.clientWidth,
-            mainTop: main.getBoundingClientRect().top + (fixedToViewport ? 0 : window.scrollY),
+            mainTop: fixedToViewport ? 0 : main.getBoundingClientRect().top + window.scrollY,
             // En colonnes, la hauteur du conteneur suit la plus haute d'entre elles : seules ses marges entourent l'écran.
             // Sinon, la hauteur du contenu (et non `offsetHeight`, étiré à toute la fenêtre en plein écran).
             mainHeight: aside
@@ -311,7 +313,7 @@ export function mountGameShell(options: GameShellOptions): GameShell {
                   paddingBottom,
                 ),
             stageHeight: stage.offsetHeight,
-            viewportHeight: window.innerHeight,
+            viewportHeight: rotated ? window.innerWidth : window.innerHeight,
             asideWidth: aside,
           },
           logicalWidth,

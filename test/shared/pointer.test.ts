@@ -46,6 +46,33 @@ describe("toLogical (pointeur -> coordonnées du jeu)", () => {
   });
 });
 
+describe("toLogical dans un plein écran pivoté de 90° (sens horaire)", () => {
+  // Canvas 320×200 affiché à l'échelle 2 (640×400) puis pivoté : son rectangle englobant fait 400 de large sur 640 de haut.
+  const size = { width: 320, height: 200 };
+  const rect = { left: 100, top: 50, width: 400, height: 640 };
+
+  it("le coin haut gauche du jeu est le coin haut droit du rectangle", () => {
+    expect(toLogical(500, 50, rect, size, true)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("le coin bas droit du jeu est le coin bas gauche du rectangle", () => {
+    expect(toLogical(100, 690, rect, size, true)).toEqual({ x: 320, y: 200 });
+  });
+
+  it("le bas du jeu est à gauche de l'écran, sa droite en bas", () => {
+    expect(toLogical(100, 50, rect, size, true)).toEqual({ x: 0, y: 200 });
+    expect(toLogical(500, 690, rect, size, true)).toEqual({ x: 320, y: 0 });
+  });
+
+  it("le centre reste le centre", () => {
+    expect(toLogical(300, 370, rect, size, true)).toEqual({ x: 160, y: 100 });
+  });
+
+  it("une rotation sans le drapeau garde la correspondance directe", () => {
+    expect(toLogical(100, 50, rect, size)).toEqual({ x: 0, y: 0 });
+  });
+});
+
 describe("LongPress", () => {
   it("se déclenche après la durée, à la position de départ", () => {
     const { timers, advance } = fakeTimers();

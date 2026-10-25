@@ -37,7 +37,7 @@ function leave(container: HTMLElement, options: AppOptions): void {
 
 /**
  * Monte le jeu dans la page commune des jeux sur canvas (`ui/game-shell.ts`) : écran 320×200 à l'échelle entière, états de
- * chargement et d'erreur, bouton « Son », pause quand l'onglet est masqué. Le moteur tourne à 50 Hz sur les images de l'écran
+ * chargement et d'erreur, bouton « Son », pause quand l'onglet est masqué. Le moteur tourne à 70 Hz (images VGA) sur les images de l'écran
  * (`TickScheduler`). Les erreurs de chargement et d'exécution remplacent l'écran par un message.
  */
 export async function mountApp(container: HTMLElement, options: AppOptions): Promise<void> {

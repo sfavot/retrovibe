@@ -1,5 +1,5 @@
 /**
- * Partie pure de la sortie OPL2 navigateur : horodatage des écritures par tick du moteur (50 Hz) et rendu à
+ * Partie pure de la sortie OPL2 navigateur : horodatage des écritures par tick du séquenceur (50 Hz) et rendu à
  * l'échantillon près. Elle tourne telle quelle dans l'AudioWorklet (`opl-worklet.ts`) et dans les tests ; `web-opl.ts`
  * n'en garde que la colle Web Audio.
  */
@@ -11,7 +11,7 @@ export interface OplChip {
   generate(buffer: Int16Array, offset: number, length: number): void;
 }
 
-/** Cadence du moteur : un tick de pilote musical toutes les 20 ms. */
+/** Cadence du pilote musical (IRQ0) : un tick toutes les 20 ms, quelle que soit la cadence des images du moteur. */
 export const OPL_TICK_RATE = 50;
 
 /** Avance gardée entre la position de lecture et la première écriture d'une séquence (absorbe la gigue du fil principal). */

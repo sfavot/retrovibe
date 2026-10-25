@@ -4,7 +4,7 @@ import { OplWriteBuffer } from "./opl-stream";
 import workletUrl from "./opl-worklet.ts?worker&url";
 
 /**
- * `OplSink` navigateur : les écritures du séquenceur (50 Hz) sont horodatées par tick, regroupées puis envoyées
+ * `OplSink` navigateur : les écritures du séquenceur (50 Hz, indépendant des images du moteur) sont horodatées par tick du séquenceur, regroupées puis envoyées
  * à un AudioWorklet qui les applique à l'échantillon près dans l'émulateur OPL2 (voir `opl-stream.ts`). Le contexte
  * ne démarre qu'après un geste (règle des navigateurs) : `unlock()` depuis un gestionnaire d'événement utilisateur ;
  * les écritures faites avant sont gardées puis rejouées à la connexion du worklet.

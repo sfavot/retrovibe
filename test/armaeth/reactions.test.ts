@@ -93,6 +93,38 @@ describe.skipIf(!hasOriginalFiles)("réactions : trop loin, le héros marche pui
     expect(g.engine.windows.text).toBe(text("V", 84)); // rejeu : à portée, armoire fermée
   });
 
+  it("en présence de Prytwen : le héros reste en place, Prytwen marche vers lui et dit G119 (mesuré sous DOSBox-X)", () => {
+    const g = game();
+    const state = g.engine.state!;
+    const hero = state.hero!;
+    const room = state.loadedRoom!;
+    const wardrobe = state.findByNum(113)!;
+    const prytwen = state.findByNum(101)!;
+    state.moveToRoom(wardrobe, room);
+    wardrobe.x = 40;
+    wardrobe.y = hero.y;
+    wardrobe.p = hero.p;
+    wardrobe.plane = hero.plane;
+    wardrobe.ego = 1;
+    state.moveToRoom(prytwen, room);
+    prytwen.ego = 0;
+    prytwen.x = hero.x - 50;
+    prytwen.y = hero.y;
+    prytwen.p = hero.p;
+    prytwen.plane = hero.plane;
+    const startX = hero.x;
+
+    ask(g, 22005, 1, 15113);
+    expect(g.engine.hasReactionArmed).toBe(false); // aucune marche du héros ni rejeu
+    expect(hero.path.defined).toBe(false);
+    expect(prytwen.path.target).toMatchObject({ x: hero.x, p: hero.p }); // Prytwen reçoit le héros pour cible (`walkTo`)
+    g.run(2);
+    expect(g.engine.windows.text).toBe(messages().messages(messageId("G", 119)));
+    expect(g.engine.windows.text).toMatch(/^Prytwen n'aime pas que l'on fouine/);
+    expect(hero.x).toBe(startX);
+    expect(g.replays).toHaveLength(0);
+  });
+
   it("un héros indisponible (Ego 6) ne marche pas : V093 immédiat", () => {
     const g = game();
     const state = g.engine.state!;

@@ -181,22 +181,26 @@ describe.skipIf(!hasOriginalFiles)("sauvegardes : un vrai monde", () => {
   });
 });
 
-describe("TickScheduler : 50 Hz sur les images d'écran", () => {
-  it("le premier appel ne fait que fixer l'origine ; ensuite un tic toutes les 20 ms", () => {
+describe("TickScheduler : 70,0866 Hz sur les images d'écran", () => {
+  it("le premier appel ne fait que fixer l'origine ; ensuite une image toutes les 14,27 ms", () => {
     const s = new TickScheduler();
-    expect(TICK_MS).toBe(20);
+    expect(TICK_MS).toBeCloseTo(1000 / 70.0866, 9);
     expect(s.due(1000)).toBe(0);
-    expect(s.due(1010)).toBe(0);
-    expect(s.due(1020)).toBe(1);
-    expect(s.due(1040)).toBe(1);
+    expect(s.due(1007)).toBe(0);
+    expect(s.due(1000 + TICK_MS + 0.01)).toBe(1);
+    expect(s.due(1000 + 2 * TICK_MS + 0.02)).toBe(1);
   });
 
-  it("un écran à 60 Hz joue 50 tics par seconde", () => {
+  it("un écran à 60 Hz joue 70 images par seconde (jusqu'à 2 par image d'écran)", () => {
     const s = new TickScheduler();
     let total = 0;
     s.due(0);
-    for (let frame = 1; frame <= 600; frame++) total += s.due((frame * 1000) / 60);
-    expect(total).toBe(500);
+    for (let frame = 1; frame <= 600; frame++) {
+      const n = s.due((frame * 1000) / 60);
+      expect(n).toBeLessThanOrEqual(2);
+      total += n;
+    }
+    expect(total).toBe(700);
   });
 
   it("un écran à 144 Hz aussi, avec des images sans tic", () => {
@@ -209,7 +213,7 @@ describe("TickScheduler : 50 Hz sur les images d'écran", () => {
       total += n;
       if (n === 0) empty++;
     }
-    expect(total).toBe(500);
+    expect(total).toBe(700);
     expect(empty).toBeGreaterThan(0);
   });
 
@@ -217,16 +221,16 @@ describe("TickScheduler : 50 Hz sur les images d'écran", () => {
     const s = new TickScheduler();
     s.due(0);
     expect(s.due(10_000)).toBe(MAX_CATCH_UP_TICKS);
-    expect(s.due(10_020)).toBe(1);
+    expect(s.due(10_000 + TICK_MS + 0.01)).toBe(1);
   });
 
   it("resync : après une pause, l'absence n'est pas rattrapée", () => {
     const s = new TickScheduler();
     s.due(0);
-    s.due(20);
+    s.due(TICK_MS + 0.01);
     s.resync();
     expect(s.due(60_000)).toBe(0);
-    expect(s.due(60_020)).toBe(1);
+    expect(s.due(60_000 + TICK_MS + 0.01)).toBe(1);
   });
 });
 

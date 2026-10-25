@@ -345,6 +345,23 @@ export function tooFar(ctx: HandlerContext, target: GameObject | null, priority:
 }
 
 /**
+ * « Trop loin » pour l'armoire de la tanière (`Num 113`). Mesuré sous DOSBox-X (`docs/armaeth/dosbox.md` § 4.1) : sans Prytwen le
+ * héros marche vers elle puis la commande est rejouée (`tooFar`) ; en sa présence (`Ego 0`, même salle) le héros ne bouge pas,
+ * **Prytwen** marche vers lui et dit `G119` (« n'aime pas que l'on fouine ») ; s'il l'atteint, le contact (`28b1:0734`) lance le duel.
+ * Hypothèse : l'état `Ego 0` de Prytwen est la condition (seul état observé).
+ */
+export function tooFarWardrobe(ctx: HandlerContext, wardrobe: GameObject | null, priority: number, number = 8): 0 {
+  const hero = ctx.hero;
+  const room = wardrobe ? roomOf(wardrobe) : null;
+  const guard = room?.listA.find((o) => o.num === NUM.prytwen && o.ego === 0);
+  if (!hero || !guard) return tooFar(ctx, wardrobe, priority, number);
+  approach(ctx, guard, hero, false);
+  ctx.disableVerb();
+  ctx.messages.enqueue(priority, "G", 119);
+  return 0;
+}
+
+/**
  * `209c:0092` : affiche le message tout de suite si l'objet est dans la salle du héros (héros de `Num 1`) ou dans la salle chargée
  * pendant un script (`characters.md` § 1).
  */

@@ -44,6 +44,7 @@ import {
   siblingNum,
   spawn,
   tooFar,
+  tooFarWardrobe,
   wander,
 } from "./helpers";
 import { becomeToad } from "./magic";
@@ -624,18 +625,18 @@ export const wardrobe: ObjectHandler = (ctx) => {
   const cupboard = direct(ctx);
   switch (ctx.verb) {
     case VERB.open:
-      if (!ctx.direct.inReach) return tooFar(ctx, cupboard, 3);
+      if (!ctx.direct.inReach) return tooFarWardrobe(ctx, cupboard, 3);
       if (cupboard.ego === 2) return refuse(ctx, 3, 83);
       cupboard.ego = 2;
       return done(ctx, 15, OK);
     case VERB.close:
-      if (!ctx.direct.inReach) return tooFar(ctx, cupboard, 3);
+      if (!ctx.direct.inReach) return tooFarWardrobe(ctx, cupboard, 3);
       if (cupboard.ego !== 2) return refuse(ctx, 3, 84);
       cupboard.ego = 1;
       // hypothèse (objects.md §4.14) : même accusé que l'ouverture
       return done(ctx, 15, OK);
     case VERB.search:
-      if (!ctx.direct.inReach) return tooFar(ctx, cupboard, 3);
+      if (!ctx.direct.inReach) return tooFarWardrobe(ctx, cupboard, 3);
       return cupboard.ego === 2 ? 0 : refuse(ctx, 4, 84);
     default:
       return 0;

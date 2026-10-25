@@ -21,7 +21,7 @@ Ce document sert de brief commun aux sous-agents. Les références font foi sur 
 
 - **Langue** : version française seulement (`A1F*`). Les versions anglaise et allemande restent dans `archives/armaeth/cd/`.
 - **Protection `SC0.EXE`** (code de tableau) : non reproduite.
-- **Cadence** : IRQ0 à 50 Hz (diviseur PIT `0x5D37`), comme l'original ; le monde avance toutes les `délai + 1` images.
+- **Cadence** (mesurée sous DOSBox-X, `dosbox.md` § 3) : les **images** suivent le retour vertical du VGA, **70,0866 Hz** (`FRAME_RATE`, `TICK_MS = 1000 / 70,0866`) ; le monde avance toutes les `délai + 1` images (7 au délai 6 : 10,01 tics/s, héros à 20 px/s). La **musique** reste sur l'IRQ0 à **50 Hz** (diviseur PIT `0x5D37`) : le moteur la convertit par un accumulateur entier (50 / 70,0866 tick de séquenceur par image), et `WebOpl` date les écritures par tick de séquenceur. Les tics BIOS (`wat`, 18,2065 Hz) valent 0,2598 par image.
 - **Son** : AdLib/OPL2 seulement, avec l'émulateur OPL2 de Lost in Time déplacé dans un module commun (vague F0)
   et un séquenceur neuf qui reproduit le pilote de `AM1.EXE`. MIDI MPU-401 et haut-parleur non portés.
 - **Moteur propre au jeu**, sur le modèle du Téléportaschtroumpf et de Mathémagique : `Host` seule frontière avec

@@ -20,6 +20,7 @@ import {
   setScratch,
   setState,
   tooFar,
+  tooFarWardrobe,
   wakeAndChase,
 } from "./helpers";
 import { turnIntoToad } from "./npc-creatures";
@@ -148,7 +149,7 @@ const prytwenIndirect: ObjectHandler = (ctx) => {
 const wardrobeIndirect: ObjectHandler = (ctx) => {
   const wardrobe = indirectOf(ctx);
   if (!wardrobe || !inPrep(ctx, PREP.in)) return 0;
-  if (!ctx.indirect.inReach) return tooFar(ctx, ctx.indirect.object, 4);
+  if (!ctx.indirect.inReach) return tooFarWardrobe(ctx, ctx.indirect.object, 4);
   const touchesContent = ([VERB.look, VERB.take, VERB.search, VERB.put, VERB.drop] as number[]).includes(ctx.verb);
   if (touchesContent && wardrobe.ego !== OPEN_STATE) return refuse(ctx, 4, 84);
   return 0;

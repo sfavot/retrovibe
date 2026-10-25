@@ -108,7 +108,7 @@ describe.skipIf(!hasOriginalFiles)("moteur : démarrage et écran de jeu (fichie
   });
 
   it("la distribution suit après 80 tics BIOS : la scène 20", () => {
-    s.run(205); // 80 tics BIOS à 18,2 Hz = 220 images à 50 Hz
+    s.run(300); // 80 tics BIOS à 18,2 Hz = 308 images à 70,0866 Hz
     expect(s.engine.shownScene).toBe(21);
     s.run(20);
     expect(s.engine.shownScene).toBe(20);
@@ -117,7 +117,7 @@ describe.skipIf(!hasOriginalFiles)("moteur : démarrage et écran de jeu (fichie
   });
 
   it("le récit s'affiche en fenêtres sur la scène 20 ; chaque clic passe une page", () => {
-    s.run(165);
+    s.run(230);
     expect(s.engine.windows.active).toBe(true);
     expect(s.engine.windowRect).toMatchObject({ x: 62, y: 66, width: 196 });
     expect(s.engine.windows.text).toMatch(/^Il y a longtemps/);
@@ -135,7 +135,7 @@ describe.skipIf(!hasOriginalFiles)("moteur : démarrage et écran de jeu (fichie
 
   it("le clic qui ouvre une fenêtre ne la ferme pas : il faut relâcher le bouton", () => {
     const t = new Session();
-    t.run(400);
+    t.run(560);
     expect(t.engine.windows.active).toBe(true);
     t.host.pointer(100, 100, 1);
     t.run(3);
@@ -203,6 +203,30 @@ describe.skipIf(!hasOriginalFiles)("moteur : démarrage et écran de jeu (fichie
     s.run(30);
     expect(hero.x).toBe(stopped);
     expect(hero.speedX).toBe(0);
+  });
+
+  it("cadence : le héros marche à 20 px par seconde (70 images, 10 tics de monde au délai 6)", () => {
+    const t = new Session();
+    t.skipIntro();
+    const { hero } = t;
+    t.host.key({ type: "nav", key: "left" });
+    t.run(1); // le tic de monde que force la touche
+    const x0 = hero.x;
+    t.run(70);
+    expect(x0 - hero.x).toBe(20);
+  });
+
+  it("cadence : le séquenceur reste à 50 Hz quand les images sont à 70,0866 Hz", () => {
+    const t = new Session();
+    const before = t.engine.sequencer.driver.ticks;
+    t.run(7009); // 100,0 s d'images = 5000,6 ticks à 50 Hz
+    const played = t.engine.sequencer.driver.ticks - before;
+    expect(played).toBeGreaterThanOrEqual(5000);
+    expect(played).toBeLessThanOrEqual(5001);
+    // les écritures OPL sont datées par tick du séquenceur (50 Hz), pas par image
+    const lastTick = t.host.opl.writes.at(-1)!.tick;
+    expect(lastTick).toBeLessThanOrEqual(t.engine.sequencer.driver.ticks);
+    expect(lastTick).toBeGreaterThan(before + 4000);
   });
 
   it("bottes : un clic sur l'icône puis un clic dans la salle font marcher le héros jusqu'au point", () => {

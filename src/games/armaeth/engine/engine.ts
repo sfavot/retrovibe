@@ -102,7 +102,7 @@ import { createTerrain, MAX_P, MAX_PLANES, MAX_X, type Footprint, type Terrain }
 
 /**
  * Moteur d'*Armaeth* sans navigateur (`docs/armaeth/plan.md`, tâche G-int) : assemble les modules purs en un jeu qui avance
- * image par image. `tick()` correspond à l'IRQ0 à 50 Hz ; l'hôte fournit fichiers, entrées, écran, sauvegardes et puce OPL2.
+ * image par image. `tick()` correspond à une image VGA (70,0866 Hz, `FRAME_RATE`) ; le séquenceur musical garde sa propre horloge de 50 Hz ; l'hôte fournit fichiers, entrées, écran, sauvegardes et puce OPL2.
  *
  * Déroulement (`engine.md` § 2, § 4) : `CM1` (amorçage silencieux), `CM2` (titre, distribution, récit ; `rsv -1` charge
  * `A1FCFG.SYS`), puis la boucle principale : chargement de salle, mise à jour des objets (interface à chaque image, monde
@@ -114,8 +114,18 @@ import { createTerrain, MAX_P, MAX_PLANES, MAX_X, type Footprint, type Terrain }
 const LANGUAGE = "A1F";
 /** Emplacement de sauvegarde utilisé par F2 / F3 en attendant le sélecteur d'emplacements (décision en suspens, `plan.md`). */
 export const DEFAULT_SAVE_SLOT = "svg001";
-/** Tics BIOS (18,2065 Hz) pour 50 Hz : 1821 centièmes de tic BIOS par `tick()` pour 5000 par tic BIOS. */
-const BIOS_PER_TICK = 1821;
+/**
+ * Cadence de l'original (mesurée sous DOSBox-X, `docs/armaeth/dosbox.md` § 3) : la boucle de jeu suit le retour vertical du VGA
+ * (mode 13h, 70,0866 Hz), pas l'IRQ0. `tick()` joue une image à cette cadence ; le monde avance toutes les `délai + 1` images.
+ */
+export const FRAME_RATE = 70.0866;
+/** Le pilote musical reste sur l'IRQ0 (PIT, diviseur `0x5D37`) : 50 Hz, indépendamment des images. */
+export const SEQUENCER_RATE = 50;
+/** Rapport 50 / 70,0866 en entiers (dix-millièmes de Hz) : le séquenceur joue un tick chaque fois que le cumul atteint `FRAME_UNITS`. */
+const SEQUENCER_UNITS_PER_FRAME = SEQUENCER_RATE * 1e4;
+const FRAME_UNITS = Math.round(FRAME_RATE * 1e4);
+/** Tics BIOS (18,2065 Hz) par image à 70,0866 Hz : 1299 centièmes de tic BIOS par `tick()` pour 5000 par tic BIOS (18,2065 / 70,0866 = 0,25977). */
+const BIOS_PER_TICK = 1299;
 const BIOS_UNIT = 5000;
 /** Capacité ajoutée par la file d'événements quand elle est pleine (`23a2:0002` : `capacité += 5`). */
 const EVENT_QUEUE_GROWTH = 5;
@@ -124,8 +134,8 @@ const DEFAULT_WINDOW = { x: 8, y: 20, width: 304, height: 160 };
 /** Ligne de saisie (`1e22:0008`) : `(38,168)`, 244 x 11. */
 const INPUT_BOX: Rect = { x: 38, y: 168, width: 244, height: 11 };
 const INPUT_COLORS = { frame: 0xee, inner: 0xdd, background: 0xfa };
-/** Pas du clignotement du curseur de saisie, en tics. */
-const CARET_BLINK = 25;
+/** Pas du clignotement du curseur de saisie, en images : 35 images = 0,5 s à 70 Hz (le pas d'origine est une boucle d'attente de 3000 tours, non mesurée). */
+const CARET_BLINK = 35;
 /** Indicateur `+0x43` du héros : le trajet bloqué a déjà été recalculé une fois (`2363:01ea`, remis à 0 par un clic ou `2363:0154`). */
 const HERO_RETRY = 0x43;
 /** Garde-fou du chargement de salle (un échec de placement du héros recharge l'ancienne). */
@@ -268,6 +278,8 @@ export class ArmaethEngine implements TokenHostEngine {
   private readonly afterWindows: (() => void)[] = [];
   private windowGate = false;
   private bios = 0;
+  /** Cumul de la conversion images (70,0866 Hz) vers ticks du séquenceur (50 Hz), en `FRAME_UNITS`. */
+  private sequencerPhase = 0;
 
   // entrées
   private readonly keys: HostKey[] = [];
@@ -340,7 +352,7 @@ export class ArmaethEngine implements TokenHostEngine {
 
   // --- API ----------------------------------------------------------------------------------------------------------------
 
-  /** Une image à 50 Hz (IRQ0) : entrées, minuteries BIOS, monde, composition, séquenceur, présentation. */
+  /** Une image à 70,0866 Hz : entrées, minuteries BIOS, monde, composition, séquenceur, présentation. */
   tick(): void {
     if (this.quitRequested) return;
     this.readInput();
@@ -348,7 +360,7 @@ export class ArmaethEngine implements TokenHostEngine {
     this.processKeys();
     this.fillWindows();
     this.frame();
-    this.sequencer.tick();
+    this.advanceSequencer();
     this.frames++;
     this.host.present({ pixels: this.compositor.screen.pixels, palette: this.litPalette });
   }
@@ -816,6 +828,14 @@ export class ArmaethEngine implements TokenHostEngine {
         break;
     }
     this.keyForcesTick = true;
+  }
+
+  /** Séquenceur à 50 Hz sur des images à 70,0866 Hz : accumulateur entier, donc déterministe (au plus un tick par image). */
+  private advanceSequencer(): void {
+    this.sequencerPhase += SEQUENCER_UNITS_PER_FRAME;
+    if (this.sequencerPhase < FRAME_UNITS) return;
+    this.sequencerPhase -= FRAME_UNITS;
+    this.sequencer.tick();
   }
 
   private advanceBios(): void {

@@ -39,7 +39,7 @@ export interface ArmaethHost {
   readFile(name: string): Uint8Array;
   /** Horloge monotone en millisecondes (graine du hasard, `srand(time())`). */
   now(): number;
-  /** Puce OPL2 (pilote musical, 50 Hz). */
+  /** Puce OPL2 (pilote musical, 50 Hz sur sa propre horloge). */
   readonly opl: OplSink;
   /** Image prête à afficher, une fois par `tick()`. */
   present(frame: ArmaethFrame): void;

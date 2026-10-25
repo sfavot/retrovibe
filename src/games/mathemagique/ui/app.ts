@@ -49,14 +49,16 @@ export function canvasMayTakeFocus(active: Element | null, body: Element, canvas
   return active === null || active === body || active === canvas;
 }
 
-/** Échelle entière la plus grande qui tient dans la place disponible ; fractionnaire en dessous de 1. */
+/**
+ * Échelle la plus grande qui tient dans la place disponible, même fractionnaire : une échelle entière laisserait l'écran
+ * 640×480 à 1 sur toute fenêtre de moins de 1312×960 environ.
+ */
 export function fitScale(availableWidth: number, availableHeight: number): number {
-  const fit = Math.min(availableWidth / SCREEN_WIDTH, availableHeight / SCREEN_HEIGHT);
-  return fit >= 1 ? Math.floor(fit) : Math.max(fit, 0.1);
+  return Math.max(Math.min(availableWidth / SCREEN_WIDTH, availableHeight / SCREEN_HEIGHT), 0.1);
 }
 
 /**
- * Monte le jeu : canvas 640×480 mis à l'échelle entière (`image-rendering: pixelated`), centré, boucle `requestAnimationFrame`,
+ * Monte le jeu : canvas 640×480 agrandi à la plus grande échelle qui tient, même fractionnaire, centré, boucle `requestAnimationFrame`,
  * états de chargement et d'erreur, pause quand l'onglet est masqué. Les erreurs de chargement et d'exécution remplacent l'écran
  * par un message.
  */

@@ -1,4 +1,4 @@
-/* Math Workshop (Mathémagique) : écran du jeu, canvas 640×480 à l'échelle entière, pixels nets. */
+/* Math Workshop (Mathémagique) : écran du jeu, canvas 640×480 à la plus grande échelle qui tient. */
 
 .mw {
   /* Pleine largeur : l'échelle du canvas se calcule sur la largeur de ce conteneur. */

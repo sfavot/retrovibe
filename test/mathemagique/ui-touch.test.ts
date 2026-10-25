@@ -49,9 +49,9 @@ describe("toPlayArea (doigt ou souris -> zone de jeu)", () => {
 });
 
 describe("fitScale (échelle du canvas)", () => {
-  it("entière quand l'écran tient au moins une fois", () => {
-    expect(fitScale(1300, 1000)).toBe(2);
-    expect(fitScale(700, 500)).toBe(1);
+  it("fractionnaire aussi au-dessus de 1, pour remplir la fenêtre", () => {
+    expect(fitScale(1300, 1000)).toBeCloseTo(2.03, 2);
+    expect(fitScale(1280, 720)).toBeCloseTo(1.5);
   });
 
   it("fractionnaire sur un écran plus étroit que 640 px (portrait) ou plus bas que 480 px (paysage)", () => {

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Cache de vitest
+.vitest/
 
 # Installeurs / archives d'origine (lourds, inutiles au site) : non versionnés.
 *.exe

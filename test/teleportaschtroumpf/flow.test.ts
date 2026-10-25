@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
 import { isLocked, saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
 import type { GameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
-import { PARENTS_HOLD_SECONDS, createMenuScene } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
+import { MENU_PARENTS, PARENTS_HOLD_SECONDS, createMenuScene, paletteBounds } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles } from "./helpers";
 
@@ -197,13 +197,42 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
     await t.press("Space"); // valide : retour au menu
     await t.settle("MenuScene");
 
-    // Le clic gauche maintenu 4 s n'ouvre rien (pas d'équivalent souris).
+    // Le clic gauche maintenu 4 s ailleurs que sur le bouton Parents n'ouvre rien (le pointeur est au centre de l'écran).
     await t.select(4);
     t.host.input.mouseDown(0);
     await runFor(t.engine, t.host, PARENTS_HOLD_SECONDS * 1000 + 300);
     t.host.input.mouseUp(0);
     await runFor(t.engine, t.host, 500);
     expect(t.top()).toBe("MenuScene");
+  }, 60_000);
+
+  it("Parents à la souris ou au doigt : appui tenu 4 s sur le bouton (ajout du port) ; plus court, rien ne part", async () => {
+    const t = await startMenu();
+    t.host.audio.enabled = false;
+    await t.settle("MenuScene");
+    const mcg = await t.engine.ctx.resources.mcg("s07a001d.mcg");
+    const area = paletteBounds(mcg.pixels, 120 + MENU_PARENTS)!;
+    expect(area).not.toBeNull();
+    const x = (area.x0 + area.x1) / 2;
+    const y = (area.y0 + area.y1) / 2;
+    // « Jouer » sélectionné : un appui court sur Parents ne le lance pas, il sélectionne Parents (qui ne fait rien).
+    await t.select(3);
+    t.host.input.mouseMove(x, y);
+    await t.click(0);
+    await runFor(t.engine, t.host, 1000);
+    expect(t.top()).toBe("MenuScene");
+    expect(t.lit()).toEqual([MENU_PARENTS]);
+    // Tenu moins de 4 s : rien.
+    t.host.input.mouseDown(0);
+    await runFor(t.engine, t.host, (PARENTS_HOLD_SECONDS - 1) * 1000);
+    t.host.input.mouseUp(0);
+    await runFor(t.engine, t.host, 300);
+    expect(t.top()).toBe("MenuScene");
+    // Tenu 4 s : menu parents.
+    t.host.input.mouseDown(0);
+    await runFor(t.engine, t.host, PARENTS_HOLD_SECONDS * 1000 + 300);
+    t.host.input.mouseUp(0);
+    await t.settle("ParentsScene");
   }, 60_000);
 
   it("Quitter : Non → menu ; Oui → générique puis sortie du jeu", async () => {

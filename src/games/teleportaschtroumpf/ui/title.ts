@@ -32,6 +32,8 @@ export function renderTitle(onStart: () => void, onResume?: () => void): HTMLEle
     start,
     h("a", { class: "button secondary", href: MANUAL_URL, target: "_blank", rel: "noopener" }, copy.manual),
     h("p", { class: "muted tsm-title-note" }, copy.manualNote),
+    h("h2", { class: "tsm-title-controls" }, copy.parentsTitle),
+    h("p", { class: "tsm-title-parents" }, copy.parentsText),
     h("h2", { class: "tsm-title-controls" }, copy.controlsTitle),
     h("ul", { class: "help-list" }, ...copy.controls.map((t) => h("li", {}, t))),
   );

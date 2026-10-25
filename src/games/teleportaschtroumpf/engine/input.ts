@@ -95,6 +95,11 @@ export class Input {
     return (this.held.get(action)?.size ?? 0) > 0;
   }
 
+  /** Le bouton gauche de la souris (ou un doigt) est tenu : « valider » vient du pointeur, pas d'Espace. */
+  get pointerHeld(): boolean {
+    return this.held.get("validate")?.has("mouse:0") ?? false;
+  }
+
   justPressed(action: Action): boolean {
     return (this.pending.get(action) ?? 0) > 0;
   }

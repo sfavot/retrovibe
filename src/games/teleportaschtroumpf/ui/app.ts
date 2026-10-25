@@ -24,6 +24,10 @@ export const copy = {
   // Manuel d'origine et contrôles, sur l'écran de présentation.
   manual: "Manuel d'origine",
   manualNote: "Notice Infogrames, en français (PDF, dans un nouvel onglet).",
+  // Menu parents, en vue sur l'écran de présentation : son accès est caché dans le jeu (appui tenu 4 s).
+  parentsTitle: "Menu parents",
+  parentsText:
+    "Durée d'une partie, pause obligatoire entre deux parties et message de fin se règlent dans le menu Parents. Pour l'ouvrir, au menu principal du jeu, gardez le doigt ou le clic appuyé 4 secondes sur le bouton Parents, ou sélectionnez-le avec les flèches puis maintenez la flèche droite 4 secondes.",
   controlsTitle: "Contrôles",
   controls: [
     "Flèches : se déplacer et choisir.",
@@ -31,7 +35,6 @@ export const copy = {
     "Entrée ou clic droit : voix d'aide du Grand Schtroumpf.",
     "Échap : passer une séquence.",
     "P : pause, sur le plateau.",
-    "Menu Parents : au menu principal, sur le bouton Parents, maintenir la flèche droite 4 secondes.",
     "F1 / F2 : baisser / monter le volume.",
   ],
   loading: "Chargement…",

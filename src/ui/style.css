@@ -1264,6 +1264,66 @@ a.button:hover {
   justify-content: flex-end;
 }
 
+/* Barre tactile en icônes (`touch-bar--icons`, Armaeth) : toutes les commandes dans une seule colonne d'icônes à droite de l'écran (le
+   retour en haut, la barre au milieu, le pied de page en bas), sans colonne à gauche : l'écran prend toute la place qui reste. */
+.game-shell.is-touch-landscape:has(> .touch-bar--icons) {
+  grid-template-columns: auto 44px;
+}
+
+.game-shell.is-touch-landscape:has(> .touch-bar--icons) > .game-shell-stage {
+  grid-column: 1;
+}
+
+.game-shell.is-touch-landscape:has(> .touch-bar--icons) .game-shell-footer > .back-link,
+.game-shell.is-touch-landscape:has(> .touch-bar--icons) .game-shell-toggles {
+  grid-column: 2;
+  justify-self: center;
+}
+
+.game-shell.is-touch-landscape:has(> .touch-bar--icons) .game-shell-toggles {
+  flex-direction: column;
+}
+
+.game-shell.is-touch-landscape > .touch-bar--icons {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+  width: auto;
+}
+
+.game-shell.is-touch-landscape > .touch-bar--icons > * {
+  display: contents;
+}
+
+.game-shell.is-touch-landscape > .touch-bar--icons button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.game-shell.is-touch-landscape > .touch-bar--icons button[hidden] {
+  display: none;
+}
+
+.game-shell.is-touch-landscape > .touch-bar--icons button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.game-shell.is-touch-landscape > .touch-bar--icons .icon {
+  display: block;
+}
+
 /* Icônes du pied de page en paysage tactile : retour (croix), Son (haut-parleur, barré quand coupé), Plein écran (flèches). Le
    libellé, masqué, reste le nom du bouton pour les lecteurs d'écran. */
 .game-shell.is-touch-landscape .game-shell-footer :is(.back-link, button) {
@@ -1285,7 +1345,7 @@ a.button:hover {
   color: var(--text);
 }
 
-.game-shell.is-touch-landscape .game-shell-footer .icon-label {
+.game-shell.is-touch-landscape :is(.game-shell-footer, .touch-bar--icons) .icon-label {
   position: absolute;
   width: 1px;
   height: 1px;

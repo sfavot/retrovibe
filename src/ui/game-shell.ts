@@ -163,14 +163,16 @@ function landscapeMargins(style: CSSStyleDeclaration, fixedToViewport: boolean, 
 }
 
 /**
- * Largeur prise par les colonnes de côté quand le conteneur est en grille à trois colonnes (paysage tactile) : les deux colonnes
- * extérieures et leurs gouttières. `columns` est la valeur calculée de `grid-template-columns` (pistes en px). Hors grille : 0.
+ * Largeur prise par les colonnes de côté quand le conteneur est en grille (paysage tactile) : toutes les pistes sauf celle de l'écran
+ * (la plus large), et les gouttières. Deux colonnes (écran et commandes à droite) ou trois (commandes de part et d'autre). `columns`
+ * est la valeur calculée de `grid-template-columns` (pistes en px). Hors grille, ou une seule piste : 0.
  */
 export function asideWidth(display: string, columns: string, columnGap: string): number {
   if (display !== "grid") return 0;
   const tracks = columns.split(" ").map(parseFloat);
-  if (tracks.length !== 3 || tracks.some(Number.isNaN)) return 0;
-  return tracks[0] + tracks[2] + 2 * (parseFloat(columnGap) || 0);
+  if (tracks.length < 2 || tracks.length > 3 || tracks.some(Number.isNaN)) return 0;
+  const total = tracks.reduce((sum, track) => sum + track, 0);
+  return total - Math.max(...tracks) + (tracks.length - 1) * (parseFloat(columnGap) || 0);
 }
 
 /**

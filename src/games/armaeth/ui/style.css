@@ -139,7 +139,7 @@
 }
 
 /* Barre tactile (Clavier, Tenir ; pendant une saisie : Échap et Entrée) : les groupes ne forment qu'une rangée, de la largeur de l'écran
-   (portrait) ; en paysage tactile, le shell les range de part et d'autre de l'écran (`ui/style.css`). */
+   (portrait) ; en paysage tactile, le shell en fait une colonne d'icônes à gauche de l'écran (`touch-bar--icons`, `ui/style.css`). */
 .aeth-touch-group {
   display: contents;
 }
@@ -160,4 +160,10 @@
     background: var(--accent);
     color: var(--bg);
   }
+}
+
+/* Paysage tactile : la colonne d'icônes n'a pas la place pour quatre boutons de plus ; pendant une saisie, Échap et Entrée prennent la
+   place de Clavier et Tenir. */
+.aeth.is-touch-landscape .aeth-touch-bar.is-typing .aeth-idle-only {
+  display: none;
 }

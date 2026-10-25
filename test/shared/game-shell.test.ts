@@ -83,7 +83,11 @@ describe("asideWidth", () => {
     expect(asideWidth("grid", "120px 560px 120px", "8px")).toBe(256);
   });
 
-  it("vaut 0 hors grille ou sans trois colonnes", () => {
+  it("deux colonnes (commandes d'un seul côté) : la colonne des commandes et une gouttière", () => {
+    expect(asideWidth("grid", "560px 44px", "8px")).toBe(52);
+  });
+
+  it("vaut 0 hors grille ou avec une seule colonne", () => {
     expect(asideWidth("flex", "none", "normal")).toBe(0);
     expect(asideWidth("grid", "800px", "8px")).toBe(0);
   });

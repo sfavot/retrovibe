@@ -6,7 +6,7 @@ import { leaveGame, mountGameShell } from "../../../ui/game-shell";
 import { localStorageStore } from "../../../ui/local-storage";
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
 import { h } from "../../../ui/dom";
-import { withIcons } from "../../../ui/icons";
+import { type IconName, withIcons } from "../../../ui/icons";
 import { copy } from "../copy";
 import { parseHelp } from "../data/tables";
 import { parsePlainMessages } from "../data/text";
@@ -92,8 +92,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
    * Bouton de la barre tactile. Il ne prend pas le focus au toucher ou au clic (le clavier virtuel reste sur le champ de saisie,
    * le clavier physique sur le jeu) ; au clavier, il le garde.
    */
-  const touchButton = (label: string, ariaLabel: string, action: () => void, props: Record<string, string | boolean> = {}): HTMLButtonElement => {
-    const button = h("button", { type: "button", "aria-label": ariaLabel, ...props }, label);
+  const touchButton = (
+    label: string,
+    ariaLabel: string,
+    iconName: IconName,
+    action: () => void,
+    props: Record<string, string | boolean> = {},
+  ): HTMLButtonElement => {
+    const button = h("button", { type: "button", "aria-label": ariaLabel, ...props }, ...withIcons(label, iconName));
     button.addEventListener("mousedown", (e) => e.preventDefault());
     button.addEventListener("click", (e) => {
       host?.unlock();
@@ -103,14 +109,19 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     return button;
   };
   const key = (char: string) => (): void => host?.pressKey({ type: "char", char });
-  const keyboardButton = touchButton(copy.keyboard, copy.keyboardLabel, () => textField.focus({ preventScroll: true }));
-  const cancelButton = touchButton(copy.cancel, copy.cancelLabel, key("\x1b"), { hidden: true });
-  const confirmButton = touchButton(copy.confirm, copy.confirmLabel, key("\r"), { hidden: true });
-  const holdButton = touchButton(copy.hold, copy.holdLabel, () => host?.hold.toggle(), { "aria-pressed": "false" });
-  // deux groupes : en paysage tactile, l'un à gauche de l'écran, l'autre à droite (sous les pouces) ; ailleurs, une seule rangée
+  const keyboardButton = touchButton(copy.keyboard, copy.keyboardLabel, "keyboard", () => textField.focus({ preventScroll: true }), {
+    class: "aeth-idle-only",
+  });
+  const cancelButton = touchButton(copy.cancel, copy.cancelLabel, "undo", key("\x1b"), { hidden: true });
+  const confirmButton = touchButton(copy.confirm, copy.confirmLabel, "enter", key("\r"), { hidden: true });
+  const holdButton = touchButton(copy.hold, copy.holdLabel, "hand", () => host?.hold.toggle(), {
+    "aria-pressed": "false",
+    class: "aeth-idle-only",
+  });
+  // une seule rangée de boutons ; en paysage tactile, une colonne d'icônes à gauche de l'écran (`touch-bar--icons`)
   const touchBar = h(
     "div",
-    { class: "touch-bar aeth-touch-bar" },
+    { class: "touch-bar touch-bar--icons aeth-touch-bar" },
     h("div", { class: "aeth-touch-group" }, keyboardButton, cancelButton),
     h("div", { class: "aeth-touch-group" }, holdButton, confirmButton),
   );
@@ -160,6 +171,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     typing = open;
     cancelButton.hidden = !open;
     confirmButton.hidden = !open;
+    touchBar.classList.toggle("is-typing", open);
     if (!open && document.activeElement === textField) {
       textField.blur();
       shell.canvas.focus({ preventScroll: true });

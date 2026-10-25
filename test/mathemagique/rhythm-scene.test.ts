@@ -5,7 +5,7 @@ import { installServices, type MathServices } from "../../src/games/mathemagique
 import { ERROR_LINES } from "../../src/games/mathemagique/game/rhythm/errors";
 import { type BinId, BIN_EDGES, pieceSpan } from "../../src/games/mathemagique/game/rhythm/pieces";
 import { createRhythmScene, type RhythmScene } from "../../src/games/mathemagique/scenes/rhythm";
-import { BUTTONS, edgesRect, toolRect } from "../../src/games/mathemagique/scenes/rhythm-view";
+import { ALGEBIRD_CLEAN, BUTTONS, edgesRect, toolRect } from "../../src/games/mathemagique/scenes/rhythm-view";
 import { dancePoses, planDance } from "../../src/games/mathemagique/scenes/rhythm-dance";
 import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
@@ -190,6 +190,32 @@ describe.skipIf(!hasOriginalFiles)("Rhythm Shop : scène (vraies données)", () 
     const r = api.scene.inspect().reactions;
     expect(r).toHaveLength(1);
     expect(ERROR_LINES[5]).toContain(r[0]!);
+  }, 60_000);
+
+  it("réaction : la pose au repos d'Algebird est retirée de l'écran avant que l'animation ne le sauvegarde (pas de second Algebird, ni pendant ni sur la dernière image)", async () => {
+    const api = await boot();
+    await api.idle();
+    const screen = api.services.graphics.screen;
+    const { x, y, w, h } = ALGEBIRD_CLEAN;
+    const zone = (): Uint8Array => {
+      const out = new Uint8Array(w * h);
+      for (let row = 0; row < h; row++) out.set(screen.pixels.subarray((y + row) * screen.width + x, (y + row) * screen.width + x + w), row * w);
+      return out;
+    };
+    const diff = (a: Uint8Array, b: Uint8Array): number => a.reduce((n, v, i) => n + (v !== b[i] ? 1 : 0), 0);
+    const atRest = zone();
+    // Zone d'Algebird à l'écran quand la réaction démarre : c'est ce que le drapeau 1 sauvegarde et rétablit avant chaque image.
+    let saved: Uint8Array | null = null;
+    const play = api.services.scr.playBlocking.bind(api.services.scr);
+    api.services.scr.playBlocking = (archive, id, options, then) => {
+      saved = zone();
+      return play(archive, id, options, then);
+    };
+    // Clic sur Algebird (hors aide) : une réplique.
+    await api.click(90, 330);
+    expect(api.scene.inspect().reaction).not.toBeNull();
+    expect(saved).not.toBeNull();
+    expect(diff(saved!, atRest), "pose au repos encore dans le fond de la réaction").toBeGreaterThan(1000);
   }, 60_000);
 
   it("Help : la zone du Parts Bin joue son SCR de RSHELP", async () => {

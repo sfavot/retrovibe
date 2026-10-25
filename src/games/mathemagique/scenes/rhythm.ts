@@ -20,7 +20,7 @@ import { Surface, intersectRect, type Rect } from "../engine/graphics/surface";
 import { type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
 import type { KeyEvent } from "../engine/input";
 import type { Archive } from "../engine/resources";
-import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
+import { SCR_FLAG, type AnimationHandle, type ScrStartOptions } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices, SceneArchive } from "../engine/services";
 import { parsePrograms, type ProgramEntry } from "../audio/sequencer";
@@ -454,17 +454,29 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   }
 
   // --- Réactions d'Algebird ---
+  /**
+   * Joue une animation où Algebird est dessiné en entier (entrée, réactions). Elle sauvegarde l'écran au démarrage et le rétablit
+   * avant chaque image : la pose au repos est donc retirée de la composition (et de l'écran) avant, sinon elle resterait derrière
+   * l'Algebird animé ; la pose neutre revient à la fin.
+   */
+  function playAlgebird(id: number, options: ScrStartOptions, then: () => void): AnimationHandle {
+    setPose(null);
+    return scr.playBlocking(archive, id, options, () => {
+      setPose(neutralPose());
+      then();
+    });
+  }
+
   function playReaction(id: number, then?: () => void): void {
     reactions.push(id);
     reactionThen = then ?? null;
     const back = state === "exiting" || state === "finale" ? state : "reacting";
     state = back;
     syncGroups();
-    reaction = scr.playBlocking(archive, id, { flags: REACTION_FLAGS, soundChannel: "voice" }, () => {
+    reaction = playAlgebird(id, { flags: REACTION_FLAGS, soundChannel: "voice" }, () => {
       reaction = null;
       // La dernière image reste à l'écran : la composition (fond, pose neutre) reprend la main.
       compose(REACTION_ZONE);
-      compose(ALGEBIRD_CLEAN);
       const next = reactionThen;
       reactionThen = null;
       if (state === "reacting" || state === "finale") setState("idle");
@@ -946,7 +958,7 @@ export function createRhythmScene(services: MathServices): RhythmScene {
 
       syncGroups();
       palette.fadeFromBlack(30);
-      scr.playBlocking(archive, ENTRY_SCR, { flags: ENTRY_FLAGS }, () => {
+      playAlgebird(ENTRY_SCR, { flags: ENTRY_FLAGS }, () => {
         compose(FULL);
         setState("idle");
       });

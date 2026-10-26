@@ -48,4 +48,5 @@ R1 à R5, S1 et S2 tournent en parallèle (aucun fichier en commun). Chaque vagu
 ## Dette technique notée
 
 - Polonais et tchèque (page de glyphes 1) non décodés : hors périmètre.
-- Blocs non élucidés : `GLOBAL.BD` 450-452, 500, 502 ; SLV 104, 106, 500 ; drapeaux 0x02 et 0x10 du bloc 2.
+- Restes sans conséquence pour un port : SLV 104 (jamais chargé), SLV 200/501 (absents des fichiers livrés), bit `0x10` des drapeaux de `GLOBAL.BD` (jamais testé), bloc 502 de `GLOBAL.BD` (chargé, jamais dessiné) et table de 8 192 octets des écrans 1001-1005 hors radar.
+- Non étudiés : les `GLOBAL.BD` de l'installation (blocs 1, 100, 600, 1000, 1003 différents) et les variables 1 et 2 du script de missions (énergie initiale, niveau d'arme : hypothèses).

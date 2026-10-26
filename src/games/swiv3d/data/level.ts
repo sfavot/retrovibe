@@ -5,7 +5,7 @@
  *   - 100 : carte de hauteur 512×512 octets, torique ;
  *   - 102 : carte « sol » 512×512 (indice de couleur du terrain) ; < 0x20 = eau ;
  *   - 103 : carte de couleurs 512×512 précalculée (palette du bloc 11003) ;
- *   - 104 : table de rampes de couleurs (non lue par le code, brute) ;
+ *   - 104 : dégradés de couleurs de structure non établie (chargé par aucun des trois exécutables, brut) ;
  *   - 105 : placement des objets, enregistrements de 64 octets terminés par un type -1 ;
  *   - 106, 108, 109, 110, 500 : tables et sprites de rendu, exposés bruts ;
  *   - 107 : réseau de points de passage (nœuds de 36 octets) ;
@@ -120,7 +120,7 @@ export interface Tileset {
   pixels: Uint8Array;
   /** Palette RGB 8 bits (768 octets) stockée à la suite des pixels : RVB de la couleur d'atlas à pleine luminosité (≈ ligne 126 de `lightTable`). Le jeu ne la lit pas ; le rendu logiciel passe par `lightTable` puis la palette 11003. L'indice 0 est le magenta de transparence dans 12001-12004. */
   palette: Uint8Array;
-  /** Octets restants après la palette : 0x180 dans 12000 (motif de 3 u32 répété), vide sinon. */
+  /** Octets restants après la palette : 0x180 dans 12000 (32 teintes, voir `groundTileTints`), vide sinon. */
   trailer: Uint8Array;
 }
 
@@ -136,6 +136,18 @@ export function tileStride(tileset: Pick<Tileset, "layout">): number {
   return tileset.layout === "tiles" ? TILE_SIZE : 256;
 }
 
+/**
+ * Teintes des 32 tuiles de sol, stockées dans la queue de 0x180 octets de 12000 : 32 triplets `(r, g, b)` de u32, chacun la couleur
+ * moyenne de la tuile (palette de queue) ramenée à un canal maximal de 255 (écart ≤ 4 avec la moyenne recalculée). Pointeur
+ * `_DAT_005b1fb4` de `gm_slv_setup_tiles` (`00453ed4`) : écrit, jamais relu. Tableau vide pour 12001-12004 (pas de queue).
+ */
+export function groundTileTints(tileset: Pick<Tileset, "trailer">): [number, number, number][] {
+  const r = new BinaryReader(tileset.trailer);
+  const tints: [number, number, number][] = [];
+  while (r.offset + 12 <= r.length) tints.push([r.u32(), r.u32(), r.u32()]);
+  return tints;
+}
+
 export interface Level {
   name: string;
   /** Bloc 100 : hauteur, `MAP_SIZE²` octets, index `z * 512 + x`. Bornes observées 28..255 ; l'eau est à 28-30. */
@@ -146,7 +158,11 @@ export interface Level {
   colorMap: Uint8Array;
   /** Palette RGB 8 bits (768 octets) du jeu : 0x300 premiers octets du bloc 11003 (VGA 6 bits) via `vga6ToRgb8`. C'est la palette d'exécution : tout pixel du niveau est un indice de celle-ci (le jeu la passe par une gamma 4×64, identité au niveau 0), les textures y arrivent par `Tileset.lightTable`. */
   palette: Uint8Array;
-  /** Bloc 104 : 1 048 octets, en-tête de 6 u32 (`0x93 0x93 0x93 1 1 0`) puis 64 groupes de 4 u32 ; rampes de couleurs ? Non lu par le code. */
+  /**
+   * Bloc 104 : 1 048 octets, en-tête de 6 u32 (`0x93 0x93 0x93 1 1 0`) puis 1 024 octets d'ensembles de couleurs `(r, g, b)` (octets
+   * ≤ 0x7f, dégradés de tons verts, jaunes et rouges, 64 pas de 16 octets) dont le découpage exact n'est pas établi. Aucun des trois
+   * exécutables (`SWIV_WIN`, `SWIV_WFX`, `SWIV_WDX`) ne charge ce bloc : donnée résiduelle, identique dans les cinq niveaux.
+   */
   rampTable: Uint8Array;
   /** Bloc 105 sans le terminateur. */
   objects: LevelObject[];

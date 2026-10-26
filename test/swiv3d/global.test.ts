@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { parseBd } from "../../src/games/swiv3d/data/bd";
 import {
+  argb4444,
+  DIGIT_HEIGHT,
+  DIGIT_WIDTH,
   GAUGE_HEIGHT,
   GAUGE_WIDTH,
   GLOBAL_FLAGS,
+  hudIconRect,
+  parseDigitSprites,
   parseGauge,
+  parseHardwareHud,
+  parseRowRleSprites,
   parseGlobal,
   parseScreen,
   SCREEN_HEIGHT,
@@ -25,6 +32,47 @@ describe("lecteurs synthétiques", () => {
     frame[GAUGE_HEIGHT * 5 * 3 + 5 * 2 + 4] = 3; // plan 3, ligne 2, octet 4 -> pixel (19, 2)
     const [image] = parseGauge(frame);
     expect([image![0], image![5], image![2 * GAUGE_WIDTH + 19]]).toEqual([1, 2, 3]);
+  });
+
+  it("range les 4 plans des chiffres en lignes de 12 pixels", () => {
+    const frame = new Uint8Array(4 * DIGIT_HEIGHT * 3);
+    frame[2] = 7; // plan 0, ligne 0, octet 2 -> pixel (8, 0)
+    frame[DIGIT_HEIGHT * 3 * 2 + 3 * 13 + 1] = 9; // plan 2, ligne 13, octet 1 -> pixel (6, 13)
+    const [digit] = parseDigitSprites(frame);
+    expect([digit![8], digit![13 * DIGIT_WIDTH + 6]]).toEqual([7, 9]);
+    expect(() => parseDigitSprites(new Uint8Array(100))).toThrow(/chiffres/);
+  });
+
+  it("décode les sprites à lignes compressées (sauts, plages, littéraux, lignes vides)", () => {
+    // Offsets (2 sprites : 8 puis 20), puis flux : saut 2 · plage de 3 × 0x88 · littéraux 1 2 · fin de ligne · ligne vide · fin.
+    const bytes = Uint8Array.from([
+      8, 0, 0, 0, 20, 0, 0, 0,
+      0x42, 0x83, 0x88, 0xc2, 1, 2, 0xfe, 0x04, 0x00, 0xfe, 0xff, 0,
+      0x00, 0x05, 0x81, 0x07, 0xfe, 0xff,
+    ]);
+    const [a, b] = parseRowRleSprites(bytes);
+    expect(a).toMatchObject({ width: 7, height: 2 });
+    expect([...a!.pixels.subarray(0, 7)]).toEqual([0, 0, 0x88, 0x88, 0x88, 1, 2]);
+    expect([...a!.covered.subarray(0, 7)]).toEqual([0, 0, 1, 1, 1, 1, 1]);
+    expect(a!.covered.subarray(7).every((v) => v === 0)).toBe(true);
+    // Saut long de 5 pixels (14 bits), puis un pixel de valeur 7.
+    expect(b).toMatchObject({ width: 6, height: 1 });
+    expect(b!.pixels[5]).toBe(7);
+    expect(() => parseRowRleSprites(Uint8Array.from([4, 0, 0, 0, 0x41]))).toThrow(/non terminé/);
+  });
+
+  it("découpe l'atlas du HUD accéléré en trois textures et adresse les icônes par cellules de 51", () => {
+    expect(() => parseHardwareHud(new Uint8Array(10))).toThrow(/atlas/);
+    const hud = parseHardwareHud(new Uint8Array(98304));
+    expect([hud.icons.width, hud.radar[0].width, hud.radar[1].height]).toEqual([256, 128, 128]);
+    expect(hudIconRect(0)).toEqual({ x: 0, y: 0, size: 51 });
+    expect(hudIconRect(21)).toEqual({ x: 51, y: 204, size: 51 });
+  });
+
+  it("décompose un u16 ARGB 4-4-4-4", () => {
+    expect(argb4444(0xf000)).toEqual([0, 0, 0, 255]);
+    expect(argb4444(0x0fff)).toEqual([255, 255, 255, 0]);
+    expect(argb4444(0x8321)).toEqual([51, 34, 17, 136]);
   });
 });
 
@@ -95,6 +143,67 @@ describe.skipIf(!hasOriginalFiles)("GLOBAL.BD (fichier du jeu)", () => {
     expect(global.colorRamp).toHaveLength(256);
     expect(global.colorRamp[0]).toBe(0xf000);
     expect(global.colorRamp[255]).toBe(0x0fff);
+  });
+
+  it("lit les chiffres du bloc 502 : 11 images 12×14 en traits sombres sur fond transparent", () => {
+    expect(global.digits).toHaveLength(11);
+    for (const digit of global.digits) {
+      expect(digit).toHaveLength(DIGIT_WIDTH * DIGIT_HEIGHT);
+      expect(Math.min(...digit)).toBeGreaterThanOrEqual(0xf0);
+      expect(digit.some((v) => v >= 0xfc)).toBe(true);
+    }
+    // Le « 1 » est étroit : pas de trait sombre dans les trois premières colonnes (le « 0 » en a).
+    const strokes = (digit: Uint8Array, columns: number[]) => columns.some((x) => digit.some((v, i) => i % DIGIT_WIDTH === x && v >= 0xfc));
+    expect(strokes(global.digits[1]!, [0, 1, 2])).toBe(false);
+    expect(strokes(global.digits[0]!, [2, 3])).toBe(true);
+  });
+
+  it("lit la police accélérée (bloc 450) : mêmes 384 glyphes que la police 2D, indexés pareil", () => {
+    const { font } = global.hardware;
+    expect(font).toHaveLength(384);
+    const a = font[65]!;
+    expect(a.height).toBe(16);
+    expect(a.width).toBeLessThanOrEqual(20);
+    expect(a.covered.some((v) => v === 1)).toBe(true);
+    expect(font[0]!.covered.every((v) => v === 0)).toBe(true);
+    expect(font[32]!.covered.every((v) => v === 0)).toBe(true);
+  });
+
+  it("lit la jauge accélérée (bloc 452) : 44 images de 38 colonnes (la version agrandie de 503)", () => {
+    const { gauge } = global.hardware;
+    expect(gauge).toHaveLength(44);
+    for (const frame of gauge) {
+      expect(frame.width).toBe(38);
+      expect(frame.height).toBeGreaterThanOrEqual(GAUGE_HEIGHT - 8);
+      expect(frame.height).toBeLessThanOrEqual(99);
+      expect(frame.covered.some((v) => v === 1)).toBe(true);
+    }
+  });
+
+  it("lit l'atlas du HUD accéléré (bloc 451) : icônes en grille 5×5, deux textures de radar", () => {
+    const { hud } = global.hardware;
+    expect([hud.icons.data.length, hud.radar[0].data.length, hud.radar[1].data.length]).toEqual([65536, 16384, 16384]);
+    // La capsule vide (cellule 0) est opaque (quartet d'alpha) ; la cellule 22, hors des 22 icônes, est transparente.
+    const alphaSum = (index: number) => {
+      const { x, y, size } = hudIconRect(index);
+      let sum = 0;
+      for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) sum += hud.icons.data[(y + j) * 256 + x + i]! >> 4;
+      return sum;
+    };
+    expect(alphaSum(0)).toBeGreaterThan(0);
+    expect(alphaSum(22)).toBe(0);
+  });
+
+  it("lit les sept textures de particules du bloc 500, dont les indices existent dans la rampe 509", () => {
+    const { particles } = global.hardware;
+    expect(particles).toHaveLength(7);
+    for (const texture of particles) {
+      expect(texture).toHaveLength(64 * 64);
+      expect(Math.max(...texture)).toBeLessThan(global.colorRamp.length);
+    }
+    // Seuls les 128 premiers indices de la rampe servent ; le texel 0 d'une rampe est le noir opaque, le dernier d'une rampe est clair.
+    expect(particles.every((t) => Math.max(...t) < 128 && Math.max(...t) % 16 === 15)).toBe(true);
+    expect(argb4444(global.colorRamp[0]!)).toEqual([0, 0, 0, 255]);
   });
 
   it("assemble les chaînes, la police et les missions", () => {

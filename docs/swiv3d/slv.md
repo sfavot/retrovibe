@@ -25,7 +25,7 @@ Le fichier entier est lu dans un tampon de 2 000 000 octets (`gm_slv_alloc` `004
 | 11003 | `005b1f98` | palette du jeu (0x300 octets) puis table d'attributs `005bc158` |
 | 200 | copie dans `005bbe28` | 0x300 octets ; **absent** des SLV livrés |
 
-Puis `gm_slv_index_models`, `gm_slv_setup_tiles` (textures 12xxx), `gm_level_spawn_objects` (`0043e958`, bloc 105). Le bloc 104 n'est référencé par aucun code.
+Puis `gm_slv_index_models`, `gm_slv_setup_tiles` (textures 12xxx), `gm_level_spawn_objects` (`0043e958`, bloc 105). Le bloc 104 n'est référencé par aucun code : la liste des identifiants cherchés par `gm_slv_load` (100, 102, 103, 105, 107, 106, 108, 109, 110, 500, 501, 200, 11003, 11004) est la même dans `SWIV_WIN.EXE`, `SWIV_WFX.EXE` (`004545a8`) et `SWIV_WDX.EXE` (`0045b5fb`-`0045bb9d`).
 
 ## Terrain
 
@@ -64,12 +64,12 @@ Les `0x300` premiers octets du bloc 11003 sont une palette VGA 6 bits (valeurs 0
 | `0x0100` | `0x8000` | **table de lumière**, 128 lignes de 256 : `table[lumière][texel] → indice 11003` (le jeu la recopie à une adresse alignée sur 256 ; pour 12001-12004 la colonne 0 est remise à 0) ; la ligne 100 sert aux faces de type 4 |
 | `0x8100` | `0x10000` (12001-12004) ou `0x20000` (12000) | pixels indexés : 12001-12004 = atlas 256×256 ; 12000 = **32 tuiles 64×64 contiguës** |
 | suite | `0x300` | palette RGB **8 bits** (non lue par le jeu mais exacte : couleur d'atlas à pleine luminosité ; l'indice 0 est le magenta `ff00ff` de transparence dans 12001-12004) |
-| suite | `0x180` (12000 seul) | trois u32 répétés `0x62 0xdd 0xff` : non identifié (`_DAT_005b1fb4`) |
+| suite | `0x180` (12000 seul) | 32 triplets `(r, g, b)` de u32 : **teinte de chacune des 32 tuiles de sol** (couleur moyenne de la tuile, canal maximal ramené à 255) ; pointeur `_DAT_005b1fb4`, écrit et jamais relu |
 
 Tailles : 12000 = `0x28580`, 12001-12004 = `0x18400`.
 
 - **12001-12004** : atlas 256×256 = 4×4 tuiles de 64×64, tuile `k` à `+(k & 3) * 0x40 + (k >> 2) * 0x4000`, pas de ligne 256. Le bloc `12000 + n` remplit les emplacements `16n + k` (`k` de 0 à 15) des tables `005b0690` (pointeur de tuile) et `005b1950` (table de lumière). Ces emplacements sont indexés par le champ « texture » `in_EAX[5]` des polygones des modèles (`00430380`, `00430f40`, `004329b4`) : ce sont les **textures des modèles 3D** (avions, véhicules, bâtiments), pas du terrain. Vérifié visuellement (cockpits, ailes, roues).
-- **12000** : **32 tuiles 64×64 contiguës** de 4 096 octets (offset `k × 0x1000`, pas de ligne 64 ; `Tileset.layout = "tiles"`, lues ainsi par le terrain, `DAT_0058369c`). Tous les 200 emplacements pointent d'abord sur son début ; les emplacements 16 à 79 sont ensuite remplacés par 12001-12004. C'est la texture du sol (voir 102) ; la table de lumière du sol est celle de l'emplacement 0 (12000). Le lecteur l'expose ainsi (`tileOffset`, `tileStride`, `groundTile`) ; la queue de 0x180 octets et la palette de queue restent lues.
+- **12000** : **32 tuiles 64×64 contiguës** de 4 096 octets (offset `k × 0x1000`, pas de ligne 64 ; `Tileset.layout = "tiles"`, lues ainsi par le terrain, `DAT_0058369c`). Tous les 200 emplacements pointent d'abord sur son début ; les emplacements 16 à 79 sont ensuite remplacés par 12001-12004. C'est la texture du sol (voir 102) ; la table de lumière du sol est celle de l'emplacement 0 (12000). Le lecteur l'expose ainsi (`tileOffset`, `tileStride`, `groundTile`) ; la queue de 0x180 octets s'exploite par `groundTileTints` et la palette de queue reste lue.
 
 ## Objets : bloc 105 (confirmé)
 
@@ -129,7 +129,7 @@ Les champs 6, 7, 8 sont des **compteurs de capacité par classe de véhicule** (
 
 Les blocs 104, 106, 108, 109, 110, 500, la palette 11003 et les atlas 12000-12004 sont **identiques dans les cinq fichiers** (vérifié) : seuls 100, 102, 103, 105 et 107 changent d'un niveau à l'autre.
 
-- **104** (1 048 octets) : en-tête de 6 u32 `0x93 0x93 0x93 1 1 0`, puis 64 groupes de 4 u32 de la forme `(c, d, c, 0)` avec `c`, `d` à trois octets (`07 2a 07`, `2a 7f 2a`…), probablement des rampes de couleur (hypothèse). Aucun lecteur trouvé ; identique dans les cinq fichiers.
+- **104** (1 048 octets, **non chargé**) : en-tête de 6 u32 `0x93 0x93 0x93 1 1 0`, puis 1 024 octets (octets ≤ 0x7f) d'ensembles de couleurs `(r, g, b)` en dégradés de tons verts, jaunes et rouges, les premières entrées de 16 octets prenant la forme `(c, d, c, 0)` avec `c`, `d` à trois octets (`07 2a 07`, `2a 7f 2a`…) mais le découpage cesse d'être aligné ensuite (les canaux se décalent d'un octet d'une entrée à l'autre : pas de structure en quatre couleurs). Aucun des trois exécutables ne le charge (identifiants de `gm_slv_load` relevés dans WIN, WFX et WDX) : donnée résiduelle d'éditeur, rôle inconnu et sans conséquence pour un port. Identique dans les cinq fichiers. Exposé brut (`Level.rampTable`).
 - **106** (16 384) : 64 lignes × 256 colonnes, table du **terrain de faible détail** : `couleur = t106[(lumière >> 1) << 8 | carte102]` (`004147df`, `render.md` §6). Le lecteur l'expose dans `pattern106`.
 - **108** (65 536) : table 256×256 de fondu des sprites RLE (`pixel = table[(teinte + banque) << 8 | pixel]`), commence par une ligne de zéros. Déjà décrit dans `re-index.md`.
 - **109** (32 768) : 128 lignes de 256 octets ; la ligne 0 est l'identité, la dernière est constante `0x5d`. Lue par `004349ac`, `004353f4`, `00435688`, `00437c38`.
@@ -146,5 +146,5 @@ Les blocs 104, 106, 108, 109, 110, 500, la palette 11003 et les atlas 12000-1200
 
 - Rastériseur du terrain, éclairage et tables 108/109 : voir `render.md` (§6, §2) ; ouverts là-bas : quel emplacement de texture pour quel modèle hors 14..68, ligne 127 des tables de lumière.
 - Types d'objets absents des niveaux livrés (2001, 3002, 5001, 8000-8040, 14000…) : `objects.md` §4.4.
-- Bloc 104 ; bloc 200 (palette de secours, absent) et 501.
-- Nature exacte des 0x180 octets de fin de 12000.
+- Bloc 200 (palette de secours, absent des fichiers livrés) et bloc 501 (absent : son seul lecteur `00415259`, fonction sans appelant, dessine des sprites par entrées de 16 octets, hypothèse : code mort).
+- Bloc 104 : rôle inconnu (non chargé par le jeu).

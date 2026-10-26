@@ -2,29 +2,29 @@
 
 Les 28 ressources de `original/swiv3d/GLOBAL.BD`, leur rôle et leur format. Le conteneur (`parseBd`, `src/games/swiv3d/data/bd.ts`) est décrit dans `re-index.md`. Les adresses et noms de fonctions viennent de la rétro-ingénierie de `SWIV_WIN.EXE` (corpus décrit dans `re-index.md`, décompilations dans `archives/swiv3d/re/decomp/`). « Confirmé » : lu dans le code et vérifié sur le fichier (rendu à l'œil pour les images). « Hypothèse » : déduit, non prouvé.
 
-Lecteurs : `strings.ts` (100), `font.ts` (507, 508 et le format des sprites RLE), `missions.ts` (600), `global.ts` (tout le reste, `parseGlobal` assemble l'ensemble). Tests : `test/swiv3d/{strings,font,missions,global}.test.ts`.
+Lecteurs : `strings.ts` (100), `font.ts` (507, 508 et le format des sprites RLE), `missions.ts` (600), `global.ts` (tout le reste, `parseGlobal` assemble l'ensemble ; les blocs accélérés sont sous `hardware`, les chiffres sous `digits`). Tests : `test/swiv3d/{strings,font,missions,global}.test.ts`.
 
 ## Vue d'ensemble
 
 | Id | Taille | Rôle | Statut | Lecteur |
 |---|---:|---|---|---|
 | 1 | 203 | Texte d'en-tête, jamais lu par le jeu | confirmé | `parseHeader` |
-| 2 | 4 | Drapeaux u32 (= `0xb2`) | confirmé | `parseHeader` |
+| 2 | 4 | Drapeaux u32 (= `0xb2`) | confirmé (0x10 : jamais testé) | `parseHeader` |
 | 100 | 79 298 | Chaînes localisées | confirmé | `parseStrings` |
 | 200 | 126 012 | Police vectorielle 3D (lettres extrudées) | confirmé | `parseVectorFont` |
-| 450 | 35 297 | Police des versions accélérées (3Dfx/D3D) | hypothèse | octets bruts |
-| 451 | 98 304 | Atlas 256×384 (8 bits) des icônes du HUD, versions accélérées | rendu confirmé, rôle hypothèse | octets bruts |
-| 452 | 128 392 | Jauge d'énergie des versions accélérées (44 entrées) | hypothèse | octets bruts |
-| 500 | 28 672 | Atlas 256×112 de formes floues (versions accélérées) | hypothèse | octets bruts |
+| 450 | 35 297 | Police 2D des versions accélérées : 384 glyphes à lignes compressées | confirmé | `parseRowRleSprites` |
+| 451 | 98 304 | Textures AI44 des versions accélérées : atlas 256×256 des icônes d'armes + 2 textures 128×128 du radar | confirmé | `parseHardwareHud` |
+| 452 | 128 392 | Jauge d'énergie des versions accélérées : 44 sprites 38×99 à lignes compressées | confirmé | `parseRowRleSprites` |
+| 500 | 28 672 | 7 textures 64×64 de particules (halos, anneaux, viseurs), versions accélérées | confirmé | `parseParticleTextures` |
 | 501 | 24 410 | Icônes d'armes du HUD, 22 sprites RLE de 24×38 | confirmé | `parseRleSprites` |
-| 502 | 1 848 | Chargé, jamais relu | inconnu | octets bruts |
+| 502 | 1 848 | Chiffres `0`-`9` et `x` de 12×14 (ancien compteur de munitions), jamais dessinés | confirmé | `parseDigitSprites` |
 | 503 | 71 280 | Jauge d'énergie du HUD, 44 images de 20×81 | confirmé | `parseGauge` |
 | 504 | 229 376 | Animation d'explosion, 56 images de 64×64 | confirmé | `parseTextures` |
 | 505 | 70 560 | Impacts/explosions rétrécissants, 96 images de 21×35 | confirmé | `parseSprites21x35` |
 | 506 | 37 120 | Viseurs rotatifs, 32 images de 29×40 | confirmé (29ᵉ colonne : hypothèse) | `parseSprites29x40` |
 | 507 | 50 237 | Police 2D : 384 glyphes RLE | confirmé | `parseFont` |
 | 508 | 1 536 | Avances des 384 glyphes | confirmé | `parseFont` |
-| 509 | 512 | 256 u16 : rampes de couleur | format hypothèse | `parseColorRamp` |
+| 509 | 512 | 256 u16 ARGB 4-4-4-4 : palette des textures 8 bits des versions accélérées | confirmé | `parseColorRamp` |
 | 510 | 117 150 | Radar : 32 images (cadre rotatif) | confirmé, rôle hypothèse | `parseRleSprites` |
 | 511 | 16 505 | Radar : 128 petites images (triangles) | confirmé, rôle hypothèse | `parseRleSprites` |
 | 512 | 123 636 | Radar : 128 images (éclats rotatifs) | confirmé, rôle hypothèse | `parseRleSprites` |
@@ -35,11 +35,11 @@ Lecteurs : `strings.ts` (100), `font.ts` (507, 508 et le format des sprites RLE)
 
 ## Chargement (`gm_global_init`, `0046fa58`)
 
-Ordre : bloc 2 (drapeaux, `gm_global_load_block` `0046f288`), tampon de 0x21700 octets, écrans selon les drapeaux (`gm_global_read_block` `0046f3a4`, ids `0x3e8`, `0x3ec`, `0x3ed`), puis 100, 200, 502, 504, et, selon `DAT_0048464c` (0 = rendu logiciel) : 505, 501, 503, 510, 511, 512 (logiciel) ou 500, 451, 452, 450 (accéléré) ; enfin 507, 506, 508, 600, 800, 700, 509. Les blocs 1, 450-452 et 500 ne servent pas à `SWIV_WIN.EXE` (logiciel). Le bloc 1000 n'existe pas (drapeau `0x80`).
+Ordre : bloc 2 (drapeaux, `gm_global_load_block` `0046f288`), tampon de 0x21700 octets, écrans selon les drapeaux (`gm_global_read_block` `0046f3a4`, ids `0x3e8`, `0x3ec`, `0x3ed`), puis 100, 200, 502, 504, et, selon `DAT_0048464c` (0 = rendu logiciel) : 505, 501, 503, 510, 511, 512 (logiciel) ou 500, 451, 452, 450 (accéléré) ; enfin 507, 506, 508, 600, 800, 700, 509. Les blocs 1, 450-452 et 500 ne servent pas à `SWIV_WIN.EXE` (logiciel) ; le bloc 502 est chargé mais jamais dessiné (voir plus bas). Les `SWIV_WFX.EXE` (3Dfx) et `SWIV_WDX.EXE` (D3D) du CD et de l'installation ont la même séquence de chargement (`0046fc50`-`0046fd75` pour WFX) ; ce sont d'autres compilations (WFX : drapeaux en `0048467c`, mode accéléré en `0048469c`, couche Glide à partir de `0046ff74` ; WDX : drapeaux en `00496fac`), pas des variantes de WIN. Le `GLOBAL.BD` de l'installation (WDX) diffère par les blocs 1, 2 (`0x04`), 100, 600 (2 976 octets), 1000 et 1003 ; 450-452, 500, 502 et 509 y sont identiques. Le bloc 1000 n'existe pas (drapeau `0x80`).
 
 ### Bloc 2, drapeaux (`DAT_0048462c`)
 
-`0xb2` = `0x80 | 0x20 | 0x10 | 0x02`. Confirmés par le code : `0x01` démo (`swivdemo.cfg`, charge 1005) ; `0x20` charge 1004 ; `0x40` force la piste CD 2 ; `0x80` pas de chargement de 1000 et séquence d'intro de `gm_main_game`. `0x02` : testé par `gm_main_game` (chargement de 1005 pendant l'intro), effet exact non établi ; `0x10` : jamais testé trouvé. Constantes : `GLOBAL_FLAGS`.
+`0xb2` = `0x80 | 0x20 | 0x10 | 0x02`. Tous les tests de `DAT_0048462c` ont été relevés dans `SWIV_WIN.EXE` (`TEST byte ptr`, une seule écriture à `0046fb3d`), puis dans `SWIV_WFX.EXE` (variable `0048467c`, mêmes tests aux mêmes adresses) et `SWIV_WDX.EXE` (variable `00496fac`). Confirmés : `0x01` démo (`swivdemo.cfg` via `gm_cfg_load`, menu principal, charge 1005) ; `0x20` charge 1004 ; `0x40` force la piste CD 2 (`gm_cd_play_track`) ; `0x80` pas de chargement de 1000 et séquence d'intro de `gm_main_game`. **`0x02`** : testé à `0042174a` et `0042182c` (intro de `gm_main_game`, branches logicielle et accélérée) et seulement là : affiche l'écran 1005 (id `0x3ed`) exactement comme `0x01` aux mêmes endroits (`gm_global_init` ne le teste pas). Il n'a donc d'effet que sur l'intro : avec `0xb2` l'écran « TEMPERATE ZONE » est montré par le test `0x02` (et `0x01` seul, de la démo, le montre aussi). **`0x10`** : **jamais testé** dans les trois exécutables, bit résiduel (réservé). `SWIV_WDX.EXE` ajoute le bit **`0x08`** (testé à `00424d52`/`00424d9b` : avec `0x20`, affiche l'écran 1003, id `0x3eb`, dans l'intro) ; son `GLOBAL.BD` vaut `0x04`, bit que personne ne teste. Constantes : `GLOBAL_FLAGS`.
 
 ## Bloc 100, chaînes (confirmé)
 
@@ -80,16 +80,33 @@ Un pixel n'est pas une couleur mais un **numéro de ligne** `banque + teinte` da
 
 | Étiquette | Sens |
 |---|---|
-| 100 / 101 / 102 / 103 `(variable, valeur)` | affecte / maximise / minimise / additionne. Variables 0, 1, 2 : champs `+0x38`, `+0x3c`, `+0x34` du profil ; 3 : `00577670` ; 4 : `004841b0` ; ≥ 5 : u16 du profil à `i·2 − 0xbc` (109 et 119 apparaissent partout). Sens métier des variables : hypothèse |
+| 100 / 101 / 102 / 103 `(variable, valeur)` | affecte / maximise / minimise / additionne. Variables 0, 1, 2 : champs `+0x38`, `+0x3c`, `+0x34` du profil ; 3 : `00577670` ; 4 : `004841b0` ; 100 à 119 : **munitions de l'arme spéciale `i − 100`** (voir ci-dessous). Sens des variables 0 à 4 : voir « Variables du script » |
 | 200 `n` | début de la mission n ; `gm_menu_retry` saute jusqu'au `200 n` choisi (balayage en avant) ; le profil mémorise la mission la plus haute (`+0x20`) |
 | 300 + nom (12 octets) | niveau : fichier `<nom>.SLV` (`gm_slv_load`) puis boucle de jeu |
 | 400 + 6 u16 | pistes CD par contexte (table `005bba10[6]`, défaut `{2, 9, 3, 2, 2, 2}`) |
 | 500 + nom | vidéo Smacker jouée (`BR_TER0` briefing, `END_TER`, `END_ART`, `END_LUN`, `OUTRO`), coupe la piste CD |
-| 600 `(r, g, b)` | `00484650 = (r·256 + g)·256 + b` : (100, 100, 120) par défaut, (170, 50, 50) sur MARS, (0, 0, 0) sur LUNAR01 ; rôle : couleur d'ambiance (brouillard/ciel : hypothèse) |
+| 600 `(r, g, b)` | `00484650 = (r·256 + g)·256 + b` : (100, 100, 120) par défaut, (170, 50, 50) sur MARS, (0, 0, 0) sur LUNAR01 ; **couleur de brouillard et d'effacement des versions accélérées** (confirmé, voir ci-dessous) ; jamais lue par `SWIV_WIN.EXE` (écrite à `004218f2`, `00421c04`, `00422473`, aucune lecture) |
 | -2 | fin de l'aventure livrée : met la progression du profil à `0xb4c69` |
 | -1 | fin du script |
 
 Structure : 17 missions (index 0-16) ; l'élément 46 (premier -1) clôt la chaîne jouée d'affilée (missions 0-3 = `TERRAN00-03`, puis `200 999`, `-2`, `-1`) ; les 13 missions suivantes (`TERRAN04-06`, `TERRANBS`, `ARCTIC01-03`, `LUNAR01`, `MARS01-05`, vidéos `BR_TER4-6`, `BR_TERB`, `END_TER`, `END_ART`, `END_LUN`, `OUTRO`) ne sont atteintes que par le menu. Seuls `TERRAN00-03.SLV` sont livrés (édition « CUTDOWN »). Les 12 octets d'un nom contiennent du résidu mémoire après le NUL. Les `500` précèdent ou suivent le `300` selon que la vidéo est un briefing ou une fin.
+
+### Variables du script (confirmé par `gm_main_game`, `00421614`, lignes de l'interpréteur 100-103)
+
+Les variables sont des champs de la structure d'état de mission `DAT_004841c0` (28 dwords, copiée depuis et vers la fiche du pilote `(0x14, p, 1000 + n)`, voir `screens.md`). L'index `i` d'un élément `10x (i, valeur)` choisit le champ : `0` → `+0x38`, `1` → `+0x3c`, `2` → `+0x34`, `3` → `DAT_00577670`, `4` → `DAT_004841b0`, sinon le **u16 à `+ 2i − 0xbc`** de la structure. Seuls les `i` de 100 à 119 sont valides : ils tombent sur `+0x0c + 2(i − 100)`, soit **la case de munitions de l'arme spéciale `i − 100`** (les 20 armes de `rules.md` §3.2). Les variables 5 à 99 n'existent pas (adresse avant la structure) et le script ne les utilise pas.
+
+| Variable | Champ | Sens | Preuve |
+|---|---|---|---|
+| 0 | `+0x38` | véhicule de départ du joueur (0 hélico, 1 buggy, 2 skidoo, 3 hovercraft) | `gm_player_set_form` (`0043de0c`) lit `[004841c0]+0x38` ; valeurs du script 0/1/2/3 selon le monde |
+| 1 | `+0x3c` | énergie initiale (496 en mission 0, puis `max(énergie, 248)`) | `gm_player_init_state` (`0043cab4`) ; hypothèse sur l'unité (248 = 100 %) |
+| 2 | `+0x34` | niveau de l'arme principale (0 à la mission 0, jamais modifié ensuite) | hypothèse |
+| 3 | `DAT_00577670` | **drapeaux d'eau** : bit 0 (`0x1`) = vagues sur les sommets d'eau (cellules de la carte 102 `< 0x20`, `gm_terrain_project_flat`/`_lit` `0042695f`, `00426e66`) ; bit 1 (`0x2`) = hauteur de l'eau ondulée (`gm_terrain_height_water` `00425cdd`) ; non nul : texture d'eau animée par `gm_water_animate` dans `gm_frame` (`0042f6d2`, détail maximal). Script : 3 sur la Terre et l'Arctique, 1 sur TERRANBS, 0 sur LUNAR01 et MARS (pas d'eau) | confirmé |
+| 4 | `DAT_004841b0` | **monde** : 0 TERRAN, 1 ARCTIC, 2 LUNAR, 3 MARS. Effets : forme 1 (buggy) = roues `0x3d4` aux textures 0 à 3 si `< 2`, 7 à 10 sinon (`0043de0c`) ; `gm_menu_pickups` (`0041bb40`, `0041c301`) choisit les véhicules proposés par monde | confirmé |
+| 100 + k | `+0x0c + 2k` (u16) | munitions de l'arme `k` | confirmé |
+
+L'élément `600 (r, g, b)` écrit `DAT_00484650` (`DAT_004846b0` dans `SWIV_WFX.EXE`), la couleur `0xRRGGBB` passée par la version 3Dfx à `grFogColorValue` (`00470046`, `0047010b`) et à `grBufferClear` (`004700eb`, `0047010b`) : **couleur du brouillard et du fond** (gris bleuté par défaut, rouge sur Mars, noir sur la Lune). `SWIV_WIN.EXE` ne la lit pas ; `SWIV_WDX.EXE` ne la lit pas non plus par un accès direct (`00496fd8`).
+
+Le script ne remet à 0 que les variables **109** (arme 9, « Super Ressort ! ») et **119** (arme 19, « Accélérateur ») au début de chaque mission : ces deux munitions propres aux véhicules roulants ne se reportent pas, les 18 autres suivent la fiche d'arrivée (`screens.md`).
 
 ## Bloc 700, cratères (confirmé)
 
@@ -107,9 +124,26 @@ Structure : 17 missions (index 0-16) ; l'élément 46 (premier -1) clôt la cha�
 - **505** (confirmé) : 96 images de 21×35 octets, rangées **colonne par colonne** (`FUN_004353f4`) : 6 séries de 16 images rétrécissantes (boules de feu, flash vert, nuage, étoile, étincelles, flamme). Même table 109.
 - **506** (confirmé, `FUN_00437c38`) : 32 images de 29 colonnes × 40 lignes (pas de 0x488 octets), colonne par colonne ; le code ne lit que 28 colonnes (la 29ᵉ est un remplissage : hypothèse). Viseurs rotatifs en deux séries de 16 (jaune, rouge). Table 109, 0 = transparent.
 - **510 / 511 / 512** (formats confirmés, rôle hypothèse) : sprites RLE lus par `gm_draw_overlay_sw` `004362b8` (`FUN_00414c7e` à l'origine) après le tracé du radar ; 510 (32 images, `& 0x1f`) : cadre ovale rotatif de 59×95 ; 511 (128 images de ~10×8, `& 0x7f`) : triangles ; 512 (128 images de ~61×95, `& 0x7f`) : éclats rotatifs du cadre. L'angle de la caméra choisit l'image.
-- **509** (hypothèse sur le format) : 256 u16 copiés tels quels dans `005bb810` par `0046f0c0` (appelée pendant le chargement d'un niveau). Lus en ARGB 4-4-4-4 : 8 rampes de 32 couleurs (feu noir-orange-jaune-blanc, gris, rouge, vert-jaune, vert, bleu…) dont l'alpha décroît de 15 à 0 ; premier u16 `0xf000`, dernier `0x0fff`. Sans doute des rampes pour les versions accélérées.
-- **502** (inconnu) : 1848 octets, tous entre `0xf0` et `0xff` (lignes proches de l'identité de la table 800). Chargé dans `005bc18c`, aucune lecture trouvée. Dimensions non établies (1848 = 4 × 462 ; le début montre une période de 3 octets).
-- **450-452, 500** (versions accélérées 3Dfx/D3D, non utilisés par `SWIV_WIN.EXE`, rôle hypothèse) : 451 = atlas 8 bits de 256 colonnes × 384 lignes avec les icônes du HUD (501), les cadres du radar, une flèche ; 500 = atlas 256×112 de formes floues (valeurs 0-3, ellipses, anneaux) ; 452 = table de 44 offsets (176, 2986, …) puis données : la jauge (503) ; 450 = 384 offsets (`0x600`, `0x601`… puis irréguliers), glyphes courts à lignes terminées par `0xfe` et fin `0xff` : la police (507). Non décodés.
+- **509** (confirmé) : 256 u16 copiés tels quels dans `005bb810` par `0046f0c0` (appelée pendant le chargement d'un niveau) ; ARGB 4-4-4-4 : 8 rampes de 32 couleurs (feu noir-orange-jaune-blanc, gris, rouge, vert-jaune, vert, bleu…) dont l'alpha décroît de 15 à 0 ; premier u16 `0xf000`, dernier `0x0fff`. Utilisés seulement par les versions accélérées (voir plus bas).
+- **502** (confirmé) : 11 images de 12×14 pixels, 168 octets chacune (4 plans × 14 lignes × 3 octets, même disposition que 503), un octet = numéro de ligne de la table 800 (`0xf0` transparent, `0xfc`-`0xff` trait sombre). Les images 0 à 9 sont les chiffres `0`-`9` et la 10 le signe `x` : le compteur `x%02d` des munitions. Le seul lecteur est `00437a7c` (`add esi, [005bc18c]`, stride `0xa8`, 4 plans de 14 lignes de 3 octets, `table[ah << 8 | al]` sur `005882e8`), une fonction **sans appelant** dans `SWIV_WIN.EXE`, `SWIV_WFX.EXE` et `SWIV_WDX.EXE` (`0043b958`, case `005d2bfc`) : ni `call`/`jmp` ni pointeur vers elle ; absente de la décompilation (Ghidra ne l'a pas créée). Le jeu écrit le compteur avec la police 2D (`gm_draw_text`). Donc : chargé, copié, jamais utilisé (reliquat d'un ancien HUD). Lecteur : `parseDigitSprites`. De même `00437a08` lit 501 (icônes 24×38, stride `0x390`) et n'est pas appelée.
+
+## Versions accélérées (3Dfx / Direct3D) : blocs 450, 451, 452, 500 et 509 (confirmé)
+
+`gm_global_init` les charge quand `DAT_0048464c != 0` (`0046fcd3`-`0046fd0a` dans `SWIV_WFX.EXE`) : 500 → `005bc160`, 451 → `005bc16c` (même case que 501), 452 → `005bc138` (même case que 503), 450 → `005bc128` ; 504 et 509 sont chargés dans les deux cas. `FUN_0046f0c0` (`SWIV_WIN.EXE` : un appel à `FUN_0046ff9c`, coquille vide ; `SWIV_WFX.EXE` : `0046f0c0`, appels à `004752f4`, l'envoi de texture de la couche Glide) transforme ensuite ces données en textures :
+
+| Appel | Données | Texture |
+|---|---|---|
+| `0x7d7` (index `n + 0x8c`, n de 0 à 55) | 504, 56 images 64×64, palette 509 | Glide format `0xc` (ARGB 4-4-4-4) : texel `t` → `rampe509[t]` |
+| `0x7d7` (index 0 à 6) | 500, 7 images 64×64, palette 509 | idem |
+| `0x7d8` (index 10) | 451, octets `0` à `0xffff` | 256×256, format `0x4` (alpha 4 bits en haut, intensité 4 bits en bas), sans palette |
+| `0x7d9` (index 11, 12) | 451, octets `0x10000`-`0x13fff` puis `0x14000`-`0x17fff` | 128×128, même format |
+
+- **500** : les 7 textures 64×64 sont (rendu vérifié avec la rampe 509) : quatre halos d'impact (orange, vert, bleu, anneau de flammes), un petit flash, un viseur carré à coins et un viseur en croix : les équivalents accélérés des blocs 505 et 506. Les valeurs vont jusqu'à 127 : quatre rampes de 32 couleurs de 509 (banque = valeur `>> 4`, mêmes teintes que 505/506).
+- **451** : texture 10 = les icônes du HUD (rendu vérifié) : grille de 5 colonnes de **cellules de 51×51** (`HUD_ICON_CELL`), image `i` en `(i % 5, i / 5)`, 22 images (0 capsule vide, 1-20 armes, 21 flèche : même numérotation que 501, plus grosses). La commande de dessin `0x3f3` (`SWIV_WFX.EXE` `0047230b`, appelée par `gm_draw_hud` avec l'indice dans `[005c4910]`) dessine un carré de 45 pixels avec les UV `(i % 5 × 51, i / 5 × 51)` sur 51 texels (`50,99`). L'alpha (quartet haut) contient la capsule, l'intensité (quartet bas) l'icône ; la flèche (21) n'a que de l'intensité. Textures 11 et 12 : les deux demi-images tournantes du radar (commande `0x3f4`, quadrilatères tournés avec l'angle de la caméra `005a84b4` et `+0x100`, fonction `00437870`/`004379xx`), équivalents accélérés de 510 et 512.
+- **450** : police 2D (mêmes 384 glyphes, indexés comme 507). Table de 384 offsets u32 absolus (premier `0x600`), puis un flux par glyphe, dessiné sur une surface 16 bits par `00414e81` (opaque : niveau `(octet << 1) & 0x1f` en gris RVB) ou `00414f0f` (mélangé avec `table[canal << 8 | octet]` à `0056f350`). Octet : `0xff` fin ; `0xfe` ligne suivante (`edi -= 0x800 ; edi += pas`, d'où chaque ligne complétée à **1 024 pixels** par un saut final) ; sinon deux bits de tête et `n` sur 6 bits : `00` saut de `(n << 8 | octet suivant)` pixels, `01` saut de `n`, `10` `n` pixels d'une valeur (octet suivant), `11` `n` valeurs littérales. Dessin : `gm_draw_text` met en file `(base 450, x, y, glyphe)` par `FUN_00422950` (800 entrées max, `00495270`), la file est vidée par `0046fea8` de WFX (position `y + 0x46`). Rendu vérifié (« A », « g » lisibles, 13×16 pour « A »). Lecteur : `parseRowRleSprites`.
+- **452** : 44 images 38×99 (jauge d'énergie plus grande que 503, indexée par le niveau d'énergie `+0x118`), même format de lignes compressées que 450 ; dessinée par la même file (`0042f58b` : `FUN_00422950(base 452, x = largeur − 0x32, y = −0x39, image)` en 3Dfx, `y = 0xd` en D3D). Offsets absolus (premier 176). Rendu vérifié (silhouette de jauge).
+- **509** : u16 ARGB 4-4-4-4 (`GR_TEXFMT_ARGB_4444`) : format confirmé par l'envoi de texture ci-dessus.
+
 
 ## Blocs 1001-1005, écrans plein cadre (confirmé)
 
@@ -119,6 +153,10 @@ Le tableau de 8192 octets est identique pour 1001 et 1002, différent pour 1003-
 
 ## Questions ouvertes
 
-- Rôle des variables ≥ 5 du script de mission (109, 119…) et de l'élément 600 (couleur d'ambiance ?).
-- Bloc 502 (dimensions, rôle), blocs 450-452/500 (lire `SWIV_WFX.EXE`/`SWIV_WDX.EXE`), format exact de 509.
-- Bit `0x10` des drapeaux, effet exact de `0x02`.
+- Rôle des variables 1 et 2 du script au-delà de ce qu'écrit la fiche (énergie de départ ; niveau d'arme principale : hypothèse).
+- Écran 1000 absent (drapeau `0x80`) et table de 8 192 octets des écrans 1001-1005 hors radar : inconnue.
+- Divers `GLOBAL.BD` de l'installation (WDX) : blocs 1, 100, 600, 1000 et 1003 différents, non étudiés.
+
+## Note : `DAT_00484624` et `DAT_00484620`
+
+`gm_detect_mmx` (`0042fcac`) pose `DAT_00484628 = 1` si l'instruction `cpuid` existe, `DAT_00484620 = 1` si le bit MMX (`0x800000`) de l'EDX de `cpuid(1)` est levé, puis `DAT_00484624 = DAT_00484620` : **`DAT_00484624` = « le processeur gère MMX »** (fixe), **`DAT_00484620` = « chemin MMX actif »** (modifiable : `gm_frame` le met à 1 tant que `DAT_0049011c` est nul et à 0 sinon, uniquement si le CPU a MMX ; testé par `gm_render_view`, `0042b31c`, lignes 461, 580, 979). Avec MMX, `gm_frame` force la taille de l'écran (`DAT_00480c88 = 0xff`) et le détail (`DAT_00480c64 = 0xf0`) au maximum et le menu de configuration masque les curseurs « Taille de l'écran » et « Résolution » (`gm_menu_setup`, `0041b540`, `0041b6c3`) : ils ne servent donc que sans MMX. Un port n'en a pas besoin (curseurs facultatifs).

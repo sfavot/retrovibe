@@ -5,6 +5,7 @@ import {
   WORLD_SIZE,
   heightAt,
   groundTile,
+  groundTileTints,
   objectiveGroup,
   tileOffset,
   tileStride,
@@ -205,6 +206,38 @@ describe.skipIf(!hasOriginalFiles)(
         // Tuile du terrain : valeur de la carte 102 >> 3 ; eau (< 0x20) = tuiles 0 à 3, max 0xf0 = tuile 30.
         expect(groundTile(0x1f)).toBe(3);
         for (const g of l.groundMap) expect(groundTile(g)).toBeLessThan(ground!.tileCount);
+      }
+    });
+
+    it("lit les 32 teintes de tuiles de la queue de 12000 : couleur moyenne de la tuile, canal maximal à 255", () => {
+      for (const l of levels.values()) {
+        const [ground, ...models] = l.tilesets;
+        const tints = groundTileTints(ground!);
+        expect(tints).toHaveLength(32);
+        for (const m of models) expect(groundTileTints(m)).toEqual([]);
+        tints.forEach((tint, k) => {
+          expect(Math.max(...tint)).toBe(255);
+          const mean = [0, 0, 0];
+          const start = tileOffset(ground!, k);
+          for (let i = 0; i < 4096; i++) {
+            const index = ground!.pixels[start + i]!;
+            for (let c = 0; c < 3; c++) mean[c]! += ground!.palette[index * 3 + c]! / 4096;
+          }
+          const top = Math.max(...mean);
+          mean.forEach((v, c) => expect(Math.abs((v / top) * 255 - tint[c]!)).toBeLessThanOrEqual(4));
+        });
+        // Les quatre tuiles d'eau ont la même teinte (bleu clair).
+        expect(tints[0]).toEqual([98, 221, 255]);
+        expect(tints[3]).toEqual(tints[0]);
+      }
+    });
+
+    it("garde le bloc 104 identique dans les cinq niveaux (aucun exécutable ne le charge)", () => {
+      const header = new DataView(level("TERRAN00").rampTable.buffer, level("TERRAN00").rampTable.byteOffset, 24);
+      expect([0, 4, 8, 12, 16, 20].map((o) => header.getUint32(o, true))).toEqual([0x93, 0x93, 0x93, 1, 1, 0]);
+      for (const l of levels.values()) {
+        expect(l.rampTable).toEqual(level("TERRAN00").rampTable);
+        expect(Math.max(...l.rampTable.subarray(24))).toBeLessThanOrEqual(0x7f);
       }
     });
 

@@ -1410,3 +1410,117 @@ a.button:hover {
   max-height: calc(var(--view-h, 100dvh) - 16px);
   overflow-y: auto;
 }
+
+/* ------------------------------------------------------------------ commandes tactiles d'un jeu d'action (`ui/touch-controls.ts`) */
+
+/* Couche posée dans l'écran du jeu (`stageChildren`) : cachée hors écran tactile, elle ne capte que le stick et les boutons. Le stick
+   en bas à gauche, les boutons en bas à droite, sur les bords pour laisser le centre libre. */
+.touch-controls {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  line-height: normal;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@media (pointer: coarse) {
+  .touch-controls {
+    display: block;
+  }
+}
+
+/* paysage tactile et plein écran pivoté, qui ne correspondent pas toujours à la requête de média */
+.game-shell.is-touch-landscape .touch-controls {
+  display: block;
+}
+
+.touch-stick,
+.touch-buttons {
+  position: absolute;
+  bottom: max(12px, var(--safe-b));
+}
+
+.touch-stick {
+  left: max(12px, var(--safe-l));
+  width: clamp(112px, 26%, 160px);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, var(--text) 45%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg) 40%, transparent);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-stick__knob {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 46%;
+  aspect-ratio: 1;
+  margin: -23% 0 0 -23%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+  border: 2px solid color-mix(in srgb, var(--accent) 85%, transparent);
+  pointer-events: none;
+}
+
+.touch-stick.is-active {
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+}
+
+.touch-buttons {
+  right: max(12px, var(--safe-r));
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+  align-content: flex-end;
+  gap: 12px;
+  max-width: 50%;
+}
+
+.touch-button {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 72px;
+  min-height: 72px;
+  padding: 0 12px;
+  border: 2px solid color-mix(in srgb, var(--text) 45%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  color: var(--text);
+  font-weight: 700;
+  pointer-events: auto;
+  /* ni défilement ni zoom ; le doigt reste sur le bouton même s'il glisse */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.08s, transform 0.08s;
+}
+
+.touch-button .icon {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+
+.touch-button.is-active {
+  background: color-mix(in srgb, var(--accent) 65%, transparent);
+  color: var(--accent-ink);
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .touch-button {
+    transition: none;
+  }
+
+  .touch-button.is-active {
+    transform: none;
+  }
+}

@@ -293,8 +293,8 @@ export function doubleGrille(kit: NpcKit): BehaviorHandler {
 /**
  * `2caf:000e` (`Num 333`) : l'acteur du couronnement remplace le héros (§ 10.1). `Ego 0` attend la fin de l'animation puis rejoint
  * la salle du trône ; 1 s'y place ; 2 à 6 : séquence d'animations et marche vers le trône ; 7 : fin de partie.
- * hypothèse (characters.md § 10.1) : les arguments cachés (`Fig`, `Txt`, identifiants d'animation) de chaque étape ne sont pas
- * relevés ; seuls l'enchaînement, les messages `G371` / `G372`, les points `(3, 7)` et la fin de partie le sont.
+ * Les états de chaque étape (`Gst`, `Mob`, `Fig`, `Txt`, mode) sont ceux des appels `1a37:007f` de `2caf:0142`..`2caf:0269` ; la marche vers le
+ * trône (`Ego 4`) est la seule étape mobile (`Mob 2`). Hypothèse : les identifiants d'animation des étapes 3, 5 et 6.
  */
 export function king(kit: NpcKit): BehaviorHandler {
   return (obj, ctx) => {
@@ -326,13 +326,15 @@ export function king(kit: NpcKit): BehaviorHandler {
           break run;
         case 2:
           if (kit.pollAnimation(ctx, obj) === 0) break run;
-          kit.setState(ctx, obj, { gst: 7, mob: 1, ego: 3, fig: 0 }, 2);
+          // `2caf:0142` : `1a37:007f` (Gst 7, Mob 1, Ego 3, Fig 0, Dep 0, Txt 2, mode 2), puis `Ver = 1`
+          kit.setState(ctx, obj, { gst: 7, mob: 1, ego: 3, fig: 0, dep: 0, txt: 2 }, 2);
           obj.speedY = 1;
           continue;
         case 3:
           if (!finished()) break run;
           kit.sayHere(ctx, obj, "G", 371);
-          kit.setState(ctx, obj, { gst: 7, mob: 1, ego: 4, txt: 2, fig: 1 }, 2);
+          // `2caf:0182` : Mob 2 (c'est la marche vers le trône : `Prf = -1`, `+0x62 = 0xff`), Fig 1
+          kit.setState(ctx, obj, { gst: 7, mob: 2, ego: 4, fig: 1, dep: 0, txt: 2 }, 2);
           obj.speedX = 0;
           obj.speedY = 0;
           obj.speedP = -1;
@@ -342,12 +344,13 @@ export function king(kit: NpcKit): BehaviorHandler {
             obj.speedP = -1;
             break run;
           }
-          kit.setState(ctx, obj, { ego: 5, txt: 2, fig: 1 }, 2);
+          // `2caf:01ba` : Mob 1 (l'acteur s'arrête), Fig 0, `Ver = 1`
+          kit.setState(ctx, obj, { gst: 7, mob: 1, ego: 5, fig: 0, dep: 0, txt: 2 }, 2);
           obj.speedY = 1;
           continue;
         case 5:
           if (!finished()) break run;
-          kit.setState(ctx, obj, { ego: 6, txt: 2, fig: 2 }, 2);
+          kit.setState(ctx, obj, { gst: 7, mob: 1, ego: 6, fig: 2, dep: 0, txt: 2 }, 2);
           obj.speedY = 1;
           continue;
         case 6:
@@ -356,10 +359,11 @@ export function king(kit: NpcKit): BehaviorHandler {
           ctx.score.award(3, 7);
           setHeaderByte(ctx.state, GAME_OVER, 7);
           setHeaderByte(ctx.state, SECRET_FLAG.crowned, 7);
-          // lacune (characters.md § 10.3) : verdict `14cf:000c` et message `S55` (écran de fin, hors de portée de `BehaviorContext`)
-          kit.setState(ctx, obj, { ego: 7, txt: 2, fig: 3 }, 2);
+          // `2caf:0232` : verdict `14cf:000c(0x32)` (en-tête `S50`), puis `S55` (`2caf:023a`) ; le héros disparaît (`4bfe = 0`)
+          ctx.score.verdict(50);
+          ctx.messages.say("S", 55);
           ctx.state.setHero(null);
-          obj.gst = 0;
+          kit.setState(ctx, obj, { gst: 0, mob: 0, ego: 7, fig: 3, dep: 0, txt: 2 }, 2);
           return RESTART;
         default:
           break run;

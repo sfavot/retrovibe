@@ -384,14 +384,23 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
    * on longe la salle par le milieu, de proche en proche, à la hauteur du sol de chaque case.
    */
   const lavaWalk = (path: readonly (readonly [number, number])[]): void => {
-    const terrain = (p.engine as unknown as { terrain: { grid: { types: Uint8Array; spans: Uint16Array } } }).terrain;
-    const floor = (x: number, depth: number): number => terrain.grid.spans[(depth >> 3) * 81 + (x >> 2)]! & 0xff;
     for (const [x, depth] of path) {
       for (let k = 0; k < 4 && p.state.hero && Math.abs(p.hero.p - depth) > 6; k++) {
-        p.walkTo(x, floor(x, depth), 1500);
+        p.walkTo(x, p.floor(x, depth), 1500);
         p.drain(2);
       }
     }
+  };
+
+  /** Le tunnel du fond de la salle 302 mène à la lave (304) : on se place dessous (P 23), flèche haut, puis on longe la salle. */
+  const enterLava = (): void => {
+    p.walkTo(95, 60, 1500);
+    p.arrow("up");
+    p.until(() => p.roomId !== 302, 600);
+    p.stop();
+    p.run(30);
+    if (p.roomId !== 304) throw new RobotSetback(`salle ${p.roomId}`);
+    lavaWalk(LAVA_PATH);
   };
 
   it("chapitre 3 (c) : la planche de la salle de Minas Thyl (304)", () => {
@@ -412,14 +421,7 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
         p.walkTo(230, 62, 4000);
         p.drain();
         for (const room of p.route(302)!) p.hop(room);
-        // le tunnel du fond de la salle 302 mène à la lave (304) : on se place dessous (P 23), flèche haut
-        p.walkTo(95, 60, 1500);
-        p.arrow("up");
-        p.until(() => p.roomId !== 302, 600);
-        p.stop();
-        p.run(30);
-        if (p.roomId !== 304) throw new RobotSetback(`salle ${p.roomId}`);
-        lavaWalk(LAVA_PATH);
+        enterLava();
         // Minas Thyl vient à la rencontre du héros (sans baguette elle ne propose que son pacte : `G325`, puis attend : `Ego 5`)
         for (let k = 0; k < 8 && p.state.hero && !has(308); k++) p.say("prendre la planche");
         if (!has(308)) throw new RobotSetback("pas de planche");
@@ -427,9 +429,213 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
         lavaWalk([...LAVA_PATH].reverse().slice(1));
         p.goTo(302, new Set(), true);
       },
+      // Minas Thyl, restée où le héros l'a laissée, ne doit pas être dans son antre (301) : elle y capturerait le héros
       () => has(308) && p.roomId === 302,
     );
     expect(has(308)).toBe(true);
     expect(p.roomId).toBe(302);
+  }, 120_000);
+
+  /**
+   * Passe dans la salle voisine `room` : sauvegarde (F2) à l'entrée de la salle précédente, et, si le héros y meurt (un nain, un
+   * duel perdu), restauration (F3) puis nouvel essai de cette seule salle. Sauvegarder à chaque salle et ne refaire que la dernière
+   * est ce qui rend fiable la traversée des cinq salles de nains (`Robot.attempt`).
+   */
+  const crossTo = (room: number): void => {
+    p.attempt(`traversée de la salle ${room}`, 40, () => p.hop(room, 4), () => p.roomId === room);
+  };
+
+  /**
+   * La herse de granite (`Num 207`, entre 202 et 305) : un nain qui la voit ouverte crie « Armaëth ! » et la referme (`2a44:0a60`) ; on la
+   * rouvre par « tinhuel », dit de l'une des deux salles (`3443:0028`), et on attend la fin du coulissement (`Tim = 0x22`).
+   */
+  const portcullisOpen = (): void => {
+    for (let k = 0; k < 6 && object(207).ego !== 3; k++) {
+      p.say("tinhuel");
+      wait(700);
+    }
+  };
+
+  /** Marche jusqu'à la salle `target`, salle par salle (`crossTo`) ; la herse est rouverte en route si les nains l'ont refermée. */
+  const crossAll = (target: number): void => {
+    p.forgetFailures();
+    for (let k = 0; k < 30 && p.roomId !== target; k++) {
+      if (object(207).ego !== 3 && (p.roomId === 202 || p.roomId === 305)) p.attempt("herse", 20, portcullisOpen, () => object(207).ego === 3);
+      const route = p.route(target) ?? p.route(202);
+      if (!route) throw new Error(`aucune route de la salle ${p.roomId} à ${target}`);
+      crossTo(route[0]!);
+    }
+    expect(p.roomId).toBe(target);
+  };
+
+  it("chapitre 3 (d) : la salle de garde et la mine, la planche posée en travers du gouffre et l'épée d'orichalque (score 220)", () => {
+    expect(p.roomId).toBe(302);
+    expect(has(308)).toBe(true);
+    expect(p.state.score).toBe(200);
+    // la salle de garde 305 : les nains de la route de retour (205, 206, 207, 203, 202) puis les gardes, qui dorment 1 fois sur 4
+    crossAll(312);
+    expect(p.roomId).toBe(312);
+    p.attempt(
+      "épée",
+      30,
+      () => {
+        // le pont vermoulu (`Sol 53`) ne porte que 40 de charge, la planche comprise (20) : le superflu reste sur la plateforme de gauche
+        for (const item of ["le seau", "la hache", "le bouclier", "le fouet", "le levier"]) p.say(`jeter ${item}`);
+        for (const [x, yy] of [[118, 106], [160, 100], [198, 98]]) p.walkTo(x, yy, 3000);
+        if (p.hero.ground !== 0x3e) throw new RobotSetback("pas au bout de la plateforme du centre");
+        // la planche (« poser » n'est pas dans le dictionnaire : `mettre`) au bord du gouffre, score(3, 2) : +20
+        if (!p.say("mettre la planche").includes(text("V", 306))) throw new RobotSetback("planche non posée");
+        for (const [x, yy] of [[215, 98], [240, 98], [285, 98]]) p.walkTo(x, yy, 3000);
+        // l'épée est dans la crevasse de la plateforme de droite
+        p.say("regarder dans le trou");
+        p.say("prendre l'épée dans le trou");
+        if (!has(314)) throw new RobotSetback("pas d'épée");
+        for (const [x, yy] of [[240, 98], [160, 100], [118, 106], [40, 100]]) p.walkTo(x, yy, 3000);
+        for (const item of ["le bouclier", "le seau", "la hache"]) p.say(`prendre ${item}`);
+      },
+      () => has(314) && has(205) && has(25) && has(206),
+    );
+    expect(object(308).ego).toBe(1);
+    expect(p.state.score).toBe(220);
+  }, 120_000);
+
+  it("chapitre 3 (e) : le garde du cellier, la clef ouvragée, la grille de fer et la vanne du puits", () => {
+    // l'épée et le bouclier donnent toujours la victoire en duel (`2a44:02de`) : on traverse sans attendre les nains
+    crossAll(305);
+    p.attempt(
+      "garde du cellier",
+      30,
+      () => {
+        const guard = p.state.objects.find((o) => o.num === 301 && o.contents.some((c) => c.num === 331))!;
+        // la case 0x37 devant la grille déclenche le garde (`Ego 5`, `2a44:08fe`) : il attaque, l'épée le transperce et la clef tombe
+        p.walkTo(140, p.floor(140, 52), 3000);
+        p.until(() => !p.state.objects.includes(guard) || !p.state.hero, 1500);
+        p.run(300);
+        p.drain();
+        if (!p.state.hero) throw new RobotSetback("mort devant le garde");
+        if (!p.say("prendre la clef").includes(text("V", 15)) || !has(331)) throw new RobotSetback("pas de clef ouvragée");
+        p.say("ouvrir la grille avec la clef");
+        if (object(309).ego !== 2) throw new RobotSetback("grille fermée");
+        // la vanne est dans l'alcôve du garde-manger : elle vide le puits (salle 212, eau `Num 215`)
+        if (!p.say("ouvrir la vanne").includes(text("V", 301))) throw new RobotSetback("vanne");
+      },
+      () => has(331) && object(309).ego === 2 && object(215).fig === 1,
+    );
+    expect(p.state.score).toBe(220);
+  }, 120_000);
+
+  it("chapitre 3 (f) : le puits vidé, le coffre de fer du fond et la baguette de Minas Thyl", () => {
+    crossAll(202);
+    p.attempt(
+      "vers le trône",
+      30,
+      () => {
+        crossGapUp();
+        leaveDomeUp();
+      },
+      () => p.roomId === 108,
+    );
+    p.attempt("vers le puits", 30, () => p.goTo(102), () => p.roomId === 102);
+    p.attempt(
+      "fond du puits",
+      30,
+      () => {
+        for (const [x, yy] of [[90, 100], [90, 90], [88, 80], [80, 85], [100, 85], [90, 70]]) {
+          if (p.hero.ground === 40) break;
+          p.walkTo(x, yy, 800);
+          p.run(20);
+        }
+        p.vertical("=");
+        p.run(20);
+        p.vertical("="); // la corde : on descend sans s'arrêter, le puits est vide (la salle 313 est le fond)
+        if (!p.until(() => p.roomId === 313 && p.hero.ego === 0, 1500)) throw new RobotSetback(`salle ${p.roomId}`);
+        p.run(20);
+        if (!p.say("ouvrir le coffre avec le trousseau").includes(text("V", 15))) throw new RobotSetback("coffre fermé");
+        p.say("prendre la baguette dans le coffre");
+        if (!has(320)) throw new RobotSetback("pas de baguette");
+        // la remontée : le pied de la corde (case 7), puis `-` jusqu'à la margelle
+        for (const [x, yy] of [[64, 52], [66, 54], [62, 50]]) {
+          if (p.hero.ground === 7) break;
+          p.walkTo(x, yy, 1500);
+        }
+        p.vertical("-");
+        if (!p.until(() => p.roomId === 102 && p.hero.ego === 0, 1500)) throw new RobotSetback("remontée");
+        p.run(60);
+      },
+      () => has(320) && p.roomId === 102,
+    );
+    expect(has(320)).toBe(true);
+  }, 120_000);
+
+  it("chapitre 3 (g) : le talisman contre la baguette, « sillerynn », la couronne et le verdict du roi (score 320)", () => {
+    p.attempt("vers le dôme", 30, () => p.goTo(108), () => p.roomId === 108);
+    p.attempt(
+      "descente au dôme",
+      30,
+      () => {
+        enterDome();
+        if (p.roomId !== 202) throw new RobotSetback(`salle ${p.roomId}`);
+        crossGapDown();
+        p.walkTo(230, 62, 4000);
+        p.drain();
+      },
+      () => p.roomId === 202 && !!p.state.hero,
+    );
+    p.attempt("vers la salle 302", 30, () => p.goTo(302), () => p.roomId === 302);
+    // Minas Thyl, immobile là où le héros l'a laissée (souvent dans son antre, 301), va à la rencontre du héros qu'elle voit (elle n'a plus sa
+    // baguette) : elle exige la baguette, qu'on lui donne tout de suite (dans l'antre elle capture le héros au contact, `2dd9:0858` : la
+    // commande part avant). Si elle est dans la salle de lave (304) on l'y rejoint, sinon on va dans sa salle.
+    const minas = object(303);
+    p.attempt(
+      "talisman",
+      20,
+      () => {
+        for (let k = 0; k < 12 && p.state.hero && !has(321); k++) {
+          const where = minas.room!.id;
+          if (p.roomId !== where) {
+            if (where === 304) {
+              p.goTo(302);
+              enterLava();
+            } else {
+              p.goTo(where, new Set(), true); // sans s'attarder à l'arrivée : dans l'antre elle est tout près de l'entrée
+              p.stop(); // le héros garde son élan en entrant : il irait à son contact (la capture)
+            }
+          }
+          // elle approche (`G316`, `G317`), puis exige la baguette (`G327`) : on la lui donne dès qu'elle est à portée de main, avant le
+          // contact (dans l'antre le contact est la capture)
+          const reach = (): boolean => !!p.state.hero && (p.engine as unknown as { inReach(o: unknown): boolean }).inReach(minas);
+          for (let i = 0; i < 30 && p.state.hero && !has(321) && minas.room === p.state.loadedRoom; i++) {
+            if (!p.until(() => reach() || !p.state.hero || minas.room !== p.state.loadedRoom, 1200)) break;
+            if (p.state.hero && reach()) p.say("donner la baguette à Minas");
+          }
+        }
+        if (!has(321)) throw new RobotSetback("Minas Thyl ne vient pas");
+      },
+      () => has(321),
+    );
+    expect(has(320)).toBe(false);
+    expect(p.state.score).toBe(240);
+
+    // le talisman change le seau en couronne (+30), qu'on chausse : l'ensorcellement mène au trône (108), l'acteur gravit les marches
+    expect(p.say("sillerynn").join(" ")).toContain(text("V", 355));
+    expect(has(328)).toBe(true);
+    expect(p.state.score).toBe(270);
+    p.say("chausser la couronne");
+    expect(p.state.hero?.num).toBe(333);
+    const read: string[] = [];
+    for (let k = 0; k < 120 && !p.state.gameOver; k++) {
+      p.run(50);
+      read.push(...p.drain(2));
+    }
+    read.push(...p.drain(2));
+    expect(p.state.gameOver).toBe(true);
+    expect(p.state.hero).toBeNull();
+    expect(p.roomId).toBe(108);
+    expect(p.state.score).toBe(320);
+    // le verdict (`S50`) conclut sur `S53` (secret du niveau découvert, trésor incomplet) ; puis `S55`
+    const verdict = read.findIndex((t) => t.startsWith(text("S", 50).slice(0, 40)));
+    expect(verdict).toBeGreaterThanOrEqual(0);
+    expect(read[verdict]).toContain(text("S", 53).slice(0, 40));
+    expect(read.findIndex((t) => t.startsWith(text("S", 55).slice(0, 40)))).toBeGreaterThan(verdict);
   }, 120_000);
 });

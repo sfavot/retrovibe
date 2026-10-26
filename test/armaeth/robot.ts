@@ -19,6 +19,13 @@ const SIDES = ["up", "right", "down", "left"] as const;
  * sorties à marcher, puis `leave`), c'est-à-dire uniquement par des clics et des flèches, jamais par téléportation.
  */
 export class Robot extends Player {
+  /** Le héros ; mort, il n'y a plus rien à lire : contretemps, l'essai en cours est à recommencer (F3). */
+  override get hero(): GameObject {
+    const hero = this.state.hero;
+    if (!hero) throw new RobotSetback("le héros est mort");
+    return hero;
+  }
+
   /** Réflexe du joueur, appelé après chaque image (par exemple fouetter l'ours dès qu'il est à portée). */
   watcher: (() => void) | null = null;
   private watching = false;
@@ -104,11 +111,17 @@ export class Robot extends Player {
         if (process.env.ROBOT_DEBUG) console.log(`${name} essai ${n} : ${error.message}`);
       }
       if (this.state.hero && ok()) return n;
-      if (process.env.ROBOT_DEBUG) console.log(`${name} essai ${n} : échec (héros ${this.state.hero ? "vivant" : "mort"}, salle ${this.roomId})`);
+      if (process.env.ROBOT_DEBUG) console.log(`${name} essai ${n} : échec (héros ${this.state.hero ? "vivant" : "mort"}, salle ${this.roomId}) ${this.log.slice(-2).join(" | ").slice(0, 200)}`);
       this.restore();
       if (process.env.ROBOT_DEBUG) console.log(`${name} restauré : salle ${this.state.loadedRoom?.id}, héros ${this.state.hero ? "vivant" : "absent"}, ${this.state.hero?.x},${this.state.hero?.y}`);
     }
     throw new Error(`${name} : échec après ${tries} essais`);
+  }
+
+  /** Hauteur Y du sol de la case (X, P) du plan 0 de la salle chargée (le joueur la lit à l'écran : hauteur du pied pour un clic des bottes). */
+  floor(x: number, depth: number): number {
+    const terrain = (this.engine as unknown as { terrain: { grid: { spans: Uint16Array } } }).terrain;
+    return terrain.grid.spans[(depth >> 3) * 81 + (x >> 2)]! & 0xff;
   }
 
   /** Salle chargée. */
@@ -131,6 +144,11 @@ export class Robot extends Player {
 
   /** Sorties qui ont échoué : `salle>destination@entrée` (l'emplacement par lequel le héros est arrivé, -1 au départ). */
   private readonly failedExits = new Set<string>();
+  /** Le joueur oublie les sorties qui n'ont pas marché (le monde a changé : herse levée, planche posée, nouvelle étape). */
+  forgetFailures(): void {
+    this.failedExits.clear();
+  }
+
   /** Emplacement de la sortie par lequel le héros est entré dans la salle courante (-1 : placement libre). */
   private entry = -1;
 
@@ -186,19 +204,36 @@ export class Robot extends Player {
   }
 
   /**
-   * Sort de la salle du côté `side` de l'écran : clic droit des bottes dans le secteur (`interface.md` § 5.6) ; si le trajet n'existe
-   * pas depuis la position du héros, clics des bottes au bord puis flèche (`Player.leave`). Rend vrai si la salle a changé.
+   * Sort de la salle du côté géométrique `side` : clic droit des bottes dans le secteur `sector` (`interface.md` § 5.6 ; le secteur est
+   * l'emplacement de sortie, le héros marche ensuite vers le côté que la permutation de la scène lui donne : `side` et `sector`
+   * diffèrent dans les salles à côtés permutés de la mine) ; si le trajet n'existe pas depuis la position du héros, clics des bottes
+   * au bord puis flèche (`Player.leave`). Rend vrai si la salle a changé.
    */
-  exit(side: (typeof SIDES)[number], maxTicks = 3000, quick = false): boolean {
+  exit(side: (typeof SIDES)[number], maxTicks = 3000, quick = false, sector: (typeof SIDES)[number] = side): boolean {
     const before = this.roomId;
     this.stop();
+    this.run(15); // le clic d'arrêt lance l'animation de refus du curseur (20 images) : un clic de sortie tombé dedans serait perdu
     this.useBoots();
     const { x, y } = this.origin;
-    const spot = { up: [160, 8], right: [300, 70], down: [160, 130], left: [20, 70] }[side];
-    this.click(x + spot[0], y + spot[1], 2);
-    for (let i = 0; i < maxTicks && this.state.loadedRoom?.id === before && this.state.hero && this.hero.path.defined; i += 5) {
-      this.run(5);
-      this.drain(4);
+    // les salles étroites de la mine ne remplissent pas la fenêtre : le secteur se lit dans le rectangle de la scène
+    const { width: w, height: h } = this.engine.currentScene!.header;
+    const spot = { up: [w / 2, Math.max(12, h * 0.12)], right: [w * 0.94, h * 0.4], down: [w / 2, h * 0.72], left: [w * 0.06, h * 0.4] }[sector].map(Math.round) as [number, number];
+    // un trajet qui s'interrompt (`Err 0x11`, passage d'un plan à l'autre) est relancé par un nouveau clic, comme le ferait le joueur
+    for (let round = 0; round < 4 && this.state.loadedRoom?.id === before && this.state.hero; round++) {
+      if (round > 0) {
+        // le héros arrêté (`Err 0x11`) ne prend un nouveau trajet qu'après un premier clic, qui n'est que l'arrêt
+        this.stop();
+        this.run(15);
+      }
+      this.click(x + spot[0], y + spot[1], 2);
+      let walked = false;
+      for (let i = 0; i < maxTicks && this.state.loadedRoom?.id === before && this.state.hero && this.hero.path.defined; i += 5) {
+        walked = true;
+        this.run(5);
+        this.drain(4);
+      }
+      if (process.env.ROBOT_DEBUG) console.log(`exit ${before} côté ${side} tour ${round} : marché ${walked}, héros ${this.state.hero ? [this.hero.x, this.hero.y, this.hero.p, this.hero.err].join(",") : "mort"}`);
+      if (!walked) break;
     }
     // `quick` : le joueur presse (salle dangereuse) : il ne s'arrête pas et reprend la main dès l'arrivée
     if (quick && this.state.loadedRoom?.id !== before) return true;
@@ -222,7 +257,7 @@ export class Robot extends Player {
       const slot = this.neighbours(from).find(([, id]) => id === dest)![0];
       const side = this.sideTo(dest);
       let moved = false;
-      for (let attempt = 0; attempt < 2 && !moved; attempt++) moved = this.exit(side, 3000, quick && this.roomId === from && path.length === 1);
+      for (let attempt = 0; attempt < 2 && !moved; attempt++) moved = this.exit(side, 3000, quick && this.roomId === from && path.length === 1, SIDES[slot]);
       if (!moved) {
         this.failedExits.add(`${from}>${dest}@${this.entry}`);
         continue;
@@ -235,10 +270,13 @@ export class Robot extends Player {
     return visited;
   }
 
-  /** Les nains, soldats et Sarhûls éveillés de la salle chargée : ce que le joueur voit en entrant. */
+  /**
+   * Les nains, soldats et Sarhûls éveillés de la salle chargée : ce que le joueur voit en entrant. Les gardes de poste (soldats `Ego 5` et
+   * `6`) n'attaquent pas tant qu'un autre soldat dort ou veille dans la salle (`characters.md` § 7.3) : ils ne comptent pas.
+   */
   threats(): GameObject[] {
     return this.state.objects.filter(
-      (o) => ((o.num >= 201 && o.num <= 204) || o.num === 301 || o.num === 302) && o.room === this.state.loadedRoom && o.holder === null && o.ego !== 7 && o.ego !== 8 && o.ego !== 2 && o.ego !== 3,
+      (o) => ((o.num >= 201 && o.num <= 204) || o.num === 301 || o.num === 302) && o.room === this.state.loadedRoom && o.holder === null && o.ego !== 7 && o.ego !== 8 && o.ego !== 2 && o.ego !== 3 && !(o.num === 301 && (o.ego === 5 || o.ego === 6)),
     );
   }
 
@@ -256,7 +294,12 @@ export class Robot extends Player {
         throw error;
       }
       if (this.threats().length === 0) return;
-      this.goTo(from, new Set(), true);
+      try {
+        this.goTo(from, new Set(), true);
+      } catch (error) {
+        // la sortie par laquelle le héros est venu est fermée derrière lui (herse refermée par les nains) : il n'a plus qu'à recharger
+        throw new RobotSetback(`pas de retraite : ${String(error)}`);
+      }
       this.stop(); // le héros garde son élan en entrant : il ne doit pas filer jusqu'au vide pendant l'attente
       for (let i = 0; i < 40; i++) {
         this.run(10);

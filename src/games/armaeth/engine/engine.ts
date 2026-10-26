@@ -1412,6 +1412,7 @@ export class ArmaethEngine implements TokenHostEngine {
           if (award && award.sound > 0) engine.playJingle(award.sound);
           return award;
         },
+        verdict: (header) => engine.showScore(header),
       },
       rooms: {
         want: (room: GameRoom) => void (engine.state!.wantedRoom = room),

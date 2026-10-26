@@ -96,6 +96,8 @@ export interface HandlerEvents {
 export interface HandlerScore {
   /** `2255:00e8(chapitre, indice)` : points, jingle éventuel joué. */
   award(chapter: number, index: number): ScoreAward | null;
+  /** `14cf:000c(en-tête)` : l'écran du score et du verdict (`S50` au couronnement, `characters.md` § 10.3), en fenêtre plein écran. */
+  verdict(header: number): void;
 }
 
 export interface HandlerRooms {

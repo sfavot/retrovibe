@@ -111,7 +111,10 @@ export class Player {
 
   /** Choisit l'outil « bottes » (icône de la dernière case de la page 0) : un clic dans la salle fait marcher le héros. */
   useBoots(): void {
-    if (this.engine.controller.tool.num !== 198) this.click(284, 10);
+    if (this.engine.controller.tool.num !== 198) {
+      this.click(284, 10);
+      this.run(25); // le curseur change d'outil : un clic dans la salle tombé dans cette animation serait perdu
+    }
   }
 
   /** Clic « bottes » sur un point du monde `(x, y)` ; le héros marche jusqu'à la fin de son trajet ou du délai. */

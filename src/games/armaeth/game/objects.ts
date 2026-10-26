@@ -7,6 +7,7 @@ import {
   NUM,
   OK,
   PREP,
+  ROOM,
   VERB,
   approach,
   award,
@@ -1229,11 +1230,26 @@ const CROWN_DELAY = 6;
 const CROWNING_ANIMATION = 42;
 
 /**
+ * `27ed:0194` : la dalle du trône (`Num 104`) est replacée fermée (`Y = 0x8B`, `1a37:007f` : Gst 0, Mob 0, Ego 0, Fig 0, Dep 1, Txt 2, mode 2) ;
+ * dans la salle du trône chargée les trois plans sont actifs (`4ae0 = 3`) et les trajets sont annulés (`1793:0006(0)`). Sans cela le
+ * trou de la dalle ouverte (cases 81 du plan 0) sert de sol à l'acteur du couronnement, qui ne peut plus gravir les marches (plan 1).
+ */
+function closeSlab(ctx: HandlerContext): void {
+  const slab = ctx.state.findByNum(NUM.slab);
+  if (!slab) return;
+  slab.y = 0x8b;
+  setState(ctx, slab, { gst: 0, mob: 0, ego: 0, fig: 0, dep: 1, txt: 2 }, 2);
+  if (ctx.room?.id !== ROOM.throne) return;
+  ctx.rooms.refreshPlanes();
+  for (const o of ctx.room.listA) if (o.path.defined) ctx.motion.reset(o);
+}
+
+/**
  * `2c83:0004` : tous les objets mobiles ou animés autres que le héros sont détruits (leur contenu va dans leur conteneur), puis le
  * héros est remplacé par l'acteur du couronnement (`Num 333`, qui devient le héros contrôlé) et l'animation démarre sur lui.
- * hypothèse (characters.md § 10.1) : la dalle (`27ed:0194`) n'est pas replacée.
  */
 function crownHero(ctx: HandlerContext, walker: GameObject): void {
+  closeSlab(ctx);
   for (const obj of [...ctx.state.objects]) {
     if (obj === walker || (obj.mob !== 2 && obj.animId === 0)) continue;
     for (const child of [...obj.contents]) {

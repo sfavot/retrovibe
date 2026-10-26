@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { Menu, paletteHighlight, type MenuEvent, type MenuItem } from "../../src/games/teleportaschtroumpf/engine/menu";
+import { Menu, paletteHighlight, type MenuEvent, type MenuItem, type MenuOptions } from "../../src/games/teleportaschtroumpf/engine/menu";
 import { Input } from "../../src/games/teleportaschtroumpf/engine/input";
 import { Palette } from "../../src/games/teleportaschtroumpf/engine/palette";
 import type { SceneContext } from "../../src/games/teleportaschtroumpf/engine/scene";
 
 const HOVER = [0x10, 0xa4, 0xcc] as const;
+
+/** Trois entrées empilées de 20 px de haut, de x = 100 à 199, à partir de y = 50. */
+const AREAS: MenuOptions["areas"] = () => [0, 1, 2].map((i) => ({ x0: 100, y0: 50 + i * 30, x1: 199, y1: 69 + i * 30 }));
 
 /** Trois éléments, voix d'aide sur les deux premiers. */
 const ITEMS: MenuItem[] = [{ voice: "a.voc" }, { voice: "b.voc" }, {}];
@@ -24,7 +27,10 @@ interface Harness {
   lit(): number[];
 }
 
-async function harness(axis: "vertical" | "horizontal" | "none", options: { wrap?: boolean; initial?: number; changeSound?: string; changeSoundIfIdle?: boolean } = {}): Promise<Harness> {
+async function harness(
+  axis: "vertical" | "horizontal" | "none",
+  options: { wrap?: boolean; initial?: number; changeSound?: string; changeSoundIfIdle?: boolean; areas?: MenuOptions["areas"] } = {},
+): Promise<Harness> {
   const input = new Input();
   const palette = new Palette();
   for (let i = 0; i < 3; i++) palette.setColor(120 + i, 83, 23, 23);
@@ -216,5 +222,48 @@ describe("Menu", () => {
     expect(h.lit()).toEqual([2]);
     h.menu.exit(h.ctx);
     expect(h.lit()).toEqual([]);
+  });
+
+  describe("zones (ajout du port pour le doigt et la souris)", () => {
+    it("toucher une entrée la sélectionne et la valide, sans bip", async () => {
+      const h = await harness("vertical", { areas: AREAS, changeSound: "bip.voc" });
+      h.input.mouseMove(150, 115);
+      h.input.mouseDown(0);
+      expect(h.step()).toEqual({ kind: "validate", index: 2 });
+      expect(h.menu.index).toBe(2);
+      expect(h.lit()).toEqual([2]);
+      expect(h.effects).toEqual([]);
+    });
+
+    it("un appui hors des zones ne fait rien ; Espace valide toujours l'entrée courante", async () => {
+      const h = await harness("vertical", { areas: AREAS });
+      h.input.mouseMove(20, 20);
+      h.input.mouseDown(0);
+      expect(h.step()).toBeNull();
+      h.input.mouseUp(0);
+      h.input.keyDown("Space");
+      expect(h.step()).toEqual({ kind: "validate", index: 0 });
+    });
+
+    it("la souris qui survole une entrée la sélectionne avec le bip ; immobile, elle laisse le clavier changer la sélection", async () => {
+      const h = await harness("vertical", { areas: AREAS, changeSound: "bip.voc" });
+      h.input.pointerHovering = true;
+      h.input.mouseMove(150, 85);
+      h.step();
+      expect(h.menu.index).toBe(1);
+      expect(h.effects).toEqual(["bip.voc"]);
+      h.input.keyDown("ArrowDown");
+      h.step();
+      h.input.keyUp("ArrowDown");
+      h.step();
+      expect(h.menu.index).toBe(2);
+    });
+
+    it("un doigt ne survole pas : seule la position de l'appui compte", async () => {
+      const h = await harness("vertical", { areas: AREAS });
+      h.input.mouseMove(150, 85);
+      h.step();
+      expect(h.menu.index).toBe(0);
+    });
   });
 });

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
 import { isLocked, saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
 import type { GameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
-import { MENU_PARENTS, PARENTS_HOLD_SECONDS, createMenuScene, paletteBounds } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
+import { paletteBounds } from "../../src/games/teleportaschtroumpf/engine/menu";
+import { MENU_PARENTS, MENU_QUIT, PARENTS_HOLD_SECONDS, createMenuScene } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles } from "./helpers";
 
@@ -116,7 +117,7 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
     const t = await startMenu();
     await t.settle("MenuScene");
     await t.select(2);
-    await t.click(0);
+    await t.press("Space");
     await t.settle("FreeModeScene");
     expect(t.lastFile()).toMatch(/S02A00[12]D\.MCG/i);
     await t.click();
@@ -233,6 +234,22 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
     await runFor(t.engine, t.host, PARENTS_HOLD_SECONDS * 1000 + 300);
     t.host.input.mouseUp(0);
     await t.settle("ParentsScene");
+  }, 60_000);
+
+  it("toucher un bouton du menu le valide (ajout du port) ; toucher ailleurs ne fait rien", async () => {
+    const t = await startMenu();
+    t.host.audio.enabled = false;
+    await t.settle("MenuScene");
+    const mcg = await t.engine.ctx.resources.mcg("s07a001d.mcg");
+    t.host.input.mouseMove(10, 10);
+    await t.click(0);
+    await runFor(t.engine, t.host, 1000);
+    expect(t.top()).toBe("MenuScene");
+    expect(t.lit()).toEqual([0]);
+    const area = paletteBounds(mcg.pixels, 120 + MENU_QUIT)!;
+    t.host.input.mouseMove((area.x0 + area.x1) / 2, (area.y0 + area.y1) / 2);
+    await t.click(0);
+    await t.settle("ConfirmScene");
   }, 60_000);
 
   it("Quitter : Non → menu ; Oui → générique puis sortie du jeu", async () => {

@@ -2,7 +2,7 @@ import type { Hy8 } from "../data/hy8";
 import { SCREEN_WIDTH, type Mcg } from "../data/mcg";
 import type { Voc } from "../data/voc";
 import { TICKS_PER_SECOND } from "../engine/clock";
-import { Menu, paletteHighlight } from "../engine/menu";
+import { AREA_MARGIN, Menu, paletteBounds, paletteHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
@@ -43,7 +43,7 @@ export const IDLE_SECONDS = 30;
  * L'écran de la partie reste affiché : seuls la barre du bas et le parchemin sont dessinés par-dessus, comme l'original ;
  * il est rétabli à la sortie (`ScreenSnapshot`). Gauche / droite choisissent un bouton sans rebouclage (« Retour » au
  * départ), clic gauche ou Espace valide, clic droit ou Entrée joue la voix du bouton ; si rien ne se passe pendant 30 s, une
- * voix de rappel est jouée. Échap n'a pas d'effet (l'original l'ignore).
+ * voix de rappel est jouée. Échap n'a pas d'effet (l'original l'ignore). Ajout du port : toucher un bouton le valide.
  */
 export function createPauseScene(onDone: (ctx: SceneContext, choice: PauseChoice) => void): Scene {
   return new PauseScene(onDone);
@@ -62,6 +62,8 @@ class PauseScene implements Scene {
     wrap: false,
     items: CHOICES.map(() => ({})),
     highlight: paletteHighlight(PALETTE_FIRST_BUTTON, HOVER_COLOR),
+    // Lues dans l'image de la barre seule : le reste de l'écran est la partie, dont les couleurs peuvent reprendre ces indices.
+    areas: () => CHOICES.map((_, i) => paletteBounds(this.mcg.pixels, PALETTE_FIRST_BUTTON + i, AREA_MARGIN)),
     changeSound: CLICK_SOUND,
     changeSoundIfIdle: true,
   });

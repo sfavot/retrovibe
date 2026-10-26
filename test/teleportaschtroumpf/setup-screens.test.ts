@@ -106,13 +106,14 @@ describe.skipIf(!hasOriginalFiles)("S09 : nombre de joueurs", () => {
     expect(pixel()).toBe(brown);
   });
 
-  it("souris : la position du pointeur ne compte pas ; le clic gauche valide le nombre courant", async () => {
+  it("souris et doigt : toucher une silhouette choisit ce nombre et le valide, ailleurs rien", async () => {
     const t = await players();
-    await t.moveTo(SILHOUETTE_X[3], 75); // sur la 4e silhouette : sans effet
-    await t.press("ArrowRight");
-    await t.moveTo(SILHOUETTE_X[0], 75);
+    await t.moveTo(10, 10);
     await t.click(0);
-    expect(t.results).toEqual([2]);
+    expect(t.results).toEqual([]);
+    await t.moveTo(SILHOUETTE_X[2], 75);
+    await t.click(0);
+    expect(t.results).toEqual([3]);
   });
 
   it("avec le son : voix d'accueil, puis voix du choix, puis voix de validation ; aucune musique", async () => {
@@ -247,16 +248,15 @@ describe.skipIf(!hasOriginalFiles)("S08 : personnages et niveaux", () => {
     expect(menu.results).toEqual([{ action: "menu" }]);
   }, 60_000);
 
-  it("boutons de la souris : gauche valide le bouton courant, la position du pointeur ne compte pas", async () => {
+  it("souris et doigt : toucher un bouton de fin le valide, ailleurs rien", async () => {
     const t = await characters(1);
     await validate(t);
-    const text = (entry: number) => [...t.ctx.palette.colors.subarray(entry * 3, entry * 3 + 3)];
-    const normal = text(122);
-    await t.moveTo(270, 175); // sur le bouton Retour : sans effet
-    expect(text(122)).toEqual(normal);
+    await t.moveTo(10, 10);
     await t.click(0);
-    expect(t.results).toHaveLength(1);
-    expect(t.results[0].action).toBe("play");
+    expect(t.results).toHaveLength(0);
+    await t.moveTo(270, 178); // sur le bouton Retour (menu)
+    await t.click(0);
+    expect(t.results).toEqual([{ action: "menu" }]);
   }, 60_000);
 
   it("clic droit / Entrée : voix du personnage puis du niveau, sans valider", async () => {

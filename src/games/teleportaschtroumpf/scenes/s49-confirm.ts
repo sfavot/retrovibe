@@ -3,7 +3,7 @@ import { parseConfirmationTexts } from "../data/text";
 import { measureText, type PfnFont } from "../data/font";
 import type { Mcg } from "../data/mcg";
 import type { Voc } from "../data/voc";
-import { Menu, paletteHighlight } from "../engine/menu";
+import { Menu, paletteAreas, paletteHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
@@ -36,7 +36,7 @@ const PALETTE_YES = 124;
  *   `s49v008t.voc` (Non).
  *
  * Gauche / droite choisissent Oui / Non sans rebouclage (Oui au départ), clic gauche ou Espace valide l'élément choisi,
- * clic droit ou Entrée dit son nom. Échap n'a pas d'effet (l'original l'ignore).
+ * clic droit ou Entrée dit son nom. Échap n'a pas d'effet (l'original l'ignore). Ajout du port : toucher Oui ou Non le valide.
  */
 export function createConfirmScene(n: number, onDone: (ctx: SceneContext, yes: boolean) => void): Scene {
   return new ConfirmScene(n, onDone);
@@ -55,6 +55,7 @@ class ConfirmScene implements Scene {
     wrap: false,
     items: [{ voice: voiceName("s49v", 7) }, { voice: voiceName("s49v", 8) }],
     highlight: paletteHighlight(PALETTE_YES, HOVER_COLOR),
+    areas: paletteAreas(PALETTE_YES, 2),
     changeSound: CLICK_SOUND,
     changeSoundIfIdle: true,
   });

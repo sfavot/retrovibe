@@ -211,17 +211,19 @@ describe.skipIf(!hasOriginalFiles)("S49 confirmation", () => {
     expect(t.top()).toBe("ConfirmScene");
   });
 
-  it("boutons de la souris : gauche valide le choix courant, droit joue sa voix ; la position du pointeur ne compte pas", async () => {
+  it("souris et doigt : toucher Oui ou Non le valide, ailleurs rien ; le clic droit joue la voix du choix courant", async () => {
     const t = await session();
     const answers = await ask(t, 1);
-    await t.moveTo(300, 150); // sur l'étiquette de Non : sans effet
+    await t.moveTo(10, 10);
+    await t.click(0);
+    expect(answers).toEqual([]);
     expect(t.lit([124, 125])).toEqual([124]);
     await t.click(2);
     expect(t.lastSound()).toBe(await t.voc("s49v007t.voc"));
-    expect(answers).toEqual([]);
+    await t.moveTo(289, 160); // sur l'étiquette de Non
     await t.click(0);
     await t.settle("Board");
-    expect(answers).toEqual([true]);
+    expect(answers).toEqual([false]);
   });
 
   it("Échap n'a pas d'effet (l'original l'ignore)", async () => {
@@ -319,11 +321,14 @@ describe.skipIf(!hasOriginalFiles)("S48 pause", () => {
     expect([...c.subarray(251 * 3, 251 * 3 + 3)]).toEqual([...c.subarray(250 * 3, 250 * 3 + 3)]);
   });
 
-  it("souris : le clic gauche valide le bouton courant, sans tenir compte du pointeur", async () => {
+  it("souris et doigt : toucher un bouton le valide, ailleurs rien", async () => {
     const t = await session();
     const choices = await pause(t);
-    await t.moveTo(160, 172); // sur un autre parchemin : sans effet
-    expect(t.lit([251, 252, 253, 254])).toEqual([251]);
+    await t.moveTo(160, 100); // sur l'écran de la partie
+    await t.click();
+    expect(choices).toEqual([]);
+    expect(t.top()).toBe("PauseScene");
+    await t.moveTo(40, 170); // sur « Retour »
     await t.click();
     await t.settle("Board");
     expect(choices).toEqual(["resume"]);
@@ -477,18 +482,21 @@ describe.skipIf(!hasOriginalFiles)("S46 abandon", () => {
     expect(t.restored()).toBe(true);
   });
 
-  it("souris : le clic droit joue la voix du joueur courant, le clic gauche le valide ; la position ne compte pas", async () => {
+  it("souris et doigt : le clic droit joue la voix du joueur courant ; toucher un portrait le valide, ailleurs rien", async () => {
     const t = await session();
     const results = await abandon(t, [0, 3, 5]);
-    await t.moveTo(250, 80); // au-dessus du troisième joueur : sans effet
     await t.press("ArrowRight"); // joueur 2
     await t.click(2);
     expect(t.lastSound()).toBe(await t.voc("s46a003t.voc"));
+    await t.moveTo(10, 10);
+    await t.click();
+    expect(t.top()).toBe("AbandonScene");
+    await t.moveTo(203, 67); // portrait du troisième joueur
     await t.click();
     await t.settle("ConfirmScene");
     await t.press("Space");
     await t.settle("Board");
-    expect(results).toEqual([{ kind: "player", index: 1 }]);
+    expect(results).toEqual([{ kind: "player", index: 2 }]);
   });
 
   it("dessine portraits, cloches et boutons", async () => {

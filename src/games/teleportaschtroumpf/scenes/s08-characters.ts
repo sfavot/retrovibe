@@ -2,7 +2,7 @@ import type { Hy8 } from "../data/hy8";
 import type { Mcg } from "../data/mcg";
 import type { Voc } from "../data/voc";
 import type { PlayerSetup } from "../game/rules";
-import { Menu, paletteHighlight } from "../engine/menu";
+import { Menu, paletteHighlight, spriteArea } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { CLICK_SOUND, centisecondsToTicks } from "./setup/common";
@@ -89,7 +89,7 @@ const CAPSULE_STEP = 5;
  * Retour) : haut / bas avec rebouclage, clic droit = voix `s08v012..014`, validation = `play` / `back` / `menu`.
  *
  * Clavier d'origine seul : les boutons de la souris valident (gauche) et jouent la voix (droit), sans tenir compte de la
- * position du pointeur.
+ * position du pointeur. Ajout du port : toucher un des trois boutons de fin le valide.
  */
 export function createCharactersScene(players: number, onDone: (ctx: SceneContext, result: CharactersResult) => void): Scene {
   return new CharactersScene(players, onDone);
@@ -159,7 +159,13 @@ class CharactersScene implements Scene {
     this.voices = voices;
     const c = mcg.palette.subarray(BUTTON_HOVER_ENTRY * 3, BUTTON_HOVER_ENTRY * 3 + 3);
     const items = BUTTON_Y.map((_, i) => ({ voice: voiceName("s08v", BUTTON_VOICE_BASE + i) }));
-    this.menu = new Menu({ items, axis: "vertical", highlight: paletteHighlight(BUTTON_TEXT_ENTRY, [c[0], c[1], c[2]]), changeSound: CLICK_SOUND });
+    this.menu = new Menu({
+      items,
+      axis: "vertical",
+      highlight: paletteHighlight(BUTTON_TEXT_ENTRY, [c[0], c[1], c[2]]),
+      changeSound: CLICK_SOUND,
+      areas: () => BUTTON_SPRITES.map((sprite, i) => spriteArea(sprites, sprite, BUTTON_X, BUTTON_Y[i])),
+    });
     await this.menu.load(ctx);
   }
 

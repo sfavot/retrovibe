@@ -1,6 +1,8 @@
 import type { Hy8 } from "../data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../data/mcg";
 import type { Voc } from "../data/voc";
 import type { SceneContext } from "./scene";
+import { boundsOf, placeSprite } from "./sprites";
 
 export interface MenuItem {
   /** Voix d'aide jouée par le clic droit / Entrée (nom d'origine, ex. `s07v004t.voc`) ; absente : rien ne se passe. */
@@ -55,6 +57,56 @@ export function spriteHighlight(
   };
 }
 
+/** Zone d'une entrée à l'écran, en pixels 320×200, bornes incluses. */
+export interface MenuArea {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** Marge par défaut autour d'une entrée (pixels 320×200) : un texte seul est une cible trop fine pour le doigt. */
+export const AREA_MARGIN = 6;
+
+/** Rectangle des pixels d'un indice de palette dans un écran 320×200, élargi de `margin` ; `null` si l'indice est absent. */
+export function paletteBounds(pixels: Uint8Array, index: number, margin = 0): MenuArea | null {
+  let x0 = SCREEN_WIDTH;
+  let y0 = SCREEN_HEIGHT;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < SCREEN_HEIGHT; y++) {
+    for (let x = 0; x < SCREEN_WIDTH; x++) {
+      if (pixels[y * SCREEN_WIDTH + x] !== index) continue;
+      x0 = Math.min(x0, x);
+      x1 = Math.max(x1, x);
+      y0 = Math.min(y0, y);
+      y1 = Math.max(y1, y);
+    }
+  }
+  if (x1 < 0) return null;
+  return expand({ x0, y0, x1, y1 }, margin);
+}
+
+/** Zones d'entrées dont le texte est peint dans les indices `firstEntry + i` (menus à `paletteHighlight`), lues à l'écran. */
+export function paletteAreas(firstEntry: number, count: number, margin = AREA_MARGIN): (ctx: SceneContext) => (MenuArea | null)[] {
+  return (ctx) => Array.from({ length: count }, (_, i) => paletteBounds(ctx.surface.work, firstEntry + i, margin));
+}
+
+/** Zone d'un sprite HY8 posé en (x, y) (ancre de `drawSprite`), élargie de `margin`. */
+export function spriteArea(hy8: Hy8, sprite: number, x: number, y: number, margin = 0): MenuArea {
+  const b = boundsOf(placeSprite(hy8, sprite, false));
+  return expand({ x0: x + b.minX, y0: y + b.minY, x1: x + b.maxX - 1, y1: y + b.maxY - 1 }, margin);
+}
+
+function expand(area: MenuArea, margin: number): MenuArea {
+  return {
+    x0: Math.max(0, area.x0 - margin),
+    y0: Math.max(0, area.y0 - margin),
+    x1: Math.min(SCREEN_WIDTH - 1, area.x1 + margin),
+    y1: Math.min(SCREEN_HEIGHT - 1, area.y1 + margin),
+  };
+}
+
 export interface MenuOptions {
   items: readonly MenuItem[];
   /**
@@ -74,6 +126,12 @@ export interface MenuOptions {
    * bruitage en cours (S07, S08, S04).
    */
   changeSoundIfIdle?: boolean;
+  /**
+   * Ajout du port pour le doigt et la souris (l'original n'a que le clavier) : zones des entrées, calculées à `enter` (l'écran
+   * est alors dessiné). Toucher ou cliquer une entrée la sélectionne et la valide ; un appui hors des zones ne fait rien ; la
+   * souris qui survole une entrée la sélectionne. Sans zones, le clic valide l'élément courant où que soit le pointeur.
+   */
+  areas?: (ctx: SceneContext) => readonly (MenuArea | null)[];
 }
 
 /** Ce que `update` renvoie : un élément validé (clic gauche, Espace) ou l'aide demandée (clic droit, Entrée). */
@@ -84,7 +142,8 @@ export interface MenuEvent {
 
 /**
  * Composant de sélection réutilisable (engine.md §1.2, §4) : liste d'éléments, un index courant. Clavier d'origine seul :
- * la souris ne désigne rien (ses boutons ne sont que les actions « valider » et « aide », sans tenir compte de la position).
+ * la souris ne désigne rien (ses boutons ne sont que les actions « valider » et « aide », sans tenir compte de la position),
+ * sauf dans les menus à zones (`areas`), ajout du port pour le doigt.
  *
  * - touches : haut/bas ou gauche/droite selon l'axe, avec ou sans rebouclage (`wrap`) ; un bip (`changeSound`) accompagne
  *   chaque changement ;
@@ -98,6 +157,10 @@ export class Menu {
   private current: number;
   private voices: (Voc | null)[] = [];
   private beep: Voc | null = null;
+  private areas: readonly (MenuArea | null)[] = [];
+  /** Dernière position de survol traitée : la souris immobile ne reprend pas la sélection changée au clavier. */
+  private hoverX = -1;
+  private hoverY = -1;
 
   constructor(private readonly options: MenuOptions) {
     this.current = options.initial ?? 0;
@@ -125,6 +188,14 @@ export class Menu {
   /** À l'entrée de la scène (et à sa reprise) : applique la surbrillance. */
   enter(ctx: SceneContext): void {
     this.options.highlight?.select?.(ctx, this.current);
+    this.areas = this.options.areas?.(ctx) ?? [];
+    this.hoverX = this.hoverY = -1;
+  }
+
+  /** Entrée dont la zone contient (x, y), ou `null` (aucune zone, ou menu sans zones). */
+  itemAt(x: number, y: number): number | null {
+    const index = this.areas.findIndex((a) => a !== null && x >= a.x0 && x <= a.x1 && y >= a.y0 && y <= a.y1);
+    return index < 0 ? null : index;
   }
 
   /** Change l'élément courant (surbrillance comprise), sans bip. */
@@ -139,6 +210,12 @@ export class Menu {
   update(ctx: SceneContext): MenuEvent | null {
     const { input } = ctx;
     const { axis, wrap = true } = this.options;
+    if (input.pointerHovering && (input.mouseX !== this.hoverX || input.mouseY !== this.hoverY)) {
+      this.hoverX = input.mouseX;
+      this.hoverY = input.mouseY;
+      const hovered = this.itemAt(input.mouseX, input.mouseY);
+      if (hovered !== null) this.move(ctx, hovered);
+    }
     if (axis !== "none") {
       const [previous, next] = axis === "vertical" ? (["up", "down"] as const) : (["left", "right"] as const);
       const count = this.options.items.length;
@@ -150,7 +227,14 @@ export class Menu {
         this.move(ctx, target);
       }
     }
-    if (input.justPressed("validate")) return { kind: "validate", index: this.current };
+    if (input.justPressed("validate")) {
+      const at = input.validateAt;
+      if (at === null || this.areas.length === 0) return { kind: "validate", index: this.current };
+      const touched = this.itemAt(at.x, at.y);
+      if (touched === null) return null;
+      this.select(ctx, touched);
+      return { kind: "validate", index: touched };
+    }
     if (input.justPressed("cancel")) {
       const voice = this.voices[this.current];
       if (voice) ctx.voice.play(voice);

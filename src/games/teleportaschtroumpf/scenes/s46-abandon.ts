@@ -1,6 +1,6 @@
 import type { Hy8 } from "../data/hy8";
 import type { Mcg } from "../data/mcg";
-import { Menu, type MenuHighlight } from "../engine/menu";
+import { AREA_MARGIN, Menu, spriteArea, type MenuHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
@@ -63,6 +63,7 @@ export function slotsFor(count: number): number[] {
  * Un seul joueur : pas d'écran S46, S49 est demandé tout de suite (Oui → `all`, Non → `cancel`). Sinon : haut / bas
  * changent de ligne (joueurs, « tous », « retour »), gauche / droite de joueur, sans rebouclage. Un joueur choisi puis
  * confirmé rend `player` ; refusé, on reste sur S46. « Tous » confirmé rend `all`, refusé `cancel` ; « retour » rend `cancel`.
+ * Ajout du port : toucher un portrait ou un bouton le valide.
  */
 export function createAbandonScene(players: number | readonly number[], onDone: (ctx: SceneContext, result: AbandonResult) => void): Scene {
   const characters = typeof players === "number" ? Array.from({ length: players }, (_, i) => i) : [...players];
@@ -101,6 +102,12 @@ class AbandonScene implements Scene {
       highlight: this.highlight(),
       changeSound: CLICK_SOUND,
       changeSoundIfIdle: true,
+      areas: () => [
+        // Le portrait, pas le parchemin : celui-ci descend jusqu'aux boutons et déborde sur ses voisins.
+        ...this.characters.map((character, i) => spriteArea(this.sprites, PORTRAIT_SPRITES[character], SLOT_X[this.slots[i]], ROW_Y, AREA_MARGIN)),
+        spriteArea(this.sprites, SPRITE_ALL, BUTTON_ALL.x, BUTTON_ALL.y),
+        spriteArea(this.sprites, SPRITE_CANCEL, BUTTON_CANCEL.x, BUTTON_CANCEL.y),
+      ],
     });
   }
 

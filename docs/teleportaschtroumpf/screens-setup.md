@@ -18,7 +18,7 @@ Ressources : `s09a001d.mcg` (`13fc:0150`, drapeau 1 : fondu d'entrée), `s09a000
 3. Clic gauche : voix de validation (`s09v008` ou `011` pour 1 joueur, `009` ou `010` sinon, `rand%2`), coupée par un clic gauche, puis retourne n.
 4. Pas de clic droit, pas de voix d'aide. Écart assumé : aucun.
 
-Pas d'adaptation souris : clavier d'origine seul (le clic gauche valide le nombre courant, la position du pointeur ne compte pas).
+Souris dans l'original : le clic gauche valide le nombre courant, la position du pointeur ne compte pas. Écart du port (doigt et souris) : toucher une silhouette choisit ce nombre et le valide, un appui ailleurs ne fait rien.
 Écart de confiance : attendre les voix sans lire les entrées est conservé (voix de 0,6 s à 5 s).
 
 ## S08 : personnages et niveaux (`21ee:0435` puis `21ee:0c19`)
@@ -47,7 +47,7 @@ Cadence de la capsule : l'original ne temporise pas (une recopie d'écran par im
 
 **Boutons** (`21ee:0c19`, retourne 0, 1 ou 2) : trois sprites 14, 15, 16 en x = 265, y = 131, 155, 179, figés dans le fond. Sélection initiale 0 ; haut / bas avec rebouclage ; bip à chaque changement ; surbrillance par palette : le texte du bouton i (entrées 121 + i) prend la couleur de l'entrée 125 du MCG (cyan 0, 203, 239) ; l'ancienne couleur est restaurée en le quittant. Clic droit : voix `s08v(12 + i)` (012, 013, 014), attendue. Clic gauche : 0 = « Jouer » → `play`, 1 = « Annuler » → `back` (retour S09), 2 = « Retour » → `menu` (S07). Les noms des boutons viennent des images.
 
-Pas d'adaptation souris : clavier d'origine seul (gauche valide, droit joue la voix, sans tenir compte de la position du pointeur).
+Souris dans l'original : gauche valide, droit joue la voix, sans tenir compte de la position du pointeur. Écart du port (doigt et souris) : toucher un des trois boutons le valide, un appui ailleurs ne fait rien. Le choix du personnage et du niveau reste au clavier.
 
 ## S04 : menu parents (`21ee:13a1`)
 

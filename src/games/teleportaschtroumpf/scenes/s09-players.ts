@@ -1,7 +1,7 @@
 import type { Hy8 } from "../data/hy8";
 import type { Mcg } from "../data/mcg";
 import type { Voc } from "../data/voc";
-import { Menu } from "../engine/menu";
+import { Menu, spriteArea } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { centisecondsToTicks } from "./setup/common";
@@ -13,6 +13,8 @@ const MAX_PLAYERS = 4;
 /** Position (bord gauche, ligne du bas) du sprite 0 de `s09a000s.hy8` qui colore les silhouettes 2, 3 et 4 (`21ee:0315..0373`). */
 const COLORED_X = [0x7c, 0xae, 0xe0];
 const COLORED_Y = 0x6d;
+/** Silhouettes 1 à 4 du fond, pour le toucher (ajout du port) : même pas que les silhouettes colorées, la première comprise. */
+const SILHOUETTE_X = [COLORED_X[0] - (COLORED_X[1] - COLORED_X[0]), ...COLORED_X];
 
 /** Attentes de l'original, en centièmes de seconde : entre la voix d'accueil et la voix du premier choix (`1f33:00fc(0xf)`). */
 const GAP_CS = 0xf;
@@ -35,7 +37,8 @@ const hintVoice = (players: number): number => 3 + players;
  * temps. À la validation : voix `s09v008` ou `011` (1 joueur) / `009` ou `010` (2 à 4), coupée par un clic gauche, puis
  * le nombre est rendu. Aucune musique pendant l'écran (la voix la coupe et la boucle ne la relance pas).
  *
- * Clavier d'origine seul : les boutons de la souris valident (gauche) sans tenir compte de la position du pointeur.
+ * Clavier d'origine seul : les boutons de la souris valident (gauche) sans tenir compte de la position du pointeur. Ajout du
+ * port : toucher une silhouette choisit ce nombre de joueurs et le valide.
  */
 export function createPlayersScene(onDone: (ctx: SceneContext, players: number) => void): Scene {
   return new PlayersScene(onDone);
@@ -51,7 +54,12 @@ class PlayersScene implements Scene {
   private phase: Phase = "fadeIn";
   private waitStart = 0;
   /** Gauche / droite : 1 à 4 joueurs, bornés (l'original ne reboucle pas). */
-  private readonly menu = new Menu({ items: Array.from({ length: MAX_PLAYERS }, () => ({})), axis: "horizontal", wrap: false });
+  private readonly menu = new Menu({
+    items: Array.from({ length: MAX_PLAYERS }, () => ({})),
+    axis: "horizontal",
+    wrap: false,
+    areas: () => SILHOUETTE_X.map((x) => spriteArea(this.sprites, 0, x, COLORED_Y)),
+  });
 
   constructor(private readonly onDone: (ctx: SceneContext, players: number) => void) {}
 
@@ -73,6 +81,7 @@ class PlayersScene implements Scene {
     ctx.fade.in();
     this.phase = "fadeIn";
     this.menu.select(ctx, 0);
+    this.menu.enter(ctx);
     // Pas de musique dans cet écran : la voix la coupe et l'original ne la relance pas.
     ctx.voice.holdMusic(true);
   }
@@ -146,14 +155,13 @@ class PlayersScene implements Scene {
   private select(ctx: SceneContext): void {
     const before = this.menu.index;
     const event = this.menu.update(ctx);
-    if (this.menu.index !== before) {
-      ctx.voice.play(this.voice(hintVoice(this.players)));
-      this.phase = "voice";
-      return;
-    }
+    // Une silhouette touchée change le nombre et le valide d'un coup : la validation passe avant la voix du nombre.
     if (event?.kind === "validate") {
       ctx.voice.play(this.voice(this.confirmVoice(ctx)));
       this.phase = "confirm";
+    } else if (this.menu.index !== before) {
+      ctx.voice.play(this.voice(hintVoice(this.players)));
+      this.phase = "voice";
     }
   }
 

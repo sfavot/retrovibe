@@ -2,8 +2,9 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../data/mcg";
 
 /**
  * Actions abstraites du jeu (engine.md §4 et §9.6). Clavier et boutons de souris sont deux sources de ces mêmes actions :
- * l'original émule les boutons de la souris au clavier (Espace = gauche, Entrée = droit). La position du pointeur ne
- * désigne rien ; les scènes à pointeur libre seules la lisent (`mouseX`, `mouseY`).
+ * l'original émule les boutons de la souris au clavier (Espace = gauche, Entrée = droit). Dans l'original, la position du
+ * pointeur ne désigne rien hors des scènes à pointeur libre (`mouseX`, `mouseY`) ; le port la lit aussi dans les menus à
+ * zones (toucher ou cliquer une entrée la valide).
  */
 export type Action =
   | "up"
@@ -70,7 +71,7 @@ const MAX_PENDING_PRESSES = 4;
  *   chaque `update`.
  */
 export class Input {
-  /** Position de la souris en coordonnées 320×200 : sert seulement aux scènes qui dessinent leur curseur HY8 (aucune zone cliquable). */
+  /** Position de la souris en coordonnées 320×200 : scènes qui dessinent leur curseur HY8 et menus à zones (ajout du port). */
   mouseX = CENTER_X;
   mouseY = CENTER_Y;
   /**
@@ -86,6 +87,11 @@ export class Input {
    * peut déplacer. La souris de l'original était relative : le jeu la recentrait sans que rien ne bouge sous la main du joueur.
    */
   pointerHovering = false;
+  /**
+   * Position (320×200) du dernier appui « valider » s'il vient du pointeur (clic gauche, doigt) ; `null` s'il vient du clavier.
+   * Les menus à zones (`Menu`, option `areas`) s'en servent pour valider l'entrée touchée.
+   */
+  validateAt: { x: number; y: number } | null = null;
 
   private readonly held = new Map<Action, Set<string>>();
   /** Appuis pas encore consommés, par action. */
@@ -136,7 +142,10 @@ export class Input {
     let sources = this.held.get(action);
     if (!sources) this.held.set(action, (sources = new Set()));
     if (sources.has(source)) return;
-    if (sources.size === 0) this.pending.set(action, Math.min(MAX_PENDING_PRESSES, (this.pending.get(action) ?? 0) + 1));
+    if (sources.size === 0) {
+      this.pending.set(action, Math.min(MAX_PENDING_PRESSES, (this.pending.get(action) ?? 0) + 1));
+      if (action === "validate") this.validateAt = source === "mouse:0" ? { x: this.mouseX, y: this.mouseY } : null;
+    }
     sources.add(source);
   }
 

@@ -1,7 +1,7 @@
 import type { Hy8 } from "../../data/hy8";
 import { parsePal, type Mcg } from "../../data/mcg";
 import type { Voc } from "../../data/voc";
-import { Menu, paletteHighlight } from "../../engine/menu";
+import { Menu, paletteAreas, paletteHighlight } from "../../engine/menu";
 import { voiceName } from "../../engine/paths";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Game } from "../../game/rules";
@@ -132,6 +132,7 @@ export class MagicianScene implements Scene {
     wrap: false,
     items: [{}, {}],
     highlight: paletteHighlight(QUESTION_PALETTE_ENTRY, HOVER_COLOR),
+    areas: paletteAreas(QUESTION_PALETTE_ENTRY, 2),
     changeSound: "s07a001b.voc",
   });
   private readonly confirmMenu = new Menu({
@@ -139,6 +140,7 @@ export class MagicianScene implements Scene {
     wrap: false,
     items: [{}, {}],
     highlight: paletteHighlight(CONFIRM_PALETTE_ENTRY, HOVER_COLOR),
+    areas: paletteAreas(CONFIRM_PALETTE_ENTRY, 2),
     changeSound: "s07a001b.voc",
   });
   private branchKind: MagicianBranch = "closed";

@@ -8,6 +8,13 @@ function fresh(name = "TERRAN00", opts = {}): World {
   return World.load(level, models, opts);
 }
 
+/** Niveau réduit au départ du joueur : aucune cible, donc pas d'assistance en altitude vers la cible (player.md §3.2). */
+function bare(name: string): World {
+  const { level, models } = loadLevel(name);
+  const objects = level.objects.filter((o) => o.type >= 1000 && o.type <= 1002);
+  return World.load({ ...level, objects }, models);
+}
+
 describe.skipIf(!hasOriginalFiles)("joueur (hélicoptère, forme 0)", () => {
   it("atteint la vitesse d'équilibre de player.md (≈ 4 320 Q8/tick) en poussée avant continue", () => {
     const w = fresh();
@@ -82,7 +89,7 @@ describe.skipIf(!hasOriginalFiles)("joueur (hélicoptère, forme 0)", () => {
 
   it("garde l'altitude de consigne de 80 unités au-dessus du relief en vol stationnaire", () => {
     for (const n of ["TERRAN00", "TERRAN01", "TERRAN02", "TERRAN03"]) {
-      const w = fresh(n);
+      const w = bare(n);
       for (let i = 0; i < 200; i++) w.tick(emptyInput());
       expect(
         (w.player.y - w.terrain.height(w.player.x, w.player.z)) / 256,

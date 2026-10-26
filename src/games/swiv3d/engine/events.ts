@@ -32,4 +32,18 @@ export type WorldEvent =
   /** Sélection d'arme : -1 suivante, -2 précédente, 0..9 directe (`gm_weapon_select`). */
   | { kind: "weaponSelect"; command: number }
   /** Tir demandé ce tick : principal (maintenu) ou spécial (appui bref). */
-  | { kind: "fire"; special: boolean };
+  | { kind: "fire"; special: boolean }
+  /** Bonus ramassé et appliqué (`gm_pickup_apply`) : `n` 0..19 = arme, 100..113 = vie, compagnon, bouclier, puissance. */
+  | { kind: "pickup"; n: number }
+  /** Le score réel du joueur a changé (`gm_score_add`). */
+  | { kind: "scoreChanged"; score: number; delta: number }
+  /** Une cible d'objectif détruite ; `group` : groupe 0..9, `groupDone` : plus aucune cible dans ce groupe. */
+  | { kind: "objective"; group: number; groupDone: boolean; left: number }
+  /** Message en jeu (`gm_message_spawn`) : chaîne `textId` de la table `textTable`. */
+  | { kind: "message"; textTable: number; textId: number }
+  /** Cratère d'explosion (`gm_terrain_explosion_crater`) : non appliqué à la carte de hauteur, à reproduire par le terrain. */
+  | { kind: "crater"; x: number; z: number; size: 0 | 1 | 2 }
+  /** Objectif final accompli : le niveau s'arrête (`DAT_00480a9c = 0x2a`, 55 ticks après la destruction du groupe 0). */
+  | { kind: "levelComplete" }
+  /** Le joueur est mort depuis 35 ticks (`DAT_00480a9c = 0x34`). */
+  | { kind: "gameOver" };

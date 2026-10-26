@@ -103,6 +103,8 @@ export class Player {
   ceiling = NO_CEILING;
   /** pv ≤ 0 : le pilote ne lit plus les entrées. */
   dead = false;
+  /** Amarrage sur une plate-forme (`gm_pilot_none`) : le pilote ne lit plus les entrées. */
+  autopilot = false;
   /** Type de sol sous le véhicule (`00577664`), dernier calculé. */
   groundTypeUnder = 0xff;
 
@@ -320,7 +322,7 @@ export function pilot(
   inp: PlayerInput,
   emit: (e: WorldEvent) => void,
 ): void {
-  if (p.dead || p.form === FORM_DEMO || p.form === FORM_DYING) return;
+  if (p.dead || p.autopilot || p.form === FORM_DEMO || p.form === FORM_DYING) return;
   if (p.form === 0 || p.form === 3) heliPilot(p, inp);
   else vehiclePilot(p, inp);
   commonButtons(p, inp, emit);

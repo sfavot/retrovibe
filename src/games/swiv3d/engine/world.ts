@@ -16,7 +16,13 @@ import { parseBd } from "../data/bd";
 import { listModels, parseModel, type Model } from "../data/model";
 import { Camera } from "./camera";
 import { collideCell } from "./collisions";
+import { DebrisTable } from "./debris";
+import { toEffect, FX_MODEL_FIRST, type Effect } from "./effects";
 import type { WorldEvent } from "./events";
+import { GameState } from "./game";
+import { advanceEndCounter, playerTick, registerGameplay, setupLevel } from "./gameplay";
+import { NodeNet } from "./nodes";
+import { MAX_ENERGY, newStatus, type PlayerStatus } from "./status";
 import { wrapQ8 } from "./fixed";
 import type { PlayerInput } from "./input";
 import {
@@ -29,7 +35,6 @@ import {
   ObjectPool,
   type ModelTable,
   UPDATE_INERT,
-  UPDATE_STATIC,
   isPlayerStart,
   spawnLevelObjects,
 } from "./objects";
@@ -47,6 +52,7 @@ import {
   type PlayerContext,
 } from "./player";
 import { Terrain } from "./terrain";
+import { emptyInput } from "./input";
 
 /** Fonction de comportement d'un objet (`+0x68`), appelée après `pos += vel`. H1 en enregistre via `registerBehavior`. */
 export type Behavior = (world: World, o: GameObject) => void;
@@ -60,6 +66,12 @@ export interface WorldOptions {
   cameraFps?: number;
   /** Mission à eau (drapeau `00577670 & 2`) : la carte 102 donne le type de sol des véhicules. */
   water?: boolean;
+  /** Table de débris du bloc 11004 (`loadDebris`) : sans elle, pas d'épaves ni d'éclats à la destruction. */
+  debris?: DebrisTable;
+  /** Munitions de départ des 20 armes spéciales (profil `+0x0c…`), niveau du canon (`+0x40`) et score de départ (`+0x34`). */
+  ammo?: readonly number[];
+  cannonPower?: number;
+  score?: number;
 }
 
 /** Table de mise à jour des cellules : mode 0 = proche, 1 = moyenne, 2 = ignorée (`00480c90`, 11 × 11, objects.md §2). */
@@ -70,9 +82,6 @@ const CELL_MODES: readonly number[] = [
   1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 1, 1, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 1, 1, 0,
   0, 0, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2,
 ];
-
-/** Points d'une cible statique détruite (`0042ebc4`, objects.md §10.3). */
-const STATIC_SCORE = 73;
 
 /** Lit tous les modèles `10xxx` d'un fichier `.SLV` (clé = emplacement `id % 1000`, comme les champs `REC[4]`/`REC[5]`). */
 export function loadModels(
@@ -88,6 +97,11 @@ export function loadModels(
   return models;
 }
 
+/** Lit la table de débris (bloc 11004) d'un `.SLV`. */
+export function loadDebris(slvBytes: Uint8Array, name = "SLV"): DebrisTable {
+  return DebrisTable.fromSlv(slvBytes, name);
+}
+
 export class World {
   readonly level: Level;
   readonly models: ModelTable;
@@ -96,6 +110,14 @@ export class World {
   readonly grid: Grid;
   readonly player: Player;
   readonly camera = new Camera();
+  /** État de jeu : score, munitions, arme spéciale, compagnons, objectifs, fin de niveau. */
+  readonly game = new GameState();
+  /** Réseau de chemins (bloc 107) avec ses capacités. */
+  readonly nodes: NodeNet;
+  /** Table de débris (copie propre à ce monde), ou null. */
+  readonly debris: DebrisTable | null;
+  /** État du joueur pour le HUD, mis à jour à chaque tick. */
+  readonly status: PlayerStatus = newStatus();
   /** Objets posés par le niveau (un par enregistrement du bloc 105 hors départ du joueur), dans l'ordre du bloc. */
   readonly levelObjects: readonly GameObject[];
   /** Ticks de logique exécutés (pause exclue). */
@@ -112,6 +134,11 @@ export class World {
     this.terrain = Terrain.fromLevel(level);
     this.pool = new ObjectPool();
     this.grid = new Grid();
+    this.nodes = new NodeNet(level);
+    this.debris = opts.debris ? opts.debris.clone() : null;
+    if (opts.ammo) opts.ammo.forEach((n, i) => (this.game.ammo[i] = n));
+    this.game.power = opts.cannonPower ?? 0;
+    this.game.score = this.game.scoreShown = opts.score ?? 0;
     this.options = {
       cameraFps: opts.cameraFps ?? 40,
       water: opts.water ?? false,
@@ -124,7 +151,7 @@ export class World {
     };
 
     this.registerBehavior(UPDATE_INERT, () => {});
-    this.registerBehavior(UPDATE_STATIC, staticTarget);
+    registerGameplay(this);
     this.registerBehavior(UPDATE_PLAYER_HELI, () =>
       playerHeliUpdate(this.player, this.playerContext),
     );
@@ -147,6 +174,8 @@ export class World {
       );
     this.player = this.spawnPlayer(start, opts);
     this.levelObjects = spawnLevelObjects(level, ctx);
+    setupLevel(this);
+    this.refreshStatus();
 
     this.camera.setGoal(this.player.obj, this.terrain);
     this.camera.snap();
@@ -251,7 +280,10 @@ export class World {
     if (input.pause) return;
     this.tickCount++;
     this.updateObjects();
+    advanceEndCounter(this);
     this.updatePlayer(input);
+    this.game.tickMessages();
+    this.refreshStatus();
     this.camera.setGoal(this.player.obj, this.terrain);
     if (this.options.cameraFps > 0) this.camera.smooth(this.options.cameraFps);
   }
@@ -262,14 +294,40 @@ export class World {
   }
 
   private updatePlayer(input: PlayerInput): void {
-    const p = this.player;
-    if (!p.dead && p.obj.hp <= 0) {
-      // Mort : la séquence (forme 0x2b, explosions, caméra figée) est portée par H1/R3 ; ici le joueur devient un fantôme inerte.
-      p.dead = true;
-      p.obj.classe = CLASS.GHOST;
-      this.events.push({ kind: "playerDied" });
-    }
-    pilot(p, input, (e) => this.events.push(e));
+    const g = this.game;
+    // fin de niveau : après 25 ticks le véhicule garde son vol sans entrée (`gm_pilot_victory_*`)
+    const flying =
+      g.endState === "victory" && g.endCounter >= 0x19 ? emptyInput() : input;
+    pilot(this.player, flying, (e) => this.events.push(e));
+    playerTick(this, input);
+  }
+
+  /** Recopie l'état du joueur dans `status`. */
+  private refreshStatus(): void {
+    const s = this.status;
+    const g = this.game;
+    s.energy = this.player.obj.hp;
+    s.maxEnergy = MAX_ENERGY;
+    s.shield = g.shield && g.shield.classe !== 0 ? g.shield.hp : 0;
+    s.score = g.scoreShown;
+    s.cannonPower = g.power;
+    s.special = g.selected;
+    this.player.weapon = g.selected;
+    for (let i = 0; i < 20; i++) s.specialAmmo[i] = g.ammo[i]!;
+    s.specialArmed = g.weaponState === 10;
+    s.objectivesLeft = g.objectives.length;
+    s.levelComplete = g.levelComplete;
+    s.gameOver = g.gameOver;
+    s.messages = g.messages.map((m) => ({ ...m }));
+  }
+
+  /** Effets de sprite en cours (explosions, impacts, fumées) pour le rendu. */
+  effects(): Effect[] {
+    const out: Effect[] = [];
+    for (const o of this.pool.objects)
+      if (o.classe !== 0 && o.model >= FX_MODEL_FIRST && o.model <= 11004)
+        out.push(toEffect(o));
+    return out;
   }
 
   /** Cellules actives autour du joueur avec leur mode, dans l'ordre de découverte (`0042a084` §1). */
@@ -338,6 +396,11 @@ export class World {
     for (let i = items.length - 1; i >= 0; i--) {
       const o = items[i]!;
       o.flags &= ~FLAG.FLASH;
+      if (o.classe === 0) {
+        o.cell = -1;
+        this.pool.release(o);
+        continue;
+      }
       if (!(o.classe & CLASS.DEPOP)) {
         this.grid.insert(o);
         continue;
@@ -389,32 +452,6 @@ export class World {
       mix(o.age);
     }
     return h >>> 0;
-  }
-}
-
-/** Cible statique `00446d24` (2000, 2002, 2003, base de 3000, décor de 7000) : gelée tant qu'intacte, fumée à la 1ʳᵉ blessure, détruite à pv ≤ 0. */
-function staticTarget(world: World, o: GameObject): void {
-  if (o.age === 0) o.state = o.hp;
-  if (o.hp !== o.state && o.hp > 0) {
-    o.state = o.hp;
-    world.emit({ kind: "smoke", x: o.x, y: o.y, z: o.z });
-  }
-  if (o.hp <= 0) {
-    o.classe = 0;
-    world.emit({
-      kind: "objectDestroyed",
-      type: o.type,
-      model: o.model,
-      childModel: o.rec?.childModel ?? 0,
-      subtype: o.subtype,
-      x: o.x,
-      y: o.y,
-      z: o.z,
-      yaw: o.yaw,
-      score: STATIC_SCORE,
-    });
-  } else {
-    o.flags |= FLAG.FROZEN;
   }
 }
 

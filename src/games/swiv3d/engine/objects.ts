@@ -403,6 +403,8 @@ export function spawnLevelObjects(
         child.owner = body;
         child.rec = null;
         child.state = k;
+        // une tourelle porte le code d'arme `REC[7]` (les groupes d'objectifs 5000-5009 ne sont pas des armes)
+        if (c.classe & 0x1000 && rec.subtype < 1000) child.subtype = rec.subtype;
         child.update = c.update;
         ctx.grid.insert(child);
       }

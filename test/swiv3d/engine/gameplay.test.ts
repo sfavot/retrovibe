@@ -304,7 +304,7 @@ describe.skipIf(!hasOriginalFiles)("gameplay : joueur", () => {
     s.run(2);
     expect(s.world.status.specialAmmo[0]).toBe(2);
     expect(s.world.status.specialArmed).toBe(false); // réarmement du missile suivant
-    expect(live(s.world, "special_missile").length + count(s.world.drainEvents(), "objectDestroyed")).toBeGreaterThan(0);
+    expect(live(s.world, "missile_straight").length + count(s.world.drainEvents(), "objectDestroyed")).toBeGreaterThan(0);
     s.run(120);
     expect(live(s.world, "static")).toHaveLength(0); // le missile (80) a détruit la cible (50)
     // sans munition, l'arme est retirée et la sélection passe à « aucune »
@@ -421,12 +421,11 @@ describe.skipIf(!hasOriginalFiles)("gameplay : objectifs, fin de niveau, mort", 
 });
 
 describe.skipIf(!hasOriginalFiles)("gameplay : plates-formes, navires, contrat de statut", () => {
-  it("une plate-forme 7011 capte l'hélicoptère, le transforme en véhicule, puis le reprend et le replace sur l'hélicoptère posé", () => {
+  it("une plate-forme 7010 capte l'hélicoptère et le transforme en véhicule, puis attend un véhicule au sol (le retour : pads.test.ts)", () => {
     const s = scenario("TERRAN00", (sx, sz) => [
-      rec(7011, sx + 30, sz, { model: 504, childModel: 990, hitPoints: 1000, angle: 100 }),
+      rec(7010, sx + 30, sz, { model: 504, hitPoints: 1000, angle: 100 }),
     ]);
     const pad = live(s.world, "upd_004482dc")[0]!;
-    const helper = live(s.world, "upd_0044822c")[0]!;
     s.run(5);
     expect(pad.state).toBe(1); // captation (joueur en vol à moins de 122 unités)
     expect(s.world.player.autopilot).toBe(true);
@@ -438,16 +437,6 @@ describe.skipIf(!hasOriginalFiles)("gameplay : plates-formes, navires, contrat d
     s.run(250);
     expect(pad.state).toBe(5);
     expect(s.world.player.autopilot).toBe(false);
-    // le véhicule revient sur la plate-forme : amarrage au sol, puis replacé à l'hélicoptère posé, forme 0
-    const helperX = helper.x;
-    s.world.grid.remove(s.world.player.obj);
-    s.world.player.obj.x = pad.x;
-    s.world.player.obj.z = pad.z;
-    s.world.grid.insert(s.world.player.obj);
-    s.run(120);
-    expect(s.world.player.form).toBe(0);
-    expect(helper.classe).toBe(0); // l'objet auxiliaire s'est consommé
-    expect(Math.abs(s.world.player.x - helperX)).toBeLessThan(256 * 5);
   });
 
   it("un navire (5500) suit les nœuds d'eau (compteur navire) et tire sur le joueur", () => {
@@ -502,9 +491,9 @@ describe.skipIf(!hasOriginalFiles)("gameplay : plates-formes, navires, contrat d
     expect(st.score).toBe(120 + 3 + 3 + 3);
     s.run(1);
     expect(st.score).toBe(130);
-    s.world.game.message(100, 3);
+    s.world.game.message(100, 3, 0x1000);
     s.run(1);
-    expect(st.messages).toEqual([{ textTable: 100, textId: 3, ticksLeft: 99 }]);
+    expect(st.messages).toEqual([{ serial: 0, textTable: 100, textId: 3, tint: 0x1000, type: 0, ticksLeft: 70 }]);
   });
 
   it("les effets exposent explosions et impacts avec leur image et leur taille", () => {

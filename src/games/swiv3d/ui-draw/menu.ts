@@ -2,6 +2,9 @@
  * Moteur de menu de `gm_menu_run` (`00415a20`, docs/swiv3d/screens.md §4.1), sans entrées-sorties : l'état et la navigation sont purs,
  * le tracé écrit dans l'image indexée 320×400 avec les aplats de la table de mélange.
  *
+ * Partagé par les écrans (`screens/`) et le HUD (`render/hud/pause.ts`). Le titre 3D du menu n'en fait pas partie : il se dessine à part
+ * (`render/text3d/titles.ts`), au-dessus du menu placé à l'ordonnée `Y` de l'exécutable.
+ *
  * Lignes de 19 px centrées en x = 160, cadre de la largeur du texte le plus large + 10, navigation Haut / Bas avec bouclage,
  * Entrée ignorée pendant les 3 premières images, curseurs 0..255 réglés par Gauche / Droite.
  */
@@ -36,7 +39,7 @@ export type MenuLine =
   | { type: "slider"; id: number; text: string; value: number };
 
 export interface MenuOptions {
-  /** Ordonnée de la première ligne, ou `center` pour centrer le menu verticalement (pas de titre 3D au-dessus, contrairement à l'original). */
+  /** Ordonnée de la première ligne (le `Y` passé à `gm_menu_run`), ou `center` pour centrer le menu verticalement. */
   y: number | "center";
   /** Pas d'annulation (drapeau `0x20` : menu principal, sélection du pilote). */
   noCancel?: boolean;
@@ -65,12 +68,14 @@ const isSelectable = (line: MenuLine): line is Extract<MenuLine, { type: "choice
 
 /**
  * Menu type : espaceur de 3 px, trait, bandeau(x), trait, espaceur, lignes, espaceur, trait, espaceur (§4.1).
- * `banner` : lignes de titre ; `body` : choix et textes.
+ * `banner` : lignes du bandeau de texte (sous le titre 3D) ; sans bandeau, un seul trait sépare le haut du cadre des lignes.
+ * `body` : choix et textes.
  */
 export function standardLines(banner: string[], body: MenuLine[]): MenuLine[] {
   const space: MenuLine = { type: "spacer", height: 3, row: ROW.veil };
   const rule: MenuLine = { type: "spacer", height: 1, row: ROW.rule };
-  return [space, rule, ...banner.flatMap((text) => splitLines(text).map((t): MenuLine => ({ type: "title", text: t }))), rule, space, ...body, space, rule, space];
+  const bands = banner.flatMap((text) => splitLines(text).map((t): MenuLine => ({ type: "title", text: t })));
+  return [space, rule, ...(bands.length > 0 ? [...bands, rule] : []), space, ...body, space, rule, space];
 }
 
 export class Menu {

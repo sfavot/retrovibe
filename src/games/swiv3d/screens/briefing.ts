@@ -4,7 +4,7 @@
  */
 import type { StringTables } from "../data/strings";
 import { parseScr } from "../data/scr";
-import { BRIEFING_TEXT_MAX_WIDTH, type TextAlign, type TextRenderer, type TextStyle } from "./text";
+import { BRIEFING_TEXT_MAX_WIDTH, type TextAlign, type TextRenderer, type TextStyle } from "../ui-draw/text";
 
 /** Table des noms de missions : son numéro de chaîne est remplacé par la mission courante. */
 export const MISSION_NAME_TABLE = 200;

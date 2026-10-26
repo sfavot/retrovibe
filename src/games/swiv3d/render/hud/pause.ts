@@ -3,8 +3,8 @@
  * (table 4, id 0, type 11, teinte `0x400`), et un menu d'une seule ligne (table 4, id 1) à `Y = 260`, encadrée de deux espaceurs de
  * 4 px de la ligne `0x76`. Une touche quelconque rend la main.
  */
-import { Menu, MenuLine, ROW, splitLines } from "../../screens/menu";
-import { TextRenderer } from "../../screens/text";
+import { Menu, MenuLine, ROW, splitLines } from "../../ui-draw/menu";
+import { TextRenderer } from "../../ui-draw/text";
 import type { Font } from "../../data/font";
 
 /** Ordonnée de la première ligne du menu (`0x104`). */

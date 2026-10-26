@@ -113,6 +113,8 @@ export class Controls {
   private pad = { turn: 0, forward: 0, strafe: 0 };
   private touch = { turn: 0, forward: 0 };
   private pauseRequested = false;
+  /** Une touche ou un bouton tactile a été pressé (n'importe laquelle : ferme la pause). */
+  private anyKey = false;
   private padStart = false;
 
   constructor(keys: Readonly<Record<Action, readonly string[]>> = DEFAULT_KEYS) {
@@ -127,6 +129,7 @@ export class Controls {
   /** Touche enfoncée ; `true` si elle est liée (l'appelant fait alors `preventDefault`). La répétition automatique est ignorée : l'exe efface la touche après usage. */
   keyDown(event: KeyLike): boolean {
     if (event.metaKey) return false;
+    if (!event.repeat) this.anyKey = true;
     if (PAUSE_KEYS.includes(event.code)) {
       if (!event.repeat) this.pauseRequested = true;
       return true;
@@ -143,6 +146,7 @@ export class Controls {
   /** Commandes tactiles : boutons (`TOUCH_ACTIONS`) et manche (tourner = X, avancer = haut). */
   readonly touchSink: TouchSink = {
     press: (id) => {
+      this.anyKey = true;
       const action = TOUCH_ACTIONS[id];
       if (action) this.held.press(action);
     },
@@ -181,6 +185,13 @@ export class Controls {
     return requested;
   }
 
+  /** Une touche (ou un bouton tactile) a-t-elle été pressée depuis le dernier appel ? La pause de l'exe se ferme sur n'importe laquelle. */
+  takeAnyKey(): boolean {
+    const pressed = this.anyKey;
+    this.anyKey = false;
+    return pressed;
+  }
+
   /** Entrées d'un tick (appuis brefs compris), puis oubli des appuis brefs. */
   sample(): PlayerInput {
     const h = this.held;
@@ -215,6 +226,7 @@ export class Controls {
     this.pad = { turn: 0, forward: 0, strafe: 0 };
     this.touch = { turn: 0, forward: 0 };
     this.pauseRequested = false;
+    this.anyKey = false;
   }
 }
 

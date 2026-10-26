@@ -16,6 +16,7 @@ import * as pickups from "./pickups";
 import * as pw from "./player-weapons";
 import { UPDATE_PLAYER_INERT } from "./player";
 import * as proj from "./projectiles";
+import { MESSAGE_TINT } from "./status";
 import type { Behavior, World } from "./world";
 
 /** Les effets et projectiles n'ont rien à faire pendant leur dépeuplement : ils sont simplement supprimés. */
@@ -91,6 +92,8 @@ export function registerGameplay(world: World): void {
   r("upd_0044822c", pads.padHelper);
   r("dock_flying", (w, o) => pads.dockFlying(w, o));
   r("dock_ground", (w, o) => pads.dockGround(w, o));
+  // Armes spéciales : leurs comportements de vol remplacent les versions génériques de `projectiles` enregistrées plus haut.
+  pw.registerWeaponBehaviors(world);
 }
 
 /**
@@ -131,7 +134,7 @@ function playerDie(world: World): void {
   for (const b of g.buddies) if (b) b.hp = 0;
   g.buddies.fill(null);
   if (g.shield) g.shield.hp = 0;
-  g.message(20, 10, 160);
+  g.message(20, 10, MESSAGE_TINT.gameOver, 10);
   world.emit({ kind: "message", textTable: 20, textId: 10 });
   g.endState = "dead";
   g.endCounter = 0;

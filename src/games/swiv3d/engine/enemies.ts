@@ -26,14 +26,15 @@ import { ANGLE_MASK, COS, SIN } from "./fixed";
 import { CLASS, DEPOP_MARK, FLAG, radius2, type GameObject } from "./objects";
 import { unregisterObjective } from "./objectives";
 import { heliPhysics } from "./player";
+import { digCrater } from "./terrain";
 import type { World } from "./world";
 
 /** `gm_object_explode` (`00443ac0`) : décalque d'explosion de taille 900/901/902 selon le rayon², cratère (événement), son 1000. */
 export function explodeHeavy(world: World, o: GameObject): void {
   const r2 = radius2(world.models, o.model);
   const size: 0 | 1 | 2 = r2 < 1000 ? 0 : r2 < 5000 ? 1 : 2;
-  // Le cratère est creusé avant la pose du décalque, qui se pose donc sur le fond.
-  world.crater(o.x, o.z, size);
+  // Le cratère est creusé (si le site est libre de décor) avant la pose du décalque, qui se pose donc sur le fond.
+  digCrater(world, o, size);
   world.emit({ kind: "crater", x: o.x, z: o.z, size });
   spawnOnGround(world, {
     x: o.x,

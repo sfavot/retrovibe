@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Terrain, applyCrater } from "../../../src/games/swiv3d/engine/terrain";
+import { Terrain, applyCrater, applyPointCrater, craterSiteClear } from "../../../src/games/swiv3d/engine/terrain";
 import { loadGlobal } from "../screens/support";
 import { hasOriginalFiles, loadLevel } from "./helpers";
+import { rec, scenario } from "./scenario";
 
 describe("terrain (synthétique)", () => {
   const map = new Uint8Array(512 * 512);
@@ -150,5 +151,68 @@ describe.skipIf(!hasOriginalFiles)("World.crater", () => {
     expect(world.terrain.heightmap).toBe(fresh.heightmap);
     expect(fresh.heightmap[100 * 512 + site]!).toBeLessThanOrEqual(before);
     expect([...fresh.heightmap].some((v, i) => v !== level.heightmap[i])).toBe(true);
+  });
+});
+
+describe("cratères : lissage, site libre, cratère ponctuel", () => {
+  const MAP = 512;
+  const at = (x: number, z: number): number => z * MAP + x;
+  const q8 = (cell: number): number => cell << 14;
+  const deep = (): Int32Array[][] =>
+    Array.from({ length: 3 }, () => Array.from({ length: 16 }, () => Int32Array.from({ length: 16 }, (_, i) => (i === 5 ? 30 : 0))));
+
+  it("lisse en place les cellules dont un voisin diffère de plus de 19 (moyenne entière des 9 cellules)", () => {
+    const heights = new Uint8Array(MAP * MAP).fill(100);
+    const ground = new Uint8Array(MAP * MAP).fill(40);
+    expect(applyCrater(heights, ground, deep(), q8(10), q8(20), 1)).toBe(true);
+    // centre du profil (10, 20) : 100 - 30 = 70 ; ses voisins sont à 100 (écart 30 > 19), les cellules déjà lissées comptent
+    // lignes 19..22, colonnes 9..12 : (9, 19) est la première : voisins (8..10, 18..20), dont (10, 20) à 70 mais écart de 30 → moyenne
+    expect(heights[at(9, 19)]).toBe(Math.trunc((100 * 8 + 70) / 9));
+    // la cellule creusée est lissée à son tour, avec les cellules voisines déjà moyennées
+    const center = heights[at(10, 20)]!;
+    expect(center).toBeGreaterThan(70);
+    expect(center).toBeLessThan(100);
+    // hors des 4 × 4 cellules : intact
+    expect(heights[at(13, 20)]).toBe(100);
+    expect(heights[at(8, 20)]).toBe(100);
+    // le lissage ne touche pas le sol dans le test de ressaut : un creux de 10 (≤ 19) n'est pas lissé
+    const h2 = new Uint8Array(MAP * MAP).fill(100);
+    const profile = Array.from({ length: 3 }, () => Array.from({ length: 16 }, () => Int32Array.from({ length: 16 }, (_, i) => (i === 5 ? 10 : 0))));
+    applyCrater(h2, new Uint8Array(MAP * MAP).fill(40), profile, q8(10), q8(20), 0);
+    expect(h2[at(10, 20)]).toBe(90);
+  });
+
+  it("ramène à 240 une carte 102 déjà au-dessus, même sous une profondeur nulle ; laisse les 0 (eau) hors de la zone de refus", () => {
+    const heights = new Uint8Array(MAP * MAP).fill(100);
+    const ground = new Uint8Array(MAP * MAP).fill(250);
+    expect(applyCrater(heights, ground, deep(), q8(10), q8(20), 0)).toBe(true);
+    expect(ground[at(12, 22)]).toBe(240);
+    expect(ground[at(13, 20)]).toBe(250);
+  });
+
+  it("applyPointCrater creuse les 4 cellules du point (plancher 0), sans lissage", () => {
+    const heights = new Uint8Array(MAP * MAP).fill(10);
+    applyPointCrater(heights, q8(5) + 100, q8(6) + 100, 15);
+    for (const [x, z] of [[5, 6], [6, 6], [5, 7], [6, 7]] as const) expect(heights[at(x, z)]).toBe(0);
+    expect(heights[at(7, 6)]).toBe(10);
+    applyPointCrater(heights, q8(20), q8(20), 4);
+    expect(heights[at(20, 20)]).toBe(6);
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("cratères : site libre de décor (`00424db4`)", () => {
+  it("refuse un site à moins de 100 / 141 / 173 unités d'un décor (ni solide ni en vol), selon la taille", () => {
+    const s = scenario("TERRAN00", (sx, sz) => [rec(2002, sx + 120, sz, { model: 560, hitPoints: 10 })]);
+    const self = s.world.player.obj;
+    expect(craterSiteClear(s.world, self, 0)).toBe(true); // 120² + 1 ≥ 10 000
+    expect(craterSiteClear(s.world, self, 1)).toBe(false); // 14 401 < 20 000
+    expect(craterSiteClear(s.world, self, 2)).toBe(false); // < 30 000
+  });
+
+  it("un décor proche refuse le site, un objet solide ou en vol non", () => {
+    const near = scenario("TERRAN00", (sx, sz) => [rec(2002, sx + 50, sz, { model: 560, hitPoints: 10 })]);
+    expect(craterSiteClear(near.world, near.world.player.obj, 0)).toBe(false);
+    const solid = scenario("TERRAN00", (sx, sz) => [rec(5000, sx + 50, sz, { model: 500, childModel: 501, hitPoints: 10 })]);
+    expect(craterSiteClear(solid.world, solid.world.player.obj, 0)).toBe(true);
   });
 });

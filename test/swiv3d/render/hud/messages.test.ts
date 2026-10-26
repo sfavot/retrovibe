@@ -4,7 +4,7 @@ import { parseBd } from "../../../../src/games/swiv3d/data/bd";
 import { parseGlobal } from "../../../../src/games/swiv3d/data/global";
 import { parseLevel } from "../../../../src/games/swiv3d/data/level";
 import { createHud, LAYOUT, radarColorTable } from "../../../../src/games/swiv3d/render/hud";
-import { messageKey, messageStyle, TINT } from "../../../../src/games/swiv3d/render/hud/messages";
+import { TITLE_TINT } from "../../../../src/games/swiv3d/render/text3d";
 import { pauseMenuLines, PAUSE_MENU_Y } from "../../../../src/games/swiv3d/render/hud/pause";
 import type { HudMessage, HudState } from "../../../../src/games/swiv3d/render/hud/state";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../src/games/swiv3d/render/view";
@@ -13,25 +13,7 @@ import { hasOriginalFiles, readOriginal } from "../../helpers";
 const SIZE = SCREEN_WIDTH * SCREEN_HEIGHT;
 const hash = (pixels: Uint8Array): string => createHash("sha1").update(pixels).digest("hex");
 
-describe("messages 3D : teinte et type de chaque message du monde", () => {
-  it("armes (0 à 19) : teinte 0x1000 ; bonus 100-102 et 105-108 : 0x400 ; 110-113 : 0x100 ; toujours en vol (type 0)", () => {
-    for (const id of [0, 7, 19]) expect(messageStyle({ textTable: 100, textId: id })).toEqual({ tint: 0x1000, type: 0 });
-    for (const id of [100, 101, 102, 105, 106, 107, 108]) expect(messageStyle({ textTable: 100, textId: id })).toEqual({ tint: 0x400, type: 0 });
-    for (const id of [110, 111, 112, 113]) expect(messageStyle({ textTable: 100, textId: id })).toEqual({ tint: 0x100, type: 0 });
-  });
-
-  it("objectifs : « Accompli » (id 0) et « Game over ! » (id 10) restent figés ; les groupes traversent l'écran", () => {
-    expect(messageStyle({ textTable: 20, textId: 0 })).toEqual({ tint: 0x1400, type: 10 });
-    expect(messageStyle({ textTable: 20, textId: 10 })).toEqual({ tint: 0x1000, type: 10 });
-    for (const id of [1, 5, 9]) expect(messageStyle({ textTable: 20, textId: id })).toEqual({ tint: 0x1400, type: 0 });
-  });
-
-  it("la clé d'un message ne change pas pendant sa vie", () => {
-    const m = (ticksLeft: number): HudMessage => ({ textTable: 100, textId: 2, ticksLeft });
-    expect(messageKey(m(100), 10)).toBe(messageKey(m(95), 15));
-    expect(messageKey(m(100), 10)).not.toBe(messageKey(m(100), 11));
-  });
-
+describe("écran de pause : menu", () => {
   it("menu de pause : espaceur de 4 px, une ligne de texte, espaceur", () => {
     expect(pauseMenuLines("N'importe quelle touche")).toEqual([
       { type: "spacer", height: 4, row: 0x76 },
@@ -39,7 +21,7 @@ describe("messages 3D : teinte et type de chaque message du monde", () => {
       { type: "spacer", height: 4, row: 0x76 },
     ]);
     expect(pauseMenuLines("a|b").filter((l) => l.type === "choice")).toHaveLength(2);
-    expect(TINT.menu).toBe(0x400);
+    expect(TITLE_TINT).toBe(0x400);
   });
 });
 
@@ -71,6 +53,9 @@ describe.skipIf(!hasOriginalFiles)("HUD : messages 3D et écran de pause (fichie
       },
     };
   }
+  /** Messages du monde : un ramassage (type 0) et « Game over ! » (type 10, figé). */
+  const pickup: HudMessage = { serial: 1, textTable: 100, textId: 1, tint: 0x1000, type: 0 };
+  const gameOver: HudMessage = { serial: 2, textTable: 20, textId: 10, tint: 0x1000, type: 10 };
   const gauge = (fb: Uint8Array) => fb.subarray(LAYOUT.gauge.y * SCREEN_WIDTH, (LAYOUT.gauge.y + 80) * SCREEN_WIDTH).some((v) => v !== 0);
   /** Pixels allumés dans la moitié haute de l'écran : en pause, seul le titre 3D y est dessiné. */
   const top = (fb: Uint8Array) => fb.subarray(0, 200 * SCREEN_WIDTH).reduce((n, v) => n + (v !== 0 ? 1 : 0), 0);
@@ -79,7 +64,7 @@ describe.skipIf(!hasOriginalFiles)("HUD : messages 3D et écran de pause (fichie
     const r = rig();
     expect(r.draw({ tick: 0 }).extra).toBe(0);
     const visible: boolean[] = [];
-    for (let tick = 1; tick <= 100; tick++) visible.push(r.draw({ tick, messages: [{ textTable: 100, textId: 1, ticksLeft: 101 - tick }] }).extra > 0);
+    for (let tick = 1; tick <= 100; tick++) visible.push(r.draw({ tick, messages: [pickup] }).extra > 0);
     // Créé au tick 1 avec une vie de 70, décomptée à chaque tick : dernière image au tick 70, retiré au tick 71 (vie -1).
     expect(visible.slice(0, 70).filter(Boolean).length).toBeGreaterThan(40);
     expect(visible[69]).toBe(true);
@@ -87,7 +72,7 @@ describe.skipIf(!hasOriginalFiles)("HUD : messages 3D et écran de pause (fichie
   });
 
   it("le même message n'est pas recréé à chaque image, et la trajectoire ne dépend que des ticks du monde", () => {
-    const state = (tick: number): Partial<HudState> => ({ tick, messages: [{ textTable: 20, textId: 10, ticksLeft: 500 - tick }] });
+    const state = (tick: number): Partial<HudState> => ({ tick, messages: [gameOver] });
     const every = rig();
     let last = every.draw(state(1)).fb;
     for (let tick = 2; tick <= 40; tick++) last = every.draw(state(tick)).fb;
@@ -145,7 +130,7 @@ describe.skipIf(!hasOriginalFiles)("HUD : messages 3D et écran de pause (fichie
 
   it("un nouveau niveau (tick qui recule) vide les messages en cours", () => {
     const r = rig();
-    r.draw({ tick: 500, messages: [{ textTable: 20, textId: 10, ticksLeft: 100 }] });
+    r.draw({ tick: 500, messages: [gameOver] });
     for (let tick = 501; tick < 600; tick++) r.draw({ tick });
     expect(r.draw({ tick: 600 }).extra).toBeGreaterThan(0); // « Game over ! » reste figé tant que rien ne le libère
     expect(r.draw({ tick: 0 }).extra).toBe(0);

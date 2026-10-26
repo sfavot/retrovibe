@@ -243,6 +243,8 @@ interface SpawnDef {
     model: "child" | number;
     count?: number;
   }[];
+  /** État initial (`+0x50`) du corps : 5 pour 7011 (`0043e958`), 0 sinon. */
+  state?: number;
   /** Le 7000 crée deux objets indépendants : décor (`REC[4]`) et bonus (`REC[5]`, pv 1000). */
   separateChild?: boolean;
 }
@@ -311,6 +313,7 @@ const SPAWN: Record<number, SpawnDef> = {
   7011: {
     classe: 0x0001,
     update: "upd_004482dc",
+    state: 5,
     children: [{ classe: 0x40, update: "upd_0044822c", model: 990 }],
   },
 };
@@ -369,6 +372,7 @@ export function spawnLevelObjects(
     body.rec = rec;
     body.update = def.update;
     place(body, ctx, rec.type === 6300 ? 0 : rec.model, x, z);
+    body.state = def.state ?? 0;
     ctx.grid.insert(body);
     bodies.push(body);
 

@@ -6,6 +6,7 @@
  */
 import { objectiveGroup } from "../data/level";
 import type { GameObject } from "./objects";
+import { MESSAGE_TINT } from "./status";
 import type { World } from "./world";
 
 /** Inscrit un objet dans le groupe de son `subtype` (5000 à 5009) ; sans effet pour les autres valeurs. */
@@ -59,13 +60,13 @@ export function unregisterObjective(world: World, o: GameObject): void {
   });
   if (group === 0) {
     if (game.endCounter === -1) {
-      game.message(20, 0);
+      game.message(20, 0, MESSAGE_TINT.objective, 10);
       world.emit({ kind: "message", textTable: 20, textId: 0 });
       game.endCounter = 0;
       game.endState = "victory";
     }
   } else {
-    game.message(20, group);
+    game.message(20, group, MESSAGE_TINT.objective);
     world.emit({ kind: "message", textTable: 20, textId: group });
     if (group === 9) game.group9Done = true;
   }

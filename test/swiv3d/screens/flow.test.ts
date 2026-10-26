@@ -125,6 +125,25 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     host = new FakeHost();
   });
 
+  it("chaque menu a un titre 3D (chaîne `(groupe, 0)`) et un bandeau sans le titre ; l'écran de fin garde le niveau derrière", () => {
+    const strings = loadGlobal().strings;
+    const bytes = (table: number, id: number): Uint8Array | undefined => strings.getBytes(1, table, id);
+    const d = mainMenuAs();
+    const view = (): { title: Uint8Array | null; menu: { texts(): string[] } } => d.flow.view as never;
+    expect(view().title).toEqual(bytes(1, 0));
+    expect(view().menu.texts()[0]).toBe("Menu principal pour les"); // le bandeau (1, 1), pas le titre
+    d.choose(40); // Installer
+    expect(view().title).toEqual(bytes(2, 0));
+    expect(view().menu.texts()).toContain("Volume");
+    expect(view().menu.texts()).not.toContain("Installer");
+    d.press("escape");
+    d.choose(10);
+    d.flow.videoEnded(false);
+    d.flow.levelEnded("gameOver", { seconds: 5 });
+    expect((d.flow.view as { title: Uint8Array | null }).title).toEqual(bytes(7, 1));
+    expect(d.flow.view).toMatchObject({ backdrop: "level" });
+  });
+
   it("sans pilote : la sélection propose seulement « Nouveau pilote », musique des menus", () => {
     const d = start();
     expect(d.flow.phaseName).toBe("menu");
@@ -176,7 +195,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     d.flow.videoEnded(false);
     d.flow.levelEnded("complete", { seconds: 75 });
     expect(d.flow.phaseName).toBe("end");
-    expect(d.flow.view).toMatchObject({ kind: "menu", backdrop: "frozen" });
+    expect(d.flow.view).toMatchObject({ kind: "menu", backdrop: "level" });
     d.idle(70); // ~1,1 s : compteur de fin à 99 sur 110
     d.anyKey();
     expect(d.flow.phaseName).toBe("end");

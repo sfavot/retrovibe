@@ -1,11 +1,11 @@
 import { FixedStepClock } from "../../../engine/clock";
-import { h } from "../../../ui/dom";
 import { paletteToLut } from "../../../ui/indexed-canvas";
 import type { MusicSystem, SoundSystem } from "../audio";
 import type { GlobalData } from "../data/global";
 import { parseBd } from "../data/bd";
 import { parseLevel } from "../data/level";
 import type { WorldEvent } from "../engine/events";
+import { emptyInput } from "../engine/input";
 import { World, loadDebris, loadModels } from "../engine/world";
 import { createRenderAssets } from "../render/assets";
 import { createHud, radarColorTable, type Hud } from "../render/hud";
@@ -53,9 +53,7 @@ export interface LevelServices {
   controls: Controls;
   /** Commandes tactiles : relâchées à la pause. */
   touch: { reset(): void };
-  /** Voile « Pause » (touche Pause), géré ici ; un appui le ferme. */
-  pauseOverlay: HTMLElement;
-  /** Le canvas reprend le focus après la fermeture du voile. */
+  /** Le canvas reprend le focus quand la pause se ferme. */
   focusCanvas(): void;
   /** Image 320×400 dans laquelle le niveau dessine. */
   framebuffer: Uint8Array;
@@ -95,8 +93,16 @@ export interface LevelSession {
   onFrame(now: number): void;
   /** Onglet masqué ou de nouveau visible. */
   onPause(hidden: boolean): void;
-  /** Pause imposée par l'application (écran d'abandon) : la simulation s'arrête, sans voile. */
+  /** Pause imposée par l'application (écran d'abandon) : la simulation s'arrête, sans titre « Pause ». */
   setPaused(paused: boolean): void;
+  /** Pause demandée par le joueur (touche Pause, Start) : le monde est figé mais dessiné, avec le titre 3D « Pause ». */
+  readonly userPaused: boolean;
+  /** Ferme la pause du joueur (n'importe quelle touche, appui sur l'écran). */
+  resume(): void;
+  /** Table de couleurs du texte 3D de ce niveau (bloc 11003, `005bc158`) : couleurs des titres de menu devant ce niveau. */
+  readonly textColors: Uint8Array;
+  /** Fait repartir les messages 3D figés (ouverture d'un écran de fin). */
+  releaseTitles(): void;
   /** Dev : termine le niveau (F9) ou fait mourir le joueur (F8). */
   complete(): void;
   gameOver(): void;
@@ -107,7 +113,8 @@ export interface LevelSession {
 
 /**
  * Charge un niveau et le fait vivre : monde à 40 Hz, caméra de poursuite, rendu logiciel à chaque image du navigateur, son (moteur,
- * événements) et musique du niveau. Pause sur la touche Pause ou quand l'onglet est masqué.
+ * événements) et musique du niveau. Pause sur la touche Pause (n'importe quelle touche la ferme) ou quand l'onglet est masqué. Une fois
+ * le niveau fini (mission accomplie, game over) le monde continue de tourner, joueur sans commandes, derrière l'écran de fin.
  */
 export async function startLevel(services: LevelServices, request: LevelRequest): Promise<LevelSession> {
   const name = request.name.toUpperCase();
@@ -128,6 +135,7 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
   });
   const language = request.language ?? 1;
   const missionName = request.mission === undefined ? "" : (services.global.strings.get(language, 200, request.mission) ?? "");
+  const textColors = radarColorTable(parseBd(levelBytes, name).get(11003));
   const hud: Hud | null =
     request.hud === false
       ? null
@@ -136,11 +144,11 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
           blendTable: level.fadeTable,
           table109: level.lightTable109,
           colorMap: level.colorMap,
-          radarColors: radarColorTable(parseBd(levelBytes, name).get(11003)),
+          radarColors: textColors,
         });
   const hudBuilder = new HudStateBuilder();
 
-  const { controls, sound, music, audio, pauseOverlay, stats, framebuffer } = services;
+  const { controls, sound, music, audio, stats, framebuffer } = services;
   const bridge = sound ? new SoundBridge(sound, music) : null;
   bridge?.attach(world, name);
 
@@ -164,7 +172,6 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
   const isPaused = (): boolean => tabHidden || userPaused || hostPaused;
   const applyPause = (): void => {
     const paused = isPaused();
-    pauseOverlay.style.display = userPaused ? "" : "none";
     if (paused === wasPaused) return;
     wasPaused = paused;
     if (paused) {
@@ -181,12 +188,12 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
       clock.resync();
     }
   };
-  const closeOverlay = (): void => {
+  const resume = (): void => {
+    if (!userPaused) return;
     userPaused = false;
     applyPause();
     services.focusCanvas();
   };
-  pauseOverlay.addEventListener("pointerdown", closeOverlay);
 
   const views = new ViewBuilder();
   const palette = paletteToLut(renderer.palette);
@@ -216,6 +223,12 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
       hostPaused = paused;
       applyPause();
     },
+    get userPaused() {
+      return userPaused;
+    },
+    resume,
+    textColors,
+    releaseTitles: () => hud?.releaseTitles(),
     complete: () => finish("levelComplete"),
     gameOver: () => finish("gameOver"),
     requestQuit: () => emit(events.quit),
@@ -225,23 +238,29 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
       if (dt > 0 && dt < 500) stats.frameMs = stats.frameMs === 0 ? dt : stats.frameMs * 0.95 + dt * 0.05;
       if (tabHidden) return;
       controls.poll();
-      if (controls.takePauseRequest() && !hostPaused) {
-        userPaused = !userPaused;
-        applyPause();
+      if (!finished && !hostPaused) {
+        // Pause : la touche Pause la pose ; une fois posée, n'importe quelle touche la ferme (`gm_screen_pause`, `00419058`).
+        const pauseKey = controls.takePauseRequest();
+        const anyKey = controls.takeAnyKey();
+        if (!userPaused && pauseKey) {
+          userPaused = true;
+          applyPause();
+        } else if (userPaused && (pauseKey || anyKey)) resume();
       }
-      if (userPaused) return;
 
-      if (!hostPaused && !finished) {
+      // En pause, le monde reste dessiné (viseurs, messages) : seuls l'horloge et les ticks s'arrêtent.
+      if (!hostPaused && !userPaused) {
         clock.update(now);
         while (clock.consume()) {
-          world.tick(controls.sample());
+          // Fin de niveau : le monde continue (effets, ennemis) mais le joueur n'a plus de commandes.
+          world.tick(finished ? emptyInput() : controls.sample());
           stats.ticks++;
           ticksInLevel++;
         }
         handleWorldEvents(world.drainEvents());
+        // Cadence d'image estimée pour le lissage de la caméra (`k = max(1, fps / 4)`, bornée comme l'exe : au moins 5).
+        world.updateCamera(Math.max(5, Math.min(240, stats.frameMs > 0 ? 1000 / stats.frameMs : 60)));
       }
-      // Cadence d'image estimée pour le lissage de la caméra (`k = max(1, fps / 4)`, bornée comme l'exe : au moins 5).
-      world.updateCamera(Math.max(5, Math.min(240, stats.frameMs > 0 ? 1000 / stats.frameMs : 60)));
 
       const view = views.build(world);
       const start = performance.now();
@@ -251,7 +270,7 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
         hudBuilder.build(world, view.camera, {
           missionName: world.tickCount < MISSION_NAME_TICKS ? missionName : "",
           language: language === 1 ? "fr" : "en",
-          paused: isPaused(),
+          paused: userPaused,
         }),
       );
       const renderMs = performance.now() - start;
@@ -259,8 +278,6 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
       bridge?.update(view.camera);
     },
     dispose() {
-      pauseOverlay.removeEventListener("pointerdown", closeOverlay);
-      pauseOverlay.style.display = "none";
       sound?.stopAll();
       void audio?.resume();
       music?.resume();
@@ -296,11 +313,4 @@ export function summarize(world: World, seconds: number, request: Pick<LevelRequ
     secretsTotal: g.bonusDropped,
     state,
   };
-}
-
-/** Voile « Pause » (texte du jeu) : à poser dans le cadre de l'écran. */
-export function createPauseOverlay(title: string, hint: string): HTMLElement {
-  const overlay = h("div", { class: "game-shell-overlay sw3-pause", role: "status" }, h("p", {}, title), h("p", { class: "sw3-pause-hint" }, hint));
-  overlay.style.display = "none";
-  return overlay;
 }

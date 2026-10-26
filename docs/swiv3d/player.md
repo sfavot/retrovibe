@@ -2,7 +2,7 @@
 
 Rétro-ingénierie de `SWIV_WIN.EXE` (voir `re-index.md` pour les conventions : Watcom, arguments en registres EAX/EDX/EBX/ECX, adresses linéaires). Ce document donne à l'auteur du moteur de quoi réimplémenter fidèlement la boucle, le véhicule du joueur, la caméra et les commandes. Étiquettes : **[confirmé]** lu directement dans le code ou les données ; **[probable]** déduit de plusieurs indices concordants ; **[hypothèse]** à vérifier ; **[calculé]** valeur obtenue en simulant les formules du jeu (script jetable, pas dans le code).
 
-Les décompilations du joueur sont **incomplètes** : les fonctions de pilotage et de physique (`00438678`-`0043b4f4`, `00444xxx`-`00446xxx`) ne sont pas des « fonctions » pour Ghidra (pas de `decomp/`), seul `disasm.txt` les contient. Tout ce qui suit pour ces zones vient de la lecture du désassemblage.
+Les fonctions des véhicules (`0043a174`-`0043b0ac`, `00443510`, `00445228`-`00445f44`, `004446a0`) ont une décompilation dans `decomp/` et sont **portées ligne à ligne** (`vehicle.ts`) ; l'hélicoptère (`00439088`, `00444af8`) et la physique de démonstration `00449af8` (hors fonction pour Ghidra : `disasm.txt`) sont portés aussi.
 
 ## 1. Boucle et cadence
 
@@ -107,12 +107,12 @@ Le joueur est un **objet de 0x228 octets** (20 emplacements à `005a936c`, point
 | Forme | Type | Fonction pilote `+0xa8` | Physique `+0x68` | Son en boucle | Rôle |
 |---|---|---|---|---|---|
 | 0 | 990 | `00439088` (`00439670` si réseau) | `00449aa8` → `FUN_00444af8(obj, 0x50)` | 5000 | **hélicoptère** (forme de départ) |
-| 1 | 991 | `0043a174` | `00445228` | 5001 | véhicule à 4 roues (enfants `0x3d4`, `+0x50` = 0..3) : « jeep » (**hypothèse** sur le nom) |
-| 2 | 991 | `0043a760` | `00445670` | 5001 | véhicule, 3 enfants (`0x3d4`, `0x3d4`, `0x3d7`) |
+| 1 | 991 | `0043a174` | `00445228` | 5001 | buggy : 4 roues enfants `0x3d4` (non portées) ; `+0x190 = 11000` à la création |
+| 2 | 991 | `0043a760` | `00445670` | 5001 | motoneige : 2 roues `0x3d4` + ski `0x3d7` ; l'arrière s'enfonce de 2 000 dans l'eau |
 | 3 | 990 | `00439bcc` | `00449ad0` → `FUN_00444af8(obj, 0x50)` | 5002 | hélicoptère, même pilotage que la forme 0 (molette lue dans `+0x224`) |
-| 4 | 991 | `0043ac64` | `00445a84` | 5001 | véhicule plus nerveux (poussée +210 par tick) |
-| 5 | 980 (`0x3d4`) | `0043b0ac` | `00445f44` | 5002 | autre véhicule |
-| `0x2a` | 990 | `00438678` (vide) | `00449af8` | | fantôme/spectateur (démarrage de type 1001) |
+| 4 | 991 | `0043ac64` | `00445a84` | 5001 | véhicule nerveux (poussée 210 par touche, frottement 61/64, gravité 120, pas de roues) |
+| 5 | 980 (`0x3d4`) | `0043b0ac` | `00445f44` | 5002 | aéroglisseur : modèle 980 à terre, 982 (`0x3d6`) sur l'eau, ne souffre pas de l'eau |
+| `0x2a` | 990 | `00438678` (vide) | `00449af8` | | **pilote de démonstration** (départ de type 1001, `DEMO.SLV`), voir §3.10 |
 | `0x2b` | 990 | `00438744` | `00449bc8` | 5002 | séquence de mort / fin (démarrage de type 1002) |
 | `0x63` (99) | 0 | `00438678` (vide) | `00441630` | | joueur réseau inactif |
 
@@ -189,50 +189,56 @@ Conséquences **[calculé]** (simulation du pilote + de cette fonction, sol plat
 
 Altitude minimale : consigne = **80 unités** au-dessus du relief ; le relief situé 32 ticks de vitesse devant est anticipé, mais `P.y - 2000 <= hauteur` déclenche le choc (rebond vers l'aval, 10 PV).
 
-### 3.5 Pilotes des véhicules (formes 1, 2, 4, 5) [confirmé]
+### 3.5 Pilotes des véhicules (formes 1, 2, 4, 5) [confirmé, porté]
 
-Fonctions `0043a174`, `0043a760`, `0043ac64`, `0043b0ac`. Variables : `+0x74` poussée (u32 signé), `+0x34` cap, `+0xb4` braquage cible, `+0x50` frein.
-
-```
-si P.+0x50 == 1 : P.+0x50 = 0 ; P.+0xb4 = 0                  // le frein ne dure qu'un tick
-// virage
-si T > 1 et axeTourner != 0 : P.cap += ax(axeTourner)*10 >> 8 ; P.+0xb4 += ax(axeTourner)*100 >> 8
-sinon : si touche[tournerG] { P.cap -= 4 ; P.+0xb4 = -40 } ; si touche[tournerD] { P.cap += 4 ; P.+0xb4 = +40 }
-// poussée
-si T > 1 et axeAvancer != 0 : P.+0x74 += ax(axeAvancer) * 0x104 >> 8
-sinon : (forme 1, 2) si touche[avancer] P.+0x74 += 0x82 ; si touche[reculer] P.+0x74 -= 0x82         // 130 ; forme 4 : 0xd2 (210)
-// frein : « Strafe On/Brake », ou avancer+reculer ensemble (forme 1 : ou « latéral gauche ») → P.+0x50 = 1
-// braquage visuel des roues : +0xb0 → +0xb4 par pas de 4 ; transmis aux enfants par FUN_004446a0
-// marche arrière : si (vx*SIN[cap] + vz*COS[cap]) < -7000 (0xffffe4a8) : P.+0xb4 = -P.+0xb4
-```
-
-Pas d'inertie angulaire : le cap change **de 4 unités/tick (112°/s)** au clavier. Même sélection d'armes/tir que l'hélicoptère (touches `2..11`, molette, `+0xd8/+0xdc`, `+0xd0`, `+0xd4`). Formes 1 et 2 : la molette et les touches avancer/reculer font aussi tourner les roues enfants (`+0x38 -= 13`/`+= 13`).
-
-### 3.6 Physique des véhicules (forme 1, `00445228`) [confirmé]
-
-`FUN_00443510(obj, 1000, forme)` calcule d'abord **4 points de contact** (coins ±5 120, ±7 680 Q8 = ±20, ±30 unités, à la hauteur de pied du modèle `+0x10`, tournés par tangage, roulis, cap) : `w[i] = y_monde(i) − hauteur_terrain_eau(i)` dans `[0048420c, 00484218, 00484224, 00484230]` (Q8 ; +2 000 si `00577664 < 4` et forme 1, +2 000 aux deux avants pour la forme 2), et le vecteur « avant corps » `T = (005b04c4, 005b04c0, 005b04b0)` = `1000 × (sin cap·cos tangage, sin tangage, cos cap·cos tangage)` et une poussée de pente `(005b04c8, 005b04cc)`.
+`0043a174`, `0043a760`, `0043ac64`, `0043b0ac`. Variables : `+0x74` poussée, `+0x34` cap, `+0xb4/+0xb0` braquage cible/courant, `+0x50` frein (1 = un tick).
 
 ```
-poussée = clamp(P.+0x74, -500, 500) ; P.+0x78 = P.+0x78*13>>4 ; P.+0x74 = P.+0x74*15>>4 ; P.+0x78 = P.+0x78*13>>4
-h = min(1000, w0, w1, w2, w3)
-si h < 1000 :                                    // roues au sol
-    frein : (vx, vz) *= 14/16 ; P.+0x74 = 0     sinon (vx, vz) *= 15/16
-    roulis  += ((w3 + w1) - (w2 + w0)) >> 9
-    si P.+0x50 == 3 : P.+0x50 = 0
-    si P.+0x50 != 2 : tangage += ((w2 + w3) - (w0 + w1)) >> 9
-    si sol normal (00577664 >= 4) : si frein absent : (vx, vz) += pentes >> 8 ; v += poussée * T >> 11 ; (forme 1)
-    sinon (00577664 < 4, eau/boue : hypothèse) : v += pentes >> 10 ; v += poussée * T >> 13 ; PV-- si > 0
-sinon (en l'air) : si P.+0x50 == 3 { tangage -= 4 si > -50 } sinon { tangage += 2 si < 90 }
-vy = vy * 15 >> 4
-si h > 0 : vy -= 150                             // gravité 150 Q8/tick² (0,59 unité/tick²)
-si h < 0 : (sons d'impact 0xfaa si vy < -1100, 0xfab si vy < -1900) ; vy = max(vy, 0) ; P.y -= h   // repousse hors du sol
+si état == 1 : état = 0 ; braquage cible = 0
+virage : axe (T > 1) cap += ax*10 >> 8, cible += ax*100 >> 8 ; sinon gauche : cap -= 4, cible = -40 ; droite : cap += 4, cible = +40
+poussée : axe : += ax*0x104 >> 8 ; sinon avancer += pas, reculer -= pas (pas 0x82 ; forme 4 : 0xd2)
+frein (clavier) : avancer+reculer, ou « frein », ou « latéral gauche » (formes 1, 4, 5 ; pas la 2) → état = 1
+frein (axe) : « frein » si état == 0 (forme 2 : toujours)
+puis, APRÈS les armes, si état != 1 : avancer += pas, reculer -= pas   // une touche tenue vaut donc 2 pas (0x104) sans frein
++0x94 = cap tant que « latéral droit » n'est pas tenu (cap de tir des projectiles)
+formes 1, 2 : si vx*SIN[cap] + COS[cap]*vz < -7000 (marche arrière) : cible = -cible ; puis b0 → b4 par pas de 4 ; roues enfants
 ```
 
-Vitesse d'équilibre sur sol plat **[calculé]** ≈ 3 400 Q8/tick (13,4 u/tick, 534 u/s) pour la forme 1 ; la forme 4 (gravité 120, poussée 210, frottement latéral supplémentaire `v*0x3d >> 6`) et la forme 5 (`v*0x3c >> 6`) sont des variantes **[hypothèse sur les valeurs exactes]** : relire `00445a84`/`00445f44` pour les porter.
+Le doc d'origine (R1) comptait un seul pas de poussée : corrigé, la lecture de la décompilation en montre deux. Les formes 4 et 5 n'ont ni braquage ni roues.
+
+### 3.6 Suspension et physique des véhicules [confirmé, porté]
+
+**`00443510(obj, 1000, forme)`** : 4 contacts (coins `(±5120, ±7680)` Q8, ordre AG, AD, RG, RD ; avant = +z), à la hauteur de pied du modèle (`+0x10`), tournés par tangage puis roulis puis cap (sinus/cosinus de l'angle **opposé**), `w[i] = y_monde − hauteur_terrain_eau`. `+2000` si type de sol < 4 pour la forme 1 (4 coins) ou la forme 2 (arrière seulement : les deux **arrière**, pas les avant comme noté avant). `T = (sin cap·cos tangage, sin tangage, cos cap·cos tangage)·1000` et poussée de pente `(005b04c8, 005b04cc)` = poids **le long de l'inclinaison du corps** (`350·(−cos tangage·sin roulis >> 10, sin tangage)` tourné par le cap), non le gradient du relief. Le type de sol `00577664` est celui du **dernier** contact.
+
+**Physique** (`00445228` forme 1 ; variantes) :
+
+```
+poussée = clamp(+0x74, ±500) (écrite) ; puis +0x78 = +0x78·13>>4 ; +0x74 = +0x74·15>>4 ; +0x78 = +0x78·13>>4
+h = min(1000, w0..w3)
+si h < 1000 (au sol) :
+  frein : (vx,vz)·14/16 (4, 5 : 15/16), +0x74 = 0 ; sinon ·15/16 (forme 4 : ·0x3d>>6 ; forme 5 : ·0x3c>>6)
+  roulis += (w3+w1 − w2−w0) >> 9 ; si état == 3 : 0 ; si état != 2 : tangage += (w2+w3 − w0−w1) >> 9
+  sol sec (type >= 4) / eau (< 4) ; « pente » = si état ∉ {1,2} : v += pente >> s ; « pousse » : v += +0x74·T >> s   (la poussée UTILISÉE est celle après frottement)
+     forme 1 : sec  pente 8, pousse 11 ; eau  pente 10, pousse 13, pv −1
+     forme 2 : sec  pente 8, pousse 11 ; eau  pas de pente, pousse 13, pv −1
+     forme 4 : sec  pente 9, pousse 11 ; eau  pente 11, pousse 13, pv −2
+     forme 5 : sec  pente 9, pousse 12, modèle 980 ; eau  pente 11, pousse 11, modèle 982, pas de dégâts
+  +0x70 += +0x78 · min(10, (vx²+vz²) >> 18)
+sinon en l'air : état 3 : tangage −4 si > −50 ; formes 1, 2 : tangage +2 si < 90 ; formes 4, 5 : tangage vers [−10, 0] par 2, roulis vers 0 par 1
+forme 4 : v += +0x74·T >> 16 (toujours)
+vy = vy·15>>4 ; si h > 0 : vy −= gravité (150 ; 120 pour 4, 5) ; si h < 0 : sons 0xfaa/0xfab (vy < −1100 / −1900), vy = max(vy, 0), y −= h
++0x190 += min(100, (v² >> 10) + 7000 − +0x190) (×2 formes 4, 5 ; plafonds 20500 → 15000, 41000 → 35000)
+```
+
+Aucun garde-fou d'angle dans l'exe (l'ancien `±128` du port est supprimé). **Vitesses mesurées dans le port** (sol plat, poussée tenue) : forme 1 : 3 650 Q8/tick (14,3 u/tick ; le doc d'origine annonçait ≈ 3 400, calculé avec une poussée non amortie) ; forme 4 : 4 990 (19,5) ; forme 5 : 1 810 (7,1), 3 640 sur l'eau ; sur eau la forme 1 tombe à 920. Rampe : la forme 1 passe de 3 280 (pente 0,06) à 1 460 (0,38), 800 (0,5), cale vers 0,6 ; la forme 4 monte encore à 0,75.
+
+Hauteur et type de sol : `gm_terrain_height_water` (`sampleGround`) avec `00577670 & 2` (script : 3 dans TERRAN00-03, donc `water` vaut `true` par défaut dans `World`) : type = octet de la carte 102, coins d'eau relevés de `WAVE[(cz·4 + temps + SIN[(cx&31)·16]) & 31]·256`, `temps` = ticks (`00481154`).
+
+**Non porté** : les roues enfants (`0x3d4`/`0x3d7`, `004446a0`, `gm_upd_wheel`) : décor sans effet sur la physique (`steer` et `wheelSpin` sont tenus à jour pour elles).
 
 ### 3.7 Collisions et dégâts [confirmé]
 
-- **Terrain** : l'hélicoptère rebondit et perd 10 PV (§3.4). Les véhicules sont posés par les 4 contacts (§3.6) ; PV −1 par tick quand le type de sol `00577664` est < 4 (−2 pour la forme 4) : **hypothèse** sur ce que sont ces cases (carte 102, octets < 4).
+- **Terrain** : l'hélicoptère rebondit et perd 10 PV (§3.4). Les véhicules sont posés par les 4 contacts (§3.6) ; PV −1 par tick quand le type de sol `00577664` est < 4 (−2 pour la forme 4, 0 pour la forme 5) : ce sont les cases d'eau de la carte 102 [confirmé par le code].
 - **Objets** (`FUN_0042a084`, cellules à l'état 0 seulement, hors réseau) : pour chaque paire (A, B) dont l'un a le drapeau `+4 & 2`, ni B fantôme (`+4 & 0x40`) ni liés par `+0x5c`, `d² = Σ((Δ >> 8)²)` en unités ; **collision si `d² <= rayon²(A) + rayon²(B)`** avec `rayon² = bloc de modèle +0xc` (100 si type 0 ou ≥ 10 000, `FUN_0042a010`). Normale : `FUN_00415374` (normalise `Δ >> 4`). Si les deux n'ont que le drapeau 2 (physique pure) : poussée `v += ∓4·n`. Sinon : dégâts **`min(PV_A, PV_B, 100)` retirés aux deux** (sauf drapeau `+6 & 4` « invulnérable »), drapeaux `+6 |= 0x102` (« touché »), `+0x58` = propriétaire de l'autre, recul `v += ∓8·n`.
 - **Mort** : voir `FUN_0043c234` : forme `0x2b`/`0x2a` après la séquence `00438744` (chrono `+0x50` jusqu'à 0x3e8 ; objets 0xe1 explosion à chaque tick entre 0xaa et 0x258, caméra figée à 0x17c, etc.). Détails à fusionner avec R3.
 
@@ -243,6 +249,18 @@ Pour l'hélicoptère et les véhicules : tous les `n` ticks (`n` = 60 si `(vx>>8
 ### 3.9 Apparition [confirmé]
 
 `gm_level_spawn_objects` `0043e958` : l'objet de type **1000** du bloc 105 `(1000, x, z, cap)` crée le joueur solo (1001, 1002 : variantes de départ `0x2a`/`0x2b`) avec `gm_object_init(0, 0, mode 0, x, 0x50, z, cap…)` : `x`, `z` en unités (`<< 8`), `y = hauteur_terrain + 0x50 × 256` (80 unités au-dessus du sol), cap en unités d'angle ; puis `FUN_0043cab4` (PV, armes, touches copiées de `profil[4..14]`), forme initiale, et la vue 0 reçoit `00480e7c = 0`, `00480e80 = 0`, `00480e84 = 0x1e`, `00480e88 = 0x226`. TERRAN00 : départ `(12159, 29373)` cap 248 ; TERRAN01 `(30804, 20028)` cap 424 ; TERRAN02 `(3963, 10467)` cap 72 ; TERRAN03 `(11121, 16469)` cap 208 ; DEMO : type 1001 `(15747, 20469)` cap 424. Plafond de vol : `005b03cc = 0x7ffffff8` (aucun) sauf objet de type `0x1edc` (hauteur du terrain à son emplacement, `0043e958` / `00440e71`).
+
+### 3.10 Pilote de démonstration (forme `0x2a`, `00449af8`) [confirmé, porté]
+
+Le choix n'a rien d'implicite : `gm_level_spawn_objects` crée le joueur du type 1001 avec `gm_player_set_form(0x2a)` (type 1000 : forme du profil ; 1002 : `0x2b`). Sa « fonction pilote » est vide (`gm_pilot_none`), le mouvement est dans la physique `+0x68 = 00449af8` (`demo-pilot.ts`) :
+
+```
+si +0x40 == -1 : gm_node_claim_air                     // nœud aérien libre le plus proche
+gm_heli_physics(obj, 0x50)                             // vol à 80 unités du relief
+gm_aircraft_turn_to_point(obj, 0x19, x_nœud, z_nœud)   // bascule bornée à 25, cap par secteurs
+si (Δx² + Δz²) < 10000 (unités) : FUN_00442c90          // nœud suivant
+```
+`FUN_00442c90` prend le **dernier** lien non vide du nœud courant, efface dans ce nœud les liens qui reviennent vers l'ancien (le circuit ne se parcourt que dans un sens), rend l'ancien nœud (capacité aérienne +1) et réserve le nouveau. Sur `DEMO.SLV` l'appareil boucle en ≈ 2 200 ticks à ≈ 2 900 Q8/tick, tangage ≈ −25, sans dégât ; les entrées sont ignorées.
 
 ## 4. Caméra
 
@@ -496,7 +514,8 @@ Variables globales utiles : `00490010` états de touches, `004841a4` type de con
 ## 8. Questions ouvertes
 
 - Lecture des types 3, 4 (calibration), 6 (Creative Blaster) : seule `joyGetPosEx` du type 5 est dans `gm_poll_events` ; `FUN_00410b74` lit les trois axes pour la calibration. Les codes `0xf0..0xf7` du type 6 restent inexpliqués.
-- Rôle exact des formes 2, 4, 5 et de la forme 3 (identique à la 0 pour le pilotage) ; déclencheurs précis (objets bonus), à croiser avec R2/R3. Les constantes de frottement des formes 4 et 5 sont à relire dans `00445a84` / `00445f44` avant portage.
+- Forme 3 (identique à la 0 pour le pilotage) ; déclencheurs précis des formes 2, 4, 5 (objets bonus), à croiser avec R2/R3. Noms des formes (buggy, motoneige, aéroglisseur) : déduits du comportement (eau, modèles), pas des chaînes du jeu.
+- Roues enfants des formes 1 et 2 non portées (décor). `+0x94` (cap de tir) est tenu à jour dans `Player.fireYaw` et lu par le canon (`gm_primary_bullet_spawn`, `0046b4b4`). Les constantes de frottement des formes 4 et 5 sont à relire dans `00445a84` / `00445f44` avant portage.
 - `FUN_0042fc70` (table `005624c8`), liste `00587704` (« plan large », +900 en hauteur), `+0x190`, `00480c80`, le sens des touches F3/F4 et la condition `profil[+0x28] > 0` : hypothèses.
 - `FUN_004446a0` et `FUN_00443ed0` (effets au choc) non lus ; séquence de mort `00438744` non décrite en détail (R3).
 - La cadence réelle dépend de la résolution de `msg.time` de Windows 95 ; le port devrait utiliser un pas exact de 25 ms avec la même règle de plafond (800 ms).

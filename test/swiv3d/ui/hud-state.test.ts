@@ -26,13 +26,13 @@ describe("viseur et radar : formules", () => {
 describe.skipIf(!hasOriginalFiles)("HudState d'après le monde", () => {
   it("jauge, score, armes et messages viennent de `world.status`", () => {
     const s = scenario("TERRAN00", () => [], { ammo: [0, 0, 5], score: 40 });
-    s.world.game.message(100, 2);
+    s.world.game.message(100, 2, 0x400);
     s.run(1);
     const view = { camera: cameraToRender(s.world.camera) };
     const state = new HudStateBuilder().build(s.world, view.camera, OPTIONS);
     expect(state).toMatchObject({ energy: 496, maxEnergy: 496, score: 40, missionName: "Fastoche", language: "fr", paused: false, tick: 1 });
     expect(state.specialAmmo[2]).toBe(5);
-    expect(state.messages).toEqual([{ textTable: 100, textId: 2, ticksLeft: 99 }]);
+    expect(state.messages).toEqual([{ serial: 0, textTable: 100, textId: 2, tint: 0x400, type: 0, ticksLeft: 70 }]);
     expect(state.radar.playerYaw).toBe(s.world.player.obj.yaw);
   });
 

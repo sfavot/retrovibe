@@ -11,7 +11,6 @@
  * cellule (`stamp`) ; les collisions s'appliquent à la cellule traitée (l'exe réutilise l'indice de cellule du dernier objet).
  */
 import type { Level, LevelObject } from "../data/level";
-import { MAP_SIZE } from "../data/level";
 import { parseBd } from "../data/bd";
 import { listModels, parseModel, type Model } from "../data/model";
 import { Camera } from "./camera";
@@ -42,15 +41,17 @@ import {
   FORM_DEMO,
   FORM_DYING,
   Player,
+  UPDATE_PLAYER_DEMO,
   UPDATE_PLAYER_HELI,
   UPDATE_PLAYER_INERT,
   UPDATE_PLAYER_VEHICLE,
   pilot,
   playerHeliUpdate,
-  playerVehicleUpdate,
   setForm,
   type PlayerContext,
 } from "./player";
+import { demoPilotUpdate } from "./demo-pilot";
+import { vehiclePhysics } from "./vehicle";
 import { Terrain, applyCrater } from "./terrain";
 import { emptyInput } from "./input";
 
@@ -64,7 +65,7 @@ export interface WorldOptions {
   startForm?: number;
   /** Cadence (images/s) du lissage de caméra appelé par `tick` ; 0 = pas de lissage automatique (le rendu appelle `updateCamera`). Défaut 40. */
   cameraFps?: number;
-  /** Mission à eau (drapeau `00577670 & 2`) : la carte 102 donne le type de sol des véhicules. */
+  /** Mission à eau (drapeau `00577670 & 2`) : la carte 102 donne le type de sol et les vagues sous les véhicules. Défaut : `true` (le script pose 3 dans TERRAN00-03). */
   water?: boolean;
   /** Table de débris du bloc 11004 (`loadDebris`) : sans elle, pas d'épaves ni d'éclats à la destruction. */
   debris?: DebrisTable;
@@ -146,12 +147,14 @@ export class World {
     this.game.score = this.game.scoreShown = opts.score ?? 0;
     this.options = {
       cameraFps: opts.cameraFps ?? 40,
-      water: opts.water ?? false,
+      water: opts.water ?? true,
     };
     this.playerContext = {
       terrain: this.terrain,
       models,
-      groundType: (x, z) => this.groundType(x, z),
+      groundMap: this.options.water ? level.groundMap : null,
+      time: () => this.tickCount,
+      nodes: this.nodes,
       emit: (e) => this.events.push(e),
     };
 
@@ -161,7 +164,10 @@ export class World {
       playerHeliUpdate(this.player, this.playerContext),
     );
     this.registerBehavior(UPDATE_PLAYER_VEHICLE, () =>
-      playerVehicleUpdate(this.player, this.playerContext),
+      vehiclePhysics(this.player, this.playerContext),
+    );
+    this.registerBehavior(UPDATE_PLAYER_DEMO, () =>
+      demoPilotUpdate(this.player, this.playerContext),
     );
     this.registerBehavior(UPDATE_PLAYER_INERT, () => {});
 
@@ -216,14 +222,6 @@ export class World {
     );
     this.events.length = 0; // le changement de forme initial n'est pas un événement de jeu
     return p;
-  }
-
-  /** Type de sol sous (x, z) Q8 (`00577664`) : carte 102 en mission à eau, sinon 0xff (sol normal). */
-  groundType(x: number, z: number): number {
-    if (!this.options.water) return 0xff;
-    return this.level.groundMap[
-      ((z >> 14) & (MAP_SIZE - 1)) * MAP_SIZE + ((x >> 14) & (MAP_SIZE - 1))
-    ]!;
   }
 
   /**

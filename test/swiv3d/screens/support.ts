@@ -1,6 +1,6 @@
 import { parseBd } from "../../../src/games/swiv3d/data/bd";
 import { parseGlobal, type GlobalData } from "../../../src/games/swiv3d/data/global";
-import { TextRenderer } from "../../../src/games/swiv3d/screens/text";
+import { TextRenderer } from "../../../src/games/swiv3d/ui-draw/text";
 import { readOriginal } from "../helpers";
 
 let cached: GlobalData | undefined;

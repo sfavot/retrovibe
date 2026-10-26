@@ -5,12 +5,13 @@
  */
 import {
   SND,
+  acquireTarget,
   applyAimOption,
   bestAimOption,
   cloneObject,
-  directionTo,
   explosionBig,
   findNearestPlayer,
+  localVelocity,
   sound,
   spawnOnGround,
 } from "./combat";
@@ -18,7 +19,9 @@ import { normalize256, SIN } from "./fixed";
 import { AMMO_CAP, AMMO_PICKUP } from "./game";
 import { CLASS, type GameObject } from "./objects";
 import { unregisterObjective } from "./objectives";
-import { isWeaponAllowed } from "./player-weapons";
+import { PLAYER_PROJECTILE_CLASS, isWeaponAllowed } from "./player-weapons";
+import { hoverFollow } from "./special-weapons";
+import { MESSAGE_TINT } from "./status";
 import type { World } from "./world";
 
 /** Premiers codes de bonus autres que les armes : 100 à 102 vie, 105-106-108 compagnons, 107 bouclier, 109 rien, 110-113 puissance. */
@@ -29,6 +32,9 @@ export const PICKUP_BUDDY_LOCK = 105;
 export const PICKUP_BUDDY_AUTO = 106;
 export const PICKUP_SHIELD = 107;
 export const PICKUP_BUDDY_SUPER = 108;
+
+/** Classe des compagnons et du bouclier (`MOV EAX,0x14` de `004585c4`) : en vol et cible des ennemis, ni solide ni fantôme. */
+const BUDDY_CLASS = 0x14;
 
 const MAX_ENERGY = 496;
 const MAX_MEGA_ENERGY = 992;
@@ -69,10 +75,17 @@ export function canTake(world: World, n: number): boolean {
   else if (n >= 110 && n <= 113) ok = g.power < 19;
   else ok = true;
   if (ok) {
-    g.message(100, n);
+    g.message(100, n, pickupTint(n));
     world.emit({ kind: "message", textTable: 100, textId: n });
   }
   return ok;
+}
+
+/** Teinte du texte d'un ramassage (`00458f88`) : armes 0 à 19 rouge, bonus 100 à 108 `0x400`, 110 à 113 `0x100`. */
+function pickupTint(n: number): number {
+  if (n >= 110) return MESSAGE_TINT.bonus;
+  if (n >= 100) return MESSAGE_TINT.powerUp;
+  return MESSAGE_TINT.weapon;
 }
 
 /** `gm_pickup_apply` : effet du bonus `n`. */
@@ -93,7 +106,7 @@ export function applyPickup(world: World, n: number): void {
           : n === PICKUP_BUDDY_AUTO
             ? ([852, 70, "buddy_auto"] as const)
             : ([810, 70, "buddy_super"] as const);
-      const b = cloneObject(world, p, { classe: 0x40, hp, model, update });
+      const b = cloneObject(world, p, { classe: BUDDY_CLASS, hp, model, update });
       if (b) {
         b.y += 80000;
         b.vx = b.vy = b.vz = 0;
@@ -102,7 +115,7 @@ export function applyPickup(world: World, n: number): void {
     }
   } else if (n === PICKUP_SHIELD) {
     if (!g.shield) {
-      const s = cloneObject(world, p, { classe: 0x40, hp: 200, model: 853, update: "shield" });
+      const s = cloneObject(world, p, { classe: BUDDY_CLASS, hp: 200, model: 853, update: "shield" });
       if (s) {
         g.shield = s;
         if (p.hp < 200) p.hp = 200;
@@ -275,112 +288,111 @@ export function shield(world: World, o: GameObject): void {
   o.roll += o.hp >> 5;
 }
 
-/** Plus proche objet hostile (classe 0x1000, sans bit 0x40) dans les 5 × 5 cellules de `o`, à moins de `range` unités. */
-function nearestHostile(world: World, o: GameObject, range: number): GameObject | null {
-  let best: GameObject | null = null;
-  let bestD = range * range;
-  const cx = o.x >> 17;
-  const cz = o.z >> 17;
-  for (let dz = -2; dz <= 2; dz++) {
-    for (let dx = -2; dx <= 2; dx++) {
-      const list = world.grid.cells[((cz + dz) & 63) * 64 + ((cx + dx) & 63)]!;
-      for (const c of list) {
-        if (!(c.classe & 0x1000) || c.classe & CLASS.GHOST || c.hp < 1) continue;
-        const a = (c.x - o.x) >> 8;
-        const b = (c.z - o.z) >> 8;
-        const d = a * a + b * b;
-        if (d < bestD) {
-          bestD = d;
-          best = c;
-        }
-      }
-    }
-  }
-  return best;
+/** Suit le joueur : cap et vitesse horizontale du joueur, ressort vertical à 90 unités du relief (raideur 4 en montée, 2 en descente). */
+function buddyFollow(world: World, o: GameObject): GameObject {
+  const owner = o.owner;
+  o.timer++;
+  o.roll = 0;
+  o.vx = owner.vx;
+  o.vz = owner.vz;
+  hoverFollow(world, o, 0x5a, 4, 2);
+  return owner;
 }
 
-const dir = { x: 0, y: 0, z: 0 };
+/** Tourne le compagnon vers sa cible (un des 5 pas de `AIM_OPTIONS`) ; retourne l'option choisie (0 : cap bon). */
+function buddyAim(o: GameObject, owner: GameObject, wrap: boolean): number {
+  if (o.target === owner || o.target === o) {
+    o.yaw += (owner.yaw - o.yaw) >> 1;
+    o.pitch >>= 1;
+    return -1;
+  }
+  const k = bestAimOption(o, o.target);
+  if (wrap) {
+    if (k === 1) o.yaw = (o.yaw - 3) & 0x1ff;
+    if (k === 2) o.yaw = (o.yaw + 3) & 0x1ff;
+    if (k === 3) o.pitch = (o.pitch + 3) & 0x1ff;
+    if (k === 4) o.pitch = (o.pitch - 3) & 0x1ff;
+  } else {
+    if (k === 1) o.yaw -= 3;
+    if (k === 2) o.yaw += 3;
+    if (k === 3) o.pitch += 3;
+    if (k === 4) o.pitch -= 3;
+  }
+  return k;
+}
 
-function buddyShot(
-  world: World,
-  o: GameObject,
-  model: number,
-  hp: number,
-  life: number,
-  update: string,
-  target: GameObject,
-): void {
-  const b = cloneObject(world, o, { classe: 0x3b, hp, model, update });
+function buddyDie(world: World, o: GameObject): void {
+  if (o.hp >= 1) return;
+  o.classe = 0;
+  explosionBig(world, o);
+  const b = world.game.buddies;
+  const i = b.indexOf(o);
+  if (i >= 0) b[i] = null;
+}
+
+/** Balle de compagnon (`10002` ou `10000`, classe `0x3f`, `+0x14` = 30) tirée à 9 000 dans le cap du compagnon, propriétaire : le joueur. */
+function buddyBullet(world: World, o: GameObject, model: number, hp: number, lat: number, vert = 0): void {
+  const b = cloneObject(world, o, { classe: PLAYER_PROJECTILE_CLASS, hp, model, update: "bullet_right" });
   if (!b) return;
-  b.owner = world.player.obj;
-  b.timer = life;
-  directionTo(o, target, dir);
-  b.vx = dir.x << 5;
-  b.vy = dir.y << 5;
-  b.vz = dir.z << 5;
+  b.owner = o.owner;
+  b.timer = 0x1e;
+  localVelocity(b, lat, vert, 9000);
 }
 
-/** Suit le joueur : ressort vertical vers son altitude, frottement ; la position horizontale est posée par le tick de jeu. */
-function buddyFollow(world: World, o: GameObject): void {
-  const p = world.player.obj;
-  o.vy = ((o.vy * 14) >> 4) + ((p.y - o.y) >> 6);
-  if (o.hp < 1) {
-    o.classe = 0;
-    explosionBig(world, o);
-    const b = world.game.buddies;
-    const i = b.indexOf(o);
-    if (i >= 0) b[i] = null;
-  }
-}
-
-/** `gm_upd_buddy_autofire` (`00456abc`) : module de tir auto, balles 10000 (14 pv) sur la cible la plus proche. */
+/**
+ * `gm_upd_buddy_autofire` (`00456abc`) : module de tir auto. Cherche une cible tous les 10 ticks (rayon 1, classe `0x45 == 1`),
+ * se tourne vers elle (3 pas par tick) et, cap bon, tire une balle `10000` (14 pv) aux ticks `& 0xf` = 0 et 3 (2,5 coups par seconde
+ * en rafale de deux), sans appui sur le tir du joueur.
+ */
 export function buddyAuto(world: World, o: GameObject): void {
-  buddyFollow(world, o);
-  if (o.age % 12 === 0) {
-    const t = nearestHostile(world, o, 1200);
-    if (t) {
-      buddyShot(world, o, 10000, 14, 30, "bullet_right", t);
-      sound(world, SND.enemyBullets, o);
-    }
-  }
+  if (o.target.classe === 0) o.age = 9999;
+  acquireTarget(world, o, 10, 0x45, 1, 1);
+  const owner = buddyFollow(world, o);
+  const k = buddyAim(o, owner, true);
+  if (k === 0 && ((o.timer & 0xf) === 0 || (o.timer & 0xf) === 3)) buddyBullet(world, o, 10000, 14, 0);
+  buddyDie(world, o);
 }
 
-/** `gm_upd_buddy_lock` (`004560e4`) : module de verrouillage, 4 balles 10002 (8 pv) en croix. */
+/**
+ * `gm_upd_buddy_lock` (`004560e4`) : module de verrouillage. Prend la cible du joueur et s'oriente vers elle ; tant que le joueur
+ * tient le tir principal : 4 balles `10002` (8 pv) en croix, à 9 000 dans le cap du compagnon : deux écartées de ±150 sur le côté
+ * au tick `& 0x1f` = 7, deux de ±150 en hauteur au tick 0.
+ */
 export function buddyLock(world: World, o: GameObject): void {
-  buddyFollow(world, o);
-  if (o.age % 16 === 0) {
-    const t = nearestHostile(world, o, 1200);
-    if (t) {
-      for (const [lat, vert] of [[300, 0], [-300, 0], [0, 300], [0, -300]] as const) {
-        const b = cloneObject(world, o, { classe: 0x3b, hp: 8, model: 10002, update: "bullet_right" });
-        if (!b) break;
-        b.owner = world.player.obj;
-        b.timer = 30;
-        directionTo(o, t, dir);
-        b.vx = dir.x << 5;
-        b.vy = dir.y << 5;
-        b.vz = dir.z << 5;
-        // décalage en croix autour de la direction de tir
-        b.yaw = o.yaw;
-        b.pitch = 0;
-        const sy = SIN[o.yaw & 0x1ff]!;
-        b.vx += (lat * sy) >> 8;
-        b.vy += vert;
-      }
-      sound(world, SND.enemyBullets, o);
+  const owner = o.owner;
+  o.target = owner.target;
+  const player = buddyFollow(world, o);
+  buddyAim(o, player, false);
+  if (world.player.firePrimaryHeld) {
+    if ((o.timer & 0x1f) === 7) {
+      buddyBullet(world, o, 10002, 8, -150);
+      buddyBullet(world, o, 10002, 8, 150);
+    }
+    if ((o.timer & 0x1f) === 0) {
+      buddyBullet(world, o, 10002, 8, 0, -150);
+      buddyBullet(world, o, 10002, 8, 0, 150);
     }
   }
+  buddyDie(world, o);
 }
 
-/** `gm_upd_buddy_super` (`00456658`) : super module, balles lourdes 10001 (20 pv). */
+/**
+ * `gm_upd_buddy_super` (`00456658`) : super module, cap et cible du joueur ; tant que le tir principal est tenu, un missile
+ * (`10001`, 20 pv, classe 10 : 7 000, virage 2) tous les 32 ticks.
+ */
 export function buddySuper(world: World, o: GameObject): void {
+  const owner = o.owner;
+  o.target = owner.target;
   buddyFollow(world, o);
-  if (o.age % 10 === 0) {
-    const t = nearestHostile(world, o, 1500);
-    if (t) {
-      buddyShot(world, o, 10001, 20, 20, "bullet_right", t);
-      sound(world, SND.enemyBullets, o);
+  o.yaw = owner.yaw;
+  o.pitch = 0;
+  o.target = owner.target;
+  if (world.player.firePrimaryHeld && (o.timer & 0x1f) === 0) {
+    const m = cloneObject(world, o, { classe: PLAYER_PROJECTILE_CLASS, hp: 0x14, model: 10001, update: "missile_class10" });
+    if (m) {
+      m.owner = owner;
+      m.timer = 0x14;
     }
   }
+  buddyDie(world, o);
 }
-

@@ -158,14 +158,25 @@ export function missileStraight(world: World, o: GameObject): void {
   guidedMissile(world, o, 2, 4);
 }
 
+/** `gm_upd_missile_class10` (`00455300`) : missile du super module (classe 10 : vitesse 7 000, virage 2, fumée tous les 3 ticks), sans durée de vol. */
+export function missileClass10(world: World, o: GameObject): void {
+  groundOrDead(world, o);
+  missileSteer(o, 2, 10);
+  smokeTrail(world, o, 3);
+}
+
 /** `gm_upd_missile_coast` (`00455190`) : vol libre après 100 ticks, fumée tous les 7 ticks. */
 export function missileCoast(world: World, o: GameObject): void {
   groundOrDead(world, o);
   smokeTrail(world, o, 7);
 }
 
-/** `gm_steer_to_point` (`00443114`) : cap + {-2, -1, 0, 1, 2} × `rate`, le meilleur vers (tx, tz) Q8. */
-export function steerToPoint(o: GameObject, rate: number, tx: number, tz: number): void {
+/**
+ * `gm_steer_to_point` (`00443114`) : cap + {-2, -1, 0, 1, 2} × `rate`, le meilleur vers (tx, tz) Q8. Retourne `true` quand le cap
+ * actuel est déjà le meilleur (l'objet est aligné sur le point). Écart : l'exe réécrit sa table de pas à chaque appel (les cases
+ * ±2 et +1 gardent la valeur de l'appel précédent pendant l'appel courant) ; ici la table est celle de l'appel courant.
+ */
+export function steerToPoint(o: GameObject, rate: number, tx: number, tz: number): boolean {
   const dx = (tx - o.x) >> 8;
   const dz = (tz - o.z) >> 8;
   let best = -999999999;
@@ -180,6 +191,7 @@ export function steerToPoint(o: GameObject, rate: number, tx: number, tz: number
     }
   }
   o.yaw += bestInc;
+  return bestInc === 0;
 }
 
 /** `gm_upd_rocket` (`00457d4c`) : fusée à phases (montée, virages de plus en plus serrés, vol libre). */

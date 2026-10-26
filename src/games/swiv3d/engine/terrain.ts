@@ -4,6 +4,8 @@
  * `docs/swiv3d/player.md` §2.
  */
 import { MAP_SIZE, type Level } from "../data/level";
+import type { GameObject } from "./objects";
+import type { World } from "./world";
 
 const MASK = MAP_SIZE - 1;
 
@@ -45,14 +47,64 @@ export class Terrain {
 
 /** Plafond de la carte 102 après ajout de suie (`gm_terrain_explosion_crater`). */
 const GROUND_MAX = 240;
+/** Écart de hauteur entre une cellule et l'un de ses 8 voisins au-delà duquel la cellule est lissée (`0x13` = 19). */
+const SMOOTH_STEP = 19;
 
 /**
- * `gm_terrain_explosion_crater` (`00424f44`, `objects.md` §10.4) : si aucune des 36 cellules (6 × 6) de la carte 102 autour du point ne
- * vaut 0 (eau : `gm_crater_site_ok`), soustrait le profil 4 × 4 du bloc 700 (taille, sous-position `(z >> 12 & 3) * 4 + (x >> 12 & 3)`)
- * à la carte de hauteur (plancher 0) et ajoute `2 × profondeur` (plafond 240) à la carte 102 là où elle n'est pas nulle (le sol brunit).
- * `x`, `z` : Q8. Le profil est posé sur les cellules `cx - 1 .. cx + 2` (le centre des profils est en ligne 1, colonne 1 : hypothèse,
- * cohérente avec la symétrie des profils), le test d'emplacement sur `cx - 2 .. cx + 3` (hypothèse). La dernière passe de l'exe (8 voisins)
- * n'est pas décodée : non portée. Retourne `false` si le site est refusé.
+ * `gm_crater_site_ok` (`00424db4`) : le site est refusé si un objet « décor » (ni solide `0x02` ni en vol `0x10`), autre que `self`,
+ * se trouve à moins de `sqrt(10 000 / 20 000 / 30 000)` unités (taille 0 / 1 / 2, distance² + 1 < limite). Le test parcourt les cases
+ * de la grille d'objets (512 unités) de la cellule de carte `(cx, cz)` puis de `(cx + 4, cz)`, `(cx, cz + 4)`, `(cx + 4, cz + 4)` :
+ * la seconde case de chaque ligne n'est lue que si elle change de case de grille. **Défaut fidèle** : l'abscisse n'est pas
+ * remise à `cx` pour la seconde ligne (le compteur de l'exe, `00587d94`, garde sa valeur avancée), donc la seconde ligne est lue à
+ * partir de `cx + 4` ou `cx + 8`. Ne regarde que les cases de la grille, pas la distance au-delà de leur contenu.
+ */
+export function craterSiteClear(world: World, self: GameObject, size: 0 | 1 | 2): boolean {
+  const limit = size === 0 ? 10000 : size === 1 ? 20000 : 30000;
+  let cx = self.x >> 14;
+  let cz = self.z >> 14;
+  let rows = 0;
+  let bz = 0;
+  do {
+    bz = cz >> 3;
+    let cols = 0;
+    let bx = 0;
+    do {
+      bx = cx >> 3;
+      const list = world.grid.cells[(bz & 63) * 64 + (bx & 63)]!;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const o = list[i]!;
+        if ((o.classe & 0x12) !== 0 || o === self) continue;
+        const dx = (self.x >> 8) - (o.x >> 8);
+        const dz = (self.z >> 8) - (o.z >> 8);
+        if (dx * dx + dz * dz + 1 < limit) return false;
+      }
+      cx += 4;
+      cols++;
+    } while (cols === 1 && cx >> 3 !== bx);
+    cz += 4;
+    rows++;
+  } while (rows === 1 && cz >> 3 !== bz);
+  return true;
+}
+
+/**
+ * Cratère d'explosion d'un objet mourant (`00443ac0` → `00424f44`) : site libre de décor (`craterSiteClear`), puis `World.crater`
+ * (eau, profils, lissage). `true` si le sol a été creusé.
+ */
+export function digCrater(world: World, o: GameObject, size: 0 | 1 | 2): boolean {
+  if (!craterSiteClear(world, o, size)) return false;
+  return world.crater(o.x, o.z, size);
+}
+
+/**
+ * `gm_terrain_explosion_crater` (`00424f44`, `objects.md` §10.4), sans le test de décor (`craterSiteClear`) : `x`, `z` Q8.
+ *  1. refus si l'une des 36 cellules `cx - 2 .. cx + 3` de la carte 102 (`groundMap`) vaut 0 (eau ou bord de mer) ;
+ *  2. sur les 4 × 4 cellules `cx - 1 .. cx + 2`, `profondeur = profil[ligne · 4 + colonne]` (bloc 700, taille, sous-position
+ *     `(z >> 12 & 3) · 4 + (x >> 12 & 3)`) : la carte 102 prend `min(240, valeur + 2 · profondeur)` là où elle n'est pas nulle (même
+ *     quand la profondeur est nulle : une valeur > 240 est ramenée à 240), la hauteur perd `profondeur` (plancher 0) ;
+ *  3. dernière passe sur les mêmes 16 cellules, dans l'ordre ligne par ligne, **en place** : si l'un des 8 voisins diffère de plus de 19
+ *     de la cellule (valeurs déjà lissées pour les cellules précédentes), la cellule devient la moyenne entière des 9 cellules.
+ * Retourne `false` si le site est refusé.
  */
 export function applyCrater(
   heightmap: Uint8Array,
@@ -62,20 +114,51 @@ export function applyCrater(
   z: number,
   size: 0 | 1 | 2,
 ): boolean {
-  const cx = (x >> 14) & MASK;
-  const cz = (z >> 14) & MASK;
+  const cx = (x >> 14) - 1;
+  const cz = (z >> 14) - 1;
   const at = (ax: number, az: number): number => (az & MASK) * MAP_SIZE + (ax & MASK);
-  for (let dz = -2; dz <= 3; dz++) for (let dx = -2; dx <= 3; dx++) if (groundMap[at(cx + dx, cz + dz)] === 0) return false;
+  for (let dz = -1; dz < 5; dz++)
+    for (let dx = -1; dx < 5; dx++) if (groundMap[at(cx + dx, cz + dz)] === 0) return false;
   const profile = profiles[size]?.[(((z >> 12) & 3) << 2) | ((x >> 12) & 3)];
   if (!profile) return false;
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
+      const i = at(cx + c, cz + r);
       const depth = profile[r * 4 + c]!;
-      if (depth <= 0) continue;
-      const i = at(cx - 1 + c, cz - 1 + r);
-      heightmap[i] = Math.max(0, heightmap[i]! - depth);
       if (groundMap[i] !== 0) groundMap[i] = Math.min(GROUND_MAX, groundMap[i]! + 2 * depth);
+      heightmap[i] = Math.max(0, heightmap[i]! - depth);
+    }
+  }
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      const ax = cx + c;
+      const az = cz + r;
+      const center = heightmap[at(ax, az)]!;
+      let rough = false;
+      let sum = center;
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dz === 0) continue;
+          const h = heightmap[at(ax + dx, az + dz)]!;
+          sum += h;
+          if (Math.abs(h - center) > SMOOTH_STEP) rough = true;
+        }
+      }
+      if (rough) heightmap[at(ax, az)] = Math.trunc(sum / 9);
     }
   }
   return true;
+}
+
+/**
+ * `gm_terrain_crater` (`00424a24`, mode de création 3) : creuse de `depth` (plancher 0) les 4 cellules `(cx, cz)`, `(cx + 1, cz)`,
+ * `(cx, cz + 1)`, `(cx + 1, cz + 1)` de la carte de hauteur sous le point `(x, z)` Q8 ; ni test de site ni lissage.
+ */
+export function applyPointCrater(heightmap: Uint8Array, x: number, z: number, depth: number): void {
+  const cx = x >> 14;
+  const cz = z >> 14;
+  for (const [dx, dz] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+    const i = ((cz + dz) & MASK) * MAP_SIZE + ((cx + dx) & MASK);
+    heightmap[i] = heightmap[i]! < depth ? 0 : heightmap[i]! - depth;
+  }
 }

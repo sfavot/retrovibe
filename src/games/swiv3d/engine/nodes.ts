@@ -106,6 +106,25 @@ export class NodeNet {
     }
   }
 
+  /**
+   * `FUN_00442c90` (pilote de démonstration) : avance sur le chemin sans jamais revenir. Prend le dernier lien utilisé du nœud
+   * courant (le dernier des 4 qui n'est pas -1, sinon le nœud lui-même), efface dans ce nœud les liens qui reviennent vers l'ancien,
+   * rend l'ancien à la classe aérienne et réserve le nouveau.
+   */
+  advanceAir(o: GameObject): void {
+    const cur = o.node;
+    if (cur < 0) return;
+    let next = cur;
+    for (let k = 0; k < 4; k++) {
+      const l = this.links[cur * 4 + k]!;
+      if (l !== -1) next = l;
+    }
+    for (let k = 0; k < 4; k++) if (this.links[next * 4 + k] === cur) this.links[next * 4 + k] = -1;
+    this.cap.air[cur]!++;
+    this.cap.air[next]!--;
+    o.node = next;
+  }
+
   /** `gm_node_distance_*` : D² au point (tx, tz) en unités avec exploration de 4 niveaux de voisins libres. */
   private distance(
     node: number,

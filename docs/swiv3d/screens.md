@@ -100,7 +100,7 @@ Tous les menus partagent un moteur : on remplit un tableau de lignes de 0x60 oct
 
 - **Drapeaux d'appel** (registre EBX) : `0x01` sélection initiale valide (id donné par `00416834`, sinon première ligne sélectionnable) ; `0x02` ne rend pas la main avant une touche (retourne `-1` après une image : sert aux écrans d'attente) ; `0x20` pas d'annulation ; `0x40` retour après chaque réglage de curseur.
 - **Sons** (SOUNDS.BD, numéro de son = id/100 ; `gm_sound_play` `00412e44`) : `6000` ouverture de pause / test, `6002` déplacement, `6003` validation ou annulation, `6004` curseur. `6001` non utilisé par les menus. Les 5 entrées existent (`600002`, `600102`, `600204`, `600304`, `600405`).
-- **Titre 3D** : chaque menu crée un texte flottant en police vectorielle du bloc 200 (`FUN_00422f8c(groupe, id)` avec `kind = 0xb`) qui vole vers sa position en 30 images et repart à la fermeture (`FUN_004235d8`). Le titre est la chaîne `(groupe, 0)`. Position, vitesse et échelle : champs établis dans `00422f8c` (hypothèse sur leur sens exact), à porter avec le rendu de la police vectorielle déjà décodée.
+- **Titre 3D** (porté : `render/text3d/titles.ts`, tracé avec la table de couleurs du niveau de fond) : chaque menu crée un texte flottant en police vectorielle du bloc 200 (`FUN_00422f8c(groupe, id)` avec `kind = 0xb`) qui vole vers sa position en 30 images et repart à la fermeture (`FUN_004235d8`). Le titre est la chaîne `(groupe, 0)`. Position, vitesse et échelle : champs établis dans `00422f8c` (hypothèse sur leur sens exact), à porter avec le rendu de la police vectorielle déjà décodée.
 - **Fond** : pendant les menus, `gm_frame` rend les vues actives du niveau chargé, soit `DEMO.SLV` (chargé avant la boucle de menu, `00421c0e`, confirmé). Pas de minuterie d'attract-mode : le « mode démo » de l'énoncé est ce décor. Le comportement exact du décor (caméra automatique ? ennemis animés ?) : **ouvert**, relève de R1/R2.
 
 ### 4.2 Sélection du pilote (`0041cfac`) et nom du pilote
@@ -122,7 +122,7 @@ Titre `(2, 0)` « Installer » (**c'est « Setup »** : la chaîne française es
 | 13 | Correction gamma / Gamma Correction | `gm_menu_gamma` (§4.6) ; **mode logiciel seulement** (`DAT_0048464c == 0`) | Oui. |
 | 14 | Choix des musiques / Music Preference | `gm_menu_music` (§4.7) ; la préférence est recopiée dans la fiche (`+0x24`) | Oui. |
 | 15 | Commandes de débogage [%s] | seulement si `+0x28 > 0`, bascule `DAT_00480bdc` | Non. |
-| 16 / 17 | Taille de l'écran / Screen Size : curseur type 4 sur `DAT_00480c88` (défaut 255) | si `DAT_00484624 == 0` | Optionnel (agrandir/rétrécir la fenêtre de rendu ; touches `-`/`+` du pavé en jeu : ±5). |
+| 16 / 17 | Taille de l'écran / Screen Size : curseur type 4 sur `DAT_00480c88` (défaut 255) | si `DAT_00484624 == 0` (pas de MMX : `DAT_00484624` = le processeur a MMX, posé par `gm_detect_mmx`) | Optionnel (agrandir/rétrécir la fenêtre de rendu ; touches `-`/`+` du pavé en jeu : ±5). |
 | 17 / 18 | Résolution / Detail Level : curseur type 5 sur `DAT_00480c64` (4 crans, défaut `0xf0`) | si `DAT_00484624 == 0` | Optionnel (détail du rendu, relève de R4). |
 | 19 | Fog [Oui/Non] | **mode 3Dfx** (`DAT_0048464c == 1`) | Non. |
 
@@ -150,7 +150,7 @@ Titre `(9, 0)` « Musique » ; trois choix : `10` « SWIV » (0), `11` « Classi
 
 ### 4.8 Pause, abandon, quitter
 
-- **Pause** (`gm_screen_pause` `00419058`) : touche `DAT_00480a94` = scan-code **`0x45`** (Pause) en jeu ; son 6000. Titre 3D `(4, 0)` « Pause », ligne `(4, 1)` « N'importe quelle touche pour continuer » (id 99), `Y = 260`, drapeaux `3`, boucle jusqu'à `DAT_00480aa0`. Confirmé. Le monde continue-t-il d'être mis à jour derrière (le menu rappelle `gm_frame`) : **ouvert** (R1).
+- **Pause** (`gm_screen_pause` `00419058`) : touche `DAT_00480a94` = scan-code **`0x45`** (Pause) en jeu ; son 6000. Titre 3D `(4, 0)` « Pause », ligne `(4, 1)` « N'importe quelle touche pour continuer » (id 99), `Y = 260`, drapeaux `3`, boucle jusqu'à `DAT_00480aa0`. Confirmé. Le monde est **figé mais dessiné** derrière (le menu rappelle `gm_frame`, sans radar ni HUD) ; port : `ui/level-session.ts` saute l'horloge et les ticks, rend la vue et le HUD en mode pause, le titre « Pause » est un texte 3D (type 11) et n'importe quelle touche, Échap compris, ou un appui sur l'écran reprend.
 - **Abandon** (`gm_menu_abort` `0041f8e8`, groupe 13) : déclenché en jeu par Échap (`DAT_00490014`). Titre `(13, 0)` « Abandonner la mission », ligne `(13, 1)` « Voulez-vous abandonner la mission en cours ? », choix Oui (`13/10`, renvoie 1) et Non (`13/11`, renvoie 2), `Y = 160`, drapeau `1`. « Oui » : ajoute le temps joué à la fiche et `DAT_00480a9c = 2` (retour menu principal, **sans écran de score ni sauvegarde de l'état**).
 - **Quitter** (`0041fc20`, groupe 13) : titre `(13, 0x14)` « Quitter Swiv », ligne `(13, 30 + (DAT_00480bec & 3))` : une des 4 phrases `13/30..33` (« Voulez-vous vraiment abandonner ? », « Vous êtes une vraie poule mouillée ! », « Préférez-vous vraiment le système d'exploitation ? », « Allez-y, vous ne perdez rien pour attendre ! »), compteur `DAT_00480bec` incrémenté à chaque affichage ; Oui (renvoie 1) / Non, drapeaux `5`. Port : « Oui » ramène à la page d'accueil du site.
 
@@ -240,7 +240,7 @@ Les 4 briefings livrés (textes FR / EN, vérifiés) : `BR_TER0` « Fastoche » 
 |---|---|---|
 | `(0x0a, 0x7d0, -1)` | réglages globaux | `+0x10` langue par défaut des nouveaux pilotes (hypothèse) ; `+0x14` brouillard (3Dfx) |
 | `(0x0a, 0x3f6, -1)` | dossier des vidéos (lu par `gm_play_smacker` via `0046eb5c`) | chemin de la source des `.SMK` (CD ou disque) : hypothèse |
-| `(0x14, p, 1)` | **fiche du pilote p** (p de 0 à 9) | `+0x0c` nom (16 octets, NUL ; non nul = case occupée) ; `+0x1c` langue ; `+0x20` meilleure mission atteinte (`0xb4c69` = terminée) ; `+0x24` préférence musicale (0..2) ; `+0x28` mode test débloqué ; `+0x2c` temps de jeu total en secondes ; `+0x30` gamma (0..3). `+0x34`..`+0x7b` : non élucidé (scores ? : le groupe de chaînes `10` « Meilleurs scores » n'a pas d'écran atteignable). |
+| `(0x14, p, 1)` | **fiche du pilote p** (p de 0 à 9) | `+0x0c` nom (16 octets, NUL ; non nul = case occupée) ; `+0x1c` langue ; `+0x20` meilleure mission atteinte (`0xb4c69` = terminée) ; `+0x24` préférence musicale (0..2) ; `+0x28` mode test débloqué ; `+0x2c` temps de jeu total en secondes ; `+0x30` gamma (0..3). `+0x34`..`+0x7b` : **inutilisés** (jamais lus ni écrits ; le groupe de chaînes `10` « Meilleurs scores » n'a pas d'écran atteignable). |
 | `(0x14, p, 2)` | **contrôleurs du pilote** | `+0x0c` type ; octets `+0x3c`..`+0x3f` (axes) ; dwords `+0x40`..`+0x54` (touches) |
 | `(0x14, p, 1000 + n)` | **état d'arrivée dans la mission n** | 20 munitions (u16), `+0x34` arme primaire, `+0x38` véhicule, `+0x3c` énergie, `+0x40` (joueur `+0x9c` : non élucidé) |
 
@@ -292,7 +292,7 @@ Les deux écrans réutilisent le moteur de menu (drapeaux `7`, `Y = 120`, confir
 - **Touches** : l'écran tourne dans `do { … menu_run(flags 7) … } while (aucune touche)` ; **une touche n'abrège pas le décompte**, elle quitte l'écran (valeurs finales ou non). Garde : si une touche est tombée alors que le compteur de fin `DAT_005b03e8` est `< 110` (`0x6e`), `gm_clear_keys` et on continue. Ce compteur est celui de la boucle de jeu (`+1` par tick, y compris derrière l'écran) ; il vaut **`0x37` (55)** quand une victoire sort de la boucle et **`0x23` (35)** après la mort du joueur : touches ignorées pendant **55 ticks = 1,375 s** (succès) ou **75 ticks = 1,875 s** (game over). Souris, clavier et manette comptent (`DAT_00480aa0`).
 - **Sons : aucun.** Le drapeau `2` de `gm_menu_run` fait sortir la fonction avant le traitement des touches : ni `6002` ni `6003` ne sont joués, ni pendant le décompte, ni à la sortie du menu. La musique de niveau continue (§7) ; `gm_sound_stop_all` et `gm_cd_stop` ne passent qu'après l'écran.
 - **Game over** (`gm_screen_game_over` `00419ed8`) : même mise en page, titre `(7, 1)` « Game over » et bandeau de mission, lignes `10` à `14` seulement (pas de bonus ni de secrets, pourcentage d'objectifs compris), mêmes décompte, garde (110 ticks, départ à 35) et absence de son. La chaîne `20/10` « Game over ! » sert au HUD (non vérifié).
-- **Port** (`screens/end-screen.ts`, `Flow`) : compteurs et horloge de ticks purs (`EndCounters`, 25 ms, accumulateur remis à 0 au-delà de 800 ms comme `gm_poll_events`) ; le menu est reconstruit à chaque tick avec les valeurs courantes ; aucun son à la sortie. Écarts connus : le monde est figé derrière l'écran (l'original continue de le simuler : ticks, effets) et le titre n'est pas en 3D, donc le menu est centré verticalement au lieu de `Y = 120` ; le compteur de fin démarre à 55 / 35 sans relire celui du niveau.
+- **Port** (`screens/end-screen.ts`, `Flow`) : compteurs et horloge de ticks purs (`EndCounters`, 25 ms, accumulateur remis à 0 au-delà de 800 ms comme `gm_poll_events`) ; le menu est reconstruit à chaque tick avec les valeurs courantes ; aucun son à la sortie. Le monde continue d'être simulé derrière l'écran (joueur sans commandes, `LevelSession` après `finish`), le titre est en 3D (type 11) et le menu est à `Y = 120` ; écart connu : le compteur de fin démarre à 55 / 35 sans relire celui du niveau.
 - **Fin d'aventure** : aucune vidéo ni écran dans cette édition (l'élément `-2` met `+0x20 = 0xb4c69`). Les vidéos `END_*`/`OUTRO` n'existent pas.
 
 ## 10. Modules à porter (H3) et décisions
@@ -316,11 +316,11 @@ Les deux écrans réutilisent le moteur de menu (drapeaux `7`, `Y = 120`, confir
 ## 11. Questions ouvertes
 
 - Comportement exact du décor `DEMO.SLV` derrière les menus (caméra automatique, logique active ou non), et du monde pendant la pause (R1/R2).
-- Sens exact des variables 0, 1, 2 et 3 du script, et des champs `+0x34..+0x7b` de la fiche pilote ; champ `+0x40` de l'état de mission.
+- Sens exact des variables 0, 1, 2 et 3 du script ; champ `+0x40` de l'état de mission.
 - Origine des fiches `(0x0a, 0x7d0, -1)` / `(0x0a, 0x3f6, -1)` au premier lancement (langue par défaut, dossier vidéo).
 - F1 : le manuel annonce « menu de configuration » en jeu ; le code relu ne l'utilise que pour restaurer l'état en mode test. Pas de menu Setup accessible en jeu dans cette version.
-- Paramètre `EBX` de `00422f8c` (échelle ou durée du titre 3D : valeurs `0x100`, `0x400`, `0x1000`, `0x1400`, `0x1500`), vitesse et position des titres.
-- Valeur de `DAT_00484624` (autorisation des curseurs d'écran / détail), rôle de `DAT_00480c88` / `DAT_00480c64` côté rendu.
+- Position exacte des titres 3D de chaque menu (le port les place tous au centre, décalage -140, comme le type 11 de `rules.md` § 8).
+- Rôle de `DAT_00480c88` / `DAT_00480c64` côté rendu (`DAT_00484624` = le processeur a MMX, `gm_detect_mmx` : réglé).
 - Détails du calibrage de manette (chaînes `3/330..343`) et des écrans de contrôleur non relus.
 
 ## 12. Fonctions à nommer

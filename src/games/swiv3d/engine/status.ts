@@ -3,12 +3,22 @@
  * Valeurs d'origine (`docs/swiv3d/rules.md`) : énergie 496 = 100 %, 992 = 200 %.
  */
 
+/** Teintes des messages (ligne × 256 de la table de couleurs du bloc 11003, `rules.md` § 8.2). */
+export const MESSAGE_TINT = { weapon: 0x1000, powerUp: 0x400, bonus: 0x100, objective: 0x1400, gameOver: 0x1000 } as const;
+/** Type de trajectoire (`gm_message_spawn`) : 0 traverse l'écran (ramassage, objectif de groupe), 10 reste au centre (« Accompli », « Game over ! »). */
+export type MessageKind = 0 | 10;
+
 /** Message affiché en jeu (`gm_message_spawn`, `00422f8c`) : chaîne `textId` de la table `textTable` de `GLOBAL.BD`. */
 export interface GameMessage {
+  /** Numéro d'ordre de création, unique dans le niveau. */
+  serial: number;
   /** Table de chaînes : 100 (noms des armes et bonus), 20 (objectifs : id = indice, 0 = « Accompli », 10 = « Game over ! »). */
   textTable: number;
   textId: number;
-  /** Ticks restants avant disparition. */
+  /** Teinte (`MESSAGE_TINT`) et type de trajectoire du texte 3D. */
+  tint: number;
+  type: MessageKind;
+  /** Ticks restants avant disparition (`MESSAGE_TICKS` à la création). */
   ticksLeft: number;
 }
 

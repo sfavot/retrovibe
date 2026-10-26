@@ -13,7 +13,6 @@ let cachedGlobal: GlobalData | undefined;
 const global = (): GlobalData => (cachedGlobal ??= parseGlobal(parseBd(readOriginal("GLOBAL.BD"), "GLOBAL.BD")));
 
 function services(): LevelServices & { framebuffer: Uint8Array } {
-  const overlay = { style: {}, addEventListener() {}, removeEventListener() {} } as unknown as HTMLElement;
   const stats: AppStats = { renderMs: 0, frameMs: 0, ticks: 0 };
   return {
     read: async (name) => readOriginal(name),
@@ -23,7 +22,6 @@ function services(): LevelServices & { framebuffer: Uint8Array } {
     audio: null,
     controls: new Controls(),
     touch: { reset() {} },
-    pauseOverlay: overlay,
     focusCanvas() {},
     framebuffer: new Uint8Array(SCREEN_WIDTH * SCREEN_HEIGHT),
     stats,
@@ -104,5 +102,42 @@ describe.skipIf(!available)("session de niveau : HUD, état de départ, bilan", 
     for (let i = 0; i < before.length; i++) if (before[i] !== s.framebuffer[i]) differing++;
     expect(differing).toBeGreaterThan(500);
     maybeDumpPng("level-explosions", s.framebuffer, session.palette);
+  });
+
+  it("pause : le monde est figé mais dessiné avec le titre 3D, n'importe quelle touche la ferme ; fin de niveau : le monde continue sans commandes", async () => {
+    const s = services();
+    const session = await startLevel(s, { name: "TERRAN00", mission: 0, language: 1 });
+    let now = 1000;
+    const frame = (n = 1): void => {
+      for (let k = 0; k < n; k++) session.onFrame((now += 25));
+    };
+    frame(4);
+    const tick = session.world.tickCount;
+    s.controls.keyDown({ code: "KeyP" });
+    frame(); // la pause se pose
+    expect(session.userPaused).toBe(true);
+    frame(10);
+    expect(session.world.tickCount).toBe(tick);
+    const early = Uint8Array.from(s.framebuffer);
+    frame(30); // le titre « Pause » arrive : l'image change alors que le monde ne bouge pas
+    let differing = 0;
+    for (let i = 0; i < early.length; i++) if (early[i] !== s.framebuffer[i]) differing++;
+    expect(differing).toBeGreaterThan(200);
+    maybeDumpPng("level-paused", s.framebuffer, session.palette);
+    s.controls.keyDown({ code: "KeyZ" }); // une touche quelconque
+    frame(2);
+    expect(session.userPaused).toBe(false);
+    frame(4);
+    expect(session.world.tickCount).toBeGreaterThan(tick);
+
+    // Fin de niveau : le monde continue de tourner, le joueur n'a plus de commandes.
+    session.complete();
+    const ended = session.world.tickCount;
+    s.controls.keyDown({ code: "ArrowUp" });
+    frame(8);
+    expect(session.world.tickCount).toBeGreaterThan(ended);
+    s.controls.keyDown({ code: "KeyP" });
+    frame(2);
+    expect(session.userPaused).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ENTER_GUARD_FRAMES, Menu, SLIDER_STEP, standardLines, type MenuLine } from "../../../src/games/swiv3d/screens/menu";
-import { stubText } from "./support";
+import { ENTER_GUARD_FRAMES, Menu, SLIDER_STEP, standardLines, type MenuLine } from "../../../src/games/swiv3d/ui-draw/menu";
+import { stubText } from "../screens/support";
 
 const choices = (...ids: number[]): MenuLine[] => ids.map((id) => ({ type: "choice", id, text: `choix ${id}` }));
 

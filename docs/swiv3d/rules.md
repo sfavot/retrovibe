@@ -101,11 +101,11 @@ Pas de munitions, pas de surchauffe. Tant que la commande `+0xd0` est tenue, `FU
 
 | Type de projectile (arg 0) | Objet (`FUN_004261a0`) | Comportement | Durée de vie (ticks) | Particularité |
 |---|---|---|---:|---|
-| 0 | 10002 (`0x2712`) | `LAB_0044a374` | 28 | balle droite |
-| 1 | 10000 (`0x2710`) | `LAB_0044a374` | 30 | balle droite |
-| 2 | 10001 (`0x2711`) | `LAB_0044a430` | 40 | balle lourde, gravité (`vy −= 210` par tick) |
-| 3 | 10003 (`0x2713`) | `LAB_0044a4f8` | 60 | à tête chercheuse (5 directions testées contre la cible `+0x58`) |
-| 4 | 800 (`0x320`, modèle de missile) | `LAB_0044a4f8` | 60 | tête chercheuse |
+| 0 | 10002 (`0x2712`) | `LAB_0044a374` | 28 | [C] `missile_straight` (`004551f0`) : 5 000, tête chercheuse (virage 2) pendant 100 ticks puis vol libre `missile_coast` (sans durée de vie ni plafond d'altitude). Lanceur accroché sous le fuselage (hélicoptère) ou au-dessus (véhicules) pendant l'armement (20 ticks) |
+| 1 | 10000 (`0x2710`) | `LAB_0044a374` | 30 | [C] `missile_b` (virage 4), 2 lanceurs à ±4 000, le second part **8 ticks** après le premier (compteur 7). Armement 40 |
+| 2 | 10001 (`0x2711`) | `LAB_0044a430` | 40 | [C] 2 nacelles ; après le tir, **8 missiles** (800, 60 pv, `missile_b`) aux ticks 8, 16 … 64, depuis 4 coins `(±500, ±500)` (table `00484468`), nacelles larguées aux ticks 70 et 85, retour à l'état 0 au tick 90. Armement 60 |
+| 3 | 10003 (`0x2713`) | `LAB_0044a4f8` | 60 | [C] `gm_upd_cruise_missile` (`00455a98`) : vitesse = `timer` (300, +10 par tick sans cible), spirale 30 ticks (états 10 / 11) puis guidage parmi 7 caps (table `00484564`) ; le second part 8 ticks après. Armement 40 |
+| 4 | 800 (`0x320`, modèle de missile) | `LAB_0044a4f8` | 60 | [C] nacelle qui descend ; au tir 5 missiles (800, 60 pv, `missile_b`), un par cap `+0x66` (couronne), chacun cherche sa cible dans son cap (`FUN_0043848c`) ; nacelle larguée |
 
 La vitesse d'écriture est en unités 1/256 par tick : **8 000 = 31,25 unités monde par tick** (1 250 u/s, soit 19,5 cellules par seconde) pour les balles. Une balle meurt à zéro durée de vie, au contact du sol (hauteur du terrain ≥ altitude) ou quand son énergie ≤ 0 ; elle crée alors une petite explosion (type 11000). L'énergie du projectile (dernier argument) est son **dégât** : 10 (balle 0 et 1 en général), 12 (variante), 20 (type 2), 24 (type 4 à puissance 19).
 
@@ -120,9 +120,9 @@ Motifs pour les niveaux de puissance atteignables avec les 4 niveaux livrés (0 
 | 3 | 0 | 3 balles, lat. +350 / 0 / −350, E 10 |
 | 3 | 8 | 2 balles, lat. +200 / −200, E 10 |
 | 4 | 0 | éventail de 5 : cap +10 (E 10), +5 (E 12), 0 (**type 1**, E 10), −5, −10 (E 10) |
-| 5 | 0 | 3 balles : lat. +300 (E 10) / 0 (E 12) / −300 (E 10) |
+| 5 | 0 | [C] `gm_upd_super_nova` : 4 500, tangage −3/tick (départ 70) pendant 35 ticks ; puis petite explosion, une balle (10001, 25 pv, classe `0x3b`) par ennemi des 5 × 5 cellules (visée à 32 u/tick si < 282 u) et 10 éclats `10005` (15 pv) |
 | 5 | 8 | 3 balles : vert. +300 (E 10) / 0 (E 12) / −300 (E 10) |
-| 6 | 0 | lat. +400 (E 10), centrale **type 1** (E 12), lat. −400 (E 10) |
+| 6 | 0 | [C] `gm_upd_mortar` : fantôme `0x40` lancé à 32 u/tick dans le cap du joueur, vitesse × 30/32, rase le relief à 90 u ; au 40ᵉ tick 35 éclats `10005` (15 pv, ×16) ; super mortier (16) : +20 éclats `10001` (20 pv) |
 | 6 | 8 | vert. +400 (E 10), centrale **type 1** (E 12), vert. −400 (E 10) |
 
 Au total le canon tire 2,5 à 5 salves par seconde (grille de 16 ticks, plus des phases intermédiaires). Les niveaux 7 à 19 (jusqu'à 14 projectiles par salve, balles lourdes type 2 d'énergie 20 lancées en cloche, balles à tête chercheuse types 3 et 4 d'énergie 12 à 24, vitesses 4 000 à 8 000) existent dans le code mais ne sont pas atteignables avec les données livrées ; ils s'extraient de `FUN_0046b6fc` (un appel `0046b4b4` par motif dans `disasm.txt`) si une édition complète est visée. [C pour 0 à 6]
@@ -142,19 +142,19 @@ Les noms sont ceux de la table 100 (français / anglais). L'icône du HUD est l'
 | 4 | Rocketpak | MultiTarget | 5 | +2 / 20 | tous | nacelle 854 (80) ; 5 missiles 800 (60) | **5 missiles à tête chercheuse en couronne** (5 directions : table `00484238`) |
 | 5 | Super Nova | Star Burst | 6 | +2 / 20 | tous | 855, 80 | `LAB_0045754c` : vitesse 4 500, après 35 ticks se désintègre en bombelettes (10001 d'énergie 25, 10005 d'énergie 15) |
 | 6 | Bombe Mortier | Mortar Bomb | 7 | +2 / 20 | tous | 811, 30 | `LAB_00457074` : lancée en cloche (gravité double), explose au contact ou après 40 ticks en éclats (10005 énergie 15, 10001 énergie 20) |
-| 7 | Bombe | Smart Bomb | 8 | +1 / 10 | tous | 812, 80 | `LAB_00455370` : s'arrête après 40 ticks puis onde de choc de 40 ticks : tous les objets non invulnérables à moins de **4 cases (≈ 2 048 u)** subissent, un tick sur deux, `sin((d²>>9) + (t−20)·64) × t / 64` points (jusqu'à 160), où `t` est le décompte restant |
-| 8 | Napalm | Napalm | 9 | +2 / 20 | tous | 858, 80 | `LAB_00457784` : vitesse 4 500, sème des gouttes enflammées (10005, énergie 50) pendant 120 ticks |
-| 9 | Super Ressort ! | Jump Boost! | 10 | +1 / 10 | 1, 4, 5 | 981 (`0x3d5`), 80 | Véhicules roulants : saut / décollage de quelques secondes (« Envol » du manuel) [H sur l'effet] |
+| 7 | Bombe | Smart Bomb | 8 | +1 / 10 | tous | 812, 80 | [C] `gm_upd_bomb_fly` : fantôme rasant (40 u), 40 ticks puis onde de 40 ticks : un tick sur deux, tout objet (joueur compris) des 9 × 9 cellules perd `sin(d)·t>>6` avec `d = (dx²+dz²)>>9 + (t−20)·64 ∈ ]0,255[` (rayon réel ≈ 360 à 850 u, pas 2 048) |
+| 8 | Napalm | Napalm | 9 | +2 / 20 | tous | 858, 80 | [C] `gm_upd_napalm` : 4 500, pique du 6ᵉ au 11ᵉ tick, goutte (10005, 50 pv, `00457000`) tous les 4 ticks du 18ᵉ au 119ᵉ ; une goutte au sol creuse un cratère (décalque 901) |
+| 9 | Super Ressort ! | Jump Boost! | 10 | +1 / 10 | 1, 4, 5 | 981 (`0x3d5`), 80 | [C] (véhicules 1, 2, 4, 5) pilote coupé, `classe &= ~4` ; 30 ticks de cabrage (tangage +4 jusqu'à 90, état 2), poussée 9 000 jusqu'au tick 80 (état 3), fin à l'atterrissage (la physique remet l'état à 0), nacelle larguée |
 | 10 | Missiles tri-ogives | Triple Missiles | 11 | +2 / 40 | tous | 800, 70 | version améliorée de 0 |
-| 11 | Missiles Faucon | Quad Homing | 12 | +2 / 30 | tous | 801, 100 | 4 tirs (ticks 8, 16, 24, 25) |
+| 11 | Missiles Faucon | Quad Homing | 12 | +2 / 30 | tous | 801, 100 | [C] 4 lanceurs ; missiles aux ticks 0, 8, 16, 24 de la salve (`missile_b`) |
 | 12 | Megacanon | MegaFire | 13 | +2 / 15 | tous | 850 + 857 (80) | version de 2 |
 | 13 | Super Tomawhak | Super Cruise | 14 | +3 / 40 | tous | 856, 100 | version de 3 |
 | 14 | Missiles Apocalypse | MegaTarget | 15 | +2 / 20 | tous | 854 + 801 (80) | version de 4 |
-| 15 | Nucléator | Power Burst | 16 | +1 / 5 | tous | 855, 80 | `LAB_00457abc` : après 35 ticks libère des sous-missiles à tête chercheuse (10003 énergie 25) |
+| 15 | Nucléator | Power Burst | 16 | +1 / 5 | tous | 855, 80 | [C] `gm_upd_nucleator` : 35 ticks puis 3 sous-munitions (10003, 25 pv, vie 30 / 50 / 70, 1 700 u/tick dans 3 caps) qui explosent comme une super nova |
 | 16 | Super mortier | Super Mortar | 17 | +2 / 20 | tous | 811, 30 | version de 6 |
-| 17 | Méga-bombe | Mega Bomb | 18 | +1 / 10 | tous | 812, 80 | `LAB_004556dc` : onde de choc de **60 ticks** (au lieu de 40) |
-| 18 | Super napalm | Super Napalm | 19 | +2 / 20 | tous | 858, 80 | `LAB_00457bcc` |
-| 19 | Accélérateur | Thruster | 20 | **+80 / 500** | 1, 2, 4, 5 | 813 (`0x32d`), 80 | turbo des véhicules roulants ; les 500 « munitions » sont une réserve de poussée [P] |
+| 17 | Méga-bombe | Mega Bomb | 18 | +1 / 10 | tous | 812, 80 | [C] `gm_upd_bomb_shockwave` : onde de 60 ticks, plan x : `d = dx/4 + (t−30)·16 + 128`, perte `sin(d)>>2`, rayon 894 u |
+| 18 | Super napalm | Super Napalm | 19 | +2 / 20 | tous | 858, 80 | [C] `gm_upd_super_napalm` : 150 u/tick en semant une goutte tous les 4 ticks du 40ᵉ au 149ᵉ |
+| 19 | Accélérateur | Thruster | 20 | **+80 / 500** | 1, 2, 4, 5 | 813 (`0x32d`), 80 | [C] (véhicules 1, 2, 4, 5) tant que le tir spécial est tenu : 1 munition/tick, `vy −= 60`, `v = (2·(sin,cos cap) + v)·14/16` (limite 14 u/tick), fumée ; plus de munition : retrait |
 
 Les armes 10 à 19 ont leurs propres munitions : appuyer sur la touche `n` (0 à 9) sélectionne l'arme `n`, un second appui bascule sur l'arme `n + 10` si elle a des munitions (`FUN_004582dc`). [C]
 
@@ -181,17 +181,15 @@ Le tir spécial (`+0xd4`) ne fait que passer de l'état 10 à l'état 0x0b (`FUN
 - `FUN_00454ce0(missile, virage, classe)` (tête chercheuse) : à chaque tick, vitesse = `vitesse(classe) × direction (cap, tangage)` — classe 0 : **5 000**, classe 2 : 900, classe 10 : **7 000** (en 1/256 unité par tick), classe 1 : vers le haut (cible fictive à la verticale). Si la cible n'est plus vivante (`+4 == 0`) elle est remplacée par le tireur. Quand la cible n'est ni le tireur ni le missile et que `+0x18 < 6`, le missile compare 5 directions candidates (table `0048442c` : droit devant, ±44/1000 à gauche, à droite, en haut, en bas) et tourne de `virage` pas de 1/512 de tour dans le sens de la meilleure (cap − / + ou tangage + / −) ; direction « devant » : pas de correction. [C]
 - Fumigènes : `FUN_00444084(seuil)` crée une bouffée (type 11001) quand `+0x18 > seuil` puis remet `+0x18` à 0.
 
-### 3.5 Compagnons (bonus 105, 106, 108) [C pour les valeurs, P pour la dynamique]
+### 3.5 Compagnons (bonus 105, 106, 108) [C]
 
-Jusqu'à **6 compagnons** (`+0x1f8…+0x20c`), remplis dans l'ordre d'emplacements 1, 0, 2, 3, 4, 5 (table `0048459c`), placés à (−0x40, +0x40, −0x78, +0x8c, −0xbe, +0xbe) unités à gauche / à droite du joueur selon son cap (`FUN_0043c234`). Ils suivent le joueur (ressort) et tirent :
+Jusqu'à 6 (`+0x1f8…`), classe `0x14` (modèles 851, 852, 810 ; pv 250, 70, 70), placés par `FUN_0043c234` ; ressort vertical à 90 u du relief (raideur 4 en montée, 2 en descente, frottement 29/32), vitesse horizontale du joueur.
 
-| Bonus | Nom FR / EN | Modèle, énergie | Tir |
-|---:|---|---|---|
-| 105 | Module de verrouillage / Tracking Buddy | 851, 250 | 4 balles type 10002 (énergie 8, durée 30, vitesse 9 000) en croix |
-| 106 | Module de tir auto / Auto Buddy | 852, 70 | balles type 10000 (énergie 14, durée 30, vitesse 9 000) sur la cible la plus proche (`FUN_00443938`) |
-| 108 | Super Module / Super Buddy | 810, 70 | balles lourdes type 10001 (énergie 20, durée 20) |
-
-Un compagnon explose quand son énergie tombe à 0.
+| Bonus | Comportement | Tir |
+|---:|---|---|
+| 105 verrouillage (`004560e4`) | cible = celle du joueur, se tourne de 3 pas | joueur tenant le tir principal : 4 balles `10002` (8 pv, 9 000) en croix, ±150 latéral au tick `&0x1f = 7`, ±150 vertical au tick 0 |
+| 106 tir auto (`00456abc`) | cherche une cible tous les 10 ticks (rayon 1, classe `0x45 == 1`) | cap bon : balle `10000` (14 pv) aux ticks `&0xf` = 0 et 3 |
+| 108 super (`00456658`) | cap du joueur, tangage 0 | tir tenu : missile `10001` (20 pv, classe 10 : 7 000, virage 2) tous les 32 ticks |
 
 ## 4. Bonus
 
@@ -328,9 +326,16 @@ Fonction `gm_draw_overlay_sw` (`004362b8`), appelée par `gm_frame` avec la cart
 4. **Cadres** : après le fond et les points, trois sprites RLE aux coordonnées (0, 0) : `005bc174` (bloc **512**, 128 images, image `(pointeur − (cap & 0x1fc)) >> 2 & 0x7f`), `005bc178` (bloc **510**, 32 images, image `A & 0x1f`) et `005bc170` (bloc **511**, 128 images, image `A & 0x7f`) avec `A = (−(cap & 0x1fc) >> 2) & 0x7f` : un pas d'image = 4/512 de tour. Le sprite 510 est le cadre ovale, le 511 le repère du Nord, le 512 le **pointeur vers l'objectif**. [C pour les blocs, P pour les rôles]
 5. **Pointeur d'objectif** (`param_2[0x19]` de la vue) : angle qui suit la direction de l'objectif courant (tête de liste `DAT_005af3a8`, position relative au joueur) ; à chaque image, parmi 5 essais (`0, −4, +4, −170, +170`) on garde celui qui maximise le produit scalaire avec la direction réelle, donc une rotation de ±4/512 de tour par image au maximum. Sans cible, il tourne de 8 par image. [C]
 
-### 7.5 Viseur (réticule)
+### 7.5 Viseurs (réticules) [C]
 
-Deux jeux de 16 images du bloc 506 (29 × 40, dont 28 colonnes tracées), tracés par `FUN_00437c38(x, y, image)` dans `gm_render_view`, avec la table 109 (0 = transparent) : une partie **jaune** (extérieure, suit toujours l'objet le plus menaçant à l'écran) et une partie **rouge** (intérieure, n'apparaît que lorsqu'un objet est à atteindre ; les deux alignées = cible verrouillée), d'après le manuel. Position : 28 colonnes centrées en x, 40 lignes centrées en y ; l'écran de la cible est rejoint par lissage `p += (cible − p) >> 1` à chaque image ; l'image tourne d'un pas par image vers la valeur demandée. [C pour la mécanique du tracé, P pour l'association jaune / rouge aux séries]
+Deux séries de 16 images du bloc 506 (29 × 40, dont 28 colonnes tracées), tracées par `gm_draw_crosshair` (`00437c38`, `EAX` = x, `EDX` = y, `EBX` = image) à la fin de `gm_render_view`, à travers la table 109 (0 = transparent). Les images 0 à 15 sont une **ellipse jaune** (viseur extérieur), les images 16 à 31 un **carré rouge** (vérifié en rendant le bloc avec la palette du niveau). Qui suit quoi est fixé par la boucle des objets de `gm_render_terrain` (`0042718c`, `00427fbf` à `004280b1`), qui pose deux cibles à l'écran :
+
+| Viseur | Série | Suit | Condition |
+|---|---|---|---|
+| A (`005774dc/e0/e4`) | jaune, image `0..15` | l'objet que `+0x58` du joueur désigne (la cible choisie par `FUN_00438198`, § 3.4) | `+0x58` ≠ joueur |
+| B (`005774d0/d4/cc`) | rouge, image `16 + (0..15)` | l'objet de la tête de la liste des objectifs (`DAT_005af3a8`, champ `+4`) | liste non vide **et** `+0x58` ≠ joueur |
+
+Un viseur n'existe donc que si le joueur a une cible (pas de viseur « au point visé » sans cible). Le rouge reste sur l'objectif en tête, que le joueur l'ait ciblé ou non : quand les deux coïncident, la cible est l'objectif (jaune et rouge alignés). Chaque objet est projeté depuis son origine (`+0x1c`, `+0x20`, `+0x24` >> 8) par la vue ; un objet n'a de viseur que si sa profondeur `D` (sans le recul `0x19`) est dans `]-10, 2000[` et si sa position à l'écran est à moins de `largeur + 0x14` en x et `hauteur + 0x1e` en y du centre. L'image demandée est `clamp((D >> 6) - 11, 0, 15)`. `gm_render_view` fait le lissage, un état par viseur (`+0x4c/0x50/0x54` et `+0x58/0x5c/0x60` de la vue) : un viseur absent à une image perd son état ; au premier affichage position et image sont celles demandées ; ensuite l'image avance de 1 vers la demandée et `p += (demandée − p) >> 1` pour x et y à chaque image. Le A est tracé avant le B. Le tracé : 28 colonnes de x − 14 à x + 13, 40 lignes de y − 20, `dst = table109[src << 8 | dst]`. En pause (`gm_screen_pause`), les viseurs restent (ils appartiennent à la vue).
 
 ### 7.6 Textes
 
@@ -339,18 +344,58 @@ Deux jeux de 16 images du bloc 506 (29 × 40, dont 28 colonnes tracées), tracé
 
 ## 8. Messages en jeu (`FUN_00422f8c`) [C]
 
-`FUN_00422f8c(table, id, teinte, type)` ajoute (pool de 50) un texte dessiné par `FUN_00424454` avec la **police vectorielle 3D** (bloc 200, lettres extrudées) et dont la chaîne est `gm_get_string(table, id)` (`|` = saut de ligne). Le type fixe la trajectoire (position, vitesse, rotation, durée de pré-simulation : 60 pour le type 0, 80 pour 1 à 10, 30 pour 11). Messages utilisés :
+`gm_message_spawn` (`00422f8c`) prend `EAX` = table, `EDX` = id, `EBX` = teinte, `ECX` = type (le décompilé range ces arguments de travers) et ajoute dans un pool de **50** messages le texte `gm_get_string(table, id)` (`|` = saut de ligne). Le texte est dessiné par `gm_message_draw` (`00424454`, appelée dans `gm_frame` après la file vidée, donc **par-dessus le HUD**) avec la **police vectorielle 3D** du bloc 200 (`gm_text3d_emit_glyph` `00423974`), en faces pleines (`gm_draw_flat_tri` `004359c8`). Aucun empilement : plusieurs messages se superposent au même endroit.
+
+### 8.1 Types et trajectoires
+
+Seuls trois types sont utilisés ; le spawn n'initialise rien pour les autres. Un message a une position `P` (`+8, +0xc, +0x10`), une vitesse `V` (`+0x14..`), des angles `A` (`+0x20..`, 16 par pas de 1/512 de tour), leur vitesse `W` (`+0x2c..`), une vie `L` (`+0x38`) et un décalage vertical `Y` (`+0x40`, pixels). À la création, `P −= V` et `A −= W` sont répétés **N fois** (pré-simulation : le message arrive de loin).
+
+| Type | `P` | `V` | `A` | `W` | `L` | `Y` | N |
+|---:|---|---|---|---|---:|---:|---:|
+| 0 | (0, −40000, 0) | (6400, −3000, 7000) | (−480, 240, 160) | (32, 63, 44) | 70 | 0 | 60 |
+| 10 | (0, 0, 0) | (−6400, −3000, 7000) | (300, 0, 0) | (0, 45, 0) | 1080 | −140 | 80 |
+| 11 | (0, 0, 0) | (6400, −5000, 8000) | (300, 0, 0) | (0, 45, 0) | 1031 | −140 | 30 |
+
+`gm_effects_tick` (`004234ec`, un appel par tick de 25 ms de `gm_poll_events` quand le drapeau 4 est posé : en jeu **et** dans les menus) fait, pour chaque message : si `L ≠ 1000`, `L--` ; si `L < 0`, le message est libéré ; sinon si `L > 10`, `A += W` ; si `L ≠ 1000`, `P += V`. Conséquences :
+
+- **Type 0** (ramassage d'arme ou de bonus, objectif de groupe) : il arrive, passe à `(0, −40000, 0)` au tick 60, file ensuite ; libéré quand `L` passe sous 0 : **71 ticks (1,78 s)**, rotation arrêtée aux 10 derniers. `MESSAGE_TICKS` (`engine/game.ts`) vaut 71 : la liste du monde suit cette durée et le HUD joue la trajectoire dans son pool.
+- **Types 10 et 11** : `L` descend jusqu'à **1000** puis le message **se fige** (plus de décompte ni de déplacement ; il continue de tourner autour de l'axe y de 45 / 16 pas par tick). Il y reste jusqu'à `gm_title_release` (`004235d8`, appelée à la sortie de chaque menu), qui retire `0x3d4` aux vies ≥ 1000 : il repart alors et disparaît en 21 ticks. Type 10 : « Game over ! » (20, 10, teinte `0x1000`) et « Accompli » (20, 0, teinte `0x1400`) ; type 11 : titres de menu, dont « Pause » (4, 0, teinte `0x400`).
+
+### 8.2 Appels
 
 | Déclencheur | Table, id | Teinte | Type |
 |---|---|---|---:|
-| Ramassage d'une arme (`FUN_00458f88`) | 100, `n` (0 à 19) | `0x1000` (association teinte ↔ famille de bonus : approximative [H]) | 0 |
-| Ramassage de 100 à 102 | 100, 100 à 102 | `0x400` | 0 |
-| Ramassage de 105 à 113 | 100, `n` | `0x100` | 0 |
-| Objectif accompli (`FUN_0043ce6c`) | 20, indice (0 = « Accompli ») | `0x1400` | 10 (accompli) ou 0 |
-| Mort du joueur (`FUN_0043b4f4`) | 20, 10 (« Game over ! ») | `0x1000` | 10 |
+| Ramassage d'une arme (`FUN_00458f88`, ids 0 à 19) | 100, `n` | `0x1000` | 0 |
+| Ramassage de bonus 100 à 102 et 105 à 108 | 100, `n` | `0x400` | 0 |
+| Ramassage de bonus 110 à 113 | 100, `n` | `0x100` | 0 |
+| Objectif de groupe accompli (`gm_objective_unregister` `0043ce6c`) | 20, indice | `0x1400` | 0 |
+| Objectif final accompli (même fonction, indice 0, `param_2 == 0`) ; zone d'extraction (`0043c314`) | 20, 0 (« Accompli ») | `0x1400` | 10 |
+| Mort du joueur (`0043c046`, `gm_player_die`) | 20, 10 (« Game over ! ») | `0x1000` | 10 |
+| Écran de pause (`gm_screen_pause` `00419058`) | 4, 0 (« Pause ») | `0x400` | 11 |
 | Menus (multijoueur) | 5, … | `0x100` | 11 |
 
-La table 22 (« Commencer », « Objectif final », « Nord », « Guide des objectifs ») n'est référencée par aucun appel trouvé : usage inconnu (carte des objectifs dans un menu non repéré) [H]. Écrans de pause (« Pause », « N'importe quelle touche pour continuer ») : table 4 (`gm_screen_pause`).
+La teinte est une ligne × 256 de la **table d'attributs du bloc 11003** (`005bc158`, 8 192 octets à `+0x300`, la même que celle des points du radar) : `0x1000` rouge, `0x1400`, `0x400`, `0x100` les autres familles. La couleur d'une face est `table[teinte + lumière]`, lumière de 0 à 127.
+
+### 8.3 Mise en page, projection et lumière (`00424454`, `00423974`)
+
+Une ligne est centrée : avance d'une lettre `(largeur >> 2) + 5` (`largeur` = champ `+0` de l'enregistrement du bloc 200, 45 pour un emplacement vide ; l'espace, `-` et `'` n'ont pas de triangle mais avancent), lettre `i` centrée en `(−S + 2·Σ_{j<i} a_j + a_i) · 4`, `S` = somme des avances de la ligne. La première ligne est à `150 · (nombre de |)` et chaque ligne suivante 300 plus bas. Pour chaque sommet `(x, y, z)` du glyphe (avec `SIN`/`COS` = tables 256 de `render.md` § 4.2, `a1, a2, a3` = `A >> 4 & 0x1ff`) :
+
+```ts
+const px = (x + offX) * 4, py = (y + offY) * 4, pz = z * 4;
+const y1 = (COS[a1] * py - SIN[a1] * pz) >> 8,  z1 = (COS[a1] * pz + SIN[a1] * py) >> 8;
+const x2 = (px * COS[a2] - SIN[a2] * z1) >> 8;
+const D  = ((px * SIN[a2] + COS[a2] * z1 - Pz * 4) >> 9) + 0xd61;          // D < 1 : la lettre entière est abandonnée
+const sx = trunc((((x2 * COS[a3] - SIN[a3] * y1) >> 2) - Px * 4) / D) + 160;
+const sy = 200 - trunc(((((x2 * SIN[a3] + COS[a3] * y1) * 0x1aa) >> 10) - Py * 4) / D) + Y;
+```
+
+La caméra n'intervient pas : le texte est dans le repère de l'écran. Lumière par normale `n` (les 23 normales du bloc 200) : `u = ((offX >> 6) + a2) & 0x1ff`, `t = (SIN[a1]·ny + COS[a1]·nz) >> 8`, `l = clamp(((((nx·SIN[u] + COS[u]·t) >> 8) · −256) >> 9), 0, 127)`. Une face (a, b, c) est gardée si `(xc − xa)(yb − ya) < (xb − xa)(yc − ya)` ; sa clé de tri est la somme des trois `D`. Les faces s'insèrent dans la file de `gm_queue_insert` (2 995 entrées ; rejet si les trois sommets sont hors de `[0, 0x13e] × [0, 0x18f]` du même côté) et sont tracées **du plus loin au plus proche** par `gm_draw_flat_tri` (couleur unie, découpe `0 ≤ x ≤ 0x13f`, `0 ≤ y ≤ 399`). Centre de projection (160, 200) : valeurs initiales de `DAT_00480c6c/70` (jamais écrites).
+
+### 8.4 Écran de pause (`gm_screen_pause`, `00419058`)
+
+`gm_menu_run` appelle `gm_frame` avec le drapeau `0x10` absent, donc **sans radar ni HUD** (`gm_frame` ne les trace qu'avec le drapeau 2) : le décor 3D (viseurs compris), les messages 3D (dont le titre « Pause » qui arrive en 31 ticks puis tourne) et le menu (espaceur de 4 px de la ligne `0x76`, le choix `(4, 1)`, espaceur) à `Y = 260`, par-dessus. À la sortie : `gm_clear_keys`, `gm_title_release`.
+
+La table 22 (« Commencer », « Objectif final », « Nord », « Guide des objectifs ») n'est référencée par aucun appel trouvé : usage inconnu (carte des objectifs dans un menu non repéré) [H].
 
 ## 9. Fonctions à nommer
 
@@ -436,12 +481,11 @@ Noms proposés (préfixe `gm_`), à fusionner par le coordinateur dans `keyfuncs
 ## 10. Questions ouvertes
 
 - **Cadence** : 40 ticks par seconde (pas de 25 ms dans `gm_poll_events`) est établi ; la mesure du nombre d'images (`DAT_00480c60`, `DAT_00481188`) n'influence pas la logique (R1).
-- **Armes 10 à 19, nacelles et comportements** : modèles, énergies, plafonds et temps d'armement sont établis ; les durées et vitesses de chaque comportement (croisière, Nova, napalm, mortier) ne sont qu'esquissées ; pour 0 à 4 les formules de vol sont établies. À lire dans `disasm.txt` aux étiquettes du § 9 si une exactitude de tir est requise.
-- **Arme 9 (Jump Boost)** et **19 (Thruster)** : effet exact sur la vitesse verticale du véhicule non décodé.
+- **Armes spéciales** : portées de l'exe (E3b, `launchers.ts`, `special-weapons.ts`). Restent hypothèses : constantes de la forme 3 (reprend celles de l'hélicoptère), signe latéral des nacelles uniques 5-8 / 15-18, éclairs au sol (`gm_ground_flash_add`, non rendus : la réserve est supposée non vide), animation des roues pendant l'amarrage, pads 7012+ (`004477b0`…).
+- **Classes des projectiles** [C] : projectiles du joueur et des compagnons `0x3f` (bit `0x04` : les ennemis les voient comme le joueur), projectiles ennemis et balles de nova `0x3b` ; compagnons et bouclier : classe `0x14`.
 - **Dégâts des ennemis** : l'énergie de leurs projectiles est dans chaque comportement (R2) ; la règle `min(A, B, 100)` est établie.
 - **Types 3000 et suivants** : le lien type → comportement vient du code, les noms (char, navire, tourelle…) de R2. Le dépôt de bonus par les cibles 2000 portant un champ 7 de 1000 à 1999 (« secrets ») est probable mais non lu dans le détail.
 - **Radar** : échelle exacte de la carte tournée ; sens des classes de drapeaux `+0x04` (hostiles, alliés, bonus) à confirmer avec R2 ; mode `DAT_00480c80` (touche `DAT_00490108`) non identifié.
-- **Viseur** : affectation exacte des deux séries d'images du bloc 506 aux deux parties ; sprites « jaune » et « rouge ».
 - **Meilleurs scores** : écran et enregistrement non trouvés (table 10) ; table 22 sans référence.
 - **Types 7010 à 7030, 1010, 7800, 7801** : types de plateforme de changement de véhicule, d'extraction, de repères (7800/7801 : `LAB_00446a7c`, indexent `DAT_005a859c[champ 7]`, relais ou téléporteurs [H]) à documenter avec R2.
 - **Effet d'invulnérabilité de coup (bits `0x102`)** et clignotement du véhicule touché : non observés.

@@ -30,8 +30,6 @@ export const copy = {
   runtimeError: "Le jeu s'est arrêté sur une erreur :",
   missingFiles: "Les fichiers du jeu sont introuvables : SWIV 3D ne peut pas démarrer.",
   unknownLevel: "Niveau inconnu :",
-  paused: "Pause",
-  resumeHint: "Appuie sur P ou touche l'écran pour reprendre.",
   // Démarrage : le navigateur n'autorise le son qu'après un geste.
   startPrompt: "Clique pour lancer le jeu",
   startButton: "Jouer",

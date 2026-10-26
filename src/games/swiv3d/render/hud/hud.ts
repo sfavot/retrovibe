@@ -7,11 +7,10 @@ import type { GlobalData } from "../../data/global";
 import { blitRows, blitSprite } from "./blit";
 import { drawRadar, stepPointer, type RadarAssets } from "./radar";
 import { SPECIAL_SLOTS, type HudState, type Reticle } from "./state";
-import { messageKey, messageStyle, TINT } from "./messages";
 import { createPauseScreen, type PauseScreen } from "./pause";
 import { ascii, drawText } from "./text";
 import { GAUGE_HEIGHT, GAUGE_WIDTH } from "../../data/global";
-import { createText3d, MessagePool } from "../text3d";
+import { createText3d, MessagePool, TITLE_TINT } from "../text3d";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../view";
 
 export interface HudAssets {
@@ -46,6 +45,8 @@ export function radarColorTable(block11003: Uint8Array): Uint8Array {
 export interface Hud {
   /** Dessine le HUD par-dessus `fb` (`320 × 400` indices). */
   draw(fb: Uint8Array, state: HudState): void;
+  /** Fait repartir les messages 3D figés (« Accompli », « Game over ! ») : `gm_title_release`, à l'ouverture d'un écran de fin. */
+  releaseTitles(): void;
 }
 
 /** Position de la jauge, des armes, du score et du nom de mission (`rules.md` § 7). */
@@ -110,7 +111,7 @@ export function createHud(assets: HudAssets, options: HudOptions = {}): Hud {
   const pool = new MessagePool();
   let glyphPage = 0;
   const text3d = createText3d({ font: g.vectorFont, glyphIndex: (code) => g.font.glyphIndex(code, glyphPage), colors: assets.radarColors });
-  let seen = new Set<string>();
+  let seen = new Set<number>();
   let wasPaused = false;
   let wallLast = 0;
   let wallAccumulated = 0;
@@ -132,17 +133,13 @@ export function createHud(assets: HudAssets, options: HudOptions = {}): Hud {
 
   /** Crée les messages 3D des nouveaux messages du monde, retire ceux qui ont disparu de la liste, ouvre ou ferme l'écran de pause. */
   function syncMessages(state: HudState): void {
-    const current = new Set<string>();
+    const current = new Set<number>();
     for (const m of state.messages) {
-      if (m.ticksLeft <= 0) continue;
-      const key = messageKey(m, state.tick);
-      current.add(key);
-      if (seen.has(key)) continue;
-      const { tint, type } = messageStyle(m);
-      pool.spawn(bytesOf(state, m.textTable, m.textId), tint, type);
+      current.add(m.serial);
+      if (!seen.has(m.serial)) pool.spawn(bytesOf(state, m.textTable, m.textId), m.tint, m.type);
     }
     seen = current;
-    if (state.paused && !wasPaused) pool.spawn(bytesOf(state, 4, 0), TINT.menu, 11);
+    if (state.paused && !wasPaused) pool.spawn(bytesOf(state, 4, 0), TITLE_TINT, 11);
     if (!state.paused && wasPaused) pool.releaseTitles();
   }
 
@@ -232,6 +229,7 @@ export function createHud(assets: HudAssets, options: HudOptions = {}): Hud {
   }
 
   return {
+    releaseTitles: () => pool.releaseTitles(),
     draw(fb, state) {
       if (fb.length < SCREEN_WIDTH * SCREEN_HEIGHT) throw new Error("HUD : image trop petite");
       glyphPage = g.strings.glyphPages[GLYPH_PAGE_LANGUAGE[state.language]] ?? 0;

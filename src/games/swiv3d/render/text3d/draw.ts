@@ -37,11 +37,13 @@ export interface Text3dAssets {
 
 export interface Text3d {
   /** Trace tous les messages du pool dans `fb` (`320 × 400`), par-dessus l'image. */
-  draw(fb: Uint8Array, pool: MessagePool): void;
+  draw(fb: Uint8Array, pool: MessagePool, colors?: Uint8Array): void;
 }
 
 export function createText3d(assets: Text3dAssets): Text3d {
-  const { font, colors } = assets;
+  const { font } = assets;
+  /** Table de couleurs de l'image en cours : celle du niveau, ou celle que l'appelant impose (écrans devant un autre niveau). */
+  let colors = assets.colors;
   let maxVertices = 1;
   for (const glyph of font.glyphs.values()) maxVertices = Math.max(maxVertices, glyph.vertices.length / 3);
   const sx = new Int32Array(maxVertices);
@@ -151,8 +153,9 @@ export function createText3d(assets: Text3dAssets): Text3d {
   }
 
   return {
-    draw(fb, pool) {
+    draw(fb, pool, table = assets.colors) {
       if (fb.length < SCREEN_WIDTH * SCREEN_HEIGHT) throw new Error("texte 3D : image trop petite");
+      colors = table;
       count = 0;
       for (const m of pool.active) layout(m);
       // Du plus loin au plus proche ; à clé égale, dans l'ordre d'empilement.

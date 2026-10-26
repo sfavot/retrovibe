@@ -10,11 +10,11 @@ export interface HudMessage {
   /** Table de chaînes (`gm_get_string(table, id)`) : 100 pour les armes ramassées, 20 pour les objectifs et la mort… */
   textTable: number;
   textId: number;
-  /**
-   * Ticks restants dans la liste du monde. Le HUD ne s'en sert que pour reconnaître un message déjà vu (`tick + ticksLeft` ne change
-   * pas pendant sa vie) : la durée affichée est celle de l'exécutable (`render/text3d/message.ts`), pas celle-ci.
-   */
-  ticksLeft: number;
+  /** Numéro d'ordre du message : un numéro jamais vu crée un texte 3D (la durée affichée est celle de `render/text3d/message.ts`). */
+  serial: number;
+  /** Teinte (ligne × 256 de la table de couleurs du bloc 11003) et type de trajectoire (0 ou 10, `rules.md` § 8.1). */
+  tint: number;
+  type: 0 | 10;
 }
 
 export interface RadarBlip {

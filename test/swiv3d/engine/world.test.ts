@@ -70,13 +70,17 @@ describe.skipIf(!hasOriginalFiles)("monde (fichiers du jeu)", () => {
     }
   });
 
-  it("démarre la démo en forme 0x2a (type 1001), sans pilotage", () => {
+  it("démarre la démo en forme 0x2a (type 1001) : elle vole seule, les entrées sont ignorées (demo-pilot.test.ts)", () => {
     const { level, models } = loadLevel("DEMO");
     const w = World.load(level, models);
     expect(w.player.form).toBe(0x2a);
-    const x = w.player.x;
-    for (let i = 0; i < 20; i++) w.tick(input({ forward: true }));
-    expect(w.player.x).toBe(x);
+    expect(w.player.obj.update).toBe("player_demo");
+    const run = (inp: PlayerInput) => {
+      const v = World.load(loadLevel("DEMO").level, models);
+      for (let i = 0; i < 60; i++) v.tick(inp);
+      return v.stateHash();
+    };
+    expect(run(input({ forward: true, turnLeft: true }))).toBe(run(emptyInput()));
   });
 
   it("est déterministe : mêmes entrées, même empreinte ; entrées différentes, empreintes différentes", () => {

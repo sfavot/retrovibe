@@ -167,7 +167,7 @@ describe.skipIf(!hasOriginalFiles)("HUD (fichiers du jeu)", () => {
     const extreme: HudState = {
       ...base,
       energy: -1e9, score: 1e15, special: 19, specialAmmo: Array(20).fill(1e9), tick: 1e9,
-      missionName: "X".repeat(500), messages: [{ textTable: 100, textId: 3, ticksLeft: 5 }, { textTable: 99999, textId: 1, ticksLeft: 5 }],
+      missionName: "X".repeat(500), messages: [{ serial: 1, textTable: 100, textId: 3, tint: 0x1000, type: 0 }, { serial: 2, textTable: 99999, textId: 1, tint: 0x1000, type: 0 }],
       radar: {
         playerX: -1e9, playerZ: 1e9, playerYaw: -12345,
         blips: Array.from({ length: 50 }, (_, i) => ({ x: i * 1e8 - 1e9, z: -i * 1e8, kind: 0x1001 })),

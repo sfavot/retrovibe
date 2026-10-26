@@ -9,11 +9,14 @@ import { emptyInput } from "../../../src/games/swiv3d/engine/input";
 import { torusDelta } from "../../../src/games/swiv3d/engine/fixed";
 import type { GameObject } from "../../../src/games/swiv3d/engine/objects";
 import type { World } from "../../../src/games/swiv3d/engine/world";
+import { GroundField } from "./ground-planner";
 
 /** Distance (unités) à laquelle le pilote cesse d'avancer et se contente de tirer. */
 const STANDOFF = 260;
 /** Portée de tir : une balle vole 28 à 30 ticks à 31 unités par tick. */
 const FIRE_RANGE = 640;
+/** Véhicule au sol : il tire depuis le bord (sous la portée de 640) au lieu de descendre dans une cuvette dont il ne sortirait plus. */
+const GROUND_STANDOFF = 480;
 /** Fenêtre de contrôle de blocage (ticks) et déplacement minimal attendu (unités). */
 /** Écart minimal (ticks) entre deux tirs spéciaux. */
 const SPECIAL_GAP = 40;
@@ -21,6 +24,13 @@ const STUCK_WINDOW = 120;
 const STUCK_MIN_MOVE = 40;
 /** Durée (ticks) d'une manœuvre de dégagement. */
 const UNSTUCK_TICKS = 70;
+
+/** Véhicule au sol : sous cette distance (unités) à la cible, tout droit ; au-delà, on suit le trajet (`GroundField`). */
+const DIRECT_RANGE = 560;
+/** Rayon (cases) d'arrivée autour d'une plate-forme de transformation. */
+const PAD_SEED = 1;
+/** Cases (64 unités) devant le véhicule visées sur le trajet. */
+const PATH_LOOKAHEAD = 5;
 
 export interface StuckEvent {
   tick: number;
@@ -65,6 +75,7 @@ export class Robot {
   private unstuckLeft = 0;
   private unstuckDir = 1;
   private tick = 0;
+  private field: { goal: GameObject; field: GroundField } | null = null;
 
   constructor(private readonly world: World) {}
 
@@ -90,6 +101,24 @@ export class Robot {
     const dx = torusDelta(o.x, p.x) / 256;
     const dz = torusDelta(o.z, p.z) / 256;
     return { obj: o, group, dx, dz, distance: Math.hypot(dx, dz), pickup: false };
+  }
+
+  /**
+   * Véhicule au sol : la plate-forme `7011` qui attend un véhicule (état 5) le transforme en hélicoptère ; le robot y va d'abord
+   * (par le trajet le moins pentu), puis joue en vol. `null` en vol, sans plate-forme prête, ou pendant l'amarrage.
+   */
+  private padGoal(): TargetInfo | null {
+    const w = this.world;
+    if (w.player.form === 0 || w.player.form === 3 || w.player.autopilot) return null;
+    const p = w.player.obj;
+    let best: TargetInfo | null = null;
+    for (const o of w.liveObjects()) {
+      if (o.update !== "upd_004482dc" || o.state !== 5) continue;
+      const info = this.info(o, -2, p);
+      if (!best || info.distance < best.distance) best = info;
+    }
+    if (best) best.pickup = true;
+    return best;
   }
 
   /** Bonus d'énergie à ramasser : actif seulement quand l'énergie est basse (avec hystérésis jusqu'à la disparition du bonus). */
@@ -127,12 +156,14 @@ export class Robot {
     const w = this.world;
     const p = w.player.obj;
     this.tick++;
-    const t = this.pickupGoal() ?? this.target();
+    const t = this.padGoal() ?? this.pickupGoal() ?? this.target();
     if (!t || w.game.endCounter >= 0) return inp;
 
     const heli = w.player.form === 0 || w.player.form === 3;
     const desired = Math.round((Math.atan2(t.dx, t.dz) * 512) / (2 * Math.PI));
     const err = (((desired - p.yaw + 256) % 512) + 512) % 512 - 256;
+    // véhicule au sol : le cap de conduite contourne les pentes que le véhicule ne grimpe pas (le tir reste réglé sur `err`)
+    const drive = heli ? err : this.driveError(desired, t);
     const speed = Math.hypot(p.vx, p.vz) / 256;
 
     // détection de blocage
@@ -169,13 +200,13 @@ export class Robot {
       return inp;
     }
 
-    if (err > 2) inp.turnRight = true;
-    else if (err < -2) inp.turnLeft = true;
+    if (drive > 2) inp.turnRight = true;
+    else if (drive < -2) inp.turnLeft = true;
 
-    if (Math.abs(err) < 60) {
+    if (Math.abs(drive) < 60) {
       // freinage : la distance de glissade vaut environ 16 ticks de vitesse (frottement 1/16)
       const slide = speed * 16;
-      const standoff = t.pickup ? 30 : STANDOFF;
+      const standoff = t.pickup ? 30 : heli ? STANDOFF : GROUND_STANDOFF;
       if (t.distance > standoff && t.distance > slide * 0.8 + standoff * 0.5) inp.forward = true;
       else if (heli && speed > 3 && t.distance < slide + 80 && !t.pickup) inp.back = true;
     }
@@ -185,6 +216,25 @@ export class Robot {
     if (!t.pickup && t.distance < FIRE_RANGE && Math.abs(err) <= tol) inp.firePrimary = true;
     if (!t.pickup) this.special(inp, t, err);
     return inp;
+  }
+
+  /**
+   * Écart de cap (pas) à suivre pour un véhicule au sol : le cap vers un point quelques cases plus loin sur le trajet le moins
+   * pentu et le plus sec jusqu'à la cible (`GroundField`) ; tout droit quand la cible est proche ou le champ n'y mène pas.
+   */
+  private driveError(desired: number, t: TargetInfo): number {
+    const p = this.world.player.obj;
+    let yaw = desired;
+    // une plate-forme se rejoint par le trajet jusqu'à 100 unités (elle capte à 122), une cible se vise depuis DIRECT_RANGE
+    const seed = t.group === -2 ? PAD_SEED : undefined;
+    if (t.distance > (seed ? PAD_SEED * 64 + 36 : DIRECT_RANGE)) {
+      if (this.field?.goal !== t.obj) {
+        this.field = { goal: t.obj, field: new GroundField(this.world.level, t.obj.x >> 8, t.obj.z >> 8, seed) };
+      }
+      const wp = this.field.field.waypoint(p.x / 256, p.z / 256, PATH_LOOKAHEAD);
+      yaw = Math.round((Math.atan2(torusDelta(wp.x * 256, p.x) / 256, torusDelta(wp.z * 256, p.z) / 256) * 512) / (2 * Math.PI));
+    }
+    return (((yaw - p.yaw + 256) % 512) + 512) % 512 - 256;
   }
 
   /** Arme spéciale : sélectionne la première arme de 1 à 10 qui a des munitions, tire (appui bref) armée, alignée et à portée. */

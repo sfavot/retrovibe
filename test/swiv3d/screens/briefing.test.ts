@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { briefingString, drawBriefing, parseBriefing, visibleTexts, type BriefingText } from "../../../src/games/swiv3d/screens/briefing";
-import { BRIEFING_TEXT_MAX_WIDTH, TextRenderer, UI_HEIGHT, UI_WIDTH, dimRow } from "../../../src/games/swiv3d/screens/text";
+import { BRIEFING_TEXT_MAX_WIDTH, TextRenderer, UI_HEIGHT, UI_WIDTH, dimRow } from "../../../src/games/swiv3d/ui-draw/text";
 import { hasOriginalFiles, readOriginal } from "../helpers";
 import { loadGlobal } from "./support";
 

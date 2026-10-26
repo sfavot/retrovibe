@@ -16,14 +16,15 @@ import { copy } from "../copy";
 import { parseBd } from "../data/bd";
 import { parseGlobal } from "../data/global";
 import { parseSoundBank } from "../data/sounds";
+import { createTitleLayer } from "../render/text3d";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../render/view";
 import { parseBriefing, drawBriefing, type BriefingText } from "../screens/briefing";
 import { Flow, type FlowHost, type FlowView, type LevelRequest } from "../screens/flow";
 import { keyLabel } from "../screens/key-names";
 import { AMMO_SLOTS, PilotStore } from "../screens/pilots";
-import { TextRenderer } from "../screens/text";
+import { TextRenderer } from "../ui-draw/text";
 import { Controls, DEFAULT_KEYS, type Action } from "./controls";
-import { startLevel, createPauseOverlay, type AppStats, type LevelServices, type LevelSession } from "./level-session";
+import { startLevel, type AppStats, type LevelServices, type LevelSession } from "./level-session";
 import { UiInputCollector } from "./ui-input";
 import { VideoPlayer } from "./video";
 import { VolumeSink } from "./volume-sink";
@@ -83,7 +84,6 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     ],
   });
   touch.element.style.display = "none";
-  const pauseOverlay = createPauseOverlay(copy.paused, copy.resumeHint);
   const startButton = h("button", { type: "button", class: "primary" }, copy.startButton);
   const startOverlay = h("div", { class: "game-shell-overlay sw3-start", role: "dialog" }, h("p", {}, copy.startPrompt), startButton);
   startOverlay.style.display = "none";
@@ -95,7 +95,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     copy,
     backLabel: options.backLabel,
     classes: { root: "sw3", stage: "sw3-stage", canvas: "sw3-canvas" },
-    stageChildren: [touch.element, pauseOverlay, startOverlay],
+    stageChildren: [touch.element, startOverlay],
   });
   const store = localStorageStore();
   const pilotStore = new PilotStore(prefixedStorage(store, `${GAME_ID}:`));
@@ -125,7 +125,6 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     audio,
     controls,
     touch,
-    pauseOverlay,
     focusCanvas: shell.focusCanvas,
     framebuffer,
     stats,
@@ -152,7 +151,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
     // Décor des menus : `DEMO.SLV`, sans son ni musique (la musique des menus vient du flux), commandes inertes.
     demo = await startLevel(
-      { ...services(), sound: null, music: null, controls: new IdleControls(), pauseOverlay: document.createElement("div"), stats: { renderMs: 0, frameMs: 0, ticks: 0 } },
+      { ...services(), sound: null, music: null, controls: new IdleControls(), stats: { renderMs: 0, frameMs: 0, ticks: 0 } },
       { name: "DEMO", hud: false },
     );
   } catch (error) {
@@ -169,6 +168,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const demoTable = demo.world.level.fadeTable;
   let frozenTable = demoTable;
   const collector = new UiInputCollector();
+  // Titres 3D des menus et des écrans de fin : une couche commune, tracée avec la table de couleurs du niveau qui sert de fond.
+  let glyphPage = 0;
+  const titles = createTitleLayer({
+    font: global.vectorFont,
+    glyphIndex: (code) => global.font.glyphIndex(code, glyphPage),
+    colors: demo.textColors,
+  });
 
   // --- Volumes (§4.6) : principal × musique, principal × effets, principal pour le son des vidéos ----------------------------------
   let volumes = { master: 255, music: 255, effects: 255 };
@@ -187,7 +193,6 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let levelLut: Uint32Array = BLACK_PALETTE;
   let levelSession: LevelSession | null = null;
   let loadToken = 0;
-  let freezeAfterFrame = false;
   let flow!: Flow;
 
   const beginLevel = async (request: LevelRequest): Promise<void> => {
@@ -210,14 +215,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       }
       levelSession = session;
       levelLut = session.palette;
-      session.events.levelComplete.push(() => {
-        freezeAfterFrame = true;
-        flow.levelEnded("complete", session.summary());
-      });
-      session.events.gameOver.push(() => {
-        freezeAfterFrame = true;
-        flow.levelEnded("gameOver", session.summary());
-      });
+      // Le niveau continue de tourner derrière l'écran de fin (backdrop « level ») : plus de commandes, mais le monde vit.
+      session.events.levelComplete.push(() => flow.levelEnded("complete", session.summary()));
+      session.events.gameOver.push(() => flow.levelEnded("gameOver", session.summary()));
       session.events.quit.push(() => flow.abortRequested());
       touch.element.style.display = "";
       shell.focusCanvas();
@@ -348,7 +348,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   // --- Entrées -----------------------------------------------------------------------------------------------------------------------
   shell.canvas.addEventListener("pointerdown", (event) => {
     unlock();
-    if (!started || flow.view.kind === "level") return;
+    if (started && flow.view.kind === "level") {
+      // Pause du joueur : un appui sur l'écran la ferme (comme n'importe quelle touche).
+      if (levelSession?.userPaused) levelSession.resume();
+      return;
+    }
+    if (!started) return;
     const p = toLogical(event.clientX, event.clientY, shell.canvas.getBoundingClientRect(), { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, isRotated(shell.main));
     collector.tap(p.x, p.y);
   });
@@ -361,7 +366,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         if (!session) return collector.keyDown(event);
         if (options.debug && event.code === "F9") return void session.complete(), true;
         if (options.debug && event.code === "F8") return void session.gameOver(), true;
-        if (event.code === "Escape") return void session.requestQuit(), true;
+        // En pause, Échap est une touche comme une autre : elle ferme la pause (l'abandon se demande en jeu).
+        if (event.code === "Escape" && !session.userPaused) return void session.requestQuit(), true;
         return controls.keyDown(event);
       },
       keyUp: (event) => controls.keyUp(event),
@@ -426,6 +432,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     const view = flow.view;
     if (view !== lastView) {
       if (lastView?.kind === "video") video?.player?.stop();
+      // Titres 3D : en quittant un menu les titres repartent (`gm_title_release`) et le titre du menu suivant arrive ; un écran sans menu les efface.
+      if (view.kind === "menu") {
+        glyphPage = global.strings.glyphPages[flow.language] ?? 0;
+        titles.release();
+        if (view.title) titles.show(view.title);
+        // Écran de fin : les messages figés du niveau (« Accompli », « Game over ! ») repartent aussi.
+        if (view.backdrop === "level") levelSession?.releaseTitles();
+      } else if (lastView?.kind === "menu") titles.clear();
       lastView = view;
     }
     switch (view.kind) {
@@ -445,33 +459,29 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         if (levelSession) {
           levelSession.onFrame(now);
           present(levelLut);
-          // Fin de niveau détectée pendant cette image : elle sert de fond à l'écran de fin.
-          if (freezeAfterFrame) {
-            frozen.set(framebuffer);
-            frozenLut = levelLut;
-            frozenTable = levelSession.world.level.fadeTable;
-            freezeAfterFrame = false;
-          }
         }
         break;
       case "menu": {
         // Les aplats se mélangent à l'image déjà présente : le fond est refait à chaque image.
-        text.blend = view.backdrop === "demo" ? demoTable : frozenTable;
-        if (view.backdrop === "demo") {
+        if (view.backdrop === "level" && levelSession) {
+          // Écran de fin : le niveau continue (monde simulé, joueur sans commandes), le menu et le titre 3D par-dessus.
+          text.blend = levelSession.world.level.fadeTable;
+          levelSession.onFrame(now);
+          view.menu.draw(framebuffer);
+          titles.draw(framebuffer, now, levelSession.textColors);
+          present(levelLut);
+        } else if (view.backdrop === "demo") {
+          text.blend = demoTable;
           demo.onFrame(now);
           view.menu.draw(framebuffer);
+          titles.draw(framebuffer, now, demo.textColors);
           present(demo.palette);
         } else {
-          // Fin de niveau déclenchée hors image (touche de dev) : le tampon tient encore la dernière image du niveau.
-          if (freezeAfterFrame) {
-            frozen.set(framebuffer);
-            frozenLut = levelLut;
-            frozenTable = levelSession?.world.level.fadeTable ?? frozenTable;
-            freezeAfterFrame = false;
-          }
+          // Écran d'abandon : dernière image du niveau, figée.
           text.blend = frozenTable;
           framebuffer.set(frozen);
           view.menu.draw(framebuffer);
+          titles.draw(framebuffer, now, levelSession?.textColors ?? demo.textColors);
           present(frozenLut);
         }
         break;

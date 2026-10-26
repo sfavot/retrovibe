@@ -4,10 +4,13 @@
  * les variables globales `005b03xx` (voir `docs/swiv3d/rules.md`).
  */
 import type { GameObject } from "./objects";
-import type { GameMessage } from "./status";
+import type { GameMessage, MessageKind } from "./status";
 
-/** Ticks d'affichage d'un message en jeu (durée non décodée : choix d'implémentation, ≈ 2,5 s). */
-export const MESSAGE_TICKS = 100;
+/**
+ * Durée d'un message en jeu : le monde en garde la trace 71 ticks (vie 70 à la création, libéré sous 0, `gm_effects_tick` `004234ec`,
+ * `rules.md` § 8.1). Le HUD en tire le texte 3D, dont la trajectoire et la durée sont celles de l'exécutable.
+ */
+export const MESSAGE_TICKS = 71;
 /** Plafond de munitions par arme spéciale (`gm_pickup_can_take`, `00458f88`). */
 export const AMMO_CAP: readonly number[] = [
   100, 60, 30, 40, 20, 20, 20, 10, 20, 10, 40, 30, 15, 40, 20, 5, 20, 10, 20, 500,
@@ -85,17 +88,20 @@ export class GameState {
   gauge = 0;
 
   messages: GameMessage[] = [];
+  /** Numéro du prochain message : identifie un message pour le HUD (un nouveau numéro = un nouveau texte 3D). */
+  private nextMessageSerial = 0;
 
   addScore(points: number): void {
     this.score += points;
     this.levelScore += points;
   }
 
-  message(textTable: number, textId: number, ticks = MESSAGE_TICKS): void {
-    this.messages.push({ textTable, textId, ticksLeft: ticks });
+  /** `gm_message_spawn` : `tint` et `type` sont ceux de l'appel de l'exécutable (`rules.md` § 8.2). */
+  message(textTable: number, textId: number, tint: number, type: MessageKind = 0): void {
+    this.messages.push({ serial: this.nextMessageSerial++, textTable, textId, tint, type, ticksLeft: MESSAGE_TICKS });
   }
 
-  /** Avance les durées des messages d'un tick. */
+  /** Avance les durées des messages d'un tick (vie `ticksLeft - 1`, libéré sous 0). */
   tickMessages(): void {
     for (const m of this.messages) m.ticksLeft--;
     this.messages = this.messages.filter((m) => m.ticksLeft > 0);

@@ -308,24 +308,13 @@ Objet invisible et inattaquable (classe `0x40`). Toutes les 31 images (`âge > 3
 - `004469fc` ajoute 1 à `joueur+0x198` (bonus posé ramassé) ; `00446a3c` (largué par une cible `2000`) ajoute 1 à `joueur+0x194`. Ces deux compteurs, rapportés à `005b03d8` / `005b03f4`, donnent les pourcentages de l'écran de fin.
 - Codes `REC[7]` : `1000 + n` avec `n` de 0 à 19 (le joueur refuse le bonus tant que son stock `joueur+0x128+4n` n'est pas sous un plafond propre à `n` : 100, 60, 30, 40, 20, 20, 20, 10, 20, 10, 40, 30, 15, 40, 20, 5…) ou `n` de 100 à 113 (autres bonus : 100-102, 105, 107, 108, 110, 112, 113). Dans les niveaux : 1000 (79 `7000`), 1001 (55), 1101 (81), 1010, 1007, 1110… Le sens de chaque `n` relève de `rules.md`. Modèles associés dans les données : 800/801 (1000, 1001, 1010, 1011), 606 (1101), 608 (1110, 1111), 812 (1007), 850 (1002), 855 (1005), 811 (1006), 853 (1107).
 
-### 6.11 Plates-formes de transformation `7010`, `7011` (`004482dc`, `0044822c`) (confirmé pour la mécanique, hypothèse pour l'interprétation)
+### 6.11 Plates-formes de transformation `7010`, `7011` (`004482dc`, `0044822c`, `00446efc`, `00447080`) [C]
 
-Objet indestructible (`pv = 1000` réécrits à chaque image ; la plate-forme est aussi de classe 1, donc blessable, mais ses pv sont rétablis). Le joueur le plus proche est recherché toutes les 32 images (`0043c164`, `D² < 15 000`, **122 unités**). États `+0x50` (table de sauts `00448300`) :
+**7010 naît à l'état 0 (attend un hélicoptère : → véhicule) ; 7011 naît à l'état 5 (attend un véhicule au sol : → hélicoptère)** et crée un hélicoptère posé (modèle 990, classe `0x40`, `0044822c`) décalé de cap + 64, 39 u plus haut, 32 u en arrière. Indestructible (pv 1 000 réécrits). Joueur cherché tous les 32 ticks, `D² < 15 000` (122 u). États `+0x50` : 0 capte un joueur `& 0x21c == 0x214` (pilote coupé, classe `0x40`, `+0x180 = 1` : armes retirées, minuteur 70) ; 1 attend la fin de l'amarrage ; 2 pose le joueur sur la plate-forme et `set_form(1)` (qui rend le pilote, `+0x5c = soi`, `+0x180 = 0`) ; 3 pousse 40 ticks à 4 u/tick le long du cap ; 4 pause 200 ; 5 capte un joueur `& 0x21c == 0x204` ; 6 attend l'arrivée (`+0x50 == 0x20`) ; 7 attend l'objet auxiliaire qui replace le joueur (position, angles) → 8 `set_form(0)`, 200 ticks → 9 → 0.
 
-| État | Rôle |
-|---|---|
-| 0 | joueur **en vol** (`classe & 0x21c == 0x214`) à portée : capté (`joueur.+0x5c = pad`, `pad.+0x5c = joueur`, classe du joueur 0x40, vitesse 0, `+0x68 = 00446efc` : mouvement d'amarrage, minuteur 70) → 1 |
-| 1 | attend que l'amarrage soit fini (`joueur.+0x50 == 2`) → 2 |
-| 2 | pose le joueur sur la plate-forme (position du pad, état du joueur 0) et appelle **`gm_player_set_form(joueur, 1)`** (forme au sol, modèle 991) ; minuteur 40 → 3. Alloue aussi un objet brut (`004260e4`, upd `0044822c`, `+0x5c = pad`) dont la classe n'est pas initialisée (0) : il est libéré après son premier appel, sans effet |
-| 3 | pousse le joueur le long du cap de la plate-forme (4 unités par image) ; à 0 : relâche (`pad.+0x58 = +0x5c = soi`), minuteur 200 → 4 |
-| 4 | pause 200 images → 5 |
-| 5 | joueur **au sol** (`& 0x21c == 0x204`) à portée : capté (`+0x68 = 00447080`) → 6 |
-| 6 | attend `joueur.+0x50 == 32` (arrivé) → 7 |
-| 7 | attend que l'objet auxiliaire **`0044822c` posé au chargement par `7011`** (classe `0x40`, `+0x5c = pad`) recopie sa position, son cap et ses angles dans le joueur, passe l'état à 8 et se supprime |
-| 8 | `gm_player_set_form(joueur, 0)` (forme en vol, modèle 990) ; minuteur 200 → 9 |
-| 9 | à 0 → état 0 |
-
-Lecture (hypothèse) : le joueur **atterrit** sur la plate-forme et se **transforme** en véhicule ; au retour il est replacé sur l'hélicoptère posé que `7011` ajoute au chargement (modèle 990, classe `0x40`, upd `0044822c`, cap + 64, 32 unités en arrière, `y` + 10 000/256). Une `7010` seule n'a pas cet objet : sa séquence de retour (états 5-7) resterait bloquée à l'état 7 ; le niveau place donc les `7011` pour les retours. Présent seulement dans `TERRAN02` (1 × `7010` et 1 × `7011`) et `TERRAN03` (2 × `7011`).
+- **Amarrage en vol** (`00446efc`) : cap vers la plate-forme (pas 4) ; état 0 : vol stationnaire à 130 u du relief, glissement de 1/16 de l'écart vers le point à 32 u de la plate-forme (cap + 0x140), le compteur de 70 baisse de 2 par tick (35 ticks) ; état 1 : descente de 550/256 u par tick jusqu'à 9 500/256 u au-dessus de la plate-forme ; état 2 = arrivé.
+- **Amarrage au sol** (`00447080`) : suspension des 4 roues, frottement 14/16, gravité 150 ; état 0 choisit l'approche par le point à 256 u devant ou derrière (le plus proche du point à 32 u devant le véhicule) ; états 10/0x14 (vise ce point, pas 2), 0xb/0x15 (avance de 4 u par tick jusqu'à 100 u), 0x1e (vise la plate-forme, pas 3), 0x1f (avance jusqu'à 70 u) → 0x20.
+- Variantes 7012 et suivantes (`004477b0`, `00447afc`, `0044878c`, `004490cc`, `004493e8`, `004495f8`) : non lues. 7010 sans hélicoptère posé reste bloquée à l'état 7 au retour.
 
 ### 6.12 Ce qui n'est pas des « types » mais des objets créés
 
@@ -476,7 +465,7 @@ Sur mort d'une cible lourde (`2000`, `3000` base, `6000`, hangars) : `00443ac0(o
 
 Le bloc 11004 (identique dans les 5 niveaux, 80 nœuds) : 990/991 (joueur) : éclats seulement (clés `+0x10000`/`+0x20000` : modèles 700-708, pas d'épave) ; 400 : épave 709, petits éclats 710-711 ; 500-522 : épaves 712-754 (2 ou 3 variantes par modèle), gros éclats 715-756 ; 552/553 : épaves 757-758, éclats 759-760, 733 ; **560-565 (arbres) : 6 épaves 761-766, gros éclats 767-770, petits 769-770**. Les types sans clé (200-206, 300, 401…) ne laissent ni épave ni éclats.
 
-`gm_terrain_explosion_crater` (`00424f44(o, taille)`, taille 0/1/2) : si le site est autorisé (`00424db4(o, 10 000 / 20 000 / 30 000)` ; abandon si l'une des 36 cellules (6 × 6) de la carte 102 autour du point vaut 0), soustrait la matrice de profondeur 4 × 4 du **bloc GLOBAL 700** (3 tailles × 16 sous-positions de 4 cellules × 16 octets : `taille·0x400 + ((z>>12 & 3)·4 + (x>>12 & 3))·0x40`) à la carte de hauteur 100 (plancher 0), ajoute `2 × profondeur` (plafond 240) à la carte 102 là où elle n'est pas nulle (le sol brunit), puis une dernière passe sur les 4 × 4 cellules (comparaison des 8 voisins, non détaillée ici). Le cratère est **persistant** : il modifie les cartes du niveau en mémoire.
+`gm_terrain_explosion_crater` (`00424f44`, taille 0/1/2) [C] : 1) `gm_crater_site_ok` (`00424db4`) refuse si un objet « décor » (classe `& 0x12 == 0`) autre que le mourant est à `√(10 000 / 20 000 / 30 000)` u (cases de grille de la cellule, +4, avec un défaut : l'abscisse n'est pas remise à zéro pour la seconde ligne) ; 2) refus si l'une des 36 cellules `cx−2 … cx+3` de la carte 102 vaut 0 ; 3) sur les 16 cellules `cx−1 … cx+2` : carte 102 = `min(240, v + 2·profondeur)` si `v ≠ 0` (même à profondeur 0), hauteur −= profondeur (plancher 0), profil du bloc 700 `taille·0x400 + ((z>>12&3)·4 + (x>>12&3))·0x40` ; 4) passe finale en place sur les 16 cellules : si un des 8 voisins diffère de plus de 19, la cellule prend la moyenne entière des 9. Le cratère est persistant. `gm_terrain_crater` (`00424a24`, création en mode 3) creuse seulement 4 cellules sans lissage. Les gouttes de napalm creusent aussi (modèle 901).
 
 ### 10.5 Tore (confirmé / limite)
 
@@ -593,5 +582,5 @@ Fonctions de comportement (champ `+0x68`) :
 - **Sons** : numéros passés à `gm_sound_play` établis (1000 grande explosion, 1001 petite, 1003 chute, 2000-2005 armes, 4000/4002 bonus), correspondance avec les WAV de `SOUNDS.BD` à voir avec `sounds.ts`.
 - **Sprites ≥ 10000** : numérotation et planches (GLOBAL 504/505/506…) à voir avec `render.md` (R4) ; ici seuls le numéro et le rôle de l'image `+0x50` sont établis.
 - `REC[9]`, `REC[10]`, `+0x44`, `+0x6c` : sans effet constaté.
-- Le test `00424db4` de cratère et la table `005624c8` de suie (rendu ?) ne sont pas décodés en détail.
+- La table `005624c8` de suie (rendu ?) n'est pas décodée.
 - Le point exact de gel/dégel d'un objet (drapeau `+6 & 0x20`) est posé par les fonctions de comportement ; seule la base de `00446d24` et des épaves a été lue.

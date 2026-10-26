@@ -25,3 +25,8 @@
   font-size: 0.8rem;
   opacity: 0.7;
 }
+
+/* Invite de démarrage : le navigateur n'autorise le son qu'après un geste. */
+.sw3-start {
+  z-index: 4;
+}

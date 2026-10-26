@@ -161,8 +161,12 @@ function carries(o: GameObject, num: number): boolean {
 
 /** `186d:000c` : "transit" = fin du tic ; "again" = relire `Err` ; "continue" = suite. */
 function takeExit(h: H): "transit" | "again" | "continue" {
+  const from = h.obj.room;
   const r = h.ctx.rooms.exit(h.obj);
-  if (r === "transit") return "transit";
+  if (r === "transit") {
+    noteClimbedEntry(h.ctx.state, h.obj.ego === EGO.climb && from ? { room: h.ctx.state.wantedRoom, from } : null);
+    return "transit";
+  }
   if (r === "blocked") return "again";
   h.obj.err = 0; // hypothèse : « none » / « moved » ne bloquent pas le héros
   return "continue";
@@ -1006,8 +1010,21 @@ export function registerHero(registry: HandlerRegistry, services: HeroServices =
 export type ContinueResult = "gameOver" | "present" | "created";
 
 /**
+ * Dernière salle où le héros est entré en grimpant (`Ego 2`), et celle qu'il quittait. Écart au jeu original : le centre de la cime
+ * de l'arbre (salle 10, où l'on ne fait que grimper) tombe sur un bout de branche d'où le héros recréé à pied tombe au premier pas ;
+ * on le recrée donc dans la salle d'où il était monté. Non sauvegardé : après une restauration, la règle de l'original s'applique.
+ */
+const climbedEntries = new WeakMap<WorldState, { room: GameRoom; from: GameRoom }>();
+
+function noteClimbedEntry(state: WorldState, entry: { room: GameRoom | null; from: GameRoom } | null): void {
+  if (entry?.room) climbedEntries.set(state, { room: entry.room, from: entry.from });
+  else climbedEntries.delete(state);
+}
+
+/**
  * Commande `continuer` : partie terminée -> `S49` ; héros présent -> `S46` (déjà dans la salle) ou `S47` (le jeu rejoint sa salle) ;
- * sinon le héros est recréé au centre de la fenêtre avec `S24` (`screens.md` E13).
+ * sinon le héros est recréé au centre de la fenêtre avec `S24` (`screens.md` E13), dans la salle chargée, ou dans celle d'où il était
+ * monté s'il y était entré en grimpant (`climbedEntries`).
  */
 export function continueGame(ctx: BehaviorContext, services: HeroServices = {}): ContinueResult {
   const state: WorldState = ctx.state;
@@ -1023,8 +1040,11 @@ export function continueGame(ctx: BehaviorContext, services: HeroServices = {}):
     existing.err = 0;
     return "present";
   }
-  const room = ctx.room;
-  if (!room) return "present";
+  if (!ctx.room) return "present";
+  const climbed = climbedEntries.get(state);
+  const room = climbed?.room === ctx.room ? climbed.from : ctx.room;
+  climbedEntries.delete(state);
+  // hypothèse : les limites de la salle chargée valent pour la salle d'en dessous (319 x 159 dans les deux salles de l'arbre)
   const limits = services.limits?.() ?? ctx.rooms.limits() ?? { xMax: 319, pMax: 159 }; // hypothèse : limites de la salle 1 si le moteur ne les fournit pas
   const hero = state.createObject({ typ: 2, num: HERO_NUM, gst: 7, mob: 2, dep: 0, txt: 0, weight: 800, capacity: 500, canContain: 7, ego: 0, fig: 0 });
   state.moveToRoom(hero, room);
@@ -1033,6 +1053,7 @@ export function continueGame(ctx: BehaviorContext, services: HeroServices = {}):
   hero.presence = 1;
   loadObjectSprite(hero, services.sprites ?? (ctx as HeroContext).sprites ?? NO_SPRITES);
   state.setHero(hero);
+  if (room !== ctx.room) ctx.rooms.want(room);
   state.moveEnabled = true; // hypothèse : `4b50` repasse à 7 (le héros peut être recréé après une mort animée)
   ctx.messages.say("S", 24);
   hero.err = 0;

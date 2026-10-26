@@ -184,6 +184,7 @@ Ils viennent de l'image ISO du CD : `scripts/armaeth-extract.sh [archive.7z]` li
 - `src/games/swiv3d/screens/` — enchaînement des écrans : démarrage, menus, pilotes, briefings, script des missions.
 - `src/games/swiv3d/ui/` — le navigateur : page du jeu (`app.ts`), commandes clavier, manette et tactile, écran de présentation (`title.ts`) et manuel (`manual.ts`).
 - Pages de développement (avec `npm run dev`) : `ui/dev.html` (le jeu seul ; `?skip=boot` passe les vidéos, `?level=TERRAN01` ou `DEMO` joue un niveau tout de suite, F9 = mission accomplie, F8 = game over), `ui/render-test.html` (rendu) et `ui/asset-viewer.html` (visionneuse des ressources).
+- `CAMPAIGN=1 npx vitest run test/swiv3d/engine/campaign.test.ts` : un robot pilote les 4 missions sans affichage et vérifie qu'elles se terminent (invulnérable) ; il rapporte aussi le résultat sans aide (`CAMPAIGN_ONLY`, `CAMPAIGN_BUDGET`).
 
 ### Documentation
 

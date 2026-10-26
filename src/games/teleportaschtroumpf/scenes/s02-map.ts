@@ -17,7 +17,8 @@ export type { MapMode, MapRequest };
  * - rend : `onDone(ctx, k)` avec `k = 1` (retour) ou `2..18` (lieu de `MAP_LOCATIONS`, `game/tables.ts`) ; en consultation `k`
  *   vaut toujours 1 ; en mode `"wish"`, `k = 1` aussi quand 36 s se sont écoulées sans choix ;
  * - commandes (clavier d'origine) : consultation, haut / bas tenus font défiler ; `"free"` et `"wish"`, haut / bas changent de
- *   lieu (bip), Espace valide, Entrée joue la voix d'aide du lieu (mode libre seul) ; la souris ne désigne rien ;
+ *   lieu (bip), Espace valide, Entrée joue la voix d'aide du lieu (mode libre seul) ; la souris ne désigne rien ; au doigt (ajout
+ *   du port) : glisser fait défiler, toucher un lieu y va (le bandeau « Retour » en consultation), appui long = voix d'aide ;
  * - appelant : la scène de partie (`scenes/game.ts`, pause → carte : elle `replace` / `pop` au retour), `events/well.ts` (puits,
  *   mode `"wish"`) et `createFreeModeScene` ;
  * - écran suivant : décidé par l'appelant (la carte n'enchaîne rien) ;

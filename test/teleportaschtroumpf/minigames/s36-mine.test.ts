@@ -9,6 +9,7 @@ import {
   MINE_VARIANTS,
   MineScene,
   createMine,
+  mineTouchKeys,
   mineVariant,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s36-mine";
 import {
@@ -24,6 +25,7 @@ import {
   hasSwitch,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s36/run";
 import { hasOriginalFiles, readData } from "../helpers";
+import { tap, touchDown, touchMove, touchUp } from "../touch";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
 
 /** HY8 minimal : une animation par entrée de `frameCounts`, des frames numérotées. */
@@ -546,4 +548,82 @@ describe.skipIf(!hasOriginalFiles)("S36 La Mine Désaffectée : parcours depuis 
     await run.tap("Escape");
     await run.until(() => run.free.stage === "map" && !run.ctx.scenes.transitioning, 30_000);
   }, 180_000);
+});
+
+describe("S36 : au doigt (ajout du port)", () => {
+  const NONE = { up: false, down: false, left: false, right: false };
+
+  it("sur une autre voie : la flèche de ce côté ; sur la voie du chariot : haut ou bas vers le doigt ; sur le chariot, rien", () => {
+    // Chariot au centre, ordonnée 100 : son milieu est à 118.
+    expect(mineTouchKeys(LANE_CENTER, 100, LANE_LEFT, 118)).toEqual({ ...NONE, left: true });
+    expect(mineTouchKeys(LANE_CENTER, 100, LANE_RIGHT, 30)).toEqual({ ...NONE, right: true });
+    expect(mineTouchKeys(LANE_LEFT, 100, LANE_RIGHT, 118)).toEqual({ ...NONE, right: true });
+    expect(mineTouchKeys(LANE_CENTER, 100, LANE_CENTER + 30, 60)).toEqual({ ...NONE, up: true });
+    expect(mineTouchKeys(LANE_CENTER, 100, LANE_CENTER - 30, 190)).toEqual({ ...NONE, down: true });
+    expect(mineTouchKeys(LANE_CENTER, 100, LANE_CENTER, 118)).toEqual(NONE);
+    expect(mineTouchKeys(LANE_CENTER, 100, LANE_CENTER + 10, 123)).toEqual(NONE);
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("S36 La Mine Désaffectée : au doigt", () => {
+  /** Lance la mine `s36e` et relève ce que chaque image reçoit comme touches. */
+  const launch = async () => {
+    const run = await seedFor("s36e", { level: 2 });
+    const scene = run.scene as MineScene;
+    const inputs: MineInput[] = [];
+    const course = scene.course;
+    const step = course.step.bind(course);
+    course.step = (input: MineInput) => {
+      inputs.push(input);
+      step(input);
+    };
+    return { run, scene, inputs };
+  };
+
+  it("doigt posé sur la voie du chariot : il monte ou descend d'un pas par image vers le doigt, puis s'arrête", async () => {
+    const { run, scene } = await launch();
+    const { input } = run.host;
+    // Doigt à 86 : le chariot monte de 100 jusqu'à ce que son milieu (ordonnée + 18) soit à moins d'un pas (5) du doigt : 70.
+    touchDown(input, LANE_CENTER, 86);
+    await run.run(700);
+    expect(scene.stage).toBe("run");
+    expect(scene.course.y).toBe(70);
+    touchMove(input, LANE_CENTER, 199);
+    await run.run(400);
+    expect(scene.course.y).toBeGreaterThan(70);
+    // Comme une flèche relâchée, le doigt levé compte encore pour l'image en cours, puis plus rien.
+    touchUp(input, LANE_CENTER, 199);
+    await run.run(100);
+    const y = scene.course.y;
+    await run.run(300);
+    expect(scene.course.y).toBe(y);
+  }, 30_000);
+
+  it("doigt posé sur une autre voie : la flèche de ce côté tenue (comme au clavier) ; un toucher bref : un appui d'une image", async () => {
+    const { run, inputs } = await launch();
+    touchDown(run.host.input, LANE_LEFT, 120);
+    await run.run(300);
+    const held = inputs.slice(-2);
+    expect(held.every((i) => i.left && !i.right && !i.up && !i.down && !i.idle)).toBe(true);
+    touchUp(run.host.input, LANE_LEFT, 120);
+    await run.run(200);
+    expect(inputs.at(-1)).toMatchObject({ left: false, idle: true });
+    const before = inputs.length;
+    tap(run.host.input, LANE_RIGHT, 120);
+    await run.run(300);
+    const after = inputs.slice(before);
+    expect(after.filter((i) => i.right)).toHaveLength(1);
+    expect(after.find((i) => i.right)).toMatchObject({ idle: true });
+  }, 30_000);
+
+  it("hors cible : le doigt posé sur le chariot ne le déplace pas et ne vaut aucune flèche", async () => {
+    const { run, scene, inputs } = await launch();
+    const before = inputs.length;
+    touchDown(run.host.input, LANE_CENTER, CART_START_Y + 18);
+    await run.run(400);
+    touchUp(run.host.input, LANE_CENTER, CART_START_Y + 18);
+    await run.run(200);
+    expect(scene.course.y).toBe(CART_START_Y);
+    expect(inputs.slice(before).every((i) => !i.up && !i.down && !i.left && !i.right && i.idle)).toBe(true);
+  }, 30_000);
 });

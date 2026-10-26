@@ -4,11 +4,16 @@ import type { Scene, SceneContext } from "../../src/games/teleportaschtroumpf/en
 import type { Game } from "../../src/games/teleportaschtroumpf/game/rules";
 import { MAP_CELLS, MAP_LOCATIONS } from "../../src/games/teleportaschtroumpf/game/tables";
 import { FreeModeScene, MapScene, createFreeModeScene, createMapScene } from "../../src/games/teleportaschtroumpf/scenes/s02-map";
+import { BACK_BUTTON } from "../../src/games/teleportaschtroumpf/scenes/map/map-scene";
+import { boundsOf, placeSprite } from "../../src/games/teleportaschtroumpf/engine/sprites";
 import {
   MAP_ROWS,
   MAP_SEGMENTS,
   SCROLL_MAX,
+  VIEW_TOP,
   cellOfK,
+  locationAnchors,
+  locationAt,
   markerOfCell,
   moveSelection,
   sceneOfK,
@@ -18,6 +23,7 @@ import {
 import { TestHost } from "./engine-test-host";
 import { advance } from "./game-helpers";
 import { hasOriginalFiles } from "./helpers";
+import { longPress, swipe, tap, touchDown, touchMove, touchUp } from "./touch";
 
 /** Mini-jeux lancés par le mode libre : le registre est remplacé par une scène qui rend la main sur Espace. */
 const launched = vi.hoisted(() => ({ list: [] as { id: number; scene: number | undefined; level: number }[] }));
@@ -272,4 +278,137 @@ describe.skipIf(!hasOriginalFiles)("mode libre « Schtroumpf »", () => {
   it("createMapScene rend une carte indépendante du mode libre", () => {
     expect(createMapScene({ mode: "free" }, () => undefined)).toBeInstanceOf(MapScene);
   });
+});
+
+describe.skipIf(!hasOriginalFiles)("carte S02 : au doigt", () => {
+  /** Point de l'écran sur le lieu `k` (milieu du segment marqueur → case), pour le décalage courant de la carte. */
+  async function spot(t: Awaited<ReturnType<typeof launch>>, map: MapScene, k: number) {
+    const sprites = await t.engine.ctx.resources.hy8("s02a000s.hy8");
+    const a = locationAnchors((sprite) => boundsOf(placeSprite(sprites, sprite, false))).find((l) => l.k === k)!;
+    return { x: Math.round((a.mx + a.cx) / 2), y: Math.round((a.my + a.cy) / 2) - map.scrollOffset + VIEW_TOP };
+  }
+  const gesture = async (t: Awaited<ReturnType<typeof launch>>, act: () => void) => {
+    act();
+    await advance(t.engine, t.host, 200);
+  };
+
+  it("chaque lieu a sa zone : le milieu de son segment le désigne, sans ambiguïté", async () => {
+    const t = await launch(new MapScene({ mode: "free" }, () => undefined));
+    const sprites = await t.engine.ctx.resources.hy8("s02a000s.hy8");
+    const anchors = locationAnchors((sprite) => boundsOf(placeSprite(sprites, sprite, false)));
+    for (const a of anchors) expect(locationAt(anchors, (a.mx + a.cx) / 2, (a.my + a.cy) / 2, 1)).toBe(a.k);
+    // Puits : la maison (retour) ne compte pas.
+    const back = anchors[0];
+    expect(locationAt(anchors, back.mx, back.my, 2)).toBeNull();
+  }, 60_000);
+
+  it("mode libre : toucher un lieu y va ; le doigt qui se pose seul ne valide rien", async () => {
+    const results: number[] = [];
+    const map = new MapScene({ mode: "free" }, (_c, k) => results.push(k));
+    const t = await launch(map);
+    const { x, y } = await spot(t, map, 3);
+    touchDown(t.host.input, x, y);
+    await advance(t.engine, t.host, 200);
+    expect(results).toEqual([]);
+    touchUp(t.host.input, x, y);
+    await advance(t.engine, t.host, 200);
+    expect(results).toEqual([3]);
+    expect(map.selection).toBe(3);
+  }, 60_000);
+
+  it("mode libre : toucher la maison rend « retour » ; toucher hors d'un lieu ou hors de la fenêtre ne fait rien", async () => {
+    const results: number[] = [];
+    const map = new MapScene({ mode: "free" }, (_c, k) => results.push(k));
+    const t = await launch(map);
+    const sprites = await t.engine.ctx.resources.hy8("s02a000s.hy8");
+    const anchors = locationAnchors((sprite) => boundsOf(placeSprite(sprites, sprite, false)));
+    // Un point de la fenêtre loin de tout lieu.
+    let empty: { x: number; y: number } | null = null;
+    for (let y = VIEW_TOP; y < VIEW_TOP + 170 && !empty; y += 5) {
+      for (let x = 0; x < 320 && !empty; x += 5) if (locationAt(anchors, x, y - VIEW_TOP + map.scrollOffset, 1) === null) empty = { x, y };
+    }
+    await gesture(t, () => tap(t.host.input, empty!.x, empty!.y));
+    await gesture(t, () => tap(t.host.input, 160, 190)); // cadre
+    expect(results).toEqual([]);
+    expect(map.selection).toBe(1);
+    const house = await spot(t, map, 1);
+    await gesture(t, () => tap(t.host.input, house.x, house.y));
+    expect(results).toEqual([1]);
+  }, 60_000);
+
+  it("mode libre : l'appui long sur un lieu le sélectionne et dit sa voix d'aide, un geste la coupe ; rien sur la maison", async () => {
+    const results: number[] = [];
+    const map = new MapScene({ mode: "free" }, (_c, k) => results.push(k));
+    const t = await launch(map, { audio: true });
+    const plays = () => t.host.audio.plays.length;
+    const house = await spot(t, map, 1);
+    const before = plays();
+    await gesture(t, () => longPress(t.host.input, house.x, house.y));
+    expect(plays()).toBe(before);
+    expect(map.stage).toBe("browse");
+    const cake = await spot(t, map, 2);
+    await gesture(t, () => longPress(t.host.input, cake.x, cake.y));
+    expect(map.selection).toBe(2);
+    expect(map.stage).toBe("voice");
+    expect(t.host.audio.plays.at(-1)?.sound.samples).toBe((await t.engine.ctx.resources.voc("s45v023t.voc")).samples);
+    await gesture(t, () => tap(t.host.input, cake.x, cake.y)); // coupe la voix sans valider
+    expect(map.stage).toBe("browse");
+    expect(results).toEqual([]);
+  }, 60_000);
+
+  it("glisser fait défiler la carte (doigt suivi image par image, ou d'un coup au relâchement), puis on touche un lieu du haut", async () => {
+    const results: number[] = [];
+    const map = new MapScene({ mode: "free" }, (_c, k) => results.push(k));
+    const t = await launch(map);
+    expect(map.scrollOffset).toBe(SCROLL_MAX);
+    // Doigt tenu : la carte ne bouge pas sous le seuil, puis suit le doigt (vers le bas = haut de la carte).
+    touchDown(t.host.input, 160, 40);
+    await advance(t.engine, t.host, 100);
+    touchMove(t.host.input, 160, 46);
+    await advance(t.engine, t.host, 100);
+    expect(map.scrollOffset).toBe(SCROLL_MAX);
+    touchMove(t.host.input, 160, 140);
+    await advance(t.engine, t.host, 100);
+    expect(map.scrollOffset).toBe(SCROLL_MAX - 100);
+    touchUp(t.host.input, 160, 140);
+    await advance(t.engine, t.host, 100);
+    expect(map.scrollOffset).toBe(SCROLL_MAX - 100);
+    // Glissement d'un coup, borné en haut.
+    await gesture(t, () => swipe(t.host.input, 160, 20, 0, 150));
+    expect(map.scrollOffset).toBe(SCROLL_MAX - 250);
+    await gesture(t, () => swipe(t.host.input, 160, 20, 0, 150));
+    expect(map.scrollOffset).toBe(0);
+    expect(results).toEqual([]);
+    const mine = await spot(t, map, 18);
+    await gesture(t, () => tap(t.host.input, mine.x, mine.y));
+    expect(results).toEqual([18]);
+  }, 60_000);
+
+  it("puits : toucher un lieu le rend ; la maison et l'appui long ne font rien", async () => {
+    const results: number[] = [];
+    const map = new MapScene({ mode: "wish" }, (_c, k) => results.push(k));
+    const t = await launch(map);
+    const house = await spot(t, map, 1);
+    await gesture(t, () => tap(t.host.input, house.x, house.y));
+    const cake = await spot(t, map, 2);
+    await gesture(t, () => longPress(t.host.input, cake.x, cake.y));
+    expect(map.stage).toBe("browse");
+    expect(results).toEqual([]);
+    const next = await spot(t, map, 4);
+    await gesture(t, () => tap(t.host.input, next.x, next.y));
+    expect(results).toEqual([4]);
+  }, 60_000);
+
+  it("consultation : glisser fait défiler, toucher la carte ne fait rien, toucher « Retour » sort", async () => {
+    const results: number[] = [];
+    const map = new MapScene({ mode: "consult", zone: 5 }, (_c, k) => results.push(k));
+    const t = await launch(map);
+    await gesture(t, () => swipe(t.host.input, 160, 150, 0, -100));
+    expect(map.scrollOffset).toBe(100);
+    await gesture(t, () => tap(t.host.input, 160, 100));
+    await gesture(t, () => longPress(t.host.input, 160, 185));
+    expect(results).toEqual([]);
+    await gesture(t, () => tap(t.host.input, (BACK_BUTTON.x0 + BACK_BUTTON.x1) / 2, 189));
+    expect(results).toEqual([1]);
+  }, 60_000);
 });

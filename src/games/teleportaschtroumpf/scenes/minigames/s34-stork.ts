@@ -1,7 +1,8 @@
 import type { Hy8 } from "../../data/hy8";
 import { parsePal } from "../../data/mcg";
 import type { Voc } from "../../data/voc";
-import { AnimationPlayer } from "../../engine/sprites";
+import type { Input } from "../../engine/input";
+import { AnimationPlayer, boundsOf, placeFrame } from "../../engine/sprites";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Game } from "../../game/rules";
 import {
@@ -23,9 +24,9 @@ import {
  * - reçoit : `game`, la partie en cours ; la requête est `game.state.pending` (scène 34) : `level` 0..2 donne 3, 5 ou 7 oiseaux à éviter,
  *   `bonus` (indice de l'oiseau) 3 oiseaux (le niveau 0) ;
  * - joue : la vidéo de fond `s34a.mux` (non passable, 373 images) sur laquelle on pilote la cigogne (flèches ou Q / A / Z / X : battre des
- *   ailes, plonger, avancer, reculer) pendant 28 s en évitant les oiseaux qui traversent l'écran ; après 28 s plus aucun oiseau ne part,
- *   et quand l'écran est libre la cigogne s'envole vers la droite. Un oiseau touché fait jouer l'animation de chute puis la vidéo
- *   d'échec `s34b` ; la sortie réussie donne `s34c1` / `s34c2` selon que l'ingrédient 0 fait partie de l'objectif ;
+ *   ailes, plonger, avancer, reculer ; au doigt, elle va vers le doigt posé, ajout du port) pendant 28 s en évitant les oiseaux qui
+ *   traversent l'écran ; après 28 s plus aucun oiseau ne part, et quand l'écran est libre la cigogne s'envole vers la droite. Un oiseau
+ *   touché fait jouer l'animation de chute puis la vidéo d'échec `s34b` ; la sortie réussie donne `s34c1` / `s34c2` selon que l'ingrédient 0 fait partie de l'objectif ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la dernière vidéo (passable par Échap ou Espace) ; l'appelant applique
  *   l'issue.
  */
@@ -383,6 +384,26 @@ export class StorkRun {
   }
 }
 
+/**
+ * Zone morte (pixels) autour du centre de la cigogne pour le doigt : en deçà, la direction n'est pas tenue. Plus large que le pas
+ * horizontal (7 px par image) pour que la cigogne ne batte pas d'un côté à l'autre sous le doigt ; en hauteur, autour du corps.
+ */
+export const STORK_TOUCH_DEAD_X = 8;
+export const STORK_TOUCH_DEAD_Y = 10;
+
+/**
+ * Directions que tient un doigt posé en (x, y) quand la cigogne a son centre en (cx, cy) : vers le doigt, au-delà de la zone morte.
+ * Au-dessus, elle bat des ailes (haut) ; au-dessous, elle plonge (bas).
+ */
+export function touchKeys(x: number, y: number, cx: number, cy: number): StorkKeys {
+  return {
+    up: y < cy - STORK_TOUCH_DEAD_Y,
+    down: y > cy + STORK_TOUCH_DEAD_Y,
+    left: x < cx - STORK_TOUCH_DEAD_X,
+    right: x > cx + STORK_TOUCH_DEAD_X,
+  };
+}
+
 export type StorkPhase = "ride" | "hitSound" | "fadeOut" | "result" | "done";
 
 export class StorkScene implements Scene {
@@ -401,6 +422,8 @@ export class StorkScene implements Scene {
   private startCs = 0;
   private won = false;
   private keys: StorkKeys = { up: false, down: false, left: false, right: false };
+  /** Centre de la cigogne en plané par rapport à son point (x, y) : la référence du doigt. */
+  private center = { dx: 0, dy: 0 };
   private frame = -1;
   private done = false;
 
@@ -423,6 +446,11 @@ export class StorkScene implements Scene {
   /** Numéro de la dernière image de la vidéo traitée, −1 avant la première (pour les tests). */
   get currentFrame(): number {
     return this.frame;
+  }
+
+  /** Centre de la cigogne, la référence du doigt (pour les tests). */
+  get touchCenter(): { x: number; y: number } {
+    return { x: this.run.x + this.center.dx, y: this.run.y + this.center.dy };
   }
 
   /** Vrai si la cigogne est sortie à droite. */
@@ -451,6 +479,8 @@ export class StorkScene implements Scene {
     this.hitVoc = hitVoc;
     this.flapVoc = flapVoc;
     this.palette = parsePal(palette);
+    const glide = boundsOf(placeFrame(hy8, hy8.animations[ANIMATION_GLIDE].frames[0]));
+    this.center = { dx: Math.round((glide.minX + glide.maxX) / 2), dy: Math.round((glide.minY + glide.maxY) / 2) };
   }
 
   enter(ctx: SceneContext): void {
@@ -472,6 +502,7 @@ export class StorkScene implements Scene {
         // Un appui plus court qu'une image de la vidéo compte quand même (comme S27) : l'original lit les touches tenues à chaque image.
         const { input } = ctx;
         for (const key of ["up", "down", "left", "right"] as const) this.keys[key] ||= input.pressed(key) || input.justPressed(key);
+        this.steerByTouch(input);
         this.ride.update(ctx);
         return;
       }
@@ -515,6 +546,19 @@ export class StorkScene implements Scene {
     this.ride.stop(ctx);
     this.fail.stop(ctx);
     this.win.stop(ctx);
+  }
+
+  /**
+   * Au doigt (ajout du port) : tant que le doigt est posé, la cigogne tient les directions qui la mènent vers lui, comme les flèches
+   * tenues ; un toucher bref compte pour une image. La souris et son bouton ne pilotent rien, comme dans l'original.
+   */
+  private steerByTouch(input: Input): void {
+    const gesture = input.touchGesture;
+    const at = input.touchHeldAt ?? (gesture?.kind === "tap" ? gesture : null);
+    if (!at || !this.run) return;
+    const { x, y } = this.touchCenter;
+    const keys = touchKeys(at.x, at.y, x, y);
+    for (const key of ["up", "down", "left", "right"] as const) this.keys[key] ||= keys[key];
   }
 
   /** Rappel par image (`1b05:055a`). */

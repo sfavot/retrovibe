@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Hy8 } from "../../../src/games/teleportaschtroumpf/data/hy8";
 import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
-import { DragonScene, createDragon, dragonClip } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s22-dragon";
+import { DragonScene, SMURF_MIDDLE_Y, createDragon, dragonClip, dragonTouchKey } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s22-dragon";
 import {
   BIRD_START_COUNT,
   DELAY_BASES,
@@ -16,6 +16,7 @@ import {
   type SmurfPose,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s22/run";
 import { hasOriginalFiles, listData } from "../helpers";
+import { tap, touchDown, touchUp } from "../touch";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
 
 const INGREDIENT = 3;
@@ -485,3 +486,58 @@ function botSession(s: { host: { input: { keyDown(code: string): void; keyUp(cod
     set("ArrowDown", want === "ArrowDown");
   };
 }
+
+describe("S22 : au doigt (ajout du port)", () => {
+  it("un doigt au-dessus du milieu du Schtroumpf vaut haut, en dessous bas ; sur son milieu, rien", () => {
+    expect(dragonTouchKey(20)).toBe("up");
+    expect(dragonTouchKey(SMURF_MIDDLE_Y - 11)).toBe("up");
+    expect(dragonTouchKey(SMURF_MIDDLE_Y)).toBeNull();
+    expect(dragonTouchKey(SMURF_MIDDLE_Y + 10)).toBeNull();
+    expect(dragonTouchKey(SMURF_MIDDLE_Y + 11)).toBe("down");
+    expect(dragonTouchKey(199)).toBe("down");
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("S22 Le Dragon : au doigt", () => {
+  /** Niveau 0 : le premier dragon ne bouge pas avant 1,9 s, le Schtroumpf a le temps de poser. */
+  const playing = async () => {
+    const run = await launchMinigame(22, { seed: 5, level: 0 });
+    const scene = sceneOf(run);
+    await run.until(() => scene.stage === "play");
+    return { run, scene };
+  };
+
+  it("doigt posé au-dessus du Schtroumpf : pose « haut » ; en dessous : pose « bas »", async () => {
+    const { run, scene } = await playing();
+    touchDown(run.host.input, 200, 30);
+    await run.run(120);
+    expect(scene.course.pose).toBe("up");
+    touchUp(run.host.input, 200, 30);
+    await run.until(() => scene.course.pose === "idle", 2000);
+    touchDown(run.host.input, 76, 190);
+    await run.run(120);
+    expect(scene.course.pose).toBe("down");
+    touchUp(run.host.input, 76, 190);
+    // Le relâchement d'un doigt déjà vu posé ne relance pas de pose.
+    await run.until(() => scene.course.pose === "idle", 2000);
+    await run.run(200);
+    expect(scene.course.pose).toBe("idle");
+  }, 30_000);
+
+  it("un toucher bref compte comme un appui bref", async () => {
+    const { run, scene } = await playing();
+    tap(run.host.input, 76, 40);
+    await run.run(120);
+    expect(scene.course.pose).toBe("up");
+  }, 30_000);
+
+  it("hors cible : un doigt sur le milieu du Schtroumpf ne fait rien", async () => {
+    const { run, scene } = await playing();
+    touchDown(run.host.input, 76, SMURF_MIDDLE_Y);
+    await run.run(400);
+    expect(scene.course.pose).toBe("idle");
+    touchUp(run.host.input, 76, SMURF_MIDDLE_Y);
+    await run.run(200);
+    expect(scene.course.pose).toBe("idle");
+  }, 30_000);
+});

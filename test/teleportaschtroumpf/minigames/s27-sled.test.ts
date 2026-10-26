@@ -17,10 +17,12 @@ import {
   parseMarker,
   sledHits,
   sledStepSound,
+  sledTouchKey,
   sledVideo,
   steer,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s27-sled";
 import { hasOriginalFiles, listData } from "../helpers";
+import { tap, touchDown, touchMove, touchUp } from "../touch";
 import type { Scene } from "../../../src/games/teleportaschtroumpf/engine/scene";
 import type { TestHost } from "../engine-test-host";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
@@ -420,4 +422,49 @@ describe.skipIf(!hasOriginalFiles)("S27 La Luge : parcours depuis le plateau et 
     await run.until(() => run.free.stage === "map" && !run.ctx.scenes.transitioning, 30_000);
     expect(run.free.shown.selection).toBe(13);
   }, 180_000);
+});
+
+describe("S27 : au doigt (ajout du port)", () => {
+  it("la luge va vers le doigt : à plus d'un demi-pas de son milieu, la flèche de ce côté ; plus près, rien", () => {
+    expect(sledTouchKey(SLED_START_X, 20)).toBe("left");
+    expect(sledTouchKey(SLED_START_X, SLED_START_X - 16)).toBe("left");
+    expect(sledTouchKey(SLED_START_X, SLED_START_X - 15)).toBeNull();
+    expect(sledTouchKey(SLED_START_X, SLED_START_X + 15)).toBeNull();
+    expect(sledTouchKey(SLED_START_X, SLED_START_X + 16)).toBe("right");
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("S27 La Luge : au doigt", () => {
+  it("doigt posé : la luge le rejoint d'un pas par image et s'arrête dessous ; le doigt qui glisse l'entraîne ; bornes du clavier", async () => {
+    const run = await seedFor("s27e.mux", { level: 0 });
+    const scene = run.scene as SledScene;
+    const { input } = run.host;
+    touchDown(input, SLED_START_X - 2 * SLED_STEP, 150);
+    await run.run(600);
+    expect(scene.position).toBe(SLED_START_X - 2 * SLED_STEP);
+    touchMove(input, 310, 150);
+    await run.run(800);
+    expect(scene.position).toBe(SLED_MAX_X);
+    touchUp(input, 310, 150);
+    await run.run(300);
+    expect(scene.position).toBe(SLED_MAX_X);
+    expect(scene.stage).toBe("ride");
+  }, 30_000);
+
+  it("un toucher bref vaut un pas ; un toucher sur la luge, rien", async () => {
+    const run = await seedFor("s27e.mux", { level: 0 });
+    const scene = run.scene as SledScene;
+    tap(run.host.input, 300, 100);
+    await run.run(300);
+    expect(scene.position).toBe(SLED_START_X + SLED_STEP);
+    tap(run.host.input, SLED_START_X + SLED_STEP + 10, 150);
+    await run.run(300);
+    expect(scene.position).toBe(SLED_START_X + SLED_STEP);
+    // Doigt posé sur la luge : rien non plus.
+    touchDown(run.host.input, SLED_START_X + SLED_STEP, 150);
+    await run.run(300);
+    touchUp(run.host.input, SLED_START_X + SLED_STEP, 150);
+    await run.run(200);
+    expect(scene.position).toBe(SLED_START_X + SLED_STEP);
+  }, 30_000);
 });

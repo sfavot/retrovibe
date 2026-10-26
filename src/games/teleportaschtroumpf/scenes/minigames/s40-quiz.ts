@@ -18,7 +18,8 @@ import { levelTimeLimit, minigameLevel, minigameRequest, pointsOutcome, type Min
  *   (35, 28 ou 21 s), `bonus` (indice de l'oiseau) force le niveau 0 ;
  * - joue : une expression dont un mot est remplacé par « schtroumpf » (`S40A.DAT`, 44 questions) et trois propositions dans un ordre tiré
  *   au sort. Haut / bas (flèches, `Q` / `A`) changent la proposition surlignée, Espace (clic gauche) valide, Entrée (clic droit) la lit à voix haute.
- *   Le temps écoulé valide la proposition surlignée ;
+ *   Au doigt (ajout du port), toucher une proposition la choisit et la valide, l'appui long la lit. Le temps écoulé valide la proposition
+ *   surlignée ;
  * - rend : `onDone(ctx, { kind: "points", points })` : 1 point si la bonne proposition est choisie, 0 sinon ; l'appelant applique l'issue.
  */
 
@@ -42,6 +43,20 @@ const SHIFTED_FROM = 13;
 const MOVE_SOUND = "s07a001b.voc";
 const SPACE = 0x20;
 const PERIOD = 0x2e;
+
+/** Marge (pixels) autour du bloc de texte pour le doigt : les propositions se touchent sur toute la largeur du parchemin. */
+const TOUCH_MARGIN = 6;
+
+/**
+ * Ligne de proposition touchée en (x, y), ou `null` : une bande par ligne, de la largeur du bloc de texte, centrée sur le texte et
+ * aussi haute que l'écart entre deux lignes (`fontHeight` : hauteur de la police).
+ */
+export function answerRowAt(x: number, y: number, fontHeight: number): number | null {
+  if (x < TEXT_LEFT - TOUCH_MARGIN || x > TEXT_LEFT + TEXT_WIDTH + TOUCH_MARGIN) return null;
+  const step = ANSWER_ROWS[1] - ANSWER_ROWS[0];
+  const row = Math.floor((y - (ANSWER_ROWS[0] + fontHeight / 2 - step / 2)) / step);
+  return row >= 0 && row < ANSWER_ROWS.length ? row : null;
+}
 
 /** Temps imparti (secondes) au niveau interne 0..2. */
 export function timeLimit(level: number): number {
@@ -158,6 +173,8 @@ export class QuizScene implements Scene {
   /** Verrou de répétition de ↑ / ↓ (`local_47`) et ordonnée de la souris au tick précédent (bord haut / bas). */
   private latch = false;
   private lastMouseY = 100;
+  /** Ce que le doigt a demandé sur la ligne touchée, fait une fois le clic de sélection joué : valider ou lire. */
+  private touchAction: "validate" | "read" | null = null;
   private successVoice = -1;
   private earned = 0;
   private done = false;
@@ -254,6 +271,7 @@ export class QuizScene implements Scene {
     this.row = 0;
     this.announced = 0;
     this.latch = false;
+    this.touchAction = null;
     this.earned = 0;
     this.done = false;
   }
@@ -283,8 +301,8 @@ export class QuizScene implements Scene {
         if (!ctx.voice.voicePlaying) this.phase = "choose";
         return;
       case "answer":
-        // `1f33:03a7(1)` : un clic gauche coupe la voix de la proposition choisie.
-        if (ctx.voice.voicePlaying && !ctx.input.justPressed("validate")) return;
+        // `1f33:03a7(1)` : un clic gauche (ou un toucher du doigt) coupe la voix de la proposition choisie.
+        if (ctx.voice.voicePlaying && !ctx.input.validateNotTouch && ctx.input.touchGesture?.kind !== "tap") return;
         this.conclude(ctx);
         return;
       case "result":
@@ -330,6 +348,14 @@ export class QuizScene implements Scene {
       this.row++;
     }
     this.row = Math.min(2, Math.max(0, this.row));
+    // Au doigt : la ligne touchée devient la ligne surlignée (avec son clic, comme aux flèches), puis le toucher la valide et l'appui
+    // long la lit, comme Espace et Entrée. Le doigt qui se pose ne valide rien : son geste décide au relâchement.
+    const gesture = input.touchGesture;
+    const touched = gesture && gesture.kind !== "swipe" ? answerRowAt(gesture.x, gesture.y, this.font.height) : null;
+    if (touched !== null) {
+      this.row = touched;
+      this.touchAction = gesture!.kind === "tap" ? "validate" : "read";
+    }
 
     if (input.justPressed("cancel")) {
       ctx.voice.play(this.answerVoices[this.order[this.row]]);
@@ -342,7 +368,14 @@ export class QuizScene implements Scene {
       this.phase = "move";
       return;
     }
-    if (input.justPressed("validate") || this.timer!.seconds >= timeLimit(this.level)) {
+    const touch = this.touchAction;
+    this.touchAction = null;
+    if (touch === "read") {
+      ctx.voice.play(this.answerVoices[this.order[this.row]]);
+      this.phase = "read";
+      return;
+    }
+    if (touch === "validate" || input.validateNotTouch || this.timer!.seconds >= timeLimit(this.level)) {
       // `1f33:036d` n'attend plus rien ici ; la voix de la proposition choisie est lue.
       ctx.voice.play(this.answerVoices[this.order[this.row]]);
       this.phase = "answer";

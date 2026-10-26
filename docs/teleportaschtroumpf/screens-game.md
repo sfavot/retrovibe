@@ -25,6 +25,7 @@ Par tour : musique aléatoire `s52m00Nm` (`28a3:0007`), plateau `291e:0401` → 
 ## Écarts à l'original
 
 - Le bouton est un appui (front), pas un bouton tenu ; clavier d'origine seul, souris : boutons.
+- Gestes du doigt (ajout du port ; clavier et souris inchangés) : toucher le décor fait marcher le pion jusque-là sur sa rangée (près d'un bord : jusqu'au bord), toucher le pion est le bouton, glisser vers le haut saute du côté du glissement, toucher le bandeau du bas met en pause (P), l'appui long joue la voix d'aide (clic droit).
 - Bandeau sans objectif avant S19, comme l'original (`Board.setGoalHidden`) ; S19 le complète, puis le plateau le redessine entier.
 - Poussée hors des lignes de séparation (`2813:0886`) et marche d'entrée d'écran (`291e:13f2`) instantanées, sans animation.
 - Fondu de 0x20 pas après la voix d'accroche : fondu normal.

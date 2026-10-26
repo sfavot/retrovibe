@@ -1,8 +1,9 @@
 import type { Hy8 } from "../data/hy8";
-import type { Mcg } from "../data/mcg";
+import { SCREEN_HEIGHT, type Mcg } from "../data/mcg";
 import type { Voc } from "../data/voc";
 import type { PlayerSetup } from "../game/rules";
-import { Menu, paletteHighlight, spriteArea } from "../engine/menu";
+import type { TouchGesture } from "../engine/input";
+import { AREA_MARGIN, insideArea, Menu, type MenuArea, paletteHighlight, spriteArea } from "../engine/menu";
 import { voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
 import { CLICK_SOUND, centisecondsToTicks } from "./setup/common";
@@ -89,7 +90,10 @@ const CAPSULE_STEP = 5;
  * Retour) : haut / bas avec rebouclage, clic droit = voix `s08v012..014`, validation = `play` / `back` / `menu`.
  *
  * Clavier d'origine seul : les boutons de la souris valident (gauche) et jouent la voix (droit), sans tenir compte de la
- * position du pointeur. Ajout du port : toucher un des trois boutons de fin le valide.
+ * position du pointeur. Ajout du port : toucher un des trois boutons de fin le valide. Au doigt, pendant le choix d'un
+ * joueur : glisser vers la droite / la gauche = personnage suivant / précédent, vers le haut / le bas = niveau (comme les
+ * flèches de même sens) ; toucher le personnage le valide, toucher le pot sous lui (couleur et icône de niveau) passe au
+ * niveau suivant ; l'appui long sur l'un ou l'autre dit leurs voix (clic droit). Un toucher ailleurs ne fait rien.
  */
 export function createCharactersScene(players: number, onDone: (ctx: SceneContext, result: CharactersResult) => void): Scene {
   return new CharactersScene(players, onDone);
@@ -318,10 +322,11 @@ class CharactersScene implements Scene {
       this.level = (this.level + step) % 3;
       changed = true;
     };
-    if (input.justPressed("right")) move(1);
-    if (input.justPressed("left")) move(-1);
-    if (input.justPressed("up")) shiftLevel(1);
-    if (input.justPressed("down")) shiftLevel(2);
+    const touch = this.touchAction(input.touchGesture);
+    if (input.justPressed("right") || touch === "next") move(1);
+    if (input.justPressed("left") || touch === "previous") move(-1);
+    if (input.justPressed("up") || touch === "levelUp") shiftLevel(1);
+    if (input.justPressed("down") || touch === "levelDown") shiftLevel(2);
 
     if (changed) {
       // Bruitage mélangé `348d:0b42` : le bip n'est lancé que si aucun bruitage ne sonne.
@@ -329,13 +334,42 @@ class CharactersScene implements Scene {
       this.applyLevelColor(ctx);
       return;
     }
-    if (input.justPressed("cancel")) {
+    if (input.justPressed("cancel") || touch === "help") {
       ctx.voice.holdMusic(true);
       ctx.voice.play(this.voice(1 + CHARACTER_VOICE[this.character]));
       this.phase = "helpCharacter";
       return;
     }
-    if (input.justPressed("validate")) this.validateCharacter(ctx);
+    // Le doigt qui se pose envoie aussi « valider » : ignoré, son geste décide.
+    if (input.validateNotTouch || touch === "validate") this.validateCharacter(ctx);
+  }
+
+  /**
+   * Geste du doigt pendant le choix (ajout du port) : un glissement vaut la flèche de même sens, où qu'il soit (un seul
+   * emplacement se choisit à la fois) ; toucher et appui long visent le personnage ou le pot de l'emplacement courant.
+   */
+  private touchAction(gesture: TouchGesture | null): "next" | "previous" | "levelUp" | "levelDown" | "validate" | "help" | null {
+    if (!gesture) return null;
+    if (gesture.kind === "swipe") {
+      if (Math.abs(gesture.dx) >= Math.abs(gesture.dy)) return gesture.dx > 0 ? "next" : "previous";
+      return gesture.dy < 0 ? "levelUp" : "levelDown";
+    }
+    const { character, level } = this.touchAreas();
+    const onCharacter = insideArea(character, gesture.x, gesture.y);
+    if (!onCharacter && !insideArea(level, gesture.x, gesture.y)) return null;
+    if (gesture.kind === "long") return "help";
+    return onCharacter ? "validate" : "levelUp";
+  }
+
+  /**
+   * Zones de l'emplacement courant : le personnage (son sprite, élargi) et, dessous jusqu'au bas de l'écran, le pot avec sa
+   * couleur et son icône de niveau (largeur de l'icône, élargie).
+   */
+  private touchAreas(): { character: MenuArea; level: MenuArea } {
+    const x = this.layout.x[this.slot];
+    const character = spriteArea(this.sprites, CHARACTER_SPRITES[this.character], x, CHARACTER_Y, AREA_MARGIN);
+    const icon = spriteArea(this.sprites, LEVEL_SPRITE + this.level, this.layout.levelX[this.slot], LEVEL_Y, AREA_MARGIN);
+    return { character, level: { x0: icon.x0, y0: character.y1 + 1, x1: icon.x1, y1: SCREEN_HEIGHT - 1 } };
   }
 
   /** La couleur de niveau est copiée sur l'entrée de palette de l'emplacement (`21ee:08c6..0929`). */

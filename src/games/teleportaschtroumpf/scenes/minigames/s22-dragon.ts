@@ -13,6 +13,7 @@ import {
   type MinigameDone,
   type MinigameFactory,
 } from "./common";
+import { HeldFinger } from "./held-finger";
 import {
   Anim,
   DEATH_ANIMATION,
@@ -34,7 +35,8 @@ import {
  *   (190, 120 ou 50 centièmes de seconde plus un tirage de 0 à 99) ; `bonus` (indice de l'oiseau) force le niveau 0 (le plus lent) et compte
  *   déjà 5 dragons sur les 10 ;
  * - joue : un Schtroumpf se tient à gauche ; un dragon arrive de la droite sur l'une des trois hauteurs, fonce jusqu'au milieu de l'écran puis
- *   repart. Haut ou bas (flèches, `Q` / `A`) lui fait prendre une pose qui esquive certaines hauteurs. Le dixième dragon qui apparaît donne la
+ *   repart. Haut ou bas (flèches, `Q` / `A` ; au doigt, posé au-dessus ou en dessous du Schtroumpf) lui fait prendre une pose qui
+ *   esquive certaines hauteurs. Le dixième dragon qui apparaît donne la
  *   victoire ; un dragon qui touche le Schtroumpf, la brûlure (échec) ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la vidéo de victoire (`s22c1` si l'ingrédient 3 fait partie de l'objectif,
  *   `s22c2` sinon : sens **inverse** de S27 ; passable par Échap ou Espace) ou, en cas d'échec, après le fondu au noir ; l'appelant applique l'issue.
@@ -45,6 +47,21 @@ const INGREDIENT = sceneIngredient(22)!;
 
 /** Cadence de la boucle (`1f33:0348(5)`) : 5 ticks, soit 12 itérations par seconde. */
 export const DRAGON_FRAME_TICKS = 5;
+/**
+ * Au doigt (ajout du port) : ligne du milieu du Schtroumpf au repos (`s22a001s.hy8`, animation 0 : lignes 67 à 176). Un doigt posé
+ * au-dessus vaut « haut », en dessous « bas », tant qu'il reste posé ; sur le Schtroumpf, à moins de `TOUCH_DEAD_ZONE` lignes de ce
+ * milieu, il ne vaut rien.
+ */
+export const SMURF_MIDDLE_Y = SMURF_Y - 55;
+export const TOUCH_DEAD_ZONE = 10;
+
+/** Direction que vaut un doigt posé en `y` (voir `SMURF_MIDDLE_Y`), ou `null`. */
+export function dragonTouchKey(y: number): "up" | "down" | null {
+  if (y < SMURF_MIDDLE_Y - TOUCH_DEAD_ZONE) return "up";
+  if (y > SMURF_MIDDLE_Y + TOUCH_DEAD_ZONE) return "down";
+  return null;
+}
+
 /** Pause de 2 s après la victoire (`1f33:0279(2)`). */
 const WIN_PAUSE_TICKS = 120;
 
@@ -75,6 +92,7 @@ export class DragonScene implements Scene {
   private done = false;
   /** Fond sonore en cours (`s22a005b`) : un bruitage ne doit pas attendre qu'il finisse, il le coupe. */
   private held = { up: false, down: false };
+  private readonly finger = new HeldFinger();
   private drawn: { dragon: Drawn | null; smurf: Drawn | null; death: Drawn | null } = { dragon: null, smurf: null, death: null };
 
   constructor(
@@ -144,6 +162,7 @@ export class DragonScene implements Scene {
     this.won = false;
     this.done = false;
     this.held = { up: false, down: false };
+    this.finger.reset();
     this.deathAnim = new Anim(this.smurfSheet, DEATH_ANIMATION);
     this.run = new DragonRun({ dragonSheet: this.dragonSheet, smurfSheet: this.smurfSheet }, this.level, this.bonus, ctx.clock.centiseconds);
     // Avant le fondu d'entrée, le Schtroumpf au repos est déjà dessiné (`1c78:00b2`).
@@ -224,9 +243,12 @@ export class DragonScene implements Scene {
     ctx.voice.holdMusic(false);
   }
 
+  /** Touches retenues jusqu'à l'itération suivante ; le doigt posé au-dessus ou en dessous du Schtroumpf vaut haut ou bas tenu. */
   private latchKeys(ctx: SceneContext): void {
     const { input } = ctx;
-    for (const key of ["up", "down"] as const) this.held[key] ||= input.pressed(key) || input.justPressed(key);
+    const finger = this.finger.read(input);
+    const touched = finger ? dragonTouchKey(finger.y) : null;
+    for (const key of ["up", "down"] as const) this.held[key] ||= input.pressed(key) || input.justPressed(key) || touched === key;
   }
 
   /** Un bruitage (pas le fond sonore) sort : `348d:0b42(1, 0) != 0`. */

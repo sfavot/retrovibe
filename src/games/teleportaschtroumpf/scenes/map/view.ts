@@ -78,3 +78,62 @@ export function moveSelection(k: number, delta: 1 | -1, min: number): number {
 export function scrolled(scroll: number, delta: number): number {
   return Math.min(SCROLL_MAX, Math.max(0, scroll + delta));
 }
+
+/**
+ * Ajout du port pour le doigt : un lieu se touche le long d'un segment qui va du centre du marqueur (le Schtroumpf posé à côté du
+ * lieu) à la case elle-même (sur le chemin, au pied de l'objet du lieu), coordonnées du fond défilant. L'original n'a que le clavier.
+ */
+export interface LocationAnchor {
+  k: number;
+  /** Centre du marqueur du lieu. */
+  mx: number;
+  my: number;
+  /** Case de `DS:1470`. */
+  cx: number;
+  cy: number;
+}
+
+/**
+ * Distance (pixels) au-delà de laquelle un toucher ne désigne aucun lieu. Assez large pour l'objet dessiné du lieu (la guitare
+ * du musicien est à ~25 px du marqueur), le lieu le plus proche l'emporte.
+ */
+export const TOUCH_RADIUS = 36;
+
+/**
+ * Ancres des lieux `k` = 1..18 ; `markerBounds(sprite)` = rectangle du sprite du marqueur autour de son ancre (bord gauche, ligne
+ * du bas).
+ */
+export function locationAnchors(markerBounds: (sprite: number) => { minX: number; minY: number; maxX: number; maxY: number }): LocationAnchor[] {
+  const anchors: LocationAnchor[] = [];
+  for (let k = K_BACK; k <= K_LAST; k++) {
+    const cell = cellOfK(k);
+    const marker = markerOfCell(cell);
+    const b = markerBounds(marker.sprite);
+    const [cx, cy] = MAP_CELLS[cell];
+    anchors.push({ k, mx: marker.x + (b.minX + b.maxX) / 2, my: marker.footY + (b.minY + b.maxY) / 2, cx, cy });
+  }
+  return anchors;
+}
+
+/** Lieu (≥ `min`) le plus proche du point (x, y) du fond défilant, à moins de `TOUCH_RADIUS` ; `null` sinon. */
+export function locationAt(anchors: readonly LocationAnchor[], x: number, y: number, min: number): number | null {
+  let best: number | null = null;
+  let bestDistance = TOUCH_RADIUS;
+  for (const a of anchors) {
+    if (a.k < min) continue;
+    const distance = segmentDistance(x, y, a.mx, a.my, a.cx, a.cy);
+    if (distance <= bestDistance) {
+      best = a.k;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function segmentDistance(x: number, y: number, x0: number, y0: number, x1: number, y1: number): number {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const length = dx * dx + dy * dy;
+  const t = length === 0 ? 0 : Math.min(1, Math.max(0, ((x - x0) * dx + (y - y0) * dy) / length));
+  return Math.hypot(x - (x0 + t * dx), y - (y0 + t * dy));
+}

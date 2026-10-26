@@ -14,10 +14,13 @@ import {
   createMagicFormula,
   drawSecret,
   drawSymbols,
+  formulaTargetAt,
+  isSubmitSwipe,
   levelRules,
   scoreGuess,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s33-magic-formula";
 import { hasOriginalFiles } from "../helpers";
+import { swipe, tap, touchDown, touchUp } from "../touch";
 import { Session } from "../game-helpers";
 import { doorPosition, enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame } from "./harness";
 
@@ -83,6 +86,31 @@ describe("S33 : règles de la formule (pur, `1ceb:000c`)", () => {
     expect(new Set(SYMBOL_VOICES).size).toBe(12);
     expect(Math.min(...SYMBOL_VOICES) + 3).toBe(3);
     expect(Math.max(...SYMBOL_VOICES) + 3).toBe(14);
+  });
+
+  it("doigt : chaque ligne de la liste désigne son symbole, chaque cadre du bas son emplacement, le reste rien", () => {
+    for (let i = 0; i < 6; i++) {
+      expect(formulaTargetAt(40, 0x18 + i * 0x16, 6)).toEqual({ kind: "symbol", index: i });
+      expect(formulaTargetAt(12, 0x18 + i * 0x16 - 10, 6)).toEqual({ kind: "symbol", index: i });
+    }
+    expect(formulaTargetAt(40, 0x18 + 6 * 0x16, 6)).toBeNull();
+    expect(formulaTargetAt(40, 0x18 + 6 * 0x16, 7)).toEqual({ kind: "symbol", index: 6 });
+    expect(formulaTargetAt(40, 4, 6)).toBeNull();
+    for (let j = 0; j < 3; j++) {
+      expect(formulaTargetAt(0x69 + j * 0x41 + 0x1e, 0xa8, 6)).toEqual({ kind: "slot", index: j });
+      expect(formulaTargetAt(0x69 + j * 0x41 + 2, 0xa1, 6)).toEqual({ kind: "slot", index: j });
+    }
+    expect(formulaTargetAt(200, 60, 6)).toBeNull();
+    expect(formulaTargetAt(200, 0xb1 + 20, 6)).toBeNull();
+    expect(formulaTargetAt(0x5a, 0xa8, 6)).toBeNull();
+  });
+
+  it("doigt : proposer, c'est glisser vers le haut depuis la partie droite (proposition ou parchemin)", () => {
+    expect(isSubmitSwipe({ x: 200, dx: 0, dy: -40 })).toBe(true);
+    expect(isSubmitSwipe({ x: 120, dx: 10, dy: -20 })).toBe(true);
+    expect(isSubmitSwipe({ x: 200, dx: 0, dy: 40 })).toBe(false);
+    expect(isSubmitSwipe({ x: 200, dx: 40, dy: -20 })).toBe(false);
+    expect(isSubmitSwipe({ x: 40, dx: 0, dy: -40 })).toBe(false);
   });
 
   it("la requête est exigée : Game.openMinigame(33) d'abord", () => {
@@ -247,6 +275,86 @@ describe.skipIf(!hasOriginalFiles)("S33 La Formule Magique : commandes", () => {
     // Les bruitages ne passent pas par la voie : la musique n'a pas été relancée à chaque son.
     expect(run.host.audio.plays.length).toBe(voicesBefore);
     expect(scene.lastAnswers.every((a) => a !== ANSWER_EXACT)).toBe(true);
+  }, 60_000);
+});
+
+describe.skipIf(!hasOriginalFiles)("S33 La Formule Magique : au doigt (ajout du port)", () => {
+  /** Toucher bref puis un pas de logique (5 ticks). */
+  const touch = async (run: LaunchedMinigame, x: number, y: number) => {
+    tap(run.host.input, x, y);
+    await run.run(TAP_MS);
+  };
+  const slotPoint = (column: number): [number, number] => [0x69 + column * 0x41 + 0x1e, 0xa8];
+  const symbolPoint = (index: number): [number, number] => [40, 0x18 + index * 0x16];
+
+  it("toucher un emplacement puis un symbole compose la proposition, avec le clic des flèches ; glisser vers le haut la propose", async () => {
+    const run = await launch({ level: 1, audio: true });
+    const scene = run.scene as MagicFormulaScene;
+    await run.until(() => scene.stage === "play");
+    const { effects } = run.host.audio;
+    await run.tap("ArrowDown", TAP_MS);
+    const move = effects.at(-1)!.sound;
+    for (let column = 2; column >= 0; column--) {
+      const before = effects.length;
+      await touch(run, ...slotPoint(column));
+      expect(scene.selectedColumn).toBe(column);
+      await touch(run, ...symbolPoint(scene.secret[column]));
+      expect(scene.guess[column]).toBe(scene.secret[column]);
+      expect(scene.selectedSymbol).toBe(scene.secret[column]);
+      expect(effects.length).toBeGreaterThan(before);
+      expect(effects.at(-1)!.sound).toBe(move);
+    }
+    expect(scene.attemptCount).toBe(0);
+    swipe(run.host.input, 200, 0xa8, 0, -50);
+    await run.run(TAP_MS);
+    expect(scene.attemptCount).toBe(1);
+    await run.until(() => !scene.answering || scene.stage !== "play", 30_000);
+    expect(scene.lastAnswers).toEqual([2, 2, 2]);
+    expect(scene.succeeded).toBe(true);
+    expect(await run.finish(120_000)).toEqual({ kind: "ingredient", success: true });
+  }, 180_000);
+
+  it("le doigt qui se pose ne propose rien ; toucher le parchemin, glisser ailleurs ou vers le bas ne fait rien", async () => {
+    const run = await launch({ level: 0 });
+    const scene = run.scene as MagicFormulaScene;
+    await run.until(() => scene.stage === "play");
+    touchDown(run.host.input, 200, 0xa8);
+    await run.run(400);
+    expect(scene.attemptCount).toBe(0);
+    touchUp(run.host.input, 200, 0xa8 + 30);
+    await run.run(TAP_MS);
+    await touch(run, 200, 60);
+    await touch(run, 300, 10);
+    swipe(run.host.input, 40, 0x60, 0, -50);
+    await run.run(TAP_MS);
+    swipe(run.host.input, 200, 0x40, 0, 50);
+    await run.run(TAP_MS);
+    swipe(run.host.input, 200, 0xa8, 60, 0);
+    await run.run(TAP_MS);
+    expect(scene.attemptCount).toBe(0);
+    expect(scene.guess).toEqual([0, 0, 0]);
+    expect(scene.selectedColumn).toBe(0);
+    // Un toucher sous la liste (au-delà du dernier symbole du niveau) ne choisit rien non plus.
+    await touch(run, 40, 0x18 + scene.symbols * 0x16);
+    expect(scene.guess).toEqual([0, 0, 0]);
+  }, 60_000);
+
+  it("pendant l'animation d'une réponse, les touchers sont ignorés comme les flèches", async () => {
+    const run = await launch({ level: 0 });
+    const scene = run.scene as MagicFormulaScene;
+    await run.until(() => scene.stage === "play");
+    const picks = wrongPicks(scene, 0);
+    for (let column = 0; column < 3; column++) {
+      await touch(run, ...slotPoint(column));
+      await touch(run, ...symbolPoint(picks[column]));
+    }
+    swipe(run.host.input, 200, 0xa8, 0, -50);
+    await run.run(TAP_MS);
+    expect(scene.answering).toBe(true);
+    await touch(run, ...slotPoint(0));
+    await touch(run, ...symbolPoint((picks[2] + 1) % scene.symbols));
+    expect(scene.selectedColumn).toBe(2);
+    expect(scene.guess).toEqual(picks);
   }, 60_000);
 });
 

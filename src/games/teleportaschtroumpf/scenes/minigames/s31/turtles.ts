@@ -216,6 +216,30 @@ export interface SmurfKeys {
   click: boolean;
 }
 
+/**
+ * Au doigt (ajout du port) : boîte du Schtroumpf au repos autour de son point (`s31a000s.hy8`, animation 0 : colonnes −17 à 31,
+ * lignes −44 à 9) et son milieu. Toucher le Schtroumpf le fait sauter sur place ; toucher plus loin le long de la rivière, à au moins
+ * un demi-saut de lui (projection sur le saut `(HOP_DX, −HOP_DY)`), en avant ou en arrière ; un glissement vaut le saut de son sens.
+ */
+export const SMURF_BOX = { left: -17, top: -44, right: 31, bottom: 9 } as const;
+const SMURF_MIDDLE = { dx: 7, dy: -17 } as const;
+
+/** Touche que vaut un toucher en (`x`, `y`) (ou un glissement de (`dx`, `dy`)) pour un Schtroumpf en (`smurfX`, `smurfY`), ou `null`. */
+export function touchedHop(
+  smurfX: number,
+  smurfY: number,
+  gesture: { kind: "tap" | "long"; x: number; y: number } | { kind: "swipe"; x: number; y: number; dx: number; dy: number },
+): keyof SmurfKeys | null {
+  const hop = HOP_DX * HOP_DX + HOP_DY * HOP_DY;
+  if (gesture.kind === "swipe") return gesture.dx * HOP_DX - gesture.dy * HOP_DY >= 0 ? "up" : "down";
+  const { x, y } = gesture;
+  if (x >= smurfX + SMURF_BOX.left && x < smurfX + SMURF_BOX.right && y >= smurfY + SMURF_BOX.top && y < smurfY + SMURF_BOX.bottom) return "click";
+  const along = ((x - smurfX - SMURF_MIDDLE.dx) * HOP_DX - (y - smurfY - SMURF_MIDDLE.dy) * HOP_DY) / hop;
+  if (along >= 0.5) return "up";
+  if (along <= -0.5) return "down";
+  return null;
+}
+
 export interface SmurfDraw {
   animation: number;
   frame: number;

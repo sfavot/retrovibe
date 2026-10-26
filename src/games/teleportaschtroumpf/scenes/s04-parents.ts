@@ -2,7 +2,8 @@ import type { PfnFont } from "../data/font";
 import type { Hy8 } from "../data/hy8";
 import type { Mcg } from "../data/mcg";
 import { encodeCp437 } from "../../../data/cp437";
-import { Menu, paletteHighlight } from "../engine/menu";
+import type { Input } from "../engine/input";
+import { insideArea, Menu, type MenuArea, paletteHighlight } from "../engine/menu";
 import { saveOptions } from "../engine/options";
 import type { Scene, SceneContext } from "../engine/scene";
 import { CLICK_SOUND } from "./setup/common";
@@ -48,6 +49,17 @@ const LABEL_FIRST_ENTRY = 119;
 const HOVER_COLOR = [0x10, 0xa4, 0xcc] as const;
 
 /**
+ * Zones du doigt (ajout du port, mesurées sur `s04a001d` et `s04a000s`), par réglage : le libellé (entrées 119 à 121 élargies)
+ * et la valeur, centrée sur `centerX` (cadran du premier coucou, pendule de la pause, ligne du message). Toucher la valeur à
+ * gauche / à droite de ce centre la diminue / l'augmente.
+ */
+const TOUCH_ROWS: readonly { label: MenuArea; value: MenuArea; centerX: number }[] = [
+  { label: { x0: 0, y0: 10, x1: 56, y1: 42 }, value: { x0: 40, y0: 8, x1: 116, y1: 150 }, centerX: 78 },
+  { label: { x0: 238, y0: 68, x1: 296, y1: 94 }, value: { x0: 176, y0: 84, x1: 256, y1: 136 }, centerX: 216 },
+  { label: { x0: 28, y0: 150, x1: 176, y1: 174 }, value: { x0: 20, y0: 175, x1: 184, y1: 199 }, centerX: 102 },
+];
+
+/**
  * S04 : menu parents (engine.md §6.3, `21ee:13a1`).
  *
  * - reçoit : rien (lit et écrit `ctx.options` : `saveOptions(ctx.host.storage, ctx.options)`) ;
@@ -61,6 +73,12 @@ const HOVER_COLOR = [0x10, 0xa4, 0xcc] as const;
  * en 7 images, la pause pose une jauge de 5 sprites, le message est écrit en bas. Clic gauche / Espace : valide, écrit
  * les options (durée, pause, message et la date de la dernière partie, conservée) et quitte. Pas de voix, pas de
  * quitter par Échap. Clavier d'origine seul : la position du pointeur ne compte pas.
+ *
+ * Ajout du port pour le doigt (la souris reste celle de l'original) : toucher le libellé ou la valeur d'un réglage le
+ * sélectionne ; une fois sélectionné, toucher sa valeur à gauche / à droite du centre la diminue / l'augmente ; glisser
+ * horizontalement sur un réglage le sélectionne et change sa valeur dans le sens du doigt ; l'appui long, n'importe où,
+ * enregistre et quitte (aucun bouton à l'écran, et un toucher bref ne doit pas quitter par mégarde). Un toucher ailleurs
+ * ne fait rien.
  */
 export function createParentsScene(onDone: (ctx: SceneContext) => void): Scene {
   return new ParentsScene(onDone);
@@ -141,8 +159,34 @@ class ParentsScene implements Scene {
     const delta = (input.justPressed("right") ? 1 : 0) - (input.justPressed("left") ? 1 : 0);
     const event = this.menu.update(ctx);
     if (delta !== 0) this.change(this.menu.index, delta, this.menu.index === MESSAGE);
-    // Valider : Espace ou clic gauche.
-    if (event?.kind === "validate") this.finish(ctx);
+    // Valider : Espace ou clic gauche. Le doigt qui se pose envoie aussi « valider » (le menu, sans zones, le rend) : ignoré.
+    if (event?.kind === "validate" && !input.validateByTouch) this.finish(ctx);
+    else if (delta === 0) this.touch(ctx, input);
+  }
+
+  /** Geste du doigt (ajout du port, voir `createParentsScene`). */
+  private touch(ctx: SceneContext, input: Input): void {
+    const gesture = input.touchGesture;
+    if (!gesture) return;
+    if (gesture.kind === "long") {
+      this.finish(ctx);
+      return;
+    }
+    const row = TOUCH_ROWS.findIndex((r) => insideArea(r.value, gesture.x, gesture.y) || insideArea(r.label, gesture.x, gesture.y));
+    if (row < 0) return;
+    if (gesture.kind === "swipe") {
+      if (Math.abs(gesture.dx) < Math.abs(gesture.dy)) return;
+      this.menu.move(ctx, row);
+      this.change(row, gesture.dx > 0 ? 1 : -1, row === MESSAGE);
+      return;
+    }
+    if (row !== this.menu.index) {
+      // Comme haut / bas : sélection et bip, la valeur ne change pas.
+      this.menu.move(ctx, row);
+      return;
+    }
+    const { value, centerX } = TOUCH_ROWS[row];
+    if (insideArea(value, gesture.x, gesture.y)) this.change(row, gesture.x < centerX ? -1 : 1, row === MESSAGE);
   }
 
   render(ctx: SceneContext): void {

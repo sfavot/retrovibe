@@ -58,6 +58,22 @@ const BUTTON_ACTIONS: Readonly<Record<number, Action>> = { 0: "validate", 2: "ca
 const CENTER_X = 0xa0;
 const CENTER_Y = 100;
 
+/**
+ * Geste du doigt reconnu au relâchement (ou au bout de l'appui long), en pixels 320×200. Ajout du port pour jouer au tactile
+ * sans flèches : seuls les doigts en produisent, la souris et le clavier gardent les entrées d'origine.
+ *
+ * - `tap` : doigt posé puis levé sans glisser ni s'attarder, en (x, y) ;
+ * - `long` : doigt resté en place `LONG_PRESS_MS` (le relâchement ne produit plus rien) ;
+ * - `swipe` : doigt glissé de (x, y) de (dx, dy), d'au moins `SWIPE_MIN` pixels.
+ */
+export type TouchGesture = { kind: "tap" | "long"; x: number; y: number } | { kind: "swipe"; x: number; y: number; dx: number; dy: number };
+
+/** Distance (pixels 320×200) au-delà de laquelle un doigt levé a glissé plutôt que touché. */
+export const SWIPE_MIN = 12;
+
+/** Gestes mémorisés au plus : comme pour les appuis, un doigt qui s'emballe n'accumule pas de retard. */
+const MAX_PENDING_GESTURES = 4;
+
 /** Appuis rapides mémorisés au plus par action : au-delà, un clavier qui s'emballe n'accumule pas de retard. */
 const MAX_PENDING_PRESSES = 4;
 
@@ -92,10 +108,20 @@ export class Input {
    * Les menus à zones (`Menu`, option `areas`) s'en servent pour valider l'entrée touchée.
    */
   validateAt: { x: number; y: number } | null = null;
+  /**
+   * Le dernier appui « valider » vient d'un doigt (et non de la souris ou du clavier). Les scènes à gestes ignorent cet appui,
+   * qui part dès que le doigt se pose, et lisent `touchGesture` à la place.
+   */
+  validateByTouch = false;
 
   private readonly held = new Map<Action, Set<string>>();
   /** Appuis pas encore consommés, par action. */
   private readonly pending = new Map<Action, number>();
+  /** Le bouton gauche tenu vient d'un doigt. */
+  private touching = false;
+  private touchStart: { x: number; y: number } | null = null;
+  private touchLongDone = false;
+  private readonly gestures: TouchGesture[] = [];
 
   pressed(action: Action): boolean {
     return (this.held.get(action)?.size ?? 0) > 0;
@@ -104,6 +130,21 @@ export class Input {
   /** Le bouton gauche de la souris (ou un doigt) est tenu : « valider » vient du pointeur, pas d'Espace. */
   get pointerHeld(): boolean {
     return this.held.get("validate")?.has("mouse:0") ?? false;
+  }
+
+  /** Position du doigt posé sur l'écran (pas la souris), ou `null`. */
+  get touchHeldAt(): { x: number; y: number } | null {
+    return this.pointerHeld && this.touching ? { x: this.mouseX, y: this.mouseY } : null;
+  }
+
+  /** Geste du doigt pas encore consommé (voir `TouchGesture`) ; un par mise à jour de scène, comme les appuis. */
+  get touchGesture(): TouchGesture | null {
+    return this.gestures[0] ?? null;
+  }
+
+  /** Appui « valider » de ce pas venu de la souris ou du clavier, pas d'un doigt (les scènes à gestes lisent le doigt à part). */
+  get validateNotTouch(): boolean {
+    return this.justPressed("validate") && !this.validateByTouch;
   }
 
   justPressed(action: Action): boolean {
@@ -117,6 +158,7 @@ export class Input {
 
   /** À appeler après chaque `update` de scène : consomme un appui de chaque action (les suivants attendent leur tour). */
   endUpdate(): void {
+    this.gestures.shift();
     for (const [action, count] of this.pending) {
       if (count > 1) this.pending.set(action, count - 1);
       else this.pending.delete(action);
@@ -126,12 +168,16 @@ export class Input {
   /** Oublie tous les appuis pas encore consommés, sans relâcher les touches tenues (changement de scène). */
   discardPresses(): void {
     this.pending.clear();
+    this.gestures.length = 0;
   }
 
   /** Relâche tout et oublie les appuis récents (perte du focus). */
   reset(): void {
     this.held.clear();
     this.pending.clear();
+    this.gestures.length = 0;
+    this.touchStart = null;
+    this.touching = false;
   }
 
   /**
@@ -144,7 +190,10 @@ export class Input {
     if (sources.has(source)) return;
     if (sources.size === 0) {
       this.pending.set(action, Math.min(MAX_PENDING_PRESSES, (this.pending.get(action) ?? 0) + 1));
-      if (action === "validate") this.validateAt = source === "mouse:0" ? { x: this.mouseX, y: this.mouseY } : null;
+      if (action === "validate") {
+        this.validateAt = source === "mouse:0" ? { x: this.mouseX, y: this.mouseY } : null;
+        this.validateByTouch = source === "mouse:0" && this.touching;
+      }
     }
     sources.add(source);
   }
@@ -168,15 +217,49 @@ export class Input {
     return true;
   }
 
-  mouseDown(button: number): void {
+  /** `touch` : le bouton vient d'un doigt (l'hôte suit alors le geste avec `touchStarted` / `touchEnded`). */
+  mouseDown(button: number, touch = false): void {
     const action = BUTTON_ACTIONS[button];
     if (!action) return;
+    if (button === 0) this.touching = touch;
     this.press(action, `mouse:${button}`);
   }
 
   mouseUp(button: number): void {
     const action = BUTTON_ACTIONS[button];
     if (action) this.release(action, `mouse:${button}`);
+  }
+
+  /** Un doigt se pose en (x, y) (pixels 320×200). */
+  touchStarted(x: number, y: number): void {
+    this.touchStart = { x: Math.round(x), y: Math.round(y) };
+    this.touchLongDone = false;
+  }
+
+  /** Le doigt posé est resté en place assez longtemps : appui long, le relâchement ne produira rien. */
+  touchLongPressed(): void {
+    if (!this.touchStart || this.touchLongDone) return;
+    this.touchLongDone = true;
+    this.pushGesture({ kind: "long", ...this.touchStart });
+  }
+
+  /** Le doigt se lève en (x, y) : toucher ou glissement, sauf après un appui long. */
+  touchEnded(x: number, y: number): void {
+    const start = this.touchStart;
+    this.touchStart = null;
+    if (!start || this.touchLongDone) return;
+    const dx = Math.round(x - start.x);
+    const dy = Math.round(y - start.y);
+    this.pushGesture(Math.hypot(dx, dy) >= SWIPE_MIN ? { kind: "swipe", ...start, dx, dy } : { kind: "tap", ...start });
+  }
+
+  /** Geste interrompu (le navigateur a repris le doigt) : aucun geste. */
+  touchCancelled(): void {
+    this.touchStart = null;
+  }
+
+  private pushGesture(gesture: TouchGesture): void {
+    if (this.gestures.length < MAX_PENDING_GESTURES) this.gestures.push(gesture);
   }
 
   /** Pilote clavier du curseur (`3134:03bb`) : les flèches tenues déplacent la position de la souris de `1 << keyPointerShift` pixels. */

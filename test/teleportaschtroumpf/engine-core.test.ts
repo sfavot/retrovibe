@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parsePfn, measureText } from "../../src/games/teleportaschtroumpf/data/font";
 import { parseHy8, HY8_PART_IMAGE } from "../../src/games/teleportaschtroumpf/data/hy8";
 import { Clock, TICKS_PER_SECOND } from "../../src/games/teleportaschtroumpf/engine/clock";
-import { Input, actionForKey } from "../../src/games/teleportaschtroumpf/engine/input";
+import { Input, SWIPE_MIN, actionForKey } from "../../src/games/teleportaschtroumpf/engine/input";
 import { DEFAULT_OPTIONS, isLocked, loadOptions, saveOptions, STORAGE_KEY, gameSeconds } from "../../src/games/teleportaschtroumpf/engine/options";
 import { Fade, Palette } from "../../src/games/teleportaschtroumpf/engine/palette";
 import { expandName, musicName, resolveGameFile, voiceName } from "../../src/games/teleportaschtroumpf/engine/paths";
@@ -517,5 +517,72 @@ describe.skipIf(!hasOriginalFiles)("Surface et sprites HY8 (fichiers du jeu)", (
     const blank = new Surface();
     expect(blank.drawText(font, Uint8Array.of(0x20), 0, 0, 9)).toBe(measureText(font, Uint8Array.of(0x20)));
     expect(blank.work.every((p) => p === 0)).toBe(true);
+  });
+});
+
+describe("Input : gestes du doigt (ajout du port)", () => {
+  const finger = (input: Input, x: number, y: number) => {
+    input.mouseMove(x, y);
+    input.touchStarted(x, y);
+    input.mouseDown(0, true);
+  };
+  const lift = (input: Input, x: number, y: number) => {
+    input.mouseMove(x, y);
+    input.mouseUp(0);
+    input.touchEnded(x, y);
+  };
+
+  it("le doigt posé envoie « valider » (marqué comme venu du doigt) ; le relâchement sur place est un toucher", () => {
+    const input = new Input();
+    finger(input, 100, 50);
+    expect(input.justPressed("validate")).toBe(true);
+    expect(input.validateByTouch).toBe(true);
+    expect(input.validateNotTouch).toBe(false);
+    expect(input.touchHeldAt).toEqual({ x: 100, y: 50 });
+    expect(input.touchGesture).toBeNull();
+    lift(input, 102, 51);
+    expect(input.touchHeldAt).toBeNull();
+    expect(input.touchGesture).toEqual({ kind: "tap", x: 100, y: 50 });
+    input.endUpdate();
+    expect(input.touchGesture).toBeNull();
+  });
+
+  it("glissement au-delà de SWIPE_MIN ; appui long sans geste au relâchement", () => {
+    const input = new Input();
+    finger(input, 100, 50);
+    lift(input, 100 + SWIPE_MIN, 50 - 5);
+    expect(input.touchGesture).toEqual({ kind: "swipe", x: 100, y: 50, dx: SWIPE_MIN, dy: -5 });
+    input.endUpdate();
+    finger(input, 10, 20);
+    input.touchLongPressed();
+    expect(input.touchGesture).toEqual({ kind: "long", x: 10, y: 20 });
+    input.endUpdate();
+    lift(input, 10, 20);
+    expect(input.touchGesture).toBeNull();
+  });
+
+  it("la souris et le clavier ne font aucun geste ; leur « valider » n'est pas celui du doigt", () => {
+    const input = new Input();
+    input.mouseMove(40, 40);
+    input.mouseDown(0);
+    expect(input.validateNotTouch).toBe(true);
+    expect(input.touchHeldAt).toBeNull();
+    input.mouseUp(0);
+    input.endUpdate();
+    input.keyDown("Space");
+    expect(input.validateNotTouch).toBe(true);
+    expect(input.touchGesture).toBeNull();
+  });
+
+  it("un geste interrompu ne touche rien ; changer de scène oublie les gestes en attente", () => {
+    const input = new Input();
+    finger(input, 100, 50);
+    input.touchCancelled();
+    lift(input, 100, 50);
+    expect(input.touchGesture).toBeNull();
+    finger(input, 100, 50);
+    lift(input, 100, 50);
+    input.discardPresses();
+    expect(input.touchGesture).toBeNull();
   });
 });

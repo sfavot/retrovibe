@@ -20,6 +20,7 @@ import {
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s28-black-smurfs";
 import type { TestHost } from "../engine-test-host";
 import { hasOriginalFiles } from "../helpers";
+import { tap, touchDown, touchMove, touchUp } from "../touch";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
 
 describe("S28 : règles des Schtroumpfs noirs (pur, `2573:000f`)", () => {
@@ -312,6 +313,51 @@ describe.skipIf(!hasOriginalFiles)("S28 Les Schtroumpfs Noirs : cibles, viseur, 
     expect((run.ctx.clock.ticks - waiting) / 60).toBeGreaterThanOrEqual(2);
     expect(scene.appearances).toBe(2);
   }, 120_000);
+
+  it("au doigt : toucher la cible tire là où le doigt se pose ; une partie se gagne en touchant chaque Schtroumpf noir", async () => {
+    const run = await launch({ seed: 7, level: 2 });
+    const scene = run.scene as BlackSmurfsScene;
+    let shotAt = -1;
+    let seen = 0;
+    let upSince = 0;
+    await run.until(() => {
+      if (scene.appearances !== seen) {
+        seen = scene.appearances;
+        upSince = run.ctx.clock.ticks;
+      }
+      // Un toucher par cible, au centre de sa zone, une fois sortie (0,6 s : `canHit` garde la valeur de la cible précédente au départ).
+      if (scene.targetState === TARGET_UP && run.ctx.clock.ticks - upSince > 36 && shotAt !== scene.appearances) {
+        const { zone } = TARGETS[scene.targetIndex];
+        tap(run.host.input, (zone.left + zone.right) / 2, (zone.top + zone.bottom) / 2);
+        shotAt = scene.appearances;
+      }
+      return finished(scene);
+    }, 300_000);
+    expect(scene.hasFailed).toBe(false);
+    expect(scene.missCount).toBe(0);
+    expect(scene.hitCount).toBe(TARGET_COUNT - 1);
+    expect(await run.finish(120_000)).toEqual({ kind: "ingredient", success: true });
+  }, 300_000);
+
+  it("au doigt : un toucher à côté est un tir raté sans perte ; le doigt tenu ne répète pas, le glisser déplace le viseur", async () => {
+    const run = await launch({ seed: 7 });
+    const scene = run.scene as BlackSmurfsScene;
+    tap(run.host.input, 300, 20);
+    await run.run(200);
+    expect(scene.shotCount).toBe(1);
+    expect(scene.missCount).toBe(1);
+    expect(scene.hasFailed).toBe(false);
+    expect(scene.cursor).toEqual({ x: 300, y: 20 });
+    touchDown(run.host.input, 100, 100);
+    await run.run(500);
+    touchMove(run.host.input, 140, 120);
+    await run.run(200);
+    expect(scene.shotCount).toBe(2);
+    expect(scene.cursor).toEqual({ x: 140, y: 120 });
+    touchUp(run.host.input, 140, 120);
+    await run.run(200);
+    expect(scene.shotCount).toBe(2);
+  }, 30_000);
 
   it("un tir par appui : le bouton tenu ne répète pas ; relâché puis enfoncé, il tire à nouveau", async () => {
     const run = await launch({ seed: 7 });

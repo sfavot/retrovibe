@@ -98,6 +98,11 @@ export function spriteArea(hy8: Hy8, sprite: number, x: number, y: number, margi
   return expand({ x0: x + b.minX, y0: y + b.minY, x1: x + b.maxX - 1, y1: y + b.maxY - 1 }, margin);
 }
 
+/** (x, y) est dans `area` (bornes incluses). */
+export function insideArea(area: MenuArea, x: number, y: number): boolean {
+  return x >= area.x0 && x <= area.x1 && y >= area.y0 && y <= area.y1;
+}
+
 function expand(area: MenuArea, margin: number): MenuArea {
   return {
     x0: Math.max(0, area.x0 - margin),
@@ -128,8 +133,9 @@ export interface MenuOptions {
   changeSoundIfIdle?: boolean;
   /**
    * Ajout du port pour le doigt et la souris (l'original n'a que le clavier) : zones des entrées, calculées à `enter` (l'écran
-   * est alors dessiné). Toucher ou cliquer une entrée la sélectionne et la valide ; un appui hors des zones ne fait rien ; la
-   * souris qui survole une entrée la sélectionne. Sans zones, le clic valide l'élément courant où que soit le pointeur.
+   * est alors dessiné). Cliquer une entrée la sélectionne et la valide ; au doigt, elle se valide au relâchement et l'appui
+   * long joue sa voix d'aide. Un appui hors des zones ne fait rien ; la souris qui survole une entrée la sélectionne. Sans
+   * zones, le clic valide l'élément courant où que soit le pointeur.
    */
   areas?: (ctx: SceneContext) => readonly (MenuArea | null)[];
 }
@@ -194,7 +200,7 @@ export class Menu {
 
   /** Entrée dont la zone contient (x, y), ou `null` (aucune zone, ou menu sans zones). */
   itemAt(x: number, y: number): number | null {
-    const index = this.areas.findIndex((a) => a !== null && x >= a.x0 && x <= a.x1 && y >= a.y0 && y <= a.y1);
+    const index = this.areas.findIndex((a) => a !== null && insideArea(a, x, y));
     return index < 0 ? null : index;
   }
 
@@ -227,20 +233,34 @@ export class Menu {
         this.move(ctx, target);
       }
     }
+    const gesture = this.areas.length > 0 ? input.touchGesture : null;
+    if (gesture && gesture.kind !== "swipe") {
+      // Au doigt : l'entrée touchée se valide au relâchement, l'appui long dit son nom (le clic droit du doigt).
+      const touched = this.itemAt(gesture.x, gesture.y);
+      if (touched !== null) {
+        this.select(ctx, touched);
+        return gesture.kind === "tap" ? { kind: "validate", index: touched } : this.help(ctx);
+      }
+    }
     if (input.justPressed("validate")) {
       const at = input.validateAt;
       if (at === null || this.areas.length === 0) return { kind: "validate", index: this.current };
-      const touched = this.itemAt(at.x, at.y);
-      if (touched === null) return null;
-      this.select(ctx, touched);
-      return { kind: "validate", index: touched };
+      // Le doigt qui se pose ne valide rien : son geste décide au relâchement.
+      if (input.validateByTouch) return null;
+      const clicked = this.itemAt(at.x, at.y);
+      if (clicked === null) return null;
+      this.select(ctx, clicked);
+      return { kind: "validate", index: clicked };
     }
-    if (input.justPressed("cancel")) {
-      const voice = this.voices[this.current];
-      if (voice) ctx.voice.play(voice);
-      return { kind: "help", index: this.current };
-    }
+    if (input.justPressed("cancel")) return this.help(ctx);
     return null;
+  }
+
+  /** Voix d'aide de l'élément courant (si elle existe). */
+  private help(ctx: SceneContext): MenuEvent {
+    const voice = this.voices[this.current];
+    if (voice) ctx.voice.play(voice);
+    return { kind: "help", index: this.current };
   }
 
   /** Changement par une touche de direction : sélection et bip (utile aussi à une scène qui déplace la sélection elle-même). */

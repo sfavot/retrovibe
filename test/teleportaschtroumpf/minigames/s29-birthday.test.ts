@@ -8,12 +8,14 @@ import {
   CANDLE_OUT,
   CANDLE_POSITIONS,
   CANDLE_RELIGHTING,
+  candleAt,
   createBirthday,
   pointsForTime,
   timeLimit,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s29-birthday";
 import type { TestHost } from "../engine-test-host";
 import { hasOriginalFiles } from "../helpers";
+import { longPress, swipe, tap, touchDown, touchUp } from "../touch";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
 
 describe("S29 : règles de l'anniversaire (pur, `1da0:0009`)", () => {
@@ -382,4 +384,73 @@ describe.skipIf(!hasOriginalFiles)("S29 L'Anniversaire : parcours depuis le plat
     await run.until(() => run.free.stage === "map" && !run.ctx.scenes.transitioning, 30_000);
     expect(run.free.currentGame).toBeNull();
   }, 180_000);
+});
+
+describe("S29 : au doigt (ajout du port)", () => {
+  it("zones des bougies : de la pointe de la flamme au bas de la bougie, autour du milieu de la flamme ; rien ailleurs", () => {
+    CANDLE_POSITIONS.forEach(([x, y], i) => {
+      expect(candleAt(x + 1, y - 20)).toBe(i + 1);
+      expect(candleAt(x + 1, y + 50)).toBe(i + 1);
+    });
+    expect(candleAt(10, 60)).toBeNull();
+    expect(candleAt(310, 60)).toBeNull();
+    expect(candleAt(0x90, 190)).toBeNull();
+    expect(candleAt(0x90, 5)).toBeNull();
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("S29 L'Anniversaire : au doigt", () => {
+  const launch = async () => {
+    const run = await launchMinigame(29, { seed: 5 });
+    await run.until(() => !run.ctx.fade.active);
+    return { run, scene: run.scene as BirthdayScene };
+  };
+  const centre = (i: number) => [CANDLE_POSITIONS[i - 1][0] + 1, CANDLE_POSITIONS[i - 1][1] + 20] as const;
+
+  it("toucher une bougie : le curseur y va d'une bougie par itération puis la souffle ; le doigt posé ne souffle pas la bougie du curseur", async () => {
+    const { run, scene } = await launch();
+    const start = scene.position;
+    const target = start <= 4 ? 8 : 1;
+    touchDown(run.host.input, ...centre(target));
+    await run.run(200);
+    expect(scene.states[start - 1]).toBe(CANDLE_LIT);
+    touchUp(run.host.input, ...centre(target));
+    await run.until(() => scene.states[target - 1] !== CANDLE_LIT, 3000);
+    expect(scene.position).toBe(target);
+    expect(scene.states[target - 1]).toBe(CANDLE_BLOWING);
+    // Une bougie par itération (5 ticks), comme une flèche par itération.
+    expect(scene.iterations).toBeGreaterThanOrEqual(Math.abs(target - start) + 1);
+    expect(scene.states.filter((state) => state === CANDLE_LIT)).toHaveLength(7);
+  }, 30_000);
+
+  it("toucher la bougie du curseur la souffle ; un appui long aussi ; un glissement ne fait rien", async () => {
+    const { run, scene } = await launch();
+    const start = scene.position;
+    tap(run.host.input, ...centre(start));
+    await run.until(() => scene.states[start - 1] !== CANDLE_LIT, 1000);
+    const other = start === 1 ? 2 : start - 1;
+    swipe(run.host.input, ...centre(other), 0, 30);
+    await run.run(500);
+    expect(scene.position).toBe(start);
+    expect(scene.states[other - 1]).toBe(CANDLE_LIT);
+    longPress(run.host.input, ...centre(other));
+    await run.until(() => scene.states[other - 1] !== CANDLE_LIT, 1000);
+    expect(scene.position).toBe(other);
+  }, 30_000);
+
+  it("hors cible : toucher hors des bougies ne déplace pas le curseur et ne souffle rien ; une flèche reprend la main", async () => {
+    const { run, scene } = await launch();
+    const start = scene.position;
+    tap(run.host.input, 0x90, 190);
+    await run.run(500);
+    expect(scene.position).toBe(start);
+    expect(scene.states).toEqual(Array(8).fill(CANDLE_LIT));
+    // Une flèche pendant le trajet du curseur annule la bougie visée.
+    const target = start <= 4 ? 8 : 1;
+    tap(run.host.input, ...centre(target));
+    await run.tap(target === 8 ? "ArrowLeft" : "ArrowRight", 60);
+    await run.run(600);
+    expect(scene.position).not.toBe(target);
+    expect(scene.states).toEqual(Array(8).fill(CANDLE_LIT));
+  }, 30_000);
 });

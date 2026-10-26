@@ -2,11 +2,28 @@ import type { Hy8 } from "../../data/hy8";
 import type { Mcg } from "../../data/mcg";
 import type { Voc } from "../../data/voc";
 import { TICKS_PER_SECOND } from "../../engine/clock";
+import { SWIPE_MIN, type Input } from "../../engine/input";
+import { insideArea, type MenuArea } from "../../engine/menu";
 import { voiceName } from "../../engine/paths";
 import type { Scene, SceneContext } from "../../engine/scene";
+import { boundsOf, placeSprite } from "../../engine/sprites";
 import { VoiceLine } from "../board/voices";
 import { MapImage } from "./image";
-import { K_BACK, K_FIRST_LOCATION, SCROLL_STEP, cellOfK, moveSelection, sceneOfK, scrollOfK, scrolled } from "./view";
+import {
+  K_BACK,
+  K_FIRST_LOCATION,
+  SCROLL_STEP,
+  VIEW_ROWS,
+  VIEW_TOP,
+  cellOfK,
+  locationAnchors,
+  locationAt,
+  moveSelection,
+  sceneOfK,
+  scrollOfK,
+  scrolled,
+  type LocationAnchor,
+} from "./view";
 
 /**
  * Carte S02 (`1a3c:0225`) : fond défilant, marqueur, navigation. Voir `scenes/s02-map.ts` pour le contrat et
@@ -26,6 +43,9 @@ const TIMEOUT_SECONDS = 36;
 /** Première voix d'encouragement du puits : `s13b` + 0x15 + `rand × 3`. */
 const HINT_VOICE = 0x15;
 
+/** Bandeau « Retour » du cadre de consultation (`s02a002d`, mesuré : pixels qui diffèrent de `s02a001d`), élargi pour le doigt. */
+export const BACK_BUTTON: MenuArea = { x0: 112, y0: 173, x1: 207, y1: 199 };
+
 type Phase = "browse" | "voice" | "done";
 
 export class MapScene implements Scene {
@@ -44,6 +64,12 @@ export class MapScene implements Scene {
   private skippable = false;
   private start = 0;
   private hinted = false;
+  /** Doigt : ancres des lieux (`locationAt`). */
+  private anchors: LocationAnchor[] = [];
+  /** Doigt posé : sa hauteur et le décalage au posé ; `moved` une fois `SWIPE_MIN` dépassé (la carte suit alors le doigt). */
+  private drag: { y: number; scroll: number; moved: boolean } | null = null;
+  /** Le dernier glissement a fait défiler la carte en direct : son geste au relâchement ne la refait pas défiler. */
+  private dragged = false;
 
   constructor(
     private readonly request: MapRequest,
@@ -79,6 +105,8 @@ export class MapScene implements Scene {
       ctx.resources.hy8("s02a000s.hy8"),
       ctx.resources.voc("s07a001b.voc"),
     ]);
+    const sprites = this.sprites;
+    this.anchors = locationAnchors((sprite) => boundsOf(placeSprite(sprites, sprite, false)));
   }
 
   /** Fond du cadre : `s02a002d` (« Retour ») en consultation, `s02a007d` pour le puits (`DS:6EB3`), `s02a001d` en mode libre. */
@@ -119,6 +147,8 @@ export class MapScene implements Scene {
     this.phase = "browse";
     this.line = null;
     this.start = ctx.clock.ticks;
+    this.drag = null;
+    this.dragged = false;
   }
 
   private placeSelection(): void {
@@ -128,15 +158,84 @@ export class MapScene implements Scene {
 
   update(ctx: SceneContext): void {
     if (ctx.fade.active || this.phase === "done") return;
+    const { input } = ctx;
     if (this.phase === "voice") {
-      if (this.line!.update(ctx, this.skippable && ctx.input.justPressed("validate"))) this.phase = "browse";
+      // Au doigt, la voix d'aide se coupe d'un geste (le doigt qui se pose ne compte pas : son geste suit).
+      const skip = input.validateNotTouch || input.touchGesture !== null;
+      if (this.line!.update(ctx, this.skippable && skip)) this.phase = "browse";
       return;
     }
     if (this.request.mode === "consult") this.scrollView(ctx);
     else this.moveMarker(ctx);
     if (this.request.mode === "wish" && this.timers(ctx)) return;
-    if (ctx.input.justPressed("validate")) this.finish(ctx, this.k);
-    else if (this.request.mode === "free" && ctx.input.justPressed("cancel")) this.help(ctx);
+    if (this.touch(ctx)) return;
+    // Le doigt qui se pose envoie aussi « valider » : ignoré, son geste décide (`touch`).
+    if (input.validateNotTouch) this.finish(ctx, this.k);
+    else if (this.request.mode === "free" && input.justPressed("cancel")) this.help(ctx);
+  }
+
+  /**
+   * Ajout du port, doigt (l'original n'a que le clavier) : glisser verticalement fait défiler la carte dans tous les modes ;
+   * consultation : toucher le bandeau « Retour » sort ; sélection : toucher un lieu y va, l'appui long dit sa voix d'aide (mode
+   * libre seul, comme Entrée). Un toucher ailleurs ne fait rien. Renvoie vrai si la carte est sortie ou parle.
+   */
+  private touch(ctx: SceneContext): boolean {
+    const { input } = ctx;
+    const gesture = input.touchGesture;
+    if (gesture?.kind === "swipe") {
+      // Glissement trop bref pour avoir été suivi image par image : il fait défiler d'un coup.
+      if (!this.dragged) this.scroll = scrolled(this.scroll, -gesture.dy);
+      this.dragged = false;
+    }
+    this.follow(input);
+    if (!gesture || gesture.kind === "swipe") return false;
+    if (this.request.mode === "consult") {
+      if (gesture.kind !== "tap" || !insideArea(BACK_BUTTON, gesture.x, gesture.y)) return false;
+      this.finish(ctx, K_BACK);
+      return true;
+    }
+    const k = this.locationAt(gesture.x, gesture.y);
+    if (k === null) return false;
+    if (gesture.kind === "tap") {
+      this.mark(k);
+      this.finish(ctx, k);
+      return true;
+    }
+    if (this.request.mode !== "free") return false;
+    this.mark(k);
+    this.help(ctx);
+    return this.phase === "voice";
+  }
+
+  /** Doigt tenu : au-delà de `SWIPE_MIN` pixels de glissement vertical, la carte suit le doigt. */
+  private follow(input: Input): void {
+    const held = input.touchHeldAt;
+    if (!held) {
+      this.drag = null;
+      return;
+    }
+    if (!this.drag) {
+      this.drag = { y: held.y, scroll: this.scroll, moved: false };
+      this.dragged = false;
+      return;
+    }
+    const dy = held.y - this.drag.y;
+    if (!this.drag.moved && Math.abs(dy) < SWIPE_MIN) return;
+    this.drag.moved = this.dragged = true;
+    this.scroll = scrolled(this.drag.scroll, -dy);
+  }
+
+  /** Lieu touché en (x, y) de l'écran (fenêtre de la carte seulement), selon le mode ; `null` hors d'un lieu. */
+  private locationAt(x: number, y: number): number | null {
+    if (y < VIEW_TOP || y >= VIEW_TOP + VIEW_ROWS) return null;
+    const min = this.request.mode === "wish" ? K_FIRST_LOCATION : K_BACK;
+    return locationAt(this.anchors, x, y - VIEW_TOP + this.scroll, min);
+  }
+
+  /** Sélection posée au doigt : le marqueur va sur le lieu, la fenêtre ne bouge pas sous le doigt. */
+  private mark(k: number): void {
+    this.k = k;
+    this.image!.setMarker(this.sprites!, cellOfK(k));
   }
 
   /** Consultation : haut / bas tenus font défiler de 5 pixels par image. */

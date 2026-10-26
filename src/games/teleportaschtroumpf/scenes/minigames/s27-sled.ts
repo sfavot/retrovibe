@@ -13,6 +13,7 @@ import {
   type MinigameDone,
   type MinigameFactory,
 } from "./common";
+import { HeldFinger } from "./held-finger";
 
 /**
  * S27 « La Luge » (`1f84:000e`, 696 octets ; RE : `docs/teleportaschtroumpf/minigames/s27.md`).
@@ -22,9 +23,9 @@ import {
  * - reçoit : `game`, la partie en cours ; la requête est `game.state.pending` (scène 27) : `level` 0..2 choisit la vidéo de la descente, `bonus`
  *   (indice de l'oiseau) la remplace par le niveau 3 ;
  * - joue : une descente en vidéo MUX (`s27e/f`, `s27h`, `s27i/j`, `s27l`) sur laquelle on pilote la luge (gauche / droite : `Z`, `X` ou
- *   les flèches) pour éviter les obstacles que la vidéo signale par ses marqueurs. Un obstacle touché interrompt la descente (animation de
- *   chute, son `s27a003b`, vidéo d'échec `s27b`) ; arriver au bout donne la vidéo `s27c1` / `s27c2` selon que l'ingrédient 2 fait partie de
- *   l'objectif ;
+ *   les flèches ; au doigt, la luge va vers le doigt posé) pour éviter les obstacles que la vidéo signale par ses marqueurs. Un obstacle
+ *   touché interrompt la descente (animation de chute, son `s27a003b`, vidéo d'échec `s27b`) ; arriver au bout donne la vidéo `s27c1` /
+ *   `s27c2` selon que l'ingrédient 2 fait partie de l'objectif ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la dernière vidéo (passable par Échap ou Espace) ; l'appelant applique
  *   l'issue.
  */
@@ -44,6 +45,19 @@ export const SLED_Y = 0x7e;
 export const SLED_STEP = 0x1e;
 export const SLED_MIN_X = 0x40;
 export const SLED_MAX_X = 0x100;
+/**
+ * Au doigt (ajout du port) : la luge (`s27a000s.hy8`, animation 0, centrée sur son abscisse) va vers le doigt posé, d'un pas par image
+ * comme une flèche tenue, et s'arrête quand il est à moins d'un demi-pas de son milieu.
+ */
+export const SLED_TOUCH_DEAD_ZONE = SLED_STEP / 2;
+
+/** Direction que vaut un doigt posé en `fingerX` pour une luge en `x`, ou `null`. */
+export function sledTouchKey(x: number, fingerX: number): "left" | "right" | null {
+  if (fingerX < x - SLED_TOUCH_DEAD_ZONE) return "left";
+  if (fingerX > x + SLED_TOUCH_DEAD_ZONE) return "right";
+  return null;
+}
+
 /** Limites des trois couloirs (`1f84:03d0`) : gauche `x < 0x69`, centre `0x69 < x < 0xd7`, droite `x > 0xd7`. */
 export const LANE_LEFT_LIMIT = 0x69;
 export const LANE_RIGHT_LIMIT = 0xd7;
@@ -147,6 +161,7 @@ export class SledScene implements Scene {
   private crashFrame = -1;
   private left = false;
   private right = false;
+  private readonly finger = new HeldFinger();
   private frame = -1;
   private fileName = "";
   private done = false;
@@ -217,6 +232,7 @@ export class SledScene implements Scene {
     this.finished = false;
     this.left = false;
     this.right = false;
+    this.finger.reset();
     this.frame = -1;
     this.done = false;
     this.ride.start(ctx);
@@ -226,9 +242,12 @@ export class SledScene implements Scene {
     switch (this.phase) {
       case "ride": {
         // Un appui plus court qu'une image de la vidéo (≈ 5,5 ticks) compte quand même : l'original lit les touches tenues à chaque image.
+        // Au doigt : vers le doigt posé, comme la flèche de son côté tenue.
         const { input } = ctx;
-        this.left ||= input.pressed("left") || input.justPressed("left");
-        this.right ||= input.pressed("right") || input.justPressed("right");
+        const finger = this.finger.read(input);
+        const touched = finger ? sledTouchKey(this.x, finger.x) : null;
+        this.left ||= input.pressed("left") || input.justPressed("left") || touched === "left";
+        this.right ||= input.pressed("right") || input.justPressed("right") || touched === "right";
         this.ride.update(ctx);
         return;
       }

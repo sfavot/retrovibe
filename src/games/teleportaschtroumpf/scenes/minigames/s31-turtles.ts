@@ -4,7 +4,7 @@ import type { Voc } from "../../data/voc";
 import type { Scene, SceneContext } from "../../engine/scene";
 import type { Game } from "../../game/rules";
 import { Clip, SoundHush, goalClip, ingredientOutcome, minigameLevel, minigameRequest, sceneIngredient, type MinigameDone, type MinigameFactory } from "./common";
-import { LEVELS, SMURF_FALLING, Smurf, placeTurtles, type LevelSpec, type SmurfState, type Turtle, type TurtlePhase } from "./s31/turtles";
+import { LEVELS, SMURF_FALLING, Smurf, placeTurtles, touchedHop, type LevelSpec, type SmurfState, type Turtle, type TurtlePhase } from "./s31/turtles";
 
 /**
  * S31 « Les Tortues » (`2f87:0008`, 1 614 octets, avec `2f87:0656` et `2f87:0950` ; RE : `docs/teleportaschtroumpf/minigames/s31.md`).
@@ -14,7 +14,8 @@ import { LEVELS, SMURF_FALLING, Smurf, placeTurtles, type LevelSpec, type SmurfS
  * - reçoit : `game`, la partie en cours ; la requête est `game.state.pending` (scène 31) : `level` 0..2 (teinte du joueur) donne le fond et le
  *   nombre de tortues à traverser (3, 4 ou 5), `bonus` (indice de l'oiseau) force le niveau 0 et ne laisse que des tortues lentes ;
  * - joue : le Schtroumpf traverse la rivière de tortue en tortue. Haut / bas : saut en avant / en arrière, Espace ou clic : saut sur place.
- *   Il se noie s'il atterrit loin d'une tortue ou si la sienne plonge ; il gagne en atteignant l'autre rive. Pas de limite de temps ;
+ *   Au doigt, toucher devant ou derrière lui le long de la rivière (ou glisser dans ce sens) le fait sauter de ce côté, le toucher lui-même
+ *   sur place. Il se noie s'il atterrit loin d'une tortue ou si la sienne plonge ; il gagne en atteignant l'autre rive. Pas de limite de temps ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la vidéo de fin (`s31c2` si l'ingrédient 5 est dans l'objectif, `s31c1`
  *   sinon, `s31b` en cas d'échec ; toutes passables) ; l'appelant donne l'ingrédient 5.
  */
@@ -171,10 +172,13 @@ export class TurtlesScene implements Scene {
       case "play": {
         if (ctx.fade.active) return;
         // Les touches sont lues tenues à chaque itération de l'original ; la scène tourne à chaque tick et retient ce qui a été enfoncé depuis.
+        // Au doigt, le geste désigne le saut (`touchedHop`) ; l'appui « valider » de son posé ne fait pas sauter sur place.
         const { input } = ctx;
-        this.up ||= input.pressed("up") || input.justPressed("up");
-        this.down ||= input.pressed("down") || input.justPressed("down");
-        this.click ||= input.pressed("validate") || input.justPressed("validate");
+        const gesture = input.touchGesture;
+        const touched = gesture ? touchedHop(this.smurf.x, this.smurf.y, gesture) : null;
+        this.up ||= input.pressed("up") || input.justPressed("up") || touched === "up";
+        this.down ||= input.pressed("down") || input.justPressed("down") || touched === "down";
+        this.click ||= (input.pressed("validate") && !input.validateByTouch) || input.validateNotTouch || touched === "click";
         if (ctx.clock.ticks < this.nextAt) return;
         if (this.ended) return this.startHush(ctx);
         this.iterate(ctx);

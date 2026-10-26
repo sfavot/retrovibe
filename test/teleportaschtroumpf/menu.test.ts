@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { longPress, tap, touchDown, touchUp } from "./touch";
 import { Menu, paletteHighlight, type MenuEvent, type MenuItem, type MenuOptions } from "../../src/games/teleportaschtroumpf/engine/menu";
 import { Input } from "../../src/games/teleportaschtroumpf/engine/input";
 import { Palette } from "../../src/games/teleportaschtroumpf/engine/palette";
@@ -257,6 +258,20 @@ describe("Menu", () => {
       h.input.keyUp("ArrowDown");
       h.step();
       expect(h.menu.index).toBe(2);
+    });
+
+    it("au doigt : l'entrée se valide au relâchement, pas au posé ; l'appui long joue sa voix d'aide", async () => {
+      const h = await harness("vertical", { areas: AREAS });
+      touchDown(h.input, 150, 85);
+      expect(h.step()).toBeNull();
+      touchUp(h.input, 150, 85);
+      expect(h.step()).toEqual({ kind: "validate", index: 1 });
+      longPress(h.input, 150, 55);
+      expect(h.step()).toEqual({ kind: "help", index: 0 });
+      expect(h.voices).toEqual(["a.voc"]);
+      tap(h.input, 20, 20);
+      expect(h.step()).toBeNull();
+      expect(h.step()).toBeNull();
     });
 
     it("un doigt ne survole pas : seule la position de l'appui compte", async () => {

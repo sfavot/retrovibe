@@ -11,14 +11,18 @@ import {
   STORK_DURATION,
   STORK_GROUND,
   STORK_HEAD,
+  STORK_TOUCH_DEAD_X,
+  STORK_TOUCH_DEAD_Y,
   StorkRun,
   StorkScene,
   birdCount,
   birdHits,
   createStork,
+  touchKeys,
   type StorkKeys,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s34-stork";
 import { hasOriginalFiles, listData, readData } from "../helpers";
+import { tap, touchDown, touchUp } from "../touch";
 import type { TestHost } from "../engine-test-host";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchOptions } from "./harness";
 
@@ -53,6 +57,17 @@ describe("S34 : zones de collision et nombre d'oiseaux (pur, `1b05:0cda`)", () =
     expect(hit(STORK_BODY, 70, 93)).toBe(false);
     expect(hit(STORK_BODY, 70, 66)).toBe(true);
     expect(hit(STORK_BODY, 70, 65)).toBe(false);
+  });
+
+  it("doigt : la cigogne tient les directions qui la mènent au doigt, au-delà d'une zone morte autour de son centre", () => {
+    expect(touchKeys(100, 100, 100, 100)).toEqual(NONE);
+    expect(touchKeys(100 + STORK_TOUCH_DEAD_X, 100 - STORK_TOUCH_DEAD_Y, 100, 100)).toEqual(NONE);
+    expect(touchKeys(100 + STORK_TOUCH_DEAD_X + 1, 100, 100, 100)).toEqual(keys({ right: true }));
+    expect(touchKeys(100 - STORK_TOUCH_DEAD_X - 1, 100, 100, 100)).toEqual(keys({ left: true }));
+    expect(touchKeys(100, 100 - STORK_TOUCH_DEAD_Y - 1, 100, 100)).toEqual(keys({ up: true }));
+    expect(touchKeys(100, 100 + STORK_TOUCH_DEAD_Y + 1, 100, 100)).toEqual(keys({ down: true }));
+    expect(touchKeys(0, 0, 100, 100)).toEqual(keys({ up: true, left: true }));
+    expect(STORK_TOUCH_DEAD_X).toBeGreaterThan(7);
   });
 
   it("la requête est exigée : Game.openMinigame(34) d'abord", () => {
@@ -550,6 +565,71 @@ describe.skipIf(!hasOriginalFiles)("S34 La Cigogne : la traversée, l'issue", ()
     run.host.input.keyUp("ArrowLeft");
     await run.until(() => scene.currentFrame > before, 2000);
     expect(scene.state.x).toBe(x - 7);
+  }, 60_000);
+
+  it("doigt posé : la cigogne avance ou recule vers lui, puis s'arrête dessous ; au-dessus elle bat des ailes, au-dessous elle plonge", async () => {
+    const run = await launchMinigame(34, { level: 0, seed: 2 });
+    const scene = run.scene as StorkScene;
+    const { input } = run.host;
+    await run.until(() => scene.currentFrame >= 1, 3000);
+    // À droite, à la hauteur du centre : elle avance de 7 par image jusqu'à avoir le doigt dans sa zone morte.
+    const x0 = scene.state.x;
+    const target = scene.touchCenter.x + 50;
+    touchDown(input, target, scene.touchCenter.y);
+    await run.until(() => Math.abs(scene.touchCenter.x - target) <= STORK_TOUCH_DEAD_X, 3000);
+    expect((scene.state.x - x0) % 7).toBe(0);
+    const reached = scene.state.x;
+    const frame = scene.currentFrame;
+    await run.until(() => scene.currentFrame >= frame + 4, 2000);
+    expect(scene.state.x).toBe(reached);
+    touchUp(input, target, scene.touchCenter.y);
+    // À gauche.
+    const x1 = scene.state.x;
+    touchDown(input, scene.touchCenter.x - 40, scene.touchCenter.y);
+    await run.until(() => scene.state.x < x1 - 14, 3000);
+    touchUp(input, 0, 0);
+    // Au-dessus : battement, la cigogne remonte.
+    const y0 = scene.state.y;
+    touchDown(input, scene.touchCenter.x, scene.touchCenter.y - 40);
+    await run.until(() => scene.state.flapping, 3000);
+    touchUp(input, 0, 0);
+    await run.until(() => !scene.state.flapping, 3000);
+    expect(scene.state.y).toBeLessThan(y0);
+    // Au-dessous : elle plonge de 5 en plus de sa chute de 2.
+    const y1 = scene.state.y;
+    const f1 = scene.currentFrame;
+    touchDown(input, scene.touchCenter.x, 199);
+    await run.until(() => scene.currentFrame >= f1 + 3, 2000);
+    touchUp(input, 0, 0);
+    expect(scene.state.y - y1).toBeGreaterThanOrEqual(2 * 7);
+  }, 60_000);
+
+  it("doigt sur la cigogne : rien n'est tenu ; un toucher bref vaut une image de flèche ; le bouton de la souris ne pilote rien", async () => {
+    const run = await launchMinigame(34, { level: 0, seed: 2 });
+    const scene = run.scene as StorkScene;
+    const { input } = run.host;
+    await run.until(() => scene.currentFrame >= 1, 3000);
+    const x0 = scene.state.x;
+    touchDown(input, scene.touchCenter.x, scene.touchCenter.y);
+    const f0 = scene.currentFrame;
+    await run.until(() => scene.currentFrame >= f0 + 3, 2000);
+    touchUp(input, scene.touchCenter.x, scene.touchCenter.y);
+    expect(scene.state.x).toBe(x0);
+    expect(scene.state.flapping).toBe(false);
+    // Toucher bref à droite : une image.
+    const f1 = scene.currentFrame;
+    tap(input, scene.touchCenter.x + 60, scene.touchCenter.y);
+    await run.until(() => scene.currentFrame > f1, 2000);
+    await run.run(200);
+    expect(scene.state.x).toBe(x0 + 7);
+    // Souris : clic tenu loin à droite, sans effet.
+    input.mouseMove(scene.touchCenter.x + 80, scene.touchCenter.y - 40);
+    input.mouseDown(0);
+    const f2 = scene.currentFrame;
+    await run.until(() => scene.currentFrame >= f2 + 3, 2000);
+    input.mouseUp(0);
+    expect(scene.state.x).toBe(x0 + 7);
+    expect(scene.state.flapping).toBe(false);
   }, 60_000);
 
   it("la traversée ne se passe pas (Échap, Espace sans effet) ; les vidéos de fin se passent", async () => {

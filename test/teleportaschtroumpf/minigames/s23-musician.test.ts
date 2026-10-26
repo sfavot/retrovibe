@@ -11,11 +11,13 @@ import {
   WRONG_SOUNDS,
   createMusician,
   goalLength,
+  instrumentAt,
   pointsFor,
   rollNote,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s23-musician";
 import type { TestHost } from "../engine-test-host";
 import { hasOriginalFiles } from "../helpers";
+import { longPress, swipe, tap } from "../touch";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
 
 describe("S23 : règles du musicien (pur, `24d0:000c`)", () => {
@@ -65,6 +67,19 @@ describe("S23 : règles du musicien (pur, `24d0:000c`)", () => {
     expect(new Set([...RIGHT_SOUNDS, ...WRONG_SOUNDS]).size).toBe(8);
   });
 
+  it("doigt : le musicien touché est celui dont la zone contient le point ; dans un chevauchement, le centre le plus proche l'emporte", () => {
+    const areas = [
+      { x0: 0, y0: 0, x1: 100, y1: 100 },
+      { x0: 90, y0: 0, x1: 200, y1: 100 },
+    ];
+    expect(instrumentAt(areas, 10, 50)).toBe(0);
+    expect(instrumentAt(areas, 150, 50)).toBe(1);
+    expect(instrumentAt(areas, 92, 50)).toBe(0);
+    expect(instrumentAt(areas, 99, 50)).toBe(1);
+    expect(instrumentAt(areas, 250, 50)).toBeNull();
+    expect(instrumentAt(areas, 50, 150)).toBeNull();
+  });
+
   it("la requête est exigée : sans Game.openMinigame(23) la scène ne se construit pas", () => {
     const game = newGame({ players: [{ character: 0 }] }, new BorlandRandom(1));
     expect(() => createMusician(game, () => undefined)).toThrow(/openMinigame\(23\)/);
@@ -82,6 +97,14 @@ interface BotOptions {
   pick?(expected: number, scene: MusicianScene): number;
   /** Touche utilisée pour un instrument (défaut : les flèches). */
   codes?: readonly string[];
+  /** Joue au doigt : touche le centre du musicien au lieu d'appuyer sur sa flèche. */
+  touch?: boolean;
+}
+
+/** Centre de la zone touchable d'un musicien. */
+function center(scene: MusicianScene, instrument: number): [number, number] {
+  const a = scene.touchAreas[instrument];
+  return [Math.round((a.x0 + a.x1) / 2), Math.round((a.y0 + a.y1) / 2)];
 }
 
 /** Pilote : une touche (tenue 3 ticks) par note attendue, après `delay` ticks d'écoute. Appelé une fois par image (≈ 1 tick). */
@@ -104,10 +127,14 @@ function bot(scene: MusicianScene, host: TestHost, options: BotOptions = {}) {
     if (waited < (options.delay ?? 0)) return;
     const expected = scene.sequence[scene.progress];
     const instrument = options.pick ? options.pick(expected, scene) : expected;
+    waited = -1;
+    if (options.touch) {
+      tap(host.input, ...center(scene, instrument));
+      return;
+    }
     down = codes[instrument];
     downFrames = 0;
     host.input.keyDown(down);
-    waited = -1;
   };
 }
 
@@ -373,6 +400,70 @@ describe.skipIf(!hasOriginalFiles)("S23 Le Schtroumpf Musicien : manches, notes,
     await run.tap("Escape");
     expect(await run.finish(5000)).toMatchObject({ kind: "points" });
   }, 240_000);
+});
+
+describe.skipIf(!hasOriginalFiles)("S23 Le Schtroumpf Musicien : au doigt (ajout du port)", () => {
+  const launch = async (options: LaunchOptions = {}) => {
+    const run = await launchMinigame(23, options);
+    await run.until(() => !run.ctx.fade.active);
+    await run.tap("Escape");
+    return run;
+  };
+
+  it("les quatre zones entourent les musiciens au repos (cymbales, guitare, tambour, trompette)", async () => {
+    const run = await launch({ seed: 7 });
+    const scene = run.scene as MusicianScene;
+    const areas = scene.touchAreas;
+    expect(areas).toHaveLength(4);
+    // Chaque centre désigne son musicien ; le guitariste est en haut, le trompettiste en bas, les cymbales à gauche, le tambour à droite.
+    for (let i = 0; i < 4; i++) expect(instrumentAt(areas, ...center(scene, i))).toBe(i);
+    const [left, up, right, down] = [0, 1, 2, 3].map((i) => center(scene, i));
+    expect(left[0]).toBeLessThan(right[0]);
+    expect(up[1]).toBeLessThan(down[1]);
+  }, 60_000);
+
+  it("toucher le Schtroumpf qui doit jouer reproduit la mélodie : cinq notes, 3 gouttes", async () => {
+    const run = await launch({ seed: 7 });
+    const scene = run.scene as MusicianScene;
+    await play(run, { touch: true });
+    expect(scene.hasFailed).toBe(false);
+    expect(scene.score).toBe(5);
+    expect(await run.finish(120_000)).toEqual({ kind: "points", points: 3 });
+  }, 180_000);
+
+  it("toucher un autre musicien : son d'erreur de celui qui est touché, comme sa flèche", async () => {
+    const run = await launch({ seed: 8, audio: true });
+    const scene = run.scene as MusicianScene;
+    const wrongSounds = await Promise.all(WRONG_SOUNDS.map((name) => run.ctx.resources.voc(name)));
+    let touched = -1;
+    await play(run, { touch: true, pick: (expected) => (touched = (expected + 1) % 4) });
+    expect(scene.hasFailed).toBe(true);
+    expect(scene.lastNote).toBe("wrong");
+    expect(run.host.audio.plays.at(-1)!.sound.samples).toEqual(wrongSounds[touched].samples);
+  }, 120_000);
+
+  it("toucher hors des musiciens, un appui long ou un glissement sur un musicien ne jouent rien", async () => {
+    const run = await launch({ seed: 7 });
+    const scene = run.scene as MusicianScene;
+    await run.until(() => scene.stage === "listen", 20_000);
+    const [x, y] = center(scene, scene.sequence[0]);
+    for (const act of [
+      () => tap(run.host.input, 4, 4),
+      () => tap(run.host.input, 300, 190),
+      () => longPress(run.host.input, x, y),
+      () => swipe(run.host.input, x, y, 30, 0),
+    ]) {
+      act();
+      await run.run(100);
+      expect(scene.stage).toBe("listen");
+      expect(scene.progress).toBe(0);
+      expect(scene.hasFailed).toBe(false);
+    }
+    tap(run.host.input, x, y);
+    await run.run(50);
+    expect(scene.lastNote).toBe("right");
+    expect(scene.progress).toBe(1);
+  }, 60_000);
 });
 
 describe.skipIf(!hasOriginalFiles)("S23 Le Schtroumpf Musicien : parcours depuis le plateau et depuis le mode libre", () => {

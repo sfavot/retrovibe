@@ -1,10 +1,11 @@
 import type { Hy8, Hy8Frame } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../data/mcg";
 import type { Voc } from "../../data/voc";
 import type { Timer } from "../../engine/clock";
-import type { Action } from "../../engine/input";
+import type { Action, Input } from "../../engine/input";
+import type { MenuArea } from "../../engine/menu";
 import type { Scene, SceneContext } from "../../engine/scene";
-import { AnimationPlayer } from "../../engine/sprites";
+import { AnimationPlayer, boundsOf, placeFrame } from "../../engine/sprites";
 import type { Game } from "../../game/rules";
 import { Clip, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
 
@@ -16,7 +17,8 @@ import { Clip, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone,
  * - reçoit : `game`, la partie en cours ; la requête est `game.state.pending` (scène 23) : `level` 0..2 allonge la mélodie à
  *   reproduire (5, 6 ou 7 notes) et change le tirage des notes, `bonus` (indice de l'oiseau) force le niveau 0 et retire une note (4) ;
  * - joue : quatre instruments. Le Schtroumpf joue une mélodie qui s'allonge d'une note à chaque manche ; le joueur la reproduit
- *   avec les flèches (gauche, haut, droite, bas = instruments 0 à 3 ; `Z`, `Q`, `X`, `A` aussi). Dix secondes pour toute la mélodie,
+ *   avec les flèches (gauche, haut, droite, bas = instruments 0 à 3 ; `Z`, `Q`, `X`, `A` aussi), ou au doigt en touchant le Schtroumpf
+ *   qui doit jouer (ajout du port). Dix secondes pour toute la mélodie,
  *   quarante-cinq secondes pour toute la partie ;
  * - rend : `onDone(ctx, { kind: "points", points })` à la fin de la vidéo de fin (`s23c` si réussi, `s23b` sinon, passables) ; 1 à 3
  *   gouttes selon la longueur de la dernière mélodie réussie, 0 à la moindre erreur ou au moindre délai dépassé ; l'appelant applique l'issue.
@@ -36,6 +38,27 @@ export const INSTRUMENT_KEYS: readonly Action[] = ["left", "up", "right", "down"
 /** Sons de l'instrument quand la note est juste, puis quand elle est fausse (tables `24d0:0a2f` et `24d0:09ef`). */
 export const RIGHT_SOUNDS: readonly string[] = ["s23a004c.voc", "s23a002b.voc", "s23a001b.voc", "s23a003e.voc"];
 export const WRONG_SOUNDS: readonly string[] = ["s23a008e.voc", "s23a006b.voc", "s23a005b.voc", "s23a007d.voc"];
+
+/** Marge (pixels) autour de chaque musicien au repos pour le toucher du doigt. */
+const TOUCH_MARGIN = 4;
+
+/**
+ * Musicien touché en (x, y) parmi les zones (une par instrument), `null` hors de toutes. Les zones du guitariste et du joueur de
+ * cymbales se chevauchent un peu : le musicien dont le centre est le plus proche l'emporte.
+ */
+export function instrumentAt(areas: readonly MenuArea[], x: number, y: number): number | null {
+  let best: number | null = null;
+  let bestDistance = Infinity;
+  for (const [index, a] of areas.entries()) {
+    if (x < a.x0 || x > a.x1 || y < a.y0 || y > a.y1) continue;
+    const distance = Math.hypot(x - (a.x0 + a.x1) / 2, y - (a.y0 + a.y1) / 2);
+    if (distance < bestDistance) {
+      best = index;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
 
 /** Longueur à atteindre (`DS:2370`) : 5, 6, 7 selon le niveau 0, 1, 2 ; 4 avec l'indice de l'oiseau. */
 export function goalLength(level: number, bonus: boolean): number {
@@ -112,6 +135,8 @@ export class MusicianScene implements Scene {
   private noteAt = 0;
   private noteAnimDone = false;
   private shown: { instrument: number; frame: Hy8Frame } | null = null;
+  /** Zones des musiciens au repos (première image de chaque animation), pour le doigt. */
+  private areas: MenuArea[] = [];
   private until = 0;
   private releaseStart = 0;
   private done = false;
@@ -165,6 +190,11 @@ export class MusicianScene implements Scene {
     return this.earned;
   }
 
+  /** Zones touchables des quatre musiciens (gauche, haut, droite, bas), pour les tests. */
+  get touchAreas(): readonly MenuArea[] {
+    return this.areas;
+  }
+
   /** Secondes écoulées dans la manche d'écoute (chrono 3) et dans la partie (chrono 2), pour les tests. */
   get listenSeconds(): number {
     return this.listenTimer?.seconds ?? 0;
@@ -197,6 +227,15 @@ export class MusicianScene implements Scene {
       this.win.load(ctx),
       this.fail.load(ctx),
     ]);
+    this.areas = INSTRUMENT_POSITIONS.map(([x, y], index) => {
+      const b = boundsOf(placeFrame(this.sprites, this.sprites.animations[index].frames[0]));
+      return {
+        x0: Math.max(0, x + b.minX - TOUCH_MARGIN),
+        y0: Math.max(0, y + b.minY - TOUCH_MARGIN),
+        x1: Math.min(SCREEN_WIDTH - 1, x + b.maxX - 1 + TOUCH_MARGIN),
+        y1: Math.min(SCREEN_HEIGHT - 1, y + b.maxY - 1 + TOUCH_MARGIN),
+      };
+    });
   }
 
   enter(ctx: SceneContext): void {
@@ -358,15 +397,20 @@ export class MusicianScene implements Scene {
     return true;
   }
 
-  /** Écoute du joueur (`24d0:0522..0894`) : une seule touche de direction à la fois, 10 s pour toute la mélodie. */
+  /**
+   * Écoute du joueur (`24d0:0522..0894`) : une seule touche de direction à la fois, 10 s pour toute la mélodie. Au doigt, toucher un
+   * musicien vaut la flèche de son instrument (ajout du port).
+   */
   private updateListen(ctx: SceneContext): void {
     const { input } = ctx;
     const timedOut = this.listenTimer!.seconds >= LISTEN_LIMIT_SECONDS;
     if (timedOut) this.failed = true;
-    const pressed = INSTRUMENT_KEYS.flatMap((key, instrument) => (input.justPressed(key) ? [instrument] : []));
+    const pressed = new Set(INSTRUMENT_KEYS.flatMap((key, instrument) => (input.justPressed(key) ? [instrument] : [])));
+    const touched = this.touchedInstrument(input);
+    if (touched !== null) pressed.add(touched);
     // Deux directions à la fois ne désignent aucun instrument (table `24d0:0a0f`) : la touche est ignorée.
-    if (pressed.length === 1) {
-      const instrument = pressed[0];
+    if (pressed.size === 1) {
+      const [instrument] = pressed;
       const right = instrument === this.melody[this.reproduced];
       if (right) this.reproduced++;
       else this.failed = true;
@@ -374,6 +418,12 @@ export class MusicianScene implements Scene {
       return;
     }
     if (timedOut) this.endListen(ctx);
+  }
+
+  /** Musicien touché par le geste de ce pas (un toucher bref ; l'appui long et le glissement ne jouent rien), ou `null`. */
+  private touchedInstrument(input: Input): number | null {
+    const gesture = input.touchGesture;
+    return gesture?.kind === "tap" ? instrumentAt(this.areas, gesture.x, gesture.y) : null;
   }
 
   /** `1f33:030e` : tant qu'une flèche est tenue (5 s au plus), la boucle attend. */

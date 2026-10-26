@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Hy8 } from "../../src/games/teleportaschtroumpf/data/hy8";
 import {
   BEEP_ARRIVE,
@@ -26,6 +26,7 @@ import { zoneIndex } from "../../src/games/teleportaschtroumpf/game/board";
 import { DOORS, SCREEN_COUNT } from "../../src/games/teleportaschtroumpf/game/tables";
 import { Session } from "./game-helpers";
 import { hasOriginalFiles, readData } from "./helpers";
+import { longPress, swipe, tap, touchDown, touchUp } from "./touch";
 import { parseHy8 } from "../../src/games/teleportaschtroumpf/data/hy8";
 
 /** Longueur des animations de pose de `s01a000s.hy8` (0..7, 9, 0xB, 0xC). */
@@ -309,5 +310,91 @@ describe.skipIf(!hasOriginalFiles)("plateau : marche, course, saut sur la partie
     await s.hold("ArrowLeft", 800);
     await s.run(200);
     expect(s.game.player).toMatchObject({ screen: 1, row: "bottom" });
+  }, 60_000);
+});
+
+describe.skipIf(!hasOriginalFiles)("plateau au doigt (ajout du port)", () => {
+  it("toucher le décor : le pion marche jusque-là sur sa rangée et s'arrête ; une flèche du clavier reprend la main", async () => {
+    const s = await Session.start();
+    await s.ready();
+    s.place({ screen: 2, row: "top", x: 0x30 });
+    tap(s.host.input, 200, 40);
+    await s.run(3000);
+    // Le milieu du pion est sous le doigt, à un pas près.
+    expect(Math.abs(s.game.player.x + 12 - 200)).toBeLessThanOrEqual(8);
+    expect(s.game.player).toMatchObject({ screen: 2, row: "top" });
+    tap(s.host.input, 30, 40);
+    await s.run(300);
+    const walking = s.game.player.x;
+    expect(walking).toBeLessThan(200);
+    await s.tap("ArrowRight");
+    const stopped = s.game.player.x;
+    await s.run(1000);
+    expect(s.game.player.x).toBe(stopped);
+  }, 60_000);
+
+  it("toucher près du bord droit : le pion marche jusqu'au bord et s'arrête sur la rangée où il arrive", async () => {
+    const s = await Session.start();
+    await s.ready();
+    s.place({ screen: 2, row: "top", x: 0x110 });
+    tap(s.host.input, 315, 40);
+    await s.run(3000);
+    expect(s.game.player).toMatchObject({ screen: 2, row: "bottom" });
+    const arrived = s.game.player.x;
+    await s.run(1000);
+    expect(s.game.player.x).toBe(arrived);
+  }, 60_000);
+
+  it("toucher le pion : le bouton ; le doigt qui se pose ailleurs n'appuie pas", async () => {
+    const s = await Session.start();
+    await s.ready();
+    s.place({ screen: 2, row: "top", x: 0x60 });
+    await s.run(200);
+    const press = vi.spyOn(s.game, "press");
+    touchDown(s.host.input, 250, 40);
+    await s.run(200);
+    expect(press).not.toHaveBeenCalled();
+    touchUp(s.host.input, 250, 40);
+    await s.run(200);
+    s.host.input.keyDown("ArrowRight"); // annule la marche vers le doigt
+    await s.run(100);
+    s.host.input.keyUp("ArrowRight");
+    await s.run(200);
+    const x = s.game.player.x;
+    tap(s.host.input, x + 12, 0x38 - 15);
+    await s.run(200);
+    expect(press).toHaveBeenCalledWith("button");
+  }, 60_000);
+
+  it("glisser vers le haut : le saut de 68 px, du côté du glissement", async () => {
+    const s = await Session.start();
+    await s.ready();
+    s.place({ screen: 2, row: "top", x: 0x80 });
+    await s.run(200);
+    swipe(s.host.input, 150, 60, -20, -30);
+    await s.run(1500);
+    expect(s.game.player.x).toBe(0x80 - 0x44);
+    // Glisser de côté ne fait rien.
+    swipe(s.host.input, 150, 60, 40, 0);
+    await s.run(1500);
+    expect(s.game.player.x).toBe(0x80 - 0x44);
+  }, 60_000);
+
+  it("toucher le bandeau du bas : la pause ; appui long : la voix d'aide", async () => {
+    const s = await Session.start();
+    await s.ready();
+    const outputs: string[] = [];
+    const step = s.board.step.bind(s.board);
+    vi.spyOn(s.board, "step").mockImplementation((ctx) => {
+      const out = step(ctx);
+      if (out && out.kind !== "events") outputs.push(out.kind);
+      return out;
+    });
+    longPress(s.host.input, 150, 60);
+    await s.run(200);
+    expect(outputs).toEqual(["help"]);
+    tap(s.host.input, 150, 180);
+    await s.settle("PauseScene");
+    expect(outputs).toEqual(["help", "pause"]);
   }, 60_000);
 });

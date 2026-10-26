@@ -14,7 +14,8 @@ import {
   type MinigameDone,
   type MinigameFactory,
 } from "./common";
-import { LANE_CENTER, LANE_RIGHT, MineRun, TILE_TOPS, type MineSound } from "./s36/run";
+import { HeldFinger } from "./held-finger";
+import { CART_STEP_Y, LANE_CENTER, LANE_LEFT, LANE_RIGHT, MineRun, TILE_TOPS, type MineSound } from "./s36/run";
 
 /**
  * S36 « La Mine Désaffectée » (`23c9:0004`, 3 505 octets ; RE : `docs/teleportaschtroumpf/minigames/s36.md`, format des tronçons :
@@ -26,8 +27,9 @@ import { LANE_CENTER, LANE_RIGHT, MineRun, TILE_TOPS, type MineSound } from "./s
  *   `bonus` (indice de l'oiseau) force le niveau 3 (paire `s36j` / `s36k`). Défaut de l'original corrigé (2026-10-23) : S36 comparait
  *   l'indice de l'oiseau à 0x1B (la valeur de S27) ; `MINIGAMES` lui donne maintenant le sien, 0x24 (S27 garde le sien) ;
  * - joue : un chariot sur trois voies que le décor fait défiler vers le bas, 10 px par image (12 images par seconde) ; haut / bas le déplacent
- *   dans l'écran, gauche / droite changent de voie là où le tronçon a un aiguillage (dans la fenêtre verticale de celui-ci) ; un obstacle sur
- *   la voie du chariot l'arrête. Un tirage (`rand × 2`) choisit la variante dans la paire du niveau ;
+ *   dans l'écran, gauche / droite changent de voie là où le tronçon a un aiguillage (dans la fenêtre verticale de celui-ci) ; au doigt,
+ *   posé sur la voie du chariot, il l'attire vers le haut ou le bas, posé sur une autre voie, il vaut la flèche de ce côté ; un obstacle
+ *   sur la voie du chariot l'arrête. Un tirage (`rand × 2`) choisit la variante dans la paire du niveau ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la vidéo de fin (`s36b` après un choc, `s36c1` / `s36c2` selon que
  *   l'ingrédient 1 fait partie de l'objectif), passable par Échap ou Espace ; l'appelant applique l'issue.
  */
@@ -60,6 +62,32 @@ export function mineVariant(level: number, roll: number): string {
   return roll === 0 ? zero : other;
 }
 
+/**
+ * Au doigt (ajout du port) : milieu vertical du chariot sous son ordonnée (`s36a000s.hy8`, animation 0 : lignes −3 à 38, centrée sur
+ * l'abscisse). Un doigt posé sur une autre voie que celle du chariot (à plus d'une demi-voie de son abscisse) vaut la flèche de ce côté
+ * tenue (aiguillage, ou refus hors aiguillage, comme au clavier) ; sur sa voie, il vaut haut ou bas tenu jusqu'à ce que le milieu du
+ * chariot soit à moins d'un pas du doigt.
+ */
+export const CART_MIDDLE_DY = 18;
+export const LANE_HALF_WIDTH = (LANE_CENTER - LANE_LEFT) / 2;
+
+export interface MineKeys {
+  up: boolean;
+  down: boolean;
+  left: boolean;
+  right: boolean;
+}
+
+/** Flèches que vaut un doigt posé en (`fingerX`, `fingerY`) pour un chariot en (`x`, `y`). */
+export function mineTouchKeys(x: number, y: number, fingerX: number, fingerY: number): MineKeys {
+  const keys = { up: false, down: false, left: false, right: false };
+  if (fingerX < x - LANE_HALF_WIDTH) keys.left = true;
+  else if (fingerX > x + LANE_HALF_WIDTH) keys.right = true;
+  else if (fingerY < y + CART_MIDDLE_DY - CART_STEP_Y) keys.up = true;
+  else if (fingerY > y + CART_MIDDLE_DY + CART_STEP_Y) keys.down = true;
+  return keys;
+}
+
 export type MinePhase = "run" | "fadeOut" | "sound" | "result" | "done";
 
 export class MineScene implements Scene {
@@ -80,6 +108,7 @@ export class MineScene implements Scene {
   private done = false;
   /** Touches vues depuis la dernière image : un appui plus court qu'une image compte (l'original lit les touches tenues à chaque image). */
   private held = { up: false, down: false, left: false, right: false };
+  private readonly finger = new HeldFinger();
 
   constructor(
     private readonly game: Game,
@@ -142,6 +171,7 @@ export class MineScene implements Scene {
     this.done = false;
     this.result = null;
     this.held = { up: false, down: false, left: false, right: false };
+    this.finger.reset();
     this.run = new MineRun(
       this.sequence,
       this.mut.tiles.map((tile) => tile.flags),
@@ -199,13 +229,19 @@ export class MineScene implements Scene {
 
   private updateRun(ctx: SceneContext): void {
     const { input } = ctx;
-    for (const key of ["up", "down", "left", "right"] as const) this.held[key] ||= input.pressed(key) || input.justPressed(key);
+    // Au doigt : la flèche que vaut sa position (voir `mineTouchKeys`), tenue tant qu'il est posé.
+    const finger = this.finger.read(input);
+    const touched = finger ? mineTouchKeys(this.run.x, this.run.y, finger.x, finger.y) : null;
+    for (const key of ["up", "down", "left", "right"] as const) {
+      this.held[key] ||= input.pressed(key) || input.justPressed(key) || touched?.[key] === true;
+    }
     if (ctx.clock.ticks - this.lastFrame < MINE_FRAME_TICKS) return;
     this.lastFrame = ctx.clock.ticks;
     const { held } = this;
+    const fingerHeld = input.touchHeldAt !== null && touched !== null && (touched.up || touched.down || touched.left || touched.right);
     this.run.step({
       ...held,
-      idle: !(input.pressed("up") || input.pressed("down") || input.pressed("left") || input.pressed("right")),
+      idle: !(input.pressed("up") || input.pressed("down") || input.pressed("left") || input.pressed("right") || fingerHeld),
       soundPlaying: ctx.voice.voicePlaying,
     });
     this.held = { up: false, down: false, left: false, right: false };

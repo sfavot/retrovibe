@@ -15,8 +15,8 @@ import { Clip, SoundHush, levelTimeLimit, minigameLevel, minigameRequest, points
  * - reçoit : `game`, la partie en cours ; la requête est `game.state.pending` (scène 29) : `level` 0..2 raccourcit le temps imparti
  *   (30, 26 ou 22 s), `bonus` (indice de l'oiseau) force le niveau 0 ;
  * - joue : un gâteau de huit bougies allumées. Gauche / droite (flèches, `Z` / `X`) déplacent le curseur d'une bougie à chaque appui,
- *   Espace (ou clic gauche) souffle la bougie visée. Une bougie soufflée se rallume toute seule 3 à 7 s plus tard : il faut que
- *   les huit soient éteintes **en même temps** avant la fin du temps ;
+ *   Espace (ou clic gauche) souffle la bougie visée ; au doigt, toucher une bougie y mène le curseur puis la souffle. Une bougie soufflée
+ *   se rallume toute seule 3 à 7 s plus tard : il faut que les huit soient éteintes **en même temps** avant la fin du temps ;
  * - rend : `onDone(ctx, { kind: "points", points })` à la fin de la vidéo de fin (`s29c` si réussi, `s29b` sinon, passables) ; 1 à 3 points
  *   selon le temps mis (moins de 10 s : 3, moins de 20 s : 2, sinon 1), 0 en cas d'échec ; l'appelant applique l'issue.
  */
@@ -32,6 +32,29 @@ export const CANDLE_POSITIONS: readonly (readonly [number, number])[] = [
   [0xf3, 0x51],
   [0x114, 0x4d],
 ];
+
+/**
+ * Au doigt (ajout du port) : toucher une bougie la vise. Zone d'une bougie : à moins de `CANDLE_TOUCH_HALF_WIDTH` pixels du milieu de sa
+ * flamme (`s29a000s.hy8`, animations 0 et 1 : colonnes −7 à 10 autour de son bord gauche), de la pointe de la flamme (`y − 45`) au bas
+ * de la bougie peinte dans le fond (`y + 65`).
+ */
+export const CANDLE_TOUCH_HALF_WIDTH = 14;
+const CANDLE_MIDDLE_DX = 1;
+const CANDLE_TOUCH_TOP = 45;
+const CANDLE_TOUCH_BOTTOM = 65;
+
+/** Bougie (1 à 8) touchée en (x, y), la plus proche si deux zones se touchent ; `null` hors des bougies. */
+export function candleAt(x: number, y: number): number | null {
+  let best: number | null = null;
+  let bestDistance = Infinity;
+  CANDLE_POSITIONS.forEach(([cx, cy], i) => {
+    const distance = Math.abs(x - (cx + CANDLE_MIDDLE_DX));
+    if (distance > CANDLE_TOUCH_HALF_WIDTH || y < cy - CANDLE_TOUCH_TOP || y > cy + CANDLE_TOUCH_BOTTOM || distance >= bestDistance) return;
+    best = i + 1;
+    bestDistance = distance;
+  });
+  return best;
+}
 
 /** Temps imparti : `30 − 4 × niveau` secondes (`1da0:0703`) ; dépassé quand les secondes écoulées lui sont strictement supérieures. */
 export const TIME_LIMIT_SECONDS = 30;
@@ -109,6 +132,8 @@ export class BirthdayScene implements Scene {
   private left = false;
   private right = false;
   private blow = false;
+  /** Bougie touchée du doigt (1 à 8) : le curseur la rejoint d'une bougie par itération, comme aux flèches, puis la souffle ; `null` sans. */
+  private aimed: number | null = null;
   private releaseStart = 0;
   private readonly hushing = new SoundHush();
   private over = false;
@@ -216,6 +241,7 @@ export class BirthdayScene implements Scene {
     this.left = false;
     this.right = false;
     this.blow = false;
+    this.aimed = null;
     this.over = false;
     this.allOut = false;
     this.timedOut = false;
@@ -283,11 +309,23 @@ export class BirthdayScene implements Scene {
    */
   private readKeys(ctx: SceneContext): void {
     const { input } = ctx;
+    // Au doigt, le geste (toucher bref ou long) désigne la bougie ; l'appui « valider » de son posé ne souffle pas la bougie du curseur.
+    const gesture = input.touchGesture;
+    if (gesture && gesture.kind !== "swipe") this.aimed = candleAt(gesture.x, gesture.y) ?? this.aimed;
+    if (input.anyJustPressed("left", "right")) this.aimed = null;
     if (this.phase === "play") {
       this.left ||= input.pressed("left") || input.justPressed("left");
       this.right ||= input.pressed("right") || input.justPressed("right");
+      if (this.aimed !== null) {
+        this.left ||= this.aimed < this.cursor;
+        this.right ||= this.aimed > this.cursor;
+        if (this.aimed === this.cursor) {
+          this.blow = true;
+          this.aimed = null;
+        }
+      }
     }
-    this.blow ||= input.justPressed("validate");
+    this.blow ||= input.validateNotTouch;
   }
 
   private arrowHeld(ctx: SceneContext): boolean {

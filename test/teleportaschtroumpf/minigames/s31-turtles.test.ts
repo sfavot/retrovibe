@@ -22,10 +22,12 @@ import {
   TURTLE_SPECS,
   Turtle,
   placeTurtles,
+  touchedHop,
   type SmurfKeys,
   type TurtlePhase,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s31/turtles";
 import { hasOriginalFiles, listData, readData } from "../helpers";
+import { swipe, tap, touchDown, touchUp } from "../touch";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
 
 const INGREDIENT = 5;
@@ -602,4 +604,76 @@ describe.skipIf(!hasOriginalFiles)("S31 Les Tortues : parcours depuis le plateau
     await run.until(() => run.free.stage === "map" && !run.ctx.scenes.transitioning, 30_000);
     expect(run.free.currentGame).toBeNull();
   }, 180_000);
+});
+
+describe("S31 : au doigt (ajout du port)", () => {
+  // Schtroumpf en (100, 120) : milieu en (107, 103).
+  const at = (x: number, y: number) => touchedHop(100, 120, { kind: "tap", x, y });
+
+  it("toucher le Schtroumpf : saut sur place ; devant lui le long de la rivière : en avant ; derrière : en arrière", () => {
+    expect(at(107, 103)).toBe("click");
+    expect(at(84, 77)).toBe("click");
+    expect(at(107 + HOP_DX, 103 - HOP_DY)).toBe("up");
+    expect(at(300, 10)).toBe("up");
+    expect(at(107 - HOP_DX, 103 + HOP_DY)).toBe("down");
+    expect(at(10, 199)).toBe("down");
+    expect(touchedHop(100, 120, { kind: "long", x: 300, y: 10 })).toBe("up");
+  });
+
+  it("hors cible : à moins d'un demi-saut le long de la rivière, hors du Schtroumpf, rien", () => {
+    // De travers par rapport au saut (perpendiculaire) : ni en avant ni en arrière.
+    expect(at(107 + HOP_DY, 103 + HOP_DX)).toBeNull();
+    expect(at(107 - HOP_DY, 103 - HOP_DX)).toBeNull();
+  });
+
+  it("glissement : vers le haut ou la droite, en avant ; vers le bas ou la gauche, en arrière", () => {
+    const slide = (dx: number, dy: number) => touchedHop(100, 120, { kind: "swipe", x: 160, y: 100, dx, dy });
+    expect(slide(0, -30)).toBe("up");
+    expect(slide(30, 0)).toBe("up");
+    expect(slide(0, 30)).toBe("down");
+    expect(slide(-30, 0)).toBe("down");
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("S31 Les Tortues : au doigt", () => {
+  const middle = (scene: TurtlesScene) => ({ x: scene.coordinates.x + 7, y: scene.coordinates.y - 17 });
+
+  it("toucher la tortue devant : saut en avant ; toucher derrière : retour ; glisser vers le haut : en avant", async () => {
+    const run = await launch();
+    const scene = turtlesScene(run);
+    readyNextTurtle(scene);
+    const { x, y } = middle(scene);
+    tap(run.host.input, x + HOP_DX, y - HOP_DY);
+    await run.run(100);
+    expect(scene.smurfState).toBe(SMURF_HOP_FORWARD);
+    await run.until(() => scene.position === LEVELS[0].start + 1 && scene.smurfState === SMURF_IDLE, 5000);
+    const back = middle(scene);
+    tap(run.host.input, back.x - HOP_DX, back.y + HOP_DY);
+    await run.run(100);
+    expect(scene.smurfState).toBe(SMURF_HOP_BACK);
+    await run.until(() => scene.position === LEVELS[0].start && scene.smurfState === SMURF_IDLE, 5000);
+    readyNextTurtle(scene);
+    swipe(run.host.input, 160, 150, 0, -40);
+    await run.run(100);
+    expect(scene.smurfState).toBe(SMURF_HOP_FORWARD);
+  }, 30_000);
+
+  it("toucher le Schtroumpf : saut sur place ; le doigt posé ailleurs ne le fait pas sauter (son « valider » est ignoré)", async () => {
+    const run = await launch();
+    const scene = turtlesScene(run);
+    const { x, y } = middle(scene);
+    // Hors cible : de travers par rapport au saut.
+    touchDown(run.host.input, x + HOP_DY, y + HOP_DX);
+    await run.run(400);
+    expect(scene.smurfState).toBe(SMURF_IDLE);
+    touchUp(run.host.input, x + HOP_DY, y + HOP_DX);
+    await run.run(200);
+    expect(scene.smurfState).toBe(SMURF_IDLE);
+    expect(scene.position).toBe(LEVELS[0].start);
+    tap(run.host.input, x, y);
+    await run.run(100);
+    expect(scene.smurfState).toBe(SMURF_HOP_IN_PLACE);
+    await run.until(() => scene.smurfState === SMURF_IDLE, 3000);
+    expect(scene.position).toBe(LEVELS[0].start);
+  }, 30_000);
 });

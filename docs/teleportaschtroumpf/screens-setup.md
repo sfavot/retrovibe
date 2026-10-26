@@ -47,7 +47,15 @@ Cadence de la capsule : l'original ne temporise pas (une recopie d'écran par im
 
 **Boutons** (`21ee:0c19`, retourne 0, 1 ou 2) : trois sprites 14, 15, 16 en x = 265, y = 131, 155, 179, figés dans le fond. Sélection initiale 0 ; haut / bas avec rebouclage ; bip à chaque changement ; surbrillance par palette : le texte du bouton i (entrées 121 + i) prend la couleur de l'entrée 125 du MCG (cyan 0, 203, 239) ; l'ancienne couleur est restaurée en le quittant. Clic droit : voix `s08v(12 + i)` (012, 013, 014), attendue. Clic gauche : 0 = « Jouer » → `play`, 1 = « Annuler » → `back` (retour S09), 2 = « Retour » → `menu` (S07). Les noms des boutons viennent des images.
 
-Souris dans l'original : gauche valide, droit joue la voix, sans tenir compte de la position du pointeur. Écart du port (doigt et souris) : toucher un des trois boutons le valide, un appui ailleurs ne fait rien. Le choix du personnage et du niveau reste au clavier.
+Souris dans l'original : gauche valide, droit joue la voix, sans tenir compte de la position du pointeur. Écart du port (doigt et souris) : toucher un des trois boutons le valide, un appui ailleurs ne fait rien.
+
+Écart du port, doigt seul, pendant le choix d'un joueur (adaptation ; souris et clavier inchangés) : le doigt qui se pose ne valide plus rien, le geste décide au relâchement.
+
+- glisser (au moins 12 pixels, n'importe où) : vers la droite / la gauche = personnage suivant / précédent, vers le haut / le bas = niveau + 1 / − 1, comme la flèche de même sens (bip et couleur de niveau identiques) ;
+- toucher le personnage de l'emplacement courant (son sprite, élargi de 6 pixels) : validation ;
+- toucher le pot dessous (de la base du personnage au bas de l'écran, largeur de l'icône de niveau élargie de 6 pixels : étiquette colorée et icône) : niveau suivant, avec rebouclage (comme haut) ;
+- appui long sur le personnage ou le pot : voix du personnage puis du niveau (le clic droit) ;
+- toucher ailleurs (fond, autres pots) : rien.
 
 ## S04 : menu parents (`21ee:13a1`)
 
@@ -60,6 +68,14 @@ Ressources : `s04a001d.mcg` (`13fc:0084`, palette `DS:57C0`), `s04a000s.hy8`, `s
 - Clic gauche (Espace) : valide et quitte (`32f4:0123(font, 0x7E)` restaure la police), écrit durée, pause, message, et la date de la dernière partie telle quelle (`DS:6E9C`). **Pas de voix, pas de sortie par Échap, pas de clic droit.** Les options ne sont écrites qu'à la validation.
 
 Pas d'adaptation souris : clavier d'origine seul (gauche = valider, droit sans effet).
+
+Écart du port, doigt seul (adaptation ; souris et clavier inchangés). Le doigt qui se pose ne valide plus (le `Menu` de l'écran est sans zones : il quitterait l'écran) ; le geste décide. Zones mesurées sur l'image (`TOUCH_ROWS`) : pour chaque réglage, son libellé et sa valeur (premier coucou et son cadran, centre x = 78 ; pendule de la pause, centre x = 216 ; ligne du message, centre x = 102).
+
+- toucher le libellé ou la valeur d'un réglage non sélectionné : le sélectionne (bip, comme haut / bas), sans changer la valeur ;
+- toucher la valeur du réglage sélectionné à gauche / à droite de son centre : valeur − 1 / + 1 (mêmes bornes et rebouclage que gauche / droite) ;
+- glisser horizontalement sur un réglage : le sélectionne et change sa valeur dans le sens du doigt ; un glissement vertical ne fait rien ;
+- appui long n'importe où : enregistre et quitte (comme Espace). L'écran n'a aucun bouton de sortie et aucun texte nouveau n'est ajouté : l'appui long évite de quitter par mégarde d'un toucher bref, mais rien à l'écran ne l'indique (point ouvert) ;
+- toucher ailleurs : rien.
 
 ## Écarts et points ouverts
 

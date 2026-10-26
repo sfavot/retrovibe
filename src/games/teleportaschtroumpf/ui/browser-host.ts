@@ -12,7 +12,7 @@ import { bindCanvasPointer, bindKeyboard } from "../../../ui/pointer";
 
 /**
  * Hôte du navigateur : fichiers par `fetch` (le cache HTTP du navigateur fait le reste ; les décodés sont gardés par
- * `Resources`), canvas 320×200, Web Audio, clavier et souris du canvas.
+ * `Resources`), canvas 320×200, Web Audio, clavier, souris et doigts du canvas (gestes : `Input.touchGesture`).
  */
 export class BrowserHost implements Host {
   readonly input = new Input();
@@ -76,14 +76,23 @@ export class BrowserHost implements Host {
         leave: () => {
           input.pointerHovering = false;
         },
-        down: (button, x, y) => {
+        down: (button, x, y, event) => {
+          const touch = event.pointerType === "touch";
           input.mouseMove(x, y);
-          input.mouseDown(button);
+          if (touch && button === 0) input.touchStarted(x, y);
+          input.mouseDown(button, touch);
         },
-        up: (button, x, y) => {
+        up: (button, x, y, event) => {
           input.mouseMove(x, y);
           input.mouseUp(button);
+          // Un geste interrompu par le navigateur (`pointercancel`) ne touche rien.
+          if (event.pointerType === "touch" && button === 0) {
+            if (event.type === "pointerup") input.touchEnded(x, y);
+            else input.touchCancelled();
+          }
         },
+        // Gestes du doigt (ajout du port) : l'appui long est un geste à part, la souris garde ses deux boutons.
+        longPress: () => input.touchLongPressed(),
       },
       { onGesture: unlock },
     );

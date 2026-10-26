@@ -1,9 +1,11 @@
 import type { PfnFont } from "../data/font";
 import type { Hy8 } from "../data/hy8";
-import type { Mcg } from "../data/mcg";
+import { SCREEN_WIDTH, type Mcg } from "../data/mcg";
 import type { Voc } from "../data/voc";
+import { SWIPE_MIN, type TouchGesture } from "../engine/input";
 import { BorlandRandom } from "../engine/rng";
 import type { SceneContext } from "../engine/scene";
+import { boundsOf, placeFrame } from "../engine/sprites";
 import { TICKS_PER_SECOND } from "../engine/clock";
 import type { Game, GameEvent } from "../game/rules";
 import { HAZARDS, ROW_Y, SCREEN_COUNT, type Position, type Row } from "../game/tables";
@@ -23,6 +25,14 @@ import { Walker, type WalkerInput } from "./board/walker";
  * - **décor** : animations des écrans (`board/ambient.ts`), puits ouvert, bruitages du lac et du pont ;
  * - **cadence** : une image tous les 4 ticks (15 images/s), `step = 4` de la scène qui l'héberge ;
  * - **minuteur de tour** (multijoueur) : image `0x77 + ⌊secondes / 3⌋` (au plus 9) en bas à droite (`2bd4:0046`).
+ *
+ * Gestes du doigt (ajout du port, l'original n'a que le clavier ; souris et clavier inchangés) :
+ *
+ * - toucher le décor : le pion marche jusque-là sur sa rangée (près d'un bord d'écran : jusqu'au bord, puis s'arrête sur la
+ *   rangée où il arrive), comme si la flèche était tenue ; toucher ailleurs change de but, une flèche du clavier l'annule ;
+ * - toucher le pion : le bouton (entrer dans la porte, déclencher l'événement) ;
+ * - glisser vers le haut : le saut, du côté du glissement (ou du côté où regarde le pion s'il est vertical) ;
+ * - toucher le bandeau du bas : la pause (touche P) ; appui long : la voix d'aide (clic droit).
  *
  * Le plateau ne décide rien : `step` lit les touches, appelle `Game.walk / jump / press` et rend les événements produits (ou
  * une demande de pause / d'aide) ; c'est `scenes/game.ts` qui les présente. Les chronos (`Game.tick`) sont ceux de la scène hôte.
@@ -96,6 +106,19 @@ const TIMER_X = 0x124;
 const TIMER_BOTTOM = 0xc6;
 const TIMER_SECONDS_PER_STEP = 3;
 
+/** Bandeau du bas (le même que celui que S48 recopie, `y ≥ 0x98`) : le toucher met en pause. */
+const HUD_TOP = 0x98;
+/** Toucher à moins de `EDGE_TOUCH` pixels d'un bord : le pion marche jusqu'à l'écran voisin. */
+const EDGE_TOUCH = 16;
+/** Marge autour du pion pour le toucher (pixels 320×200) : le doigt couvre plus que le pion. */
+const PAWN_TOUCH_MARGIN = 6;
+/** Pion sans image (caché) : demi-largeur supposée, pour viser son milieu. */
+const PAWN_HALF_WIDTH = 12;
+/** Pas de marche (4 px ; la course en fait 8) : un but plus proche est atteint. */
+const WALK_PACE = 4;
+/** Images sans avancer avant d'abandonner un but de marche (bloqué par un mur, la fin de la rangée…). */
+const TOUCH_STUCK_FRAMES = 3;
+
 /** Plages « comptées » (lac glacé, pont branlant) avec leur bruitage d'entrée (`2bd4:0af9`, `10da`). */
 const ZONE_SOUNDS = HAZARDS.filter((h) => h.counted).map((h) => ({ screen: h.screen, row: h.row, range: h.counted!, kind: h.kind }));
 
@@ -111,6 +134,8 @@ export class Board {
   private multiplayer = false;
   private turnSeconds = 0;
   private goalHidden = false;
+  /** But de marche au doigt : abscisse visée sur la rangée où il a été donné (±∞ : jusqu'au bord, vers la rangée suivante). */
+  private touchTarget: { screen: number; row: Row; x: number; stuck: number } | null = null;
 
   constructor(private readonly resources: BoardResources) {}
 
@@ -206,8 +231,19 @@ export class Board {
     if (input.justPressed("pause")) return { kind: "pause" };
     if (input.justPressed("cancel")) return { kind: "help" };
 
-    const press = input.justPressed("validate");
-    const keys: WalkerInput = { left: input.pressed("left"), right: input.pressed("right"), up: input.pressed("up"), press };
+    const touch = this.readTouch(input.touchGesture);
+    if (touch === "pause" || touch === "help") return { kind: touch };
+    if (input.pressed("left") || input.pressed("right") || input.pressed("up")) this.touchTarget = null;
+    // Le doigt qui se pose envoie aussi « valider » : c'est son geste qui décide (toucher le pion = le bouton).
+    const press = input.validateNotTouch || touch === "press";
+    const jump = typeof touch === "number" ? touch : 0;
+    const toward = this.touchDirection();
+    const keys: WalkerInput = {
+      left: input.pressed("left") || toward < 0 || jump < 0,
+      right: input.pressed("right") || toward > 0 || jump > 0,
+      up: input.pressed("up") || jump !== 0,
+      press,
+    };
     if (keys.left || keys.right || keys.up) game.markActive();
     const move = this.walker.step(keys, ctx.clock.ticks, this.resources.sprites);
     if (move.beep !== undefined) ctx.voice.playBeep(move.beep);
@@ -218,8 +254,11 @@ export class Board {
     if (events.length === 0 && press && game.state.phase === "turn") events.push(...game.press("button"));
 
     this.turnSeconds = game.state.turn.elapsed;
+    if (events.length > 0 && !events.every(isEdgeMove)) this.touchTarget = null;
     if (events.length === 0 || events.every(isEdgeMove)) {
+      const before = this.view.x;
       this.followGame(ctx);
+      if (toward !== 0 && !this.walker.busy) this.trackTouchProgress(before);
       this.advance(ctx);
       this.playZoneSound(ctx);
     }
@@ -251,6 +290,70 @@ export class Board {
   }
 
   // --- interne ----------------------------------------------------------------------------------
+
+  /**
+   * Geste du doigt de cette image : pause, aide, bouton, saut (côté −1 / 1) ou nouveau but de marche (`touchTarget`, rien à
+   * rendre). `null` : pas de geste à jouer.
+   */
+  private readTouch(gesture: TouchGesture | null): "pause" | "help" | "press" | -1 | 1 | null {
+    if (!gesture) return null;
+    if (gesture.kind === "long") return "help";
+    if (gesture.kind === "swipe") {
+      // Vers le haut (plus haut que de côté) : le saut ; les autres glissements ne font rien.
+      if (-gesture.dy < Math.abs(gesture.dx)) return null;
+      this.touchTarget = null;
+      if (Math.abs(gesture.dx) >= SWIPE_MIN / 2) return gesture.dx > 0 ? 1 : -1;
+      return this.view.facingRight ? 1 : -1;
+    }
+    if (gesture.y >= HUD_TOP) return "pause";
+    if (this.onPawn(gesture.x, gesture.y)) {
+      this.touchTarget = null;
+      return "press";
+    }
+    const x = gesture.x < EDGE_TOUCH ? -Infinity : gesture.x >= SCREEN_WIDTH - EDGE_TOUCH ? Infinity : gesture.x - this.pawnHalfWidth();
+    this.touchTarget = { screen: this.view.screen, row: this.view.row, x, stuck: 0 };
+    return null;
+  }
+
+  /** Côté où marcher vers le but du doigt (−1, 0 ou 1) ; le but est oublié une fois atteint, la rangée quittée ou le pion bloqué. */
+  private touchDirection(): number {
+    const target = this.touchTarget;
+    if (!target) return 0;
+    const dx = target.x - this.view.x;
+    const left = target.screen !== this.view.screen || target.row !== this.view.row;
+    if (left || Math.abs(dx) <= WALK_PACE || target.stuck >= TOUCH_STUCK_FRAMES || this.view.look !== "normal") {
+      this.touchTarget = null;
+      return 0;
+    }
+    return Math.sign(dx);
+  }
+
+  /** Le pion a-t-il avancé vers le but du doigt pendant cette image (sinon il est bloqué) ? */
+  private trackTouchProgress(before: number): void {
+    if (this.touchTarget) this.touchTarget.stuck = this.view.x === before ? this.touchTarget.stuck + 1 : 0;
+  }
+
+  /** Rectangle du pion à l'écran (image courante), élargi pour le doigt. */
+  private onPawn(x: number, y: number): boolean {
+    const frame = this.walker.currentFrame(this.resources.sprites);
+    const rowY = ROW_Y[this.view.row];
+    const b = frame
+      ? boundsOf(placeFrame(this.resources.sprites, frame))
+      : { minX: 0, maxX: 2 * PAWN_HALF_WIDTH, minY: -40, maxY: 1 };
+    return (
+      x >= this.view.x + b.minX - PAWN_TOUCH_MARGIN &&
+      x < this.view.x + b.maxX + PAWN_TOUCH_MARGIN &&
+      y >= rowY + b.minY - PAWN_TOUCH_MARGIN &&
+      y < rowY + b.maxY + PAWN_TOUCH_MARGIN
+    );
+  }
+
+  private pawnHalfWidth(): number {
+    const frame = this.walker.currentFrame(this.resources.sprites);
+    if (!frame) return PAWN_HALF_WIDTH;
+    const b = boundsOf(placeFrame(this.resources.sprites, frame));
+    return Math.round((b.minX + b.maxX) / 2);
+  }
 
   private drawBackground(ctx: SceneContext): void {
     const { surface, palette } = ctx;

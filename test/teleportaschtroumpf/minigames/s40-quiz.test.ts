@@ -5,8 +5,11 @@ import { parseQuiz } from "../../../src/games/teleportaschtroumpf/data/text";
 import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
+  ANSWER_ROWS,
   QuizScene,
+  TEXT_LEFT,
   TEXT_WIDTH,
+  answerRowAt,
   answerVoiceNumber,
   createQuiz,
   drawOrder,
@@ -17,6 +20,7 @@ import {
   wrongVoiceNumber,
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s40-quiz";
 import { hasOriginalFiles, readData } from "../helpers";
+import { longPress, swipe, tap, touchDown, touchMove, touchUp } from "../touch";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
 
 const below = (seed: number) => {
@@ -65,6 +69,23 @@ describe("S40 : règles du quiz (pur, `2ee8:000d`)", () => {
     const a = newGame({ players: [{ character: 0 }] }, new BorlandRandom(1));
     const b = newGame({ players: [{ character: 0 }] }, new BorlandRandom(1));
     expect(drawQuestion(a, 44, below(9))).toBe(drawQuestion(b, 44, below(9)));
+  });
+
+  it("doigt : une bande par proposition, de la largeur du bloc de texte, centrée sur la ligne", () => {
+    const h = 10;
+    const step = ANSWER_ROWS[1] - ANSWER_ROWS[0];
+    for (let row = 0; row < 3; row++) {
+      const y = ANSWER_ROWS[row] + h / 2;
+      expect(answerRowAt(160, y, h)).toBe(row);
+      expect(answerRowAt(160, Math.ceil(y - step / 2), h)).toBe(row);
+      expect(answerRowAt(160, Math.ceil(y + step / 2) - 1, h)).toBe(row);
+      expect(answerRowAt(TEXT_LEFT, y, h)).toBe(row);
+      expect(answerRowAt(TEXT_LEFT + TEXT_WIDTH, y, h)).toBe(row);
+      expect(answerRowAt(TEXT_LEFT - 20, y, h)).toBeNull();
+      expect(answerRowAt(TEXT_LEFT + TEXT_WIDTH + 20, y, h)).toBeNull();
+    }
+    expect(answerRowAt(160, 0x1e, h)).toBeNull();
+    expect(answerRowAt(160, ANSWER_ROWS[2] + h / 2 + step, h)).toBeNull();
   });
 
   it("la requête est exigée : sans Game.openMinigame(40) la scène ne se construit pas", () => {
@@ -145,6 +166,99 @@ async function chooseAnswer(run: LaunchedMinigame, answer: number): Promise<void
   await moveTo(run, scene.rowAnswers.indexOf(answer));
   await run.tap("Space", 60);
 }
+
+describe.skipIf(!hasOriginalFiles)("S40 Le Quizz : au doigt (ajout du port)", () => {
+  const launch = async (options: LaunchOptions = {}) => {
+    const run = await launchMinigame(40, options);
+    await run.until(() => !run.ctx.fade.active);
+    await settle(run);
+    return run;
+  };
+  /** Milieu de la ligne `row` à l'écran. */
+  const rowPoint = async (run: LaunchedMinigame, row: number): Promise<[number, number]> => {
+    const font = await run.ctx.resources.pfn("s52d001f.pfn");
+    return [160, Math.round(ANSWER_ROWS[row] + font.height / 2)];
+  };
+
+  it("toucher la bonne proposition sur une autre ligne : elle est surlignée avec son clic, puis validée (1 point)", async () => {
+    const run = await launch({ seed: 9, audio: true });
+    const scene = run.scene as QuizScene;
+    const row = scene.rowAnswers.indexOf(0);
+    expect(row).not.toBe(0);
+    const before = run.host.audio.plays.length;
+    tap(run.host.input, ...(await rowPoint(run, row)));
+    await run.run(50);
+    expect(scene.selection).toBe(row);
+    expect(scene.stage).toBe("move");
+    expect(run.host.audio.plays.length).toBe(before + 1);
+    await run.until(() => scene.stage === "answer");
+    expect(await run.finish()).toEqual({ kind: "points", points: 1 });
+  }, 60_000);
+
+  it("toucher la ligne déjà surlignée la valide aussitôt ; une mauvaise proposition ne donne rien", async () => {
+    const run = await launch({ seed: 9 });
+    const scene = run.scene as QuizScene;
+    expect(scene.rowAnswers[0]).not.toBe(0);
+    tap(run.host.input, ...(await rowPoint(run, 0)));
+    await run.run(50);
+    expect(scene.stage).not.toBe("choose");
+    expect(scene.selection).toBe(0);
+    expect(await run.finish()).toEqual({ kind: "points", points: 0 });
+  }, 60_000);
+
+  it("appui long sur une proposition : surlignée puis lue à voix haute, sans valider (le clic droit du doigt)", async () => {
+    const run = await launch({ seed: 5, audio: true });
+    const scene = run.scene as QuizScene;
+    const answerVoice = await run.ctx.resources.voc(`s40a${String(answerVoiceNumber(scene.questionIndex, scene.rowAnswers[2])).padStart(3, "0")}t.voc`);
+    longPress(run.host.input, ...(await rowPoint(run, 2)));
+    await run.until(() => scene.stage === "read");
+    expect(scene.selection).toBe(2);
+    expect(run.host.audio.plays.at(-1)!.sound.samples).toEqual(answerVoice.samples);
+    await run.until(() => scene.stage === "choose");
+    await run.run(300);
+    expect(scene.stage).toBe("choose");
+    expect(run.outcome).toBeUndefined();
+  }, 60_000);
+
+  it("le doigt qui se pose ne valide rien ; toucher hors des propositions ou glisser ne fait rien", async () => {
+    const run = await launch({ seed: 5, audio: true });
+    const scene = run.scene as QuizScene;
+    const [x, y] = await rowPoint(run, 1);
+    touchDown(run.host.input, x, y);
+    await run.run(200);
+    expect(scene.stage).toBe("choose");
+    // Le doigt glisse avant de se lever : pas de toucher.
+    touchMove(run.host.input, x + 40, y);
+    touchUp(run.host.input, x + 40, y);
+    await run.run(100);
+    swipe(run.host.input, x, y, 0, 30);
+    await run.run(100);
+    const before = run.host.audio.plays.length;
+    for (const [px, py] of [
+      [160, 20],
+      [10, y],
+      [310, y],
+    ]) {
+      tap(run.host.input, px, py);
+      await run.run(100);
+    }
+    expect(scene.stage).toBe("choose");
+    expect(scene.selection).toBe(0);
+    expect(run.host.audio.plays.length).toBe(before);
+  }, 60_000);
+
+  it("un toucher pendant la voix de la proposition choisie la coupe, comme le clic gauche", async () => {
+    const run = await launch({ seed: 9, audio: true });
+    const scene = run.scene as QuizScene;
+    tap(run.host.input, ...(await rowPoint(run, 0)));
+    await run.run(50);
+    expect(scene.stage).toBe("answer");
+    expect(run.ctx.voice.voicePlaying).toBe(true);
+    tap(run.host.input, 10, 10);
+    await run.run(50);
+    expect(scene.stage).toBe("result");
+  }, 60_000);
+});
 
 describe.skipIf(!hasOriginalFiles)("S40 Le Quizz : déroulé, réponses, temps", () => {
   const launch = async (options: LaunchOptions = {}) => {

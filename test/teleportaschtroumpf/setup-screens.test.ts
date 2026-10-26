@@ -10,6 +10,7 @@ import { END_MESSAGES, createParentsScene } from "../../src/games/teleportaschtr
 import { encodeCp437 } from "../../src/data/cp437";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles } from "./helpers";
+import { longPress, swipe, tap, touchDown, touchUp } from "./touch";
 
 /** Moteur sur une scène, avec les gestes de l'utilisateur. `audio` faux : sortie son verrouillée, aucune voix à attendre. */
 async function startScene(scene: Scene, { audio = false, seed = 7 } = {}) {
@@ -272,6 +273,103 @@ describe.skipIf(!hasOriginalFiles)("S08 : personnages et niveaux", () => {
     expect(lastPlayed(t)).toBe(await playedVoc(t, "s08v016t.voc"));
   }, 60_000);
 
+  /** Un joueur : personnage en x = 0x83 (sprite au-dessus de y = 100), pot et icône de niveau dessous. */
+  const CHARACTER = { x: 137, y: 70 };
+  const JAR = { x: 128, y: 150 };
+  /** Joue un geste puis laisse passer la capsule. */
+  const gesture = async (t: Awaited<ReturnType<typeof characters>>, act: () => void) => {
+    act();
+    await runFor(t.engine, t.host, 1500);
+  };
+  const played = (t: Awaited<ReturnType<typeof characters>>) => (t.results[0] as Extract<CharactersResult, { action: "play" }>).players[0];
+
+  it("doigt : glisser à droite / à gauche = personnage suivant / précédent, comme les flèches", async () => {
+    const keys = await characters(1);
+    await keys.press("ArrowRight");
+    await validate(keys);
+    await keys.press("Space");
+    const touch = await characters(1);
+    await gesture(touch, () => swipe(touch.host.input, 40, 60, 60, 5));
+    await gesture(touch, () => tap(touch.host.input, CHARACTER.x, CHARACTER.y));
+    await touch.press("Space");
+    expect(played(touch)).toEqual(played(keys));
+
+    const left = await characters(1);
+    await left.press("ArrowLeft");
+    await validate(left);
+    await left.press("Space");
+    const back = await characters(1);
+    await gesture(back, () => swipe(back.host.input, 200, 60, -40, 0));
+    await gesture(back, () => tap(back.host.input, CHARACTER.x, CHARACTER.y));
+    await back.press("Space");
+    expect(played(back)).toEqual(played(left));
+  }, 60_000);
+
+  it("doigt : glisser vers le haut / le bas et toucher le pot changent le niveau", async () => {
+    const levels: number[] = [];
+    for (const moves of [["up"], ["down"], ["jar"], ["jar", "jar"]]) {
+      const t = await characters(1);
+      for (const move of moves) {
+        if (move === "up") await gesture(t, () => swipe(t.host.input, 200, 120, 3, -40));
+        if (move === "down") await gesture(t, () => swipe(t.host.input, 200, 60, 0, 40));
+        if (move === "jar") await gesture(t, () => tap(t.host.input, JAR.x, JAR.y));
+      }
+      expect(t.results).toEqual([]);
+      await gesture(t, () => tap(t.host.input, CHARACTER.x, CHARACTER.y));
+      await t.press("Space");
+      levels.push(played(t).level ?? -1);
+    }
+    expect(levels).toEqual([2, 0, 2, 0]);
+  }, 60_000);
+
+  it("doigt : toucher le personnage le valide au relâchement ; le doigt posé seul et un toucher ailleurs ne font rien", async () => {
+    const t = await characters(1);
+    const image = () => Buffer.from(t.host.lastPresentation.surface).toString("base64");
+    const before = image();
+    await gesture(t, () => tap(t.host.input, 20, 20));
+    await gesture(t, () => tap(t.host.input, 250, 150));
+    await gesture(t, () => longPress(t.host.input, 250, 150));
+    touchDown(t.host.input, CHARACTER.x, CHARACTER.y);
+    await runFor(t.engine, t.host, 1500);
+    expect(image()).toBe(before); // ni capsule ni changement
+    touchUp(t.host.input, CHARACTER.x, CHARACTER.y);
+    await runFor(t.engine, t.host, 1500);
+    expect(image()).not.toBe(before); // capsule posée
+    await gesture(t, () => tap(t.host.input, 270, 130)); // bouton Jouer
+    expect(t.results).toHaveLength(1);
+    expect(played(t).level).toBe(1);
+  }, 60_000);
+
+  it("doigt : l'appui long sur le personnage ou le pot dit les voix du personnage et du niveau, sans valider", async () => {
+    for (const at of [CHARACTER, JAR]) {
+      const t = await characters(1, { audio: true });
+      const before = t.host.audio.plays.length;
+      longPress(t.host.input, at.x, at.y);
+      await runFor(t.engine, t.host, 15000);
+      expect(t.host.audio.plays.length).toBe(before + 2);
+      expect(lastPlayed(t)).toBe(await playedVoc(t, "s08v016t.voc"));
+      expect(t.results).toEqual([]);
+      // Toujours au choix : la flèche change encore de niveau.
+      await t.press("ArrowUp");
+      await gesture(t, () => tap(t.host.input, CHARACTER.x, CHARACTER.y));
+      await gesture(t, () => tap(t.host.input, 270, 130));
+      expect(played(t).level).toBe(2);
+    }
+  }, 60_000);
+
+  it("doigt : même bip et même couleur de niveau qu'au clavier", async () => {
+    const t = await characters(1, { audio: true });
+    const entry = 0x72;
+    const color = () => [...t.ctx.palette.colors.subarray(entry * 3, entry * 3 + 3)];
+    const effects = t.host.audio.effects.length;
+    tap(t.host.input, JAR.x, JAR.y); // niveau 2 : rouge
+    await runFor(t.engine, t.host, 200);
+    const mcg = await t.ctx.resources.mcg("s08a001d.mcg");
+    expect(color()).toEqual([...mcg.palette.subarray(119 * 3, 119 * 3 + 3)]);
+    expect(t.host.audio.effects.length).toBe(effects + 1);
+    expect(t.host.audio.effects.at(-1)?.sound.samples).toBe(await playedVoc(t, "s07a001b.voc"));
+  }, 60_000);
+
   it("la capsule se pose : le fond garde le personnage, la couleur de niveau est copiée sur l'emplacement", async () => {
     const t = await characters(1);
     const entry = 0x72;
@@ -421,6 +519,76 @@ describe.skipIf(!hasOriginalFiles)("S04 : menu parents", () => {
     await t.click(0);
     expect(t.done).toBe(1);
     expect(saved(t)).toEqual({ durationIndex: 0, pauseIndex: 0, messageIndex: 0, lastGameMinutes: 0 });
+  }, 60_000);
+
+  /** Libellés et valeurs des trois réglages (zones du doigt). */
+  const LABEL = [{ x: 28, y: 26 }, { x: 266, y: 81 }, { x: 100, y: 164 }];
+  const VALUE_LEFT = [{ x: 60, y: 72 }, { x: 196, y: 110 }, { x: 50, y: 186 }];
+  const VALUE_RIGHT = [{ x: 98, y: 72 }, { x: 236, y: 110 }, { x: 160, y: 186 }];
+  const finger = async (t: Awaited<ReturnType<typeof parents>>, act: () => void) => {
+    act();
+    await runFor(t.engine, t.host, 500);
+  };
+
+  it("doigt : toucher un réglage le sélectionne (bip), sans changer sa valeur ni quitter", async () => {
+    const t = await parents({ durationIndex: 1, pauseIndex: 2, messageIndex: 3 });
+    t.host.audio.enabled = true;
+    const effects = () => t.host.audio.effects.length;
+    const before = effects();
+    await finger(t, () => tap(t.host.input, VALUE_LEFT[1].x, VALUE_LEFT[1].y));
+    expect(t.lit()).toEqual([120]);
+    expect(effects()).toBe(before + 1);
+    await finger(t, () => tap(t.host.input, LABEL[2].x, LABEL[2].y));
+    expect(t.lit()).toEqual([121]);
+    await finger(t, () => tap(t.host.input, LABEL[0].x, LABEL[0].y));
+    expect(t.lit()).toEqual([119]);
+    await finger(t, () => tap(t.host.input, LABEL[0].x, LABEL[0].y)); // déjà sélectionné, libellé : rien
+    await finger(t, () => tap(t.host.input, 300, 20)); // ailleurs : rien
+    expect(t.lit()).toEqual([119]);
+    expect(effects()).toBe(before + 3);
+    expect(t.done).toBe(0);
+    expect(t.ctx.options).toMatchObject({ durationIndex: 1, pauseIndex: 2, messageIndex: 3 });
+    expect(t.host.storage.get(STORAGE_KEY)).toBeNull();
+  }, 60_000);
+
+  it("doigt : toucher la valeur sélectionnée à gauche / à droite la diminue / l'augmente (mêmes bornes et rebouclage)", async () => {
+    const t = await parents();
+    for (let i = 0; i < 5; i++) await finger(t, () => tap(t.host.input, VALUE_RIGHT[0].x, VALUE_RIGHT[0].y));
+    await finger(t, () => tap(t.host.input, VALUE_LEFT[0].x, VALUE_LEFT[0].y));
+    await finger(t, () => tap(t.host.input, VALUE_LEFT[1].x, VALUE_LEFT[1].y)); // sélectionne la pause
+    await finger(t, () => tap(t.host.input, VALUE_LEFT[1].x, VALUE_LEFT[1].y)); // borné à 0
+    for (let i = 0; i < 2; i++) await finger(t, () => tap(t.host.input, VALUE_RIGHT[1].x, VALUE_RIGHT[1].y));
+    await finger(t, () => tap(t.host.input, VALUE_LEFT[2].x, VALUE_LEFT[2].y)); // sélectionne le message
+    await finger(t, () => tap(t.host.input, VALUE_LEFT[2].x, VALUE_LEFT[2].y)); // reboucle : 0 → 8
+    await finger(t, () => longPress(t.host.input, 300, 20));
+    expect(t.done).toBe(1);
+    expect(saved(t)).toEqual({ durationIndex: 2, pauseIndex: 2, messageIndex: 8, lastGameMinutes: 0 });
+  }, 60_000);
+
+  it("doigt : glisser horizontalement sur un réglage le sélectionne et change sa valeur ; vertical ou ailleurs, rien", async () => {
+    const t = await parents();
+    await finger(t, () => swipe(t.host.input, VALUE_LEFT[1].x, VALUE_LEFT[1].y, 40, 0));
+    expect(t.lit()).toEqual([120]);
+    await finger(t, () => swipe(t.host.input, LABEL[2].x, LABEL[2].y, -40, 4));
+    expect(t.lit()).toEqual([121]);
+    await finger(t, () => swipe(t.host.input, VALUE_LEFT[0].x, VALUE_LEFT[0].y, 0, 40));
+    await finger(t, () => swipe(t.host.input, 300, 20, 40, 0));
+    expect(t.lit()).toEqual([121]);
+    await finger(t, () => longPress(t.host.input, VALUE_LEFT[0].x, VALUE_LEFT[0].y));
+    expect(saved(t)).toEqual({ durationIndex: 0, pauseIndex: 1, messageIndex: 8, lastGameMinutes: 0 });
+  }, 60_000);
+
+  it("doigt : le doigt posé ne quitte pas (le clic de la souris, si) ; seul l'appui long enregistre et quitte", async () => {
+    const t = await parents();
+    touchDown(t.host.input, 300, 20);
+    await runFor(t.engine, t.host, 300);
+    touchUp(t.host.input, 300, 20);
+    await runFor(t.engine, t.host, 300);
+    expect(t.done).toBe(0);
+    expect(t.host.storage.get(STORAGE_KEY)).toBeNull();
+    await finger(t, () => longPress(t.host.input, 160, 100));
+    expect(t.done).toBe(1);
+    expect(t.host.storage.get(STORAGE_KEY)).not.toBeNull();
   }, 60_000);
 
   it("tous les messages se codent en CP437 et ont chacun un glyphe", async () => {

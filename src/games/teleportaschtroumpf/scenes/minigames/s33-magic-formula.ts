@@ -1,4 +1,5 @@
 import type { Hy8, Hy8Frame } from "../../data/hy8";
+import { type Input, SWIPE_MIN } from "../../engine/input";
 import type { Mcg } from "../../data/mcg";
 import type { Voc } from "../../data/voc";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../data/mcg";
@@ -19,7 +20,9 @@ import { Clip, SoundHush, drawFrame, goalClip, ingredientOutcome, minigameLevel,
  *   (6, 7 ou 8), `bonus` (indice de l'oiseau) le remplace par le niveau 3 (5 formules, sans répétition : le plus facile) ;
  * - joue : un Mastermind à trois emplacements. Une formule secrète de trois symboles est tirée parmi `N` symboles ; le joueur choisit un
  *   symbole par emplacement (haut / bas dans la liste de gauche, gauche / droite pour changer d'emplacement, Espace pour proposer) et
- *   obtient, pour chacun, « bien placé » (2), « présent ailleurs » (1) ou « absent » (0). Il a six essais et 120 secondes ;
+ *   obtient, pour chacun, « bien placé » (2), « présent ailleurs » (1) ou « absent » (0). Il a six essais et 120 secondes. Au doigt (ajout
+ *   du port) : toucher un emplacement le choisit, toucher un symbole de la liste le met dans l'emplacement choisi, glisser vers le haut
+ *   depuis la proposition (ou le parchemin au-dessus) la propose ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la vidéo de fin (passable par Échap ou Espace) ; `Game.resolveMinigame`
  *   donne l'ingrédient 7.
  */
@@ -131,6 +134,28 @@ const CURSOR_COLOR = 5;
 const LOGIC_TICKS = 5;
 const REPEAT_CENTISECONDS = 0x32;
 
+/** Marge (pixels) des zones du doigt autour des cadres de la liste et des emplacements. */
+const TOUCH_MARGIN = 6;
+
+/**
+ * Ce que le doigt désigne en (x, y) : un symbole de la liste (`count` lignes, bandes de `ROW_HEIGHT` centrées sur le cadre du curseur),
+ * un emplacement de la proposition (sous chacun des trois cadres), ou rien.
+ */
+export function formulaTargetAt(x: number, y: number, count: number): { kind: "symbol" | "slot"; index: number } | null {
+  if (x <= 0x47 + TOUCH_MARGIN) {
+    const index = Math.floor((y - (0x10 + 0x11 / 2 - ROW_HEIGHT / 2)) / ROW_HEIGHT);
+    return index >= 0 && index < count ? { kind: "symbol", index } : null;
+  }
+  if (y < 0xa0 - TOUCH_MARGIN || y > 0xb1 + TOUCH_MARGIN || x < SLOT_X0 - TOUCH_MARGIN) return null;
+  const index = Math.min(SLOTS - 1, Math.floor((x - SLOT_X0 + (SLOT_DX - 0x3c) / 2) / SLOT_DX));
+  return { kind: "slot", index };
+}
+
+/** Glissement vers le haut parti de la partie droite (proposition et parchemin) : la proposition monte vers les rangées de réponses. */
+export function isSubmitSwipe(gesture: { x: number; dx: number; dy: number }): boolean {
+  return gesture.x >= SLOT_X0 - TOUCH_MARGIN && -gesture.dy >= SWIPE_MIN && -gesture.dy > Math.abs(gesture.dx);
+}
+
 export type MagicStage = "intro" | "play" | "soundFade" | "names" | "fadeOut" | "video" | "done";
 
 /** Anime comme `12d7:00c1` : rend la frame courante et le compteur suivant (0 après la dernière, ce que le jeu prend pour la fin). */
@@ -169,6 +194,8 @@ export class MagicFormulaScene implements Scene {
   private stampVertical = 0;
   private stampHorizontal = 0;
   private seen = { up: false, down: false, left: false, right: false, validate: false };
+  /** Symbole ou emplacement touché depuis le dernier pas de la logique (le dernier toucher l'emporte). */
+  private touched: { kind: "symbol" | "slot"; index: number } | null = null;
   private lastLogic = 0;
 
   // Essais
@@ -297,6 +324,7 @@ export class MagicFormulaScene implements Scene {
     this.column = 0;
     this.cursor = 0;
     this.guessPicks = [0, 0, 0];
+    this.touched = null;
     this.attempts = 0;
     this.won = false;
     this.lost = false;
@@ -371,7 +399,15 @@ export class MagicFormulaScene implements Scene {
     this.seen.down ||= input.justPressed("down");
     this.seen.left ||= input.justPressed("left");
     this.seen.right ||= input.justPressed("right");
-    this.seen.validate ||= input.justPressed("validate");
+    // Le doigt qui se pose ne propose rien : seul son geste compte (toucher une cible, glisser vers le haut).
+    this.seen.validate ||= input.validateNotTouch;
+    this.collectTouch(input);
+  }
+
+  private collectTouch(input: Input): void {
+    const gesture = input.touchGesture;
+    if (gesture?.kind === "tap") this.touched = formulaTargetAt(gesture.x, gesture.y, this.symbolCount) ?? this.touched;
+    else if (gesture?.kind === "swipe" && isSubmitSwipe(gesture)) this.seen.validate = true;
   }
 
   private logicStep(ctx: SceneContext): void {
@@ -381,7 +417,9 @@ export class MagicFormulaScene implements Scene {
     const left = this.seen.left || input.pressed("left");
     const right = this.seen.right || input.pressed("right");
     const validate = this.seen.validate;
+    const touched = this.touched;
     this.seen = { up: false, down: false, left: false, right: false, validate: false };
+    this.touched = null;
     const now = ctx.clock.centiseconds;
 
     // Verrous de répétition (`1ceb:0387..03c6`) : levés quand la touche est relâchée ou après 50 centièmes de seconde.
@@ -393,6 +431,9 @@ export class MagicFormulaScene implements Scene {
       if (down && !this.latchVertical) this.moveCursor(ctx, 1);
       if (left && this.column > 0 && !this.latchHorizontal) this.moveColumn(ctx, -1);
       if (right && this.column < SLOTS - 1 && !this.latchHorizontal) this.moveColumn(ctx, 1);
+      // Au doigt, la cible touchée est atteinte d'un coup, avec le même son qu'une flèche ; les verrous des touches ne changent pas.
+      if (touched?.kind === "symbol") this.pickSymbol(ctx, touched.index);
+      if (touched?.kind === "slot" && touched.index !== this.column) this.pickColumn(ctx, touched.index);
     }
     if (validate && !this.animating) this.submit(ctx);
     if (this.animating) this.animate(ctx);
@@ -405,17 +446,25 @@ export class MagicFormulaScene implements Scene {
   private moveCursor(ctx: SceneContext, direction: -1 | 1): void {
     this.latchVertical = true;
     this.stampVertical = ctx.clock.centiseconds;
-    this.cursor += direction;
-    if (this.cursor < 0) this.cursor = this.symbolCount - 1;
-    else if (this.cursor === this.symbolCount) this.cursor = 0;
-    this.guessPicks[this.column] = this.cursor;
-    ctx.voice.playEffect(this.moveSound);
+    this.pickSymbol(ctx, (this.cursor + direction + this.symbolCount) % this.symbolCount);
   }
 
   private moveColumn(ctx: SceneContext, direction: -1 | 1): void {
     this.latchHorizontal = true;
     this.stampHorizontal = ctx.clock.centiseconds;
-    this.column += direction;
+    this.pickColumn(ctx, this.column + direction);
+  }
+
+  /** Le symbole `index` de la liste passe dans l'emplacement choisi. */
+  private pickSymbol(ctx: SceneContext, index: number): void {
+    this.cursor = index;
+    this.guessPicks[this.column] = this.cursor;
+    ctx.voice.playEffect(this.moveSound);
+  }
+
+  /** L'emplacement `column` est choisi ; le curseur de la liste revient sur son symbole. */
+  private pickColumn(ctx: SceneContext, column: number): void {
+    this.column = column;
     this.cursor = this.guessPicks[this.column];
     ctx.voice.playEffect(this.moveSound);
   }

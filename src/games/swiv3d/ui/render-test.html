@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>SWIV 3D — test du rendu</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #111; color: #ddd; font: 14px/1.4 system-ui, sans-serif; }
+      main { max-width: 960px; margin: 0 auto; padding: 12px 16px; }
+      header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 8px; }
+      h1 { font-size: 16px; margin: 0; }
+      select, button { font: inherit; color: inherit; background: #222; border: 1px solid #555; border-radius: 4px; padding: 3px 8px; }
+      #screen { display: block; width: min(100%, 800px); aspect-ratio: 4 / 3; image-rendering: pixelated; background: #000; border: 1px solid #333; }
+      #stats { font-variant-numeric: tabular-nums; }
+      #help { color: #999; margin: 8px 0 0; }
+      .error { color: #f88; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>SWIV 3D — test du rendu</h1>
+        <label>Niveau <select id="level"></select></label>
+        <label><input id="objects" type="checkbox" checked /> objets</label>
+        <button id="sprites" type="button">sprites d'explosion</button>
+        <span id="stats" role="status"></span>
+      </header>
+      <canvas id="screen" width="320" height="400" tabindex="0" aria-label="Vue 3D"></canvas>
+      <p id="help">Flèches : cap et inclinaison · WASD : déplacement · Page haut / bas : altitude · Maj : plus vite · R : retour au départ.</p>
+      <p id="error" class="error" role="alert"></p>
+    </main>
+    <script type="module" src="./render-test.ts"></script>
+  </body>
+</html>

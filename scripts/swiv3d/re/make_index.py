@@ -28,7 +28,7 @@ def render_keyfuncs():
     for r in sorted(keys, key=lambda r: r[0]):
         by.setdefault(r[4], []).append(r)
     out = []
-    for g, rows in by.items():
+    for g, rows in sorted(by.items(), key=lambda kv: kv[0].startswith("Étude")):  # groupes d'études après les groupes d'origine
         out += ["#### %s\n" % g, "| Adresse | Nom | Octets | Appelants | Rôle | Preuve | Confiance |", "|---|---|---:|---:|---|---|---|"]
         for r in rows:
             out.append("| `%s` | `%s` | %s | %s | %s | %s | %s |" % (r[0], r[1], r[2], r[3], lib.md_cell(r[6]), lib.md_cell(r[7]), r[5]))

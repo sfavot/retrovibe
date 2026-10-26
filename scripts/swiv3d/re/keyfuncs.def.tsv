@@ -56,7 +56,7 @@
 00424a24	gm_terrain_crater	510	Rendu, terrain et boucle de jeu	probable	Abaisse la hauteur autour d'un point (cratère)	Soustractions sur 005b1fc4
 0042f64c	gm_frame	1174	Rendu, terrain et boucle de jeu	probable	Une image : met à jour les sons, rend chaque vue active (0042b31c), HUD, entrées de debug, fait avancer le jeu	Boucle sur 4 vues de 0x1a dwords à 00480e74
 0042b31c	gm_render_view	14496	Rendu, terrain et boucle de jeu	probable	Rendu d'une vue (terrain, objets, sprites)	14 Ko ; appelle gm_render_terrain, gm_terrain_height
-0042718c	gm_render_terrain	10909	Rendu, terrain et boucle de jeu	hypothèse	Parcourt les cellules voisines (grille 7x7 de 64x64) et projette terrain/objets	Lit 005b1fc4 ; grille 0x3f
+0042718c	gm_render_objects	10909	Rendu, terrain et boucle de jeu	certain	collecte des objets des compartiments 7×7, transformation, Gouraud, mise en file des faces et sprites	Lit 005b1fc4 ; grille 0x3f ; renommée (anciennement gm_render_terrain), render.md §13
 0042ec80	gm_draw_hud	2506	Rendu, terrain et boucle de jeu	certain	Affiche le HUD d'un joueur (score « %07d », « %s %2d »)	Chaînes 004803f8, 00480400
 004362b8	gm_draw_overlay_sw	2372	Rendu, terrain et boucle de jeu	probable	Superposition logicielle (HUD/radar) avec les sprites 510-512	Lit 005bc178/70/74
 004229c8	gm_draw_text	519	Texte et sprites	certain	Dessine une chaîne (alignement 0 centré, 1 gauche, 2 droite ; largeur max 0x118) avec la police 507 et les largeurs 508	Utilise 005bc14c, 005bc164
@@ -82,3 +82,258 @@
 0041ff94	gm_menu_multiplayer	733	Menus et écrans	probable	Menu multijoueur (groupe 5)	Groupe 5
 0041bb40	gm_menu_pickups	2793	Menus et écrans	probable	Menu des bonus / triche (groupe 100)	40 lectures du groupe 100
 0041f4d0	gm_menu_screengrab	935	Menus et écrans	probable	Menu capture d'écran (groupe 12)	Groupe 12 ; appelle 0041ee30
+00410b74	gm_joy_read_axes	85	Étude du joueur	non précisé	lit `joyGetPosEx` pour la calibration	player.md §7
+00411eb8	gm_net_receive	605	Étude du joueur	non précisé	reçoit les messages DirectPlay (joueurs distants)	player.md §7
+0041406c	gm_fb_clear_sky	260	Étude du rendu	certain	efface les lignes au-dessus de l'horizon (MMX)	render.md §13
+004141d0	gm_terrain_strip_scalar	808	Étude du rendu	certain	bande de terrain texturée, entiers	render.md §13
+004144f8	gm_emms	3	Étude du rendu	certain	`EMMS; RET`	render.md §13
+004144fb	gm_terrain_strip_mmx	740	Étude du rendu	certain	bande de terrain texturée, MMX	render.md §13
+004147df	gm_terrain_strip_flat	506	Étude du rendu	certain	bande de terrain à couleur plate (table 106)	render.md §13
+00414c7e	gm_blit_rle_glyph	148	Étude des écrans	certain	Glyphe RLE standard (utilisé par `gm_draw_text`)	screens.md §12
+00415126	gm_blit_rle_glyph_b	157	Étude des écrans	certain	Glyphe RLE, teinte divisée par deux (style `g`)	screens.md §12
+00415374	gm_vec_normalize256	103	Étude des objets	certain	normalise un vecteur 3D à la longueur 256 (tables `0055a4c8`, `005836ac`)	objects.md §12 ; autres noms proposés : player.md : gm_normalize_delta ; render.md : gm_vec3_normalize_256
+004153db	gm_vec2_normalize_256	85	Étude du rendu	probable	idem en (x, z)	render.md §13
+004157d0	gm_menu_anim_tick	228	Étude du joueur	non précisé	décompte animé des scores des menus (drapeau 2 de `gm_poll_events`)	player.md §7
+004158e8	gm_menu_add	226	Étude des écrans	certain	Ajoute une ou plusieurs lignes de menu depuis une chaîne (`\ ` = saut de ligne)	screens.md §12
+00415a20	gm_menu_run	3551	Étude des écrans	certain	Moteur de menu : tracé (bandeaux de mélange + texte), navigation, curseurs ; renvoie l'id ou -1	screens.md §12
+00416834	gm_menu_select	123	Étude des écrans	certain	Place la sélection initiale sur l'id donné	screens.md §12
+004168b0	gm_menu_capture_key	670	Étude des écrans	probable	« Appuyez sur la touche pour… » : capture d'une touche	screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_misc
+00416b50	gm_menu_calibrate	1632	Étude des écrans	probable	Calibrage manette	screens.md §12 ; autres noms proposés : player.md : gm_menu_joy_calibrate
+004171b4	gm_menu_controller_type	1965	Étude des écrans	probable	Choix du type de contrôleur (groupe 3, ids 100/101, 11-16)	screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_type
+0041797c	gm_menu_axis_bindings	1629	Étude des écrans	probable	Liaison des axes (groupe 3, 1000-1013)	screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_axes
+00418454	gm_menu_controller	2809	Étude des écrans	certain	Menu « Installation du contrôleur »	screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_bindings
+00418f54	gm_controller_check	229	Étude des écrans	certain	Rouvre le menu contrôleur si le type de contrôleur est absent ou non configuré	screens.md §12
+004191ac	gm_menu_language	772	Étude des écrans	certain	Choix de la langue (liste de la table commune 0)	screens.md §12
+00419c20	gm_screen_net_stats	693	Étude des écrans	probable	Statistiques réseau de fin de partie (groupe 5, 500/501)	screens.md §12
+00419ed8	gm_screen_game_over	1669	Étude des règles	non précisé	écran de fin « Game over »	rules.md §9
+0041c640	gm_screen_new_pilot	1589	Étude des écrans	certain	Saisie du nom d'un nouveau pilote (15 car., code `SWIV!AndLetDie`)	screens.md §12
+0041cc78	gm_screen_delete_pilot	819	Étude des écrans	certain	Suppression d'un pilote (sans confirmation)	screens.md §12
+0041cfac	gm_screen_select_pilot	1894	Étude des écrans	certain	Écran de sélection du pilote	screens.md §12
+0041e614	gm_menu_test_mission	2074	Étude des écrans	certain	Menu de mission de test (groupe 11, ids 20/21)	screens.md §12
+0041ee30	gm_menu_grab_name	1694	Étude des écrans	probable	Saisie du nom de fichier de capture (groupe 12)	screens.md §12
+0041fc20	gm_menu_exit	831	Étude des écrans	certain	Confirmation de sortie (groupe 13, phrases 30..33 en rotation)	screens.md §12
+00422eac	gm_queue_reset	121	Étude du rendu	certain	file à zéro (2995 entrées)	render.md §13
+00422f28	gm_message_pool_init	100	Étude des règles	non précisé	initialise les 50 messages flottants	rules.md §9
+00422f8c	gm_message_spawn	702	Étude des règles	non précisé	message flottant 3D (table, id, teinte, type)	rules.md §9 ; autres noms proposés : objects.md : gm_mission_message ; screens.md : gm_title_spawn
+004232ac	gm_deformers_apply	573	Étude du rendu	certain	ondes / dôme / anneaux sur un sommet	render.md §13
+004234ec	gm_effects_tick	233	Étude du joueur	non précisé	tick de la file d'effets (particules) `005876dc` : `pos += vel`, durée `+0x38`	player.md §7
+004235d8	gm_title_release	70	Étude des écrans	certain	Déclenche la sortie des titres 3D	screens.md §12
+00423620	gm_queue_insert	682	Étude du rendu	certain	insertion triée dans la file des primitives, rejet hors écran	render.md §13
+00423974	gm_text3d_emit_glyph	2783	Étude du rendu	probable	enfile les triangles d'une lettre 3D du bloc 200	render.md §13
+00424454	gm_message_draw	527	Étude des règles	non précisé	dessin des messages flottants (police vectorielle)	rules.md §9 ; autres noms proposés : render.md : gm_text3d_draw_all
+0042469c	gm_gamma_build	223	Étude du rendu	certain	table de gamma 4×64 `pow`	render.md §13
+0042477c	gm_render_init_tables	631	Étude du rendu	certain	réciproques, racines, cercle du rotor (`0052cae8`), pointeurs de colonnes	render.md §13
+00424db4	gm_crater_site_ok	399	Étude des objets	hypothèse	test d'emplacement avant cratère	objects.md §12
+00424f44	gm_terrain_explosion_crater	1916	Étude des objets	certain	cratère d'explosion (bloc 700)	objects.md §12
+004259b4	gm_ground_flash_add	716	Étude du rendu	probable	éclair d'impact dans la carte 64×64 `005624c8`	render.md §13 ; autres noms proposés : objects.md : gm_scorch_mark
+00425c94	gm_terrain_height_water	1101	Étude du rendu	certain	hauteur bilinéaire 8.8 avec vagues	render.md §13 ; autres noms proposés : objects.md : gm_terrain_height_waves
+004261a0	gm_object_clone	259	Étude des objets	certain	alloue et clone un enfant de EBX (§4.2)	objects.md §12 ; autres noms proposés : rules.md : gm_object_spawn_from
+004262a4	gm_node_claim_ground	278	Étude des objets	certain	nœud 107 libre le plus proche, compteur `+0x20`	objects.md §12
+004263bc	gm_node_claim_boat	278	Étude des objets	certain	idem compteur `+0x18`	objects.md §12
+004264d4	gm_node_claim_air	278	Étude des objets	certain	idem compteur `+0x1c`	objects.md §12
+00426814	gm_object_spawn	123	Étude des objets	certain	alloue un objet et appelle `gm_object_init`	objects.md §12 ; autres noms proposés : rules.md : gm_object_spawn_at
+00426890	gm_object_spawn_raw	105	Étude des objets	probable	idem sans test du mode réseau	objects.md §12
+004268fc	gm_terrain_project_flat	789	Étude du rendu	certain	projection d'un sommet sans éclairage, drapeau visible, horizon	render.md §13
+00426c14	gm_terrain_project_lit	1361	Étude du rendu	certain	projection + éclairage + vagues d'un sommet	render.md §13
+00429c30	gm_terrain_clip_row	491	Étude du rendu	certain	borne une rangée à ses sommets visibles	render.md §13
+00429e1c	gm_terrain_build_rows	497	Étude du rendu	certain	construit les rangées proches (pas 1) et lointaines (pas 2)	render.md §13
+0042a010	gm_model_radius2	71	Étude des objets	certain	rayon² d'un modèle (100 si sprite ou 0)	objects.md §12 ; autres noms proposés : player.md : gm_type_radius2 ; rules.md : gm_object_collide_radius
+0042a084	gm_objects_update	2236	Étude des objets	certain	boucle de mise à jour des objets (§2) : anneaux autour des joueurs, mouvement, appel `+0x68`, collisions	objects.md §12 ; autres noms proposés : rules.md : gm_world_update_collide ; render.md : gm_game_step_solo
+0042a940	gm_objects_update_net	1339	Étude des objets	certain	variante réseau (les 4 096 cellules, pas d'anneaux)	objects.md §12 ; autres noms proposés : rules.md : gm_world_update_collide_net ; render.md : gm_game_step_net
+0042ae7c	gm_grid_query	265	Étude des objets	certain	objets des `(2r+1)²` cellules dont la classe vérifie `masque == valeur`, chaînés par `+0x60`	objects.md §12 ; autres noms proposés : rules.md : gm_find_objects_near_obj
+0042af88	gm_grid_query_cells	212	Étude des objets	probable	variante sans la liste de la cellule de l'objet	objects.md §12 ; autres noms proposés : rules.md : gm_find_objects_near_pos
+0042b05c	gm_terrain_pick_row_dir	670	Étude du rendu	certain	direction de rangée parmi 8 d'après la droite de la caméra	render.md §13
+0042ebc4	gm_score_add	94	Étude des objets	certain	ajoute des points au joueur qui a donné le coup fatal	objects.md §12
+0042faf0	gm_vec3_normalize_f	103	Étude du rendu	certain	normalise un vecteur flottant	render.md §13
+0042fba8	gm_vec3_cross_f	119	Étude du rendu	certain	produit vectoriel flottant	render.md §13
+0042fc70	gm_ground_flash_fade	57	Étude du rendu	certain	décroissance de 0x1e par pas	render.md §13 ; autres noms proposés : player.md : gm_decay_flash_table
+0042fcac	gm_detect_mmx	80	Étude du rendu	certain	CPUID bit 23 → `00484620`/`00484624`	render.md §13
+0042fd24	gm_screen_load_planes	102	Étude du rendu	certain	copie un écran 320×400 planaire (bloc 100x) dans le tampon	render.md §13
+0042fd8c	gm_fb_clear_all	38	Étude du rendu	certain	efface le tampon (sans MMX)	render.md §13
+0042fddc	gm_palette_set	102	Étude du rendu	certain	efface l'écran, charge le DAC avec gamma, mémorise la palette	render.md §13 ; autres noms proposés : screens.md : gm_screen_set_palette
+0042fe44	gm_modex_enter	128	Étude du rendu	certain	CRTC/séquenceur mode X, efface, palette	render.md §13 ; autres noms proposés : screens.md : gm_gamma_apply
+0042fec4	gm_modex_enter_black	120	Étude du rendu	certain	idem avec palette noire	render.md §13
+0042ff5c	gm_present_flip	250	Étude du rendu	certain	copie du tampon vers la VRAM et bascule de page	render.md §13 ; autres noms proposés : screens.md : gm_screen_flip
+00430058	gm_draw_line	806	Étude du rendu	certain	trait coloré d'un objet à un autre	render.md §13
+00430380	gm_tri_gouraud	3008	Étude du rendu	certain	triangle texturé, lumière interpolée	render.md §13
+00430f40	gm_tri_flat	2667	Étude du rendu	certain	triangle texturé, lumière unie	render.md §13
+00432264	gm_tri_shadow_black	1871	Étude du rendu	certain	polygone noir (ombre, détail faible)	render.md §13
+004329b4	gm_tri_keyed	2656	Étude du rendu	certain	triangle à texel 0 transparent, non éclairé	render.md §13
+00433414	gm_tri_rotor	2894	Étude du rendu	certain	disque de rotor : masque 500 × table 500	render.md §13
+00433f64	gm_tri_shadow	2631	Étude du rendu	certain	ombre : silhouette 110 × table 500	render.md §13
+004349ac	gm_tri_blend504	2631	Étude du rendu	certain	triangle mélangé, image 504 × table 109	render.md §13
+004353f4	gm_sprite_505	659	Étude du rendu	certain	sprite 21×35 d'explosion/impact	render.md §13
+00435688	gm_sprite_504	829	Étude du rendu	certain	animation d'explosion 64×64 mise à l'échelle	render.md §13
+004359c8	gm_draw_flat_tri	1714	Étude du rendu	certain	triangle de couleur unie (texte 3D)	render.md §13
+004360b0	gm_fill_blend	519	Étude des écrans	certain	Remplit un rectangle de la page avec une ligne de la table de mélange (`x0, y0, x1, y1, ligne`)	screens.md §12
+00437af0	gm_draw_energy_gauge	113	Étude des règles	non précisé	jauge d'énergie (bloc 503)	rules.md §9
+00437b64	gm_water_animate	210	Étude du rendu	certain	tuile d'eau gauchie par des sinus	render.md §13
+00437c38	gm_draw_crosshair	301	Étude des règles	non précisé	une moitié du viseur (bloc 506)	rules.md §9
+00437eac	gm_smk_present	191	Étude des écrans	certain	Présente une image Smacker : attente verticale, copie, tracé du `.SCR`, bascule	screens.md §12
+00438198	gm_player_pick_target	571	Étude des règles	non précisé	choisit la cible `+0x58` (produit scalaire + biais objectifs)	rules.md §9 ; autres noms proposés : player.md : gm_player_retarget
+00438678	gm_pilot_none	-	Étude du joueur	non précisé	fonction pilote vide (formes `0x2a`, `0x63`)	player.md §7
+00438744	gm_pilot_dying	-	Étude du joueur	non précisé	séquence de mort/fin (forme `0x2b`)	player.md §7
+00438d08	gm_pilot_victory_00438d08	-	Étude des règles	probable	pilotage de fin de niveau	rules.md §9
+00438de8	gm_pilot_victory_00438de8	-	Étude des règles	probable	pilotage de fin de niveau	rules.md §9
+00438ec8	gm_pilot_victory_00438ec8	-	Étude des règles	probable	pilotage de fin de niveau	rules.md §9
+00438fb8	gm_pilot_victory_00438fb8	-	Étude des règles	probable	pilotage de fin de niveau	rules.md §9
+00439088	gm_pilot_heli	-	Étude du joueur	non précisé	pilote de l'hélicoptère, forme 0	player.md §7
+00439670	gm_pilot_heli_net	-	Étude du joueur	non précisé	même, joueur réseau (entrées `+0xe4..`)	player.md §7
+00439bcc	gm_pilot_heli_3	-	Étude du joueur	non précisé	pilote forme 3	player.md §7
+0043a174	gm_pilot_vehicle_1	-	Étude du joueur	non précisé	pilote forme 1 (roues)	player.md §7
+0043a760	gm_pilot_vehicle_2	-	Étude du joueur	non précisé	pilote forme 2	player.md §7
+0043ac64	gm_pilot_vehicle_4	-	Étude du joueur	non précisé	pilote forme 4	player.md §7
+0043b0ac	gm_pilot_vehicle_5	-	Étude du joueur	non précisé	pilote forme 5	player.md §7
+0043b4f4	gm_player_die	2927	Étude des règles	non précisé	mort : explosion, débris, message « Game over ! », `DAT_005b0414 = 2`	rules.md §9
+0043c07c	gm_player_victory_mode	214	Étude des règles	non précisé	pilotage de fin de niveau, `+0x184 = 0`	rules.md §9 ; autres noms proposés : player.md : gm_player_death_begin
+0043c164	gm_find_nearest_player	208	Étude des objets	certain	joueur le plus proche (non ignoré) dans `+0x58`	objects.md §12 ; autres noms proposés : rules.md : gm_nearest_player
+0043c234	gm_game_tick	1918	Étude du joueur	non précisé	un tick de logique (25 ms) : objets, fonctions pilote, mort, jauge de PV	player.md §7
+0043ca60	gm_player_load_keys	83	Étude du joueur	non précisé	recopie 11 touches du profil dans le joueur	player.md §7 ; autres noms proposés : rules.md : gm_player_copy_controls
+0043cab4	gm_player_init_state	605	Étude des objets	probable	initialise la structure joueur de 0x228 octets	objects.md §12 ; autres noms proposés : rules.md : gm_player_load_profile
+0043cd14	gm_player_save_profile	141	Étude des règles	non précisé	reporte munitions, énergie, véhicule, score, puissance dans le profil	rules.md §9 ; autres noms proposés : screens.md : gm_player_state_store
+0043cda4	gm_objective_register	198	Étude des objets	certain	inscrit un objet dans un groupe d'objectifs 0-9	objects.md §12
+0043ce6c	gm_objective_unregister	454	Étude des objets	certain	désinscrit à la mort, déclenche messages/fin de niveau	objects.md §12 ; autres noms proposés : rules.md : gm_objective_target_killed
+0043d034	gm_objective_head_first	222	Étude des règles	non précisé	remet en tête de liste les cibles du même objectif (radar)	rules.md §9
+0043daa0	gm_net_send_input_client	245	Étude du joueur	hypothèse	émission réseau (hypothèse)	player.md §7
+0043db98	gm_net_send_state_host	628	Étude du joueur	hypothèse	émission réseau (hypothèse)	player.md §7
+0043de0c	gm_player_set_form	1961	Étude des objets	certain	change la forme du joueur (990/991, classe, update)	objects.md §12 ; autres noms proposés : rules.md : gm_player_set_vehicle
+0043e5c4	gm_player_join_local	530	Étude du joueur	non précisé	place un joueur sur un point de départ	player.md §7
+0043e7d8	gm_player_join_net	383	Étude du joueur	non précisé	idem, joueur réseau	player.md §7
+00441630	gm_upd_fx_00441630	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+0044167c	gm_turret_aim_fire	542	Étude des objets	certain	vise parmi 5 options et tire	objects.md §12
+00441af4	gm_turn_toward_target	265	Étude des objets	probable	virages vers la cible	objects.md §12
+00441c00	gm_child_limit_angles	320	Étude des objets	probable	borne tangage/roulis d'un enfant	objects.md §12
+00441d40	gm_child_copy_tilt	187	Étude des objets	probable	tangage/roulis d'un enfant selon le parent	objects.md §12
+00441dfc	gm_aim_toward_target	662	Étude des objets	probable	virages vers la cible	objects.md §12
+004420a4	gm_aircraft_turn_to_point	720	Étude des objets	probable	virage avion avec roulis	objects.md §12
+00442398	gm_aircraft_turn_to_point2	514	Étude des objets	probable	variante	objects.md §12
+004425c0	gm_node_distance_ground	253	Étude des objets	certain	distance de graphe approchée	objects.md §12
+004426c0	gm_node_chase_ground	413	Étude des objets	certain	nœud voisin libre le plus proche de la cible	objects.md §12
+00442860	gm_node_patrol_ground	198	Étude des objets	certain	nœud voisin libre suivant	objects.md §12
+00442928	gm_node_distance_air	253	Étude des objets	certain	distance de graphe approchée	objects.md §12
+00442a28	gm_node_chase_air	413	Étude des objets	certain	nœud voisin libre le plus proche de la cible	objects.md §12
+00442bc8	gm_node_patrol_air	198	Étude des objets	certain	nœud voisin libre suivant	objects.md §12
+00442dac	gm_node_distance_boat	253	Étude des objets	certain	distance de graphe approchée	objects.md §12
+00442eac	gm_node_chase_boat	413	Étude des objets	certain	nœud voisin libre le plus proche de la cible	objects.md §12
+0044304c	gm_node_patrol_boat	198	Étude des objets	certain	nœud voisin libre suivant	objects.md §12
+00443114	gm_steer_to_point	366	Étude des objets	certain	choix entre 5 virages vers un point	objects.md §12
+00443284	gm_steer_to_node	310	Étude des objets	certain	cap vers le nœud courant, `D²`	objects.md §12
+00443510	gm_vehicle_suspension	1064	Étude des objets	certain	4 coins, ressorts, poussée	objects.md §12 ; autres noms proposés : player.md : gm_vehicle_contact
+00443938	gm_acquire_target	312	Étude des objets	certain	ciblage périodique par grille (§8.1)	objects.md §12 ; autres noms proposés : rules.md : gm_buddy_scan_targets
+00443a70	gm_upd_fx_00443a70	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+00443ac0	gm_object_explode	383	Étude des objets	certain	explosion par classe de rayon (modèles 900-902, son 1000)	objects.md §12
+00443c40	gm_upd_fx_00443c40	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+00443c88	gm_projectile_burst	107	Étude des objets	certain	petite explosion de projectile (sprite 11000)	objects.md §12 ; autres noms proposés : rules.md : gm_spawn_explosion_00443c88
+00443cf4	gm_upd_fx_00443cf4	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+00443d3c	gm_spawn_explosion_00443d3c	121	Étude des règles	non précisé	explosions et poussières (types 11000 à 11002)	rules.md §9
+00443db8	gm_upd_fx_00443db8	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+00443e00	gm_spawn_explosion_00443e00	121	Étude des règles	non précisé	explosions et poussières (types 11000 à 11002)	rules.md §9
+00443e7c	gm_upd_fx_00443e7c	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+00443ed0	gm_spawn_smoke_rise	165	Étude des objets	certain	bouffée de fumée montante (sprite 11004 frame 46)	objects.md §12 ; autres noms proposés : rules.md : gm_spawn_explosion_00443ed0
+00443f78	gm_upd_fx_00443f78	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+00443fe4	gm_spawn_explosion_00443fe4	107	Étude des règles	non précisé	explosions et poussières (types 11000 à 11002)	rules.md §9
+00444050	gm_upd_fx_00444050	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+00444084	gm_smoke_trail	130	Étude des objets	certain	traînée de fumée de missile (sprite 11001)	objects.md §12 ; autres noms proposés : rules.md : gm_missile_trail_puff
+00444108	gm_upd_fx_00444108	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+0044412c	gm_upd_fx_0044412c	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+0044420c	gm_upd_fx_0044420c	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
+004442ec	gm_object_debris	948	Étude des objets	certain	épave et éclats du bloc 11004	objects.md §12 ; autres noms proposés : rules.md : gm_spawn_debris
+004446a0	gm_wheel_update	1088	Étude du joueur	non précisé	animation et braquage d'une roue enfant	player.md §7
+00444af8	gm_heli_physics	1017	Étude du joueur	non précisé	physique de l'hélicoptère (altitude assistée, poussée par tangage/roulis, choc)	player.md §7 ; autres noms proposés : objects.md : gm_aircraft_fly ; rules.md : gm_vehicle_hover_physics
+00444ef4	gm_hover_follow_terrain	208	Étude des objets	certain	`vy` pour suivre le relief à une hauteur donnée	objects.md §12
+004450a8	gm_upd_player_004450a8	-	Étude des objets	probable	formes du joueur et armes embarquées (voir `player.md`)	objects.md §12
+004450c4	gm_upd_wheel	-	Étude des objets	certain	roue de 5002	objects.md §12
+00445228	gm_vehicle_physics_1	-	Étude du joueur	non précisé	physique du véhicule forme 1	player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445228
+00445670	gm_vehicle_physics_2	-	Étude du joueur	non précisé	physique du véhicule forme 2	player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445670
+00445a84	gm_vehicle_physics_4	-	Étude du joueur	non précisé	physique du véhicule forme 4	player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445a84
+00445f44	gm_vehicle_physics_5	-	Étude du joueur	non précisé	physique du véhicule forme 5	player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445f44
+004463c0	gm_pickup_update	1290	Étude des objets	certain	comportement d'un bonus : flotte, attiré, appliqué	objects.md §12 ; autres noms proposés : rules.md : gm_pickup_behavior
+004468cc	gm_upd_pickup_after_all	-	Étude des objets	certain	attend `005af3a4 == 1` puis crée le bonus (7001)	objects.md §12
+00446964	gm_upd_pickup_after_group9	-	Étude des objets	certain	attend `005b03e4 == 9` (7002)	objects.md §12
+004469fc	gm_upd_pickup_placed	-	Étude des objets	certain	bonus posé (compteur `+0x198`)	objects.md §12
+00446a3c	gm_upd_pickup_dropped	-	Étude des objets	certain	bonus largué (compteur `+0x194`)	objects.md §12
+00446a7c	gm_upd_camera	-	Étude des objets	probable	caméra de scénario (7800-7801), compagnon de `1002`	objects.md §12
+00446d24	gm_upd_destructible	-	Étude des objets	certain	cible statique (§6.1)	objects.md §12
+00446e90	gm_upd_companion	-	Étude des objets	probable	caméra de scénario (7800-7801), compagnon de `1002`	objects.md §12
+00446efc	gm_upd_dock_flying	-	Étude des objets	non précisé	mouvements d'amarrage du joueur sur une plate-forme (lus ; P)	objects.md §12
+00447080	gm_upd_dock_ground	-	Étude des objets	non précisé	mouvements d'amarrage du joueur sur une plate-forme (lus ; P)	objects.md §12
+004477b0	gm_upd_pad_004477b0	-	Étude des objets	hypothèse	variantes de plates-formes (7012-7013 et au-delà), **non lues**	objects.md §12
+00447afc	gm_upd_pad_00447afc	-	Étude des objets	hypothèse	variantes de plates-formes (7012-7013 et au-delà), **non lues**	objects.md §12
+0044822c	gm_upd_pad_helper	-	Étude des objets	certain	objet auxiliaire du pad	objects.md §12
+004482dc	gm_upd_transform_pad	-	Étude des objets	certain	plate-forme de transformation (§6.11)	objects.md §12
+0044878c	gm_upd_pad_0044878c	-	Étude des objets	hypothèse	variantes de plates-formes (7012-7013 et au-delà), **non lues**	objects.md §12
+004490cc	gm_upd_pad_004490cc	-	Étude des objets	hypothèse	variantes de plates-formes (7012-7013 et au-delà), **non lues**	objects.md §12
+004493e8	gm_upd_pad_004493e8	-	Étude des objets	hypothèse	variantes de plates-formes (7012-7013 et au-delà), **non lues**	objects.md §12
+004495f8	gm_upd_pad_004495f8	-	Étude des objets	hypothèse	variantes de plates-formes (7012-7013 et au-delà), **non lues**	objects.md §12
+00449aa8	gm_vehicle_tick_00449aa8	-	Étude des règles	probable	fonction de tick des véhicules (physique, collisions sol / eau)	rules.md §9
+00449ad0	gm_vehicle_tick_00449ad0	-	Étude des règles	probable	fonction de tick des véhicules (physique, collisions sol / eau)	rules.md §9
+00449c10	gm_upd_falling_wreck	-	Étude des objets	certain	épave d'avion qui tombe	objects.md §12
+0044a1a0	gm_upd_bullet_tracking	-	Étude des règles	probable	balle du canon : suivi	rules.md §9
+0044a2d0	gm_upd_bullet	-	Étude des règles	probable	balle du canon	rules.md §9
+0044a374	gm_upd_bullet_right	-	Étude des règles	probable	balle du canon (droite)	rules.md §9
+0044a430	gm_upd_bullet_heavy	-	Étude des règles	probable	balle du canon (lourde)	rules.md §9
+0044a4f8	gm_upd_bullet_homing	-	Étude des règles	probable	balle du canon (à tête chercheuse)	rules.md §9
+0044ac88	gm_upd_turret	-	Étude des objets	certain	tourelle de 3000	objects.md §12
+0044b848	gm_upd_beam_gun	-	Étude des objets	certain	canon à faisceau (3001)	objects.md §12
+0044bca8	gm_upd_ground_vehicle	-	Étude des objets	certain	char / véhicule à roues	objects.md §12
+0044cf1c	gm_upd_boat	-	Étude des objets	certain	navire	objects.md §12
+0044d470	gm_upd_vehicle_turret	-	Étude des objets	certain	tourelle de véhicule	objects.md §12
+0044d804	gm_upd_vehicle_factory	-	Étude des objets	certain	fabrique de chars (6000)	objects.md §12
+0044d938	gm_upd_attack_plane	-	Étude des objets	certain	avions des pistes	objects.md §12
+0044db38	gm_upd_attack_plane2	-	Étude des objets	certain	avions des pistes	objects.md §12
+0044de9c	gm_upd_antenna	-	Étude des objets	certain	antenne/radar décoratif	objects.md §12
+0044df98	gm_upd_airstrip_0044df98	-	Étude des objets	certain	pistes d'avions 6100/6101/6110	objects.md §12
+0044e0f8	gm_upd_airstrip_0044e0f8	-	Étude des objets	certain	pistes d'avions 6100/6101/6110	objects.md §12
+0044e2d8	gm_upd_airstrip_0044e2d8	-	Étude des objets	certain	pistes d'avions 6100/6101/6110	objects.md §12
+0044e438	gm_upd_kamikaze_heli	-	Étude des objets	certain	4001	objects.md §12
+0044e758	gm_upd_node_plane	-	Étude des objets	certain	4002	objects.md §12
+004516f4	gm_upd_fighter	-	Étude des objets	certain	6300 et ses chasseurs	objects.md §12
+0045199c	gm_upd_fighter_spawner	-	Étude des objets	certain	6300 et ses chasseurs	objects.md §12
+00454ce0	gm_missile_steer	1072	Étude des objets	certain	poussée et guidage de missile	objects.md §12
+00455124	gm_upd_missile_attached	-	Étude des règles	probable	missile accroché au lanceur (copie cap, tangage, roulis du porteur)	rules.md §9
+00455190	gm_upd_missile_coast	-	Étude des objets	certain	missiles et fusées	objects.md §12
+004551f0	gm_upd_missile_straight	-	Étude des règles	probable	vol de l'arme 0 (virage 2)	rules.md §9
+00455278	gm_upd_missile_b	-	Étude des objets	certain	missiles et fusées	objects.md §12
+00455300	gm_upd_missile_class10	-	Étude des règles	probable	vol à vitesse de classe 10 (7 000, virage 2)	rules.md §9
+00455370	gm_upd_bomb_fly	-	Étude des règles	probable	bombe : phase de vol	rules.md §9
+004556dc	gm_upd_bomb_shockwave	-	Étude des règles	probable	bombe : onde de choc de 40 / 60 ticks	rules.md §9
+00455a98	gm_upd_cruise_missile	-	Étude des règles	probable	missile de croisière	rules.md §9
+00456038	gm_upd_shield	-	Étude des règles	probable	bouclier	rules.md §9
+004560e4	gm_upd_buddy_lock	-	Étude des règles	probable	compagnon : verrouillage	rules.md §9
+00456658	gm_upd_buddy_super	-	Étude des règles	probable	compagnon : super	rules.md §9
+00456814	gm_set_local_velocity	339	Étude des objets	certain	vitesse d'un projectile en repère du tireur	objects.md §12
+00456abc	gm_upd_buddy_autofire	-	Étude des règles	probable	compagnon : tir auto	rules.md §9
+00456f78	gm_upd_missile_a	-	Étude des objets	certain	missiles et fusées	objects.md §12
+00457074	gm_upd_mortar	-	Étude des règles	probable	mortier	rules.md §9
+0045754c	gm_upd_super_nova	-	Étude des règles	probable	Super Nova	rules.md §9
+00457784	gm_upd_napalm	-	Étude des règles	probable	napalm	rules.md §9
+00457abc	gm_upd_nucleator	-	Étude des règles	probable	Nucléator	rules.md §9
+00457bcc	gm_upd_super_napalm	-	Étude des règles	probable	super napalm	rules.md §9
+00457d4c	gm_upd_rocket	-	Étude des objets	certain	missiles et fusées	objects.md §12
+00458064	gm_upd_pod_dropped	-	Étude des règles	probable	nacelle larguée	rules.md §9
+004580f0	gm_attach_offset	489	Étude des objets	certain	place un enfant à un décalage rotatif du parent	objects.md §12 ; autres noms proposés : rules.md : gm_attach_to_player
+004582dc	gm_weapon_select	689	Étude du joueur	non précisé	choix de l'arme : -1 suivante, -2 précédente, 0..9 directe (2 banques)	player.md §7
+00458590	gm_fire_special	51	Étude du joueur	non précisé	déclenche le tir spécial	player.md §7 ; autres noms proposés : rules.md : gm_special_fire
+004585c4	gm_pickup_apply	2497	Étude des objets	certain	applique le bonus (voir `rules.md`)	objects.md §12
+00458f88	gm_pickup_can_take	2456	Étude des objets	certain	le joueur peut-il prendre ce bonus (plafond) ?	objects.md §12 ; autres noms proposés : rules.md : gm_pickup_can_collect
+004599b8	gm_player_aim_update	710	Étude des règles	non précisé	tangage de visée `+0x90` (auto-aim vertical)	rules.md §9
+00459c80	gm_player_weapon_update	688	Étude des règles	non précisé	consommation des munitions, resélection, dispatch par véhicule	rules.md §9
+00459f30	gm_special_weapon_ship0	16787	Étude des règles	non précisé	armes spéciales de l'hélicoptère (véhicule 0)	rules.md §9
+0045e128	gm_special_weapon_ship1_2	18513	Étude des règles	non précisé	armes spéciales des véhicules 1 et 2	rules.md §9
+004629e4	gm_special_weapon_ship4_5	18513	Étude des règles	non précisé	armes spéciales des véhicules 4 et 5	rules.md §9
+004672a0	gm_special_weapon_ship3	16813	Étude des règles	non précisé	armes spéciales du véhicule 3 (et 43)	rules.md §9
+0046b4b4	gm_primary_bullet_spawn	560	Étude des règles	non précisé	crée un projectile du canon	rules.md §9
+0046b6fc	gm_fire_primary	6827	Étude du joueur	non précisé	tir principal (armes, R3)	player.md §7 ; autres noms proposés : rules.md : gm_primary_fire
+0046d1f8	gm_enemy_fire	5427	Étude des objets	certain	programmes d'armes ennemis (§8.2)	objects.md §12 ; autres noms proposés : rules.md : gm_enemy_fire_pattern
+0046e994	gm_cfg_save_exit	26	Étude des écrans	certain	Appelle `gm_cfg_save` à la sortie	screens.md §12
+0046e9b0	gm_state_copy	80	Étude des écrans	certain	Copie les 28 dwords d'état d'une fiche à une autre	screens.md §12
+0046ea00	gm_state_clear	67	Étude des écrans	certain	Met à zéro les 28 dwords d'état d'une mission	screens.md §12
+0046eb5c	gm_profile_data	57	Étude des écrans	certain	`gm_profile_record` + 12 (adresse des données)	screens.md §12
+0046eb98	gm_profile_delete	160	Étude des écrans	certain	Libère les cases de fiche dont la clé correspond (joker `-1` par champ)	screens.md §12
+0046feec	gm_gfx_hook_a	26	Étude des écrans	certain	Fonction vide (accroche 3Dfx/D3D, codes 3000-3008)	screens.md §12
+0046ff08	gm_gfx_hook_b	26	Étude des écrans	certain	Idem	screens.md §12
+0046ff24	gm_gfx_hook_c	21	Étude des écrans	certain	Idem	screens.md §12
+0046ff3c	gm_gfx_hook_flip	21	Étude des écrans	certain	Idem (bascule des versions accélérées)	screens.md §12
+00470cb8	gm_pow	16	Étude du rendu	certain	puissance	render.md §13
+00470cc8	gm_ftol_trunc	29	Étude du rendu	certain	flottant → entier par troncature (`__CHP`)	render.md §13
+00470ce6	gm_sqrt	48	Étude du rendu	certain	racine carrée	render.md §13

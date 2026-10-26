@@ -1,6 +1,7 @@
 // Post-script : nomme les fonctions du jeu (préfixe gm_) dont le rôle est établi ou probable.
 // La table est dans keyfuncs.def.tsv (chemin passé par SWIV3D_KEYFUNCS_DEF) : adresse, nom, taille attendue,
-// groupe, confiance, rôle, preuve. Garde-fou : la taille attendue doit correspondre.
+// groupe, confiance, rôle, preuve. Garde-fou : la taille attendue doit correspondre (« - » : pas de contrôle,
+// pour les adresses que l'analyse automatique n'avait pas reconnues comme fonctions : elles sont désassemblées et créées ici).
 // Sortie : keyfuncs.tsv (adresse, nom, taille, appelants, groupe, confiance, rôle, preuve), lu par make_index.py.
 //@category SWIV3D.RE
 
@@ -25,13 +26,16 @@ public class NameGameFuncs extends GhidraScript {
             if (line.startsWith("#") || line.isBlank()) continue;
             String[] l = line.split("\t", 7);
             Function f = getFunctionAt(toAddr(l[0]));
-            if (f == null) f = createFunction(toAddr(l[0]), null); // code non atteint par l'analyse automatique
+            if (f == null) { // code non atteint par l'analyse automatique (pilotes, comportements : appels indirects)
+                disassemble(toAddr(l[0]));
+                f = createFunction(toAddr(l[0]), null);
+            }
             if (f == null) {
                 println("[re] fonction absente à " + l[0] + " (" + l[1] + ")");
                 continue;
             }
             long size = f.getBody().getNumAddresses();
-            if (size != Long.parseLong(l[2])) {
+            if (!l[2].equals("-") && size != Long.parseLong(l[2])) {
                 println("[re] taille inattendue à " + l[0] + " : " + size + " au lieu de " + l[2] + " ; non renommée (" + l[1] + ")");
                 continue;
             }

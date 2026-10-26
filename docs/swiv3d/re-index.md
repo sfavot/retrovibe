@@ -14,11 +14,11 @@ Points d'attention pour la lecture du corpus :
 ## Statistiques
 
 <!-- GEN:stats -->
-- Outils : ghidra 12.2 ; JDK : openjdk version "25.0.5" 2026-10-20.
-- Durée de la dernière régénération : 38 s.
+- Outils : ghidra 12.2 ; JDK : ?.
+- Durée de la dernière régénération : ? s.
 - Image : 572416 octets.
-- Fonctions : 564, 324368 octets (types : func 517, import 47).
-- Décompilation : 515 ok (91.3 %), 49 partielle, 0 en erreur.
+- Fonctions : 655, 376105 octets (types : func 608, import 47).
+- Décompilation : 606 ok (92.5 %), 49 partielle, 0 en erreur.
 - Chaînes de la zone de données : 111 ; référencées par au moins une fonction : 67.
 - Décompilation partielle : `00476fd7`, `00472c7b`, `00477238`, `0047723e`, `00477244`, `0047724a`, `00477250`, `00477256`, `0047725c`, `00477262`, `00477268`, `0047726e`, `00477274`, `0047727a`, `00477280`, `00477286`, `0047728c`, `00477292`, `00477298`, `0047729e`, `004772a4`, `004772c2`, `004772c8`, `004772ce`, `004772d4`, `004772e0`, `004772e6`, `004772ec`, `004772f2`, `004772f8`, `004772fe`, `00477304`, `0047730a`, `00477310`, `00477316`, `0047731c`, `00477322`, `00477328`, `00477382`, `00477388`, `0047738e`, `00477394`, `0047739a`, `004773a0`, `004773a6`, `004773ac`, `004773b2`, `004773b8`, `004773be`.
 <!-- /GEN:stats -->
@@ -26,6 +26,10 @@ Points d'attention pour la lecture du corpus :
 ## Fonctions nommées
 
 Table `scripts/swiv3d/re/keyfuncs.def.tsv`, appliquée par `NameGameFuncs.java` (les fichiers `decomp/` portent ces noms, préfixe `gm_`). « certain » = établi par le code ; « probable » = déduit du rôle d'appelants/appelés ; « hypothèse » = à vérifier.
+
+Les groupes « Étude … » viennent des cinq études détaillées (tables « Fonctions à nommer » fusionnées dans la table) ; « non précisé » = confiance non indiquée par l'étude. Un nom à `-` octets attendus dans la table désigne du code que Ghidra n'avait pas reconnu comme fonction (pilotes, comportements : appels indirects) et que `NameGameFuncs.java` désassemble et crée.
+
+**Études détaillées.** Cinq études s'appuient sur ce corpus : [`player.md`](player.md) (joueur, pilotage, physique des véhicules, commandes, réseau), [`objects.md`](objects.md) (objets, comportements `+0x68`, déplacements, IA), [`rules.md`](rules.md) (règles de jeu : dégâts, bonus, armes, objectifs, victoire), [`render.md`](render.md) (rendu : terrain, triangles, sprites, mode X) et [`screens.md`](screens.md) (menus et écrans, configuration, palettes, Smacker).
 
 <!-- GEN:keyfuncs -->
 #### Démarrage, fenêtre et entrées
@@ -109,7 +113,7 @@ Table `scripts/swiv3d/re/keyfuncs.def.tsv`, appliquée par `NameGameFuncs.java` 
 | `00424a24` | `gm_terrain_crater` | 510 | 1 | Abaisse la hauteur autour d'un point (cratère) | Soustractions sur 005b1fc4 | probable |
 | `004256c0` | `gm_terrain_height` | 384 | 6 | Hauteur du terrain (carte 512x512 du bloc 100) à (x, z) avec interpolation bilinéaire ; cellule = >>14, fraction = >>6 & 0xff | Masque 0x1ff, *0x200, 005b1fc4 | certain |
 | `00425840` | `gm_terrain_map2_sample` | 372 | 0 | Même interpolation sur la carte du bloc 102 | Même code sur 005b1fa8 | probable |
-| `0042718c` | `gm_render_terrain` | 10909 | 1 | Parcourt les cellules voisines (grille 7x7 de 64x64) et projette terrain/objets | Lit 005b1fc4 ; grille 0x3f | hypothèse |
+| `0042718c` | `gm_render_objects` | 10909 | 1 | collecte des objets des compartiments 7×7, transformation, Gouraud, mise en file des faces et sprites | Lit 005b1fc4 ; grille 0x3f ; renommée (anciennement gm_render_terrain), render.md §13 | certain |
 | `0042b31c` | `gm_render_view` | 14496 | 1 | Rendu d'une vue (terrain, objets, sprites) | 14 Ko ; appelle gm_render_terrain, gm_terrain_height | probable |
 | `0042ec80` | `gm_draw_hud` | 2506 | 1 | Affiche le HUD d'un joueur (score « %07d », « %s %2d ») | Chaînes 004803f8, 00480400 | certain |
 | `0042f64c` | `gm_frame` | 1174 | 4 | Une image : met à jour les sons, rend chaque vue active (0042b31c), HUD, entrées de debug, fait avancer le jeu | Boucle sur 4 vues de 0x1a dwords à 00480e74 | probable |
@@ -160,6 +164,286 @@ Table `scripts/swiv3d/re/keyfuncs.def.tsv`, appliquée par `NameGameFuncs.java` 
 | `0046f9b0` | `gm_get_string_shared` | 165 | 2 | Idem pour les groupes communs (clé 0x630000 + groupe) | Constante 0x630000 | certain |
 | `0046fa58` | `gm_global_init` | 819 | 1 | Ouvre GLOBAL.BD, lit le répertoire final, charge et relocalise les blocs (2, 100, 200, 5xx, 600, 700, 800, 1001-1005) | Chaîne « I cant open GLOBAL.bd » ; appels 0046f288 avec les ids | certain |
 | `0046fd8c` | `gm_global_free` | 242 | 1 | Libère les blocs de GLOBAL.BD | Appelle free sur les globales | probable |
+
+#### Étude du joueur
+
+| Adresse | Nom | Octets | Appelants | Rôle | Preuve | Confiance |
+|---|---|---:|---:|---|---|---|
+| `00410b74` | `gm_joy_read_axes` | 85 | 1 | lit 'joyGetPosEx' pour la calibration | player.md §7 | non précisé |
+| `00411eb8` | `gm_net_receive` | 605 | 1 | reçoit les messages DirectPlay (joueurs distants) | player.md §7 | non précisé |
+| `004157d0` | `gm_menu_anim_tick` | 228 | 1 | décompte animé des scores des menus (drapeau 2 de 'gm_poll_events') | player.md §7 | non précisé |
+| `004234ec` | `gm_effects_tick` | 233 | 1 | tick de la file d'effets (particules) '005876dc' : 'pos += vel', durée '+0x38' | player.md §7 | non précisé |
+| `00438678` | `gm_pilot_none` | 26 | 0 | fonction pilote vide (formes '0x2a', '0x63') | player.md §7 | non précisé |
+| `00438744` | `gm_pilot_dying` | 1285 | 0 | séquence de mort/fin (forme '0x2b') | player.md §7 | non précisé |
+| `00439088` | `gm_pilot_heli` | 1511 | 0 | pilote de l'hélicoptère, forme 0 | player.md §7 | non précisé |
+| `00439670` | `gm_pilot_heli_net` | 1369 | 0 | même, joueur réseau (entrées '+0xe4..') | player.md §7 | non précisé |
+| `00439bcc` | `gm_pilot_heli_3` | 1447 | 0 | pilote forme 3 | player.md §7 | non précisé |
+| `0043a174` | `gm_pilot_vehicle_1` | 1514 | 0 | pilote forme 1 (roues) | player.md §7 | non précisé |
+| `0043a760` | `gm_pilot_vehicle_2` | 1284 | 0 | pilote forme 2 | player.md §7 | non précisé |
+| `0043ac64` | `gm_pilot_vehicle_4` | 1094 | 0 | pilote forme 4 | player.md §7 | non précisé |
+| `0043b0ac` | `gm_pilot_vehicle_5` | 1094 | 0 | pilote forme 5 | player.md §7 | non précisé |
+| `0043c234` | `gm_game_tick` | 1918 | 2 | un tick de logique (25 ms) : objets, fonctions pilote, mort, jauge de PV | player.md §7 | non précisé |
+| `0043ca60` | `gm_player_load_keys` | 83 | 1 | recopie 11 touches du profil dans le joueur | player.md §7 ; autres noms proposés : rules.md : gm_player_copy_controls | non précisé |
+| `0043daa0` | `gm_net_send_input_client` | 245 | 1 | émission réseau (hypothèse) | player.md §7 | hypothèse |
+| `0043db98` | `gm_net_send_state_host` | 628 | 1 | émission réseau (hypothèse) | player.md §7 | hypothèse |
+| `0043e5c4` | `gm_player_join_local` | 530 | 2 | place un joueur sur un point de départ | player.md §7 | non précisé |
+| `0043e7d8` | `gm_player_join_net` | 383 | 2 | idem, joueur réseau | player.md §7 | non précisé |
+| `004446a0` | `gm_wheel_update` | 1088 | 4 | animation et braquage d'une roue enfant | player.md §7 | non précisé |
+| `00444af8` | `gm_heli_physics` | 1017 | 0 | physique de l'hélicoptère (altitude assistée, poussée par tangage/roulis, choc) | player.md §7 ; autres noms proposés : objects.md : gm_aircraft_fly ; rules.md : gm_vehicle_hover_physics | non précisé |
+| `00445228` | `gm_vehicle_physics_1` | 1096 | 0 | physique du véhicule forme 1 | player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445228 | non précisé |
+| `00445670` | `gm_vehicle_physics_2` | 1042 | 0 | physique du véhicule forme 2 | player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445670 | non précisé |
+| `00445a84` | `gm_vehicle_physics_4` | 1214 | 0 | physique du véhicule forme 4 | player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445a84 | non précisé |
+| `00445f44` | `gm_vehicle_physics_5` | 1146 | 0 | physique du véhicule forme 5 | player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445f44 | non précisé |
+| `004582dc` | `gm_weapon_select` | 689 | 8 | choix de l'arme : -1 suivante, -2 précédente, 0..9 directe (2 banques) | player.md §7 | non précisé |
+| `00458590` | `gm_fire_special` | 51 | 8 | déclenche le tir spécial | player.md §7 ; autres noms proposés : rules.md : gm_special_fire | non précisé |
+| `0046b6fc` | `gm_fire_primary` | 6827 | 7 | tir principal (armes, R3) | player.md §7 ; autres noms proposés : rules.md : gm_primary_fire | non précisé |
+
+#### Étude du rendu
+
+| Adresse | Nom | Octets | Appelants | Rôle | Preuve | Confiance |
+|---|---|---:|---:|---|---|---|
+| `0041406c` | `gm_fb_clear_sky` | 260 | 1 | efface les lignes au-dessus de l'horizon (MMX) | render.md §13 | certain |
+| `004141d0` | `gm_terrain_strip_scalar` | 808 | 1 | bande de terrain texturée, entiers | render.md §13 | certain |
+| `004144f8` | `gm_emms` | 3 | 1 | 'EMMS; RET' | render.md §13 | certain |
+| `004144fb` | `gm_terrain_strip_mmx` | 740 | 1 | bande de terrain texturée, MMX | render.md §13 | certain |
+| `004147df` | `gm_terrain_strip_flat` | 506 | 1 | bande de terrain à couleur plate (table 106) | render.md §13 | certain |
+| `004153db` | `gm_vec2_normalize_256` | 85 | 2 | idem en (x, z) | render.md §13 | probable |
+| `00422eac` | `gm_queue_reset` | 121 | 1 | file à zéro (2995 entrées) | render.md §13 | certain |
+| `004232ac` | `gm_deformers_apply` | 573 | 3 | ondes / dôme / anneaux sur un sommet | render.md §13 | certain |
+| `00423620` | `gm_queue_insert` | 682 | 2 | insertion triée dans la file des primitives, rejet hors écran | render.md §13 | certain |
+| `00423974` | `gm_text3d_emit_glyph` | 2783 | 1 | enfile les triangles d'une lettre 3D du bloc 200 | render.md §13 | probable |
+| `0042469c` | `gm_gamma_build` | 223 | 1 | table de gamma 4×64 'pow' | render.md §13 | certain |
+| `0042477c` | `gm_render_init_tables` | 631 | 1 | réciproques, racines, cercle du rotor ('0052cae8'), pointeurs de colonnes | render.md §13 | certain |
+| `004259b4` | `gm_ground_flash_add` | 716 | 1 | éclair d'impact dans la carte 64×64 '005624c8' | render.md §13 ; autres noms proposés : objects.md : gm_scorch_mark | probable |
+| `00425c94` | `gm_terrain_height_water` | 1101 | 4 | hauteur bilinéaire 8.8 avec vagues | render.md §13 ; autres noms proposés : objects.md : gm_terrain_height_waves | certain |
+| `004268fc` | `gm_terrain_project_flat` | 789 | 2 | projection d'un sommet sans éclairage, drapeau visible, horizon | render.md §13 | certain |
+| `00426c14` | `gm_terrain_project_lit` | 1361 | 1 | projection + éclairage + vagues d'un sommet | render.md §13 | certain |
+| `00429c30` | `gm_terrain_clip_row` | 491 | 1 | borne une rangée à ses sommets visibles | render.md §13 | certain |
+| `00429e1c` | `gm_terrain_build_rows` | 497 | 1 | construit les rangées proches (pas 1) et lointaines (pas 2) | render.md §13 | certain |
+| `0042b05c` | `gm_terrain_pick_row_dir` | 670 | 1 | direction de rangée parmi 8 d'après la droite de la caméra | render.md §13 | certain |
+| `0042faf0` | `gm_vec3_normalize_f` | 103 | 1 | normalise un vecteur flottant | render.md §13 | certain |
+| `0042fba8` | `gm_vec3_cross_f` | 119 | 1 | produit vectoriel flottant | render.md §13 | certain |
+| `0042fc70` | `gm_ground_flash_fade` | 57 | 1 | décroissance de 0x1e par pas | render.md §13 ; autres noms proposés : player.md : gm_decay_flash_table | certain |
+| `0042fcac` | `gm_detect_mmx` | 80 | 1 | CPUID bit 23 → '00484620'/'00484624' | render.md §13 | certain |
+| `0042fd24` | `gm_screen_load_planes` | 102 | 2 | copie un écran 320×400 planaire (bloc 100x) dans le tampon | render.md §13 | certain |
+| `0042fd8c` | `gm_fb_clear_all` | 38 | 2 | efface le tampon (sans MMX) | render.md §13 | certain |
+| `0042fddc` | `gm_palette_set` | 102 | 4 | efface l'écran, charge le DAC avec gamma, mémorise la palette | render.md §13 ; autres noms proposés : screens.md : gm_screen_set_palette | certain |
+| `0042fe44` | `gm_modex_enter` | 128 | 3 | CRTC/séquenceur mode X, efface, palette | render.md §13 ; autres noms proposés : screens.md : gm_gamma_apply | certain |
+| `0042fec4` | `gm_modex_enter_black` | 120 | 1 | idem avec palette noire | render.md §13 | certain |
+| `0042ff5c` | `gm_present_flip` | 250 | 6 | copie du tampon vers la VRAM et bascule de page | render.md §13 ; autres noms proposés : screens.md : gm_screen_flip | certain |
+| `00430058` | `gm_draw_line` | 806 | 1 | trait coloré d'un objet à un autre | render.md §13 | certain |
+| `00430380` | `gm_tri_gouraud` | 3008 | 1 | triangle texturé, lumière interpolée | render.md §13 | certain |
+| `00430f40` | `gm_tri_flat` | 2667 | 2 | triangle texturé, lumière unie | render.md §13 | certain |
+| `00432264` | `gm_tri_shadow_black` | 1871 | 1 | polygone noir (ombre, détail faible) | render.md §13 | certain |
+| `004329b4` | `gm_tri_keyed` | 2656 | 1 | triangle à texel 0 transparent, non éclairé | render.md §13 | certain |
+| `00433414` | `gm_tri_rotor` | 2894 | 1 | disque de rotor : masque 500 × table 500 | render.md §13 | certain |
+| `00433f64` | `gm_tri_shadow` | 2631 | 1 | ombre : silhouette 110 × table 500 | render.md §13 | certain |
+| `004349ac` | `gm_tri_blend504` | 2631 | 1 | triangle mélangé, image 504 × table 109 | render.md §13 | certain |
+| `004353f4` | `gm_sprite_505` | 659 | 1 | sprite 21×35 d'explosion/impact | render.md §13 | certain |
+| `00435688` | `gm_sprite_504` | 829 | 1 | animation d'explosion 64×64 mise à l'échelle | render.md §13 | certain |
+| `004359c8` | `gm_draw_flat_tri` | 1714 | 1 | triangle de couleur unie (texte 3D) | render.md §13 | certain |
+| `00437b64` | `gm_water_animate` | 210 | 1 | tuile d'eau gauchie par des sinus | render.md §13 | certain |
+| `00470cb8` | `gm_pow` | 16 | 1 | puissance | render.md §13 | certain |
+| `00470cc8` | `gm_ftol_trunc` | 29 | 5 | flottant → entier par troncature ('__CHP') | render.md §13 | certain |
+| `00470ce6` | `gm_sqrt` | 48 | 2 | racine carrée | render.md §13 | certain |
+
+#### Étude des écrans
+
+| Adresse | Nom | Octets | Appelants | Rôle | Preuve | Confiance |
+|---|---|---:|---:|---|---|---|
+| `00414c7e` | `gm_blit_rle_glyph` | 148 | 3 | Glyphe RLE standard (utilisé par 'gm_draw_text') | screens.md §12 | certain |
+| `00415126` | `gm_blit_rle_glyph_b` | 157 | 1 | Glyphe RLE, teinte divisée par deux (style 'g') | screens.md §12 | certain |
+| `004158e8` | `gm_menu_add` | 226 | 31 | Ajoute une ou plusieurs lignes de menu depuis une chaîne ('\ ' = saut de ligne) | screens.md §12 | certain |
+| `00415a20` | `gm_menu_run` | 3551 | 29 | Moteur de menu : tracé (bandeaux de mélange + texte), navigation, curseurs ; renvoie l'id ou -1 | screens.md §12 | certain |
+| `00416834` | `gm_menu_select` | 123 | 16 | Place la sélection initiale sur l'id donné | screens.md §12 | certain |
+| `004168b0` | `gm_menu_capture_key` | 670 | 1 | « Appuyez sur la touche pour… » : capture d'une touche | screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_misc | probable |
+| `00416b50` | `gm_menu_calibrate` | 1632 | 1 | Calibrage manette | screens.md §12 ; autres noms proposés : player.md : gm_menu_joy_calibrate | probable |
+| `004171b4` | `gm_menu_controller_type` | 1965 | 1 | Choix du type de contrôleur (groupe 3, ids 100/101, 11-16) | screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_type | probable |
+| `0041797c` | `gm_menu_axis_bindings` | 1629 | 1 | Liaison des axes (groupe 3, 1000-1013) | screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_axes | probable |
+| `00418454` | `gm_menu_controller` | 2809 | 2 | Menu « Installation du contrôleur » | screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_bindings | certain |
+| `00418f54` | `gm_controller_check` | 229 | 1 | Rouvre le menu contrôleur si le type de contrôleur est absent ou non configuré | screens.md §12 | certain |
+| `004191ac` | `gm_menu_language` | 772 | 1 | Choix de la langue (liste de la table commune 0) | screens.md §12 | certain |
+| `00419c20` | `gm_screen_net_stats` | 693 | 1 | Statistiques réseau de fin de partie (groupe 5, 500/501) | screens.md §12 | probable |
+| `0041c640` | `gm_screen_new_pilot` | 1589 | 1 | Saisie du nom d'un nouveau pilote (15 car., code 'SWIV!AndLetDie') | screens.md §12 | certain |
+| `0041cc78` | `gm_screen_delete_pilot` | 819 | 1 | Suppression d'un pilote (sans confirmation) | screens.md §12 | certain |
+| `0041cfac` | `gm_screen_select_pilot` | 1894 | 1 | Écran de sélection du pilote | screens.md §12 | certain |
+| `0041e614` | `gm_menu_test_mission` | 2074 | 1 | Menu de mission de test (groupe 11, ids 20/21) | screens.md §12 | certain |
+| `0041ee30` | `gm_menu_grab_name` | 1694 | 1 | Saisie du nom de fichier de capture (groupe 12) | screens.md §12 | probable |
+| `0041fc20` | `gm_menu_exit` | 831 | 1 | Confirmation de sortie (groupe 13, phrases 30..33 en rotation) | screens.md §12 | certain |
+| `004235d8` | `gm_title_release` | 70 | 26 | Déclenche la sortie des titres 3D | screens.md §12 | certain |
+| `004360b0` | `gm_fill_blend` | 519 | 1 | Remplit un rectangle de la page avec une ligne de la table de mélange ('x0, y0, x1, y1, ligne') | screens.md §12 | certain |
+| `00437eac` | `gm_smk_present` | 191 | 1 | Présente une image Smacker : attente verticale, copie, tracé du '.SCR', bascule | screens.md §12 | certain |
+| `0046e994` | `gm_cfg_save_exit` | 26 | 1 | Appelle 'gm_cfg_save' à la sortie | screens.md §12 | certain |
+| `0046e9b0` | `gm_state_copy` | 80 | 1 | Copie les 28 dwords d'état d'une fiche à une autre | screens.md §12 | certain |
+| `0046ea00` | `gm_state_clear` | 67 | 1 | Met à zéro les 28 dwords d'état d'une mission | screens.md §12 | certain |
+| `0046eb5c` | `gm_profile_data` | 57 | 1 | 'gm_profile_record' + 12 (adresse des données) | screens.md §12 | certain |
+| `0046eb98` | `gm_profile_delete` | 160 | 1 | Libère les cases de fiche dont la clé correspond (joker '-1' par champ) | screens.md §12 | certain |
+| `0046feec` | `gm_gfx_hook_a` | 26 | 7 | Fonction vide (accroche 3Dfx/D3D, codes 3000-3008) | screens.md §12 | certain |
+| `0046ff08` | `gm_gfx_hook_b` | 26 | 2 | Idem | screens.md §12 | certain |
+| `0046ff24` | `gm_gfx_hook_c` | 21 | 1 | Idem | screens.md §12 | certain |
+| `0046ff3c` | `gm_gfx_hook_flip` | 21 | 3 | Idem (bascule des versions accélérées) | screens.md §12 | certain |
+
+#### Étude des objets
+
+| Adresse | Nom | Octets | Appelants | Rôle | Preuve | Confiance |
+|---|---|---:|---:|---|---|---|
+| `00415374` | `gm_vec_normalize256` | 103 | 6 | normalise un vecteur 3D à la longueur 256 (tables '0055a4c8', '005836ac') | objects.md §12 ; autres noms proposés : player.md : gm_normalize_delta ; render.md : gm_vec3_normalize_256 | certain |
+| `00424db4` | `gm_crater_site_ok` | 399 | 1 | test d'emplacement avant cratère | objects.md §12 | hypothèse |
+| `00424f44` | `gm_terrain_explosion_crater` | 1916 | 1 | cratère d'explosion (bloc 700) | objects.md §12 | certain |
+| `004261a0` | `gm_object_clone` | 259 | 17 | alloue et clone un enfant de EBX (§4.2) | objects.md §12 ; autres noms proposés : rules.md : gm_object_spawn_from | certain |
+| `004262a4` | `gm_node_claim_ground` | 278 | 0 | nœud 107 libre le plus proche, compteur '+0x20' | objects.md §12 | certain |
+| `004263bc` | `gm_node_claim_boat` | 278 | 0 | idem compteur '+0x18' | objects.md §12 | certain |
+| `004264d4` | `gm_node_claim_air` | 278 | 0 | idem compteur '+0x1c' | objects.md §12 | certain |
+| `00426814` | `gm_object_spawn` | 123 | 3 | alloue un objet et appelle 'gm_object_init' | objects.md §12 ; autres noms proposés : rules.md : gm_object_spawn_at | certain |
+| `00426890` | `gm_object_spawn_raw` | 105 | 1 | idem sans test du mode réseau | objects.md §12 | probable |
+| `0042a010` | `gm_model_radius2` | 71 | 2 | rayon² d'un modèle (100 si sprite ou 0) | objects.md §12 ; autres noms proposés : player.md : gm_type_radius2 ; rules.md : gm_object_collide_radius | certain |
+| `0042a084` | `gm_objects_update` | 2236 | 1 | boucle de mise à jour des objets (§2) : anneaux autour des joueurs, mouvement, appel '+0x68', collisions | objects.md §12 ; autres noms proposés : rules.md : gm_world_update_collide ; render.md : gm_game_step_solo | certain |
+| `0042a940` | `gm_objects_update_net` | 1339 | 1 | variante réseau (les 4 096 cellules, pas d'anneaux) | objects.md §12 ; autres noms proposés : rules.md : gm_world_update_collide_net ; render.md : gm_game_step_net | certain |
+| `0042ae7c` | `gm_grid_query` | 265 | 1 | objets des '(2r+1)²' cellules dont la classe vérifie 'masque == valeur', chaînés par '+0x60' | objects.md §12 ; autres noms proposés : rules.md : gm_find_objects_near_obj | certain |
+| `0042af88` | `gm_grid_query_cells` | 212 | 4 | variante sans la liste de la cellule de l'objet | objects.md §12 ; autres noms proposés : rules.md : gm_find_objects_near_pos | probable |
+| `0042ebc4` | `gm_score_add` | 94 | 0 | ajoute des points au joueur qui a donné le coup fatal | objects.md §12 | certain |
+| `0043c164` | `gm_find_nearest_player` | 208 | 1 | joueur le plus proche (non ignoré) dans '+0x58' | objects.md §12 ; autres noms proposés : rules.md : gm_nearest_player | certain |
+| `0043cab4` | `gm_player_init_state` | 605 | 3 | initialise la structure joueur de 0x228 octets | objects.md §12 ; autres noms proposés : rules.md : gm_player_load_profile | probable |
+| `0043cda4` | `gm_objective_register` | 198 | 1 | inscrit un objet dans un groupe d'objectifs 0-9 | objects.md §12 | certain |
+| `0043ce6c` | `gm_objective_unregister` | 454 | 1 | désinscrit à la mort, déclenche messages/fin de niveau | objects.md §12 ; autres noms proposés : rules.md : gm_objective_target_killed | certain |
+| `0043de0c` | `gm_player_set_form` | 1961 | 5 | change la forme du joueur (990/991, classe, update) | objects.md §12 ; autres noms proposés : rules.md : gm_player_set_vehicle | certain |
+| `00441630` | `gm_upd_fx_00441630` | 26 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `0044167c` | `gm_turret_aim_fire` | 542 | 0 | vise parmi 5 options et tire | objects.md §12 | certain |
+| `00441af4` | `gm_turn_toward_target` | 265 | 1 | virages vers la cible | objects.md §12 | probable |
+| `00441c00` | `gm_child_limit_angles` | 320 | 0 | borne tangage/roulis d'un enfant | objects.md §12 | probable |
+| `00441d40` | `gm_child_copy_tilt` | 187 | 4 | tangage/roulis d'un enfant selon le parent | objects.md §12 | probable |
+| `00441dfc` | `gm_aim_toward_target` | 662 | 1 | virages vers la cible | objects.md §12 | probable |
+| `004420a4` | `gm_aircraft_turn_to_point` | 720 | 0 | virage avion avec roulis | objects.md §12 | probable |
+| `00442398` | `gm_aircraft_turn_to_point2` | 514 | 0 | variante | objects.md §12 | probable |
+| `004425c0` | `gm_node_distance_ground` | 253 | 2 | distance de graphe approchée | objects.md §12 | certain |
+| `004426c0` | `gm_node_chase_ground` | 413 | 0 | nœud voisin libre le plus proche de la cible | objects.md §12 | certain |
+| `00442860` | `gm_node_patrol_ground` | 198 | 0 | nœud voisin libre suivant | objects.md §12 | certain |
+| `00442928` | `gm_node_distance_air` | 253 | 2 | distance de graphe approchée | objects.md §12 | certain |
+| `00442a28` | `gm_node_chase_air` | 413 | 0 | nœud voisin libre le plus proche de la cible | objects.md §12 | certain |
+| `00442bc8` | `gm_node_patrol_air` | 198 | 0 | nœud voisin libre suivant | objects.md §12 | certain |
+| `00442dac` | `gm_node_distance_boat` | 253 | 2 | distance de graphe approchée | objects.md §12 | certain |
+| `00442eac` | `gm_node_chase_boat` | 413 | 0 | nœud voisin libre le plus proche de la cible | objects.md §12 | certain |
+| `0044304c` | `gm_node_patrol_boat` | 198 | 0 | nœud voisin libre suivant | objects.md §12 | certain |
+| `00443114` | `gm_steer_to_point` | 366 | 0 | choix entre 5 virages vers un point | objects.md §12 | certain |
+| `00443284` | `gm_steer_to_node` | 310 | 0 | cap vers le nœud courant, 'D²' | objects.md §12 | certain |
+| `00443510` | `gm_vehicle_suspension` | 1064 | 0 | 4 coins, ressorts, poussée | objects.md §12 ; autres noms proposés : player.md : gm_vehicle_contact | certain |
+| `00443938` | `gm_acquire_target` | 312 | 0 | ciblage périodique par grille (§8.1) | objects.md §12 ; autres noms proposés : rules.md : gm_buddy_scan_targets | certain |
+| `00443a70` | `gm_upd_fx_00443a70` | 79 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `00443ac0` | `gm_object_explode` | 383 | 1 | explosion par classe de rayon (modèles 900-902, son 1000) | objects.md §12 | certain |
+| `00443c40` | `gm_upd_fx_00443c40` | 70 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `00443c88` | `gm_projectile_burst` | 107 | 0 | petite explosion de projectile (sprite 11000) | objects.md §12 ; autres noms proposés : rules.md : gm_spawn_explosion_00443c88 | certain |
+| `00443cf4` | `gm_upd_fx_00443cf4` | 70 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `00443db8` | `gm_upd_fx_00443db8` | 70 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `00443e7c` | `gm_upd_fx_00443e7c` | 84 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `00443ed0` | `gm_spawn_smoke_rise` | 165 | 1 | bouffée de fumée montante (sprite 11004 frame 46) | objects.md §12 ; autres noms proposés : rules.md : gm_spawn_explosion_00443ed0 | certain |
+| `00443f78` | `gm_upd_fx_00443f78` | 107 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `00444050` | `gm_upd_fx_00444050` | 51 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `00444084` | `gm_smoke_trail` | 130 | 2 | traînée de fumée de missile (sprite 11001) | objects.md §12 ; autres noms proposés : rules.md : gm_missile_trail_puff | certain |
+| `00444108` | `gm_upd_fx_00444108` | 33 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `0044412c` | `gm_upd_fx_0044412c` | 223 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `0044420c` | `gm_upd_fx_0044420c` | 224 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
+| `004442ec` | `gm_object_debris` | 948 | 2 | épave et éclats du bloc 11004 | objects.md §12 ; autres noms proposés : rules.md : gm_spawn_debris | certain |
+| `00444ef4` | `gm_hover_follow_terrain` | 208 | 0 | 'vy' pour suivre le relief à une hauteur donnée | objects.md §12 | certain |
+| `004450a8` | `gm_upd_player_004450a8` | 26 | 0 | formes du joueur et armes embarquées (voir 'player.md') | objects.md §12 | probable |
+| `004450c4` | `gm_upd_wheel` | 339 | 0 | roue de 5002 | objects.md §12 | certain |
+| `004463c0` | `gm_pickup_update` | 1290 | 0 | comportement d'un bonus : flotte, attiré, appliqué | objects.md §12 ; autres noms proposés : rules.md : gm_pickup_behavior | certain |
+| `004468cc` | `gm_upd_pickup_after_all` | 149 | 0 | attend '005af3a4 == 1' puis crée le bonus (7001) | objects.md §12 | certain |
+| `00446964` | `gm_upd_pickup_after_group9` | 149 | 0 | attend '005b03e4 == 9' (7002) | objects.md §12 | certain |
+| `004469fc` | `gm_upd_pickup_placed` | 61 | 0 | bonus posé (compteur '+0x198') | objects.md §12 | certain |
+| `00446a3c` | `gm_upd_pickup_dropped` | 61 | 0 | bonus largué (compteur '+0x194') | objects.md §12 | certain |
+| `00446a7c` | `gm_upd_camera` | 675 | 0 | caméra de scénario (7800-7801), compagnon de '1002' | objects.md §12 | probable |
+| `00446d24` | `gm_upd_destructible` | 362 | 0 | cible statique (§6.1) | objects.md §12 | certain |
+| `00446e90` | `gm_upd_companion` | 106 | 0 | caméra de scénario (7800-7801), compagnon de '1002' | objects.md §12 | probable |
+| `00446efc` | `gm_upd_dock_flying` | 381 | 0 | mouvements d'amarrage du joueur sur une plate-forme (lus ; P) | objects.md §12 | non précisé |
+| `00447080` | `gm_upd_dock_ground` | 1839 | 0 | mouvements d'amarrage du joueur sur une plate-forme (lus ; P) | objects.md §12 | non précisé |
+| `004477b0` | `gm_upd_pad_004477b0` | 820 | 0 | variantes de plates-formes (7012-7013 et au-delà), **non lues** | objects.md §12 | hypothèse |
+| `00447afc` | `gm_upd_pad_00447afc` | 1839 | 0 | variantes de plates-formes (7012-7013 et au-delà), **non lues** | objects.md §12 | hypothèse |
+| `0044822c` | `gm_upd_pad_helper` | 173 | 0 | objet auxiliaire du pad | objects.md §12 | certain |
+| `004482dc` | `gm_upd_transform_pad` | 1157 | 0 | plate-forme de transformation (§6.11) | objects.md §12 | certain |
+| `0044878c` | `gm_upd_pad_0044878c` | 2360 | 0 | variantes de plates-formes (7012-7013 et au-delà), **non lues** | objects.md §12 | hypothèse |
+| `004490cc` | `gm_upd_pad_004490cc` | 795 | 0 | variantes de plates-formes (7012-7013 et au-delà), **non lues** | objects.md §12 | hypothèse |
+| `004493e8` | `gm_upd_pad_004493e8` | 504 | 0 | variantes de plates-formes (7012-7013 et au-delà), **non lues** | objects.md §12 | hypothèse |
+| `004495f8` | `gm_upd_pad_004495f8` | 1157 | 0 | variantes de plates-formes (7012-7013 et au-delà), **non lues** | objects.md §12 | hypothèse |
+| `00449c10` | `gm_upd_falling_wreck` | 232 | 0 | épave d'avion qui tombe | objects.md §12 | certain |
+| `0044ac88` | `gm_upd_turret` | 1243 | 0 | tourelle de 3000 | objects.md §12 | certain |
+| `0044b848` | `gm_upd_beam_gun` | 393 | 0 | canon à faisceau (3001) | objects.md §12 | certain |
+| `0044bca8` | `gm_upd_ground_vehicle` | 783 | 0 | char / véhicule à roues | objects.md §12 | certain |
+| `0044cf1c` | `gm_upd_boat` | 763 | 0 | navire | objects.md §12 | certain |
+| `0044d470` | `gm_upd_vehicle_turret` | 427 | 0 | tourelle de véhicule | objects.md §12 | certain |
+| `0044d804` | `gm_upd_vehicle_factory` | 305 | 0 | fabrique de chars (6000) | objects.md §12 | certain |
+| `0044d938` | `gm_upd_attack_plane` | 509 | 0 | avions des pistes | objects.md §12 | certain |
+| `0044db38` | `gm_upd_attack_plane2` | 865 | 0 | avions des pistes | objects.md §12 | certain |
+| `0044de9c` | `gm_upd_antenna` | 250 | 0 | antenne/radar décoratif | objects.md §12 | certain |
+| `0044df98` | `gm_upd_airstrip_0044df98` | 349 | 0 | pistes d'avions 6100/6101/6110 | objects.md §12 | certain |
+| `0044e0f8` | `gm_upd_airstrip_0044e0f8` | 478 | 0 | pistes d'avions 6100/6101/6110 | objects.md §12 | certain |
+| `0044e2d8` | `gm_upd_airstrip_0044e2d8` | 349 | 0 | pistes d'avions 6100/6101/6110 | objects.md §12 | certain |
+| `0044e438` | `gm_upd_kamikaze_heli` | 798 | 0 | 4001 | objects.md §12 | certain |
+| `0044e758` | `gm_upd_node_plane` | 688 | 0 | 4002 | objects.md §12 | certain |
+| `004516f4` | `gm_upd_fighter` | 664 | 0 | 6300 et ses chasseurs | objects.md §12 | certain |
+| `0045199c` | `gm_upd_fighter_spawner` | 369 | 0 | 6300 et ses chasseurs | objects.md §12 | certain |
+| `00454ce0` | `gm_missile_steer` | 1072 | 0 | poussée et guidage de missile | objects.md §12 | certain |
+| `00455190` | `gm_upd_missile_coast` | 93 | 0 | missiles et fusées | objects.md §12 | certain |
+| `00455278` | `gm_upd_missile_b` | 135 | 0 | missiles et fusées | objects.md §12 | certain |
+| `00456814` | `gm_set_local_velocity` | 339 | 7 | vitesse d'un projectile en repère du tireur | objects.md §12 | certain |
+| `00456f78` | `gm_upd_missile_a` | 135 | 0 | missiles et fusées | objects.md §12 | certain |
+| `00457d4c` | `gm_upd_rocket` | 775 | 0 | missiles et fusées | objects.md §12 | certain |
+| `004580f0` | `gm_attach_offset` | 489 | 6 | place un enfant à un décalage rotatif du parent | objects.md §12 ; autres noms proposés : rules.md : gm_attach_to_player | certain |
+| `004585c4` | `gm_pickup_apply` | 2497 | 2 | applique le bonus (voir 'rules.md') | objects.md §12 | certain |
+| `00458f88` | `gm_pickup_can_take` | 2456 | 1 | le joueur peut-il prendre ce bonus (plafond) ? | objects.md §12 ; autres noms proposés : rules.md : gm_pickup_can_collect | certain |
+| `0046d1f8` | `gm_enemy_fire` | 5427 | 7 | programmes d'armes ennemis (§8.2) | objects.md §12 ; autres noms proposés : rules.md : gm_enemy_fire_pattern | certain |
+
+#### Étude des règles
+
+| Adresse | Nom | Octets | Appelants | Rôle | Preuve | Confiance |
+|---|---|---:|---:|---|---|---|
+| `00419ed8` | `gm_screen_game_over` | 1669 | 1 | écran de fin « Game over » | rules.md §9 | non précisé |
+| `00422f28` | `gm_message_pool_init` | 100 | 2 | initialise les 50 messages flottants | rules.md §9 | non précisé |
+| `00422f8c` | `gm_message_spawn` | 702 | 28 | message flottant 3D (table, id, teinte, type) | rules.md §9 ; autres noms proposés : objects.md : gm_mission_message ; screens.md : gm_title_spawn | non précisé |
+| `00424454` | `gm_message_draw` | 527 | 1 | dessin des messages flottants (police vectorielle) | rules.md §9 ; autres noms proposés : render.md : gm_text3d_draw_all | non précisé |
+| `00437af0` | `gm_draw_energy_gauge` | 113 | 1 | jauge d'énergie (bloc 503) | rules.md §9 | non précisé |
+| `00437c38` | `gm_draw_crosshair` | 301 | 1 | une moitié du viseur (bloc 506) | rules.md §9 | non précisé |
+| `00438198` | `gm_player_pick_target` | 571 | 1 | choisit la cible '+0x58' (produit scalaire + biais objectifs) | rules.md §9 ; autres noms proposés : player.md : gm_player_retarget | non précisé |
+| `00438d08` | `gm_pilot_victory_00438d08` | 224 | 0 | pilotage de fin de niveau | rules.md §9 | probable |
+| `00438de8` | `gm_pilot_victory_00438de8` | 224 | 0 | pilotage de fin de niveau | rules.md §9 | probable |
+| `00438ec8` | `gm_pilot_victory_00438ec8` | 238 | 0 | pilotage de fin de niveau | rules.md §9 | probable |
+| `00438fb8` | `gm_pilot_victory_00438fb8` | 206 | 0 | pilotage de fin de niveau | rules.md §9 | probable |
+| `0043b4f4` | `gm_player_die` | 2927 | 1 | mort : explosion, débris, message « Game over ! », 'DAT_005b0414 = 2' | rules.md §9 | non précisé |
+| `0043c07c` | `gm_player_victory_mode` | 214 | 1 | pilotage de fin de niveau, '+0x184 = 0' | rules.md §9 ; autres noms proposés : player.md : gm_player_death_begin | non précisé |
+| `0043cd14` | `gm_player_save_profile` | 141 | 1 | reporte munitions, énergie, véhicule, score, puissance dans le profil | rules.md §9 ; autres noms proposés : screens.md : gm_player_state_store | non précisé |
+| `0043d034` | `gm_objective_head_first` | 222 | 2 | remet en tête de liste les cibles du même objectif (radar) | rules.md §9 | non précisé |
+| `00443d3c` | `gm_spawn_explosion_00443d3c` | 121 | 2 | explosions et poussières (types 11000 à 11002) | rules.md §9 | non précisé |
+| `00443e00` | `gm_spawn_explosion_00443e00` | 121 | 0 | explosions et poussières (types 11000 à 11002) | rules.md §9 | non précisé |
+| `00443fe4` | `gm_spawn_explosion_00443fe4` | 107 | 2 | explosions et poussières (types 11000 à 11002) | rules.md §9 | non précisé |
+| `00449aa8` | `gm_vehicle_tick_00449aa8` | 39 | 0 | fonction de tick des véhicules (physique, collisions sol / eau) | rules.md §9 | probable |
+| `00449ad0` | `gm_vehicle_tick_00449ad0` | 39 | 0 | fonction de tick des véhicules (physique, collisions sol / eau) | rules.md §9 | probable |
+| `0044a1a0` | `gm_upd_bullet_tracking` | 302 | 0 | balle du canon : suivi | rules.md §9 | probable |
+| `0044a2d0` | `gm_upd_bullet` | 163 | 0 | balle du canon | rules.md §9 | probable |
+| `0044a374` | `gm_upd_bullet_right` | 188 | 0 | balle du canon (droite) | rules.md §9 | probable |
+| `0044a430` | `gm_upd_bullet_heavy` | 198 | 0 | balle du canon (lourde) | rules.md §9 | probable |
+| `0044a4f8` | `gm_upd_bullet_homing` | 990 | 0 | balle du canon (à tête chercheuse) | rules.md §9 | probable |
+| `00455124` | `gm_upd_missile_attached` | 105 | 0 | missile accroché au lanceur (copie cap, tangage, roulis du porteur) | rules.md §9 | probable |
+| `004551f0` | `gm_upd_missile_straight` | 135 | 0 | vol de l'arme 0 (virage 2) | rules.md §9 | probable |
+| `00455300` | `gm_upd_missile_class10` | 111 | 0 | vol à vitesse de classe 10 (7 000, virage 2) | rules.md §9 | probable |
+| `00455370` | `gm_upd_bomb_fly` | 874 | 0 | bombe : phase de vol | rules.md §9 | probable |
+| `004556dc` | `gm_upd_bomb_shockwave` | 954 | 0 | bombe : onde de choc de 40 / 60 ticks | rules.md §9 | probable |
+| `00455a98` | `gm_upd_cruise_missile` | 1440 | 0 | missile de croisière | rules.md §9 | probable |
+| `00456038` | `gm_upd_shield` | 172 | 0 | bouclier | rules.md §9 | probable |
+| `004560e4` | `gm_upd_buddy_lock` | 1377 | 0 | compagnon : verrouillage | rules.md §9 | probable |
+| `00456658` | `gm_upd_buddy_super` | 442 | 0 | compagnon : super | rules.md §9 | probable |
+| `00456abc` | `gm_upd_buddy_autofire` | 1189 | 0 | compagnon : tir auto | rules.md §9 | probable |
+| `00457074` | `gm_upd_mortar` | 778 | 0 | mortier | rules.md §9 | probable |
+| `0045754c` | `gm_upd_super_nova` | 566 | 0 | Super Nova | rules.md §9 | probable |
+| `00457784` | `gm_upd_napalm` | 280 | 0 | napalm | rules.md §9 | probable |
+| `00457abc` | `gm_upd_nucleator` | 269 | 0 | Nucléator | rules.md §9 | probable |
+| `00457bcc` | `gm_upd_super_napalm` | 381 | 0 | super napalm | rules.md §9 | probable |
+| `00458064` | `gm_upd_pod_dropped` | 138 | 0 | nacelle larguée | rules.md §9 | probable |
+| `004599b8` | `gm_player_aim_update` | 710 | 1 | tangage de visée '+0x90' (auto-aim vertical) | rules.md §9 | non précisé |
+| `00459c80` | `gm_player_weapon_update` | 688 | 1 | consommation des munitions, resélection, dispatch par véhicule | rules.md §9 | non précisé |
+| `00459f30` | `gm_special_weapon_ship0` | 16787 | 1 | armes spéciales de l'hélicoptère (véhicule 0) | rules.md §9 | non précisé |
+| `0045e128` | `gm_special_weapon_ship1_2` | 18513 | 1 | armes spéciales des véhicules 1 et 2 | rules.md §9 | non précisé |
+| `004629e4` | `gm_special_weapon_ship4_5` | 18513 | 1 | armes spéciales des véhicules 4 et 5 | rules.md §9 | non précisé |
+| `004672a0` | `gm_special_weapon_ship3` | 16813 | 1 | armes spéciales du véhicule 3 (et 43) | rules.md §9 | non précisé |
+| `0046b4b4` | `gm_primary_bullet_spawn` | 560 | 1 | crée un projectile du canon | rules.md §9 | non précisé |
 <!-- /GEN:keyfuncs -->
 
 ## Imports

@@ -571,7 +571,7 @@ export function createSticklersScene(services: MathServices): SticklersScene {
       });
 
       poly = new PolyHelper(STICKLERS_POLY, {
-        ports: createScrPolyPorts({ config: STICKLERS_POLY, scr, archive: polly, surface: screen, cursor: pointer.cursor, onDirty: () => c.requestPresent() }),
+        ports: createScrPolyPorts({ config: STICKLERS_POLY, scr, archive: polly, palette, surface: screen, cursor: pointer.cursor, onDirty: () => c.requestPresent() }),
         rng: c.rng,
         introFlag: rosterIntroFlag(c.roster, STICKLERS_POLY.introFlag),
         onClosed: closeHelp,

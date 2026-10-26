@@ -75,6 +75,7 @@ import {
 } from "../../src/games/mathemagique/game/poly-config";
 import { PolyHelper, createScrPolyPorts, rosterIntroFlag, type PolyAnimation, type PolyPorts } from "../../src/games/mathemagique/game/poly";
 import { Surface } from "../../src/games/mathemagique/engine/graphics/surface";
+import { Palette } from "../../src/games/mathemagique/engine/graphics/palette";
 import { Input } from "../../src/games/mathemagique/engine/input";
 import { PointerService } from "../../src/games/mathemagique/engine/pointer";
 import { Archive } from "../../src/games/mathemagique/engine/resources";
@@ -1451,6 +1452,18 @@ real("Poly : ports réels (ScrPlayer, POLLY.DAT)", () => {
     tick();
     tick();
     expect(poly.phase).toBe("listening");
+  });
+
+  it("à l'ouverture, ses couleurs (SHPL 25000, entrées 226–241) sont chargées : elle n'emprunte pas les gris de la scène", () => {
+    const { archive, scr, surface } = setup();
+    const palette = new Palette();
+    for (let i = 226; i < 242; i++) palette.setColor(i, 90, 90, 90);
+    const ports = createScrPolyPorts({ config: HIDDEN_POLY, scr, archive, palette, surface });
+    const expected = new Palette();
+    expected.loadShpl(archive.shpl(25000));
+    ports.begin?.();
+    expect(palette.snapshot(226, 16)).toEqual(expected.snapshot(226, 16));
+    expect(palette.snapshot(226, 16)).not.toEqual(new Uint8Array(48).fill(90));
   });
 
   it("sa voix est jouée sur le canal voix pendant la présentation", () => {

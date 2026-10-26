@@ -182,6 +182,7 @@ class HiddenSceneImpl implements HiddenScene {
         config: HIDDEN_POLY,
         scr: services.scr,
         archive: this.polly,
+        palette: services.graphics.palette,
         surface: screen,
         cursor: services.pointer.cursor,
         onDirty: () => ctx.requestPresent(),

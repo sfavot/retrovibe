@@ -191,6 +191,7 @@ export class PatternsScene implements Scene {
         config: PATTERNS_POLY,
         scr,
         archive: this.polyArchive,
+        palette: graphics.palette,
         surface: graphics.screen,
         cursor: pointer.cursor,
         onDirty: () => ctx.requestPresent(),

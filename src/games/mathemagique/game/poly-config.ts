@@ -97,6 +97,12 @@ export interface PolyConfig {
   after: number | null;
   /** Ticks sans clic ni survol après la présentation courte avant de rejouer la longue (300 partout). */
   idleTicks: number;
+  /**
+   * `SHPL` de l'archive d'aide qui porte les couleurs de Poly, chargée à l'ouverture de l'aide (`1090:1024` charge la `SHPL` du descripteur, dont
+   * `10a8:0640` applique la palette, engine.md §3.8) : 20000 / 25000 / 30000 / 35000 de `POLLY.DAT`, entrées 226–241, que les décors n'utilisent pas.
+   * `null` : la scène charge elle-même sa « Poly Palette » (`SHPL` 999 de `PATFILL.DAT`, `NIM.DAT`, `RSHELP.DAT`).
+   */
+  paletteShpl: number | null;
   /** Zone qui sauvegarde / restaure le fond sous les animations de Poly `(gauche, haut, droite, bas)` ; `null` : non documentée. */
   backgroundZone: readonly [number, number, number, number] | null;
   /** Zone cliquable de Poly (aide), `(gauche, haut, droite, bas)` ; `null` : table propre à la scène. */
@@ -149,6 +155,7 @@ export const HIDDEN_POLY: PolyConfig = {
   before: 25150,
   after: 25200,
   idleTicks: 300,
+  paletteShpl: 25000,
   backgroundZone: [219, 274, 576, 432],
   polyZone: [311, 280, 388, 432],
   // hidden.md §3.7 : pièces 25700 ; télé 25850 si le menu est affiché, sinon 25650.
@@ -171,6 +178,7 @@ export const PATTERNS_POLY: PolyConfig = {
   before: 35150,
   after: 35200,
   idleTicks: 300,
+  paletteShpl: 35000,
   backgroundZone: [269, 274, 576, 432],
   polyZone: [362, 280, 438, 432],
   // patterns.md §3.8 : pièces 35650 ; cadre 35850 si le menu est affiché (`3200 & 1 = 0`), sinon 35700. (35900 existe dans l'archive, sans emploi documenté.)
@@ -192,6 +200,7 @@ export const STICKLERS_POLY: PolyConfig = {
   before: 30150,
   after: 30200,
   idleTicks: 300,
+  paletteShpl: 30000,
   backgroundZone: [238, 269, 576, 432],
   polyZone: [311, 280, 388, 432],
   // sticklers.md §5.4 : fragment 30900, niveaux 30650, Help 30600, Reset 30750, Rotate 30800, Exit 30500, chevalet 30850 (menu) ou 30550.
@@ -226,6 +235,7 @@ export const BOWLING_POLY: PolyConfig = {
   before: 20150,
   after: 20200,
   idleTicks: 300,
+  paletteShpl: 20000,
   backgroundZone: null,
   polyZone: null,
   topics: Object.fromEntries(
@@ -252,6 +262,7 @@ export const PATTERN_WINDOWS_POLY: PolyConfig = {
   before: 2300,
   after: null,
   idleTicks: 300,
+  paletteShpl: null,
   backgroundZone: [248, 273, 576, 432],
   polyZone: [317, 280, 388, 432],
   topics: {
@@ -297,6 +308,7 @@ export const ROCKETS_POLY: PolyConfig = {
   before: null,
   after: null,
   idleTicks: 300,
+  paletteShpl: null,
   backgroundZone: null,
   polyZone: [472, 139, 527, 432],
   topics: {

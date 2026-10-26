@@ -333,6 +333,7 @@ export class BowlingScene implements Scene {
         config: BOWLING_POLY,
         scr,
         archive: ctx.resources.require(BOWLING_POLY.archive),
+        palette: graphics.palette,
         surface: screen,
         cursor: pointer.cursor,
         onDirty: () => ctx.requestPresent(),

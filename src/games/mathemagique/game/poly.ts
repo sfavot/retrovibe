@@ -17,6 +17,7 @@
 import type { Archive, Resources } from "../engine/resources";
 import { SCR_FLAG, type ScrArchive, type ScrPlayer } from "../engine/scr-player";
 import { Surface, type Rect, type SavedRect } from "../engine/graphics/surface";
+import type { Palette } from "../engine/graphics/palette";
 import type { CursorController } from "../engine/pointer";
 import type { RosterState, RosterFieldName } from "../engine/roster";
 import { NoRepeatPool, type MsvcRandom } from "../engine/rng";
@@ -312,6 +313,8 @@ export interface ScrPolyPortsDeps {
   scr: ScrPlayer;
   /** L'archive d'aide ouverte (`Archive` convient), ou l'archive de chaque script (Rhythm Shop : la zone Algebird est dans `RHYTHM.DAT`). */
   archive: ScrArchive | ((scr: number) => ScrArchive);
+  /** Palette de la scène : la `SHPL` `config.paletteShpl` (couleurs de Poly) y est chargée à l'ouverture. */
+  palette?: Palette;
   /** Surface de jeu : le fond de `config.backgroundZone` y est sauvegardé à l'ouverture et rétabli à la fermeture. */
   surface: Surface;
   /** Contrôleur de curseur du pointeur (`pointer.cursor`) pour le « ? » du mode aide. */
@@ -362,6 +365,10 @@ export function createScrPolyPorts(deps: ScrPolyPortsDeps): PolyPorts {
       };
     },
     begin() {
+      if (config.paletteShpl !== null && deps.palette) {
+        deps.palette.loadShpl((typeof archive === "function" ? archive(config.paletteShpl) : archive).shpl(config.paletteShpl));
+        deps.onDirty?.();
+      }
       if (config.backgroundZone) {
         const [left, top, right, bottom] = config.backgroundZone;
         zone = { x: left, y: top, w: right - left, h: bottom - top };

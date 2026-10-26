@@ -88,7 +88,7 @@ describe.skipIf(!hasOriginalFiles)("Smacker : vidéos de SWIV 3D (fichiers du je
     const a = Array.from({ length: 20 }, () => decoder.nextFrame()!.pixels);
     decoder.reset();
     expect(decoder.position).toBe(0);
-    const b = Array.from({ length: 20 }, () => decoder.nextFrame()!.pixels);
-    expect(b).toEqual(a);
+    // Comparaison par Buffer : `toEqual` sur 20 images de 128 000 octets dépasse le délai quand toute la suite tourne.
+    for (const pixels of a) expect(Buffer.from(decoder.nextFrame()!.pixels).equals(Buffer.from(pixels))).toBe(true);
   });
 });

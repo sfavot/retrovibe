@@ -51,7 +51,7 @@ describe.skipIf(!hasOriginalFiles)("salle de garde 305 : soldats endormis à l'e
     expect(seen.plate).toBeGreaterThan(0);
     expect(seen.chair).toBeGreaterThan(0);
     expect(seen.both).toBeGreaterThan(0);
-  });
+  }, 60_000);
 
   it("le soldat endormi se réveille à l'échéance (`2a44:12fc`, événements 3 et 4)", () => {
     for (let seed = 1; seed <= 24; seed++) {

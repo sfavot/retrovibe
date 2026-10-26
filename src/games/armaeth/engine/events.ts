@@ -19,7 +19,7 @@ export const MAX_COUNTER = 0xffff;
 /** Opérations de `23a2:0002`. */
 export const EventOp = {
   Remove: -1,
-  /** Crée l'entrée si absente (compteur 0) et la lit. */
+  /** Crée l'entrée si absente (compteur = valeur passée, `23a2:01a4..01aa`) et la lit ; une entrée existante n'est pas modifiée. */
   Get: 0,
   Add: 1,
   Subtract: 2,
@@ -63,6 +63,7 @@ export class DeferredEventQueue {
    */
   operate(target: EventTarget, event: number, op: EventOpCode, value = 0, handlerKey: HandlerKey = 0): number | undefined {
     let entry = this.find(target, event);
+    let created = false;
     if (op === EventOp.Remove) {
       if (entry) this.entries.splice(this.entries.indexOf(entry), 1);
       return undefined;
@@ -70,9 +71,11 @@ export class DeferredEventQueue {
     if (!entry) {
       if (op === EventOp.Subtract || op === EventOp.Other) return undefined;
       if (this.entries.length >= this.capacity) return undefined;
-      entry = { typ: target.typ, num: target.num, serial: target.serial, event, counter: 0, procedure: handlerKey };
+      entry = { typ: target.typ, num: target.num, serial: target.serial, event, counter: value & 0xffff, procedure: handlerKey };
       this.entries.push(entry);
+      created = true; // `23a2:01a4` : toute création écrit la valeur passée comme compteur (et le rend), quelle que soit l'opération
     }
+    if (created) return entry.counter;
     if (op === EventOp.Add) entry.counter = Math.min(MAX_COUNTER, entry.counter + value);
     else if (op === EventOp.Subtract) entry.counter = Math.max(0, entry.counter - value);
     else if (op === EventOp.Set) entry.counter = value & 0xffff;

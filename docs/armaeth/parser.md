@@ -124,10 +124,10 @@ Entrée : un mot normalisé ; sortie : jusqu'à **60** codes `u16` (`code = clas
 
 - Longueur significative `N = DGROUP:4b4c` (octet bas du mot 3 de l'en-tête du monde : **8** à l'état initial, sauvegardé avec la partie) : arrondi au pair supérieur, borné à **[4, 16]**. Modifiable par la commande `dictionnaire nn` (§9).
 - Comparaison `strncmp(mot, entrée, N)` : deux mots sont égaux s'ils ont les mêmes `N` premiers octets **ou s'ils sont entièrement égaux** s'ils sont plus courts que `N` (le NUL est comparé). Un mot plus court que `N` qui n'est que le début d'un mot du dictionnaire **ne correspond pas** (`prend` ≠ `prendre`, `prends` ≠ `prendre` ; seul l'infinitif est dans le dictionnaire).
-- Recherche dichotomique (démarre sur le dernier élément) puis balayage des voisins vers le bas puis vers le haut tant que le préfixe correspond, dans la limite de 60 codes. Doublons de codes supprimés (le doublon est remplacé par le dernier code du tableau : **l'ordre n'est pas conservé**).
+- Recherche dichotomique (`lo = 0`, `hi = mid = n - 1`, `mid = (lo + hi) / 2`, arrêt quand `mid` ne change plus) ; si le mot du milieu correspond, son code est rangé en premier, puis le balayage parcourt **tous** les autres mots, sans s'arrêter au premier écart : vers le bas (`mid - 1` à 0) puis vers le haut (`mid + 1` à `n - 1`), dans la limite de 60 codes. Doublons de codes supprimés (le doublon est remplacé par le dernier code du tableau : **l'ordre n'est pas conservé**). Les sens de « clef » sortent ainsi dans l'ordre [108, 22, 6, 109, 331].
 - Si rien n'est trouvé et que le mot finit par `s` ou `x`, cette lettre est supprimée **dans le mot** et on recommence (jusqu'à épuisement des `s`/`x` finaux). Aucune autre règle de pluriel ou de conjugaison.
 - Le dictionnaire est lu une fois (`gm_load_dic` `1dd4:002a`) : mots en `7b6c`, codes en `7b68`.
-- `lookupWord` (`dictionary.ts`) reproduit ces règles ; seul l'ordre des codes diffère (sans conséquence : les candidats sont triés ensuite, §6.2).
+- `lookupWord` (`dictionary.ts`) reproduit ces règles, ordre des codes compris.
 
 ### 4.2 Classes (`code / 1000`) : rôle de chacune
 

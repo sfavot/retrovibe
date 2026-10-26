@@ -11,6 +11,9 @@ describe("file d'événements différés", () => {
     expect(q.operate(a, 1, EventOp.Other)).toBeUndefined();
     expect(q.size).toBe(0);
     expect(q.operate(a, 1, EventOp.Get, 0, 5)).toBe(0);
+    expect(q.operate(a, 2, EventOp.Get, 9, 5)).toBe(9); // `23a2:01a4` : la création écrit la valeur passée, même pour la lecture
+    expect(q.operate(a, 2, EventOp.Get, 4, 5)).toBe(9); // une entrée existante n'est pas modifiée
+    q.operate(a, 2, EventOp.Remove);
     expect(q.operate(a, 1, EventOp.Add, 3)).toBe(3);
     expect(q.operate(a, 1, EventOp.Add, 0xffff)).toBe(0xffff);
     expect(q.operate(a, 1, EventOp.Subtract, 0xfffff)).toBe(0);

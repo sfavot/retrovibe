@@ -93,10 +93,27 @@ export function parseDictionary(bytes: Uint8Array): DictionaryEntry[] {
   return entries;
 }
 
+/** `strncmp(mot, entrée, n)` : octets comparés jusqu'au premier NUL commun ; un mot plus court se termine par un NUL implicite. */
+function strncmp(a: string, b: string, n: number): number {
+  for (let i = 0; i < n; i++) {
+    const x = i < a.length ? a.charCodeAt(i) : 0;
+    const y = i < b.length ? b.charCodeAt(i) : 0;
+    if (x !== y) return x - y;
+    if (x === 0) return 0;
+  }
+  return 0;
+}
+
+/** Maximum de codes rendus par `gm_dic_lookup` (tableau de pile de 60 mots). */
+const MAX_CODES = 60;
+
 /**
- * Recherche de `gm_dic_lookup` (`1dd4:0156`) : tous les mots dont les `letters` premières lettres
- * (arrondi au pair, entre 4 et 16) sont celles du mot saisi ; si rien ne correspond et que le mot se
- * termine par `s` ou `x`, la recherche est refaite sans cette lettre. Les codes sont dédoublonnés.
+ * Recherche de `gm_dic_lookup` (`1dd4:0156`, désassemblé, `parser.md` § 4.1) : sur les `letters` premières lettres (arrondies au pair,
+ * entre 4 et 16), dichotomie qui démarre sur le dernier mot (`lo = 0`, `hi = mid = n - 1`, `mid = (lo + hi) / 2`, arrêt quand `mid` ne
+ * change plus). Si le mot du milieu correspond, son code est rangé en premier, puis le balayage parcourt **tous** les autres mots (sans
+ * s'arrêter au premier écart) : d'abord vers le bas (`mid - 1` à 0), puis vers le haut (`mid + 1` à `n - 1`), dans la limite de 60 codes.
+ * Les doublons sont ensuite retirés : pour chaque code gardé, le doublon est remplacé par le dernier code du tableau (l'ordre n'est donc
+ * pas celui du fichier). Si rien ne correspond et que le mot finit par `s` ou `x`, la lettre est supprimée et la recherche refaite.
  * Le mot doit déjà être en minuscules et sans accent (voir `normalizeText`).
  */
 export function lookupWord(
@@ -105,14 +122,41 @@ export function lookupWord(
   letters = DEFAULT_SIGNIFICANT_LETTERS,
 ): number[] {
   const n = Math.min(16, Math.max(4, letters + (letters & 1)));
+  const count = entries.length;
   let word = input;
   for (;;) {
-    const prefix = word.slice(0, n);
-    const codes = new Set<number>();
-    for (const entry of entries) if (entry.word.slice(0, n) === prefix) codes.add(entry.code);
-    if (codes.size > 0 || word.length === 0) return [...codes];
+    const out: number[] = [];
+    if (count > 0) {
+      let lo = 0;
+      let hi = count - 1;
+      let mid = count - 1;
+      for (;;) {
+        const cmp = strncmp(word, entries[mid]!.word, n);
+        if (cmp === 0) {
+          out.push(entries[mid]!.code);
+          for (let i = mid - 1; i >= 0 && out.length < MAX_CODES; i--) if (strncmp(word, entries[i]!.word, n) === 0) out.push(entries[i]!.code);
+          for (let i = mid + 1; i < count && out.length < MAX_CODES; i++) if (strncmp(word, entries[i]!.word, n) === 0) out.push(entries[i]!.code);
+          break;
+        }
+        if (cmp < 0) hi = mid;
+        else lo = mid;
+        const next = (hi + lo) >> 1;
+        if (next === mid) break;
+        mid = next;
+      }
+    }
+    // dédoublonnage de `1dd4:02a0` : le doublon cède sa place au dernier code du tableau
+    for (let i = 0; i < out.length; i++) {
+      for (let j = i + 1; j < out.length; j++) {
+        if (out[j] !== out[i]) continue;
+        const last = out.pop()!;
+        if (j < out.length) out[j] = last;
+        j--;
+      }
+    }
+    if (out.length > 0 || word.length === 0) return out;
     const last = word[word.length - 1];
-    if (last !== "s" && last !== "x") return [];
+    if (last !== "s" && last !== "x") return out;
     word = word.slice(0, -1);
   }
 }

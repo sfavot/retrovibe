@@ -43,6 +43,29 @@ describe("dictionnaire : fonctions pures", () => {
   });
 });
 
+describe("ordre des codes de `gm_dic_lookup` (1dd4:0156)", () => {
+  const entry = (code: number) => ({ code, word: "mot" });
+  const filler = (word: string, code: number) => ({ code, word });
+
+  it("le mot du milieu de la dichotomie d'abord, puis le balayage vers le bas, puis vers le haut", () => {
+    // 7 mots : mid = 6, hi = 6 -> comparaison avec le dernier (« zzz » > « mot ») : lo = 6 ... puis (6+6)/2 : la dichotomie s'arrête
+    // sur le dernier mot seulement s'il correspond ; ici le mot cherché est avant lui : hi = 6, lo = 0 -> mid = 3
+    const entries = [filler("a", 1), filler("b", 2), entry(10), entry(11), entry(12), entry(13), filler("zzz", 3)];
+    expect(lookupWord(entries, "mot")).toEqual([11, 10, 12, 13]);
+  });
+
+  it("doublon remplacé par le dernier code du tableau", () => {
+    const entries = [filler("a", 1), entry(10), entry(11), entry(10), entry(12), filler("z", 2)];
+    // mid : 5 -> (0+5)>>1 = 2 : 11 ; bas : 10 ; haut : 10, 12 -> [11, 10, 10, 12] -> doublon (indice 2) cède la place à 12
+    expect(lookupWord(entries, "mot")).toEqual([11, 10, 12]);
+  });
+
+  it("s'arrête à 60 codes", () => {
+    const entries = Array.from({ length: 100 }, (_, i) => entry(i + 1));
+    expect(lookupWord(entries, "mot")).toHaveLength(60);
+  });
+});
+
 describe.skipIf(!hasOriginalFiles)("dictionnaire d'Armaeth (fichiers du jeu)", () => {
   const entries = parseDictionary(readOriginal("A1FDIC.SYS"));
   const messages = new MessageTable(readOriginal("A1FTMS.SYS"), readOriginal("A1FMSG.SYS"));
@@ -68,6 +91,10 @@ describe.skipIf(!hasOriginalFiles)("dictionnaire d'Armaeth (fichiers du jeu)", (
       if ([4, 9, 15, 22].includes(wordClass(e.code))) expect(messages.has(e.code), e.word).toBe(true);
     }
     expect(messages.messages(4003)).toMatch(/abeilles/);
+  });
+
+  it("« clef » : sens dans l'ordre de l'original (108, 22, 6, 109, 331), sous DOSBox-X", () => {
+    expect(lookupWord(entries, "clef").map((c) => c % 1000)).toEqual([108, 22, 6, 109, 331]);
   });
 
   it("retrouve les synonymes et le pluriel", () => {

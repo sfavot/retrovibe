@@ -152,10 +152,11 @@ describe("remplissage des emplacements (§ 5)", () => {
   });
 
   it("un mot à la fois préposition et verbe : le premier code libre l'emporte et le mot est consommé", () => {
-    // « devant » : préposition 5 (premier code dans l'ordre du dictionnaire), les autres sens sont perdus.
+    // « devant » : dans l'ordre de `gm_dic_lookup` (dichotomie, puis balayage vers le bas et vers le haut) le mot du milieu passe d'abord ;
+    // ce dictionnaire d'essai en compte 3 : [22040, 1005, 15300], le verbe prend l'emplacement et les autres sens sont perdus.
     const p = parse("devant");
-    expect(p.preposition).toBe(5);
-    expect(p.verb).toBe(0);
+    expect(p.verb).toBe(22040);
+    expect(p.preposition).toBe(0);
     expect(p.direct).toEqual([]);
   });
 

@@ -113,7 +113,7 @@ Le joueur est un **objet de 0x228 octets** (20 emplacements à `005a936c`, point
 | 4 | 991 | `0043ac64` | `00445a84` | 5001 | véhicule nerveux (poussée 210 par touche, frottement 61/64, gravité 120, pas de roues) |
 | 5 | 980 (`0x3d4`) | `0043b0ac` | `00445f44` | 5002 | aéroglisseur : modèle 980 à terre, 982 (`0x3d6`) sur l'eau, ne souffre pas de l'eau |
 | `0x2a` | 990 | `00438678` (vide) | `00449af8` | | **pilote de démonstration** (départ de type 1001, `DEMO.SLV`), voir §3.10 |
-| `0x2b` | 990 | `00438744` | `00449bc8` | 5002 | séquence de mort / fin (démarrage de type 1002) |
+| `0x2b` | 990 | `00438744` | `00449bc8` | 5002 | départ scripté de type 1002 (§3.12) : `+0xa4` vaut ensuite 3 ; aucun niveau livré ne l'utilise |
 | `0x63` (99) | 0 | `00438678` (vide) | `00441630` | | joueur réseau inactif |
 
 Déclencheurs : la forme initiale vient de `[004841c0]+0x38` (variable de mission) ; les passages 0 → 1/2/4/5 et le retour à 0 sont faits **par des objets bonus/boîtes** (fonctions `004484xx`, `004492xx`, `00449854` → `FUN_0043de0c(joueur, n)`), et par le menu de triche `gm_menu_pickups`. À documenter avec R2/R3.
@@ -144,7 +144,7 @@ sinon :
         si touche[tournerD] { dCap += 0x258 ; dRoulis += 0xc8 }
 ```
 
-Les boutons : touches `2..11` (`0x490018 + 4i`, chiffres 1 à 0) → `FUN_004582dc(P, i)` (sélection directe de l'arme `i`, la touche est effacée) ; touche « Select Up » (`+0xd8`) → `FUN_004582dc(P, -1)` (suivante), « Select Down » (`+0xdc`) → `(-2)` (précédente), touches effacées après usage ; molette `004841b8` (cumulée par `WM_MOUSEWHEEL`/message « MSWHEEL_ROLLMSG », pas de 120) : `<= -120` → `+= 120` et arme suivante, `>= 120` → `-= 120` et arme précédente ; tir spécial (`+0xd4`) → `FUN_00458590` (passe `+0x178` de 10 à 11) ; tir principal (`+0xd0`) → `FUN_0046b6fc` (6,8 Ko, armes : R3) et `+0xa0 = état de la touche` ; `+0x94 = cap`. **Assistance en altitude** : si la cible `+0x58` n'est pas soi-même et `P.y < cible.y` alors `P.y += 100` (Q8, 0,39 unité par tick).
+Les boutons : touches `2..11` (`0x490018 + 4i`, chiffres 1 à 0) → `FUN_004582dc(P, i)` (sélection directe de l'arme `i`, la touche est effacée) ; touche « Select Up » (`+0xd8`) → `FUN_004582dc(P, -1)` (suivante), « Select Down » (`+0xdc`) → `(-2)` (précédente), touches effacées après usage ; molette `004841b8` (cumulée par `WM_MOUSEWHEEL`/message « MSWHEEL_ROLLMSG », pas de 120) : `<= -120` → `+= 120` et arme suivante, `>= 120` → `-= 120` et arme précédente ; tir spécial (`+0xd4`) → `FUN_00458590` (passe `+0x178` de 10 à 11) ; `+0x94 = cap` ; tir principal (`+0xd0`) → `FUN_0046b6fc` (6,8 Ko, armes : R3, les balles partent aussitôt au cap `+0x94`) et `+0xa0 = état de la touche`. Tout cela précède l'intégration des angles : **le canon tire au cap du début du tick** (celui du tick précédent), pas à celui que le virage du tick vient de donner [confirmé ; porté : `heliPilot`]. **Assistance en altitude** (encore avant l'intégration, donc avant le plafond) : si la cible `+0x58` n'est pas soi-même et `P.y < cible.y` alors `P.y += 100` (Q8, 0,39 unité par tick) ; après le plafond, si `cible.y − P.y > 15 000`, `vy = vy × 14/16 + 40`.
 
 Intégration (même tick) :
 
@@ -200,7 +200,7 @@ poussée : axe : += ax*0x104 >> 8 ; sinon avancer += pas, reculer -= pas (pas 0x
 frein (clavier) : avancer+reculer, ou « frein », ou « latéral gauche » (formes 1, 4, 5 ; pas la 2) → état = 1
 frein (axe) : « frein » si état == 0 (forme 2 : toujours)
 puis, APRÈS les armes, si état != 1 : avancer += pas, reculer -= pas   // une touche tenue vaut donc 2 pas (0x104) sans frein
-+0x94 = cap tant que « latéral droit » n'est pas tenu (cap de tir des projectiles)
++0x94 = cap tant que « latéral droit » n'est pas tenu (cap de tir des projectiles) : APRÈS le tir (`gm_fire_primary` le lit), qui part donc au cap du tick précédent
 formes 1, 2 : si vx*SIN[cap] + COS[cap]*vz < -7000 (marche arrière) : cible = -cible ; puis b0 → b4 par pas de 4 ; roues enfants (§3.6)
 ```
 
@@ -253,7 +253,7 @@ sinon :
   modèle 0x3d4 ; mode 3 : cap += braquage ; mode 4 : cap −= braquage >> 1
 ```
 
-- **Appelants** : forme 1 (`0043a174`) modes 3, 3, 4, 4 ; forme 2 (`0043a760`) modes 1, 1, 2 ; pilote coupé `gm_pilot_wheels` (`00438694`, amarrage au sol par `004482dc`, Super Ressort des formes 1 et 2 par `0045e128`) : braquage vers la cible par pas de **8**, modes 3, 3, 4, 4 sur les **4** pointeurs (la motoneige y passe son ski en roue `0x3d4` et l'exe écrit un 4ᵉ pointeur resté de la forme 1 : ignoré dans le port) ; variante `00438c68` (modes 1, 1, 2, installée par `004495f8`, non porté) ; fins de niveau `00438ec8` / `00438fb8` (non portées). Le pilote de la forme 1 fait en plus tourner les roues arrière à chaque pas de poussée : touche avancer `−13` sur `+0x1b0` et `+0x1b4` (reculer `+13`), deux fois sans frein ; axe : `−axe·30 >> 8` sur `+0x1b0` seule.
+- **Appelants** : forme 1 (`0043a174`) modes 3, 3, 4, 4 ; forme 2 (`0043a760`) modes 1, 1, 2 ; pilote coupé `gm_pilot_wheels` (`00438694`, amarrage au sol par `004482dc`, Super Ressort des formes 1 et 2 par `0045e128`) : braquage vers la cible par pas de **8**, modes 3, 3, 4, 4 sur les **4** pointeurs (la motoneige y passe son ski en roue `0x3d4` et l'exe écrit un 4ᵉ pointeur resté de la forme 1 : ignoré dans le port) ; variante `00438c68` (braquage par pas de 8, modes 1, 1, 2), installée par `004495f8` = plates-formes 7012 et 7013, absentes des niveaux livrés : non portée ; fins de niveau `00438ec8` / `00438fb8` (§3.11, portées). Le pilote de la forme 1 fait en plus tourner les roues arrière à chaque pas de poussée : touche avancer `−13` sur `+0x1b0` et `+0x1b4` (reculer `+13`), deux fois sans frein ; axe : `−axe·30 >> 8` sur `+0x1b0` seule.
 - **Mort** (`0043b4f4`, formes 1 et 2) : après les explosions et les éclats du joueur, chaque roue devient un gros éclat (`0044412c`), vitesse `(x, |y|, z)·9` de la table pseudo-aléatoire, cap = `x` du tirage suivant, modèle `0x3d4`.
 - Rendu : 980 et 982 sont dans les `.SLV` livrés (blocs 10980, 10982) ; **983 (ski) n'est ni dans les `.SLV` ni dans `GLOBAL.BD`** : le port ne dessine pas le ski (aucune mission livrée ne donne la motoneige) ; ce que fait l'exe d'un modèle absent n'est pas lu.
 
@@ -261,7 +261,7 @@ sinon :
 
 - **Terrain** : l'hélicoptère rebondit et perd 10 PV (§3.4). Les véhicules sont posés par les 4 contacts (§3.6) ; PV −1 par tick quand le type de sol `00577664` est < 4 (−2 pour la forme 4, 0 pour la forme 5) : ce sont les cases d'eau de la carte 102 [confirmé par le code].
 - **Objets** (`FUN_0042a084`, cellules à l'état 0 seulement, hors réseau) : pour chaque paire (A, B) dont l'un a le drapeau `+4 & 2`, ni B fantôme (`+4 & 0x40`) ni liés par `+0x5c`, `d² = Σ((Δ >> 8)²)` en unités ; **collision si `d² <= rayon²(A) + rayon²(B)`** avec `rayon² = bloc de modèle +0xc` (100 si type 0 ou ≥ 10 000, `FUN_0042a010`). Normale : `FUN_00415374` (normalise `Δ >> 4`). Si les deux n'ont que le drapeau 2 (physique pure) : poussée `v += ∓4·n`. Sinon : dégâts **`min(PV_A, PV_B, 100)` retirés aux deux** (sauf drapeau `+6 & 4` « invulnérable »), drapeaux `+6 |= 0x102` (« touché »), `+0x58` = propriétaire de l'autre, recul `v += ∓8·n`.
-- **Mort** : voir `FUN_0043c234` : forme `0x2b`/`0x2a` après la séquence `00438744` (chrono `+0x50` jusqu'à 0x3e8 ; objets 0xe1 explosion à chaque tick entre 0xaa et 0x258, caméra figée à 0x17c, etc.). Détails à fusionner avec R3.
+- **Mort** : `energie < 1` testé par `FUN_0043c234` après le pilote, puis `gm_player_die` (§3.11). `00438744` n'est pas une séquence de mort (§3.12).
 
 ### 3.8 Re-visée (cible verrouillée) `FUN_00438198` [probable]
 
@@ -282,6 +282,38 @@ gm_aircraft_turn_to_point(obj, 0x19, x_nœud, z_nœud)   // bascule bornée à 2
 si (Δx² + Δz²) < 10000 (unités) : FUN_00442c90          // nœud suivant
 ```
 `FUN_00442c90` prend le **dernier** lien non vide du nœud courant, efface dans ce nœud les liens qui reviennent vers l'ancien (le circuit ne se parcourt que dans un sens), rend l'ancien nœud (capacité aérienne +1) et réserve le nouveau. Sur `DEMO.SLV` l'appareil boucle en ≈ 2 200 ticks à ≈ 2 900 Q8/tick, tangage ≈ −25, sans dégât ; les entrées sont ignorées.
+
+### 3.11 Fin de niveau et mort : pilotes automatiques [confirmé, porté]
+
+Ordre dans `gm_game_tick` pour le joueur : pilote `+0xa8`, armes `gm_player_weapon_update` (sauf état `005b0414 == 2`), séquences de fin, re-visée, objets accrochés, test de mort, jauge.
+
+- **Victoire** (état 1, compteur `005b03e8` parti de 0) : au tick 25, après les armes, `gm_player_victory_mode` (`0043c07c`) remplace le pilote selon `+0xa4` et, **pour les formes 0 à 3 seulement**, pose `+0x18 = 0` (âge, relance la re-visée) et `+0x04 = 0x40` (dword entier : classe fantôme, drapeaux `+6` effacés ; le modèle reste dessiné) ; pour **toutes** les formes `+0x184 = 0`. Les formes 4 et 5 n'ont pas de cas dans le `switch` : elles gardent leur pilote **et les commandes** jusqu'à la sortie (tick 55), puis derrière l'écran de fin. Là, `gm_menu_run` vide la table des touches (`gm_clear_keys`) à chaque image avant que `gm_poll_events` ne joue les ticks : le clavier et les boutons de souris n'arrivent plus au pilote, mais la manette (type 5 : boutons et axes relus par `joyGetPosEx` au début de chaque `gm_poll_events`), les axes de la souris (type 2) et la molette (`004841b8`, non remise à 0) si. Port : `gameplay.ts` (`victoryMode`), `Player.victory` ; derrière l'écran de fin, `Controls.releaseKeys` à chaque image (`ui/level-session.ts`) ; la souris n'y est pas lue, le pointeur n'étant plus verrouillé.
+  - Formes 0 (`00438d08`) et 3 (`00438de8`, octet pour octet identique) : intentions remises à 0 puis tangage `+= 0x4b0` (« avancer ») ; accumulateurs `+0x214 += 0`, `+0x218 −= 0x4b0`, `+0x21c += 0`, angles `cap = +0x214 >> 8`, `tangage = +0x218 >> 8`, `roulis = +0x21c >> 7`, puis amortissement 14/16 de `+0x218` et `+0x21c`. Ni virage, ni plafond, ni aide à la montée, ni tir, ni `+0x98++` : l'appareil file droit devant au cap qu'il avait (tangage d'équilibre ≈ −38 après le pilote). Port : `heliVictoryPilot` (`player.ts`).
+  - Forme 1 (`00438ec8`) : `+0x50` 1 → 0 (frein relâché), `cap −= 4`, `+0x74 += 0x82` (poussée), `+0x1b0.tangage −= 13` et `+0x1b4.tangage −= 13` (roues arrière), braquage `+0xb0` vers `+0xb4` (dernière cible, non remise à 0) par pas de **8**, `004841bc = +0xb0`, `gm_wheel_update` modes 3, 3, 4, 4. Le buggy tourne en rond à gauche. Forme 2 (`00438fb8`) : idem avec un seul coup de −13 sur `+0x1b0` (le ski, dont le tangage est aussitôt recopié du corps) et les modes 1, 1, 2. Port : `vehicleVictoryPilot` (`vehicle.ts`), `playerWheelsTick` (`wheels.ts`).
+  - Au tick 55 (`0x37`) : `00480a9c = 0x2a`, la boucle de niveau rend la main à l'écran « Mission accomplie », derrière lequel le monde (et ce pilote) continue de tourner (`screens.md` §9).
+- **Mort** (`gm_player_die`, `0043b4f4`, solo seulement) : `+0x04 = 0x40` (dword), puis selon la forme : pilote `gm_pilot_none`, explosion `00443d3c`, éclats `004442ec`, fumée `00443fe4`, âge 0, modèle 0, arrêt de la boucle sonore (5000, 5001 ou 5002) ; formes 1 et 2 : les roues partent en gros éclats (§3.6) ; tangage et roulis à 0. Ensuite pour toutes : `+0x184 = 0`, vitesse nulle, physique `0043863c` (vitesse remise à 0 à chaque tick), emplacements de compagnons `+0x1f8…+0x20c` vidés (les compagnons ne meurent pas : ils restent sur place, suivent la vitesse nulle du joueur et tirent encore), le bouclier `+0x210` n'est pas touché (il disparaît seul quand l'énergie du joueur vaut exactement 0, `gm_upd_shield`), les lanceurs d'armes spéciales encore référencés (`+0x19c`, `+0x1a0`, `+0x1a4`, `+0x1cc…+0x1f0`, pointeurs jamais remis à 0 après un tir) deviennent des gros éclats `0044412c` (même tirage × 9, modèle inchangé), message « Game over ! » (`20/10`), `005b0414 = 2`, `005b03e8 = 0`. Plus d'armes ni de re-visée utile ; au tick 35 `00480a9c = 0x34` (écran « Game over »). Port : `playerDie` (`gameplay.ts`).
+
+### 3.12 Départ scripté de type 1002 (`00438744`) [confirmé, non porté]
+
+`gm_level_spawn_objects` crée le joueur du type 1002 avec `gm_player_set_form(0x2b)` : type 990, classe `0x217`, physique `00449bc8`, pilote `00438744`, accumulateurs recalés, boucle sonore 5002, `+0x128++`, `+0x154++`, arme 0, puis **`+0xa4 = 3`** (la forme lue ensuite par les armes est celle de l'hélicoptère 3). Ce n'est **pas** une séquence de mort : c'est une introduction scriptée sur le compteur `+0x50` (le pilote l'incrémente à chaque tick) :
+
+| `+0x50` | Action |
+|---|---|
+| < 30 | caméra `00480e80 = 0`, tangage `= −t` |
+| < 100 | `00480e80 = −3·(t − 30)`, tangage −30 |
+| < 170 | `00480e80 = −210`, tangage −30 ; à 160 : munitions vidées (20 armes), `+0x154 = 1`, `+0x12c = 0`, `gm_weapon_select(1)` |
+| < 234 | cap `+= 4`, `00480e80 = −210 − 4·(t − 170)`, roulis et tangage `−(table(t)·30) >> 8` |
+| < 256 | tangage 30 ; à 240 : `gm_fire_special` |
+| < 320 | comme < 234 (décalage 192) |
+| < 530 | à 380 : `00480e7c = 1` et deux flottants de vue décalés ; `00480e80 = −210`, tangage −30 |
+| < 560 | tangage `= t − 560`, cap `+= (t − 530) >> 3` |
+| < 570 | vitesses x, z et tangage à 0, cap `+= 7` |
+| 560, 563, 566, 569 | `gm_object_explode` décalée de ±6 000 en x puis en y |
+| 585 | explosion, éclats, fumée, âge 0, modèle 0, classe `0x40`, boucle 5002 arrêtée, angles à 0, `+0x50 = 970` |
+| 1000 | caméra remise (`00480e7c = 0`, `00480e80 = 0`, `00480e84 = 0x1e`, `00480e88 = 0x226`), `+0x9c = 13` (canon), `gm_player_set_form(joueur, 4)`, HUD rétabli (`00480c5c = 1`) |
+| 171 à 599 | à chaque tick, une fumée (classe `0xe1`, pv 100, modèle 11004, `gm_upd_fx_00443e7c`, vitesse aléatoire / 16, +500 en y), placée par `gm_attach_offset(appareil, fumée, 0, 0, −14 000)` |
+
+Aucun niveau livré n'a de départ 1002 (vérifié par `test/swiv3d/level.test.ts`) : non porté, la forme `0x2b` du port reste inerte (`FORM_SCRIPTED_START`).
 
 ## 4. Caméra
 
@@ -383,15 +415,15 @@ Dans tous ces types, les touches de tourner/avancer/latéral par défaut restent
 |---|---|---|
 | `Échap` (`0x01`) | confirmation d'abandon (`gm_menu_abort`) | `gm_start_level` |
 | `Pause` (`0x45`) | pause (`gm_screen_pause`, boucle bloquante) | `gm_frame` |
-| `F1` (`0x3b`) | menu options en jeu (`gm_menu_setup`, puis recharge des touches) | `gm_frame` |
+| `F1` (`0x3b`) | menu Setup en jeu (`gm_menu_setup(…, 1)` entre les sons 6000 et 6001, monde figé, puis recharge des touches, du type et des axes : `gm_player_load_keys`) ; comme la pause, seulement hors séquence de fin (`005b0414 == 0`). Porté (`screens.md` §4.3) | `gm_frame` |
 | `F3` / `F4` (`0x3d`/`0x3e`) | `00480c80 = 0` / `= 1` (+ `V[2] = 1`) : surimpression radar et caméra figée (**hypothèse**) | `gm_frame` |
 | `F5` / `F6` (`0x3f`/`0x40`) | `V[3] += 6` / `-= 6` par image : fait tourner la caméra autour de l'appareil | `gm_frame` |
 | `F7` / `F8` (`0x41`/`0x42`) | `V[4] += 6` / `-= 6` : angle de site (borné 15..100) | `gm_frame` |
 | `Pavé -` / `Pavé +` (`0x4a`/`0x4e`) | « Screen Size » ∓ 5 (0..255) | `gm_frame` |
 | `F11` (`0x57`) | capture d'écran (`gm_menu_screengrab`) | `gm_frame` |
-| `F12` (`0x58`) | menu de bonus/triche (`gm_menu_pickups`) | `gm_frame` |
+| `F12` (`0x58`) | menu Tricher (`gm_menu_pickups`), seulement en mission de test (`DAT_005b03fc`, `screens.md` §4.9) | `gm_frame` |
 
-F3, F5..F8, F11 ne réagissent que si `profil(0x14, pilote, 1)[+0x28] > 0` (`*(005af3bc + 0x28) > 0` : pilote ayant terminé au moins une mission ? **hypothèse**).
+F3, F5..F8, F11 ne réagissent que si `profil(0x14, pilote, 1)[+0x28] > 0` (`*(005af3bc + 0x28) > 0`) : c'est le mode test, posé par le nom `SWIV!AndLetDie` (`screens.md` §4.9).
 
 ### 5.6 Correspondance navigateur (touches physiques) et manette proposée
 
@@ -508,9 +540,9 @@ Les noms `gm_*` proposés ne sont pas dans `keyfuncs.def.tsv` (le coordinateur f
 | `0043e5c4` | `gm_player_join_local` | place un joueur sur un point de départ |
 | `0043e7d8` | `gm_player_join_net` | idem, joueur réseau |
 | `00438198` | `gm_player_retarget` | choix de la cible verrouillée |
-| `0043c07c` | `gm_player_death_begin` | choisit la fonction pilote de mort selon la forme |
+| `0043c07c` | `gm_player_victory_mode` | pilote de fin de niveau selon la forme, `+0x184 = 0` (§3.11) |
 | `00438678` (label) | `gm_pilot_none` | fonction pilote vide (formes `0x2a`, `0x63`) |
-| `00438744` (label) | `gm_pilot_dying` | séquence de mort/fin (forme `0x2b`) |
+| `00438744` (label) | `gm_pilot_start_1002` | départ scripté de type 1002 (forme `0x2b`, §3.12) |
 | `00439088` (label) | `gm_pilot_heli` | pilote de l'hélicoptère, forme 0 |
 | `00439670` (label) | `gm_pilot_heli_net` | même, joueur réseau (entrées `+0xe4..`) |
 | `00439bcc` (label) | `gm_pilot_heli_3` | pilote forme 3 |
@@ -536,8 +568,8 @@ Variables globales utiles : `00490010` états de touches, `004841a4` type de con
 
 - Lecture des types 3, 4 (calibration), 6 (Creative Blaster) : seule `joyGetPosEx` du type 5 est dans `gm_poll_events` ; `FUN_00410b74` lit les trois axes pour la calibration. Les codes `0xf0..0xf7` du type 6 restent inexpliqués.
 - Forme 3 (identique à la 0 pour le pilotage) ; déclencheurs précis des formes 2, 4, 5 (objets bonus), à croiser avec R2/R3. Noms des formes (buggy, motoneige, aéroglisseur) : déduits du comportement (eau, modèles), pas des chaînes du jeu.
-- `+0x94` (cap de tir) est tenu à jour dans `Player.fireYaw` et lu par le canon (`gm_primary_bullet_spawn`, `0046b4b4`). Les constantes de frottement des formes 4 et 5 sont à relire dans `00445a84` / `00445f44` avant portage.
+- `+0x94` (cap de tir) est tenu à jour dans `Player.fireYaw` et lu par le canon (`gm_primary_bullet_spawn`, `0046b4b4`) : recopié au début de `heliPilot` (hélicoptères) et après le tir par `latchVehicleFireYaw` (véhicules, appelée par `playerWeaponsTick`). Les constantes de frottement des formes 4 et 5 sont à relire dans `00445a84` / `00445f44` avant portage.
 - `+0x190`, `00480c80`, le sens des touches F3/F4 et la condition `profil[+0x28] > 0` : hypothèses.
-- `FUN_00443ed0` (effets au choc) non lu ; séquence de mort `00438744` non décrite en détail (R3).
+- `FUN_00443ed0` (effets au choc) non lu. Les « flottants de vue » de `00438744` (`00480e9c`, `00480ea4`) ne sont pas nommés (séquence non portée).
 - La cadence réelle dépend de la résolution de `msg.time` de Windows 95 ; le port devrait utiliser un pas exact de 25 ms avec la même règle de plafond (800 ms).
 - Les simulations par calcul (§3.3, §3.6) n'ont **pas** été recoupées avec une exécution du jeu d'origine : les valeurs d'équilibre sont à valider visuellement.

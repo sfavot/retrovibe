@@ -51,4 +51,17 @@ describe("compteurs de fin", () => {
     c.advance(TICK_MS);
     expect(c.acceptsKeys).toBe(true);
   });
+
+  it("reprend le compteur de fin du niveau (`DAT_005b03e8`) ; sans lui (ou négatif) 55 / 35", () => {
+    // Victoire : la boucle sort à 55, mais les 3 ticks restants de l'image ont déjà été joués.
+    const c = new EndCounters("complete", values, 0x37 + 3);
+    expect(c.ticks).toBe(58);
+    c.advance(1);
+    for (let i = 0; i < 51; i++) c.advance(TICK_MS);
+    expect(c.acceptsKeys).toBe(false);
+    c.advance(TICK_MS);
+    expect(c.acceptsKeys).toBe(true);
+    expect(new EndCounters("gameOver", values, -1).ticks).toBe(END_START_TICKS.gameOver);
+    expect(new EndCounters("gameOver", values).ticks).toBe(END_START_TICKS.gameOver);
+  });
 });

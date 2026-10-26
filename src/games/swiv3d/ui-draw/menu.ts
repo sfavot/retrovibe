@@ -106,9 +106,13 @@ export class Menu {
     return this.selectedId;
   }
 
-  /** Ids sélectionnables, dans l'ordre d'affichage. */
+  /**
+   * Ids sélectionnables, dans l'ordre d'affichage. Un choix de plusieurs lignes (`gm_menu_add` donne le même id à chaque segment `|`,
+   * comme « Type du contrôleur principal|[Clavier] ») ne compte qu'une fois : la sélection est un id (`gm_menu_select`), toutes ses
+   * lignes s'éclairent ensemble.
+   */
   ids(): number[] {
-    return this.lines.filter(isSelectable).map((l) => l.id);
+    return [...new Set(this.lines.filter(isSelectable).map((l) => l.id))];
   }
 
   /** Textes affichés (titres, textes et libellés), dans l'ordre : tests et lecteurs d'écran. */

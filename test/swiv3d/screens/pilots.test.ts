@@ -50,7 +50,9 @@ describe("pilotes : sauvegarde", () => {
     raw.set("swiv3d:pilot:0", "pas du json");
     raw.set("swiv3d:pilot:1", JSON.stringify({ name: "", bestMission: 2 }));
     raw.set("swiv3d:pilot:2", JSON.stringify({ name: "Ok", bestMission: -5, music: 9, language: 7, playSeconds: "x" }));
-    expect(s.list()).toEqual([{ slot: 2, name: "Ok", language: 1, bestMission: 0, music: 2, playSeconds: 0, states: {} }]);
+    expect(s.list()).toEqual([
+      { slot: 2, name: "Ok", language: 1, bestMission: 0, music: 2, playSeconds: 0, gamma: 0, testMode: false, controller: null, states: {} },
+    ]);
     expect(s.get(-1)).toBeNull();
     expect(s.get(PILOT_LIMIT)).toBeNull();
   });

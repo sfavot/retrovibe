@@ -16,14 +16,15 @@ import { copy } from "../copy";
 import { parseBd } from "../data/bd";
 import { parseGlobal } from "../data/global";
 import { parseSoundBank } from "../data/sounds";
+import { applyPickup } from "../engine/pickups";
 import { createTitleLayer } from "../render/text3d";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../render/view";
 import { parseBriefing, drawBriefing, type BriefingText } from "../screens/briefing";
 import { Flow, type FlowHost, type FlowView, type LevelRequest } from "../screens/flow";
-import { keyLabel } from "../screens/key-names";
 import { AMMO_SLOTS, PilotStore } from "../screens/pilots";
 import { TextRenderer } from "../ui-draw/text";
-import { Controls, DEFAULT_KEYS, type Action } from "./controls";
+import { Controls } from "./controls";
+import { GammaCache } from "./gamma";
 import { startLevel, type AppStats, type LevelServices, type LevelSession } from "./level-session";
 import { UiInputCollector } from "./ui-input";
 import { VideoPlayer } from "./video";
@@ -194,9 +195,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let levelSession: LevelSession | null = null;
   let loadToken = 0;
   let flow!: Flow;
+  // Correction gamma de la fiche du pilote : appliquée à toutes les palettes présentées (écrans, vidéos, niveaux, menus).
+  const gamma = new GammaCache();
 
   const beginLevel = async (request: LevelRequest): Promise<void> => {
     const token = ++loadToken;
+    // Élément `300` : le profil de contrôleur du pilote passe aux commandes du jeu.
+    controls.configure(request.pilot.controller);
     try {
       const { vars } = request;
       const session = await startLevel(services(), {
@@ -253,6 +258,18 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     hasLevel: (name) => files.resolve(`${name}.SLV`) !== undefined,
     leave: () => leaveGame(options.backLabel, restart),
     askName: (current) => window.prompt(copy.namePrompt, current),
+    gamma: (level) => {
+      gamma.level = level;
+    },
+    // Souris : un pointeur précis (pas un écran tactile seul) ; manette : vue par la Gamepad API (après un premier appui).
+    hasController: (type) => (type === 1 ? true : type === 2 ? window.matchMedia("(pointer: fine)").matches : UiInputCollector.gamepadConnected()),
+    loadControls: (pilot) => controls.configure(pilot.controller),
+    cheat: (effect) => {
+      const world = levelSession?.world;
+      if (!world) return;
+      if ("pickup" in effect) applyPickup(world, effect.pickup);
+      else world.setPlayerForm(effect.form);
+    },
   };
   const restart = (): void => {
     shell.dispose();
@@ -265,7 +282,6 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       script: global.missions,
       text,
       store: pilotStore,
-      bindingLabel: (action, language) => keyLabel(DEFAULT_KEYS[action as Action]?.[0] ?? "", language),
     },
     host,
     !options.skipBoot && !options.level,
@@ -346,17 +362,49 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   unlock();
 
   // --- Entrées -----------------------------------------------------------------------------------------------------------------------
+  const pointerLocked = (): boolean => document.pointerLockElement === shell.canvas;
   shell.canvas.addEventListener("pointerdown", (event) => {
     unlock();
     if (started && flow.view.kind === "level") {
       // Pause du joueur : un appui sur l'écran la ferme (comme n'importe quelle touche).
-      if (levelSession?.userPaused) levelSession.resume();
+      if (levelSession?.userPaused) return void levelSession.resume();
+      // Contrôleur souris : le pointeur est verrouillé sur le canvas (l'original recentre le curseur à chaque image).
+      if (controls.usesMouse && event.pointerType === "mouse" && !pointerLocked()) void shell.canvas.requestPointerLock?.()?.catch?.(() => {});
+      if (event.pointerType === "mouse" && controls.mouseButton(event.button, true)) event.preventDefault();
       return;
     }
     if (!started) return;
     const p = toLogical(event.clientX, event.clientY, shell.canvas.getBoundingClientRect(), { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }, isRotated(shell.main));
-    collector.tap(p.x, p.y);
+    collector.tap(p.x, p.y, event.pointerType === "mouse" ? event.button : 0);
   });
+  shell.canvas.addEventListener("pointerup", (event) => {
+    if (event.pointerType === "mouse") controls.mouseButton(event.button, false);
+  });
+  // Le bouton droit est un bouton de jeu (tir spécial de la souris) : pas de menu contextuel pendant le niveau.
+  shell.canvas.addEventListener("contextmenu", (event) => {
+    if (flow.view.kind === "level" || flow.phaseName === "capture") event.preventDefault();
+  });
+  const documentListeners = new AbortController();
+  document.addEventListener(
+    "mousemove",
+    (event) => {
+      if (!pointerLocked()) return;
+      // Pixels de l'écran -> grille 320 × 240 de l'original (la fenêtre de jeu fait 320 × 240).
+      const rect = shell.canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) controls.mouseMove((event.movementX * SCREEN_WIDTH) / rect.width, (event.movementY * DISPLAY_HEIGHT) / rect.height);
+    },
+    { signal: documentListeners.signal },
+  );
+  shell.canvas.addEventListener(
+    "wheel",
+    (event) => {
+      if (!pointerLocked()) return;
+      event.preventDefault();
+      // Un cran ≈ 100 px ou 3 lignes ; vers soi (deltaY > 0) = arme suivante, comme `WM_MOUSEWHEEL` négatif.
+      controls.mouseWheel(event.deltaMode === 1 ? event.deltaY / 3 : event.deltaMode === 2 ? event.deltaY : event.deltaY / 100);
+    },
+    { passive: false },
+  );
   const detachKeyboard = bindKeyboard(
     shell.canvas,
     {
@@ -366,6 +414,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         if (!session) return collector.keyDown(event);
         if (options.debug && event.code === "F9") return void session.complete(), true;
         if (options.debug && event.code === "F8") return void session.gameOver(), true;
+        // F1 : Setup en jeu ; F12 en mission de test : menu Tricher (`gm_frame`, hors pause et séquence de fin). F1 n'est jamais laissée au
+        // navigateur (aide) ; hors mode test, F12 l'est.
+        if (event.code === "F1") {
+          if (session.menusAllowed && !session.userPaused) flow.setupRequested();
+          return true;
+        }
+        if (event.code === "F12" && flow.testMode && session.menusAllowed && !session.userPaused) return void flow.cheatRequested(), true;
         // En pause, Échap est une touche comme une autre : elle ferme la pause (l'abandon se demande en jeu).
         if (event.code === "Escape" && !session.userPaused) return void session.requestQuit(), true;
         return controls.keyDown(event);
@@ -378,7 +433,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
 
   // --- Image ---------------------------------------------------------------------------------------------------------------------------
   let lastView: FlowView | null = null;
-  const present = (lut: Uint32Array): void => presenter.present(framebuffer, lut);
+  const present = (lut: Uint32Array): void => presenter.present(framebuffer, gamma.lut(lut));
 
   const renderVideo = (now: number, view: Extract<FlowView, { kind: "video" }>): void => {
     if (!video || video.view !== view) video = startVideo(view);
@@ -424,12 +479,15 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         video.done = true;
         video.player?.stop();
         flow.videoEnded(true);
-        input = { keys: [], chars: [], taps: [], pressed: false };
+        input = { keys: [], typed: [], taps: [], pressed: false, scans: [] };
       }
     }
     flow.update(now, input);
+    collector.capturing = flow.phaseName === "capture";
 
     const view = flow.view;
+    // Hors du niveau (menus, pause d'abandon, Tricher, fin), le pointeur est rendu.
+    if (view.kind !== "level" && pointerLocked()) document.exitPointerLock();
     if (view !== lastView) {
       if (lastView?.kind === "video") video?.player?.stop();
       // Titres 3D : en quittant un menu les titres repartent (`gm_title_release`) et le titre du menu suivant arrive ; un écran sans menu
@@ -537,6 +595,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     sound: { prefs, storageKey: soundPrefKey(GAME_ID), unlock },
     onDispose: () => {
       detachKeyboard();
+      documentListeners.abort();
+      if (pointerLocked()) document.exitPointerLock();
       touch.dispose();
       video?.player?.stop();
       levelSession?.dispose();

@@ -4,6 +4,7 @@
  */
 import { decodeCp437, encodeCp437 } from "../../../data/cp437";
 import type { HostStorage } from "../../../engine/storage";
+import { parseProfile, type ControllerProfile } from "./controllers";
 
 /** Pilotes au plus (numéros 0 à 9). */
 export const PILOT_LIMIT = 10;
@@ -29,6 +30,9 @@ export interface MissionState {
   cannonPower: number;
 }
 
+/** Niveaux de correction gamma (`6/10`..`6/13`). */
+export const GAMMA_LEVELS = 4;
+
 /** Nombre d'armes spéciales (munitions de l'état de mission). */
 export const AMMO_SLOTS = 20;
 
@@ -43,6 +47,12 @@ export interface Pilot {
   music: 0 | 1 | 2;
   /** Temps de jeu total en secondes (`fiche +0x2c`). */
   playSeconds: number;
+  /** Correction gamma, 0 (aucune) à 3 (haute) (`fiche +0x30`). */
+  gamma: number;
+  /** Mode test débloqué par le nom `SWIV!AndLetDie` (`fiche +0x28 > 0`) : « Entrez le mode test niveau », menu Tricher. */
+  testMode: boolean;
+  /** Profil de contrôleur (fiche `(0x14, pilote, 2)`) ; `null` = type 0, non configuré : le menu de choix du type s'ouvre. */
+  controller: ControllerProfile | null;
   /** États d'arrivée par mission (fiches `1000 + n`), écrits au passage d'une mission accomplie à la suivante. */
   states: Record<number, MissionState>;
 }
@@ -120,6 +130,9 @@ function parsePilot(slot: number, raw: string | null): Pilot | null {
       bestMission: clamp(o.bestMission, 0, ADVENTURE_COMPLETED, 0),
       music: clamp(o.music, 0, 2, 0) as 0 | 1 | 2,
       playSeconds: clamp(o.playSeconds, 0, 1e9, 0),
+      gamma: clamp(o.gamma, 0, GAMMA_LEVELS - 1, 0),
+      testMode: o.testMode === true,
+      controller: parseProfile(o.controller),
       states: parseStates(o.states),
     };
   } catch {
@@ -146,22 +159,25 @@ export class PilotStore {
     return slot >= 0 && slot < PILOT_LIMIT ? parsePilot(slot, this.storage.get(this.key(slot))) : null;
   }
 
-  /** Crée un pilote dans la première case libre ; `null` si le nom est vide ou si les 10 cases sont prises. */
-  create(name: string, language: Language, music: 0 | 1 | 2 = 0): Pilot | null {
+  /**
+   * Crée un pilote dans la première case libre ; `null` si le nom est vide ou si les 10 cases sont prises. `testMode` : la fiche a reçu
+   * `+0x28 = 1` par le code `SWIV!AndLetDie` avant la saisie du nom. Le contrôleur n'est pas configuré (fiche 2 neuve, type 0).
+   */
+  create(name: string, language: Language, music: 0 | 1 | 2 = 0, testMode = false): Pilot | null {
     const clean = cleanName(name);
     if (clean === "") return null;
     for (let slot = 0; slot < PILOT_LIMIT; slot++) {
       if (this.get(slot)) continue;
-      const pilot: Pilot = { slot, name: clean, language, bestMission: 0, music, playSeconds: 0, states: {} };
+      const pilot: Pilot = { slot, name: clean, language, bestMission: 0, music, playSeconds: 0, gamma: 0, testMode, controller: null, states: {} };
       return this.save(pilot) ? pilot : null;
     }
     return null;
   }
 
-  /** Enregistre la fiche (au changement de mission, de langue, de musique, à la fin d'un niveau). Faux si l'écriture échoue. */
+  /** Enregistre la fiche (au changement de mission, de réglage, de commandes, à la fin d'un niveau). Faux si l'écriture échoue. */
   save(pilot: Pilot): boolean {
-    const { name, language, bestMission, music, playSeconds, states } = pilot;
-    return this.storage.set(this.key(pilot.slot), JSON.stringify({ name, language, bestMission, music, playSeconds, states }));
+    const { name, language, bestMission, music, playSeconds, gamma, testMode, controller, states } = pilot;
+    return this.storage.set(this.key(pilot.slot), JSON.stringify({ name, language, bestMission, music, playSeconds, gamma, testMode, controller, states }));
   }
 
   remove(slot: number): void {

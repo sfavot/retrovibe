@@ -12,6 +12,7 @@ import { cloneObject, localVelocity } from "./combat";
 import { ANGLE_MASK, COS, SIN } from "./fixed";
 import type { PlayerInput } from "./input";
 import { launcherStep, scanTarget } from "./launchers";
+import { latchVehicleFireYaw, normalPilotActive } from "./player";
 
 import { DEPOP_MARK } from "./objects";
 import { isDockLocked } from "./pads";
@@ -268,22 +269,24 @@ function weaponUpdate(world: World): void {
 }
 
 /**
- * Entrées d'armes et tir du canon pour un tick (à appeler après le pilote). Pendant l'amarrage ou l'envol du Super Ressort le pilote
- * est coupé : ni sélection ni tir (le canon et `gm_fire_special` sont appelés par les pilotes).
+ * Entrées d'armes et tir du canon pour un tick (à appeler après le pilote), puis `gm_player_weapon_update` (`00459c80`, appelée par
+ * `gm_game_tick` sauf après la mort, y compris pendant la fin de niveau). Les sélections, les tirs et le compteur `+0x98` sont dans
+ * les pilotes normaux de l'exe : rien de tout cela pendant l'amarrage, l'envol du Super Ressort ou la fin de niveau des formes 0 à 3.
  */
 export function playerWeaponsTick(world: World, input: PlayerInput): void {
   const g = world.game;
   const p = world.player;
-  if (!g.alive || p.dead) return;
-  if (!p.autopilot) {
+  if (p.dead) return;
+  if (normalPilotActive(p)) {
     if (input.weaponDirect !== null && input.weaponDirect >= 1 && input.weaponDirect <= 10)
       selectWeapon(world, input.weaponDirect - 1);
     if (input.weaponNext) selectWeapon(world, -1);
     if (input.weaponPrev) selectWeapon(world, -2);
     if (input.firePrimary) firePrimary(world);
     if (input.fireSpecial && g.weaponState === 10) g.weaponState = 0x0b;
+    latchVehicleFireYaw(p, input);
+    g.fireCounter++;
   }
-  g.fireCounter++;
   weaponUpdate(world);
 }
 

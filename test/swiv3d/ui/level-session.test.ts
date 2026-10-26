@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseBd } from "../../../src/games/swiv3d/data/bd";
 import { parseGlobal, type GlobalData } from "../../../src/games/swiv3d/data/global";
 import { AMMO_SLOTS } from "../../../src/games/swiv3d/screens/pilots";
+import type { PlayerInput } from "../../../src/games/swiv3d/engine/input";
 import { Controls } from "../../../src/games/swiv3d/ui/controls";
 import { startLevel, summarize, type AppStats, type LevelServices } from "../../../src/games/swiv3d/ui/level-session";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../src/games/swiv3d/render/view";
@@ -139,5 +140,50 @@ describe.skipIf(!available)("session de niveau : HUD, état de départ, bilan", 
     s.controls.keyDown({ code: "KeyP" });
     frame(2);
     expect(session.userPaused).toBe(false);
+  });
+
+  it("séquence de fin : ni pause ni menus ; derrière l'écran de fin, le clavier est vidé à chaque image et la manette reste lue", async () => {
+    /** Commandes avec une manette simulée, qui notent les entrées données au monde. */
+    class RecordingControls extends Controls {
+      buttons: number[] = [];
+      samples: PlayerInput[] = [];
+      override poll(): void {
+        const pressed = new Set(this.buttons);
+        super.poll(() => [{ connected: true, mapping: "standard", buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: pressed.has(i) })), axes: [0, 0, 0, 0] }]);
+      }
+      override sample(): PlayerInput {
+        const input = super.sample();
+        this.samples.push(input);
+        return input;
+      }
+    }
+    const s = services();
+    const controls = new RecordingControls();
+    s.controls = controls;
+    const session = await startLevel(s, { name: "TERRAN00", mission: 0 });
+    let ended: number | undefined;
+    session.events.levelComplete.push(() => (ended = session.summary().endCounter));
+    let now = 1000;
+    const frame = (n = 1): void => {
+      for (let k = 0; k < n; k++) session.onFrame((now += 25));
+    };
+    frame(2);
+    expect(session.menusAllowed).toBe(true);
+    // Victoire (`DAT_005b0414 = 1`) : la pause n'est plus lue.
+    session.world.game.endState = "victory";
+    session.world.game.endCounter = 0;
+    expect(session.menusAllowed).toBe(false);
+    controls.keyDown({ code: "KeyP" });
+    frame();
+    expect(session.userPaused).toBe(false);
+    for (let k = 0; k < 100 && ended === undefined; k++) frame();
+    expect(ended).toBeGreaterThanOrEqual(0x37);
+    // Écran de fin : une touche tenue n'arrive pas au monde, un bouton de manette si.
+    controls.keyDown({ code: "ArrowUp" });
+    controls.buttons = [0];
+    controls.samples.length = 0;
+    frame(4);
+    expect(controls.samples.length).toBeGreaterThan(0);
+    for (const input of controls.samples) expect(input).toMatchObject({ forward: false, firePrimary: true });
   });
 });

@@ -103,6 +103,13 @@ export class HeldInput<A extends string> {
     this.tapped.clear();
   }
 
+  /** Relâche le clavier et les appuis programmatiques (et oublie les appuis brefs), sans toucher à l'état lu sur la manette. */
+  clearKeys(): void {
+    this.keyHeld.clear();
+    this.programmatic.clear();
+    this.tapped.clear();
+  }
+
   /** Lit la première manette standard connectée ; à appeler une fois par image. Sans manette, l'état manette est relâché. */
   pollGamepads(getGamepads: PadGetter = defaultGetPads): void {
     const pads = getGamepads();

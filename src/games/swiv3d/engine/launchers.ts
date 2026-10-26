@@ -65,6 +65,15 @@ function slots(world: World): Slots {
   return s;
 }
 
+/**
+ * Objets lanceurs encore référencés, dans l'ordre des emplacements de l'exe (`+0x19c`, `+0x1a0`, `+0x1a4`, `+0x1cc`…) :
+ * `gm_player_die` les lance en éclats. Comme dans l'exe, un emplacement garde son objet après le tir (missile en vol) ou sa
+ * disparition (objet rendu au pool, éventuellement réutilisé).
+ */
+export function launcherObjects(world: World): GameObject[] {
+  return slots(world).objs.filter((o): o is GameObject => o !== null);
+}
+
 function pod(
   model: number,
   hp: number,

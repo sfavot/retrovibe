@@ -6,7 +6,9 @@
  * (`+0xa8`) ; la physique du tick N+1 voit donc les angles écrits par le pilote du tick N.
  *
  * Formes portées : 0 et 3 (hélicoptère, `00439088` + `gm_heli_physics`), 1, 2, 4 et 5 (véhicules au sol, `vehicle.ts`), 0x2a (pilote
- * de démonstration, `demo-pilot.ts`). La forme 0x2b (mort) est inerte, la séquence de mort relève de H1/R3.
+ * de démonstration, `demo-pilot.ts`). Pilotes de fin de niveau (`gm_player_victory_mode` `0043c07c`) : `00438d08` / `00438de8`
+ * (formes 0 et 3, `heliVictoryPilot`), `00438ec8` / `00438fb8` (formes 1 et 2, `vehicleVictoryPilot`). La forme 0x2b (départ de type
+ * 1002, séquence scriptée `00438744` : vol, tir, crash puis forme 4) est inerte : aucun niveau livré n'a ce départ (player.md §3.2).
  */
 import type { PlayerInput } from "./input";
 import { COS, friction16, SIN, sin, cos } from "./fixed";
@@ -14,7 +16,7 @@ import type { WorldEvent } from "./events";
 import type { GameObject, ModelTable } from "./objects";
 import type { NodeNet } from "./nodes";
 import type { Terrain } from "./terrain";
-import { VEHICLE_FORMS, vehiclePilot } from "./vehicle";
+import { VEHICLE_FORMS, vehiclePilot, vehicleVictoryPilot } from "./vehicle";
 
 /** Plafond de vol par défaut (`005b03cc`) : aucun. */
 export const NO_CEILING = 0x7ffffff8;
@@ -26,7 +28,8 @@ export const FORM_HELI = 0;
 export { FORM_BUGGY } from "./vehicle";
 export const FORM_HELI_3 = 3;
 export const FORM_DEMO = 0x2a;
-export const FORM_DYING = 0x2b;
+/** Départ de type 1002 (`00438744`, absent des niveaux livrés) : non porté, le joueur reste inerte. */
+export const FORM_SCRIPTED_START = 0x2b;
 
 /** Ce dont la physique a besoin du monde (évite l'import circulaire de `World`). */
 export interface PlayerContext {
@@ -59,7 +62,10 @@ export class Player {
   wheels: GameObject[] = [];
   /** `+0x190` : valeur qui suit la vitesse (hauteur du son moteur, hypothèse). */
   soundPitch = 0;
-  /** `+0x94` : cap de tir du canon (`gm_primary_bullet_spawn`, `0046b4b4`) : celui du tick, figé tant que « latéral droit » est tenu pour les véhicules. */
+  /**
+   * `+0x94` : cap de tir du canon (`gm_primary_bullet_spawn`, `0046b4b4`). Les pilotes le recopient du cap avant d'intégrer les angles
+   * (hélicoptères) ou après le tir (véhicules, sauf tant que « latéral droit » est tenu) : le canon tire au cap du début du tick.
+   */
   fireYaw = 0;
   /** `+0x120` arme courante (-1 = aucune) : choisie par H1 à partir des événements `weaponSelect`. */
   weapon = -1;
@@ -71,6 +77,11 @@ export class Player {
   dead = false;
   /** Amarrage sur une plate-forme (`gm_pilot_none`) : le pilote ne lit plus les entrées. */
   autopilot = false;
+  /**
+   * Pilote de fin de niveau installé par `gm_player_victory_mode` (`0043c07c`, formes 0 à 3 seulement) : vol ou conduite automatique
+   * sans entrée ni tir. Effacé par `setForm` (le changement de forme réinstalle le pilote normal, comme `0043de0c`).
+   */
+  victory = false;
   /** Type de sol sous le véhicule (`00577664`), dernier calculé. */
   groundTypeUnder = 0xff;
 
@@ -121,6 +132,8 @@ export const UPDATE_PLAYER_HELI = "player_heli";
 export const UPDATE_PLAYER_VEHICLE = "player_vehicle";
 export const UPDATE_PLAYER_DEMO = "player_demo";
 export const UPDATE_PLAYER_INERT = "player_inert";
+/** Physique après la mort (`0043863c`) : vitesse remise à 0 à chaque tick. */
+export const UPDATE_PLAYER_DEAD = "player_dead";
 
 /**
  * `gm_player_set_form` (`0043de0c`) : type/classe/physique/pilote selon la forme ; hélicoptères : accumulateurs d'angle recalés sur
@@ -135,6 +148,7 @@ export function setForm(
 ): void {
   const o = p.obj;
   p.form = form;
+  p.victory = false;
   const heli = form === 0 || form === 3;
   const vehicle = form in VEHICLE_FORMS;
   o.classe = heli ? 0x217 : vehicle ? 0x207 : form === FORM_DEMO ? 0x40 : 0x217;
@@ -182,6 +196,9 @@ function commonButtons(
 
 /** Pilote de l'hélicoptère (formes 0 et 3, `00439088`) : intentions de cap/tangage/roulis puis intégration. */
 function heliPilot(p: Player, inp: PlayerInput): void {
+  const o = p.obj;
+  // Cap de tir : recopié avant l'intégration des angles (et avant le tir, `00439088`) : le cap du tick précédent.
+  p.fireYaw = o.yaw;
   let dYaw = 0;
   let dPitch = 0;
   let dRoll = 0;
@@ -219,17 +236,29 @@ function heliPilot(p: Player, inp: PlayerInput): void {
       }
     }
   }
-  integrateHeliAngles(p, dYaw, dPitch, dRoll);
-  p.fireYaw = p.obj.yaw;
+  // aide à la montée vers la cible verrouillée, avant l'intégration et le plafond (`00439088`)
+  const t = o.target;
+  if (t !== o && o.y < t.y) o.y += 100;
+  accumulateHeliAngles(p, dYaw, dPitch, dRoll);
+  // plafond de vol
+  if (o.y > p.ceiling) {
+    o.y = p.ceiling;
+    if (o.vy > 0) o.vy = 0;
+  }
+  // cible loin au-dessus : la vitesse verticale tend vers le haut
+  if (t.y - o.y > 0x3a98) o.vy = ((o.vy * 14) >> 4) + 40;
 }
 
-/** Intégration commune des angles de l'hélicoptère (aussi appelée sans entrée quand le pilote est inactif). */
-function integrateHeliAngles(
-  p: Player,
-  dYaw: number,
-  dPitch: number,
-  dRoll: number,
-): void {
+/**
+ * `+0x94` des véhicules : recopié du cap à la fin de leur pilote (`0043a174`, `0043a760`, `0043ac64`, `0043b0ac`), **après** le tir, sauf
+ * tant que « latéral droit » est tenu : le canon tire au cap du tick précédent. Appelé par `playerWeaponsTick` juste après le tir.
+ */
+export function latchVehicleFireYaw(p: Player, inp: PlayerInput): void {
+  if (p.form in VEHICLE_FORMS && !inp.strafeRight) p.fireYaw = p.obj.yaw;
+}
+
+/** Intégration des intentions dans les accumulateurs d'angle (`+0x214/+0x218/+0x21c`) puis amortissement 14/16 du tangage et du roulis. */
+function accumulateHeliAngles(p: Player, dYaw: number, dPitch: number, dRoll: number): void {
   const o = p.obj;
   p.accYaw += dYaw;
   p.accPitch -= dPitch;
@@ -239,17 +268,22 @@ function integrateHeliAngles(
   o.roll = p.accRoll >> 7;
   p.accPitch = (p.accPitch * 14) >> 4;
   p.accRoll = (p.accRoll * 14) >> 4;
-  // plafond de vol
-  if (o.y > p.ceiling) {
-    o.y = p.ceiling;
-    if (o.vy > 0) o.vy = 0;
-  }
-  // aide à la montée vers la cible verrouillée (neutre tant que H1 ne pose pas de cible)
-  const t = o.target;
-  if (t !== o) {
-    if (o.y < t.y) o.y += 100;
-    if (t.y - o.y > 0x3a98) o.vy = ((o.vy * 14) >> 4) + 40;
-  }
+}
+
+/**
+ * Pilote de fin de niveau des hélicoptères (`00438d08` forme 0, `00438de8` forme 3, identiques) : l'intention « avancer » (`0x4b0`)
+ * seule, à chaque tick ; ni virage, ni plafond, ni aide à la montée, ni tir : l'appareil file droit devant au cap qu'il avait.
+ */
+function heliVictoryPilot(p: Player): void {
+  accumulateHeliAngles(p, 0, 0x4b0, 0);
+}
+
+/**
+ * Le pilote normal de la forme tourne-t-il (`+0xa8` = `00439088`, `0043a174`…) ? Lui seul lit les entrées, compte `+0x98` et tire ;
+ * pas pendant l'amarrage ou le Super Ressort (`gm_pilot_none`, `00438694`), la fin de niveau (`gm_pilot_victory_*`), la mort, la démo.
+ */
+export function normalPilotActive(p: Player): boolean {
+  return !p.dead && !p.autopilot && !p.victory && (p.form === 0 || p.form === 3 || p.form in VEHICLE_FORMS);
 }
 
 /** Fonction pilote du joueur (`+0xa8`), une fois par tick après la mise à jour des objets. */
@@ -258,7 +292,13 @@ export function pilot(
   inp: PlayerInput,
   emit: (e: WorldEvent) => void,
 ): void {
-  if (p.dead || p.autopilot || p.form === FORM_DEMO || p.form === FORM_DYING) return;
+  if (p.dead || p.form === FORM_DEMO || p.form === FORM_SCRIPTED_START) return;
+  if (p.victory) {
+    if (p.form === 0 || p.form === 3) heliVictoryPilot(p);
+    else vehicleVictoryPilot(p);
+    return;
+  }
+  if (p.autopilot) return;
   if (p.form === 0 || p.form === 3) heliPilot(p, inp);
   else if (p.form in VEHICLE_FORMS) vehiclePilot(p, inp);
   else return;

@@ -1,99 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { MusicContext, MusicPreference } from "../../../src/games/swiv3d/audio";
 import { MemoryStorage, prefixedStorage } from "../../../src/engine/storage";
-import { Flow, format, type FlowHost, type LevelRequest, type UiInput, type UiKey } from "../../../src/games/swiv3d/screens/flow";
-import { ADVENTURE_COMPLETED, PilotStore, type Volumes } from "../../../src/games/swiv3d/screens/pilots";
+import { Flow, format } from "../../../src/games/swiv3d/screens/flow";
+import { defaultProfile } from "../../../src/games/swiv3d/screens/controllers";
+import { ADVENTURE_COMPLETED, PilotStore, type Pilot } from "../../../src/games/swiv3d/screens/pilots";
+import { Driver, FakeHost, NONE } from "./flow-driver";
 import { hasOriginalFiles } from "../helpers";
 import { loadGlobal, stubText } from "./support";
-
-class FakeHost implements FlowHost {
-  sounds: number[] = [];
-  contexts: MusicContext[] = [];
-  preferences: MusicPreference[] = [];
-  volumeCalls: Volumes[] = [];
-  levels: LevelRequest[] = [];
-  ended = 0;
-  paused: boolean[] = [];
-  left = 0;
-  existing = new Set(["TERRAN00", "TERRAN01", "TERRAN02", "TERRAN03"]);
-  sound(n: number): void {
-    this.sounds.push(n);
-  }
-  music(c: MusicContext): void {
-    this.contexts.push(c);
-  }
-  musicPreference(p: MusicPreference): void {
-    this.preferences.push(p);
-  }
-  volumes(v: Volumes): void {
-    this.volumeCalls.push({ ...v });
-  }
-  startLevel(r: LevelRequest): void {
-    this.levels.push(r);
-  }
-  endLevel(): void {
-    this.ended++;
-  }
-  pauseLevel(p: boolean): void {
-    this.paused.push(p);
-  }
-  hasLevel(name: string): boolean {
-    return this.existing.has(name);
-  }
-  leave(): void {
-    this.left++;
-  }
-}
-
-const NONE: UiInput = { keys: [], chars: [], taps: [], pressed: false };
-
-class Driver {
-  now = 1000;
-  constructor(readonly flow: Flow) {}
-  /** `n` images sans entrée (16 ms chacune). */
-  idle(n = 6): void {
-    for (let i = 0; i < n; i++) {
-      this.now += 16;
-      this.flow.update(this.now, NONE);
-    }
-  }
-  /** Laisse passer la garde d'Entrée, appuie, laisse passer une image. */
-  press(...keys: UiKey[]): void {
-    this.idle();
-    this.now += 16;
-    this.flow.update(this.now, { keys, chars: [], taps: [], pressed: keys.length > 0 });
-    this.idle(1);
-  }
-  type(text: string): void {
-    this.idle();
-    this.now += 16;
-    this.flow.update(this.now, { keys: [], chars: [...text], taps: [], pressed: true });
-  }
-  anyKey(): void {
-    this.now += 16;
-    this.flow.update(this.now, { ...NONE, pressed: true });
-  }
-  wait(ms: number): void {
-    this.now += ms;
-    this.flow.update(this.now, NONE);
-  }
-  get ids(): number[] {
-    const v = this.flow.view;
-    return v.kind === "menu" ? v.menu.ids() : [];
-  }
-  get selected(): number {
-    const v = this.flow.view;
-    return v.kind === "menu" ? v.menu.selected : -1;
-  }
-  /** Choisit l'élément `id` du menu courant : descend jusqu'à lui puis valide. */
-  choose(id: number): void {
-    const v = this.flow.view;
-    if (v.kind !== "menu") throw new Error("pas de menu");
-    for (let i = 0; i < 20 && this.selected !== id; i++) this.press("down");
-    expect(this.selected).toBe(id);
-    this.press("enter");
-  }
-}
 
 describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script du jeu)", () => {
   let raw: MemoryStorage;
@@ -102,21 +14,27 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
 
   function start(boot = false): Driver {
     const global = loadGlobal();
-    const flow = new Flow(
-      { strings: global.strings, script: global.missions, text: stubText(), store, bindingLabel: (action) => action },
-      host,
-      boot,
-    );
+    const flow = new Flow({ strings: global.strings, script: global.missions, text: stubText(), store }, host, boot);
     return new Driver(flow);
   }
 
-  /** Crée « Suzy » et arrive sur le menu principal. */
+  /** Crée « Suzy », choisit le clavier au premier passage (contrôleur non configuré) et arrive sur le menu principal. */
   function mainMenuAs(name = "Suzy"): Driver {
     const d = start();
     d.choose(0);
     d.type(name);
     d.press("enter");
+    d.choose(1); // type du contrôleur : clavier
+    d.press("escape"); // configuration du contrôleur
     return d;
+  }
+
+  /** Pilote enregistré d'avance, contrôleur clavier déjà configuré. */
+  function seedPilot(name = "Suzy"): Pilot {
+    const pilot = store.create(name, 1)!;
+    pilot.controller = defaultProfile(1);
+    store.save(pilot);
+    return pilot;
   }
 
   beforeEach(() => {
@@ -183,9 +101,23 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     d.press("enter");
     expect(d.flow.phaseName).toBe("menu");
     expect(store.list().map((p) => p.name)).toEqual(["Capitaine Hadd"]);
+    // Premier passage : contrôleur non configuré (`gm_controller_check`), type puis configuration, avant le menu principal.
+    expect(d.ids).toEqual([1]);
+    d.choose(1);
+    expect(store.get(0)?.controller).toEqual(defaultProfile(1));
+    d.press("escape");
     // Menu principal d'un pilote qui n'a rien joué : seulement « Commencer le jeu ».
     expect(d.ids).toEqual([10, 40, 50, 60, 70, 80]);
     expect(host.preferences.at(-1)).toBe("swiv");
+  });
+
+  it("la saisie suit l'ordre de frappe : « nom + Entrée » dans la même image crée le pilote au nom complet", () => {
+    const d = start();
+    d.choose(0);
+    d.idle();
+    d.now += 16;
+    d.flow.update(d.now, { ...NONE, typed: [{ char: "A" }, { char: "x" }, "backspace", { char: "l" }, "enter"], pressed: true });
+    expect(store.list().map((p) => p.name)).toEqual(["Al"]);
   });
 
   it("une saisie vide ne crée rien ; Échap revient à la liste", () => {
@@ -227,6 +159,19 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     expect(d.flow.view).toMatchObject({ kind: "video", name: "BR_TER1", mission: 1 });
     // meilleure mission = celle qui est démarrée ; temps de jeu cumulé ; tout est enregistré
     expect(store.get(0)).toMatchObject({ bestMission: 1, playSeconds: 75 });
+  });
+
+  it("l'écran de fin reprend le compteur de fin du niveau : les touches sont acceptées dès qu'il atteint 110", () => {
+    const d = mainMenuAs();
+    d.choose(10);
+    d.flow.videoEnded(false);
+    d.flow.levelEnded("complete", { seconds: 10, endCounter: 108 });
+    d.idle(2); // 32 ms : un tick, compteur à 109
+    d.anyKey();
+    expect(d.flow.phaseName).toBe("end");
+    d.idle(2);
+    d.anyKey();
+    expect(d.flow.view).toMatchObject({ kind: "video", name: "BR_TER1" });
   });
 
   it("enchaîne les 4 missions, puis l'aventure est terminée : plus de « Continuer », « Rejouer » ouvert aux 4", () => {
@@ -272,7 +217,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
   });
 
   it("« Rejouer la mission 1 » repart de l'état d'arrivée enregistré", () => {
-    const pilot = store.create("Suzy", 1)!;
+    const pilot = seedPilot();
     pilot.bestMission = 2;
     pilot.states[1] = { ammo: new Array<number>(20).fill(2), score: 123, form: 0, energy: 111, cannonPower: 1 };
     store.save(pilot);
@@ -360,7 +305,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
   });
 
   it("Rejouer la mission 1 enchaîne 1, 2 puis 3, sans toucher à la meilleure mission", () => {
-    const pilot = store.create("Suzy", 1)!;
+    const pilot = seedPilot();
     pilot.bestMission = 3;
     store.save(pilot);
     const d = start();
@@ -404,7 +349,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
   it("Setup : volumes réglés par curseur, appliqués et enregistrés", () => {
     const d = mainMenuAs();
     d.choose(40);
-    expect(d.ids).toEqual([10, 11, 12, 14]); // contrôleur, volume, langue, musique : ni gamma, ni écran, ni détail
+    expect(d.ids).toEqual([10, 11, 12, 13, 14]); // contrôleur, volume, langue, gamma, musique : ni écran, ni détail
     d.choose(11);
     expect(d.ids).toEqual([1, 2, 3]);
     d.press("left");
@@ -414,7 +359,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     expect(host.volumeCalls.at(-1)).toEqual({ master: 247, music: 239, effects: 255 });
     expect(store.loadGlobal().volumes).toEqual({ master: 247, music: 239, effects: 255 });
     d.press("escape");
-    expect(d.ids).toEqual([10, 11, 12, 14]);
+    expect(d.ids).toEqual([10, 11, 12, 13, 14]);
     expect(host.sounds).toContain(6004);
   });
 
@@ -443,13 +388,20 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     expect(store.get(0)?.music).toBe(1);
   });
 
-  it("Setup : les commandes sont listées avec leurs touches, en lecture seule", () => {
+  it("Setup : la configuration du contrôleur liste le type et les touches avec les noms de la table 1000", () => {
     const d = mainMenuAs();
     d.choose(40);
+    expect(d.ids).toEqual([10, 11, 12, 13, 14]);
     d.choose(10);
-    expect(d.ids).toEqual([21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32]);
-    d.press("enter");
-    expect(d.ids).toEqual([10, 11, 12, 14]);
+    expect(d.ids).toEqual([1, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32]);
+    const texts = (d.flow.view as { menu: { texts(): string[] } }).menu.texts();
+    // Ligne double du type, flèches de la police du jeu, noms de touches du jeu (AZERTY en français).
+    expect(texts.slice(0, 3)).toEqual(["Type du contrôleur principal", "[Clavier]", "Tourner \u001c [Flèche \u001b]"]);
+    // Code 0x32 (position du M en QWERTY) : la table française nomme la touche AZERTY de cette position.
+    expect(texts).toContain("Arme spéciale [,?]");
+    expect(texts).toContain("Freiner [Ctrl à gauche]");
+    d.press("escape");
+    expect(d.ids).toEqual([10, 11, 12, 13, 14]);
   });
 
   it("Crédits : 1003, 1002 puis 1001, une touche entre chaque, musique coupée puis rétablie", () => {
@@ -505,7 +457,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
   });
 
   it("10 pilotes au plus : « Nouveau pilote » disparaît de la liste", () => {
-    for (let i = 0; i < 10; i++) store.create(`P${i}`, 1);
+    for (let i = 0; i < 10; i++) seedPilot(`P${i}`);
     const d = start();
     expect(d.ids[0]).toBe(1);
     expect(d.ids).not.toContain(0);
@@ -517,7 +469,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     d.choose(40);
     d.idle();
     d.now += 16;
-    d.flow.update(d.now, { keys: [], chars: [], taps: [{ x: 3, y: 3 }], pressed: true });
+    d.flow.update(d.now, { ...NONE, taps: [{ x: 3, y: 3 }], pressed: true });
     expect(d.flow.view.kind).toBe("menu");
     expect(d.ids).toEqual([10, 40, 50, 60, 70, 80]); // retour au menu principal
   });

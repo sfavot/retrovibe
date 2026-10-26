@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyInput, input } from "../../../src/games/swiv3d/engine/input";
+import type { GameObject } from "../../../src/games/swiv3d/engine/objects";
 import { World } from "../../../src/games/swiv3d/engine/world";
 import { hasOriginalFiles, loadLevel } from "./helpers";
 
@@ -160,7 +161,25 @@ describe.skipIf(!hasOriginalFiles)("joueur (hélicoptère, forme 0)", () => {
     ]);
     expect(w.player.firePrimaryHeld).toBe(true);
   });
+
+  it("le canon tire au cap du début du tick : `+0x94` est recopié avant l'intégration des angles (`00439088`)", () => {
+    const w = fresh();
+    // Le canon tire quand le compteur `+0x98 & 0xf` vaut 0 : au 17ᵉ tick, en virage continu.
+    for (let i = 0; i < 16; i++) w.tick(input({ turnRight: true }));
+    const yaw = w.player.obj.yaw;
+    const before = new Set(playerShots(w));
+    w.tick(input({ turnRight: true, firePrimary: true }));
+    const shots = playerShots(w).filter((o) => !before.has(o));
+    expect(shots).toHaveLength(2);
+    expect(w.player.obj.yaw).toBeGreaterThan(yaw);
+    for (const b of shots) expect(b.yaw).toBe(yaw);
+  });
 });
+
+/** Balles du canon du joueur (classe `0x3f`) vivantes. */
+function playerShots(w: World): GameObject[] {
+  return w.pool.objects.filter((o) => o.classe === 0x3f);
+}
 
 describe.skipIf(!hasOriginalFiles)("joueur (véhicule, forme 1)", () => {
   it("retombe sur le sol (gravité 150) et s'y pose avec ses 4 contacts", () => {
@@ -201,6 +220,28 @@ describe.skipIf(!hasOriginalFiles)("joueur (véhicule, forme 1)", () => {
       return w.player.speed;
     };
     expect(run(true)).toBeLessThan(run(false));
+  });
+
+  it("le canon tire au cap du tick précédent : `+0x94` est recopié après le tir, et figé tant que « latéral droit » est tenu", () => {
+    const w = fresh("TERRAN03");
+    w.setPlayerForm(1);
+    for (let i = 0; i < 16; i++) w.tick(input({ turnRight: true }));
+    const yaw = w.player.obj.yaw;
+    let before = new Set(playerShots(w));
+    w.tick(input({ turnRight: true, firePrimary: true }));
+    let shots = playerShots(w).filter((o) => !before.has(o));
+    expect(shots).toHaveLength(2);
+    expect(w.player.obj.yaw).toBe(yaw + 4);
+    for (const b of shots) expect(b.yaw).toBe(yaw);
+    // « Latéral droit » tenu : le cap de tir reste celui d'avant, même en tournant.
+    const frozen = w.player.fireYaw;
+    for (let i = 0; i < 15; i++) w.tick(input({ turnRight: true, strafeRight: true }));
+    before = new Set(playerShots(w));
+    w.tick(input({ turnRight: true, strafeRight: true, firePrimary: true }));
+    shots = playerShots(w).filter((o) => !before.has(o));
+    expect(shots.length).toBeGreaterThan(0);
+    for (const b of shots) expect(b.yaw).toBe(frozen);
+    expect(w.player.obj.yaw).toBe(frozen + 4 * 16);
   });
 
   it("revient à l'hélicoptère avec la forme 0", () => {

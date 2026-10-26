@@ -91,14 +91,14 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 
 | Adresse | Nom | Octets | Appelants | Rôle | Preuve | Confiance |
 |---|---|---:|---:|---|---|---|
-| `00417ffc` | `gm_menu_gamma` | 1109 | 1 | Réglage gamma (groupe 6) | Groupe 6 | probable |
+| `00417ffc` | `gm_menu_gamma` | 1109 | 1 | Réglage gamma (groupe 6) : 4 niveaux, fiche `+0x30`, `gm_modex_enter` ; porté (`flow.ts`) | screens.md §4.6 | certain |
 | `00419058` | `gm_screen_pause` | 337 | 1 | Écran de pause (groupe 4) | Groupe 4 | probable |
-| `004194b0` | `gm_screen_level_complete` | 1904 | 1 | Fin de niveau / scores (groupe 7) | Groupe 7 | probable |
+| `004194b0` | `gm_screen_level_complete` | 1904 | 1 | Fin de niveau / scores (groupe 7) : `gm_clear_keys` en entrée, garde des touches tant que `DAT_005b03e8 < 0x6e` (compteur du niveau, qui court derrière) | Groupe 7 ; screens.md §9 | certain |
 | `0041a560` | `gm_menu_music` | 868 | 1 | Menu préférence musicale (groupe 9) : fixe 00484634 et lance la piste | Groupe 9 ; appelle 004115bc | certain |
 | `0041a8c4` | `gm_menu_volume` | 1912 | 1 | Menu volumes (groupe 8) | Groupe 8 | probable |
-| `0041b03c` | `gm_menu_setup` | 2778 | 2 | Menu Setup (groupe 2) | Chargements du groupe 2 | probable |
-| `0041bb40` | `gm_menu_pickups` | 2793 | 1 | Menu des bonus / triche (groupe 100) | 40 lectures du groupe 100 | probable |
-| `0041d714` | `gm_menu_main` | 1741 | 1 | Menu principal (groupe de chaînes 1) | Chargements du groupe 1 | probable |
+| `0041b03c` | `gm_menu_setup` | 2778 | 2 | Menu Setup (groupe 2) ; appelé aussi par `gm_frame` sur F1 en jeu (paramètre 1 : sauve et restaure `DAT_00480e80`) | Chargements du groupe 2 ; screens.md §4.3 | certain |
+| `0041bb40` | `gm_menu_pickups` | 2793 | 1 | Menu Tricher (groupe 100, F12 en mission de test) : 3 pages, `gm_pickup_apply` / `gm_player_set_form` ; porté | screens.md §4.9 | certain |
+| `0041d714` | `gm_menu_main` | 1741 | 1 | Menu principal (groupe de chaînes 1) ; « Quitter » isolé entre espaceur 2, trait, espaceur 2 | Chargements du groupe 1 ; screens.md §3 | certain |
 | `0041dde4` | `gm_menu_retry` | 2093 | 1 | Choix de mission à rejouer (groupe 11) | Groupe 11 | probable |
 | `0041f4d0` | `gm_menu_screengrab` | 935 | 1 | Menu capture d'écran (groupe 12) | Groupe 12 ; appelle 0041ee30 | probable |
 | `0041f8e8` | `gm_menu_abort` | 822 | 2 | Confirmation d'abandon (groupe 13) | Groupe 13 | probable |
@@ -116,7 +116,7 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `0042718c` | `gm_render_objects` | 10909 | 1 | collecte des objets des compartiments 7×7, transformation, Gouraud, mise en file des faces et sprites | Lit 005b1fc4 ; grille 0x3f ; renommée (anciennement gm_render_terrain), render.md §13 | certain |
 | `0042b31c` | `gm_render_view` | 14496 | 1 | Rendu d'une vue (terrain, objets, sprites) | 14 Ko ; appelle gm_render_terrain, gm_terrain_height | probable |
 | `0042ec80` | `gm_draw_hud` | 2506 | 1 | Affiche le HUD d'un joueur (score « %07d », « %s %2d ») | Chaînes 004803f8, 00480400 | certain |
-| `0042f64c` | `gm_frame` | 1174 | 4 | Une image : met à jour les sons, rend chaque vue active (0042b31c), HUD, entrées de debug, fait avancer le jeu | Boucle sur 4 vues de 0x1a dwords à 00480e74 | probable |
+| `0042f64c` | `gm_frame` | 1174 | 4 | Une image : met à jour les sons, rend chaque vue active (0042b31c), HUD (drapeau 2) ; avec le drapeau 1 et `DAT_005b0414 == 0` : F1 (Setup), Pause, F12 (Tricher), touches de debug | Boucle sur 4 vues de 0x1a dwords à 00480e74 ; screens.md §4.3 | probable |
 | `004362b8` | `gm_draw_overlay_sw` | 2372 | 1 | Superposition logicielle (HUD/radar) avec les sprites 510-512 | Lit 005bc178/70/74 | probable |
 
 #### Niveaux .SLV et objets
@@ -175,17 +175,17 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `004234ec` | `gm_effects_tick` | 233 | 1 | tick des messages 3D '005876dc' (25 ms, drapeau 4 de 'gm_poll_events') : vie, rotation, 'pos += vel' ; inverse la liste | rules.md §8.1 | certain |
 | `00438678` | `gm_pilot_none` | 26 | 0 | fonction pilote vide (formes '0x2a', '0x63') | player.md §7 | non précisé |
 | `00438694` | `gm_pilot_wheels` | 176 | 0 | pilote coupé des formes 1 et 2 (amarrage au sol '004482dc', Super Ressort '0045e128') : braquage vers la cible par pas de 8, roues en modes 3, 3, 4, 4 | player.md §3.6 | certain |
-| `00438744` | `gm_pilot_dying` | 1285 | 0 | séquence de mort/fin (forme '0x2b') | player.md §7 | non précisé |
-| `00438c68` | `gm_pilot_wheels_2` | 157 | 0 | variante motoneige de 'gm_pilot_wheels' (modes 1, 1, 2), installée par '004495f8' | player.md §3.6 | certain |
-| `00439088` | `gm_pilot_heli` | 1511 | 0 | pilote de l'hélicoptère, forme 0 | player.md §7 | non précisé |
+| `00438744` | `gm_pilot_start_1002` | 1285 | 0 | départ scripté du type 1002 (forme '0x2b') : vol, tir spécial, crash, explosions puis forme 4 ; pas une séquence de mort ; absent des niveaux livrés, non porté | player.md §3.12 | certain |
+| `00438c68` | `gm_pilot_wheels_2` | 157 | 0 | variante motoneige de 'gm_pilot_wheels' (modes 1, 1, 2), installée par '004495f8' (types 7012/7013, absents des niveaux livrés, non porté) | player.md §3.6 | certain |
+| `00439088` | `gm_pilot_heli` | 1511 | 0 | pilote de l'hélicoptère, forme 0 ; `+0x94 = cap` et tirs avant l'intégration des angles | player.md §3.2 | certain |
 | `00439670` | `gm_pilot_heli_net` | 1369 | 0 | même, joueur réseau (entrées '+0xe4..') | player.md §7 | non précisé |
 | `00439bcc` | `gm_pilot_heli_3` | 1447 | 0 | pilote forme 3 | player.md §7 | non précisé |
-| `0043a174` | `gm_pilot_vehicle_1` | 1514 | 0 | pilote forme 1 (roues) | player.md §7 | non précisé |
+| `0043a174` | `gm_pilot_vehicle_1` | 1514 | 0 | pilote forme 1 (roues) ; `+0x94 = cap` après le tir | player.md §7 | non précisé |
 | `0043a760` | `gm_pilot_vehicle_2` | 1284 | 0 | pilote forme 2 | player.md §7 | non précisé |
 | `0043ac64` | `gm_pilot_vehicle_4` | 1094 | 0 | pilote forme 4 | player.md §7 | non précisé |
 | `0043b0ac` | `gm_pilot_vehicle_5` | 1094 | 0 | pilote forme 5 | player.md §7 | non précisé |
 | `0043c234` | `gm_game_tick` | 1918 | 2 | un tick de logique (25 ms) : objets, fonctions pilote, mort, jauge de PV | player.md §7 | non précisé |
-| `0043ca60` | `gm_player_load_keys` | 83 | 1 | recopie 11 touches du profil dans le joueur | player.md §7 ; autres noms proposés : rules.md : gm_player_copy_controls | non précisé |
+| `0043ca60` | `gm_player_load_keys` | 83 | 1 | recopie 11 touches du profil dans le joueur (aussi à la sortie du Setup ouvert par F1) | player.md §7 ; autres noms proposés : rules.md : gm_player_copy_controls | non précisé |
 | `0043daa0` | `gm_net_send_input_client` | 245 | 1 | émission réseau (hypothèse) | player.md §7 | hypothèse |
 | `0043db98` | `gm_net_send_state_host` | 628 | 1 | émission réseau (hypothèse) | player.md §7 | hypothèse |
 | `0043e5c4` | `gm_player_join_local` | 530 | 2 | place un joueur sur un point de départ | player.md §7 | non précisé |
@@ -257,20 +257,20 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `00414c7e` | `gm_blit_rle_glyph` | 148 | 3 | Glyphe RLE standard (utilisé par 'gm_draw_text') | screens.md §12 | certain |
 | `00415126` | `gm_blit_rle_glyph_b` | 157 | 1 | Glyphe RLE, teinte divisée par deux (style 'g') | screens.md §12 | certain |
 | `004158e8` | `gm_menu_add` | 226 | 31 | Ajoute une ou plusieurs lignes de menu depuis une chaîne ('\ ' = saut de ligne) | screens.md §12 | certain |
-| `00415a20` | `gm_menu_run` | 3551 | 29 | Moteur de menu : tracé (bandeaux de mélange + texte), navigation, curseurs ; renvoie l'id ou -1 | screens.md §12 | certain |
+| `00415a20` | `gm_menu_run` | 3551 | 29 | Moteur de menu : tracé (bandeaux de mélange + texte), navigation, curseurs ; renvoie l'id ou -1. `gm_clear_keys` à chaque appel ; `gm_poll_events(7)` avec le drapeau 4, `(4)` avec 8, sinon `(6)` (monde figé) ; `gm_frame(2)` avec 0x10, sinon `(0)` | screens.md §4.1 | certain |
 | `00416834` | `gm_menu_select` | 123 | 16 | Place la sélection initiale sur l'id donné | screens.md §12 | certain |
-| `004168b0` | `gm_menu_capture_key` | 670 | 1 | « Appuyez sur la touche pour… » : capture d'une touche | screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_misc | probable |
-| `00416b50` | `gm_menu_calibrate` | 1632 | 1 | Calibrage manette | screens.md §12 ; autres noms proposés : player.md : gm_menu_joy_calibrate | probable |
-| `004171b4` | `gm_menu_controller_type` | 1965 | 1 | Choix du type de contrôleur (groupe 3, ids 100/101, 11-16) | screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_type | probable |
-| `0041797c` | `gm_menu_axis_bindings` | 1629 | 1 | Liaison des axes (groupe 3, 1000-1013) | screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_axes | probable |
-| `00418454` | `gm_menu_controller` | 2809 | 2 | Menu « Installation du contrôleur » | screens.md §12 ; autres noms proposés : player.md : gm_menu_ctrl_bindings | certain |
+| `004168b0` | `gm_menu_capture_key` | 670 | 1 | « Appuyez sur la touche pour… » : capture d'une touche (refuse les noms `#…` hors mode test) ; porté | screens.md §4.4 ; autres noms proposés : player.md : gm_menu_ctrl_misc | certain |
+| `00416b50` | `gm_menu_calibrate` | 1632 | 1 | Calibrage manette / Gravis (chaînes `3/330..343`) ; non porté (Gamepad API) | screens.md §4.4 ; autres noms proposés : player.md : gm_menu_joy_calibrate | probable |
+| `004171b4` | `gm_menu_controller_type` | 1965 | 1 | Choix du type de contrôleur (groupe 3, ids 100/101, 11-16), touches et axes par défaut du type ; porté (types 1-3) | screens.md §4.4 ; autres noms proposés : player.md : gm_menu_ctrl_type | certain |
+| `0041797c` | `gm_menu_axis_bindings` | 1629 | 1 | Liaison des axes (groupe 3, 1000-1013), « Attacher au centre » ; porté | screens.md §4.4 ; autres noms proposés : player.md : gm_menu_ctrl_axes | certain |
+| `00418454` | `gm_menu_controller` | 2809 | 2 | Menu « Configuration du contrôleur » : type, liens d'axes, 11 touches ; porté | screens.md §4.4 ; autres noms proposés : player.md : gm_menu_ctrl_bindings | certain |
 | `00418f54` | `gm_controller_check` | 229 | 1 | Rouvre le menu contrôleur si le type de contrôleur est absent ou non configuré | screens.md §12 | certain |
 | `004191ac` | `gm_menu_language` | 772 | 1 | Choix de la langue (liste de la table commune 0) | screens.md §12 | certain |
 | `00419c20` | `gm_screen_net_stats` | 693 | 1 | Statistiques réseau de fin de partie (groupe 5, 500/501) | screens.md §12 | probable |
 | `0041c640` | `gm_screen_new_pilot` | 1589 | 1 | Saisie du nom d'un nouveau pilote (15 car., code 'SWIV!AndLetDie') | screens.md §12 | certain |
 | `0041cc78` | `gm_screen_delete_pilot` | 819 | 1 | Suppression d'un pilote (sans confirmation) | screens.md §12 | certain |
 | `0041cfac` | `gm_screen_select_pilot` | 1894 | 1 | Écran de sélection du pilote | screens.md §12 | certain |
-| `0041e614` | `gm_menu_test_mission` | 2074 | 1 | Menu de mission de test (groupe 11, ids 20/21) | screens.md §12 | certain |
+| `0041e614` | `gm_menu_test_mission` | 2074 | 1 | Menu de mission de test (groupe 11, ids 20/21, pages Retour / Suivant) ; porté | screens.md §4.9 | certain |
 | `0041ee30` | `gm_menu_grab_name` | 1694 | 1 | Saisie du nom de fichier de capture (groupe 12) | screens.md §12 | probable |
 | `0041fc20` | `gm_menu_exit` | 831 | 1 | Confirmation de sortie (groupe 13, phrases 30..33 en rotation) | screens.md §12 | certain |
 | `004235d8` | `gm_title_release` | 70 | 26 | Déclenche la sortie des titres 3D (vie ≥ 1000 : − 0x3d4) | screens.md §4.1 | certain |
@@ -399,19 +399,19 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 
 | Adresse | Nom | Octets | Appelants | Rôle | Preuve | Confiance |
 |---|---|---:|---:|---|---|---|
-| `00419ed8` | `gm_screen_game_over` | 1669 | 1 | écran de fin « Game over » | rules.md §9 | non précisé |
+| `00419ed8` | `gm_screen_game_over` | 1669 | 1 | écran de fin « Game over » (mêmes entrées et garde que `gm_screen_level_complete`) | screens.md §9 | non précisé |
 | `00422f28` | `gm_message_pool_init` | 100 | 2 | initialise les 50 messages flottants | rules.md §9 | non précisé |
 | `00422f8c` | `gm_message_spawn` | 702 | 28 | message flottant 3D (EAX table, EDX id, EBX teinte, ECX type) ; type 11 = titre de menu | rules.md §8, screens.md §4.1 | certain |
 | `00424454` | `gm_message_draw` | 527 | 1 | dessin des messages flottants (police vectorielle) | rules.md §9 ; autres noms proposés : render.md : gm_text3d_draw_all | non précisé |
 | `00437af0` | `gm_draw_energy_gauge` | 113 | 1 | jauge d'énergie (bloc 503) | rules.md §9 | non précisé |
 | `00437c38` | `gm_draw_crosshair` | 301 | 1 | une moitié du viseur (bloc 506) | rules.md §9 | non précisé |
 | `00438198` | `gm_player_pick_target` | 571 | 1 | choisit la cible '+0x58' (produit scalaire + biais objectifs) | rules.md §9 ; autres noms proposés : player.md : gm_player_retarget | non précisé |
-| `00438d08` | `gm_pilot_victory_00438d08` | 224 | 0 | pilotage de fin de niveau | rules.md §9 | probable |
-| `00438de8` | `gm_pilot_victory_00438de8` | 224 | 0 | pilotage de fin de niveau | rules.md §9 | probable |
-| `00438ec8` | `gm_pilot_victory_00438ec8` | 238 | 0 | pilotage de fin de niveau | rules.md §9 | probable |
-| `00438fb8` | `gm_pilot_victory_00438fb8` | 206 | 0 | pilotage de fin de niveau | rules.md §9 | probable |
-| `0043b4f4` | `gm_player_die` | 2927 | 1 | mort : explosion, débris, message « Game over ! », 'DAT_005b0414 = 2' | rules.md §9 | non précisé |
-| `0043c07c` | `gm_player_victory_mode` | 214 | 1 | pilotage de fin de niveau, '+0x184 = 0' | rules.md §9 ; autres noms proposés : player.md : gm_player_death_begin | non précisé |
+| `00438d08` | `gm_pilot_victory_00438d08` | 224 | 0 | pilote de fin de niveau, forme 0 : tangage 0x4b0 par tick, file droit devant (porté : 'heliVictoryPilot') | player.md §3.11 | certain |
+| `00438de8` | `gm_pilot_victory_00438de8` | 224 | 0 | pilote de fin de niveau, forme 3 (identique à '00438d08') | player.md §3.11 | certain |
+| `00438ec8` | `gm_pilot_victory_00438ec8` | 238 | 0 | pilote de fin de niveau, forme 1 : cap −4, poussée +0x82, roues arrière −13 par tick, braquage par pas de 8, roues 3, 3, 4, 4 (porté : 'vehicleVictoryPilot') | player.md §3.11 | certain |
+| `00438fb8` | `gm_pilot_victory_00438fb8` | 206 | 0 | pilote de fin de niveau, forme 2 : comme '00438ec8', un seul coup de −13 ('+0x1b0'), roues 1, 1, 2 | player.md §3.11 | certain |
+| `0043b4f4` | `gm_player_die` | 2927 | 1 | mort : classe 0x40, explosion, débris, roues et lanceurs en éclats, compagnons détachés (vivants), physique '0043863c', message « Game over ! », 'DAT_005b0414 = 2' | player.md §3.11, rules.md §2.5 | certain |
+| `0043c07c` | `gm_player_victory_mode` | 214 | 1 | au tick 25 de la victoire : pilote de fin des formes 0 à 3 (âge 0, classe 0x40), '+0x184 = 0' pour toutes | player.md §3.11, rules.md §6.3 | certain |
 | `0043cd14` | `gm_player_save_profile` | 141 | 1 | reporte munitions, énergie, véhicule, score, puissance dans le profil | rules.md §9 ; autres noms proposés : screens.md : gm_player_state_store | non précisé |
 | `0043d034` | `gm_objective_head_first` | 222 | 2 | remet en tête de liste les cibles du même objectif (radar) | rules.md §9 | non précisé |
 | `00443d3c` | `gm_spawn_explosion_00443d3c` | 121 | 2 | explosions et poussières (types 11000 à 11002) | rules.md §9 | non précisé |

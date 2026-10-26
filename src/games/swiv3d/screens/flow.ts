@@ -3,13 +3,15 @@
  * crédits, script des missions (briefing, niveau, fin de mission), game over. Machine à états pure : l'application lui donne le temps et
  * les entrées, lit `view` pour savoir quoi afficher et réalise les effets demandés par `FlowHost` (son, musique, niveau).
  *
- * Entrées de menu gardées : Sélection / Nouveau / Suppression de pilote (nom de 15 caractères, 10 pilotes), Commencer, Continuer,
- * Rejouer la mission, Installer (commandes en lecture seule, volumes, langue français / anglais, préférence musicale), Revoir l'intro,
- * Crédits, Nouveau joueur, Quitter (retour au site). Abandonnées : gamma (la table de gamma n'est pas portée), taille de l'écran et
- * niveau de détail (rendu à taille fixe), multi-joueur (hors périmètre), mode test des niveaux et commandes de débogage (le code
- * `SWIV!AndLetDie`), types de contrôleur DirectInput / Gravis / Creative et brouillard 3Dfx (sans objet dans un navigateur).
- * Écarts assumés : suppression d'un pilote avec confirmation ; « Non » sélectionné d'office à
- * l'abandon ; une vidéo interrompue passe aussi l'attente qui la suit ; les attentes du démarrage se passent d'une touche.
+ * Entrées de menu gardées : Sélection / Nouveau / Suppression de pilote (nom de 15 caractères, 10 pilotes, code `SWIV!AndLetDie`),
+ * Commencer, Continuer, Rejouer la mission, Installer (contrôleur : type clavier / souris / manette, liens des touches, axes ; volumes ;
+ * langue français / anglais ; correction gamma ; préférence musicale), Revoir l'intro, Crédits, Nouveau joueur, Quitter (retour au site),
+ * Entrez le mode test niveau (pilote au code), le Setup en jeu (F1) et, en mission de test, le menu Tricher (F12). Abandonnées : taille de l'écran et niveau
+ * de détail (rendu à taille fixe), multi-joueur (hors périmètre), commandes de débogage, calibrage de la manette (la Gamepad API rend des
+ * axes déjà calibrés), types de contrôleur DirectInput / Gravis / Creative et brouillard 3Dfx (sans objet dans un navigateur).
+ * Écarts assumés : suppression d'un pilote avec confirmation ; « Non » sélectionné d'office à l'abandon ; une vidéo interrompue passe
+ * aussi l'attente qui la suit ; les attentes du démarrage se passent d'une touche ; un pilote réglé sur la manette garde son profil
+ * même si le navigateur ne voit pas encore de manette (elle n'apparaît qu'après un premier appui).
  */
 import type { MusicContext, MusicPreference } from "../audio";
 import { MUSIC_PREFERENCES } from "../audio";
@@ -17,11 +19,24 @@ import { copy } from "../copy";
 import { END_MISSION, type MissionScript } from "../data/missions";
 import type { StringTables } from "../data/strings";
 import { BootSequence } from "./boot";
+import {
+  CONTROLLER_TYPES,
+  KEY_ROWS,
+  clampAxes,
+  cycleAxis,
+  defaultProfile,
+  motionOnKeys,
+  usesAxes,
+  type ControllerType,
+  type Motion,
+} from "./controllers";
 import { COUNTER, EndCounters } from "./end-screen";
 import { Menu, ROW, splitLines, standardLines, type MenuEvent, type MenuKey, type MenuLine } from "../ui-draw/menu";
 import { MissionScriptRunner, replayableMissions, stateVars, type MissionVars } from "./mission-script";
 import {
   ADVENTURE_COMPLETED,
+  AMMO_SLOTS,
+  GAMMA_LEVELS,
   LANGUAGES,
   NAME_MAX,
   PILOT_LIMIT,
@@ -40,15 +55,23 @@ export type UiKey = MenuKey | "backspace";
 
 export interface UiInput {
   keys: UiKey[];
-  /** Caractères saisis (nom du pilote). */
-  chars: string[];
+  /**
+   * Saisie du nom du pilote, dans l'ordre de frappe : caractères (`{ char }`) et touches de l'interface mêlés, comme la file de touches
+   * de l'original (`00490410`) : « nom + Entrée » dans la même image valide le nom complet.
+   */
+  typed: (UiKey | { char: string })[];
   /** Appuis de souris / doigt, repère 320×400. */
   taps: { x: number; y: number }[];
   /** Une touche, un clic ou un appui a eu lieu (`DAT_00480aa0`). */
   pressed: boolean;
+  /**
+   * Codes de l'original des touches et boutons pressés (`DAT_00480aa4` : code de balayage PC, `0x90`.. souris, `0x93`.. manette), sans la
+   * répétition automatique : capture d'une touche à lier.
+   */
+  scans: number[];
 }
 
-export const NO_INPUT: UiInput = { keys: [], chars: [], taps: [], pressed: false };
+export const NO_INPUT: UiInput = { keys: [], typed: [], taps: [], pressed: false, scans: [] };
 
 export type LevelOutcome = "complete" | "gameOver";
 
@@ -68,6 +91,11 @@ export interface LevelStats {
   secretsTotal?: number;
   /** État du joueur à l'arrivée : reporté sur la mission suivante (mission accomplie seulement). */
   state?: MissionState;
+  /**
+   * Compteur de fin du niveau (`DAT_005b03e8`) quand la boucle de niveau rend la main : 55 ou 35, plus les ticks déjà joués dans la même
+   * image. L'écran de fin en repart ; absent ou négatif (fin forcée de la page de dev) : 55 / 35.
+   */
+  endCounter?: number;
 }
 
 export interface LevelRequest {
@@ -98,6 +126,14 @@ export interface FlowHost {
   leave(): void;
   /** Saisie d'un nom sur écran tactile (sans clavier physique) ; `null` : annulé. */
   askName?(current: string): string | null;
+  /** Correction gamma de toutes les palettes, 0 (aucune) à 3 (`DAT_00484644`, `gm_modex_enter`). */
+  gamma(level: number): void;
+  /** Le périphérique du type de contrôleur est-il là ? (`DAT_0048419c` souris, `DAT_00484198` manette ; le clavier l'est toujours.) */
+  hasController(type: ControllerType): boolean;
+  /** Menu Tricher (`gm_menu_pickups`) : bonus `n` (`gm_pickup_apply`) ou forme du joueur (`gm_player_set_form`) dans le niveau en cours. */
+  cheat(effect: { pickup: number } | { form: number }): void;
+  /** Sortie du Setup ouvert en jeu (F1) : le profil de contrôleur du pilote repasse aux commandes du niveau (`gm_player_load_keys`). */
+  loadControls(pilot: Pilot): void;
 }
 
 export interface FlowData {
@@ -105,8 +141,6 @@ export interface FlowData {
   script: MissionScript;
   text: TextRenderer;
   store: PilotStore;
-  /** Libellé de la touche liée à une action (`DEFAULT_KEYS`), pour l'écran des commandes. */
-  bindingLabel(action: string, language: Language): string;
 }
 
 /** Ce qui est affiché ; l'objet change à chaque changement d'écran. */
@@ -142,24 +176,55 @@ const TITLES = {
   setup: [2, 0, 0x1500],
   language: [2, 100, 0x400],
   controller: [3, 0, 0x400],
+  controllerType: [3, 100, 0x1000],
+  axes: [3, 1000, 0x500],
+  captureKey: [3, 33, 0x1400],
+  gamma: [6, 0, 0x100],
   volume: [8, 0, 0x1500],
   music: [9, 0, 0x1500],
   retry: [11, 0, 0x400],
+  testMission: [11, 20, 0x400],
   abort: [13, 0, 0x1400],
   quit: [13, 20, 0x1400],
+  cheat: [100, 1000, 0x100],
 } as const satisfies Record<string, readonly [table: number, id: number, tint: number]>;
 
 /** Crédits : 1003, 1002, 1001 (§4.5). */
 const CREDITS_SCREENS = [1003, 1002, 1001];
 
 /**
- * Ordonnée du premier élément des menus (`Y` passé à `gm_menu_run`, `screens.md` § 4 et 9) : commandes 100, sélection / suppression du
- * pilote, menu principal et rejouer 110, écran de fin 120, langue 140, nouveau pilote et réglages 160.
+ * Ordonnée du premier élément des menus (`Y` passé à `gm_menu_run`, `screens.md` § 4 et 9) : contrôleur 100, sélection / suppression du
+ * pilote, menu principal, rejouer, type de contrôleur, mission de test et Tricher 110, écran de fin 120, langue 140, nouveau pilote,
+ * réglages, gamma et capture d'une touche 160, axes 170.
  */
-const MENU_Y = { controller: 100, list: 110, end: 120, language: 140, small: 160 } as const;
+const MENU_Y = { controller: 100, list: 110, end: 120, language: 140, small: 160, axes: 170 } as const;
 const END_MENU_Y = MENU_Y.end;
 
-const SOUND = { move: 6002, validate: 6003, slider: 6004 } as const;
+/** Sons d'interface ; `6000` / `6001` encadrent les menus ouverts en jeu (pause, Tricher : `gm_frame`). */
+const SOUND = { open: 6000, close: 6001, move: 6002, validate: 6003, slider: 6004 } as const;
+
+/** Nom qui débloque le mode test (`00480234`) : comparé à la validation du nom, il n'est pas créé (`gm_screen_new_pilot`). */
+export const TEST_MODE_CODE = "SWIV!AndLetDie";
+
+/** Lignes du cadre des menus (§4.1) : espaceur de `h` px (voile `0xa1` par défaut), trait de 1 px, bandeaux, choix sur plusieurs lignes. */
+const space = (height: number, row: number = ROW.veil): MenuLine => ({ type: "spacer", height, row });
+const RULE: MenuLine = { type: "spacer", height: 1, row: ROW.rule };
+const bands = (text: string): MenuLine[] => splitLines(text).map((t): MenuLine => ({ type: "title", text: t }));
+const choices = (id: number, text: string): MenuLine[] => splitLines(text).map((t): MenuLine => ({ type: "choice", id, text: t }));
+
+/** État d'une mission de test : tout à zéro, énergie 400 (`gm_main_game` `004220a5` : `gm_state_clear` puis `+0x3c = 0x190`). */
+const TEST_STATE: MissionState = { ammo: Array<number>(AMMO_SLOTS).fill(0), score: 0, form: 0, energy: 400, cannonPower: 0 };
+
+/** Pages du menu Tricher (`gm_menu_pickups`) : armes 0-9, armes 10-19, puis vie, compagnons, bouclier, puissance et véhicules. */
+const CHEAT_PAGES: readonly (readonly number[])[] = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+  [100, 101, 102, 105, 106, 107, 108, 113],
+];
+/** Véhicules proposés selon la zone (variable 4 du script, `DAT_004841b0`) : id `200 + forme`. */
+const CHEAT_FORMS: readonly (readonly number[])[] = [[200, 201], [200, 202], [201], [201, 203], [203, 204, 205]];
+/** « Autres tricheries » : page suivante. */
+const CHEAT_MORE = -9;
 
 /** Équivalents de `sprintf` utilisés par les chaînes du jeu : `%d`, `%02d`, `%s`, `%%`. */
 export function format(template: string, ...args: (string | number)[]): string {
@@ -175,7 +240,9 @@ export function format(template: string, ...args: (string | number)[]): string {
 type Phase =
   | { kind: "boot"; seq: BootSequence; replay: boolean }
   | { kind: "menu"; menu: Menu; backdrop: "demo" | "frozen" | "level"; choose(id: number): void; cancel(): void; adjust?(id: number, value: number): void }
-  | { kind: "name"; menu: Menu; name: string }
+  | { kind: "name"; menu: Menu; name: string; testMode: boolean }
+  /** Attente d'une touche à lier (`gm_menu_capture_key`) : le menu n'a pas de choix. */
+  | { kind: "capture"; menu: Menu; done(scan: number): void }
   | { kind: "credits"; index: number }
   | { kind: "video"; mission: number }
   | { kind: "level" }
@@ -194,6 +261,12 @@ export class Flow {
   private missionIndex = 0;
   /** État du joueur à la fin de la dernière mission accomplie : copié dans la fiche de la mission suivante (élément `200`). */
   private carry: MissionState | null = null;
+  /** Missions lancées par « Entrez le mode test niveau » (`DAT_005b03fc`) : ni progression ni état d'arrivée, menu Tricher en jeu. */
+  private test = false;
+  /** Zone du niveau en cours (variable 4 du script) : véhicules du menu Tricher. */
+  private zone = 0;
+  /** Setup ouvert en jeu par F1 : ses menus sont sur l'image figée du niveau et Échap reprend le niveau. */
+  private setupInLevel = false;
 
   /** `boot` : jouer la séquence de démarrage ; sinon, directement la sélection du pilote. */
   constructor(
@@ -220,6 +293,11 @@ export class Flow {
     return this.phase.kind;
   }
 
+  /** Mission de test en cours : F12 ouvre le menu Tricher. */
+  get testMode(): boolean {
+    return this.test;
+  }
+
   // --- Entrées de l'application ---------------------------------------------------------------------------
 
   /** Une image : `now` en ms (horloge d'image du navigateur). */
@@ -241,6 +319,10 @@ export class Flow {
       case "name":
         phase.menu.tick();
         this.driveName(phase, input);
+        break;
+      case "capture":
+        phase.menu.tick();
+        this.driveCapture(phase, input);
         break;
       case "credits":
         if (input.pressed) this.nextCredits(phase);
@@ -273,14 +355,18 @@ export class Flow {
       pilot.playSeconds += Math.round(stats.seconds);
       this.data.store.save(pilot);
     }
-    this.carry = outcome === "complete" ? (stats.state ?? null) : null;
-    const counters = new EndCounters(outcome, {
-      levelScore: stats.levelScore ?? 0,
-      totalScore: stats.score ?? 0,
-      objectivesPercent: stats.objectivesPercent ?? 0,
-      bonusPercent: stats.bonusPercent ?? 0,
-      secretsPercent: stats.secretsPercent ?? 0,
-    });
+    this.carry = outcome === "complete" && !this.test ? (stats.state ?? null) : null;
+    const counters = new EndCounters(
+      outcome,
+      {
+        levelScore: stats.levelScore ?? 0,
+        totalScore: stats.score ?? 0,
+        objectivesPercent: stats.objectivesPercent ?? 0,
+        bonusPercent: stats.bonusPercent ?? 0,
+        secretsPercent: stats.secretsPercent ?? 0,
+      },
+      stats.endCounter,
+    );
     const seconds = Math.round(stats.seconds ?? 0);
     const menu = this.makeMenu(this.endMenuLines(outcome, counters, seconds), { y: END_MENU_Y, noCancel: true });
     this.phase = { kind: "end", outcome, menu, counters, seconds };
@@ -294,6 +380,7 @@ export class Flow {
     this.pilot = pilot;
     this.runner = null;
     this.missionIndex = Math.max(0, this.data.script.missions.find((m) => m.level === name)?.index ?? 0);
+    this.zone = 0;
     this.phase = { kind: "level" };
     this.view = { kind: "level" };
     this.carry = null;
@@ -325,6 +412,30 @@ export class Flow {
       },
       cancel: resume,
     });
+  }
+
+  /**
+   * F12 en mission de test (`gm_frame` : touche `0x58`, seulement si `DAT_005b03fc`) : menu Tricher sur l'image figée du niveau, encadré
+   * des sons 6000 et 6001 comme la pause.
+   */
+  cheatRequested(): void {
+    if (this.phase.kind !== "level" || !this.test) return;
+    this.host.pauseLevel(true);
+    this.host.sound(SOUND.open);
+    this.cheatMenu();
+  }
+
+  /**
+   * F1 en jeu (`gm_frame`, touche `0x3b`, hors séquence de fin comme la pause) : menu Setup (`gm_menu_setup(…, 1)`) entre les sons 6000
+   * et 6001. Le monde est figé (`gm_menu_run` sans le drapeau 4 : `gm_poll_events` ne joue plus la logique) ; à la sortie, le profil de
+   * contrôleur est rechargé (`gm_player_load_keys`, type et axes liés).
+   */
+  setupRequested(): void {
+    if (this.phase.kind !== "level" || !this.pilot) return;
+    this.host.pauseLevel(true);
+    this.host.sound(SOUND.open);
+    this.setupInLevel = true;
+    this.setupMenu();
   }
 
   /** Le niveau n'a pas pu être chargé : retour au menu (comme le chargement raté de l'élément `300`). */
@@ -372,6 +483,11 @@ export class Flow {
     return text ? { text, tint } : null;
   }
 
+  /** Fond des menus : le décor de `DEMO.SLV`, ou l'image figée du niveau pour le Setup ouvert en jeu. */
+  private get menuBackdrop(): "demo" | "frozen" {
+    return this.setupInLevel ? "frozen" : "demo";
+  }
+
   private makeMenu(lines: MenuLine[], options: ConstructorParameters<typeof Menu>[1]): Menu {
     return new Menu(lines, options, this.data.text);
   }
@@ -380,8 +496,10 @@ export class Flow {
     /** Titre 3D `(table, id, teinte)` (`TITLES`) et bandeau(x) de texte sous lui ; `y` : ordonnée du menu (`MENU_Y`). */
     title: readonly [table: number, id: number, tint: number];
     y?: number;
-    banner: string[];
-    body: MenuLine[];
+    /** Cadre type (`standardLines`) : bandeau(x) puis lignes ; ou `lines`, le cadre exact de l'exécutable quand il diffère. */
+    banner?: string[];
+    body?: MenuLine[];
+    lines?: MenuLine[];
     backdrop?: "demo" | "frozen";
     initial?: number;
     noCancel?: boolean;
@@ -389,8 +507,9 @@ export class Flow {
     cancel?(): void;
     adjust?(id: number, value: number): void;
   }): Menu {
-    const menu = this.makeMenu(standardLines(options.banner, options.body), { y: options.y ?? MENU_Y.small, noCancel: options.noCancel, initial: options.initial });
-    const backdrop = options.backdrop ?? "demo";
+    const lines = options.lines ?? standardLines(options.banner ?? [], options.body ?? []);
+    const menu = this.makeMenu(lines, { y: options.y ?? MENU_Y.small, noCancel: options.noCancel, initial: options.initial });
+    const backdrop = options.backdrop ?? this.menuBackdrop;
     this.phase = { kind: "menu", menu, backdrop, choose: options.choose, cancel: options.cancel ?? (() => {}), adjust: options.adjust };
     this.view = { kind: "menu", menu, backdrop, title: this.title(options.title) };
     return menu;
@@ -464,13 +583,15 @@ export class Flow {
     this.settings.lastPilot = slot;
     this.settings.language = pilot.language;
     this.data.store.saveGlobal(this.settings);
+    // La gamma du pilote est réappliquée à toutes les palettes (`0041d6de` : `DAT_00484644 = +0x30`, `gm_modex_enter`).
+    this.host.gamma(pilot.gamma);
     this.host.musicPreference(MUSIC_PREFERENCES[pilot.music]!);
     this.mainMenu();
   }
 
   private newPilot(): void {
     const menu = this.makeMenu(standardLines([this.s(0, 51)], this.nameLines("")), { y: MENU_Y.small, noCancel: false });
-    this.phase = { kind: "name", menu, name: "" };
+    this.phase = { kind: "name", menu, name: "", testMode: false };
     this.view = { kind: "menu", menu, backdrop: "demo", title: this.title(TITLES.newPilot) };
   }
 
@@ -480,21 +601,27 @@ export class Flow {
 
   private driveName(phase: Extract<Phase, { kind: "name" }>, input: UiInput): void {
     let name = phase.name;
-    for (const key of input.keys) {
-      if (key === "escape") {
+    // Caractères et touches dans l'ordre de frappe.
+    for (const entry of input.typed) {
+      if (typeof entry !== "string") {
+        if ([...name].length < NAME_MAX && isNameChar(entry.char)) name += entry.char;
+      } else if (entry === "escape") {
         this.host.sound(SOUND.validate);
         return this.pilotSelect();
-      }
-      if (key === "backspace") name = [...name].slice(0, -1).join("");
-      else if (key === "enter" && name.trim() !== "") return this.createPilot(name);
+      } else if (entry === "backspace") name = [...name].slice(0, -1).join("");
+      else if (entry === "enter" && name === TEST_MODE_CODE) {
+        // Le code n'est pas un nom : la fiche reçoit `+0x28 = 1` et la saisie recommence à vide (`0041cc45`).
+        phase.testMode = true;
+        name = "";
+      } else if (entry === "enter" && name.trim() !== "") return this.createPilot(name, phase.testMode);
     }
-    for (const ch of input.chars) if ([...name].length < NAME_MAX && isNameChar(ch)) name += ch;
     // Écran tactile : un appui ouvre la saisie du navigateur.
     if (input.taps.length > 0 && this.host.askName) {
       const typed = this.host.askName(name);
       if (typed !== null) {
         const clean = [...typed].filter(isNameChar).join("").slice(0, NAME_MAX);
-        if (clean.trim() !== "") return this.createPilot(clean);
+        if (clean === TEST_MODE_CODE) phase.testMode = true;
+        else if (clean.trim() !== "") return this.createPilot(clean, phase.testMode);
       }
     }
     if (name !== phase.name) {
@@ -503,8 +630,8 @@ export class Flow {
     }
   }
 
-  private createPilot(name: string): void {
-    const pilot = this.data.store.create(name, this.settings.language, 0);
+  private createPilot(name: string, testMode: boolean): void {
+    const pilot = this.data.store.create(name, this.settings.language, 0, testMode);
     this.host.sound(SOUND.validate);
     if (!pilot) return this.pilotSelect();
     this.selectPilot(pilot.slot);
@@ -550,6 +677,9 @@ export class Flow {
   private mainMenu(initial?: number): void {
     const pilot = this.pilot;
     if (!pilot) return this.pilotSelect();
+    // Haut de la boucle principale : fin du mode test (`00421db7`), puis `gm_controller_check` avant chaque menu principal.
+    this.test = false;
+    if (this.controllerCheck(pilot, () => this.mainMenu(initial))) return;
     const completed = pilot.bestMission === ADVENTURE_COMPLETED;
     const started = pilot.bestMission > 0;
     const body: MenuLine[] = [];
@@ -563,13 +693,15 @@ export class Flow {
       { type: "choice", id: 50, text: this.s(1, 14) },
       { type: "choice", id: 60, text: this.s(1, 15) },
       { type: "choice", id: 70, text: this.s(1, 18) },
-      { type: "choice", id: 80, text: this.s(1, 19) },
     );
+    const quit: MenuLine[] = [{ type: "choice", id: 80, text: this.s(1, 19) }];
+    // « Entrez le mode test niveau » : seulement pour un pilote créé après le code (`fiche +0x28 > 0`), sous « Quitter ».
+    if (pilot.testMode) quit.push({ type: "choice", id: 90, text: this.s(1, 20) });
     this.showMenu({
       title: TITLES.main,
       y: MENU_Y.list,
-      banner: [format(this.s(1, 1), pilot.name)],
-      body,
+      // Cadre de `gm_menu_main` : « Quitter » (et le mode test) isolé entre deux traits encadrés d'espaceurs de 2 px, espaceur de 3 px en bas.
+      lines: [space(3), RULE, ...bands(format(this.s(1, 1), pilot.name)), RULE, space(3), ...body, space(2), RULE, space(2), ...quit, space(2), RULE, space(3)],
       initial,
       noCancel: true,
       choose: (id) => {
@@ -590,6 +722,8 @@ export class Flow {
             return this.pilotSelect();
           case 80:
             return this.quitMenu();
+          case 90:
+            return this.testMissionMenu();
         }
       },
     });
@@ -634,43 +768,201 @@ export class Flow {
     this.showMenu({
       title: TITLES.setup,
       banner: [],
-      body: [10, 11, 12, 14].map((id): MenuLine => ({ type: "choice", id, text: this.s(2, id) })),
+      body: [10, 11, 12, 13, 14].map((id): MenuLine => ({ type: "choice", id, text: this.s(2, id) })),
       initial,
       choose: (id) => {
-        if (id === 10) this.controllerMenu();
+        if (id === 10) this.controllerMenu(() => this.setupMenu(10));
         else if (id === 11) this.volumeMenu();
         else if (id === 12) this.languageMenu();
+        else if (id === 13) this.gammaMenu();
         else this.musicMenu();
       },
-      cancel: () => this.mainMenu(40),
+      cancel: () => (this.setupInLevel ? this.resumeFromSetup() : this.mainMenu(40)),
     });
   }
 
-  /** Commandes : liste des liaisons (lecture seule, le port ne les fait pas redéfinir). */
-  private controllerMenu(): void {
-    const language = this.language;
-    const rows: [number, string][] = [
-      [21, "turnLeft"],
-      [22, "turnRight"],
-      [24, "forward"],
-      [25, "back"],
-      [26, "strafeLeft"],
-      [27, "strafeRight"],
-      [28, "brake"],
-      [29, "firePrimary"],
-      [30, "fireSpecial"],
-      [31, "weaponNext"],
-      [32, "weaponPrev"],
+  /** Échap dans le Setup ouvert en jeu : profil de contrôleur rechargé, son 6001, le niveau reprend. */
+  private resumeFromSetup(): void {
+    this.setupInLevel = false;
+    if (this.pilot) this.host.loadControls(this.pilot);
+    this.host.pauseLevel(false);
+    this.host.sound(SOUND.close);
+    this.phase = { kind: "level" };
+    this.view = { kind: "level" };
+  }
+
+  // --- Contrôleur (`00418454`, `004171b4`, `0041797c`, `004168b0`) ----------------------------------------------------------
+
+  /**
+   * `gm_controller_check` (`00418f54`) : un pilote sans contrôleur configuré (type 0), ou réglé sur la souris sans souris, passe par le
+   * choix du type puis le menu du contrôleur avant le menu principal. Une manette absente ne remet pas le type à 0 : la Gamepad API ne
+   * montre une manette qu'après un appui sur un de ses boutons. Vrai si le menu a été ouvert (`then` est rappelé à sa sortie).
+   */
+  private controllerCheck(pilot: Pilot, then: () => void): boolean {
+    const c = pilot.controller;
+    if (c && (c.type !== 2 || this.host.hasController(2))) return false;
+    if (c) {
+      pilot.controller = null;
+      this.data.store.save(pilot);
+    }
+    this.controllerMenu(then);
+    return true;
+  }
+
+  /**
+   * « Configuration du contrôleur » : le type (ligne double), les liens d'axes (sauf au clavier), les touches des mouvements qui ne
+   * sont pas sur un axe, « Freiner », puis tir et sélection. Choisir une touche ouvre sa capture ; Échap revient à `back`. Sans type
+   * configuré, le choix du type s'ouvre d'abord (`+0x0c == 0`).
+   */
+  private controllerMenu(back: () => void, initial?: number): void {
+    const pilot = this.pilot!;
+    const c = pilot.controller;
+    if (!c) return this.controllerTypeMenu(() => this.controllerMenu(back));
+    const key = (row: number): MenuLine => ({ type: "choice", id: row, text: format(this.s(3, row), this.keyName(c.keys[KEY_ROWS[row]!]!)) });
+    const motion = (m: Motion, rows: number[]): MenuLine[] => (motionOnKeys(c, m) ? rows.map(key) : []);
+    const lines: MenuLine[] = [
+      space(3),
+      RULE,
+      ...choices(1, format(this.s(3, 1), this.s(3, 10 + c.type))),
+      space(3),
+      RULE,
+      ...(usesAxes(c.type) ? [space(3), ...choices(20, this.s(3, 20)), space(3), RULE, space(3)] : []),
+      ...motion(0, [21, 22]),
+      ...motion(1, [24, 25]),
+      ...motion(2, [26, 27]),
+      key(28),
+      RULE,
+      ...[29, 30, 31, 32].map(key),
+      space(4),
+      RULE,
+      space(4),
     ];
-    const back = (): void => this.setupMenu(10);
+    const again = (id: number) => (): void => this.controllerMenu(back, id);
     this.showMenu({
       title: TITLES.controller,
       y: MENU_Y.controller,
-      banner: [],
-      body: rows.map(([id, action]): MenuLine => ({ type: "choice", id, text: format(this.s(3, id), this.data.bindingLabel(action, language)) })),
-      choose: back,
+      lines,
+      initial,
+      choose: (id) => {
+        if (id === 1) this.controllerTypeMenu(again(1));
+        else if (id === 20) this.axisMenu(again(20));
+        else {
+          const slot = KEY_ROWS[id];
+          if (slot === undefined) return;
+          this.captureKey(id, c.keys[slot]!, (scan) => {
+            c.keys[slot] = scan;
+            this.data.store.save(pilot);
+            again(id)();
+          });
+        }
+      },
       cancel: back,
     });
+  }
+
+  /** Nom d'une touche (table 1000 du jeu, indexée par le code de balayage : « Flèche ← », « Espace », « Souris 1 », « Manette 2 »…). */
+  private keyName(scan: number): string {
+    return this.s(1000, scan);
+  }
+
+  /**
+   * « Type du contrôleur » (`004171b4`) : clavier toujours, souris et manette si elles sont là ; pas d'annulation (drapeaux `0x21`).
+   * Changer de type pose les touches et les axes par défaut du type ; reprendre le même type ne touche à rien.
+   */
+  private controllerTypeMenu(then: () => void): void {
+    const pilot = this.pilot!;
+    const types = CONTROLLER_TYPES.filter((t) => t === 1 || this.host.hasController(t));
+    this.showMenu({
+      title: TITLES.controllerType,
+      y: MENU_Y.list,
+      lines: [
+        space(3),
+        RULE,
+        ...bands(this.s(3, 101)),
+        RULE,
+        space(3),
+        ...types.map((t): MenuLine => ({ type: "choice", id: t, text: this.s(3, 10 + t) })),
+        space(2),
+        RULE,
+        space(3),
+      ],
+      initial: pilot.controller?.type,
+      noCancel: true,
+      choose: (id) => {
+        const type = id as ControllerType;
+        if (pilot.controller?.type !== type) pilot.controller = defaultProfile(type);
+        this.data.store.save(pilot);
+        then();
+      },
+    });
+  }
+
+  /**
+   * « Liens du contrôleur » (`0041797c`) : chaque mouvement passe à l'axe suivant du type (« Clavier » = aucun), « Attacher au centre »
+   * (manette seulement) bascule Oui / Non. Le titre 3D est recréé à chaque passage, comme dans l'exe.
+   */
+  private axisMenu(back: () => void, initial?: number): void {
+    const pilot = this.pilot!;
+    const c = pilot.controller!;
+    clampAxes(c);
+    const axis = (id: number, motion: Motion): MenuLine => ({ type: "choice", id, text: format(this.s(3, 1009 + id), this.s(3, 200 + c.axes[motion])) });
+    this.showMenu({
+      title: TITLES.axes,
+      y: MENU_Y.axes,
+      lines: [
+        space(3),
+        RULE,
+        space(3),
+        ...bands(this.s(3, 1001)),
+        space(3),
+        RULE,
+        space(3),
+        axis(1, 0),
+        axis(2, 1),
+        axis(3, 2),
+        // `0/100` « Oui » si la zone morte est active (octet à 0), `0/101` « Non » sinon.
+        ...(c.type > 2 ? [{ type: "choice", id: 4, text: format(this.s(3, 1013), this.s(0, 100 + c.clip)) } satisfies MenuLine] : []),
+        space(3),
+        RULE,
+        space(3),
+      ],
+      initial,
+      choose: (id) => {
+        if (id === 4) c.clip = c.clip === 0 ? 1 : 0;
+        else cycleAxis(c, (id - 1) as Motion);
+        this.data.store.save(pilot);
+        this.axisMenu(back, id);
+      },
+      cancel: back,
+    });
+  }
+
+  /**
+   * « Sélectionner une touche » (`004168b0`) : « Appuyez sur la touche pour » et la ligne de l'action avec sa touche actuelle, sans choix
+   * ni annulation ; la première touche ou le premier bouton qui a un nom dans la table 1000 est pris (son 6003). Les touches sans nom
+   * (`#…` : Échap, F1…, chiffres) sont refusées, sauf pour un pilote en mode test.
+   */
+  private captureKey(row: number, current: number, done: (scan: number) => void): void {
+    const lines: MenuLine[] = [
+      RULE,
+      space(3, ROW.banner),
+      ...bands(this.s(3, 34)),
+      ...bands(format(this.s(3, row), this.keyName(current))),
+      space(3, ROW.banner),
+      RULE,
+    ];
+    const menu = this.makeMenu(lines, { y: MENU_Y.small, noCancel: true });
+    this.phase = { kind: "capture", menu, done };
+    this.view = { kind: "menu", menu, backdrop: this.menuBackdrop, title: this.title(TITLES.captureKey) };
+  }
+
+  private driveCapture(phase: Extract<Phase, { kind: "capture" }>, input: UiInput): void {
+    for (const scan of input.scans) {
+      const name = this.keyName(scan);
+      if (name === "" || (name.startsWith("#") && !this.pilot?.testMode)) continue;
+      this.host.sound(SOUND.validate);
+      return phase.done(scan);
+    }
   }
 
   private volumeMenu(): void {
@@ -738,6 +1030,130 @@ export class Flow {
     });
   }
 
+  /**
+   * « Correction gamma » (`gm_menu_gamma` `00417ffc`) : quatre niveaux ; choisir l'applique tout de suite à la palette et l'écrit dans la
+   * fiche, le menu reste ouvert (le titre 3D n'est créé qu'une fois) jusqu'à Échap.
+   */
+  private gammaMenu(): void {
+    const pilot = this.pilot!;
+    this.showMenu({
+      title: TITLES.gamma,
+      lines: [
+        space(3),
+        RULE,
+        space(3),
+        ...bands(this.s(6, 1)),
+        space(3),
+        RULE,
+        space(3),
+        ...Array.from({ length: GAMMA_LEVELS }, (_, g): MenuLine => ({ type: "choice", id: g, text: this.s(6, 10 + g) })),
+        space(3),
+        RULE,
+        space(3),
+      ],
+      initial: pilot.gamma,
+      choose: (g) => {
+        pilot.gamma = g;
+        this.data.store.save(pilot);
+        this.host.gamma(g);
+      },
+      cancel: () => this.setupMenu(13),
+    });
+  }
+
+  // --- Mode test et menu Tricher -------------------------------------------------------------------------------------
+
+  /**
+   * « Tester la mission » (`gm_menu_test_mission` `0041e614`) : les noms de missions de la table 200 jusqu'au premier `#`, 8 par page,
+   * « Retour » / « Suivant » pour feuilleter (6 missions de plus ou de moins), des espaceurs de 19 px à la place des lignes absentes.
+   * La mission choisie se joue en mode test (`DAT_005b03fc = 1`).
+   */
+  private testMissionMenu(offset = 0, initial?: number): void {
+    let count = 0;
+    while (!(this.s(200, count) || "#").startsWith("#")) count++;
+    const empty = space(19);
+    const slots = Array.from({ length: 8 }, (_, i): MenuLine => (offset + i < count ? { type: "choice", id: offset + i, text: this.s(200, offset + i) } : empty));
+    this.showMenu({
+      title: TITLES.testMission,
+      y: MENU_Y.list,
+      lines: [
+        space(3),
+        RULE,
+        ...bands(this.s(11, 21)),
+        RULE,
+        space(3),
+        offset === 0 ? empty : { type: "choice", id: -100, text: this.s(11, 10) },
+        space(3),
+        RULE,
+        space(3),
+        ...slots,
+        space(3),
+        RULE,
+        space(3),
+        offset < count - 7 ? { type: "choice", id: 100, text: this.s(11, 11) } : empty,
+        space(3),
+        RULE,
+        space(2),
+      ],
+      initial,
+      choose: (id) => {
+        if (id === -100) this.testMissionMenu(Math.max(0, offset - 6), id);
+        else if (id === 100) this.testMissionMenu(Math.min(offset + 6, count - 5), id);
+        else if (this.data.script.missions.some((m) => m.index === id)) this.runScript(id, true);
+      },
+      cancel: () => this.mainMenu(90),
+    });
+  }
+
+  /**
+   * Menu Tricher (`gm_menu_pickups` `0041bb40`) : trois pages (armes 0-9, armes 10-19, bonus et véhicules de la zone) tournées par
+   * « Autres tricheries » ; un choix applique le bonus ou la forme et le menu reste ouvert ; Échap reprend le niveau (son 6001). Le titre
+   * 3D n'est créé qu'une fois : changer de page ne fait que remplacer les lignes.
+   */
+  private cheatMenu(): void {
+    let page = 0;
+    const lines = (): MenuLine[] => {
+      const items = CHEAT_PAGES[page]!.map((n): MenuLine => ({ type: "choice", id: n, text: this.s(100, n) }));
+      const forms = page === 2 ? (CHEAT_FORMS[this.zone] ?? []).map((n): MenuLine => ({ type: "choice", id: n, text: this.s(100, n) })) : [];
+      return [
+        space(3),
+        RULE,
+        ...bands(this.s(100, 1001)),
+        RULE,
+        space(3),
+        { type: "choice", id: CHEAT_MORE, text: this.s(100, 9999) },
+        space(3),
+        RULE,
+        space(3),
+        ...items,
+        ...(forms.length > 0 ? [space(3), RULE, space(3), ...forms] : []),
+        space(3),
+        RULE,
+        space(3),
+      ];
+    };
+    const resume = (): void => {
+      this.host.pauseLevel(false);
+      this.host.sound(SOUND.close);
+      this.phase = { kind: "level" };
+      this.view = { kind: "level" };
+    };
+    const menu = this.showMenu({
+      title: TITLES.cheat,
+      y: MENU_Y.list,
+      lines: lines(),
+      backdrop: "frozen",
+      choose: (id) => {
+        if (id === CHEAT_MORE) {
+          page = (page + 1) % CHEAT_PAGES.length;
+          menu.setLines(lines(), CHEAT_MORE);
+        } else if (id < 200) this.host.cheat({ pickup: id });
+        else this.host.cheat({ form: id - 200 });
+      },
+      cancel: resume,
+    });
+  }
+
   // --- Crédits ------------------------------------------------------------------------------------------------------
 
   private startCredits(): void {
@@ -756,7 +1172,9 @@ export class Flow {
 
   // --- Script des missions ------------------------------------------------------------------------------------------
 
-  private runScript(startMission: number | undefined): void {
+  /** `test` : « Entrez le mode test niveau » (missions sans progression, menu Tricher). */
+  private runScript(startMission: number | undefined, test = false): void {
+    this.test = test;
     this.carry = null;
     this.runner = new MissionScriptRunner(this.data.script, startMission);
     this.advanceScript();
@@ -770,7 +1188,10 @@ export class Flow {
       const step = runner.next();
       switch (step.kind) {
         case "mission":
-          if (step.index !== END_MISSION) {
+          if (step.index !== END_MISSION && this.test) {
+            // Mission de test : état remis à zéro avec 400 d'énergie, ni fiche d'arrivée ni meilleure mission (`00422024`-`004220b6`).
+            runner.seed(stateVars(TEST_STATE));
+          } else if (step.index !== END_MISSION) {
             // Élément `200` : l'état de fin de la mission précédente devient la fiche d'arrivée `1000 + n` ; le joueur repart de cet état
             // (les éléments `100`-`103` qui suivent s'y appliquent). Une partie neuve n'a pas de fiche : variables du script seules.
             if (this.carry) pilot.states[step.index] = this.carry;
@@ -789,9 +1210,17 @@ export class Flow {
           return;
         case "level":
           this.missionIndex = step.mission;
+          this.zone = step.vars.get(4) ?? 0;
           this.phase = { kind: "level" };
           this.view = { kind: "level" };
-          this.host.startLevel({ name: step.name, mission: step.mission, vars: step.vars, tracks: step.tracks, pilot, state: pilot.states[step.mission] ?? null });
+          this.host.startLevel({
+            name: step.name,
+            mission: step.mission,
+            vars: step.vars,
+            tracks: step.tracks,
+            pilot,
+            state: this.test ? null : (pilot.states[step.mission] ?? null),
+          });
           return;
         case "finished":
           this.runner = null;

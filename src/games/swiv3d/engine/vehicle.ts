@@ -78,7 +78,7 @@ function thrustKeys(p: Player, inp: PlayerInput, step: number): void {
 /**
  * Pilote des véhicules (`+0xa8`) : le cap bouge directement (4 pas par tick au clavier, pas d'inertie angulaire), la touche
  * avancer/reculer ajoute à la poussée `+0x74`, le frein est l'état `+0x50 = 1` qui ne dure qu'un tick. Les sélections d'armes
- * et les tirs sont dans `commonButtons` (player.ts). `fireYaw` (`+0x94`) garde le cap de tir tant que « latéral droit » est tenu.
+ * et les tirs sont dans `commonButtons` (player.ts). `fireYaw` (`+0x94`) se recopie après le tir (`latchVehicleFireYaw`, player.ts).
  */
 export function vehiclePilot(p: Player, inp: PlayerInput): void {
   const o = p.obj;
@@ -111,7 +111,6 @@ export function vehiclePilot(p: Player, inp: PlayerInput): void {
   }
   // seconde application des touches (après les armes dans l'exe) : sans frein, la touche vaut donc deux pas par tick
   if (o.state !== 1) thrustKeys(p, inp, f.thrustStep);
-  if (!inp.strafeRight) p.fireYaw = o.yaw;
   if (f.wheels) {
     // marche arrière (vitesse vers l'avant < -7000) : le braquage visuel s'inverse ; puis les roues suivent la cible de 4 en 4
     const yaw = o.yaw & 0x1ff;
@@ -119,6 +118,23 @@ export function vehiclePilot(p: Player, inp: PlayerInput): void {
     if (p.steer < p.steerTarget) p.steer += 4;
     if (p.steerTarget < p.steer) p.steer -= 4;
   }
+}
+
+/**
+ * Pilotes de fin de niveau des formes 1 (`00438ec8`) et 2 (`00438fb8`), installés au tick 25 de la victoire : frein relâché
+ * (`+0x50` 1 → 0), cap −4 et poussée `+0x82` à chaque tick (le véhicule tourne en rond à gauche), coup de −13 sur `+0x1b0` (et `+0x1b4`
+ * pour le buggy : ses deux roues arrière ; pour la motoneige `+0x1b0` est le ski, dont le tangage est ensuite recopié du corps). Ni
+ * entrée ni tir ; le braquage `+0xb0` va vers la dernière cible `+0xb4` par pas de 8 (`playerWheelsTick`).
+ */
+export function vehicleVictoryPilot(p: Player): void {
+  const o = p.obj;
+  if (o.state === 1) o.state = 0;
+  o.yaw -= 4;
+  p.thrust += 0x82;
+  const w2 = p.wheels[2];
+  if (w2) w2.pitch -= 0xd;
+  const w3 = p.form === FORM_BUGGY ? p.wheels[3] : undefined;
+  if (w3) w3.pitch -= 0xd;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

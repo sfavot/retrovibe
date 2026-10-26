@@ -15,8 +15,10 @@ export const MAX_CATCHUP_MS = 800;
 /** Les touches ne sont prises en compte qu'à partir de ce compteur de fin (`DAT_005b03e8 >= 0x6e`, `00419be7`). */
 export const END_GUARD_TICKS = 110;
 /**
- * Valeur du compteur de fin quand l'écran apparaît : la boucle de jeu sort à `0x37` après une victoire (`0043c234`) et à `0x23`
- * après la mort du joueur. Les touches sont donc ignorées 55 ticks (1,375 s) après une victoire, 75 ticks (1,875 s) après un game over.
+ * Valeur du compteur de fin quand la boucle de jeu en sort : `0x37` après une victoire (`0043c234`), `0x23` après la mort du joueur. Les
+ * ticks restants de la même image (`gm_poll_events` les joue tous avant de rendre la main) s'y ajoutent : l'écran reprend la valeur du
+ * niveau (`LevelStats.endCounter`) ; ces constantes ne servent que sans elle. Les touches sont donc ignorées environ 55 ticks (1,375 s)
+ * après une victoire, 75 ticks (1,875 s) après un game over.
  */
 export const END_START_TICKS: Record<LevelOutcome, number> = { complete: 0x37, gameOver: 0x23 };
 
@@ -56,8 +58,9 @@ export class EndCounters {
   ticks: number;
   private acc = 0;
 
-  constructor(outcome: LevelOutcome, values: EndValues) {
-    this.ticks = END_START_TICKS[outcome];
+  /** `endCounter` : compteur de fin du niveau à la sortie de sa boucle (`DAT_005b03e8`, le même compteur continue ici). */
+  constructor(outcome: LevelOutcome, values: EndValues, endCounter?: number) {
+    this.ticks = endCounter !== undefined && endCounter >= 0 ? endCounter : END_START_TICKS[outcome];
     this.target[COUNTER.levelScore] = values.levelScore;
     this.target[COUNTER.totalScore] = values.totalScore;
     this.target[COUNTER.objectives] = values.objectivesPercent;

@@ -112,6 +112,15 @@ describe.skipIf(!hasOriginalFiles)(
         ).toHaveLength(1);
     });
 
+    it("n'a ni départ 1002 (séquence 00438744), ni plate-forme 7012/7013 (pilote 00438c68), ni boss 8000-8040", () => {
+      for (const l of levels.values())
+        expect(
+          l.objects.filter(
+            (o) => o.type === 1002 || o.type === 7012 || o.type === 7013 || (o.type >= 8000 && o.type <= 8040),
+          ),
+        ).toHaveLength(0);
+    });
+
     it("garde les objets et les angles dans les bornes observées", () => {
       for (const l of levels.values()) {
         for (const o of l.objects) {

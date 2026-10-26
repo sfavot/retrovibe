@@ -14,9 +14,12 @@
  *   La forme 1 donne en plus un coup de rotation aux roues arrière à chaque pas de poussée (`vehicle.ts`, `kickRearWheels`).
  * - Mort (`gm_player_die` `0043b4f4`) : les roues deviennent des gros éclats (`0044412c`) lancés par la table pseudo-aléatoire × 9.
  *
+ * - Fin de niveau (`00438ec8` forme 1, `00438fb8` forme 2) : braquage vers la cible par pas de 8 comme `00438694`, modes 3, 3, 4, 4
+ *   (buggy) ou 1, 1, 2 (motoneige) ; le coup de −13 sur les roues arrière est dans `vehicleVictoryPilot` (`vehicle.ts`).
+ *
  * Écarts : sous `00438694` la motoneige n'a que trois roues et l'exe met à jour un quatrième pointeur `+0x1b4` resté de la forme 1
- * (ou nul) : ignoré ici ; les pilotes de fin de niveau (`00438ec8`, `00438fb8`) ne sont pas portés (la fin de niveau rejoue le pilote
- * normal sans entrée) ; le monde `004841b0` est déduit du nom du niveau.
+ * (ou nul) : ignoré ici ; la variante `00438c68` (modes 1, 1, 2, installée par les plates-formes 7012/7013 `004495f8`, absentes des
+ * niveaux livrés) n'est pas portée ; le monde `004841b0` est déduit du nom du niveau.
  */
 import { attachTo } from "./attach";
 import { cloneObject, nextRandom } from "./combat";
@@ -140,32 +143,41 @@ export function wheelUpdate(ctx: PlayerContext, w: GameObject, mode: number, ste
 }
 
 /**
- * Fin de la fonction pilote (`+0xa8`) pour les roues : pilote normal des formes 1 et 2 (braquage déjà avancé de 4 par `vehiclePilot`)
- * ou pilote d'amarrage `00438694` quand le pilote est coupé (`autopilot` : plate-forme au sol, Super Ressort), qui avance le braquage
- * de 8 vers sa cible.
+ * Fin de la fonction pilote (`+0xa8`) pour les roues : pilote normal des formes 1 et 2 (braquage déjà avancé de 4 par `vehiclePilot`),
+ * pilote d'amarrage `00438694` quand le pilote est coupé (`autopilot` : plate-forme au sol, Super Ressort) ou pilote de fin de niveau
+ * (`victory` : `00438ec8`, `00438fb8`) ; ces deux derniers avancent le braquage de 8 vers sa cible.
  */
 export function playerWheelsTick(p: Player, ctx: PlayerContext): void {
   if (p.wheels.length === 0 || p.dead) return;
-  let modes: readonly number[];
-  if (p.autopilot) {
+  const own = p.form === FORM_BUGGY ? MODES_BUGGY : MODES_SNOWMOBILE;
+  let modes: readonly number[] = own;
+  if (p.autopilot || p.victory) {
     if (p.steer < p.steerTarget) p.steer += 8;
     if (p.steerTarget < p.steer) p.steer -= 8;
-    modes = MODES_AUTOPILOT;
-  } else modes = p.form === FORM_BUGGY ? MODES_BUGGY : MODES_SNOWMOBILE;
+    if (p.autopilot) modes = MODES_AUTOPILOT;
+  }
   p.wheels.forEach((w, i) => wheelUpdate(ctx, w, modes[i]!, p.steer));
 }
 
 const rnd = { x: 0, y: 0, z: 0 };
 
-/** `gm_player_die`, formes 1 et 2 : chaque roue devient un gros éclat (`0044412c`) de modèle `0x3d4`, vitesse aléatoire × 9. */
+/**
+ * `gm_player_die` : l'objet accroché au joueur devient un gros éclat (`0044412c`) lancé par la table pseudo-aléatoire × 9 (vitesse
+ * verticale positive), cap = x de l'entrée suivante.
+ */
+export function flingAttached(world: World, o: GameObject): void {
+  o.update = "fx_debris";
+  nextRandom(world, rnd);
+  o.vx = rnd.x * 9;
+  o.vy = Math.abs(rnd.y) * 9;
+  o.vz = rnd.z * 9;
+  o.yaw = peekRandomX(world);
+}
+
+/** `gm_player_die`, formes 1 et 2 : chaque roue devient un gros éclat (`flingAttached`) de modèle `0x3d4`. */
 export function flingPlayerWheels(world: World, p: Player): void {
   for (const w of p.wheels) {
-    w.update = "fx_debris";
-    nextRandom(world, rnd);
-    w.vx = rnd.x * 9;
-    w.vy = Math.abs(rnd.y) * 9;
-    w.vz = rnd.z * 9;
-    w.yaw = peekRandomX(world);
+    flingAttached(world, w);
     w.model = WHEEL_MODEL;
   }
   p.wheels = [];

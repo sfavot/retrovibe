@@ -41,11 +41,12 @@ import {
 } from "./objects";
 import {
   FORM_DEMO,
-  FORM_DYING,
+  FORM_SCRIPTED_START,
   Player,
   UPDATE_PLAYER_DEMO,
   UPDATE_PLAYER_HELI,
   UPDATE_PLAYER_INERT,
+  UPDATE_PLAYER_DEAD,
   UPDATE_PLAYER_VEHICLE,
   pilot,
   playerHeliUpdate,
@@ -56,7 +57,6 @@ import { demoPilotUpdate } from "./demo-pilot";
 import { vehiclePhysics } from "./vehicle";
 import { UPDATE_PLAYER_WHEEL, playerWheelsTick, setPlayerWheels } from "./wheels";
 import { Terrain, applyCrater, fadeGroundFlash, newGroundFlash } from "./terrain";
-import { emptyInput } from "./input";
 
 /** Fonction de comportement d'un objet (`+0x68`), appelée après `pos += vel`. H1 en enregistre via `registerBehavior`. */
 export type Behavior = (world: World, o: GameObject) => void;
@@ -177,6 +177,9 @@ export class World {
       demoPilotUpdate(this.player, this.playerContext),
     );
     this.registerBehavior(UPDATE_PLAYER_INERT, () => {});
+    this.registerBehavior(UPDATE_PLAYER_DEAD, (_w, o) => {
+      o.vx = o.vy = o.vz = 0;
+    });
     this.registerBehavior(UPDATE_PLAYER_WHEEL, () => {});
 
     const ctx = {
@@ -226,7 +229,7 @@ export class World {
     setForm(
       p,
       opts.startForm ??
-        (rec.type === 1001 ? FORM_DEMO : rec.type === 1002 ? FORM_DYING : 0),
+        (rec.type === 1001 ? FORM_DEMO : rec.type === 1002 ? FORM_SCRIPTED_START : 0),
     );
     setPlayerWheels(this, p);
     this.events.length = 0; // le changement de forme initial n'est pas un événement de jeu
@@ -320,11 +323,8 @@ export class World {
   }
 
   private updatePlayer(input: PlayerInput): void {
-    const g = this.game;
-    // fin de niveau : après 25 ticks le véhicule garde son vol sans entrée (`gm_pilot_victory_*`)
-    const flying =
-      g.endState === "victory" && g.endCounter >= 0x19 ? emptyInput() : input;
-    pilot(this.player, flying, (e) => this.events.push(e));
+    // fin de niveau : à partir du tick 26 les formes 0 à 3 ont leur pilote automatique (`gm_pilot_victory_*`, `player.victory`)
+    pilot(this.player, input, (e) => this.events.push(e));
     playerWheelsTick(this.player, this.playerContext);
     playerTick(this, input);
   }

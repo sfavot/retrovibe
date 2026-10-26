@@ -145,7 +145,7 @@ Le champ `REC[7]` n'est donc **pas** un « sous-modèle `REC[7] - 5000` » (affi
 |---|---|---|---|---|---|
 | 1000 | (forme) | profil (`profil+0x3c`) | 0, puis 990/991 | joueur | struct joueur 0x228 (pool `005a936c`) ; forme = `profil+0x38` (`0043de0c`) ; créée si le compteur de joueurs `00484204` vaut 0 |
 | 1001 | `0x40` (forme 42) | profil | 990 | `00449af8` | démo : joueur piloté |
-| 1002 | (forme 43) | 300 puis profil | - | - | non présent ; crée aussi un compagnon `0x3df` |
+| 1002 | (forme 43) | 300 puis profil | - | - | non présent ; crée aussi un compagnon `0x3df` ; départ scripté `00438744` (`player.md` §3.12, non porté) |
 | 2000 | `0x0001` | `REC[6]` | `REC[4]` | `00446d24` | - |
 | 2001 | `0x0841` | `REC[6]` | `REC[4]` | `00446d24` | non présent |
 | 2002 | `0x4081` | `REC[6]` | `REC[4]` | `00446d24` | - |
@@ -171,7 +171,7 @@ Le champ `REC[7]` n'est donc **pas** un « sous-modèle `REC[7] - 5000` » (affi
 
 `2000` et `2004` incrémentent le compteur `005b03f4` (« porteurs de bonus ») si `REC[7] ∈ [1000, 2000[` ; `7000/7001/7002` incrémentent `005b03d8` (bonus posés). Ces deux compteurs servent au pourcentage de l'écran de fin de niveau (`004194b0`).
 
-Types absents des niveaux livrés mais câblés dans le même `switch` (code présent, comportements non lus ici sauf mention) : 2001, 2004, 3002 (hélicoptère-tourelle `0044b178` + `0044b310`), 5001/5003 (`0044cc78`), 5004/5005 (bateaux/chars à 2 canons `0044c41c`), 5501 (`0044d218`), 6200 (`0044edc8`), 7001, 7012/7013 (variantes de pad), 7800-7801 (caméra de scénario `00446a7c`, `REC[7]` = numéro de caméra), 7900 (hauteur de référence `005b03cc`), 8000-8040 (boss à segments : `0044fef0`, `004505dc`, `00451100`, `00451b10`, `00452398`), 14000 (`0044b9d4`), plus les formes de joueur 42/43.
+Types absents des niveaux livrés mais câblés dans le même `switch` (code présent, comportements non lus ici sauf mention) : 2001, 2004, 3002 (hélicoptère-tourelle `0044b178` + `0044b310`), 5001/5003 (`0044cc78`), 5004/5005 (bateaux/chars à 2 canons `0044c41c`), 5501 (`0044d218`), 6200 (`0044edc8`), 7001, 7012/7013 (variantes de pad), 7800-7801 (caméra de scénario `00446a7c`, `REC[7]` = numéro de caméra), 7900 (hauteur de référence `005b03cc`), 8000-8040 (boss à segments : `0044fef0`, `004505dc`, `00451100`, `00451b10`, `00452398` ; leur mort passe par `gm_object_explode` ; **non portés**, absents des niveaux livrés : `test/swiv3d/level.test.ts`), 14000 (`0044b9d4`), plus les formes de joueur 42/43.
 
 ## 5. Table des types présents
 
@@ -314,7 +314,7 @@ Objet invisible et inattaquable (classe `0x40`). Toutes les 31 images (`âge > 3
 
 - **Amarrage en vol** (`00446efc`) : cap vers la plate-forme (pas 4) ; état 0 : vol stationnaire à 130 u du relief, glissement de 1/16 de l'écart vers le point à 32 u de la plate-forme (cap + 0x140), le compteur de 70 baisse de 2 par tick (35 ticks) ; état 1 : descente de 550/256 u par tick jusqu'à 9 500/256 u au-dessus de la plate-forme ; état 2 = arrivé.
 - **Amarrage au sol** (`00447080`) : suspension des 4 roues (le pilote du joueur devient `00438694`, qui anime les roues enfants : `player.md` §3.6), frottement 14/16, gravité 150 ; état 0 choisit l'approche par le point à 256 u devant ou derrière (le plus proche du point à 32 u devant le véhicule) ; états 10/0x14 (vise ce point, pas 2), 0xb/0x15 (avance de 4 u par tick jusqu'à 100 u), 0x1e (vise la plate-forme, pas 3), 0x1f (avance jusqu'à 70 u) → 0x20.
-- Variantes 7012 et suivantes (`004477b0`, `00447afc`, `0044878c`, `004490cc`, `004493e8`, `004495f8`) : non lues. 7010 sans hélicoptère posé reste bloquée à l'état 7 au retour.
+- Variantes 7012 et suivantes (`004477b0`, `00447afc`, `0044878c`, `004490cc`, `004493e8`, `004495f8`) : non lues. `004495f8` est le comportement des types 7012 et 7013 (le 7013 crée en plus l'hélicoptère posé `0x3de` à l'état 5, comme 7011) et installe le pilote `00438c68` (motoneige amarrée : braquage par pas de 8, roues 1, 1, 2) ; absents des niveaux livrés, non portés. 7010 sans hélicoptère posé reste bloquée à l'état 7 au retour.
 
 ### 6.12 Ce qui n'est pas des « types » mais des objets créés
 

@@ -5,7 +5,6 @@ import type { GlobalData } from "../data/global";
 import { parseBd } from "../data/bd";
 import { parseLevel } from "../data/level";
 import type { WorldEvent } from "../engine/events";
-import { emptyInput } from "../engine/input";
 import { World, loadDebris, loadModels } from "../engine/world";
 import { createRenderAssets } from "../render/assets";
 import { createHud, radarColorTable, type Hud } from "../render/hud";
@@ -99,6 +98,11 @@ export interface LevelSession {
   readonly userPaused: boolean;
   /** Ferme la pause du joueur (n'importe quelle touche, appui sur l'écran). */
   resume(): void;
+  /**
+   * Pause, F1 (Setup) et F12 (Tricher) sont-ils ouverts ? `gm_frame` ne les lit que hors séquence de fin (`DAT_005b0414 == 0`) : ni
+   * pendant la victoire ou la mort, ni derrière l'écran de fin.
+   */
+  readonly menusAllowed: boolean;
   /** Table de couleurs du texte 3D de ce niveau (bloc 11003, `005bc158`) : couleurs des titres de menu devant ce niveau. */
   readonly textColors: Uint8Array;
   /** Dev : termine le niveau (F9) ou fait mourir le joueur (F8). */
@@ -112,7 +116,8 @@ export interface LevelSession {
 /**
  * Charge un niveau et le fait vivre : monde à 40 Hz, caméra de poursuite, rendu logiciel à chaque image du navigateur, son (moteur,
  * événements) et musique du niveau. Pause sur la touche Pause (n'importe quelle touche la ferme) ou quand l'onglet est masqué. Une fois
- * le niveau fini (mission accomplie, game over) le monde continue de tourner, joueur sans commandes, derrière l'écran de fin.
+ * le niveau fini (mission accomplie, game over) le monde continue de tourner derrière l'écran de fin, sans clavier (manette et souris
+ * seules, comme l'original).
  */
 export async function startLevel(services: LevelServices, request: LevelRequest): Promise<LevelSession> {
   const name = request.name.toUpperCase();
@@ -168,6 +173,7 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
   let hostPaused = false;
   let wasPaused = false;
   const isPaused = (): boolean => tabHidden || userPaused || hostPaused;
+  const menusAllowed = (): boolean => !finished && world.game.endState === "none";
   const applyPause = (): void => {
     const paused = isPaused();
     if (paused === wasPaused) return;
@@ -213,6 +219,9 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
     events,
     seconds: () => ticksInLevel / 40,
     summary: () => summarize(world, ticksInLevel / 40, request),
+    get menusAllowed() {
+      return menusAllowed();
+    },
     onPause(hidden) {
       tabHidden = hidden;
       applyPause();
@@ -234,12 +243,15 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
       lastNow = now;
       if (dt > 0 && dt < 500) stats.frameMs = stats.frameMs === 0 ? dt : stats.frameMs * 0.95 + dt * 0.05;
       if (tabHidden) return;
+      // Écran de fin : le clavier est vidé à chaque image (`gm_menu_run` → `gm_clear_keys`), la manette et la souris sont relues.
+      if (finished) controls.releaseKeys();
       controls.poll();
-      if (!finished && !hostPaused) {
-        // Pause : la touche Pause la pose ; une fois posée, n'importe quelle touche la ferme (`gm_screen_pause`, `00419058`).
+      if (!hostPaused) {
+        // Pause : la touche Pause la pose (hors séquence de fin) ; une fois posée, n'importe quelle touche la ferme (`gm_screen_pause`,
+        // `00419058`). Un appui hors de propos est oublié.
         const pauseKey = controls.takePauseRequest();
         const anyKey = controls.takeAnyKey();
-        if (!userPaused && pauseKey) {
+        if (!userPaused && pauseKey && menusAllowed()) {
           userPaused = true;
           applyPause();
         } else if (userPaused && (pauseKey || anyKey)) resume();
@@ -249,8 +261,9 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
       if (!hostPaused && !userPaused) {
         clock.update(now);
         while (clock.consume()) {
-          // Fin de niveau : le monde continue (effets, ennemis) mais le joueur n'a plus de commandes.
-          world.tick(finished ? emptyInput() : controls.sample());
+          // Fin de niveau : le monde continue (effets, ennemis, pilote de fin `gm_pilot_victory_*` des formes 0 à 3) ; les formes 4 et 5
+          // gardent leur pilote normal (`gm_player_victory_mode` n'a pas de cas pour elles), qui lit encore la manette et la souris.
+          world.tick(controls.sample());
           stats.ticks++;
           ticksInLevel++;
         }
@@ -310,5 +323,6 @@ export function summarize(world: World, seconds: number, request: Pick<LevelRequ
     bonusTotal: g.bonusPlaced,
     secretsTotal: g.bonusDropped,
     state,
+    endCounter: g.endCounter,
   };
 }

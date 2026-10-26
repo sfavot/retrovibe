@@ -88,7 +88,7 @@ Sont exclus du test : paires où l'un est le propriétaire de l'autre ou le prop
 ### 2.5 Mort, game over
 
 - Condition : `énergie < 1` et `+0x184 == 1` et `DAT_005b03e8 == -1` (aucune séquence de fin en cours), testée dans `FUN_0043c234`. [C]
-- `FUN_0043b4f4` : le véhicule passe en comportement inerte (`LAB_00438678`), explose (`FUN_00443d3c`), éclate en débris (`FUN_004442ec` : modèles de la table 11004, 3, 5 ou 8 morceaux selon le rayon du modèle) ; pour les véhicules 1 et 2 les roues partent en débris (gros éclats `0044412c`, vitesse aléatoire × 9 : `player.md` §3.6) ; le son de moteur s'arrête ; `+0x184 = 0`. Message « Game over ! » (table 20, id 10). `DAT_005b0414 = 2`, `DAT_005b03e8 = 0`. [C]
+- `FUN_0043b4f4` : le véhicule passe en pilote vide (`gm_pilot_none`, `LAB_00438678`) et en classe fantôme `0x40`, explose (`FUN_00443d3c`), éclate en débris (`FUN_004442ec` : modèles de la table 11004, 3, 5 ou 8 morceaux selon le rayon du modèle), fume (`00443fe4`), devient invisible (modèle 0) ; pour les véhicules 1 et 2 les roues partent en débris (gros éclats `0044412c`, vitesse aléatoire × 9 : `player.md` §3.6), puis les lanceurs d'armes spéciales encore référencés ; le son de moteur s'arrête ; `+0x184 = 0` ; vitesse nulle tenue par la physique `0043863c` ; les compagnons sont détachés mais **pas tués** (ils restent sur place et tirent), le bouclier n'est pas touché. Message « Game over ! » (table 20, id 10). `DAT_005b0414 = 2`, `DAT_005b03e8 = 0`. Détail : `player.md` §3.11. [C]
 - **35 ticks plus tard** (`DAT_005b03e8 == 0x23`) : `DAT_00480a9c = 0x34` (game over) : le niveau s'arrête, la boucle de `gm_main_game` ajoute le temps au profil, affiche l'écran « Game over » (`FUN_00419ed8`, § 6.3) puis **revient au menu** (rejouer la mission, continuer…). [C]
 - **Pas de vies, pas de continues, pas de réapparition, pas de temps limite.** Une seule vie par tentative ; aucun test d'invulnérabilité à l'apparition. `DAT_00577670 = 3` du script (variable 3) n'est pas un nombre de vies : ce sont des drapeaux de détail du terrain (bit 0 et bit 1 testés par le tracé du sol et de l'eau, `00425cdd`, `0042695f`). [C]
 - Pendant les séquences de fin (`DAT_005b03e8 ≥ 0`) le joueur ne peut plus mourir (condition `== -1`).
@@ -274,7 +274,7 @@ Pour chaque mission (200 n), le script pose les variables du profil, joue le bri
 
 `DAT_005b0414` (état) et `DAT_005b03e8` (compteur de ticks, −1 = inactif) :
 
-- **Victoire** (état 1) : au tick 25, `FUN_0043c07c` donne au véhicule son pilotage de fin (`LAB_00438d08`, `LAB_00438ec8`, `LAB_00438fb8`, `LAB_00438de8` selon le véhicule) et `+0x184 = 0` ; au tick 55, `DAT_00480a9c = 0x2a` (**niveau accompli**) ; le niveau s'arrête.
+- **Victoire** (état 1) : au tick 25, `FUN_0043c07c` donne au véhicule son pilotage de fin (`LAB_00438d08`, `LAB_00438ec8`, `LAB_00438fb8`, `LAB_00438de8` pour les formes 0, 1, 2, 3 : l'hélicoptère file droit devant, le buggy et la motoneige tournent en rond à gauche ; les formes 4 et 5 gardent leurs commandes), âge 0 et classe fantôme `0x40` (formes 0 à 3), et `+0x184 = 0` ; les armes continuent d'être mises à jour (missile armé toujours accroché) mais aucune ne tire ; au tick 55, `DAT_00480a9c = 0x2a` (**niveau accompli**) ; la boucle de niveau sort et l'écran de fin s'ouvre devant le monde qui continue (`player.md` §3.11, `screens.md` §9).
 - **Victoire par zone d'extraction** (état 100, compteur initial 80) : au tick 400, `DAT_00480a9c = 0x2a`, message « Accompli ».
 - **Mort** (état 2) : au tick 35, `DAT_00480a9c = 0x34`.
 - **Écran de fin de niveau** (`gm_screen_level_complete` `004194b0`, chaînes de la table 7) : « Mission accomplie ! », nom de la mission (table 200), « Score : %d » (score du niveau et score total), « Temps : %dh %02dm %02ds », « Durée totale : … », « Objectifs détruits : %d%% » = `DAT_005b0400 × 100 / DAT_005b03e0` (cibles d'objectif détruites / inscrites), « Bonus ramassés : %d%% » = `+0x198 × 100 / DAT_005b03d8` (affiché s'il est non nul), « Secrets trouvés : %d%% » = `+0x194 × 100 / DAT_005b03f4` (affiché s'il est non nul), « N'importe quelle touche pour continuer » (table 4, id 1). L'écran « Game over » (`FUN_00419ed8`) affiche le titre « Game over » (table 7, id 1), le nom de la mission, les scores et le ratio d'objectifs. [C]
@@ -475,7 +475,7 @@ Noms proposés (préfixe `gm_`), à fusionner par le coordinateur dans `keyfuncs
 | `004469fc`, `00446a3c`, `004468cc`, `00446964` | bonus ramassé (`+0x198++`), bonus « secret » (`+0x194++`), bonus cachés 7001 et 7002 |
 | `004482dc`, `004495f8`, `004493e8`, `004490cc` | plateformes de véhicule et zone d'extraction (types 7010 à 7030) |
 | `00439088`, `00439670`, `0043a174`, `0043a760`, `00439bcc`, `0043ac64`, `0043b0ac` | pilotage des véhicules 0 (deux variantes), 1, 2, 3, 4, 5 |
-| `00438d08`, `00438ec8`, `00438fb8`, `00438de8` | pilotage de fin de niveau |
+| `00438d08`, `00438ec8`, `00438fb8`, `00438de8` | pilotage de fin de niveau des formes 0, 1, 2, 3 (`player.md` §3.11, porté) |
 | `00449aa8`, `00445228`, `00445670`, `00449ad0`, `00445a84`, `00445f44` | fonctions de tick des véhicules (physique, collisions sol / eau) |
 
 ## 10. Questions ouvertes

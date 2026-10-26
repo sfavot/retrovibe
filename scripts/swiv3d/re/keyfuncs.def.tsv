@@ -30,7 +30,7 @@
 00413058	gm_sounds_update_3d	971	SOUNDS.BD et DirectSound	certain	Met à jour pan et volume (SetPan +0x40, SetVolume +0x3c) des sons actifs d'après la position relative à la caméra	Calcul distance/pente puis vtable DirectSound
 004135d4	gm_sounds_release	76	SOUNDS.BD et DirectSound	probable	Libère le tampon SOUNDS.BD	Appelle free 00470381
 00438694	gm_pilot_wheels	-	Étude du joueur	certain	pilote coupé des formes 1 et 2 (amarrage au sol `004482dc`, Super Ressort `0045e128`) : braquage vers la cible par pas de 8, roues en modes 3, 3, 4, 4	player.md §3.6
-00438c68	gm_pilot_wheels_2	-	Étude du joueur	certain	variante motoneige de `gm_pilot_wheels` (modes 1, 1, 2), installée par `004495f8`	player.md §3.6
+00438c68	gm_pilot_wheels_2	-	Étude du joueur	certain	variante motoneige de `gm_pilot_wheels` (modes 1, 1, 2), installée par `004495f8` (types 7012/7013, absents des niveaux livrés, non porté)	player.md §3.6
 004418b0	gm_wheel_attach	578	Étude du joueur	certain	pose une roue enfant à son emplacement (table `00484324`) dans le repère du joueur, relevée à sol + 2 000 sous sol + 4 000	player.md §3.6
 0046fa58	gm_global_init	819	GLOBAL.BD (chargement, chaînes)	certain	Ouvre GLOBAL.BD, lit le répertoire final, charge et relocalise les blocs (2, 100, 200, 5xx, 600, 700, 800, 1001-1005)	Chaîne « I cant open GLOBAL.bd » ; appels 0046f288 avec les ids
 0046f288	gm_global_load_block	282	GLOBAL.BD (chargement, chaînes)	certain	Charge en mémoire (malloc) le bloc d'id EAX de GLOBAL.BD ; retourne le pointeur	Recherche id dans les entrées de 12 octets (offset, taille, id) ; fseek/malloc/fread
@@ -175,11 +175,11 @@
 00437eac	gm_smk_present	191	Étude des écrans	certain	Présente une image Smacker : attente verticale, copie, tracé du `.SCR`, bascule	screens.md §12
 00438198	gm_player_pick_target	571	Étude des règles	non précisé	choisit la cible `+0x58` (produit scalaire + biais objectifs)	rules.md §9 ; autres noms proposés : player.md : gm_player_retarget
 00438678	gm_pilot_none	-	Étude du joueur	non précisé	fonction pilote vide (formes `0x2a`, `0x63`)	player.md §7
-00438744	gm_pilot_dying	-	Étude du joueur	non précisé	séquence de mort/fin (forme `0x2b`)	player.md §7
-00438d08	gm_pilot_victory_00438d08	-	Étude des règles	probable	pilotage de fin de niveau	rules.md §9
-00438de8	gm_pilot_victory_00438de8	-	Étude des règles	probable	pilotage de fin de niveau	rules.md §9
-00438ec8	gm_pilot_victory_00438ec8	-	Étude des règles	probable	pilotage de fin de niveau	rules.md §9
-00438fb8	gm_pilot_victory_00438fb8	-	Étude des règles	probable	pilotage de fin de niveau	rules.md §9
+00438744	gm_pilot_start_1002	-	Étude du joueur	certain	départ scripté du type 1002 (forme `0x2b`) : vol, tir spécial, crash, explosions puis forme 4 ; pas une séquence de mort ; absent des niveaux livrés, non porté	player.md §3.12
+00438d08	gm_pilot_victory_00438d08	-	Étude des règles	certain	pilote de fin de niveau, forme 0 : tangage 0x4b0 par tick, file droit devant (porté : `heliVictoryPilot`)	player.md §3.11
+00438de8	gm_pilot_victory_00438de8	-	Étude des règles	certain	pilote de fin de niveau, forme 3 (identique à `00438d08`)	player.md §3.11
+00438ec8	gm_pilot_victory_00438ec8	-	Étude des règles	certain	pilote de fin de niveau, forme 1 : cap −4, poussée +0x82, roues arrière −13 par tick, braquage par pas de 8, roues 3, 3, 4, 4 (porté : `vehicleVictoryPilot`)	player.md §3.11
+00438fb8	gm_pilot_victory_00438fb8	-	Étude des règles	certain	pilote de fin de niveau, forme 2 : comme `00438ec8`, un seul coup de −13 (`+0x1b0`), roues 1, 1, 2	player.md §3.11
 00439088	gm_pilot_heli	-	Étude du joueur	non précisé	pilote de l'hélicoptère, forme 0	player.md §7
 00439670	gm_pilot_heli_net	-	Étude du joueur	non précisé	même, joueur réseau (entrées `+0xe4..`)	player.md §7
 00439bcc	gm_pilot_heli_3	-	Étude du joueur	non précisé	pilote forme 3	player.md §7
@@ -187,8 +187,8 @@
 0043a760	gm_pilot_vehicle_2	-	Étude du joueur	non précisé	pilote forme 2	player.md §7
 0043ac64	gm_pilot_vehicle_4	-	Étude du joueur	non précisé	pilote forme 4	player.md §7
 0043b0ac	gm_pilot_vehicle_5	-	Étude du joueur	non précisé	pilote forme 5	player.md §7
-0043b4f4	gm_player_die	2927	Étude des règles	non précisé	mort : explosion, débris, message « Game over ! », `DAT_005b0414 = 2`	rules.md §9
-0043c07c	gm_player_victory_mode	214	Étude des règles	non précisé	pilotage de fin de niveau, `+0x184 = 0`	rules.md §9 ; autres noms proposés : player.md : gm_player_death_begin
+0043b4f4	gm_player_die	2927	Étude des règles	certain	mort : classe 0x40, explosion, débris, roues et lanceurs en éclats, compagnons détachés (vivants), physique `0043863c`, message « Game over ! », `DAT_005b0414 = 2`	player.md §3.11, rules.md §2.5
+0043c07c	gm_player_victory_mode	214	Étude des règles	certain	au tick 25 de la victoire : pilote de fin des formes 0 à 3 (âge 0, classe 0x40), `+0x184 = 0` pour toutes	player.md §3.11, rules.md §6.3
 0043c164	gm_find_nearest_player	208	Étude des objets	certain	joueur le plus proche (non ignoré) dans `+0x58`	objects.md §12 ; autres noms proposés : rules.md : gm_nearest_player
 0043c234	gm_game_tick	1918	Étude du joueur	non précisé	un tick de logique (25 ms) : objets, fonctions pilote, mort, jauge de PV	player.md §7
 0043ca60	gm_player_load_keys	83	Étude du joueur	non précisé	recopie 11 touches du profil dans le joueur	player.md §7 ; autres noms proposés : rules.md : gm_player_copy_controls

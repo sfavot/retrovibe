@@ -34,7 +34,7 @@ export function blackSmurfsWinClip(game: Game): string {
  * - reçoit : `game`, la partie en cours ; la requête est `game.state.pending` (scène 28) : `level` 0..2 rétrécit la zone qui touche une
  *   cible de 0, 4 ou 8 pixels de chaque côté, `bonus` (indice de l'oiseau) force le niveau 0 ;
  * - joue : des Schtroumpfs noirs sortent de huit trous, l'un après l'autre. Les flèches (ou `Z`, `Q`, `X`, `A`) déplacent le viseur de
- *   5 pixels par image ; la souris aussi, le viseur allant vers le pointeur à cette même vitesse. Espace (ou clic gauche) tire. Une cible qu'on laisse plus de 3 s perd la partie ;
+ *   5 pixels par image ; la souris le place sous le pointeur. Espace (ou clic gauche) tire, là où le viseur était à l'appui. Une cible qu'on laisse plus de 3 s perd la partie ;
  *   un tir qui rate ne coûte rien. La partie est gagnée quand dix cibles sont apparues sans une seule oubliée ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la vidéo de fin (`s28c2` si l'ingrédient 6 fait partie de l'objectif
  *   de la partie, `s28c1` sinon, `s28b` en cas d'échec ; toutes passables) ; l'appelant applique l'issue (ingrédient 6).
@@ -146,10 +146,10 @@ export class BlackSmurfsScene implements Scene {
   private cursorX = START_X;
   private cursorY = START_Y;
   private keys = { left: false, right: false, up: false, down: false, click: false };
-  /** Dernière position lue de la souris, et le point que le viseur rejoint depuis qu'elle a bougé (aucun après une touche). */
+  /** Dernière position lue de la souris : le viseur ne la rejoint que quand elle bouge. */
   private mouse = { x: START_X, y: START_Y };
-  private aim: { x: number; y: number } | null = null;
-  private armed = true;
+  /** Tir demandé depuis la dernière itération : position du viseur au moment de l'appui. */
+  private shot: { x: number; y: number } | null = null;
   private clickFrames = 0;
   private clicking = false;
   private state: TargetState = TARGET_WAITING;
@@ -222,7 +222,7 @@ export class BlackSmurfsScene implements Scene {
     return this.appeared;
   }
 
-  /** Tirs comptés (un par appui, bouton relâché entre deux). */
+  /** Tirs comptés (un par appui ; le bouton tenu ne répète pas). */
   get shotCount(): number {
     return this.shots;
   }
@@ -270,8 +270,7 @@ export class BlackSmurfsScene implements Scene {
     this.cursorX = START_X;
     this.cursorY = START_Y;
     this.keys = { left: false, right: false, up: false, down: false, click: false };
-    this.aim = null;
-    this.armed = true;
+    this.shot = null;
     this.clickFrames = 0;
     this.clicking = false;
     this.state = TARGET_WAITING;
@@ -360,51 +359,48 @@ export class BlackSmurfsScene implements Scene {
 
   /**
    * L'original lit les touches tenues à chaque itération ; la scène tourne à chaque tick, elle retient donc ce qui a été enfoncé depuis
-   * la dernière itération (un appui plus court que 5 ticks compte).
+   * la dernière itération (un appui plus court que 5 ticks compte). La souris, elle, place le viseur sous le pointeur dès qu'elle
+   * bouge (voir « Écarts ») ; un appui note la position visée à cet instant, le tir part de là à l'itération suivante.
    */
   private readKeys(ctx: SceneContext): void {
     const { input } = ctx;
+    if (input.mouseX !== this.mouse.x || input.mouseY !== this.mouse.y) {
+      this.mouse = { x: input.mouseX, y: input.mouseY };
+      this.cursorX = this.mouse.x;
+      this.cursorY = this.mouse.y;
+    }
     const keys = this.keys;
     keys.left ||= input.pressed("left") || input.justPressed("left");
     keys.right ||= input.pressed("right") || input.justPressed("right");
     keys.up ||= input.pressed("up") || input.justPressed("up");
     keys.down ||= input.pressed("down") || input.justPressed("down");
     keys.click ||= input.pressed("validate") || input.justPressed("validate");
+    if (input.justPressed("validate")) this.shot ??= { x: this.cursorX, y: this.cursorY };
   }
 
   /** Une itération de la boucle de `2573:015e..0321`. */
   private iterate(ctx: SceneContext): void {
-    const { input } = ctx;
     this.nextAt = ctx.clock.ticks + LOOP_TICKS;
     this.count++;
 
-    // Déplacement (`2573:019c..0243`) : 5 pixels par direction, au clavier ou vers le pointeur (voir « Écarts » : l'original avance
-    // tant que la souris est poussée loin du centre). Une touche fait oublier le pointeur, comme l'original recentre la souris.
+    // Déplacement au clavier (`2573:019c..0243`) : 5 pixels par direction ; la souris est lue à chaque tick (`readKeys`).
     const keys = this.keys;
-    if (input.mouseX !== this.mouse.x || input.mouseY !== this.mouse.y) {
-      this.mouse = { x: input.mouseX, y: input.mouseY };
-      this.aim = { ...this.mouse };
-    }
-    if (keys.right || keys.left || keys.up || keys.down) this.aim = null;
-    if (this.aim) {
-      this.cursorX += Math.max(-CURSOR_STEP, Math.min(CURSOR_STEP, this.aim.x - this.cursorX));
-      this.cursorY += Math.max(-CURSOR_STEP, Math.min(CURSOR_STEP, this.aim.y - this.cursorY));
-    }
     if (keys.right) this.cursorX += CURSOR_STEP;
     if (keys.left) this.cursorX -= CURSOR_STEP;
     if (keys.up) this.cursorY -= CURSOR_STEP;
     if (keys.down) this.cursorY += CURSOR_STEP;
-    const click = keys.click;
+    if (keys.click) this.clicking = true;
+    const shot = this.shot;
     this.keys = { left: false, right: false, up: false, down: false, click: false };
-    if (click) this.clicking = true;
+    this.shot = null;
 
     this.stepTarget(ctx);
-    const missed = !this.failed && this.handleShot(ctx, click);
+    const missed = !this.failed && shot !== null && this.handleShot(ctx, shot);
 
     // Impact d'un tir raté : une seule animation à la fois, posée à l'endroit du tir (`2573:0285..02d0`).
     if (missed && !this.effect) {
       this.effect = new AnimationPlayer(this.spritesA, ANIMATION_MISS);
-      this.effectAt = { x: this.cursorX, y: this.cursorY };
+      this.effectAt = { ...shot };
     }
     this.effectDraw = null;
     if (this.effect) {
@@ -474,18 +470,13 @@ export class BlackSmurfsScene implements Scene {
   }
 
   /**
-   * `2573:06e3` : un tir par appui (le bouton doit avoir été relâché). Touche si la cible est sortie et le viseur dans sa zone ; sinon
-   * son de raté, sauf pendant la chute d'une cible déjà touchée, où l'original rejoue le son de touche. Rend vrai pour un raté.
+   * `2573:06e3` : un tir par appui (le bouton tenu ne répète pas), en `at`, la position visée à l'appui. Touche si la cible est sortie et
+   * `at` dans sa zone ; sinon son de raté, sauf pendant la chute d'une cible déjà touchée, où l'original rejoue le son de touche. Rend
+   * vrai pour un raté.
    */
-  private handleShot(ctx: SceneContext, click: boolean): boolean {
-    if (!click) {
-      this.armed = true;
-      return false;
-    }
-    if (!this.armed) return false;
-    this.armed = false;
+  private handleShot(ctx: SceneContext, at: { x: number; y: number }): boolean {
     this.shots++;
-    if (this.hittable && this.state === TARGET_UP && isHit(this.target, this.cursorX, this.cursorY, this.margin)) {
+    if (this.hittable && this.state === TARGET_UP && isHit(this.target, at.x, at.y, this.margin)) {
       this.state = TARGET_HIT;
       this.hits++;
     }

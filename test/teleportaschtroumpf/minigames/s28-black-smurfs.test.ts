@@ -224,30 +224,47 @@ describe.skipIf(!hasOriginalFiles)("S28 Les Schtroumpfs Noirs : cibles, viseur, 
     expect(scene.cursor.x).toBe(before - CURSOR_STEP);
   }, 30_000);
 
-  it("souris : le viseur va vers le pointeur à 5 pixels par image et par axe ; une touche le fait oublier jusqu'au prochain mouvement", async () => {
+  it("souris : le viseur se place sous le pointeur dès qu'elle bouge ; une touche le déplace jusqu'au prochain mouvement", async () => {
     const run = await launch({ seed: 5 });
     const scene = run.scene as BlackSmurfsScene;
     await run.run(300);
     expect(scene.cursor).toEqual({ x: START_X, y: START_Y });
-    const iterations = scene.iterations;
     run.ctx.input.mouseMove(START_X + 100, START_Y - 30);
-    await run.run(500);
-    const steps = scene.iterations - iterations;
-    expect(scene.cursor).toEqual({ x: START_X + CURSOR_STEP * steps, y: START_Y - 30 });
-    await run.run(2000);
+    await run.run(20);
     expect(scene.cursor).toEqual({ x: START_X + 100, y: START_Y - 30 });
-    run.ctx.input.mouseMove(START_X + 98, START_Y - 30);
-    await run.run(200);
-    expect(scene.cursor).toEqual({ x: START_X + 98, y: START_Y - 30 });
     // Une touche reprend la main : la souris immobile ne ramène plus le viseur.
     await run.tap("ArrowLeft", 100);
     const settled = scene.cursor;
-    expect(settled.x).toBeLessThan(START_X + 98);
+    expect(settled.x).toBeLessThan(START_X + 100);
     await run.run(500);
     expect(scene.cursor).toEqual(settled);
     run.ctx.input.mouseMove(START_X, START_Y);
-    await run.run(3000);
+    await run.run(20);
     expect(scene.cursor).toEqual({ x: START_X, y: START_Y });
+  }, 30_000);
+
+  it("clic pendant que la souris bouge : le tir part de la position du clic ; deux clics rapides font deux tirs", async () => {
+    const run = await launch({ seed: 7 });
+    const scene = run.scene as BlackSmurfsScene;
+    await run.until(() => scene.canHit, 6000);
+    const { zone } = TARGETS[scene.targetIndex];
+    const inside = { x: (zone.left + zone.right) >> 1, y: (zone.top + zone.bottom) >> 1 };
+    run.ctx.input.mouseMove(inside.x, inside.y);
+    run.ctx.input.mouseDown(0);
+    run.ctx.input.mouseUp(0);
+    await run.run(17);
+    // La souris repart aussitôt, avant l'itération qui joue le tir.
+    run.ctx.input.mouseMove(0, 0);
+    await run.run(150);
+    expect(scene.hitCount).toBe(1);
+    const shots = scene.shotCount;
+    for (let i = 0; i < 2; i++) {
+      run.ctx.input.mouseDown(0);
+      await run.run(20);
+      run.ctx.input.mouseUp(0);
+      await run.run(40);
+    }
+    expect(scene.shotCount).toBe(shots + 2);
   }, 30_000);
 
   it("une cible oubliée plus de 3 s après sa sortie : la partie est perdue, 0 ingrédient, vidéo s28b, l'issue est appliquée", async () => {

@@ -1,0 +1,370 @@
+			       SWIV 3D
+
+Table des matières	
+
+Scénario	
+Configuration machine	
+Installation	
+Démarrage du jeu	
+Commandes	
+Véhicules
+Collimateur de pilotage	
+Historique de SWIV	
+Son	
+Support technique	
+Messages de copyright	
+L'équipe de SWIV	
+Remerciements	
+
+Scénario
+--------
+
+Juste assez d'obscurité pour passer inaperçu dans la base 7-Zéro. Combien 
+d'hélicos ont-ils ? Dix ? Quinze ? Plutôt vingt-cinq.
+
+Vingt-cinq machines de guerre qui pourraient être utilisées contre ces 
+abominables rebelles...
+
+OK, hélico 9, je suis déjà connu ici, voyons quels effets vont 
+avoir mes nouveaux gadgets...Prêt !...
+
+ALERTE, INTRUS DETECTE. ALERTE, INTRUS DETECTE.
+
+Bon sang, pas le temps d'ouvrir les portes. Chargement des roquettes 
+multi-tirs...
+
+
+Configuration machine
+---------------------
+
+Configuration minimale
+
+Processeur Pentium
+Voodoo Graphics 3D Accelerator
+8 Mo de mémoire
+Lecteur de CD-ROM
+30 Mo d'espace sur le disque dur (suivant les options d'installation)
+Carte son
+Carte vidéo PCI 1 Mo 
+Clavier, souris, manette de jeu, boîtier de commande Gravis, boîtier 
+de commande Creative Blaster
+MS-DOS 5.0
+
+Configuration recommandée
+
+Processeur Pentium 90
+16 Mo de mémoire
+Lecteur de CD-ROM quadruple vitesse (4x)
+30 à 80 Mo d'espace sur le disque dur (suivant les options d'installation)
+Carte son reconnaissant DirectSound:	Aztech, Creative Labs, 
+ESS, Mediavision, Microsoft.
+Carte vidéo PCI 2 Mo
+Clavier, souris ou boîtier de commande ou manette de jeu compatible 
+DirectInput
+Windows 95
+
+Installation
+------------
+Ce CD-ROM contient une version de SWIV 3D et une version Windows 95. 
+
+Ouvrez l'icône SWIV 3D, puis cliquez deux fois sur l'icône d'installation 
+pour lancer le processus d'installation.
+
+SWIV 3D utilise la technologie DirectX de Microsoft, si bien que les 
+bibliothèques DirectX sont installées après les fichiers du jeu SWIV 3D.
+Il vous faudra peut-être redémarrer votre machine avant que l'installation
+de DirectX soit terminée. Cela ne sera nécessaire qu'une seule fois.
+
+Pour installer les fichiers SWIV 3D requis par votre machine, suivez 
+les instructions du programme d'installation. Une fois l'installation 
+terminée, il vous suffit de cliquer deux fois sur l'icône SWIV 3D pour 
+commencer à jouer.
+
+Si vous avez des problèmes avec les périphériques de DirectX pour votre 
+carte son ou vidéo, consultez le fabricant de votre matériel. Il pourra vous 
+faire parvenir les dernières versions des périphériques de DirectX. Si les 
+problèmes persistent, veuillez consulter Microsoft.
+
+
+Séquences vidéo
+---------------
+Les séquences vidéo de SWIV 3D sont conçues pour un lecteur CD-ROM 
+quadruple vitesse (4x). Si votre lecteur CD-ROM ne fonctionne pas à 
+cette vitesse, sélectionnez alors dans le programme d'installation l'option 
+pour copier les séquences vidéo sur votre disque dur. Elles pourront alors 
+être lues depuis ce disque.
+
+Démarrage du jeu
+----------------
+Après la séquence d'introduction, vous devez entrer un nouveau nom de 
+pilote ou sélectionner un nom existant. Entrez votrenom si vous jouez pour 
+la première fois.
+
+Vos progrès au cours du jeu sont enregistrés sous votre nom. L'option 
+Continuer le jeu vous permet de continuer depuis l'endroit où vous vous 
+étiez arrêté la dernière fois. Toutes les options personnalisées, telles 
+que la configuration des touches, sont également enregistrées sous votre nom.
+
+Une fois que vous avez terminé un niveau, vous pouvez revenir en arrière 
+avec l'option Retenter la mission. Cela vous permettra d'améliorer votre 
+score précédent.
+
+Commandes
+---------
+Clavier
+Les commandes par défaut du clavier sont :
+
+Touches fléchées	rotation vers la gauche/droite,
+			déplacement vers l'avant/arrière
+"<" et ">"		mouvement latéral à gauche et à droite
+Touche CTRL		mouvement latéral
+Barre d'espace		tir primaire
+M			tir spécial
+Pg. Suiv./Pg. Préc.	sélection vers le haut/bas
+Touches 1 à 9		sélection d'armes spéciales
+F1			affichage du menu de configuration
+Touche pause		pause
+Touche Echap		abandonner la mission/menu Quitter
+
+Souris
+------
+Vous pouvez effectuer des mouvements le long d'un axe à l'aide du 
+menu Configuration du contrôleur. Cela vous permet de contrôler la 
+rotation de votre appareil, sa vitesse en avant/arrière ou ses 
+déplacements vers la droite/gauche.
+
+Manette de jeu
+-------------
+Sur Windows 95, vous devez vous assurer que les périphériques de la 
+manette de jeu sont installés et calibrés avec l'outil de calibrage 
+approprié. Les options de la manette de jeu n'apparaissent pas dans 
+le jeu si le périphérique de la manette de jeu n'est pas présent ou si 
+celle-ci n'est pas branchée lors du démarrage de SWIV 3D.
+
+Comme la souris, vous pouvez configurer la manette de jeu pour 
+contrôler la rotation, le déplacement ou les mouvements latéraux.
+
+Véhicules
+---------
+Vous avez deux types de véhicules à votre disposition dans 
+SWIV 3D. Ceux-ci varient en fonction du type de mission. Dans certains 
+niveaux, il existe des bases où vous pouvez changer de véhicule.
+
+Zone tempérée
+-------------
+Vous commencez le premier niveau dans un hélicoptère de combat. Les 
+commandes vous permettent de vous déplacer vers l'avant et vers 
+l'arrière, de tourner dans les deux sens et de virer à droite et à 
+gauche. Les « assistants » ajustent votre position verticale pour 
+que vous restiez à une hauteur constante du sol, mais méfiez-vous 
+des montagnes!
+
+Dans la Zone tempérée, vous pouvez aussi utiliser le buggy. Il se conduit
+avec les mêmes commandes, mais les touches de mouvement latéral sont 
+utilisées comme frein à main. Le buggy flotte sur l'eau, mais s'abîme 
+lorsqu'il reste immergé. Le buggy n'a pas les problèmes de limite 
+d'altitude de l'hélicoptère de combat et, grâce à un turbo, peut même 
+devenir aérien pendant quelques instants.
+
+
+Collimateur de pilotage
+-----------------------
+
+Radar et boussole
+Le radar et la boussole sont situés en haut à gauche de l'écran. L'image 
+au centre représente une vue aérienne de la zone environnante avec un 
+pointeur indiquant le Nord. Le pointeur extérieur indique la direction 
+dans laquelle se trouve la cible.
+
+Indicateur d'énergie
+L'indicateur d'énergie se trouve en haut à droite de l'écran et est 
+représenté par une barre grise 100% pleine au départ. Au fur et à mesure 
+des dégâts, le niveau de la barre baisse jusqu'à ce que toute l'énergie 
+soit utilisée. Des collectes d'énergie permettent de réalimenter la 
+barre jusqu'à un maximum de 100%. Les collectes de méga-énergie peuvent
+faire monter la barre jusqu'à 200% ; ceci est indiqué par une barre blanche. 
+
+Score
+Le numéro en bas à droite est votre score actuel et il s'accroît avec 
+le nombre d'objectifs atteints.
+
+Viseur
+Il comprend deux sections. La partie jaune extérieure vise toujours 
+l'objet ou l'ennemi le plus menaçant à l'écran. La partie rouge à 
+l'intérieur n'apparaît que lorsqu'un objet à atteindre est à l'écran. 
+Lorsque les parties jaune et rouge sont alignées, cet objet est pris en 
+cible.
+
+Armes spéciales
+Les icônes apparaissant en bas à gauche de l'écran représentent les armes 
+spéciales disponibles. L'arme spéciale couramment sélectionnée et prête à 
+tirer est indiquée en bas de l'écran. Sauf indication contraire, les armes 
+sont disponibles à la fois sur les véhicules terrestres et aériens.
+
+Missile				Missile à tête chercheuse simple.
+
+Missile à tête chercheuse	Paire de missiles à tête chercheuse envoyés 
+				simultanément.
+
+Multi-tir			Huit missiles à tête chercheuse envoyés 
+				simultanément.
+
+Missile longue distance		Missile à tête chercheuse très perfectionné.
+
+Multi-cible			Envoie cinq missiles à tête chercheuse en cercle.
+
+Starburst			Envoie d'un tir de barrage sur les installations 
+				et les 	véhicules de l'ennemi.
+
+Mortier				Cette bombe est lancée en avant de votre véhicule et 
+				explose lorsqu'elle atteint la cible.
+
+Smart Bomb			Force très importante destructive émanant de votre 
+				véhicule.
+
+Napalm				Cette roquette envoie une pluie de tirs sur 
+				son chemin.
+
+Envol				Permet à un véhicule terrestre de devenir aérien 
+				pendant une courte durée.
+
+Si vous passez au-dessus d'un point de collecte et que rien ne se passe, cela 
+signifie que votre appareil dispose de la quantité maximale de cette ressource. 
+Cela s'applique à la fois à la Vie et aux Missiles dont le maximum est 100. 
+En outre, le renforcement de votre arme primaire est limité pour chaque niveau.
+
+La liste précédente ne représente qu'une petite partie de toute la gamme des armes 
+disponibles. Dans des niveaux supérieurs, vous pouvez utiliser des armes spéciales 
+différentes.
+
+Historique de SWIV
+------------------
+
+1988	Silkworm (Spectrum 128K, Commodore64, Amstrad, 
+	Amiga, Atari ST, Archimedes)
+
+1991	SWIV (Spectrum 128K, Commodore64, Amstrad, 
+	Amiga, Atari ST, Archimedes)
+
+1993	SuperSWIV (SNES)
+
+1995	MegaSWIV (MegaDrive)
+
+1996	SWIV 3D	La guerre des guerres !
+
+Son
+---
+
+Piste 1		Données du jeu SWIV
+(NE lisez PAS cette piste sur un lecteur de CD audio)
+
+Piste 2	 07:13	Night Flight Thru Babylon (la thème de SWIV)
+		Hallucinogen
+Piste 3	 06:45	Snakey Shaker
+		Hallucinogen
+Piste 4	 04:59	Heroes & Hell
+		Louie Nicastro
+Piste 5	 05:02	Aural Onslaught
+		Louie Nicastro
+Piste 6	 04:33	Destroy
+		Paul Zimmer
+Piste 7	 04:54	Slow & Sacrificial
+		Louie Nicastro
+Piste 8	 04:58	Rush Induction
+		Louie Nicastro
+Piste 9	 10:44	Night on the Bare Mountain
+		Mussorgsky
+Piste 10 04:56	Ride of the Valkyries
+		Wagner
+
+Support technique
+-----------------
+
+Si vous avez des problèmes avec les périphériques de DirectX 
+de Windows 95, consultez votre fabricant d'audio pour les 
+dernières versions.
+
+Lisez le fichier README.TXT pour les suggestions d'installation 
+non mentionnées dans ce manuel.
+
+Si vous avez besoin de contacter l'équipe du support 
+technique de Hotline [Funsoft France]: [1] 41.86.05.08 Paris.
+
+Avant d'appeler le support technique, assurez-vous que vous 
+disposez des informations suivantes :
+
+Une description de votre problème.
+
+Les détails de la configuration de votre machine, y compris 
+le processeur, la mémoire, la carte son, la carte vidéo.
+
+Messages de copyright
+
+SWIV et SWIV 3D est protégé par copyright (c) 
+1996 SCi (Sales Curve Interactive) Ltd.
+
+Les Datasets sont fournis par Viewpoint Datalabs International, Inc., 
+625 South State Street,Orem, Utah 84058 (1-800-DATASET ou 1-801-229-3000).
+
+Utilise Smacker Video Technology. Copyright (c) 1994-1996 d'Invisible, 
+Inc. d.b.a. RAD Software.
+
+Utilise Miles Sound System de RAD Software. 
+Copyright (c) 1994-1996 de Miles Design, Inc.
+
+Microsoft, Windows, DirectX et AutoPlay sont des marques déposées 
+de Microsoft Corporation.
+
+L'équipe de SWIV
+
+Programmeur en chef		James Sharman
+Artiste en chef			Glenn Broadway
+Animation/Objets		Pieter Warmington
+Création des niveaux		Dan Little
+Programmation supplémentaire	Richard Matthias
+Conceptualisation		Bryn Williams
+Effets sonores et audio		Russ Dunham & Paul Zimmer
+Testeur en chef			Ben Gunstone
+
+Testeurs			Marc Titheridge
+				Justin Wateridge	
+				Mike Tucker
+				Andy O'Dowd
+
+Producteur			John Chasey
+
+Remerciements
+
+Toute l'équipe de SCi.
+
+AVERTISSEMENT SUR L'EPILEPSIE
+
+A lire avant toute utilisation d'un jeu vidéo par vous-même ou votre enfant.
+Certaines personnes sont susceptibles de faire des crises 
+d'épilepsie ou d'avoir des pertes de conscience à la vue de 
+certains types de lumières clignotantes ou d'éléments fréquents 
+dans notre environnement quotidien. Ces personnes s'exposent à des crises 
+lorsqu'elles regardent certaines images télévisées ou lorsqu'elles jouent 
+à certains jeux vidéo. Ces phénomènes peuvent apparaître alors même que le 
+sujet n'a pas d'antécédent médical ou n'a jamais été confronté à une crise 
+d'épilepsie.
+
+Si vous-même ou un membre de votre famille avez déjà présenté des 
+symptômes liés à l'épilepsie (crise ou perte de conscience) en présence 
+de stimulations lumineuses, veuillez consulter votre médecin avant toute 
+utilisation. Nous conseillons aux parents d'être attentifs à leurs enfants 
+lorsqu'ils jouent avec des jeux vidéo. Si vous-même ou votre enfant présentez 
+un des symptômes sulvants: vertige, trouble de la vision, contraction des yeux 
+ou des muscles, perte de conscience, trouble de l'orientation, mouvement 
+involontaire ou convulsion, veuillez cesser immédiatement de jouer et consultez 
+un médecin. Précautions à prendre dans tous les cas pour l'utilisation d'un 
+jeu vidéo
+
+• Ne vous tenez pas trop près de l'écran. Jouez à bonne distance de l'écrande 
+télévision et aussi loin que le permet le cordon de raccordement.
+• Utilisez de préférence les jeux vidéo sur un écran de petite taille.
+• Evitez de jouer si vous êtes fatigué ou si vous manquez de sommeil.
+• Assurez-vous que vous jouez dans une pièce bien éclairée.
+• En cours d'utilisation, faites des pauses de dix à quinze minutes toutes les heures.
+
+

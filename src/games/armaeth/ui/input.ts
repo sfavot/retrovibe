@@ -176,9 +176,11 @@ export class InputQueue {
     if (Math.floor(x) !== this.x || Math.floor(y) !== this.y || ctrl !== this.ctrl || this.queue.length === 0) this.move(x, y, ctrl);
   }
 
-  /** Clic complet d'un doigt (appui puis relâchement au même endroit). */
+  /** Clic complet d'un doigt (appui puis relâchement au même endroit) ; l'appui est marqué `touch`. */
   tap(mask: number, ctrl = false): void {
     this.down(mask, this.x, this.y, ctrl);
+    const press = this.queue[this.queue.length - 1];
+    if (press?.type === "pointer") press.touch = true;
     this.up(mask, this.x, this.y, ctrl);
   }
 

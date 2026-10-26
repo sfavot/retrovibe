@@ -20,7 +20,7 @@ export const copy = {
     "Taper une phrase (« regarder », « prendre la clef ») puis Entrée. Inser rappelle la dernière, Échap annule.",
     "F1 : aide du jeu. F2 : sauvegarder. F3 : restaurer. F4 : continuer. F5 : recommencer. F6 : score. F10 : inventaire.",
     "Alt + A / Alt + Z : jeu plus lent / plus rapide. Alt + P / Alt + N : pas à pas / vitesse normale.",
-    "Écran tactile : toucher = clic, appui long = clic droit. Clavier : taper une phrase. Tenir : prendre un objet de l'inventaire (Ctrl + clic).",
+    "Écran tactile : toucher = clic, appui long = clic droit. Avec les bottes, toucher le bord de la scène fait passer à l'écran voisin. Clavier : taper une phrase. Tenir : prendre un objet de l'inventaire (Ctrl + clic).",
   ],
   loading: "Chargement…",
   loadError: "Impossible de charger le jeu :",

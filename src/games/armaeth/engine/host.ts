@@ -23,7 +23,8 @@ export type HostKey = KeyEvent | { type: "delete" };
  */
 export type HostInput =
   | { type: "key"; key: HostKey }
-  | { type: "pointer"; x: number; y: number; buttons: number; ctrl?: boolean };
+  /** `touch` : appui d'un toucher du doigt (gestes de l'écran tactile), pour les aides au doigt du portage. */
+  | { type: "pointer"; x: number; y: number; buttons: number; ctrl?: boolean; touch?: boolean };
 
 /** Sauvegardes : un fichier de monde (`formats.md`, 21 868 octets) par nom d'emplacement. */
 export interface ArmaethStorage {

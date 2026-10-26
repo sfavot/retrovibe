@@ -116,6 +116,14 @@ describe("InputQueue : souris en échantillons d'état", () => {
     ]);
   });
 
+  it("l'appui d'un toucher est marqué `touch` (pas son relâchement, ni les clics de souris)", () => {
+    const q = new InputQueue();
+    q.move(100, 50);
+    q.tap(1);
+    q.down(1, 100, 50);
+    expect(q.drain().map((i) => (i.type === "pointer" ? i.touch === true : null))).toEqual([false, true, false, false]);
+  });
+
   it("perdre le focus relâche les boutons ; les touches restent en file dans l'ordre", () => {
     const q = new InputQueue();
     q.key({ type: "char", char: "a" });

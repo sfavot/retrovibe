@@ -11,6 +11,7 @@ import {
   REFUSAL_TICKS,
   type ToolCommand,
   sectorOf,
+  TOUCH_EXIT_MARGIN,
 } from "../../src/games/armaeth/engine/interface";
 import { slotCenterX } from "../../src/games/armaeth/engine/icons";
 import { messageId } from "../../src/games/armaeth/data/text";
@@ -55,6 +56,7 @@ function fixture(over: Partial<InterfaceWorld> = {}, outcome: (c: ToolCommand) =
       flags.exited = s;
       return flags.exit as boolean;
     },
+    hasExit: (s: number) => ((flags.exits as number[] | undefined) ?? [0, 1, 2, 3]).includes(s),
     ...over,
   } as Fixture["world"];
   return { world, ctl: new InterfaceController(world) };
@@ -345,6 +347,26 @@ describe("outil bottes et clic dans le vide", () => {
     expect(click(f.ctl, 100, 24, R)).toEqual([{ type: "exitBySector", sector: 0, ok: true }]);
     expect(click(f.ctl, 160, 190, R)).toEqual([{ type: "exitBySector", sector: 2, ok: true }]);
     expect(click(f.ctl, 5, 100, R)).toEqual([{ type: "exitBySector", sector: 3, ok: true }]);
+  });
+
+  it("au doigt : un toucher près d'un bord où la salle a une sortie fait sortir de ce côté (écart du portage)", () => {
+    const f = fixture();
+    f.world.flags.exits = [1, 3];
+    clickSlot(f.ctl, 9);
+    const touch = (x: number, y: number) => {
+      const actions = f.ctl.pointer(x, y, L, { ctrl: false, touch: true });
+      f.ctl.pointer(x, y, 0);
+      return actions;
+    };
+    // la scène va de (0, 10) à (320, 190) : bords gauche et droit à moins de TOUCH_EXIT_MARGIN
+    expect(touch(320 - TOUCH_EXIT_MARGIN, 100)).toEqual([{ type: "exitBySector", sector: 1, ok: true }]);
+    expect(touch(TOUCH_EXIT_MARGIN - 1, 100)).toEqual([{ type: "exitBySector", sector: 3, ok: true }]);
+    // un peu plus loin du bord : marche
+    expect(touch(TOUCH_EXIT_MARGIN, 100)).toEqual([{ type: "walkTo", x: TOUCH_EXIT_MARGIN, y: 90, ok: true }]);
+    // bord sans sortie (bas) : marche
+    expect(touch(160, 188)).toEqual([{ type: "walkTo", x: 160, y: 178, ok: true }]);
+    // à la souris, le même point du bord fait marcher (comportement d'origine)
+    expect(click(f.ctl, 315, 100)).toEqual([{ type: "walkTo", x: 315, y: 90, ok: true }]);
   });
 
   it("marche impossible : refus animé", () => {

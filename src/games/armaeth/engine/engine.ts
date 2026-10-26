@@ -133,6 +133,15 @@ const BIOS_UNIT = 5000;
 /** Capacité ajoutée par la file d'événements quand elle est pleine (`23a2:0002` : `capacité += 5`). */
 const EVENT_QUEUE_GROWTH = 5;
 /** Fenêtre de jeu par défaut quand aucune salle n'est chargée. */
+/** Échantillon de souris rejoué par le moteur (`touch` : appui d'un toucher du doigt). */
+interface PointerSample {
+  x: number;
+  y: number;
+  buttons: number;
+  ctrl: boolean;
+  touch?: boolean;
+}
+
 const DEFAULT_WINDOW = { x: 8, y: 20, width: 304, height: 160 };
 /** Ligne de saisie (`1e22:0008`) : `(38,168)`, 244 x 11. */
 const INPUT_BOX: Rect = { x: 38, y: 168, width: 244, height: 11 };
@@ -286,8 +295,8 @@ export class ArmaethEngine implements TokenHostEngine {
 
   // entrées
   private readonly keys: HostKey[] = [];
-  private samples: { x: number; y: number; buttons: number; ctrl: boolean }[] = [];
-  private pointer = { x: 160, y: 12, buttons: 0, ctrl: false };
+  private samples: PointerSample[] = [];
+  private pointer: PointerSample = { x: 160, y: 12, buttons: 0, ctrl: false };
   private lastButtons = 0;
   private keyForcesTick = false;
   private caret = 0;
@@ -762,7 +771,7 @@ export class ArmaethEngine implements TokenHostEngine {
   }
 
   private onPointer(input: Extract<HostInput, { type: "pointer" }>): void {
-    const sample = { x: input.x, y: input.y, buttons: input.buttons, ctrl: input.ctrl === true };
+    const sample: PointerSample = { x: input.x, y: input.y, buttons: input.buttons, ctrl: input.ctrl === true, touch: input.touch === true };
     this.pointer = sample;
     this.samples.push(sample);
     const pressed = input.buttons !== 0 && this.lastButtons === 0;
@@ -1090,6 +1099,10 @@ export class ArmaethEngine implements TokenHostEngine {
       execute: (command) => engine.runClick(command),
       walk: (x, y) => engine.walkHero(x, y),
       exit: (sector) => engine.exitBySector(sector),
+      hasExit: (sector) => {
+        const room = engine.state?.loadedRoom;
+        return room !== undefined && room !== null && engine.state!.neighbour(room, sector) !== undefined;
+      },
     } satisfies InterfaceWorld;
   })();
 
@@ -1760,9 +1773,9 @@ export class ArmaethEngine implements TokenHostEngine {
   }
 
   /** Souris : `controller.pointer` (une fois par image, cible en coordonnées d'écran) puis messages empilés par le clic. */
-  private pointerSample(sample: { x: number; y: number; buttons: number; ctrl: boolean }): void {
+  private pointerSample(sample: PointerSample): void {
     if (this.runner.running) return;
-    const modifiers: PointerModifiers = { ctrl: sample.ctrl };
+    const modifiers: PointerModifiers = { ctrl: sample.ctrl, touch: sample.touch };
     if (sample.buttons !== 0) {
       this.messages.reset();
       this.clickSuccesses = 0;

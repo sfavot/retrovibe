@@ -119,6 +119,8 @@ export interface InterfaceWorld {
   walk(x: number, y: number): boolean;
   /** Sortie par un secteur 0 haut, 1 droite, 2 bas, 3 gauche (`1504:0274`) : vrai si la salle a une sortie là. */
   exit(sector: number): boolean;
+  /** La salle a une sortie dans ce secteur (sans y envoyer le héros). */
+  hasExit(sector: number): boolean;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -201,7 +203,16 @@ export type KeyEvent =
 
 export interface PointerModifiers {
   ctrl: boolean;
+  /** Toucher du doigt (option du portage : avec les bottes, un toucher au bord de la scène y fait sortir, voir `TOUCH_EXIT_MARGIN`). */
+  touch?: boolean;
 }
+
+/**
+ * Au doigt, avec les bottes : un toucher à moins de ce nombre de pixels d'un bord de la scène où la salle a une sortie fait sortir de ce
+ * côté, comme le clic droit (`1504:0274`). Écart du portage : sans souris ni flèches, l'appui long (clic droit) était le seul moyen de
+ * changer de salle, et rien ne l'indiquait. Ailleurs, ou sans sortie de ce côté, le toucher fait marcher comme le clic gauche.
+ */
+export const TOUCH_EXIT_MARGIN = 20;
 
 // ---------------------------------------------------------------------------------------------------------------
 // Curseur
@@ -413,7 +424,7 @@ export class InterfaceController {
 
     // Clic dans le vide (§ 5.6).
     if (record.empty && successes === 0 && messages === 0 && this.world.pendingMessages() === 0) {
-      const outcome = this.clickEmpty(record, right, actions);
+      const outcome = this.clickEmpty(record, right, modifiers, actions);
       successes += outcome.successes;
       messages += outcome.messages;
     }
@@ -448,7 +459,12 @@ export class InterfaceController {
     };
   }
 
-  private clickEmpty(record: ToolRecord, right: boolean, actions: InterfaceAction[]): { successes: number; messages: number } {
+  private clickEmpty(
+    record: ToolRecord,
+    right: boolean,
+    modifiers: PointerModifiers,
+    actions: InterfaceAction[],
+  ): { successes: number; messages: number } {
     if (record.num === TOOL_BOOTS) {
       if (!this.world.heroPresent) {
         actions.push({ type: "message", id: this.world.heroDead ? MESSAGE_NO_HERO_DEAD : MESSAGE_NO_HERO });
@@ -461,7 +477,8 @@ export class InterfaceController {
       const { x0, y0, width, height } = this.world.scene;
       const x = this.mouseX - x0;
       const y = this.mouseY - y0;
-      if (right) {
+      const nearEdge = Math.min(x, y, width - 1 - x, height - 1 - y) < TOUCH_EXIT_MARGIN;
+      if (right || (modifiers.touch && nearEdge && this.world.hasExit(sectorOf(x, y, width, height)))) {
         const sector = sectorOf(x, y, width, height);
         const ok = this.world.exit(sector);
         actions.push({ type: "exitBySector", sector, ok });

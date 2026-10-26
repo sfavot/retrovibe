@@ -17,6 +17,7 @@ import { copy } from "../copy";
 import { END_MISSION, type MissionScript } from "../data/missions";
 import type { StringTables } from "../data/strings";
 import { BootSequence } from "./boot";
+import { COUNTER, EndCounters } from "./end-screen";
 import { Menu, standardLines, type MenuEvent, type MenuKey, type MenuLine } from "./menu";
 import { MissionScriptRunner, replayableMissions, stateVars, type MissionVars } from "./mission-script";
 import {
@@ -62,7 +63,7 @@ export interface LevelStats {
   objectivesPercent?: number;
   bonusPercent?: number;
   secretsPercent?: number;
-  /** Nombre de bonus posés / largués du niveau : les lignes « Bonus » et « Secrets » ne s'affichent que s'il y en a. */
+  /** Nombre de bonus posés / largués du niveau (informatif : l'écran de fin se règle sur les pourcentages non nuls). */
   bonusTotal?: number;
   secretsTotal?: number;
   /** État du joueur à l'arrivée : reporté sur la mission suivante (mission accomplie seulement). */
@@ -118,8 +119,6 @@ export type FlowView =
   | { kind: "menu"; menu: Menu; backdrop: "demo" | "frozen" }
   | { kind: "level" };
 
-/** Touches ignorées au début des écrans de fin de mission (110 images à 60 Hz environ, §9). */
-export const END_SCREEN_GUARD_MS = 1500;
 /** Crédits : 1003, 1002, 1001 (§4.5). */
 const CREDITS_SCREENS = [1003, 1002, 1001];
 
@@ -143,13 +142,12 @@ type Phase =
   | { kind: "credits"; index: number }
   | { kind: "video"; mission: number }
   | { kind: "level" }
-  | { kind: "end"; outcome: LevelOutcome; since: number; menu: Menu }
+  | { kind: "end"; outcome: LevelOutcome; menu: Menu; counters: EndCounters; seconds: number }
   | { kind: "idle" };
 
 export class Flow {
   view: FlowView = { kind: "none" };
   private phase: Phase = { kind: "idle" };
-  private now = 0;
   private lastNow = 0;
   private settings: GlobalSettings;
   private pilot: Pilot | null = null;
@@ -192,7 +190,6 @@ export class Flow {
     // Pas de plafond : les attentes du démarrage (3,5 s) se comptent en temps réel, même à faible cadence d'images.
     const dt = this.lastNow === 0 ? 0 : Math.max(0, now - this.lastNow);
     this.lastNow = now;
-    this.now = now;
     const phase = this.phase;
     switch (phase.kind) {
       case "boot":
@@ -213,7 +210,9 @@ export class Flow {
         break;
       case "end":
         phase.menu.tick();
-        if (input.pressed && now - phase.since >= END_SCREEN_GUARD_MS) this.finishEnd(phase);
+        // Décompte animé : 40 ticks par seconde, indépendant de la cadence d'images ; une touche n'abrège rien (§9).
+        if (phase.counters.advance(dt) > 0) phase.menu.setLines(this.endMenuLines(phase.outcome, phase.counters, phase.seconds));
+        if (input.pressed && phase.counters.acceptsKeys) this.finishEnd(phase);
         break;
       default:
         break;
@@ -238,9 +237,16 @@ export class Flow {
       this.data.store.save(pilot);
     }
     this.carry = outcome === "complete" ? (stats.state ?? null) : null;
-    const lines = this.endLines(outcome, stats);
-    const menu = this.makeMenu(standardLines(this.endBanner(outcome), lines), { y: "center", noCancel: true });
-    this.phase = { kind: "end", outcome, since: this.now, menu };
+    const counters = new EndCounters(outcome, {
+      levelScore: stats.levelScore ?? 0,
+      totalScore: stats.score ?? 0,
+      objectivesPercent: stats.objectivesPercent ?? 0,
+      bonusPercent: stats.bonusPercent ?? 0,
+      secretsPercent: stats.secretsPercent ?? 0,
+    });
+    const seconds = Math.round(stats.seconds ?? 0);
+    const menu = this.makeMenu(this.endMenuLines(outcome, counters, seconds), { y: "center", noCancel: true });
+    this.phase = { kind: "end", outcome, menu, counters, seconds };
     this.view = { kind: "menu", menu, backdrop: "frozen" };
   }
 
@@ -748,31 +754,38 @@ export class Flow {
     return [this.s(7, outcome === "complete" ? 0 : 1), this.s(200, mission)];
   }
 
-  /** Lignes de l'écran « Mission accomplie » / « Game over » (`004194b0`, `00419ed8`) ; « Bonus » et « Secrets » seulement après un succès. */
-  private endLines(outcome: LevelOutcome, stats: LevelStats): MenuLine[] {
-    const { seconds } = stats;
+  private endMenuLines(outcome: LevelOutcome, counters: EndCounters, seconds: number): MenuLine[] {
+    return standardLines(this.endBanner(outcome), this.endLines(outcome, counters, seconds));
+  }
+
+  /**
+   * Lignes de l'écran « Mission accomplie » / « Game over » (`004194b0`, `00419ed8`). Les cinq lignes de score et de pourcentage
+   * affichent les compteurs en cours de décompte ; les temps sont fixes. « Bonus » et « Secrets » n'existent qu'après un succès et
+   * seulement si leur pourcentage **final** est non nul (`DAT_00480c08`, `DAT_00480c0c`) ; « Durée totale » est toujours là.
+   */
+  private endLines(outcome: LevelOutcome, counters: EndCounters, seconds: number): MenuLine[] {
     const lines: MenuLine[] = [];
-    const value = (id: number, n: number | undefined): void => {
-      if (n !== undefined) lines.push({ type: "text", text: format(this.s(7, id), n) });
+    const value = (id: number, row: number): void => {
+      lines.push({ type: "text", text: format(this.s(7, id), counters.current[row]!) });
     };
-    value(10, stats.levelScore);
-    value(11, stats.score);
     const time = (id: number, total: number): void => {
       lines.push({ type: "text", text: format(this.s(7, id), Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60) });
     };
-    if (seconds !== undefined) time(12, Math.round(seconds));
-    if (this.pilot && this.pilot.playSeconds > 0) time(13, this.pilot.playSeconds);
-    value(14, stats.objectivesPercent);
+    value(10, COUNTER.levelScore);
+    value(11, COUNTER.totalScore);
+    time(12, seconds);
+    time(13, this.pilot?.playSeconds ?? 0);
+    value(14, COUNTER.objectives);
     if (outcome === "complete") {
-      if (stats.bonusTotal) value(15, stats.bonusPercent);
-      if (stats.secretsTotal) value(16, stats.secretsPercent);
+      if (counters.target[COUNTER.bonus]) value(15, COUNTER.bonus);
+      if (counters.target[COUNTER.secrets]) value(16, COUNTER.secrets);
     }
     lines.push({ type: "choice", id: 99, text: this.s(4, 1) });
     return lines;
   }
 
+  /** Aucun son : l'écran tourne avec le drapeau « rendre la main » de `gm_menu_run`, qui sort avant le traitement des touches (§9). */
   private finishEnd(phase: Extract<Phase, { kind: "end" }>): void {
-    this.host.sound(SOUND.validate);
     this.host.endLevel();
     if (phase.outcome === "complete") this.advanceScript();
     else {

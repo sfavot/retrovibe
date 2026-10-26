@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { MusicContext, MusicPreference } from "../../../src/games/swiv3d/audio";
 import { MemoryStorage, prefixedStorage } from "../../../src/engine/storage";
-import { END_SCREEN_GUARD_MS, Flow, format, type FlowHost, type LevelRequest, type UiInput, type UiKey } from "../../../src/games/swiv3d/screens/flow";
+import { Flow, format, type FlowHost, type LevelRequest, type UiInput, type UiKey } from "../../../src/games/swiv3d/screens/flow";
 import { ADVENTURE_COMPLETED, PilotStore, type Volumes } from "../../../src/games/swiv3d/screens/pilots";
 import { hasOriginalFiles } from "../helpers";
 import { loadGlobal, stubText } from "./support";
@@ -177,10 +177,10 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     d.flow.levelEnded("complete", { seconds: 75 });
     expect(d.flow.phaseName).toBe("end");
     expect(d.flow.view).toMatchObject({ kind: "menu", backdrop: "frozen" });
-    d.wait(END_SCREEN_GUARD_MS - 100);
+    d.idle(70); // ~1,1 s : compteur de fin à 99 sur 110
     d.anyKey();
     expect(d.flow.phaseName).toBe("end");
-    d.wait(200);
+    d.idle(20);
     d.anyKey();
     expect(host.ended).toBe(1);
     expect(d.flow.view).toMatchObject({ kind: "video", name: "BR_TER1", mission: 1 });
@@ -196,7 +196,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
       d.flow.videoEnded(false);
       expect(host.levels.at(-1)?.name).toBe(`TERRAN0${mission}`);
       d.flow.levelEnded("complete", { seconds: 10 });
-      d.wait(END_SCREEN_GUARD_MS + 10);
+      d.idle(130);
       d.anyKey();
     }
     expect(d.flow.view).toMatchObject({ kind: "menu", backdrop: "demo" });
@@ -215,7 +215,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     const ammo = Array.from({ length: 20 }, (_, k) => (k === 1 ? 3 : 0));
     const state = { ammo, score: 800, form: 0, energy: 400, cannonPower: 2 };
     d.flow.levelEnded("complete", { seconds: 10, state });
-    d.wait(END_SCREEN_GUARD_MS + 10);
+    d.idle(130);
     d.anyKey();
     expect(store.get(0)!.states[1]).toEqual(state);
     d.flow.videoEnded(false);
@@ -224,7 +224,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     expect([next.vars.get(1), next.vars.get(2), next.vars.get(101)]).toEqual([400, 800, 3]);
     // game over : rien n'est reporté, la fiche d'arrivée reste celle de la mission
     d.flow.levelEnded("gameOver", { seconds: 5, state: { ...state, score: 9999 } });
-    d.wait(END_SCREEN_GUARD_MS + 10);
+    d.idle(130);
     d.anyKey();
     expect(store.get(0)!.states[1]!.score).toBe(800);
     expect(store.get(0)!.states[2]).toBeUndefined();
@@ -261,6 +261,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
       bonusTotal: 4,
       secretsTotal: 0,
     });
+    d.idle(1500); // décompte terminé (scores de plusieurs milliers : 12 par tick)
     const view = d.flow.view;
     if (view.kind !== "menu") throw new Error("pas de menu");
     const texts = view.menu.texts();
@@ -290,7 +291,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     d.flow.videoEnded(false);
     d.flow.levelEnded("gameOver", { seconds: 5 });
     expect(d.flow.phaseName).toBe("end");
-    d.wait(END_SCREEN_GUARD_MS + 10);
+    d.idle(130);
     d.anyKey();
     expect(d.flow.view).toMatchObject({ kind: "menu", backdrop: "demo" });
     expect(host.ended).toBe(1);
@@ -327,7 +328,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     d.choose(1);
     d.flow.videoEnded(false);
     d.flow.levelEnded("complete");
-    d.wait(END_SCREEN_GUARD_MS + 10);
+    d.idle(130);
     d.anyKey();
     expect(d.flow.view).toMatchObject({ kind: "video", name: "BR_TER2" });
     expect(store.get(0)?.bestMission).toBe(3);

@@ -9,6 +9,7 @@ import { registerMagic } from "./magic";
 import { type NpcAnimations, type NpcKit, registerNpcs } from "./npc";
 import { registerObjectHandlers } from "./objects";
 import { registerReactions } from "./reactions";
+import { onEnterRoom } from "./room-entry";
 import { registerVerbs } from "./verbs";
 
 /**
@@ -72,6 +73,7 @@ export function gameOptions(deps: GameDeps = {}): ArmaethEngineOptions {
       kit = registerGame(registry, deps);
     },
     onContinue: (ctx) => void continueGame(ctx),
+    onEnterRoom,
     acceptsGround: (type, effect, body: GameObject, ctx: BehaviorContext) => acceptsGroundFor(body, type, effect, ctx.state, ctx),
     services,
   };

@@ -61,6 +61,8 @@ export interface ContactResult {
  */
 export interface PlacementMemory {
   code: number;
+  /** La dernière recherche a trouvé une position (pas seulement un code non nul périmé). */
+  found?: boolean;
 }
 
 export function createPlacementMemory(): PlacementMemory {
@@ -500,9 +502,12 @@ export function searchPosition(body: PlaceBody, env: PlaceEnv, request: SearchAr
   }
 
   if (!perfect) {
-    // aucune position parfaite : balayage des zones (en salle), sinon opération impossible hors salle
-    if (inRoom) sweepZones();
-    else memory.code = PLACE_OUTSIDE_ROOM;
+    // aucune position parfaite : balayage des zones (en salle, `Dep` 2 et 4 seulement : `1b11:04ed` renvoie les autres vers la suite
+    // de la spirale, jamais vers `1b11:0614` ; vérifié sous DOSBox-X : le héros qui quitte la corde du puits, remis en marche
+    // (`Dep 0`), est posé sur la case de la margelle, pas sur la zone), sinon opération impossible hors salle
+    if (inRoom) {
+      if (zoneOnly) sweepZones();
+    } else memory.code = PLACE_OUTSIDE_ROOM;
   }
 
   /**
@@ -646,7 +651,9 @@ export function searchPosition(body: PlaceBody, env: PlaceEnv, request: SearchAr
     body.presence = inRoom ? 2 : 1;
     if (inRoom) body.ground = found.type;
     memory.code = body.ground === originalGround ? PLACE_OK : PLACE_TYPE_CHANGED;
+    memory.found = true;
   } else {
+    memory.found = false;
     if (memory.code === 0) memory.code = PLACE_NOT_FOUND;
     Object.assign(body, origin);
   }
@@ -683,7 +690,9 @@ export function placeObject(body: PlaceBody, mode: number, env: PlaceEnv): numbe
         return searchPosition(body, env, { ...SEARCH_FREE, type: body.ground });
       case 5: {
         const result = searchPosition(body, env, { ...SEARCH_FREE, type: body.ground });
-        if (result === PLACE_OK || result === PLACE_TYPE_CHANGED) return result;
+        // un échec de la recherche typée qui rend un `0x11` périmé (`DS:0ea8`) n'est pas un succès : la recherche libre (mode 1) suit.
+        // Vérifié sous DOSBox-X (puits de la salle 102) : au sommet de la corde le héros est reposé sur la margelle (`Sol 40`)
+        if ((result === PLACE_OK || result === PLACE_TYPE_CHANGED) && env.memory.found !== false) return result;
         mode = 1;
         continue;
       }

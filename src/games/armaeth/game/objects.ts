@@ -1,5 +1,5 @@
 import { EventOp } from "../engine/events";
-import { FAMILY, type HandlerContext, type HandlerRegistry, type ObjectHandler } from "../engine/handlers";
+import { FAMILY, type BehaviorContext, type HandlerContext, type HandlerRegistry, type ObjectHandler } from "../engine/handlers";
 import type { GameObject } from "../engine/state";
 import { setHeroCarrying, startHeroFall } from "./hero";
 import {
@@ -564,7 +564,7 @@ export const keyring: ObjectHandler = (ctx) => {
 const DOOR = { locked: 0, closed: 1, open: 2 } as const;
 
 /** `20b5:0248(Num, état)` : place le battant dans la salle visible, à la position de la table, et applique l'état. */
-function setDoor(ctx: HandlerContext, leaf: GameObject, ego: number): void {
+export function setDoor(ctx: BehaviorContext, leaf: GameObject, ego: number): void {
   const row = doorRow(leaf.num);
   const visible = ctx.room;
   const side = visible && visible.id === row.roomB && row.roomB !== 0 ? 1 : 0;

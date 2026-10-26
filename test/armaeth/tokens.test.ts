@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TOKEN_GROUPS } from "../../src/games/armaeth/data/commands";
 import { type ScriptControl, type TokenHost, TOKENS, TokenInterpreter, tokenizeLine } from "../../src/games/armaeth/engine/tokens";
 import type { GameObject } from "../../src/games/armaeth/engine/state";
+import { EngineTokenHost, type TokenHostEngine } from "../../src/games/armaeth/engine/token-host";
 
 type Call = [string, ...unknown[]];
 
@@ -217,5 +218,20 @@ describe("gestionnaires", () => {
     interp.flags.dgs = 99;
     for (const t of TOKENS.filter((x) => !x.established)) expect(interp.dispatch(t.group, t.index, [1, 2, 3]).ok, t.name).toBe(true);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("hôte des jetons : lumière", () => {
+  it("`lum` transmet le plafond tel quel, -1 compris (comparaison signée `197e:0008`)", () => {
+    // régression du robot : un plafond converti ou ignoré laissait la lumière dépasser la palette normale (surexposition blanche avec une
+    // torche dans une salle éclairée)
+    const setLight = vi.fn();
+    const host = new EngineTokenHost({ setLight } as unknown as TokenHostEngine);
+    host.setLight(5, -1);
+    host.setLight(0, 7);
+    expect(setLight.mock.calls).toEqual([
+      [5, -1],
+      [0, 7],
+    ]);
   });
 });

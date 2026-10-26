@@ -214,6 +214,24 @@ describe("placement : recherche sur terrain synthétique", () => {
     expect(searchPosition(outside, envOf(terrain, { inRoom: false }), SEARCH_FREE)).toBe(PLACE_OUTSIDE_ROOM);
   });
 
+  it("zones : un marcheur (Dep 0) ne les balaie pas (`1b11:04ed` n'y envoie que Dep 2 et 4), il est posé sur la case de sol la plus proche", () => {
+    // régression du robot (puits de la salle 102, vérifié sous DOSBox-X) : au sommet de la corde, le héros remis à la marche (`Dep 0`) est
+    // posé sur la margelle (case de sol, `Sol 40`) et non sur la zone de la corde (`Sol 19`), où il tombait dans le puits
+    const ground = syntheticTerrain(concat(...[2, 3].map((row) => record(2, 0, row, 10, 179, 100, 40, 179, 100))));
+    const terrain: Terrain = {
+      ...ground,
+      zones: [{ type: 19, plane: 0xff, row: 4, colStart: 20, colEnd: 25, high: 90, low: 70, spare: new Uint8Array(4) }],
+    };
+    const walking = walker(90, 90, 36, { ground: 19 });
+    searchPosition(walking, envOf(terrain), SEARCH_FREE);
+    expect(walking.ground).toBe(2);
+    expect(walking.p).toBeLessThanOrEqual(31);
+    // le même corps en Dep 4 (grimpe) reste sur la zone
+    const climbing = walker(90, 90, 36, { ground: 19, dep: 4 });
+    searchPosition(climbing, envOf(terrain), SEARCH_FREE);
+    expect([climbing.ground, climbing.p]).toEqual([19, 36]);
+  });
+
   it("deux plans : le plan le plus proche en 3D gagne", () => {
     const stairs = syntheticTerrain(
       concat(record(2, 0, 3, 10, 179, 100, 12, 179, 100), record(2, 1, 3, 10, 179, 60, 12, 179, 60)),

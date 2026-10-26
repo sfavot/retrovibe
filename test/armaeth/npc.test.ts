@@ -6,7 +6,9 @@ import { FAMILY, type BehaviorContext } from "../../src/games/armaeth/engine/han
 import type { GameObject, GameRoom } from "../../src/games/armaeth/engine/state";
 import { type DuelGear, registerNpcs, resolveDuel } from "../../src/games/armaeth/game/npc";
 import { NUM, ROOM } from "../../src/games/armaeth/game/helpers";
-import { createAnimations, instantAnimations } from "../../src/games/armaeth/game/npc-kit";
+import { createAnimations, instantAnimations, NpcKit } from "../../src/games/armaeth/game/npc-kit";
+import { POST_CELLAR, POST_NORTH, guardAttacks } from "../../src/games/armaeth/game/npc-dwarves";
+import { wander } from "../../src/games/armaeth/game/helpers";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 import { TestHost } from "./test-host";
 
@@ -98,6 +100,12 @@ describe.skipIf(!hasOriginalFiles)("scénarios (monde réel)", () => {
   /** Un objet de ce `Num` placé dans la salle, à côté du héros qu'on y amène. */
   function stage(num: number, roomId: number): { npc: GameObject; hero: GameObject } {
     const s = state();
+    // le tirage du duel précédent a pu tuer le héros (le résultat dépend de la graine et de l'historique du hasard) : nouveau héros
+    if (!s.hero) {
+      const fresh = s.createObject({ typ: 2, num: NUM.hero, gst: 7, mob: 2, light: 0, capacity: 500 });
+      s.moveToRoom(fresh, room(1));
+      s.setHero(fresh);
+    }
     const npc = s.findByNum(num)!;
     const hero = s.hero!;
     const target = room(roomId);
@@ -175,6 +183,74 @@ describe.skipIf(!hasOriginalFiles)("scénarios (monde réel)", () => {
     expect(remains.ego).toBe(0);
     expect(npc.ego).not.toBe(1);
     state().setHero(null);
+  });
+
+  it("animations des personnages : `Ver` vaut 1 par défaut (`16f5:0132`), sans quoi la séquence n'avance pas", () => {
+    // régression du robot : les animations scénarisées des nains n'avançaient pas
+    const ani = parseAni(readOriginal("A1FANI.SYS"));
+    const animations = createAnimations(() => ({ sprites: rig.engine.sprites, ani }));
+    const { npc } = stage(NUM.dwarfMiner, 201);
+    animations.start(rig.ctx, npc, { id: 29 });
+    expect(npc.speedY).toBe(1);
+    expect(npc.animId).toBe(29);
+  });
+
+  it("garde de poste (`Ego 5` cellier, `Ego 6` passage nord) : il n'attaque que sur sa case ou quand plus aucun soldat n'est là (`2a44:08da`)", () => {
+    const { hero } = stage(NUM.soldier, ROOM.soldiers);
+    const s = state();
+    const kit = new NpcKit();
+    const soldier = (serial: number, ego: number): GameObject => {
+      const o = s.findBySerial(serial)!;
+      s.moveToRoom(o, room(ROOM.soldiers));
+      o.ego = ego;
+      return o;
+    };
+    const cellar = soldier(80, 5);
+    const north = soldier(81, 6);
+    const a = soldier(58, 0);
+    const b = soldier(82, 0);
+    hero.ground = 2;
+    // des soldats éveillés dans la salle : les gardes restent à leur poste
+    expect(guardAttacks(kit, rig.ctx, cellar, hero)).toBe(false);
+    expect(guardAttacks(kit, rig.ctx, north, hero)).toBe(false);
+    // sur leur case de déclenchement, ils attaquent (cellier : 0x37, passage nord : 0x36)
+    hero.ground = 0x37;
+    expect(guardAttacks(kit, rig.ctx, cellar, hero)).toBe(true);
+    expect(guardAttacks(kit, rig.ctx, north, hero)).toBe(false);
+    hero.ground = 0x36;
+    expect(guardAttacks(kit, rig.ctx, north, hero)).toBe(true);
+    hero.ground = 2;
+    // les deux autres dorment : le garde du cellier n'a plus de camarade éveillé mais l'ignore (les endormis comptent), le garde du
+    // passage nord a encore le garde du cellier
+    a.ego = 8;
+    b.ego = 7;
+    expect(guardAttacks(kit, rig.ctx, cellar, hero)).toBe(false);
+    expect(guardAttacks(kit, rig.ctx, north, hero)).toBe(false);
+    // plus personne d'éveillé ni d'endormi : le garde du cellier reprend son état normal et attaque
+    a.ego = 2;
+    b.ego = 2;
+    expect(guardAttacks(kit, rig.ctx, cellar, hero)).toBe(true);
+    expect(cellar.ego).toBe(0);
+    // le garde du passage nord compte les soldats d'`Ego 0..5` (assommés compris) : tant qu'il y en a un il reste à son poste
+    expect(guardAttacks(kit, rig.ctx, north, hero)).toBe(false);
+    for (const o of [cellar, a, b]) o.ego = 6;
+    expect(guardAttacks(kit, rig.ctx, north, hero)).toBe(true);
+  });
+
+  it("postes des gardes : `2151:0006` tire X et P dans des intervalles imposés (cellier X 100..169 P 50..51, passage nord X 57..94 P 18..19)", () => {
+    const guard = state().findBySerial(80)!;
+    const north = state().findBySerial(81)!;
+    for (const [obj, post] of [[guard, POST_CELLAR], [north, POST_NORTH]] as const) {
+      obj.path.defined = false;
+      for (let i = 0; i < 60; i++) {
+        wander(rig.ctx, obj, post);
+        const target = obj.path.target!;
+        expect(target.x).toBeGreaterThanOrEqual(post.x[0]);
+        expect(target.x).toBeLessThan(post.x[1]);
+        expect(target.p).toBeGreaterThanOrEqual(post.p[0]);
+        expect(target.p).toBeLessThan(post.p[1]);
+      }
+    }
   });
 
   it("ours : il poursuit le héros dans sa grotte, le dévore au contact, la faim est armée", () => {

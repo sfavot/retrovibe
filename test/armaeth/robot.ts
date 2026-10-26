@@ -76,6 +76,11 @@ export class Robot extends Player {
 
   /** Restauration (F3) : l'état du monde revient à la dernière sauvegarde, le hasard continue. */
   restore(): void {
+    // une fenêtre de message ouverte (dialogue de Minas Thyl...) avale la touche : on les ferme toutes
+    for (let k = 0; k < 30; k++) {
+      this.drain();
+      if (!this.engine.windows.active) break;
+    }
     this.host.key({ type: "function", n: 3 });
     this.run(5);
     this.drain();
@@ -101,6 +106,7 @@ export class Robot extends Player {
       if (this.state.hero && ok()) return n;
       if (process.env.ROBOT_DEBUG) console.log(`${name} essai ${n} : échec (héros ${this.state.hero ? "vivant" : "mort"}, salle ${this.roomId})`);
       this.restore();
+      if (process.env.ROBOT_DEBUG) console.log(`${name} restauré : salle ${this.state.loadedRoom?.id}, héros ${this.state.hero ? "vivant" : "absent"}, ${this.state.hero?.x},${this.state.hero?.y}`);
     }
     throw new Error(`${name} : échec après ${tries} essais`);
   }
@@ -221,10 +227,47 @@ export class Robot extends Player {
         this.failedExits.add(`${from}>${dest}@${this.entry}`);
         continue;
       }
+      if (process.env.ROBOT_DEBUG) console.log(`goTo ${from} -> ${dest} (côté ${side}) arrivé ${this.roomId} moved ${moved}`);
       this.entry = this.roomId === dest ? OPPOSITE[slot]! : -1;
       visited.push(this.roomId);
     }
     if (this.roomId !== target) throw new Error(`salle ${target} non atteinte (en ${this.roomId})`);
     return visited;
+  }
+
+  /** Les nains, soldats et Sarhûls éveillés de la salle chargée : ce que le joueur voit en entrant. */
+  threats(): GameObject[] {
+    return this.state.objects.filter(
+      (o) => ((o.num >= 201 && o.num <= 204) || o.num === 301 || o.num === 302) && o.room === this.state.loadedRoom && o.holder === null && o.ego !== 7 && o.ego !== 8 && o.ego !== 2 && o.ego !== 3,
+    );
+  }
+
+  /**
+   * Passe dans la salle `room` (voisine) comme un joueur prudent : si des ennemis éveillés y sont à l'arrivée, il ressort aussitôt, attend
+   * et recommence (au plus `patience` fois). Lève `RobotSetback` si la salle reste occupée ou si le héros meurt.
+   */
+  hop(room: number, patience = 8): void {
+    for (let k = 0; k < patience; k++) {
+      const from = this.roomId;
+      try {
+        this.goTo(room, new Set(), true);
+      } catch (error) {
+        if (!this.state.hero || this.hero.ego === 6) throw new RobotSetback(String(error));
+        throw error;
+      }
+      if (this.threats().length === 0) return;
+      this.goTo(from, new Set(), true);
+      this.stop(); // le héros garde son élan en entrant : il ne doit pas filer jusqu'au vide pendant l'attente
+      for (let i = 0; i < 40; i++) {
+        this.run(10);
+        this.drain(2);
+        if (process.env.ROBOT_DEBUG && this.state.hero && i % 8 === 0) console.log("attente", this.roomId, [this.hero.x, this.hero.y, this.hero.p, this.hero.ground, this.hero.ego, this.hero.err].join(","));
+        if (!this.state.hero) {
+          if (process.env.ROBOT_DEBUG) console.log("mort en attendant en", this.roomId, this.log.slice(-2).join(" | "));
+          throw new RobotSetback("mort en attendant");
+        }
+      }
+    }
+    throw new RobotSetback(`salle ${room} encombrée`);
   }
 }

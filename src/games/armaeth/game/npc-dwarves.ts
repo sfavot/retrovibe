@@ -255,6 +255,43 @@ const endTic = (obj: GameObject): number => {
   return UPDATE_OK;
 };
 
+/** Postes des gardes (`2a44:0a60`, `2a44:0a84` -> `2151:0006`) : intervalles de X et de P où ils flânent. */
+export const POST_CELLAR = { x: [100, 170], p: [50, 52] } as const;
+export const POST_NORTH = { x: [57, 95], p: [18, 20] } as const;
+
+/** Case où le héros déclenche le garde : `Ego 6` (passage nord) sur la case 0x36, `Ego 5` (cellier) sur la case 0x37 (`2a44:08fe`, `2a44:091a`). */
+const TRIGGER_GROUND = { 5: 0x37, 6: 0x36 } as const;
+
+/** Compteur de rappels « ils dorment » des gardes (`DGROUP:5282`, 5 puis décompte à chaque vue). */
+const sleeperHint = new WeakMap<object, number>();
+
+/**
+ * Un garde de poste (`Ego 5` ou `6`) qui voit le héros (`2a44:08da..0994`, certain) : il l'attaque si le héros est sur sa case de
+ * déclenchement ; sinon il l'ignore tant qu'un autre soldat éveillé est dans la salle (`Ego 0..5` pour le garde du passage nord, `0..1`
+ * pour le garde du cellier : `21fb:005a`) ; s'il n'y en a pas mais que des soldats dorment (`Ego 7/8`), il l'ignore aussi (et rappelle
+ * « ils dorment » `G341` une fois sur 6 devant le héros ou Prytwen, `DGROUP:5282`) ; sinon il reprend son état normal (`1a37:0002(0, 0)`,
+ * mouvements remis à zéro) et attaque.
+ */
+export function guardAttacks(kit: NpcKit, ctx: BehaviorContext, guard: GameObject, seen: GameObject): boolean {
+  if (seen.ground === TRIGGER_GROUND[guard.ego as 5 | 6]) return true;
+  const mates = guard.room?.listA ?? [];
+  const awakeMax = guard.ego === 6 ? 5 : 1;
+  if (mates.some((o) => o.num === NUM.soldier && o.ego <= awakeMax)) return false;
+  if (mates.some((o) => o.num === NUM.soldier && (o.ego === 7 || o.ego === 8))) {
+    if (seen.num === NUM.hero || seen.num === NUM.prytwen) {
+      const left = sleeperHint.get(ctx.state) ?? 0;
+      if (left === 0) {
+        kit.sayHere(ctx, guard, "G", 341);
+        sleeperHint.set(ctx.state, 5);
+      } else sleeperHint.set(ctx.state, left - 1);
+    }
+    return false;
+  }
+  kit.setEgo(ctx, guard, 0, 0);
+  ctx.motion.reset(guard);
+  return true;
+}
+
 function decide(kit: NpcKit, ctx: BehaviorContext, obj: GameObject, type: 0 | 1 | 2): number {
   obj.path.defined = false;
   if (flag(obj, OFF.control) !== 0) return endTic(obj);
@@ -286,6 +323,7 @@ function decide(kit: NpcKit, ctx: BehaviorContext, obj: GameObject, type: 0 | 1 
     if (o.num === NUM.hero) {
       if (obj.ego > 6 || o.ego === 4 || o.ego === 6) continue;
       if (obj.ego >= 5 && o.num === followedNum) continue;
+      if (soldier && obj.ego >= 5 && !guardAttacks(kit, ctx, obj, o)) continue;
       if (aggro(kit, ctx, obj, o)) return endTic(obj);
     } else if (o.num === NUM.prytwen) {
       if ((o.ego === 0 || o.ego === 1 || o.ego === 2 || o.ego === 4) && o.num !== followedNum && !soldier && kit.approach(ctx, obj, o, true)) {
@@ -305,8 +343,8 @@ function decide(kit: NpcKit, ctx: BehaviorContext, obj: GameObject, type: 0 | 1 
     setWord(obj, OFF.memo, 0);
     return endTic(obj);
   }
-  if (obj.ego === 5) kit.wander(ctx, obj, { x: 0x34, p: 0x32 });
-  else if (obj.ego === 6) kit.wander(ctx, obj, { x: 0x14, p: 0x12 });
+  if (obj.ego === 5) kit.wander(ctx, obj, POST_CELLAR);
+  else if (obj.ego === 6) kit.wander(ctx, obj, POST_NORTH);
   else kit.wander(ctx, obj);
   setWord(obj, OFF.memo, 0);
   return endTic(obj);

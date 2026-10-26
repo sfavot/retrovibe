@@ -18,6 +18,7 @@ import { parseDictionary } from "../../src/games/armaeth/data/dictionary";
 import { parseGph } from "../../src/games/armaeth/data/font";
 import { parseAccentTable, parsePlainMessages } from "../../src/games/armaeth/data/text";
 import { hasOriginalFiles, readOriginal } from "./helpers";
+import { Player } from "./player";
 import { TestHost } from "./test-host";
 
 /**
@@ -499,5 +500,33 @@ describe("fenêtres de message (mise en page de gm_draw_text)", () => {
     const fixed = layoutWindow(font!, { text, window: { x: 62, y: 66, width: 196, height: 120 }, centered: false });
     expect(fixed.pages[0].lines).toHaveLength(14);
     expect(fixed.pages[0].rect).toMatchObject({ x: 62, y: 66, width: 196 });
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("correctifs du robot de parcours (moteur)", () => {
+  const contactOf = (p: Player, body: object) => (p.engine as unknown as { contact(b: object, mutate: boolean): { err: number } }).contact(body, false);
+
+  it("contact `1a50:0006` : la liste est celle du conteneur de l'objet, pas celle de la salle chargée", () => {
+    const p = new Player();
+    p.skipIntro();
+    const hero = p.hero;
+    const sarhul = p.state.findByNum(302)!; // salle 309, jamais chargée ici
+    expect(sarhul.room).not.toBe(p.state.loadedRoom);
+    Object.assign(sarhul, { x: hero.x, y: hero.y, p: hero.p });
+    // avant le correctif le Sarhûl de la salle 309 touchait le héros de la salle 1 en permanence (`Err 8`, héros figé)
+    expect(contactOf(p, sarhul).err).toBe(0);
+    // dans la même salle que le héros, le recouvrement (même `P`, boîtes qui se croisent) est un contact
+    p.state.moveToRoom(sarhul, p.state.loadedRoom!);
+    Object.assign(sarhul, { x: hero.x, y: hero.y, p: hero.p, width: hero.width, height: hero.height });
+    expect([8, 9]).toContain(contactOf(p, sarhul).err);
+  });
+
+  it("placer (`1aba:000e`) recharge d'abord l'image (`1833:01fc`) : `dpP` revient à 1, le héros peut de nouveau bouger en profondeur après un KO", () => {
+    const p = new Player();
+    p.skipIntro();
+    const hero = p.hero;
+    hero.stepP = 0; // `26ab:0134` (KO) met `dpP` à 0
+    p.engine.place(hero, 5);
+    expect(hero.stepP).toBe(1);
   });
 });

@@ -444,7 +444,9 @@ export function setState(ctx: BehaviorContext, obj: GameObject, change: StateCha
   if (change.ego !== undefined) obj.ego = change.ego;
   if (change.fig !== undefined) obj.fig = change.fig;
   if (figChanged) ctx.refreshObject(obj);
-  if (inLoadedRoom(ctx, obj)) {
+  // `1a37:007f` appelle `1aba:000e` pour tout objet, y compris hors de la salle chargée (`DS:0ea8` prend alors `0x15`) : la valeur
+  // périmée que la recherche typée du héros rend en cas d'échec en dépend (puits de la salle 102, vérifié sous DOSBox-X)
+  if (obj.room !== null && obj.holder === null) {
     const result = ctx.motion.place(obj, mode === 0xff ? placeMode(obj) : mode);
     if (result !== PLACE_OK && result !== PLACE_TYPE_CHANGED) obj.err = result;
   }
@@ -707,16 +709,22 @@ export function approach(ctx: BehaviorContext, chaser: GameObject, target: GameO
   return true;
 }
 
+/** Intervalle imposé à un axe de `2151:0006` (mode > 0 : `rand() % (hi - lo) + lo`, la position courante si `hi <= lo`). */
+export type WanderRange = readonly [lo: number, hi: number];
+
 /**
- * `2151:0006` / `2151:02a0` : cible aléatoire dans la salle. `override` : valeurs imposées ; sinon fenêtre de tirage type d'une salle
- * (hypothèse, `movement.md` § 1 : X 0..319, P 8..159). Les volants (`Dep 1`) tirent aussi Y.
+ * `2151:0006` / `2151:02a0` : cible aléatoire dans la salle. `override` : intervalle imposé par axe (`2151:01b4`, un poste de garde) ;
+ * sans lui, fenêtre de tirage type d'une salle (hypothèse, `movement.md` § 1 : X 0..319, P 8..159, bornes élargies de 20). Les volants
+ * (`Dep 1`) tirent aussi Y. Postes des soldats (`2a44:0a3b`, relus dans le désassemblage) : `Ego 5` X `[100, 170)` P `[50, 52)` ;
+ * `Ego 6` X `[57, 95)` P `[18, 20)`.
  */
-export function wander(ctx: BehaviorContext, obj: GameObject, override?: { x?: number; y?: number; p?: number }): boolean {
+export function wander(ctx: BehaviorContext, obj: GameObject, override?: { x?: WanderRange; y?: WanderRange; p?: WanderRange }): boolean {
   const range = (min: number, max: number) => ctx.rng.mod(max - min + 40) + min - 20;
-  const x = override?.x ?? range(0, 319);
-  const p = override?.p ?? range(8, 159);
+  const fixed = (axis: WanderRange, current: number) => (axis[1] > axis[0] ? ctx.rng.mod(axis[1] - axis[0]) + axis[0] : current);
+  const x = override?.x ? fixed(override.x, obj.x) : range(0, 319);
+  const p = override?.p ? fixed(override.p, obj.p) : range(8, 159);
   let y = 0;
-  if (override?.y !== undefined) y = override.y;
+  if (override?.y) y = fixed(override.y, obj.y);
   else if (obj.dep === 1) {
     y = range(0, 179);
     if (y < obj.height) y = 30;

@@ -5,7 +5,7 @@ import { FOLLOW_ARRIVED, FOLLOW_ARRIVED_FREE, FOLLOW_WALKING } from "../engine/p
 import { type GameObject, type GameRoom, RAW_OFFSET } from "../engine/state";
 import { UPDATE_OK } from "../engine/update";
 import { createCorpse } from "./hero";
-import { NUM, OFF, type SpawnFields, type StateChange, approach, canCarry, copyPosition, destroy, flag, inLoadedRoom, roomOf, sayHere, sayNear, setFlag, setState, setWord, wander, word } from "./helpers";
+import { NUM, OFF, type SpawnFields, type StateChange, approach, canCarry, copyPosition, destroy, flag, inLoadedRoom, roomOf, sayHere, sayNear, setFlag, setState, setWord, wander, word, type WanderRange } from "./helpers";
 
 /**
  * Boîte à outils des personnages d'*Armaeth* (`docs/armaeth/characters.md` § 1 : primitives communes) : changement d'état
@@ -312,7 +312,7 @@ export class NpcKit {
   }
 
   /** `2151:0006` / `2151:02a0` (`helpers.wander`). */
-  wander(ctx: BehaviorContext, obj: GameObject, override?: { x?: number; y?: number; p?: number }): boolean {
+  wander(ctx: BehaviorContext, obj: GameObject, override?: { x?: WanderRange; y?: WanderRange; p?: WanderRange }): boolean {
     return wander(ctx, obj, override);
   }
 

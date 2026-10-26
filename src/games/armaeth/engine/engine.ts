@@ -172,6 +172,8 @@ export interface ArmaethEngineOptions {
   acceptsGround?: (type: number, effect: number, body: GameObject, ctx: BehaviorContext) => boolean;
   /** Fin d'un trajet (`FOLLOW_*` dans `result`) : remplace « arrêt + `Err 0x11` » ; `replay` rejoue la commande en attente (`2363:01ea`). */
   onPathEnd?: (obj: GameObject, ctx: BehaviorContext, result: number, replay: () => boolean) => void;
+  /** `147f:000a` (effets d'entrée des personnages) : appelé une fois la salle chargée, avant l'arrivée du héros et le placement des objets. */
+  onEnterRoom?: (ctx: BehaviorContext) => void;
   /** Services fournis par les modules de jeu : mort (`die`) et animation à deux (`playAnimation`), appelés avec le contexte. */
   services?: EngineServices;
   /**
@@ -254,6 +256,7 @@ export class ArmaethEngine implements TokenHostEngine {
   /** Couleurs du panneau de contenu (`DGROUP:0e30`, mode 13h) : cadre, filet, case, filet de case, fond. */
   private readonly panelColors: Uint8Array;
   private readonly continueHook: ((ctx: BehaviorContext) => void) | undefined;
+  private readonly enterRoomHook: ((ctx: BehaviorContext) => void) | undefined;
   private readonly groundRule: ArmaethEngineOptions["acceptsGround"];
   private readonly pathEndHook: ArmaethEngineOptions["onPathEnd"];
   private readonly extraServices: EngineServices | undefined;
@@ -342,6 +345,7 @@ export class ArmaethEngine implements TokenHostEngine {
     this.doors = readDoorTable(exe);
     this.panelColors = exe.slice(DGROUP_IMAGE_OFFSET + 0xe30, DGROUP_IMAGE_OFFSET + 0xe35);
     this.continueHook = options.onContinue ?? game.onContinue;
+    this.enterRoomHook = options.onEnterRoom ?? game.onEnterRoom;
     this.groundRule = options.acceptsGround ?? game.acceptsGround;
     this.pathEndHook = options.onPathEnd ?? game.onPathEnd;
     this.extraServices = options.services ?? game.services;
@@ -1663,6 +1667,7 @@ export class ArmaethEngine implements TokenHostEngine {
       this.scene = scene;
       this.terrain = createTerrain(scene, activePlanes(state, state.loadedRoom!.id, scene.header.planeCount));
       if (applyRoomLight(state, state.loadedRoom!)) this.lastLevel = Number.NaN;
+      this.enterRoomHook?.(this.services);
       this.origin = loaded.origin;
       this.compositor.setFrame(this.frameScene);
       this.compositor.drawScene(scene);

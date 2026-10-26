@@ -162,6 +162,8 @@ describe.skipIf(!hasOriginalFiles)("accessibilité à pied des objets et des sor
     for (const roomId of roomIds) {
       const p = new Player();
       p.skipIntro();
+      // tous les nains du monde, pas seulement ceux de la salle : le hasard les fait y entrer et prendre le héros (`Ego 6`) avant l'essai
+      for (const obj of [...p.state.objects]) if (((obj.num >= 201 && obj.num <= 204) || obj.num === 301) && obj.room !== p.state.rooms[0]) p.state.moveToRoom(obj, p.state.rooms[0]!);
       p.engine.sendToRoom(roomId, true);
       for (let i = 0; i < 60 && p.state.loadedRoom?.id !== roomId; i++) {
         p.run(2);

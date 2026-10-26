@@ -3,7 +3,7 @@ import { MessageTable, messageId } from "../../src/games/armaeth/data/text";
 import { parseAni } from "../../src/games/armaeth/data/tables";
 import { ArmaethEngine } from "../../src/games/armaeth/engine/engine";
 import type { BehaviorContext } from "../../src/games/armaeth/engine/handlers";
-import type { GameObject } from "../../src/games/armaeth/engine/state";
+import { type GameObject, setRawU16 } from "../../src/games/armaeth/engine/state";
 import { HERO_ANIMATIONS, acceptsGround, continueGame, registerCorpse, registerHero } from "../../src/games/armaeth/game/hero";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 import { TestHost } from "./test-host";
@@ -106,6 +106,25 @@ describe.skipIf(!hasOriginalFiles)("héros complet (fichiers du jeu)", () => {
     expect(t.engine.state!.loadedRoom!.id).toBe(17);
     t.run(5);
     expect(t.hero.room).toBe(t.engine.state!.loadedRoom);
+  });
+
+  it("spectateur d'une animation à deux (`Ego 6`, `Anm 0`) : le héros reste pris tant que son partenaire joue, puis reprend la marche", () => {
+    // régression du robot : le héros d'`animId` 0 repartait à la marche au premier tic d'un duel (nain, Prytwen) au lieu d'attendre
+    const t = new Session();
+    t.skipIntro();
+    const hero = t.hero;
+    const state = t.engine.state!;
+    const dwarf = state.createObject({ typ: 2, num: 201, gst: 0, mob: 0 });
+    state.moveToRoom(dwarf, hero.room!);
+    dwarf.animId = 29;
+    hero.ego = 6;
+    hero.animId = 0;
+    setRawU16(hero, 0x3a, dwarf.serial);
+    t.run(10);
+    expect(hero.ego).toBe(6);
+    dwarf.animId = 0;
+    t.run(10);
+    expect(hero.ego).toBe(0);
   });
 
   it("chute : Err 5 sans trajet entre dans Ego 4 (Dep 3) ; un atterrissage court assomme 100 tics puis la marche reprend", () => {

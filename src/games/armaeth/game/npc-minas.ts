@@ -51,14 +51,36 @@ function minasContact(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): boole
       kit.holdHero(ctx, other);
       // lacune (characters.md § 7.5, § 12.1) : le déroulé de la capture (`2dd9:009d`) : trajet jusqu'au chaudron `306`, fin « soupe humaine »
       // (`G364`), dépouille variante 2 ; non reconstitué, le héros reste suspendu en `Ego 6`
-    } else if (other.contents.some((o) => o.num === 320)) {
-      // la baguette dans ses poches : exigence et menace (`G327`, `G328`, `G343`)
-      kit.sayHere(ctx, obj, "G", 327);
-      kit.confiscate(ctx, obj, other, SNATCHED);
+    } else if (wandOf(obj)) {
+      // elle a sa baguette (`2dd9:0a1e`, désassemblage) : si elle suit le héros, `G368` et l'attente (`Ego 5`) ; sinon trois avertissements
+      // `G317` à `G319` (compteur `+0x42`, `Ego 2`), puis le sort de crapaud (`G320`, `2dd9:14cc`)
+      if (word(obj, OFF.followed) === 1) {
+        setMinas(kit, ctx, obj, 5, 5);
+        kit.sayHere(ctx, obj, "G", 368);
+      } else if (flag(obj, 0x42) !== 0) {
+        const warnings = flag(obj, 0x42);
+        setMinas(kit, ctx, obj, 2, 2);
+        kit.sayHere(ctx, obj, "G", 316 + warnings);
+        setFlag(obj, 0x42, warnings - 1);
+      } else cast(kit, ctx, obj, other);
+    } else if (!other.contents.some((o) => o.num === 320)) {
+      // sans baguette sur lui (`2dd9:0a84`) : le pacte, une seule fois par attente : `G325` la première fois (`G369` si elle a déjà eu puis
+      // reperdu sa baguette, `+0x20`), `G326` ensuite ; elle passe `Ego 5` (attend la baguette) et le contact ne se répète plus
+      const seen = flag(obj, 0x43);
+      setFlag(obj, 0x43, seen + 1);
+      setMinas(kit, ctx, obj, 5, 5);
+      kit.sayHere(ctx, obj, "G", seen === 0 ? (flag(obj, 0x20) >= 1 ? 369 : 325) : 326);
+    } else if (other.contents.some((o) => o.num === 314)) {
+      // la baguette et l'épée : exigence (`G327`, ou `G343` si elle n'a plus le talisman), elle passe `Ego 5` (`2dd9:0ab8`)
+      setMinas(kit, ctx, obj, 5, 5);
+      kit.sayHere(ctx, obj, "G", obj.contents.some((o) => o.num === 321) ? 327 : 343);
     } else {
-      const taken = kit.confiscate(ctx, obj, other, SNATCHED);
-      kit.sayHere(ctx, obj, "G", taken > 0 ? 328 : 321);
-      // lacune (characters.md § 7.5) : « rien -> G321 / G322 ou sort » : le choix n'est pas relevé, le sort n'est pas lancé ici
+      // la baguette sans l'épée : elle la reprend (`2dd9:0afc`, `19dc:0000`) ; la suite (disparition, `G328`, `G329`) : lacune
+      // (`characters.md` § 7.5, § 12.1)
+      kit.confiscate(ctx, obj, other, SNATCHED);
+      kit.sayHere(ctx, obj, "G", flag(obj, 0x20) !== 0 ? 365 : 328);
+      setFlag(obj, 0x20, 7);
+      setFlag(obj, 0x42, 3);
     }
   } else if (other.mob === 2) kit.faceOff(ctx, other, obj);
   else return true;

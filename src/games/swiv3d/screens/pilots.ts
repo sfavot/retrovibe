@@ -17,6 +17,21 @@ export type Language = 0 | 1;
 export const LANGUAGES: readonly Language[] = [1, 0];
 export const DEFAULT_LANGUAGE: Language = 1;
 
+/**
+ * État d'arrivée dans une mission (fiche `(0x14, pilote, 1000 + n)`, `screens.md` §7) : les 20 munitions, le score (`+0x34`), le véhicule
+ * (`+0x38`), l'énergie (`+0x3c`) et le niveau du canon (`+0x40`). « Rejouer la mission n » repart de cet état.
+ */
+export interface MissionState {
+  ammo: number[];
+  score: number;
+  form: number;
+  energy: number;
+  cannonPower: number;
+}
+
+/** Nombre d'armes spéciales (munitions de l'état de mission). */
+export const AMMO_SLOTS = 20;
+
 export interface Pilot {
   /** Numéro de la case, 0 à 9. */
   slot: number;
@@ -28,6 +43,8 @@ export interface Pilot {
   music: 0 | 1 | 2;
   /** Temps de jeu total en secondes (`fiche +0x2c`). */
   playSeconds: number;
+  /** États d'arrivée par mission (fiches `1000 + n`), écrits au passage d'une mission accomplie à la suivante. */
+  states: Record<number, MissionState>;
 }
 
 export interface Volumes {
@@ -66,6 +83,30 @@ export function cleanName(name: string): string {
   return [...name].filter(isNameChar).join("").trim().slice(0, NAME_MAX);
 }
 
+function parseState(raw: unknown): MissionState | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const o = raw as Record<string, unknown>;
+  const ammo = Array.isArray(o.ammo) ? o.ammo : [];
+  return {
+    ammo: Array.from({ length: AMMO_SLOTS }, (_, k) => clamp(ammo[k], 0, 65535, 0)),
+    score: clamp(o.score, 0, 1e9, 0),
+    form: clamp(o.form, 0, 5, 0),
+    energy: clamp(o.energy, 1, 992, 496),
+    cannonPower: clamp(o.cannonPower, 0, 19, 0),
+  };
+}
+
+function parseStates(raw: unknown): Record<number, MissionState> {
+  const states: Record<number, MissionState> = {};
+  if (typeof raw !== "object" || raw === null) return states;
+  for (const [key, value] of Object.entries(raw)) {
+    const n = Number(key);
+    const state = parseState(value);
+    if (Number.isInteger(n) && n >= 0 && n < 1000 && state) states[n] = state;
+  }
+  return states;
+}
+
 function parsePilot(slot: number, raw: string | null): Pilot | null {
   if (raw === null) return null;
   try {
@@ -79,6 +120,7 @@ function parsePilot(slot: number, raw: string | null): Pilot | null {
       bestMission: clamp(o.bestMission, 0, ADVENTURE_COMPLETED, 0),
       music: clamp(o.music, 0, 2, 0) as 0 | 1 | 2,
       playSeconds: clamp(o.playSeconds, 0, 1e9, 0),
+      states: parseStates(o.states),
     };
   } catch {
     return null;
@@ -110,7 +152,7 @@ export class PilotStore {
     if (clean === "") return null;
     for (let slot = 0; slot < PILOT_LIMIT; slot++) {
       if (this.get(slot)) continue;
-      const pilot: Pilot = { slot, name: clean, language, bestMission: 0, music, playSeconds: 0 };
+      const pilot: Pilot = { slot, name: clean, language, bestMission: 0, music, playSeconds: 0, states: {} };
       return this.save(pilot) ? pilot : null;
     }
     return null;
@@ -118,8 +160,8 @@ export class PilotStore {
 
   /** Enregistre la fiche (au changement de mission, de langue, de musique, à la fin d'un niveau). Faux si l'écriture échoue. */
   save(pilot: Pilot): boolean {
-    const { name, language, bestMission, music, playSeconds } = pilot;
-    return this.storage.set(this.key(pilot.slot), JSON.stringify({ name, language, bestMission, music, playSeconds }));
+    const { name, language, bestMission, music, playSeconds, states } = pilot;
+    return this.storage.set(this.key(pilot.slot), JSON.stringify({ name, language, bestMission, music, playSeconds, states }));
   }
 
   remove(slot: number): void {

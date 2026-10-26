@@ -8,7 +8,10 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH, WORLD_SIZE } from "../../../src/games/swiv
 import { parseBd } from "../../../src/games/swiv3d/data/bd";
 import { parseGlobal } from "../../../src/games/swiv3d/data/global";
 import { engineLoop, listenerOf, musicContextOf, SoundBridge, type SoundPort } from "../../../src/games/swiv3d/ui/sound-bridge";
-import { cameraToRender, lookAngles, torusDelta, ViewBuilder, wrapCoordinate } from "../../../src/games/swiv3d/ui/view";
+import { bulletToSprite, cameraToRender, effectToSprite, isBullet, lookAngles, torusDelta, ViewBuilder, wrapCoordinate } from "../../../src/games/swiv3d/ui/view";
+import type { GameObject } from "../../../src/games/swiv3d/engine/objects";
+import type { RenderSprite } from "../../../src/games/swiv3d/render/view";
+import { rec, scenario } from "../engine/scenario";
 import { hasOriginalFiles, readOriginal } from "../helpers";
 import { loadLevel } from "../engine/helpers";
 
@@ -160,5 +163,53 @@ describe("pont du son", () => {
     calls.length = 0;
     bridge.handle([{ kind: "playerDied" }]);
     expect(calls).toEqual(["stop 5001"]);
+    // Les sons des bonus (4000 / 4002), de la jauge (4001) et des explosions arrivent déjà en événements `sound` : `pickup`, `message`,
+    // `objective`, `scoreChanged`, `crater` n'ont pas de son propre (catalogue) et ne doivent rien rejouer.
+    calls.length = 0;
+    bridge.handle([
+      { kind: "pickup", n: 3 },
+      { kind: "message", textTable: 100, textId: 3 },
+      { kind: "objective", group: 9, groupDone: true, left: 2 },
+      { kind: "scoreChanged", score: 10, delta: 10 },
+      { kind: "crater", x: 0, z: 0, size: 1 },
+    ]);
+    expect(calls).toEqual([]);
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("vue : balles et explosions en sprites", () => {
+  it("chaque balle est un sprite 505 et chaque explosion un sprite 504, jamais dessinés comme modèles ni deux fois", () => {
+    const s = scenario("TERRAN00", (sx, sz) => [rec(2000, sx + 40, sz + 40, { model: 511, hitPoints: 10, subtype: 5009 })]);
+    const views = new ViewBuilder();
+    let sawBullet = false;
+    let sawEffect = false;
+    for (let t = 0; t < 120; t++) {
+      s.run(1, { firePrimary: true });
+      const view = views.build(s.world);
+      const bullets = [...s.world.liveObjects()].filter(isBullet).length;
+      const effects = s.world.effects().length;
+      const pooled = [...s.world.liveObjects()].filter((o) => o.model >= 11000 && o.model <= 11004).length;
+      expect(effects).toBe(pooled);
+      expect(view.sprites.filter((sp) => sp.setId === 505)).toHaveLength(bullets);
+      expect(view.sprites.filter((sp) => sp.setId === 504)).toHaveLength(effects);
+      // aucun modèle de sprite ne passe par le rendu des modèles 3D
+      expect(view.objects.every((o) => o.modelId > 0 && o.modelId < 10000)).toBe(true);
+      sawBullet ||= bullets > 0;
+      sawEffect ||= effects > 0;
+    }
+    expect(sawBullet).toBe(true);
+    expect(sawEffect).toBe(true);
+  });
+
+  it("série du sprite de balle = modèle - 10000 ; demi-taille de l'explosion = table W", () => {
+    const sp = { setId: 504 as const, frame: 0, x: 0, y: 0, z: 0 } as RenderSprite;
+    bulletToSprite({ model: 10003, x: 256, y: 512, z: 768 } as GameObject, sp);
+    expect(sp).toMatchObject({ setId: 505, frame: 3, x: 1, y: 2, z: 3 });
+    effectToSprite({ kind: "explosion", set: 504, frame: 20, x: 512, y: 0, z: 0, size: 3 }, sp);
+    expect(sp).toMatchObject({ setId: 504, frame: 20, x: 2, size: 40 });
+    effectToSprite({ kind: "impact", set: 504, frame: 40, x: 0, y: 0, z: 0, size: 0 }, sp);
+    expect(sp.size).toBe(15);
+    expect(isBullet({ classe: 1, model: 10006 })).toBe(false);
+    expect(isBullet({ classe: 1, model: 11002 })).toBe(false);
   });
 });

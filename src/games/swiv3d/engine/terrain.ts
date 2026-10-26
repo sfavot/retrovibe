@@ -42,3 +42,40 @@ export class Terrain {
     return this.height(Math.round(xUnits * 256), Math.round(zUnits * 256)) >> 8;
   }
 }
+
+/** Plafond de la carte 102 après ajout de suie (`gm_terrain_explosion_crater`). */
+const GROUND_MAX = 240;
+
+/**
+ * `gm_terrain_explosion_crater` (`00424f44`, `objects.md` §10.4) : si aucune des 36 cellules (6 × 6) de la carte 102 autour du point ne
+ * vaut 0 (eau : `gm_crater_site_ok`), soustrait le profil 4 × 4 du bloc 700 (taille, sous-position `(z >> 12 & 3) * 4 + (x >> 12 & 3)`)
+ * à la carte de hauteur (plancher 0) et ajoute `2 × profondeur` (plafond 240) à la carte 102 là où elle n'est pas nulle (le sol brunit).
+ * `x`, `z` : Q8. Le profil est posé sur les cellules `cx - 1 .. cx + 2` (le centre des profils est en ligne 1, colonne 1 : hypothèse,
+ * cohérente avec la symétrie des profils), le test d'emplacement sur `cx - 2 .. cx + 3` (hypothèse). La dernière passe de l'exe (8 voisins)
+ * n'est pas décodée : non portée. Retourne `false` si le site est refusé.
+ */
+export function applyCrater(
+  heightmap: Uint8Array,
+  groundMap: Uint8Array,
+  profiles: readonly (readonly Int32Array[])[],
+  x: number,
+  z: number,
+  size: 0 | 1 | 2,
+): boolean {
+  const cx = (x >> 14) & MASK;
+  const cz = (z >> 14) & MASK;
+  const at = (ax: number, az: number): number => (az & MASK) * MAP_SIZE + (ax & MASK);
+  for (let dz = -2; dz <= 3; dz++) for (let dx = -2; dx <= 3; dx++) if (groundMap[at(cx + dx, cz + dz)] === 0) return false;
+  const profile = profiles[size]?.[(((z >> 12) & 3) << 2) | ((x >> 12) & 3)];
+  if (!profile) return false;
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      const depth = profile[r * 4 + c]!;
+      if (depth <= 0) continue;
+      const i = at(cx - 1 + c, cz - 1 + r);
+      heightmap[i] = Math.max(0, heightmap[i]! - depth);
+      if (groundMap[i] !== 0) groundMap[i] = Math.min(GROUND_MAX, groundMap[i]! + 2 * depth);
+    }
+  }
+  return true;
+}

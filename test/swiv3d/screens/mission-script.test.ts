@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MissionScript, ScriptElement } from "../../../src/games/swiv3d/data/missions";
-import { DEFAULT_TRACKS, MissionScriptRunner, replayableMissions, type ScriptStep } from "../../../src/games/swiv3d/screens/mission-script";
+import { DEFAULT_TRACKS, MissionScriptRunner, replayableMissions, stateVars, type ScriptStep } from "../../../src/games/swiv3d/screens/mission-script";
 import { hasOriginalFiles } from "../helpers";
 import { loadGlobal } from "./support";
 
@@ -120,5 +120,30 @@ describe.skipIf(!hasOriginalFiles)("script de missions du jeu (bloc 600)", () =>
     expect(replayableMissions(missions, 2, false, has)).toEqual([0, 1, 2]);
     expect(replayableMissions(missions, 0, false, has)).toEqual([0]);
     expect(replayableMissions(missions, 0xb4c69, true, has)).toEqual([0, 1, 2, 3]);
+  });
+});
+
+describe("état d'arrivée et script", () => {
+  it("stateVars : véhicule, énergie, score et 20 munitions aux variables du script", () => {
+    const vars = stateVars({ ammo: Array.from({ length: 20 }, (_, k) => k + 1), score: 900, form: 1, energy: 300, cannonPower: 2 });
+    expect([vars.get(0), vars.get(1), vars.get(2), vars.get(100), vars.get(119)]).toEqual([1, 300, 900, 1, 20]);
+    expect(vars.size).toBe(23);
+  });
+
+  it("l'état semé à l'élément 200 reçoit les éléments 100-103 qui suivent (max 248 garde 300, set écrase)", () => {
+    const runner = new MissionScriptRunner(
+      script([
+        { kind: "mission", index: 1 },
+        { kind: "variable", operation: "max", variable: 1, value: 248 },
+        { kind: "variable", operation: "set", variable: 109, value: 0 },
+        { kind: "level", name: "TERRAN01" },
+        { kind: "end" },
+      ]),
+      1,
+    );
+    expect(runner.next()).toMatchObject({ kind: "mission", index: 1 });
+    runner.seed(stateVars({ ammo: new Array<number>(20).fill(4), score: 50, form: 0, energy: 300, cannonPower: 0 }));
+    const level = runner.next();
+    expect(level.kind === "level" && [level.vars.get(1), level.vars.get(109), level.vars.get(108), level.vars.get(2)]).toEqual([300, 0, 4, 50]);
   });
 });

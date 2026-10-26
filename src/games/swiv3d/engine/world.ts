@@ -51,7 +51,7 @@ import {
   setForm,
   type PlayerContext,
 } from "./player";
-import { Terrain } from "./terrain";
+import { Terrain, applyCrater } from "./terrain";
 import { emptyInput } from "./input";
 
 /** Fonction de comportement d'un objet (`+0x68`), appelée après `pos += vel`. H1 en enregistre via `registerBehavior`. */
@@ -72,6 +72,8 @@ export interface WorldOptions {
   ammo?: readonly number[];
   cannonPower?: number;
   score?: number;
+  /** Profils de cratère du bloc `GLOBAL 700` (`GlobalData.craters`) : sans eux, les explosions ne creusent pas la carte. */
+  craters?: readonly (readonly Int32Array[])[];
 }
 
 /** Table de mise à jour des cellules : mode 0 = proche, 1 = moyenne, 2 = ignorée (`00480c90`, 11 × 11, objects.md §2). */
@@ -125,6 +127,8 @@ export class World {
   /** Événements émis depuis le dernier `drainEvents`. */
   events: WorldEvent[] = [];
   readonly options: Required<Pick<WorldOptions, "cameraFps" | "water">>;
+  /** Profils de cratère (bloc 700), ou null. */
+  private readonly craters: readonly (readonly Int32Array[])[] | null;
   private readonly behaviors = new Map<string, Behavior>();
   private readonly playerContext: PlayerContext;
 
@@ -136,6 +140,7 @@ export class World {
     this.grid = new Grid();
     this.nodes = new NodeNet(level);
     this.debris = opts.debris ? opts.debris.clone() : null;
+    this.craters = opts.craters ?? null;
     if (opts.ammo) opts.ammo.forEach((n, i) => (this.game.ammo[i] = n));
     this.game.power = opts.cannonPower ?? 0;
     this.game.score = this.game.scoreShown = opts.score ?? 0;
@@ -219,6 +224,15 @@ export class World {
     return this.level.groundMap[
       ((z >> 14) & (MAP_SIZE - 1)) * MAP_SIZE + ((x >> 14) & (MAP_SIZE - 1))
     ]!;
+  }
+
+  /**
+   * Creuse un cratère d'explosion dans les cartes 100 et 102 du niveau (partagées avec le rendu) ; sans effet sans profils ou sur un
+   * site refusé. Les objets déjà posés ne suivent pas le sol (`objects.md` §10.4).
+   */
+  crater(x: number, z: number, size: 0 | 1 | 2): boolean {
+    if (!this.craters) return false;
+    return applyCrater(this.terrain.heightmap, this.level.groundMap, this.craters, x, z, size);
   }
 
   /** Enregistre (ou remplace) une fonction de comportement : c'est le point d'accroche de H1. */

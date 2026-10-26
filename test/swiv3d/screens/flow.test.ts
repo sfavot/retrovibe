@@ -207,6 +207,83 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     expect(d.ids).toEqual([0, 1, 2, 3]);
   });
 
+  it("l'état d'arrivée suit les missions : fiche 1000 + n écrite à l'élément 200, variables semées, pas de report après un game over", () => {
+    const d = mainMenuAs();
+    d.choose(10);
+    d.flow.videoEnded(false);
+    expect(host.levels[0]!.state).toBeNull();
+    const ammo = Array.from({ length: 20 }, (_, k) => (k === 1 ? 3 : 0));
+    const state = { ammo, score: 800, form: 0, energy: 400, cannonPower: 2 };
+    d.flow.levelEnded("complete", { seconds: 10, state });
+    d.wait(END_SCREEN_GUARD_MS + 10);
+    d.anyKey();
+    expect(store.get(0)!.states[1]).toEqual(state);
+    d.flow.videoEnded(false);
+    const next = host.levels.at(-1)!;
+    expect(next).toMatchObject({ name: "TERRAN01", mission: 1, state });
+    expect([next.vars.get(1), next.vars.get(2), next.vars.get(101)]).toEqual([400, 800, 3]);
+    // game over : rien n'est reporté, la fiche d'arrivée reste celle de la mission
+    d.flow.levelEnded("gameOver", { seconds: 5, state: { ...state, score: 9999 } });
+    d.wait(END_SCREEN_GUARD_MS + 10);
+    d.anyKey();
+    expect(store.get(0)!.states[1]!.score).toBe(800);
+    expect(store.get(0)!.states[2]).toBeUndefined();
+  });
+
+  it("« Rejouer la mission 1 » repart de l'état d'arrivée enregistré", () => {
+    const pilot = store.create("Suzy", 1)!;
+    pilot.bestMission = 2;
+    pilot.states[1] = { ammo: new Array<number>(20).fill(2), score: 123, form: 0, energy: 111, cannonPower: 1 };
+    store.save(pilot);
+    const d = start();
+    d.press("enter");
+    d.choose(30);
+    d.choose(1);
+    d.flow.videoEnded(false);
+    const request = host.levels.at(-1)!;
+    // énergie 111 relevée à 248 par l'élément `101 1 248`, score et munitions repris de la fiche
+    expect([request.vars.get(1), request.vars.get(2), request.vars.get(100)]).toEqual([248, 123, 2]);
+    expect(request.state?.cannonPower).toBe(1);
+  });
+
+  it("écran de fin : score du niveau et total, temps, pourcentages ; bonus et secrets seulement s'il y en a", () => {
+    const { strings } = loadGlobal();
+    const d = mainMenuAs();
+    d.choose(10);
+    d.flow.videoEnded(false);
+    d.flow.levelEnded("complete", {
+      seconds: 3725,
+      levelScore: 1500,
+      score: 4200,
+      objectivesPercent: 66,
+      bonusPercent: 25,
+      secretsPercent: 0,
+      bonusTotal: 4,
+      secretsTotal: 0,
+    });
+    const view = d.flow.view;
+    if (view.kind !== "menu") throw new Error("pas de menu");
+    const texts = view.menu.texts();
+    const s = (table: number, id: number): string => strings.get(1, table, id)!;
+    expect(texts).toEqual(
+      expect.arrayContaining([format(s(7, 10), 1500), format(s(7, 11), 4200), format(s(7, 12), 1, 2, 5), format(s(7, 14), 66), format(s(7, 15), 25)]),
+    );
+    expect(texts.some((t) => t === format(s(7, 16), 0))).toBe(false);
+  });
+
+  it("game over : même écran sans bonus ni secrets, avec le nom de la mission", () => {
+    const d = mainMenuAs();
+    d.choose(10);
+    d.flow.videoEnded(false);
+    d.flow.levelEnded("gameOver", { seconds: 5, levelScore: 10, score: 10, objectivesPercent: 0, bonusPercent: 10, bonusTotal: 3, secretsTotal: 3 });
+    const view = d.flow.view;
+    if (view.kind !== "menu") throw new Error("pas de menu");
+    const texts = view.menu.texts();
+    expect(texts.some((t) => t.includes("Bonus"))).toBe(false);
+    expect(texts.some((t) => t.includes("Secrets"))).toBe(false);
+    expect(texts.some((t) => t.includes("Fastoche"))).toBe(true);
+  });
+
   it("game over : écran de fin puis retour au menu principal, « Continuer » à la mission atteinte", () => {
     const d = mainMenuAs();
     d.choose(10);

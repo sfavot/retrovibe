@@ -18,7 +18,7 @@ import { END_MISSION, type MissionScript } from "../data/missions";
 import type { StringTables } from "../data/strings";
 import { BootSequence } from "./boot";
 import { Menu, standardLines, type MenuEvent, type MenuKey, type MenuLine } from "./menu";
-import { MissionScriptRunner, replayableMissions, type MissionVars } from "./mission-script";
+import { MissionScriptRunner, replayableMissions, stateVars, type MissionVars } from "./mission-script";
 import {
   ADVENTURE_COMPLETED,
   LANGUAGES,
@@ -27,6 +27,7 @@ import {
   isNameChar,
   type GlobalSettings,
   type Language,
+  type MissionState,
   type Pilot,
   type PilotStore,
   type Volumes,
@@ -50,9 +51,22 @@ export const NO_INPUT: UiInput = { keys: [], chars: [], taps: [], pressed: false
 
 export type LevelOutcome = "complete" | "gameOver";
 
+/** Ce que le niveau rapporte à sa fin : alimente l'écran de fin de mission (`gm_screen_level_complete`) et l'état d'arrivée suivant. */
 export interface LevelStats {
   /** Durée de jeu du niveau, en secondes. */
   seconds?: number;
+  /** Points gagnés dans le niveau (`+0x110`) et score total du joueur (`+0x108`). */
+  levelScore?: number;
+  score?: number;
+  /** `valeur × 100 / total` en entiers : cibles d'objectif détruites, bonus posés ramassés, bonus largués (« secrets ») ramassés. */
+  objectivesPercent?: number;
+  bonusPercent?: number;
+  secretsPercent?: number;
+  /** Nombre de bonus posés / largués du niveau : les lignes « Bonus » et « Secrets » ne s'affichent que s'il y en a. */
+  bonusTotal?: number;
+  secretsTotal?: number;
+  /** État du joueur à l'arrivée : reporté sur la mission suivante (mission accomplie seulement). */
+  state?: MissionState;
 }
 
 export interface LevelRequest {
@@ -61,6 +75,8 @@ export interface LevelRequest {
   vars: MissionVars;
   tracks: readonly number[];
   pilot: Pilot;
+  /** État d'arrivée enregistré pour cette mission (fiche `1000 + n`) : niveau du canon ; `null` pour une partie neuve. */
+  state?: MissionState | null;
 }
 
 /** Ce que le flux demande à l'application. */
@@ -141,6 +157,8 @@ export class Flow {
   private quitCount = 0;
   /** Mission en cours (nom du niveau terminé, écran de fin). */
   private missionIndex = 0;
+  /** État du joueur à la fin de la dernière mission accomplie : copié dans la fiche de la mission suivante (élément `200`). */
+  private carry: MissionState | null = null;
 
   /** `boot` : jouer la séquence de démarrage ; sinon, directement la sélection du pilote. */
   constructor(
@@ -219,7 +237,8 @@ export class Flow {
       pilot.playSeconds += Math.round(stats.seconds);
       this.data.store.save(pilot);
     }
-    const lines = this.endLines(outcome, stats.seconds);
+    this.carry = outcome === "complete" ? (stats.state ?? null) : null;
+    const lines = this.endLines(outcome, stats);
     const menu = this.makeMenu(standardLines(this.endBanner(outcome), lines), { y: "center", noCancel: true });
     this.phase = { kind: "end", outcome, since: this.now, menu };
     this.view = { kind: "menu", menu, backdrop: "frozen" };
@@ -232,7 +251,8 @@ export class Flow {
     this.missionIndex = Math.max(0, this.data.script.missions.find((m) => m.level === name)?.index ?? 0);
     this.phase = { kind: "level" };
     this.view = { kind: "level" };
-    this.host.startLevel({ name, mission: this.missionIndex, vars: new Map(), tracks: [], pilot });
+    this.carry = null;
+    this.host.startLevel({ name, mission: this.missionIndex, vars: new Map(), tracks: [], pilot, state: pilot.states[this.missionIndex] ?? null });
   }
 
   /** Échap pendant le niveau : demande de confirmation (§4.8). */
@@ -665,6 +685,7 @@ export class Flow {
   // --- Script des missions ------------------------------------------------------------------------------------------
 
   private runScript(startMission: number | undefined): void {
+    this.carry = null;
     this.runner = new MissionScriptRunner(this.data.script, startMission);
     this.advanceScript();
   }
@@ -677,9 +698,15 @@ export class Flow {
       const step = runner.next();
       switch (step.kind) {
         case "mission":
-          // La meilleure mission est celle qui a été démarrée, pas terminée (§5.2).
-          if (step.index !== END_MISSION && pilot.bestMission < step.index) {
-            pilot.bestMission = step.index;
+          if (step.index !== END_MISSION) {
+            // Élément `200` : l'état de fin de la mission précédente devient la fiche d'arrivée `1000 + n` ; le joueur repart de cet état
+            // (les éléments `100`-`103` qui suivent s'y appliquent). Une partie neuve n'a pas de fiche : variables du script seules.
+            if (this.carry) pilot.states[step.index] = this.carry;
+            this.carry = null;
+            const arrival = pilot.states[step.index];
+            if (arrival) runner.seed(stateVars(arrival));
+            // La meilleure mission est celle qui a été démarrée, pas terminée (§5.2).
+            if (pilot.bestMission < step.index) pilot.bestMission = step.index;
             this.data.store.save(pilot);
           }
           continue;
@@ -692,7 +719,7 @@ export class Flow {
           this.missionIndex = step.mission;
           this.phase = { kind: "level" };
           this.view = { kind: "level" };
-          this.host.startLevel({ name: step.name, mission: step.mission, vars: step.vars, tracks: step.tracks, pilot });
+          this.host.startLevel({ name: step.name, mission: step.mission, vars: step.vars, tracks: step.tracks, pilot, state: pilot.states[step.mission] ?? null });
           return;
         case "finished":
           this.runner = null;
@@ -709,6 +736,7 @@ export class Flow {
   private leaveLevelToMenu(): void {
     this.host.endLevel();
     this.runner = null;
+    this.carry = null;
     this.host.music("menu");
     this.mainMenu();
   }
@@ -717,18 +745,29 @@ export class Flow {
 
   private endBanner(outcome: LevelOutcome): string[] {
     const mission = this.missionIndex;
-    return outcome === "complete" ? [this.s(7, 0), this.s(200, mission)] : [this.s(7, 1)];
+    return [this.s(7, outcome === "complete" ? 0 : 1), this.s(200, mission)];
   }
 
-  private endLines(outcome: LevelOutcome, seconds: number | undefined): MenuLine[] {
+  /** Lignes de l'écran « Mission accomplie » / « Game over » (`004194b0`, `00419ed8`) ; « Bonus » et « Secrets » seulement après un succès. */
+  private endLines(outcome: LevelOutcome, stats: LevelStats): MenuLine[] {
+    const { seconds } = stats;
     const lines: MenuLine[] = [];
+    const value = (id: number, n: number | undefined): void => {
+      if (n !== undefined) lines.push({ type: "text", text: format(this.s(7, id), n) });
+    };
+    value(10, stats.levelScore);
+    value(11, stats.score);
     const time = (id: number, total: number): void => {
       lines.push({ type: "text", text: format(this.s(7, id), Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60) });
     };
     if (seconds !== undefined) time(12, Math.round(seconds));
     if (this.pilot && this.pilot.playSeconds > 0) time(13, this.pilot.playSeconds);
+    value(14, stats.objectivesPercent);
+    if (outcome === "complete") {
+      if (stats.bonusTotal) value(15, stats.bonusPercent);
+      if (stats.secretsTotal) value(16, stats.secretsPercent);
+    }
     lines.push({ type: "choice", id: 99, text: this.s(4, 1) });
-    void outcome;
     return lines;
   }
 

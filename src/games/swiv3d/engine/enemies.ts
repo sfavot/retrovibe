@@ -32,6 +32,8 @@ import type { World } from "./world";
 export function explodeHeavy(world: World, o: GameObject): void {
   const r2 = radius2(world.models, o.model);
   const size: 0 | 1 | 2 = r2 < 1000 ? 0 : r2 < 5000 ? 1 : 2;
+  // Le cratère est creusé avant la pose du décalque, qui se pose donc sur le fond.
+  world.crater(o.x, o.z, size);
   world.emit({ kind: "crater", x: o.x, z: o.z, size });
   spawnOnGround(world, {
     x: o.x,

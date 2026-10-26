@@ -3,6 +3,7 @@
  * absorbe les éléments internes (variables, pistes, couleur) et ne rend que ce que l'application doit faire.
  */
 import { END_MISSION, type MissionScript, type ScriptElement } from "../data/missions";
+import { AMMO_SLOTS, type MissionState } from "./pilots";
 
 /** Variables d'état de mission (§5.3) : numéro -> valeur (`0` véhicule, `1` énergie, `100 + k` munitions de l'arme `k`…). */
 export type MissionVars = ReadonlyMap<number, number>;
@@ -16,6 +17,17 @@ export type ScriptStep =
   | { kind: "level"; name: string; mission: number; vars: MissionVars; tracks: readonly number[] }
   /** Fin du script (`-1`) ; `completed` si l'élément `-2` a été passé (aventure terminée). */
   | { kind: "finished"; completed: boolean };
+
+/** Variables de l'état d'une mission (§5.3) : `0` véhicule, `1` énergie, `2` score, `100 + k` munitions de l'arme `k`. */
+export function stateVars(state: MissionState): Map<number, number> {
+  const vars = new Map<number, number>([
+    [0, state.form],
+    [1, state.energy],
+    [2, state.score],
+  ]);
+  for (let k = 0; k < AMMO_SLOTS; k++) vars.set(100 + k, state.ammo[k] ?? 0);
+  return vars;
+}
 
 /** Pistes de CD par défaut, remises en haut de la boucle principale (`{2, 9, 3, 2, 2, 2}`). */
 export const DEFAULT_TRACKS: readonly number[] = [2, 9, 3, 2, 2, 2];
@@ -42,6 +54,11 @@ export class MissionScriptRunner {
       if (found < 0) throw new Error(`script : mission ${startMission} introuvable`);
       this.at = found;
     }
+  }
+
+  /** Remplace les variables de la mission par l'état d'arrivée du joueur (les éléments `100`-`103` qui suivent s'y appliquent). */
+  seed(vars: ReadonlyMap<number, number>): void {
+    for (const [variable, value] of vars) this.vars.set(variable, value);
   }
 
   get finished(): boolean {

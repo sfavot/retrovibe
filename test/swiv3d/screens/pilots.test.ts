@@ -50,7 +50,7 @@ describe("pilotes : sauvegarde", () => {
     raw.set("swiv3d:pilot:0", "pas du json");
     raw.set("swiv3d:pilot:1", JSON.stringify({ name: "", bestMission: 2 }));
     raw.set("swiv3d:pilot:2", JSON.stringify({ name: "Ok", bestMission: -5, music: 9, language: 7, playSeconds: "x" }));
-    expect(s.list()).toEqual([{ slot: 2, name: "Ok", language: 1, bestMission: 0, music: 2, playSeconds: 0 }]);
+    expect(s.list()).toEqual([{ slot: 2, name: "Ok", language: 1, bestMission: 0, music: 2, playSeconds: 0, states: {} }]);
     expect(s.get(-1)).toBeNull();
     expect(s.get(PILOT_LIMIT)).toBeNull();
   });
@@ -82,5 +82,28 @@ describe("réglages globaux", () => {
     expect(s.loadGlobal()).toEqual({ language: 0, volumes: { master: 255, music: 0, effects: 255 }, lastPilot: null });
     raw.set("swiv3d:global", "{");
     expect(s.loadGlobal().language).toBe(1);
+  });
+});
+
+describe("pilotes : états d'arrivée des missions (fiches 1000 + n)", () => {
+  it("écrit et relit l'état d'une mission (munitions, score, véhicule, énergie, canon)", () => {
+    const { store: s, raw } = store();
+    const pilot = s.create("Suzy", 1)!;
+    const ammo = Array.from({ length: 20 }, (_, k) => k);
+    pilot.states[1] = { ammo, score: 4200, form: 1, energy: 300, cannonPower: 3 };
+    expect(s.save(pilot)).toBe(true);
+    const again = new PilotStore(prefixedStorage(raw, "swiv3d:")).get(0)!;
+    expect(again.states).toEqual({ 1: { ammo, score: 4200, form: 1, energy: 300, cannonPower: 3 } });
+  });
+
+  it("assainit une fiche abîmée : valeurs bornées, 20 munitions, missions invalides ignorées", () => {
+    const { store: s, raw } = store();
+    raw.set(
+      "swiv3d:pilot:0",
+      JSON.stringify({ name: "Ok", states: { 2: { ammo: [5, -3, "x"], score: -9, form: 99, energy: 5000, cannonPower: 40 }, 4000: {}, abc: {}, 3: 7 } }),
+    );
+    const pilot = s.get(0)!;
+    expect(Object.keys(pilot.states)).toEqual(["2"]);
+    expect(pilot.states[2]).toEqual({ ammo: [5, 0, 0, ...new Array<number>(17).fill(0)], score: 0, form: 5, energy: 992, cannonPower: 19 });
   });
 });

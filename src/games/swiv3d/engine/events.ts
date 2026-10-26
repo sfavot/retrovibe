@@ -41,7 +41,7 @@ export type WorldEvent =
   | { kind: "objective"; group: number; groupDone: boolean; left: number }
   /** Message en jeu (`gm_message_spawn`) : chaîne `textId` de la table `textTable`. */
   | { kind: "message"; textTable: number; textId: number }
-  /** Cratère d'explosion (`gm_terrain_explosion_crater`) : non appliqué à la carte de hauteur, à reproduire par le terrain. */
+  /** Cratère d'explosion (`gm_terrain_explosion_crater`) : déjà creusé par `World.crater` (option `craters`) ; informatif. */
   | { kind: "crater"; x: number; z: number; size: 0 | 1 | 2 }
   /** Objectif final accompli : le niveau s'arrête (`DAT_00480a9c = 0x2a`, 55 ticks après la destruction du groupe 0). */
   | { kind: "levelComplete" }

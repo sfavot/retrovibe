@@ -20,7 +20,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../render/view";
 import { parseBriefing, drawBriefing, type BriefingText } from "../screens/briefing";
 import { Flow, type FlowHost, type FlowView, type LevelRequest } from "../screens/flow";
 import { keyLabel } from "../screens/key-names";
-import { PilotStore } from "../screens/pilots";
+import { AMMO_SLOTS, PilotStore } from "../screens/pilots";
 import { TextRenderer } from "../screens/text";
 import { Controls, DEFAULT_KEYS, type Action } from "./controls";
 import { startLevel, createPauseOverlay, type AppStats, type LevelServices, type LevelSession } from "./level-session";
@@ -151,7 +151,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     // Décor des menus : `DEMO.SLV`, sans son ni musique (la musique des menus vient du flux), commandes inertes.
     demo = await startLevel(
       { ...services(), sound: null, music: null, controls: new IdleControls(), pauseOverlay: document.createElement("div"), stats: { renderMs: 0, frameMs: 0, ticks: 0 } },
-      { name: "DEMO" },
+      { name: "DEMO", hud: false },
     );
   } catch (error) {
     touch.dispose();
@@ -191,7 +191,17 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const beginLevel = async (request: LevelRequest): Promise<void> => {
     const token = ++loadToken;
     try {
-      const session = await startLevel(services(), { name: request.name, hitPoints: request.vars.get(1), form: request.vars.get(0) });
+      const { vars } = request;
+      const session = await startLevel(services(), {
+        name: request.name,
+        mission: request.mission,
+        language: flow.language,
+        hitPoints: vars.get(1),
+        form: vars.get(0),
+        score: vars.get(2),
+        ammo: Array.from({ length: AMMO_SLOTS }, (_, k) => vars.get(100 + k) ?? 0),
+        cannonPower: request.state?.cannonPower,
+      });
       if (token !== loadToken) {
         session.dispose();
         return;
@@ -200,11 +210,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       levelLut = session.palette;
       session.events.levelComplete.push(() => {
         freezeAfterFrame = true;
-        flow.levelEnded("complete", { seconds: session.seconds() });
+        flow.levelEnded("complete", session.summary());
       });
       session.events.gameOver.push(() => {
         freezeAfterFrame = true;
-        flow.levelEnded("gameOver", { seconds: session.seconds() });
+        flow.levelEnded("gameOver", session.summary());
       });
       session.events.quit.push(() => flow.abortRequested());
       touch.element.style.display = "";

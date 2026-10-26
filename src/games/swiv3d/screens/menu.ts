@@ -106,6 +106,11 @@ export class Menu {
     return this.lines.filter(isSelectable).map((l) => l.id);
   }
 
+  /** Textes affichés (titres, textes et libellés), dans l'ordre : tests et lecteurs d'écran. */
+  texts(): string[] {
+    return this.lines.flatMap((l) => (l.type === "title" || l.type === "text" || l.type === "choice" || l.type === "slider" ? [l.text] : []));
+  }
+
   /** Une image de plus (l'original compte les images : Entrée est ignorée au début). */
   tick(): void {
     this.frames++;

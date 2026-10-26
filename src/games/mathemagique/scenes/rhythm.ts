@@ -1072,15 +1072,14 @@ export function createRhythmScene(services: MathServices): RhythmScene {
 
   /** Ports de l'aide : les scripts sont dans `RSHELP.DAT`, sauf la zone Algebird (`SCR` 8500 de `RHYTHM.DAT`). */
   function createPorts(c: SceneContext): PolyPorts {
-    const common = { config: RHYTHM_POLY, scr, surface: screen, cursor: pointer.cursor, onDirty: () => c.requestPresent() };
-    const help = createScrPolyPorts({ ...common, archive: polly });
-    const own = createScrPolyPorts({ ...common, archive });
-    return {
-      play: (id, options) => (id === ALGEBIRD_HELP_SCR ? own : help).play(id, options),
-      begin: () => help.begin?.(),
-      end: () => help.end?.(),
-      setHelpHover: (on) => help.setHelpHover?.(on),
-    };
+    return createScrPolyPorts({
+      config: RHYTHM_POLY,
+      scr,
+      archive: (id) => (id === ALGEBIRD_HELP_SCR ? archive : polly),
+      surface: screen,
+      cursor: pointer.cursor,
+      onDirty: () => c.requestPresent(),
+    });
   }
 }
 

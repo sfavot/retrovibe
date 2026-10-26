@@ -70,7 +70,8 @@ export const RHYTHM_POLY: PolyConfig = {
   after: 2300,
   // Hypothèse : le relais d'inactivité (300 ticks, `DS:4fe2`) rejoue la grande présentation comme dans les autres jeux.
   idleTicks: 300,
-  backgroundZone: null,
+  // Union des zones des 31 scripts de `RSHELP.DAT` (le `SCR` 8500 d'Algebird en est exclu) : non documentée dans `MATH`.
+  backgroundZone: [345, 263, 576, 432],
   polyZone: null,
   topics: {
     partsBin: topic(1900),

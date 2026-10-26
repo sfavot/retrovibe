@@ -1429,6 +1429,30 @@ real("Poly : ports réels (ScrPlayer, POLLY.DAT)", () => {
     expect(surface.pixels).not.toEqual(before); // Poly est dessinée dans la zone d'aide
   });
 
+  it("chaque animation rétablit le fond d'avant l'arrivée : la dernière image de la précédente ne reste pas derrière (pas deux Poly)", () => {
+    const { scr, poly, tick, click, surface } = setup();
+    const [left, top, right, bottom] = HIDDEN_POLY.backgroundZone!;
+    const backgrounds = new Map<number, Surface | undefined>();
+    const start = scr.start.bind(scr);
+    scr.start = (archive, id, options) => {
+      backgrounds.set(id, options?.background);
+      return start(archive, id, options);
+    };
+    poly.open();
+    for (let i = 0; i < 200 && poly.phase === "arriving"; i++) tick();
+    // L'arrivée a laissé Poly dans la zone ; la présentation, elle, part d'un fond sans Poly.
+    let drawn = 0;
+    for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) if (surface.pixels[y * surface.width + x] !== 7) drawn++;
+    expect(drawn).toBeGreaterThan(2000);
+    const background = backgrounds.get(25100);
+    expect(background).toBeDefined();
+    for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) expect(background!.pixels[y * surface.width + x]).toBe(7);
+    click();
+    tick();
+    tick();
+    expect(poly.phase).toBe("listening");
+  });
+
   it("sa voix est jouée sur le canal voix pendant la présentation", () => {
     const { host, sound, poly, tick } = setup();
     poly.open();

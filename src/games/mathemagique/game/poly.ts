@@ -16,7 +16,7 @@
  */
 import type { Archive, Resources } from "../engine/resources";
 import { SCR_FLAG, type ScrArchive, type ScrPlayer } from "../engine/scr-player";
-import type { Rect, Surface, SavedRect } from "../engine/graphics/surface";
+import { Surface, type Rect, type SavedRect } from "../engine/graphics/surface";
 import type { CursorController } from "../engine/pointer";
 import type { RosterState, RosterFieldName } from "../engine/roster";
 import { NoRepeatPool, type MsvcRandom } from "../engine/rng";
@@ -310,8 +310,8 @@ export function openPolyArchive(resources: Resources, config: PolyConfig): Promi
 export interface ScrPolyPortsDeps {
   config: PolyConfig;
   scr: ScrPlayer;
-  /** L'archive d'aide ouverte (`Archive` convient). */
-  archive: ScrArchive;
+  /** L'archive d'aide ouverte (`Archive` convient), ou l'archive de chaque script (Rhythm Shop : la zone Algebird est dans `RHYTHM.DAT`). */
+  archive: ScrArchive | ((scr: number) => ScrArchive);
   /** Surface de jeu : le fond de `config.backgroundZone` y est sauvegardé à l'ouverture et rétabli à la fermeture. */
   surface: Surface;
   /** Contrôleur de curseur du pointeur (`pointer.cursor`) pour le « ? » du mode aide. */
@@ -324,17 +324,30 @@ export interface ScrPolyPortsDeps {
  * Ports branchés sur `ScrPlayer` : chaque script est lancé en mode **bloquant** (gadgets et pointeur gelés pendant l'animation, comme la boucle
  * `1090:111c`), avec les drapeaux des descripteurs de Poly (fond sauvegardé, MIDI conservé, attente des sons) et le drapeau « interruptible par clic » selon
  * l'étape ; voix sur le canal `voice`, décalage `y` de la configuration.
+ *
+ * Entre deux animations, la dernière image de Poly reste sur la surface : le fond sauvegardé au démarrage de la suivante la contiendrait, et cette
+ * Poly figée réapparaîtrait sous chaque image (deux Poly). Quand la zone de fond est connue, chaque animation reçoit donc comme fond propre la
+ * surface du moment, zone de fond remplacée par celle d'avant l'arrivée de Poly.
  */
 export function createScrPolyPorts(deps: ScrPolyPortsDeps): PolyPorts {
   const { config, scr, archive, surface, cursor } = deps;
   let saved: SavedRect | null = null;
+  let clean: Surface | null = null;
+  let zone: Rect | null = null;
   return {
     play(id, { interruptible }) {
-      const handle = scr.start(archive, id, {
+      let background: Surface | undefined;
+      if (clean && zone) {
+        background = new Surface(surface.width, surface.height);
+        background.copyFrom(surface);
+        background.copyFrom(clean, zone);
+      }
+      const handle = scr.start(typeof archive === "function" ? archive(id) : archive, id, {
         flags: SCR_FLAG.saveBackground | SCR_FLAG.keepMidi | SCR_FLAG.waitSounds | (interruptible ? SCR_FLAG.interruptible : 0),
         offsetY: config.offsetY,
         soundChannel: "voice",
         blocking: true,
+        background,
       });
       return {
         get done() {
@@ -351,11 +364,15 @@ export function createScrPolyPorts(deps: ScrPolyPortsDeps): PolyPorts {
     begin() {
       if (config.backgroundZone) {
         const [left, top, right, bottom] = config.backgroundZone;
-        const rect: Rect = { x: left, y: top, w: right - left, h: bottom - top };
-        saved = surface.saveRect(rect);
+        zone = { x: left, y: top, w: right - left, h: bottom - top };
+        saved = surface.saveRect(zone);
+        clean = new Surface(surface.width, surface.height);
+        clean.copyFrom(surface, zone);
       }
     },
     end() {
+      clean = null;
+      zone = null;
       if (saved) {
         surface.restoreRect(saved);
         saved = null;

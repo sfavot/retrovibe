@@ -9,7 +9,9 @@
  *   `onReady` signale le moment où il le devient.
  * - `close()` libère tout (voix, synthétiseur, contexte) quand la page est quittée.
  * - Les messages MIDI datés partent vers le worklet au plus `FLUSH_WINDOW_MS` avant leur heure : le worklet ne sait pas
- *   annuler un message planifié, alors que `reset()` doit pouvoir couper net ce que le séquenceur a planifié d'avance.
+ *   annuler un message planifié, alors que `reset()` doit pouvoir couper net ce que le séquenceur a planifié d'avance. Les note-on
+ *   déjà partis mais pas encore joués reçoivent de `reset()` un note-off à la même heure : sinon la note démarre après la coupure et
+ *   reste tenue sans fin.
  * - Muet = gain maître à 0 (WAVE et MIDI) ; la lecture continue, comme le moteur l'attend.
  */
 import { WorkletSynthesizer } from "spessasynth_lib";
@@ -56,6 +58,8 @@ export class WebAudioSink implements AudioSink {
   private closed = false;
   private readonly readyListeners = new Set<() => void>();
   private queue: QueuedMessage[] = [];
+  /** Note-on confiés au worklet avec une heure encore à venir (le worklet les jouera même après `reset()`). */
+  private posted: QueuedMessage[] = [];
   private flushTimer: ReturnType<typeof setInterval> | undefined;
 
   readonly midi: MidiSink = {
@@ -206,6 +210,10 @@ export class WebAudioSink implements AudioSink {
 
   private post(message: Uint8Array, atMs?: number): void {
     this.synth?.sendMessage(message, 0, atMs === undefined ? undefined : { time: atMs / 1000 });
+    if (atMs === undefined || (message[0] & 0xf0) !== 0x90 || message[2] === 0) return;
+    const now = this.now();
+    this.posted = this.posted.filter((m) => m.at > now);
+    if (atMs > now) this.posted.push({ at: atMs, message });
   }
 
   private flush(): void {
@@ -227,8 +235,15 @@ export class WebAudioSink implements AudioSink {
       this.flushTimer = undefined;
     }
     const synth = this.synth;
+    const posted = this.posted;
+    this.posted = [];
     if (!this.midiReady || !synth) return;
     synth.stopAll(true);
+    // Le worklet garde ses messages datés : chaque note-on encore à venir reçoit son note-off à la même heure (traité juste après lui).
+    const now = this.now();
+    for (const { at, message } of posted) {
+      if (at > now) this.post(Uint8Array.of(0x80 | (message[0] & 0x0f), message[1], 0), at);
+    }
     for (let channel = 0; channel < 16; channel++) {
       this.post(Uint8Array.of(0xb0 | channel, 123, 0)); // toutes les notes coupées
       this.post(Uint8Array.of(0xb0 | channel, 121, 0)); // contrôleurs remis à zéro

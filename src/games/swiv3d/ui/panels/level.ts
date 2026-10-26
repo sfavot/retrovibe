@@ -6,13 +6,17 @@ import { parseBd, type BdArchive } from "../../data/bd";
 import {
   MAP_SIZE,
   OBJECT_PARAM_COUNT,
+  TILE_SIZE,
   UNITS_PER_CELL,
   WATER_THRESHOLD,
+  groundTile,
   parseLevel,
+  tileOffset,
+  tileStride,
   type Level,
   type Tileset,
 } from "../../data/level";
-import { listModels, parseModel, type Model } from "../../data/model";
+import { FACE_ROTOR, FACE_SHADED_DOUBLE, FACE_KEYED, FACE_SHADOW, FACE_SKIN, listModels, parseModel, type Model } from "../../data/model";
 import { createMeshPreview, type PreviewFace, type PreviewTexture } from "../model-preview";
 import {
   containerView,
@@ -33,9 +37,9 @@ import { nameOf } from "./shared";
 type PaletteMode = "tail" | "line100" | "direct";
 
 const PALETTE_MODES: [PaletteMode, string][] = [
-  ["tail", "queue du bloc 12xxx (RVB 8 bits)"],
-  ["line100", "11003 via la ligne 100 de la table de teintes"],
-  ["direct", "11003 direct"],
+  ["tail", "queue du bloc 12xxx (pleine luminosité, aperçu)"],
+  ["line100", "11003 via la ligne 100 de la table de lumière (≈ 77 %)"],
+  ["direct", "11003 direct (indices bruts, faux pour les atlas)"],
 ];
 
 /** Palette RVB 8 bits (768 octets) à appliquer aux pixels d'un atlas. */
@@ -56,12 +60,12 @@ const ROLES: Record<number, string> = {
   103: "couleurs précalculées 512×512 (radar)",
   104: "rampes de couleur ? (non lu)",
   105: "objets placés",
-  106: "motif 128×128",
+  106: "terrain de faible détail 64×256",
   107: "points de passage",
   108: "table de fondu 256×256",
   109: "table de teintes 128 lignes",
   110: "silhouettes d'ombre 256×256",
-  500: "table 3×64×64",
+  500: "assombrissement 32×256 + flou du rotor",
   11003: "palette du jeu + table d'attributs",
   11004: "table de débris",
 };
@@ -141,8 +145,8 @@ function compositeView(src: Source): HTMLElement {
         } else if (settings.base === "radar" || !ground) {
           color = lutRadar[level.colorMap[i]!]!;
         } else {
-          const row = Math.min(ground.height - 1, level.groundMap[i]! * 2);
-          color = lutGround[ground.pixels[row * ground.width + ((3 * x + 5 * z) & 255)]!]!;
+          const tile = Math.min(ground.tileCount - 1, groundTile(level.groundMap[i]!));
+          color = lutGround[ground.pixels[tileOffset(ground, tile) + (z & (TILE_SIZE - 1)) * tileStride(ground) + (x & (TILE_SIZE - 1))]!]!;
         }
         if (settings.shade) {
           const d = h8(x - 1, z) - h8(x + 1, z) + (h8(x, z - 1) - h8(x, z + 1));
@@ -294,7 +298,7 @@ function palettesView(src: Source): HTMLElement {
   return h(
     "div",
     {},
-    info(["Lecture", "chaque atlas est rendu avec sa palette de queue (exacte) ; la palette du jeu 11003 y accède par la ligne 100 de la table de teintes"]),
+    info(["Lecture", "le jeu rend un texel par table[lumière][texel] → palette 11003 ; la palette de queue est la couleur d'atlas à pleine luminosité (aperçu), la ligne 100 donne 11003 à ≈ 77 %"]),
     h("div", { class: "grid" }, ...cells),
     section(
       "Écart moyen à la palette de queue, par canal (pixels utilisés)",
@@ -303,7 +307,24 @@ function palettesView(src: Source): HTMLElement {
   );
 }
 
+/** Image d'affichage d'un jeu de textures : 12000 (tuiles contiguës) est rangé en 4 colonnes de tuiles, les atlas 4×4 sont déjà en grille. */
+function tileSheet(tileset: Tileset): { pixels: Uint8Array; width: number; height: number } {
+  if (tileset.layout === "grid") return { pixels: tileset.pixels, width: tileset.width, height: tileset.height };
+  const columns = 4;
+  const rows = tileset.tileCount / columns;
+  const width = columns * TILE_SIZE;
+  const pixels = new Uint8Array(width * rows * TILE_SIZE);
+  for (let k = 0; k < tileset.tileCount; k++) {
+    const x0 = (k % columns) * TILE_SIZE;
+    const y0 = Math.floor(k / columns) * TILE_SIZE;
+    for (let y = 0; y < TILE_SIZE; y++)
+      pixels.set(tileset.pixels.subarray(tileOffset(tileset, k) + y * TILE_SIZE, tileOffset(tileset, k) + (y + 1) * TILE_SIZE), (y0 + y) * width + x0);
+  }
+  return { pixels, width, height: rows * TILE_SIZE };
+}
+
 function atlasView(src: Source, tileset: Tileset): HTMLElement {
+  const sheet = tileSheet(tileset);
   const body = h("div", {});
   let mode: PaletteMode = "tail";
   const render = (): void => {
@@ -312,7 +333,7 @@ function atlasView(src: Source, tileset: Tileset): HTMLElement {
       h(
         "div",
         { class: "layers" },
-        indexedCanvas(tileset.pixels, tileset.width, tileset.height, palette, 2, tileset.id === 12000 ? undefined : 0),
+        indexedCanvas(sheet.pixels, sheet.width, sheet.height, palette, 2, tileset.id === 12000 ? undefined : 0),
         h("figure", {}, paletteSwatch(palette), h("figcaption", {}, "palette utilisée")),
       ),
     );
@@ -322,8 +343,8 @@ function atlasView(src: Source, tileset: Tileset): HTMLElement {
     "div",
     {},
     info(
-      ["Taille", `${tileset.width}×${tileset.height}${tileset.id === 12000 ? " (sol)" : " (4×4 tuiles de 64×64 : textures des modèles)"}`],
-      ["Table de teintes", `${tileset.lightTable.length} octets`],
+      ["Disposition", tileset.id === 12000 ? "32 tuiles 64×64 contiguës (sol ; tuile = valeur de la carte 102 >> 3), affichées sur 4 colonnes" : "4×4 tuiles de 64×64, pas de ligne 256 (textures des modèles)"],
+      ["Table de lumière", `${tileset.lightTable.length} octets (128 lignes → indices 11003)`],
       ["Reste après la palette", `${tileset.trailer.length} octets`],
     ),
     h("div", { class: "bar" }, select("palette", PALETTE_MODES, mode, (value) => {
@@ -336,7 +357,13 @@ function atlasView(src: Source, tileset: Tileset): HTMLElement {
 
 // --- Modèles -----------------------------------------------------------------------------------------------------------------------
 
-const DOUBLE_SIDED_KINDS = new Set([1, 2, 4, 5]);
+const DOUBLE_SIDED_KINDS = new Set([FACE_ROTOR, FACE_SHADED_DOUBLE, FACE_KEYED, FACE_SKIN]);
+
+/** Nom d'un type de rendu de face pour l'affichage. */
+function kindLabel(kind: number): string {
+  const names: Record<number, string> = { 0: "éclairé", 1: "rotor", 2: "éclairé double face", 4: "clé 0, non éclairé", 5: "peau", [FACE_SHADOW]: "ombre" };
+  return `${kind === FACE_SHADOW ? "0x28" : kind} (${names[kind] ?? "?"})`;
+}
 
 function modelView(src: Source, model: Model): HTMLElement {
   const body = h("div", {});
@@ -350,15 +377,16 @@ function modelView(src: Source, model: Model): HTMLElement {
   }
 
   function textureOf(t: number, kind: number): PreviewTexture | null {
-    if (kind === 1 || kind === 5 || kind === 0x28 || t < 0 || t >= 80) return null;
+    if (kind === FACE_ROTOR || kind === FACE_SKIN || kind === FACE_SHADOW || t < 0 || t >= 80) return null;
+    // Les emplacements 16..79 sont les tuiles 4×4 de 12001-12004 ; les autres pointent sur le début de 12000 (tuile 0).
     const tileset = src.level.tilesets.find((ts) => ts.id === 12000 + (t >> 4));
     if (!tileset) return null;
     const palette = paletteFor(src.level, tileset, mode);
-    const k = t & 15;
-    const base = (k >> 2) * 64 * tileset.width + (k & 3) * 64;
+    const base = tileOffset(tileset, tileset.id === 12000 ? 0 : t & 15);
+    const stride = tileStride(tileset);
     return {
       sample(u, v) {
-        const p = tileset.pixels[base + (v & 63) * tileset.width + (u & 63)]!;
+        const p = tileset.pixels[base + (v & 63) * stride + (u & 63)]!;
         if (p === 0 && tileset.id !== 12000) return -1;
         return (palette[p * 3]! << 16) | (palette[p * 3 + 1]! << 8) | palette[p * 3 + 2]!;
       },
@@ -372,7 +400,7 @@ function modelView(src: Source, model: Model): HTMLElement {
       v: f.v,
       texture: textureOf(f.texture, f.kind),
       doubleSided: DOUBLE_SIDED_KINDS.has(f.kind),
-      color: f.kind === 1 ? 0x6aa2ff : f.kind === 0x28 ? 0xc8a050 : 0x9aa1b2,
+      color: f.kind === FACE_ROTOR ? 0x6aa2ff : f.kind === FACE_SHADOW ? 0xc8a050 : 0x9aa1b2,
     }));
     current?.dispose();
     current = createMeshPreview({ vertices: model.vertices, faces }, current ? { view: current.view } : {});
@@ -389,7 +417,7 @@ function modelView(src: Source, model: Model): HTMLElement {
       ["Rayon² de collision", model.radiusSquared],
       ["Décalage de pose (y)", model.groundOffset],
       ["Lumière ambiante", model.ambient],
-      ["Types de rendu", [...kinds].map(([k, n]) => `${k === 0x28 ? "0x28" : k} ×${n}`).join(", ")],
+      ["Types de rendu", [...kinds].map(([k, n]) => `${kindLabel(k)} ×${n}`).join(", ")],
       ["Textures", [...textures.keys()].sort((a, b) => a - b).join(" ")],
     ),
     h("div", { class: "bar" }, select("palette", PALETTE_MODES, mode, (value) => {
@@ -405,7 +433,8 @@ function modelView(src: Source, model: Model): HTMLElement {
 function objectsView(level: Level): HTMLElement {
   const counts = new Map<number, number>();
   for (const o of level.objects) counts.set(o.type, (counts.get(o.type) ?? 0) + 1);
-  const headers = ["#", "type", "x", "z", "cap", ...Array.from({ length: OBJECT_PARAM_COUNT }, (_, i) => `c${i + 4}`)];
+  const rest = Array.from({ length: OBJECT_PARAM_COUNT - 5 }, (_, i) => `c${i + 9}`);
+  const headers = ["#", "type", "x", "z", "cap", "modèle", "enfant/bonus", "pv", "sous-type", "poussée", ...rest];
   return h(
     "div",
     {},
@@ -415,7 +444,7 @@ function objectsView(level: Level): HTMLElement {
       "Enregistrements",
       filterTable(
         headers,
-        level.objects.map((o, i) => ({ key: `${i} ${o.type}`, cells: [i, o.type, o.x, o.z, o.angle, ...o.params] })),
+        level.objects.map((o, i) => ({ key: `${i} ${o.type}`, cells: [i, o.type, o.x, o.z, o.angle, o.model, o.childModel, o.hitPoints, o.subtype, o.thrust, ...o.params.slice(5)] })),
         headers.map(() => "num"),
       ),
     ),
@@ -428,9 +457,9 @@ function waypointsView(level: Level): HTMLElement {
     {},
     info(["Nœuds", level.waypoints.length]),
     filterTable(
-      ["#", "liens", "x", "z", "indicateurs"],
-      level.waypoints.map((w, i) => ({ key: String(i), cells: [i, w.links.join(" "), w.x, w.z, w.flags.join(" ")] })),
-      ["num", "", "num", "num"],
+      ["#", "liens", "x", "z", "navires", "aéronefs", "terrestres"],
+      level.waypoints.map((w, i) => ({ key: String(i), cells: [i, w.links.join(" "), w.x, w.z, w.capacity.ships, w.capacity.aircraft, w.capacity.ground] })),
+      ["num", "", "num", "num", "num", "num", "num"],
     ),
   );
 }
@@ -464,11 +493,11 @@ function viewOf(src: Source, key: string): HTMLElement {
   }
   if (id === 105) return objectsView(level);
   if (id === 107) return waypointsView(level);
-  if (id === 106) return greyCanvas(level.pattern106, 128, 128, 4);
+  if (id === 106) return h("div", {}, info(["Lecture", "64 lignes (lumière >> 1) × 256 colonnes (carte 102)"]), greyCanvas(level.pattern106, 256, 64, 3));
   if (id === 108) return greyCanvas(level.fadeTable, 256, 256, 2);
   if (id === 109) return greyCanvas(level.lightTable109, 256, 128, 3);
   if (id === 110) return h("div", {}, info(["Lecture", "valeurs 0-31, gris étalé"]), greyCanvas(level.shadowSprites, 256, 256, 2, 31));
-  if (id === 500) return greyCanvas(level.table500, 64, 192, 3);
+  if (id === 500) return h("div", {}, info(["Lecture", "lignes 0..31 : assombrissement ; lignes 32..47 : flou du rotor 64×64"]), greyCanvas(level.table500, 256, 48, 3));
   if (id === 11003) {
     const bytes = bd.get(id);
     return h(
@@ -496,7 +525,7 @@ export const levelPanel: Panel = {
       { key: "composite", label: "Vue de dessus", role: "composite : sol, objets, points de passage" },
       { key: "palettes", label: "Palettes", role: "11003 et queues des atlas" },
       ...bd.entries.map((e): ResourceRow => {
-        let role = ROLES[e.id] ?? (Math.floor(e.id / 1000) === 12 ? (e.id === 12000 ? "atlas du sol 256×512" : "atlas de textures de modèles") : "");
+        let role = ROLES[e.id] ?? (Math.floor(e.id / 1000) === 12 ? (e.id === 12000 ? "32 tuiles de sol 64×64" : "atlas de textures de modèles") : "");
         if (modelIds.has(e.id)) {
           try {
             const m = parseModel(bd.get(e.id), e.id);

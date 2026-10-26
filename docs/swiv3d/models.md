@@ -1,6 +1,6 @@
 # SWIV 3D : modèles 3D des niveaux (blocs 10xxx)
 
-Lecteur : `src/games/swiv3d/data/model.ts` (`parseModel`, `listModels`), tests : `test/swiv3d/model.test.ts`. Conteneur : `bd.ts` (voir `slv.md`). Fonctions du jeu : `gm_slv_index_models` (`004543f0`, indexation et relocalisation) et la boucle de rendu des objets de `gm_render_terrain` (`0042718c`, lignes « modèles » : projection, ombrage, boucle des faces), file de tri `FUN_00423620`. Chargeurs de texture : voir `slv.md` (atlas 12001-12004).
+Lecteur : `src/games/swiv3d/data/model.ts` (`parseModel`, `listModels`), tests : `test/swiv3d/model.test.ts`. Conteneur : `bd.ts` (voir `slv.md`). Fonctions du jeu : `gm_slv_index_models` (`004543f0`, indexation et relocalisation) et la boucle de collecte des objets de `gm_render_terrain` (`0042718c`, nom hérité : elle ne dessine pas le terrain, elle transforme les modèles, calcule l'éclairage et empile les faces dans la file de tri `00423620` ; le tracé se fait ensuite par les rastériseurs, `render.md` §7-8). Chargeurs de texture : voir `slv.md` (atlas 12001-12004) ; étude de rendu qui fait foi pour les types de face, l'éclairage et les ombres : `render.md`.
 
 ## Ce qui est un modèle
 
@@ -41,8 +41,8 @@ Un seul tampon, sans pointeur absolu. En-tête de 8 × i32 LE, puis trois tablea
 
 - Projection : coordonnées monde − caméra, matrice de vue, puis division perspective par `profondeur + 0x19` (0x25 unités d'écran / 25 unités de recul).
 - Éclairage : par normale, `i = max(0, n · L >> 8) + ambiant`, plafonné à `0x6e` ; chaque sommet d'un triangle prend l'intensité de sa propre normale (Gouraud). Un drapeau d'objet (octet 6, bit 1) force `0x7f` (plein feu). `L` est une direction fixe dans le monde, recalculée avec l'orientation de l'objet.
-- Élimination des faces arrière : pour les types 0 et 0x28, le triangle est dessiné si le produit vectoriel projeté `(x1-x0)(y2-y0) - (x2-x0)(y1-y0)` est positif (y d'écran vers le bas). Vérifié sur les données : la normale sortante est `(b - a) × (c - a)` en coordonnées du modèle (2 188 faces concordent avec les normales stockées, 7 non, 184 dégénérées ou à normales nulles).
-- Tri : clé de profondeur = plus grand z des 3 sommets (type 0x28 et 5 : plus grand ou plus petit des 3, voir ci-dessous), file triée `FUN_00423620`.
+- Élimination des faces arrière : pour les types 0 et 0x28 (le type 1 en dépend pour sa clé de tri), le triangle est dessiné si le produit vectoriel projeté `(x1-x0)(y2-y0) - (x2-x0)(y1-y0)` est positif (y d'écran vers le bas). Vérifié sur les données : la normale sortante est `(b - a) × (c - a)` en coordonnées du modèle (2 188 faces concordent avec les normales stockées, 7 non, 184 dégénérées ou à normales nulles).
+- Tri : par face (pas par objet), clé = plus grand z des 3 sommets pour les types 0, 2, 4 ; type 1 : `max D` de l'objet si face avant, `min D` sinon ; type 5 : `min D` de l'objet ; type 0x28 : `max D` de l'objet (les ombres sortent avant les faces de l'objet). File `00423620` triée clé décroissante (le plus lointain d'abord), au plus 2995 entrées par image.
 - Texture : `t` indexe les emplacements `16n + k` remplis par les atlas 12001-12004 : **bloc `12000 + (t >> 4)`, tuile `t & 15`** (4×4 de 64×64, voir `slv.md`). Valeurs rencontrées : 14 à 68 (+ 0 pour le type 5). u et v lus en texels de la tuile (le rendu matériel les multiplie par 4).
 
 ### Types de rendu (octet bas de `+0x28`)
@@ -50,22 +50,22 @@ Un seul tampon, sans pointeur absolu. En-tête de 8 × i32 LE, puis trois tablea
 | Type | Faces | Sens |
 |---|---:|---|
 | 0 | 10 125 | texturé, ombré, face arrière éliminée (cas général) |
-| 1 | 40 | **disque d'hélice/de rotor** : un grand triangle inscrit ; u/v ignorés et remplacés par une rotation (table de sinus, phases 0, 0x55, 0xab = 120°) selon l'image `00481150` ; pas d'élimination, pas d'ombrage |
+| 1 | 40 | **disque d'hélice/de rotor** : un grand triangle inscrit, recouvert d'un **masque de flou tournant** (image 64×64 des lignes 32..47 de SLV 500, qui assombrit le sol : `render.md` §8.4) ; u/v du fichier ignorés et remplacés par trois points d'un cercle (table de sinus, phases 0, 0x55, 0xab = 120°) selon l'image `00481150` ; pas d'ombrage |
 | 2 | 145 | texturé, ombré, double face |
-| 4 | 1 545 | comme 2 (le rendu matériel double l'intensité) ; essentiellement les textures 44-59 |
+| 4 | 1 545 | texturé, **texel 0 transparent** (clé de transparence), **non éclairé** (`table[100][texel]`, `004329b4`), double face ; essentiellement les textures 44-59 |
 | 5 | 40 | texture prise sur l'objet (`objet+0x50`), non ombrée, double face : peau variable (texture 0 dans le modèle) |
-| 0x28 | 365 | texturé non ombré, face arrière éliminée, tracé derrière (profondeur maximale) : décalque. **Les champs normales et texture de ces faces contiennent des octets résiduels** (textures aberrantes `1427505258`, etc.) et ne sont pas lus |
+| 0x28 | 365 | **ombre au sol** (et non décalque) : quadrilatère de sommets de mode 1 dont `u`, `v` (0..255) adressent une silhouette de l'image SLV 110 ; chaque pixel du sol dessous est assombri par la table SLV 500 (`00433f64` ; polygone noir à faible détail, `00432264`). Face avant seulement, tracée avant les faces de l'objet. **Les champs normales et texture de ces faces contiennent des octets résiduels** (textures aberrantes `1427505258`, etc.) et ne sont pas lus |
 
-Le type 3 n'existe pas dans les données (le code ne dessine rien pour lui). Drapeaux (octet haut) : bit 1 (valeur 2, 305 faces) = texture animée : `v += ((image >> 2) & 3) << 4` (4 images empilées de 16 texels), sauf si le bit 0 du drapeau d'objet est posé.
+Le type 3 n'existe pas dans les données (le code ne dessine rien pour lui). Drapeaux (octet haut) : bit 1 (valeur 2, 305 faces) = texture animée : `v += ((image >> 2) & 3) << 4` (4 images empilées de 16 texels), sauf si le bit 0 du drapeau d'objet est posé (l'image est `frame >> 2`, ou `frame` entière si le bit 4 du drapeau d'objet est posé).
 
 ## Blocs 11003 et 11004 (hors modèles)
 
 - **11003** : palette VGA 6 bits (0x300 octets) puis table d'attributs par type de 8 192 octets (voir `slv.md`).
-- **11004** (3 540 octets) : table de débris, identique dans les 5 niveaux. Liste chaînée de nœuds de 12 octets `(suivant, sous-liste, clé)` dont la clé est un emplacement de modèle (`+0x10000` et `+0x20000` pour deux gabarits de fragments), et sous-listes circulaires de nœuds `(?, suivant, modèle)` pointant sur les modèles 700-712 (offsets relatifs relocalisés par `gm_slv_reloc_list`). Lue par `004442ec` à la destruction d'un objet : elle fait naître des fragments (`FUN_004261a0`) avec les modèles 107xx. Hypothèse raisonnable, non lue par un parseur.
+- **11004** (3 540 octets) : table de débris, identique dans les 5 niveaux. Liste chaînée de nœuds de 12 octets `(suivant, sous-liste, clé)` dont la clé est un emplacement de modèle (`+0x10000` et `+0x20000` pour deux gabarits de fragments), et sous-listes circulaires de nœuds `(?, suivant, modèle)` pointant sur les modèles 700-712 (offsets relatifs relocalisés par `gm_slv_reloc_list`). Lue par `004442ec` à la destruction d'un objet : elle fait naître des fragments (`004261a0`) avec les modèles 107xx. Hypothèse raisonnable, non lue par un parseur.
 
 ## Vérification visuelle (scratch, non commitée)
 
-Rastériseur logiciel en script jetable (3 vues orthographiques + perspective, remplissage Lambert + fil de fer, puis version texturée avec les atlas 12001-12004 et leur palette de queue). Modèles reconnaissables, fermés, symétriques, sans pointe vers l'origine : 10990 (hélicoptère du joueur, disque de rotor type 1), 10991 (second véhicule du joueur), 10203 (char : chenilles à galets texturées), 10300 (vedette), 10504 (hangar à porte), 10101 (bimoteur à hélices), 10560/10564 (sapin, arbre), 10800 (avion à ailes delta). Les couleurs des textures dépendent de la palette choisie (la palette de queue des blocs 12xxx est celle qui donne un rendu correct, cf. `slv.md`).
+Rastériseur logiciel en script jetable (3 vues orthographiques + perspective, remplissage Lambert + fil de fer, puis version texturée avec les atlas 12001-12004 et leur palette de queue). Modèles reconnaissables, fermés, symétriques, sans pointe vers l'origine : 10990 (hélicoptère du joueur, disque de rotor type 1), 10991 (second véhicule du joueur), 10203 (char : chenilles à galets texturées), 10300 (vedette), 10504 (hangar à porte), 10101 (bimoteur à hélices), 10560/10564 (sapin, arbre), 10800 (avion à ailes delta). Les couleurs des textures dépendent de la palette choisie (la palette de queue des blocs 12xxx est la couleur d'atlas à pleine luminosité ; le jeu rend `table[lumière][texel]` vers la palette 11003, cf. `slv.md`).
 
 ## Identification (probable, d'après le code et les rendus)
 
@@ -90,5 +90,5 @@ Ordre dans le répertoire : 10800, 10801, 10810, … puis 10100…, et fin 10607
 
 - Les noms d'objets ci-dessus sont déduits de la forme et de l'usage ; seul le joueur (990/991) est établi par le code.
 - Rôle exact de `+0x10` et `+0x0c` pour les modèles où ils ne se déduisent pas des sommets (valeurs d'auteur).
-- Les types de rendu 4 et 5 (effet exact, transparence éventuelle) ne sont déduits que des branches du code.
 - Le lien entre l'octet résiduel des faces 0x28 et un éventuel second usage n'est pas établi.
+- Quel emplacement de texture pour quel modèle hors 14..68 (`render.md` §12).

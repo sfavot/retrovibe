@@ -1,7 +1,7 @@
 /**
  * Modèles 3D des niveaux `*.SLV` (blocs 10100-10991) : sommets, triangles texturés et normales d'ombrage.
  * Format établi par `gm_slv_index_models` (`004543f0`) et la boucle de rendu des objets de `gm_render_terrain`
- * (`0042718c`) ; voir `docs/swiv3d/models.md`. Le bloc est un seul tampon sans pointeur absolu : `+0x18` et
+ * (`0042718c`, qui collecte et transforme les objets, il ne dessine pas le terrain) ; voir `docs/swiv3d/models.md`. Le bloc est un seul tampon sans pointeur absolu : `+0x18` et
  * `+0x1c` sont des offsets relatifs au début du bloc (le jeu les transforme en pointeurs au chargement).
  *
  * En-tête (8 × i32 LE) puis trois tableaux contigus qui couvrent exactement le bloc :
@@ -26,6 +26,17 @@ export const MODEL_ID_MAX = 10999;
 export const VERTEX_FREE = 0;
 export const VERTEX_ON_GROUND = 1;
 export const VERTEX_ABOVE_GROUND = 2;
+
+/**
+ * Types de rendu des faces (octet bas de `+0x28`), d'après `docs/swiv3d/render.md` §7.4 et `models.md`. Le type 3 n'existe pas
+ * dans les données (le jeu ne dessine rien pour lui).
+ */
+export const FACE_SHADED = 0; // texturé, éclairé (Gouraud), face arrière éliminée : cas général
+export const FACE_ROTOR = 1; // disque de rotor : grand triangle recouvert d'un masque de flou tournant (SLV 500 lignes 32..47)
+export const FACE_SHADED_DOUBLE = 2; // comme 0, double face
+export const FACE_KEYED = 4; // texel 0 transparent, sinon `table[100][texel]` : non éclairé, double face
+export const FACE_SKIN = 5; // texture prise sur l'objet (`objet+0x50`), teintée par la table 109, non éclairée, double face
+export const FACE_SHADOW = 0x28; // ombre au sol : silhouette SLV 110 assombrie par la table SLV 500, face avant seulement
 
 export interface ModelVertex {
   x: number;
@@ -54,7 +65,11 @@ export interface ModelFace {
   /** Coordonnées de texture par sommet (i16 signés, dans le repère de la tuile 64 × 64 ; 4 × en rendu). */
   u: [number, number, number];
   v: [number, number, number];
-  /** Type de rendu (octet bas de `+0x28`) : 0, 1 (disque rotatif d'hélice), 2, 4, 5 ou 0x28 ; voir `docs/swiv3d/models.md`. */
+  /**
+   * Type de rendu (octet bas de `+0x28`) : `FACE_SHADED` (0), `FACE_ROTOR` (1), `FACE_SHADED_DOUBLE` (2), `FACE_KEYED` (4),
+   * `FACE_SKIN` (5) ou `FACE_SHADOW` (0x28). Pour `FACE_SHADOW`, `u`/`v` (0..255) adressent la silhouette SLV 110 et les champs
+   * normales et texture sont des octets résiduels non lus ; voir `docs/swiv3d/models.md`.
+   */
   kind: number;
   /** Octet haut de `+0x28` : bit 1 = texture animée (décalage de v selon l'image). */
   flags: number;

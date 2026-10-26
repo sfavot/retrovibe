@@ -4,6 +4,10 @@ import {
   WATER_THRESHOLD,
   WORLD_SIZE,
   heightAt,
+  groundTile,
+  objectiveGroup,
+  tileOffset,
+  tileStride,
   parseLevel,
   type Level,
 } from "../../src/games/swiv3d/data/level";
@@ -126,6 +130,38 @@ describe.skipIf(!hasOriginalFiles)(
       ).toBeLessThan(WORLD_SIZE);
     });
 
+    it("nomme les champs de l'enregistrement d'objet (REC[4..8]) et lit les groupes d'objectifs", () => {
+      for (const l of levels.values()) {
+        for (const o of l.objects) {
+          expect([o.model, o.childModel, o.hitPoints, o.subtype, o.thrust]).toEqual(o.params.slice(0, 5));
+          // REC[7] : code d'arme, bonus 1000+n ou groupe d'objectifs 5000+g, rien d'autre au-delà de 5009.
+          expect(o.subtype).toBeLessThan(5010);
+          const g = objectiveGroup(o);
+          if (g !== null) expect(o.subtype).toBe(5000 + g);
+        }
+      }
+      const groups = level("TERRAN02").objects.filter((o) => objectiveGroup(o) !== null);
+      expect(groups.length).toBeGreaterThan(0);
+      expect(objectiveGroup({ subtype: 5009 })).toBe(9);
+      expect(objectiveGroup({ subtype: 5010 })).toBeNull();
+      expect(objectiveGroup({ subtype: 4999 })).toBeNull();
+      // Les pv (REC[6]) des 2000 des niveaux sont ceux du tableau de objects.md §5.
+      for (const o of level("TERRAN00").objects.filter((o) => o.type === 2002)) expect(o.hitPoints).toBe(10);
+    });
+
+    it("lit les capacités des nœuds par classe de véhicule (champs 6, 7, 8)", () => {
+      for (const l of levels.values())
+        for (const w of l.waypoints)
+          for (const c of [w.capacity.ships, w.capacity.aircraft, w.capacity.ground]) expect([0, 1]).toContain(c);
+      // Navires : seuls les nœuds d'eau de TERRAN02 (245) et de DEMO (51) en acceptent.
+      expect(level("TERRAN02").waypoints.filter((w) => w.capacity.ships > 0)).toHaveLength(245);
+      expect(level("DEMO").waypoints.filter((w) => w.capacity.ships > 0)).toHaveLength(51);
+      expect(level("TERRAN00").waypoints.filter((w) => w.capacity.ships > 0)).toHaveLength(0);
+      // Véhicules terrestres : 1 sur presque tous, 15 nœuds à 0 dans TERRAN02, 51 dans DEMO.
+      expect(level("TERRAN02").waypoints.filter((w) => w.capacity.ground === 0)).toHaveLength(15);
+      expect(level("DEMO").waypoints.filter((w) => w.capacity.ground === 0)).toHaveLength(51);
+    });
+
     it("compte les points de passage et pointe vers des nœuds existants", () => {
       expect(NAMES.map((n) => level(n).waypoints.length)).toEqual([
         86, 265, 757, 182, 83,
@@ -152,6 +188,23 @@ describe.skipIf(!hasOriginalFiles)(
           expect(t.lightTable.length).toBe(0x8000);
           expect(t.palette.length).toBe(768);
         }
+      }
+    });
+
+    it("lit 12000 comme 32 tuiles 64×64 contiguës et 12001-12004 comme une grille 4×4", () => {
+      for (const l of levels.values()) {
+        const [ground, ...models] = l.tilesets;
+        expect(ground).toMatchObject({ layout: "tiles", tileCount: 32, width: 64, height: 2048 });
+        expect(tileOffset(ground!, 5)).toBe(5 * 4096);
+        expect(tileStride(ground!)).toBe(64);
+        for (const t of models) {
+          expect(t).toMatchObject({ layout: "grid", tileCount: 16, width: 256, height: 256 });
+          expect(tileOffset(t, 6)).toBe(64 * 256 + 2 * 64);
+          expect(tileStride(t)).toBe(256);
+        }
+        // Tuile du terrain : valeur de la carte 102 >> 3 ; eau (< 0x20) = tuiles 0 à 3, max 0xf0 = tuile 30.
+        expect(groundTile(0x1f)).toBe(3);
+        for (const g of l.groundMap) expect(groundTile(g)).toBeLessThan(ground!.tileCount);
       }
     });
 

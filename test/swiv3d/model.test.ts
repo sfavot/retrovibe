@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseBd } from "../../src/games/swiv3d/data/bd";
-import { listModels, parseModel } from "../../src/games/swiv3d/data/model";
+import { FACE_KEYED, FACE_ROTOR, FACE_SHADED, FACE_SHADED_DOUBLE, FACE_SHADOW, FACE_SKIN, listModels, parseModel } from "../../src/games/swiv3d/data/model";
 import { hasOriginalFiles, listOriginal, readOriginal } from "./helpers";
-
-const FACE_KIND_FLAT = 0x28;
 
 function i32s(...values: number[]): number[] {
   return values.flatMap((v) => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff]);
@@ -74,8 +72,8 @@ describe.skipIf(!hasOriginalFiles)("modèles 3D de SWIV 3D (fichiers du jeu)", (
         expect(m.normalsOffset + 12 * m.normalCount).toBe(bd.get(id).length);
         for (const face of m.faces) {
           for (const index of face.indices) expect(index).toBeLessThan(m.vertexCount);
-          // Les faces de type 0x28 n'ombrent pas : leurs champs normales/texture contiennent des octets résiduels.
-          if (face.kind === FACE_KIND_FLAT) continue;
+          // Les faces d'ombre (0x28) ne sont pas éclairées : leurs champs normales/texture contiennent des octets résiduels.
+          if (face.kind === FACE_SHADOW) continue;
           for (const index of face.normalIndices) expect(index).toBeLessThan(m.normalCount);
           expect(face.texture).toBeGreaterThanOrEqual(0);
           expect(face.texture).toBeLessThanOrEqual(68);
@@ -91,7 +89,7 @@ describe.skipIf(!hasOriginalFiles)("modèles 3D de SWIV 3D (fichiers du jeu)", (
         for (const face of m.faces) kinds.add(face.kind);
         for (const vertex of m.vertices) modes.add(vertex.mode);
       }
-      expect([...kinds].sort((a, b) => a - b)).toEqual([0, 1, 2, 4, 5, FACE_KIND_FLAT]);
+      expect([...kinds].sort((a, b) => a - b)).toEqual([FACE_SHADED, FACE_ROTOR, FACE_SHADED_DOUBLE, FACE_KEYED, FACE_SKIN, FACE_SHADOW]);
       expect([...modes].sort()).toEqual([0, 1, 2]);
     });
 
@@ -101,7 +99,7 @@ describe.skipIf(!hasOriginalFiles)("modèles 3D de SWIV 3D (fichiers du jeu)", (
       for (const id of ids) {
         const m = parseModel(bd.get(id), id);
         for (const face of m.faces) {
-          if (face.kind === FACE_KIND_FLAT) continue;
+          if (face.kind === FACE_SHADOW) continue;
           const [a, b, c] = face.indices.map((i) => m.vertices[i]!);
           const e1 = [b!.x - a!.x, b!.y - a!.y, b!.z - a!.z];
           const e2 = [c!.x - a!.x, c!.y - a!.y, c!.z - a!.z];

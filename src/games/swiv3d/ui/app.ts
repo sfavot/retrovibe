@@ -39,6 +39,8 @@ export interface AppOptions {
   level?: string;
   /** Page de dev : passe la séquence de démarrage (vidéos, logos) et ouvre la sélection du pilote. */
   skipBoot?: boolean;
+  /** Le geste qui débloque le son vient déjà de l'écran titre (« Jouer ») : pas d'invite, le démarrage commence aussitôt. */
+  autoStart?: boolean;
   /** Expose `window.__swiv3d` (flux, monde, commandes, mesures), les touches F8 / F9 (game over / mission accomplie) et les mesures sous l'écran. */
   debug?: boolean;
 }
@@ -329,7 +331,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     void audio?.resume();
     music?.unlock();
   };
-  let started = options.skipBoot === true || options.level !== undefined;
+  let started = options.autoStart === true || options.skipBoot === true || options.level !== undefined;
   if (!started) {
     // IPLAY (8 Mo) se charge pendant que le joueur lit l'invite.
     void loadVideo("IPLAY").catch(() => {});

@@ -30,3 +30,69 @@
 .sw3-start {
   z-index: 4;
 }
+
+/* Écran de présentation : jaquette 640×480 (4:3), pixels nets. */
+.sw3-title-picture {
+  width: min(480px, calc(100vw - 32px));
+  aspect-ratio: 4 / 3;
+}
+
+.sw3-title-note {
+  margin: 0;
+}
+
+.sw3-title-controls {
+  margin: 0.4rem 0 0;
+  font-size: 1rem;
+}
+
+.sw3-error {
+  margin: 0;
+  color: var(--danger, #e8836b);
+}
+
+.sw3-error:empty {
+  display: none;
+}
+
+/* Page du manuel d'origine. */
+.sw3-manual {
+  box-sizing: border-box;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+.sw3-manual h2 {
+  margin: 28px 0 8px;
+  font-size: 1.15rem;
+  color: var(--accent);
+}
+
+.sw3-manual-text {
+  margin: 0 0 16px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sw3-manual-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.sw3-manual-toc .link {
+  all: unset;
+  cursor: pointer;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.sw3-manual-toc .link:focus-visible {
+  outline: 3px solid var(--focus, #f6d27a);
+  outline-offset: 2px;
+}

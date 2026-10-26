@@ -4,6 +4,25 @@
  */
 export const copy = {
   title: "SWIV 3D",
+  description:
+    "Le shoot'em up en 3D de SCi (1997) : un hélicoptère de combat et les quatre missions de la version « Temperate Zone ».",
+  coverAlt: "Écran titre de SWIV 3D : le logo chromé du jeu, au-dessus des logos d'Interplay et de SCi.",
+  play: "Jouer",
+  manual: "Manuel d'origine",
+  manualNote: "Le manuel français du CD : scénario, commandes, véhicules.",
+  manualTitle: "Manuel de SWIV 3D",
+  manualOriginal: "Texte du manuel d'origine, en français. Il décrit la version complète du jeu : certaines options et missions n'existent pas ici.",
+  manualContents: "Sommaire du manuel",
+  manualBack: "← Écran titre",
+  manualLoading: "Chargement du manuel…",
+  manualLoadError: "Impossible de charger le manuel :",
+  controlsTitle: "Commandes",
+  controls: [
+    "Flèches ou ZQSD (WASD en QWERTY) : avancer, reculer, tourner. Virgule et point (ou Q et E) : se déplacer sur le côté.",
+    "Espace : tirer. M ou X : arme spéciale. Page préc. et Page suiv. (ou [ et ]) : changer d'arme, ou touches 1 à 0.",
+    "Ctrl gauche ou Maj gauche : déplacement latéral avec les flèches. P : pause. Les touches se changent dans le menu du jeu.",
+    "Manette : stick ou croix pour piloter, boutons de tir pour tirer. Écran tactile (en paysage) : manche virtuel à gauche, boutons de tir à droite.",
+  ],
   canvasLabel: "Écran du jeu SWIV 3D",
   sound: "Son",
   loading: "Chargement du niveau…",

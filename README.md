@@ -12,7 +12,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | Le Téléportaschtroumpf (Infogrames Multimedia, 1995) | jouable (en cours de validation) |
 | Math Workshop / Mathémagique (Broderbund, 1994) | jouable (en cours de validation) |
 | Armaeth (Grandslam Video, 1994) | jouable (en cours de validation) |
-| SWIV 3D (SCi, 1997) | rétro-ingénierie en cours |
+| SWIV 3D (SCi, 1997) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -169,20 +169,25 @@ Ils viennent de l'image ISO du CD : `scripts/armaeth-extract.sh [archive.7z]` li
 
 ## SWIV 3D
 
-*SWIV 3D* (SCi, 1996-1997, Windows 95), dans sa version limitée « Temperate Zone » : les quatre premiers niveaux (`TERRAN00` à `TERRAN03`) et la démo. C'est un shoot'em up en 3D temps réel (terrain et modèles polygonaux). Le moteur `SWIV_WIN.EXE` (rendu logiciel, Watcom C) est étudié avec Ghidra. Les lecteurs de données sont faits, le jeu n'est pas encore jouable.
+*SWIV 3D* (SCi, 1996-1997, Windows 95), dans sa version limitée « Temperate Zone » : les quatre premiers niveaux (`TERRAN00` à `TERRAN03`) et la démo. C'est un shoot'em up en 3D temps réel (terrain et modèles polygonaux). Le moteur `SWIV_WIN.EXE` (rendu logiciel, Watcom C) a été étudié avec Ghidra puis porté : le jeu est jouable (vidéos de démarrage, menus, pilotes, briefings, les quatre missions), en cours de validation. Écran de présentation avec le manuel français d'origine.
 
 ### Fichiers de données
 
-`scripts/swiv3d-extract.sh [archive.7z]` lit l'image BIN/CUE du CD placée dans `archives/swiv3d/` (non versionnée), extrait le CD complet dans `archives/swiv3d/cd/` (avec le patch D3D/3DFX et l'installeur Abandonware France, gardés comme références) et ne garde dans `original/swiv3d/` que `GLOBAL.BD`, `SOUNDS.BD`, les niveaux `*.SLV`, les vidéos Smacker et leurs sous-titres (`ANIMS/`), le manuel français (`MANUEL.TXT`), les 9 pistes audio du CD en MP3 (`MUSIC/TRACKnn.MP3`, numérotées comme sur le CD) et `files.json`. Le script régénère aussi l'inventaire `docs/swiv3d/files.md`.
+`scripts/swiv3d-extract.sh [archive.7z]` lit l'image BIN/CUE du CD placée dans `archives/swiv3d/` (non versionnée), extrait le CD complet dans `archives/swiv3d/cd/` (avec le patch D3D/3DFX et l'installeur Abandonware France, gardés comme références) et ne garde dans `original/swiv3d/` que `GLOBAL.BD`, `SOUNDS.BD`, les niveaux `*.SLV`, les vidéos Smacker et leurs sous-titres (`ANIMS/`), le manuel français (`MANUEL.TXT`), les 9 pistes audio du CD en MP3 (`MUSIC/TRACKnn.MP3`, numérotées comme sur le CD), la jaquette `COVER.png` et `files.json`. La jaquette est l'écran titre de `GLOBAL.BD` (bloc 1003), mis au format 4:3 en 640×480 par `npx vite-node scripts/swiv3d/cover.mts` ; l'extraction la conserve. Le script régénère aussi l'inventaire `docs/swiv3d/files.md`.
 
 ### Architecture
 
 - `src/games/swiv3d/data/` — conteneur commun aux `.BD` et `.SLV` (`bd.ts`), chaînes en 8 langues, police, script des missions, sprites et écrans de `GLOBAL.BD`, niveaux (terrain, objets, chemins, atlas de textures), modèles 3D, sons, sous-titres des vidéos (`.SCR`).
-- `src/games/swiv3d/ui/asset-viewer.html` — visionneuse des ressources (avec `npm run dev`).
+- `src/games/swiv3d/engine/` — le monde pur, au pas fixe de 40 Hz : joueur et caméra, objets, ennemis, armes, bonus, score, objectifs, game over.
+- `src/games/swiv3d/render/` — rendu logiciel dans une image indexée 320×400 (terrain, modèles, sprites, brouillard), avec `hud/` (jauge, armes, radar, score, viseur).
+- `src/games/swiv3d/audio/` — sons de `SOUNDS.BD` en 3D et musique des pistes du CD.
+- `src/games/swiv3d/screens/` — enchaînement des écrans : démarrage, menus, pilotes, briefings, script des missions.
+- `src/games/swiv3d/ui/` — le navigateur : page du jeu (`app.ts`), commandes clavier, manette et tactile, écran de présentation (`title.ts`) et manuel (`manual.ts`).
+- Pages de développement (avec `npm run dev`) : `ui/dev.html` (le jeu seul ; `?skip=boot` passe les vidéos, `?level=TERRAN01` ou `DEMO` joue un niveau tout de suite, F9 = mission accomplie, F8 = game over), `ui/render-test.html` (rendu) et `ui/asset-viewer.html` (visionneuse des ressources).
 
 ### Documentation
 
-`docs/swiv3d/` : inventaire (`files.md`), rétro-ingénierie (`re-index.md`, régénérée par `scripts/swiv3d/re/run.sh`), formats (`global-bd.md`, `slv.md`, `models.md`, `smacker.md`).
+`docs/swiv3d/` : inventaire (`files.md`), rétro-ingénierie (`re-index.md`, régénérée par `scripts/swiv3d/re/run.sh`), formats (`global-bd.md`, `slv.md`, `models.md`, `smacker.md`), joueur (`player.md`), objets (`objects.md`), règles (`rules.md`), rendu (`render.md`), écrans (`screens.md`) et plan (`plan.md`).
 
 ## Code commun aux jeux
 

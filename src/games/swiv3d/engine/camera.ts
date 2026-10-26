@@ -46,7 +46,7 @@ export class Camera {
   goalEyeY = 0;
   goalEyeZ = 0;
   goalRoll = 0;
-  /** Option : « plan large » des événements (liste `00587704` non vide) : œil +900 et reculé une 2ᵉ fois. */
+  /** « Plan large » tant qu'une déformation du terrain est active (liste `00587704` non vide, posé par `World.tick`) : œil +900 et reculé une 2ᵉ fois. */
   wideShot = false;
   private initialised = false;
   private px = 0;

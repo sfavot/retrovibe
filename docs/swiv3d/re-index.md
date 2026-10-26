@@ -212,7 +212,7 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `004147df` | `gm_terrain_strip_flat` | 506 | 1 | bande de terrain à couleur plate (table 106) | render.md §13 | certain |
 | `004153db` | `gm_vec2_normalize_256` | 85 | 2 | idem en (x, z) | render.md §13 | probable |
 | `00422eac` | `gm_queue_reset` | 121 | 1 | file à zéro (2995 entrées) | render.md §13 | certain |
-| `004232ac` | `gm_deformers_apply` | 573 | 3 | ondes / dôme / anneaux sur un sommet | render.md §13 | certain |
+| `004232ac` | `gm_deformers_apply` | 573 | 3 | déformations du terrain (onde de la bombe, mur d'eau de la méga-bombe, anneau de la caméra 7800) sur un sommet de terrain, de modèle ou de sprite ; réserve de 5 nœuds `0056f2d8` | render.md §10 | certain |
 | `00423620` | `gm_queue_insert` | 682 | 2 | insertion triée dans la file des primitives, rejet hors écran | render.md §13 | certain |
 | `00423974` | `gm_text3d_emit_glyph` | 2783 | 1 | enfile les triangles d'une lettre 3D du bloc 200 | render.md §13 | probable |
 | `0042469c` | `gm_gamma_build` | 223 | 1 | table de gamma 4×64 'pow' | render.md §13 | certain |
@@ -427,14 +427,14 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `00455124` | `gm_upd_missile_attached` | 105 | 0 | missile accroché au lanceur (copie cap, tangage, roulis du porteur) | rules.md §9 | probable |
 | `004551f0` | `gm_upd_missile_straight` | 135 | 0 | vol de l'arme 0 (virage 2) | rules.md §9 | probable |
 | `00455300` | `gm_upd_missile_class10` | 111 | 0 | vol à vitesse de classe 10 (7 000, virage 2) | rules.md §9 | probable |
-| `00455370` | `gm_upd_bomb_fly` | 874 | 0 | bombe : phase de vol | rules.md §9 | probable |
-| `004556dc` | `gm_upd_bomb_shockwave` | 954 | 0 | bombe : onde de choc de 40 / 60 ticks | rules.md §9 | probable |
+| `00455370` | `gm_upd_bomb_fly` | 874 | 0 | bombe : phase de vol, explose si une déformation du terrain est libre (onde, type 0) | rules.md §9, render.md §10 | probable |
+| `004556dc` | `gm_upd_bomb_shockwave` | 954 | 0 | méga-bombe : vol puis onde de choc de 60 ticks, prend une déformation du terrain (dôme, type 1) | rules.md §9, render.md §10 | probable |
 | `00455a98` | `gm_upd_cruise_missile` | 1440 | 0 | missile de croisière | rules.md §9 | probable |
 | `00456038` | `gm_upd_shield` | 172 | 0 | bouclier | rules.md §9 | probable |
 | `004560e4` | `gm_upd_buddy_lock` | 1377 | 0 | compagnon : verrouillage | rules.md §9 | probable |
 | `00456658` | `gm_upd_buddy_super` | 442 | 0 | compagnon : super | rules.md §9 | probable |
 | `00456abc` | `gm_upd_buddy_autofire` | 1189 | 0 | compagnon : tir auto | rules.md §9 | probable |
-| `00457074` | `gm_upd_mortar` | 778 | 0 | mortier | rules.md §9 | probable |
+| `00457074` | `gm_upd_mortar` | 778 | 0 | mortier ; n'éclate que si une déformation du terrain est libre | rules.md §9, render.md §10 | probable |
 | `0045754c` | `gm_upd_super_nova` | 566 | 0 | Super Nova | rules.md §9 | probable |
 | `00457784` | `gm_upd_napalm` | 280 | 0 | napalm | rules.md §9 | probable |
 | `00457abc` | `gm_upd_nucleator` | 269 | 0 | Nucléator | rules.md §9 | probable |

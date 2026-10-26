@@ -9,7 +9,8 @@ import type { Camera } from "../engine/camera";
 import type { GameObject } from "../engine/objects";
 import type { World } from "../engine/world";
 import type { Effect } from "../engine/effects";
-import { WORLD_SIZE, type RenderCamera, type RenderObject, type RenderSprite, type RenderView } from "../render/view";
+import type { Deformer } from "../engine/deformers";
+import { WORLD_SIZE, type RenderCamera, type RenderDeformer, type RenderObject, type RenderSprite, type RenderView } from "../render/view";
 
 export const ANGLE_STEPS = 512;
 const RAD_TO_STEP = ANGLE_STEPS / (2 * Math.PI);
@@ -105,6 +106,16 @@ export function effectToSprite(e: Effect, out: RenderSprite): RenderSprite {
   return out;
 }
 
+/** Déformation du terrain du monde (Q8) -> rendu (unités entières, `>> 8` comme `gm_deformers_apply`). */
+export function deformerToRender(d: Deformer, out: RenderDeformer): RenderDeformer {
+  out.x = d.x >> 8;
+  out.y = d.y >> 8;
+  out.z = d.z >> 8;
+  out.life = d.life;
+  out.type = d.type;
+  return out;
+}
+
 const blankSprite = (): RenderSprite => ({ setId: 505, frame: 0, x: 0, y: 0, z: 0 });
 const blankObject = (): RenderObject => ({ modelId: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0 });
 
@@ -117,6 +128,8 @@ export class ViewBuilder {
   private readonly objects: RenderObject[] = [];
   private readonly spritePool: RenderSprite[] = [];
   private readonly sprites: RenderSprite[] = [];
+  private readonly deformerPool: RenderDeformer[] = [];
+  private readonly deformers: RenderDeformer[] = [];
   private readonly view: RenderView = { camera: { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, objects: this.objects, sprites: this.sprites, time: 0 };
 
   build(world: World): RenderView {
@@ -141,6 +154,13 @@ export class ViewBuilder {
     this.view.camera = cameraToRender(world.camera);
     this.view.time = world.tickCount;
     this.view.groundFlash = world.groundFlash;
+    const deformers = this.deformers;
+    deformers.length = 0;
+    for (const d of world.deformers.active) {
+      const slot = (this.deformerPool[deformers.length] ??= { x: 0, y: 0, z: 0, life: 0, type: 0 });
+      deformers.push(deformerToRender(d, slot));
+    }
+    this.view.deformers = deformers;
     return this.view;
   }
 }

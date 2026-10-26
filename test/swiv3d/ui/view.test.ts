@@ -8,7 +8,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH, WORLD_SIZE } from "../../../src/games/swiv
 import { parseBd } from "../../../src/games/swiv3d/data/bd";
 import { parseGlobal } from "../../../src/games/swiv3d/data/global";
 import { engineLoop, listenerOf, musicContextOf, SoundBridge, type SoundPort } from "../../../src/games/swiv3d/ui/sound-bridge";
-import { bulletToSprite, cameraToRender, effectToSprite, isBullet, lookAngles, torusDelta, ViewBuilder, wrapCoordinate } from "../../../src/games/swiv3d/ui/view";
+import { bulletToSprite, cameraToRender, deformerToRender, effectToSprite, isBullet, lookAngles, torusDelta, ViewBuilder, wrapCoordinate } from "../../../src/games/swiv3d/ui/view";
 import type { GameObject } from "../../../src/games/swiv3d/engine/objects";
 import type { RenderSprite } from "../../../src/games/swiv3d/render/view";
 import { rec, scenario } from "../engine/scenario";
@@ -52,6 +52,12 @@ describe("vue : conversions d'angle et de position", () => {
     expect(wrapCoordinate(WORLD_SIZE + 5)).toBe(5);
     expect(torusDelta(WORLD_SIZE - 30)).toBe(-30);
     expect(torusDelta(30)).toBe(30);
+  });
+
+  it("déformation du terrain : position Q8 ramenée en unités entières (`>> 8`), durée et type inchangés", () => {
+    const out = { x: 0, y: 0, z: 0, life: 0, type: 0 };
+    deformerToRender({ x: 1000 * 256 + 255, y: 300 * 256, z: 2000 * 256 + 1, life: 39, type: 1 }, out);
+    expect(out).toEqual({ x: 1000, y: 300, z: 2000, life: 39, type: 1 });
   });
 });
 

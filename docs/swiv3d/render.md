@@ -118,7 +118,7 @@ const horiz = (COS[view.elev] * view.dist) >> 8;
 let C = [ T[0] - ((SIN[a] * horiz) >> 8),
           T[1] + ((SIN[view.elev] * view.dist) >> 8),
           T[2] - ((COS[a] * horiz) >> 8) ];                          // 0x52cad8
-// effet de déformation actif (DAT_00587704 != 0) : C.y += 900 et C.x/z reculent une seconde fois de la même quantité.
+// déformation du terrain active (DAT_00587704 != 0, §10) : C.y += 900 (_DAT_00480388) et C.x/z reculent une seconde fois de la même quantité.
 // garde-fou : C.y >= max(hauteur terrain en 5 points) / 256 + 120   (centre et ±30000 en x puis en z, en 8.8)
 ```
 
@@ -487,26 +487,34 @@ Radar et HUD (`gm_draw_overlay_sw` `004362b8`, `gm_draw_hud` `0042ec80`) : hors 
 
 ## 10. Effets de déformation (`gm_deformers_apply`, `004232ac`)
 
-Liste chaînée `DAT_00587704` de noeuds `(x, y, z, taille, type, suivant)` (x, y, z en 8.8). Si elle n'est pas vide, **tout sommet de terrain et tout sommet de modèle** passe par `004232ac` avant la projection, et la caméra se recule (§4.2) :
+Liste chaînée `DAT_00587704` de nœuds de 0x18 octets `(x, y, z, durée, type, suivant)` : `+0x00/+0x04/+0x08` position 8.8, `+0x0c` ticks restants (qui servent aussi de rayon / phase, `taille` ci-dessous), `+0x10` type, `+0x14` suivant. Si elle n'est pas vide, **tout sommet de terrain** (`gm_terrain_project_flat` `004268fc`, qui ne garde que `y`, et `gm_terrain_project_lit` `00426c14`, qui garde `y`, lumière et couleur, avant le plafond de brouillard), **tout sommet de modèle** (après le placement au sol des sommets collés, seul `y` est gardé) **et toute position de sprite** (balles, explosions) passe par `004232ac` juste avant la projection, et la caméra prend un « plan large » (§4.2). Les écarts `P - nœud` ne sont pas repliés dans le tore. Le sommet est en unités monde (`P.x = cx << 6` pour le terrain) :
 
 ```ts
 for (nd of liste) {
   const dx = P.x - (nd.x >> 8), dz = P.z - (nd.z >> 8);
-  if (nd.type === 0) {                                       // onde de choc
+  if (nd.type === 0) {                                       // onde de choc (bombe)
     let u = ((dx*dx + dz*dz) >> 9) + (nd.taille - 0x14) * 0x40;
     if (0 < u && u < 0x200) P.y -= (SIN[u & 511] * nd.taille) >> 5;
     u >>= 1;  if (0 < u && u < 0x200) light += SIN[u & 511];
-  } else if (nd.type === 1) {                                // dôme (bouclier)
+  } else if (nd.type === 1) {                                // « dôme » (méga-bombe) : seul dx compte
     let k = ((dx >> 2)) + (nd.taille - 0x1e) * 0x10 + 0x80;
     if (0 < k && k < 0xff) { const h = SIN[k] * 2 - 300 + (nd.y >> 8); if (P.y < h) { colour = 0; light = 1000; P.y = h; } }
-  } else if (nd.type === 2) {                                // anneau lumineux
+  } else if (nd.type === 2) {                                // anneau lumineux (caméra 7800)
     const u = ((dx*dx + dz*dz) >> 11) + (0x19 - nd.taille) * -0x40;
     if (0 < u && u < 0x200) light += (SIN[u & 511] * nd.taille) >> 5;
   }
 }
 ```
 
-Hypothèse sur les rôles (explosion, bouclier de boss, onde) ; formules **confirmées**. Les nœuds viennent d'une réserve de 5 (`0056f2d8`, 0x18 octets, chaînés dans la liste libre `00587714` par `gm_level_spawn_objects`) : la bombe (`gm_upd_bomb_fly`, `gm_upd_bomb_shockwave`), le mortier (`gm_upd_mortar`) et la caméra de scénario 7800 (`00446a7c`) en prennent un (le mortier et la bombe n'explosent pas tant que la réserve est vide) ; `gm_game_tick` décrémente leur durée `+0x0c` et rend à la réserve ceux qui arrivent à 0. Non porté (la réserve est supposée jamais vide). Sans lien avec les éclairs au sol (§6.1). À reporter après les missions de la zone tempérée si elles servent (script `100 3` à 3 / bonus).
+Formules et producteurs **confirmés** (porté : `engine/deformers.ts`, `render/deformers.ts`) :
+
+- **Réserve** : 5 nœuds (`0056f2d8`), chaînés dans la liste libre `00587714` par `gm_level_spawn_objects` (le nœud 4 en tête), liste active vidée. Prendre un nœud = l'ôter de la tête de la liste libre et le pousser en tête de la liste active.
+- **Bombe** (`gm_upd_bomb_fly`, arme 7) : au 40ᵉ tick de vol, **si la liste libre n'est pas vide**, nœud de type 0 (onde : anneau qui s'enfonce puis se relève en s'élargissant, avec un anneau de lumière), position de la bombe, `y = gm_terrain_height(bombe)`, durée 0x28 ; sinon le vol continue et le test est refait au tick suivant.
+- **Méga-bombe** (`gm_upd_bomb_shockwave`, arme 17) : même condition, type 1 (dôme), durée 0x3c, `y` = la plus basse des hauteurs du sol sous la bombe et sous le joueur. Le « dôme » ne dépend que de `dx` : c'est un mur infini en `z` qui balaie l'axe des x vers les x croissants (comme les dégâts de l'onde, `rules.md`) ; les sommets qu'il soulève prennent la couleur 0 (tuile d'eau) et la lumière 1000 (bornée à 110 par le brouillard) : une vague d'eau claire.
+- **Mortier** (`gm_upd_mortar`, armes 6/16) : n'éclate que si la liste libre n'est pas vide, **sans prendre de nœud**.
+- **Caméra de scénario 7800** (`gm_upd_camera` `00446a7c`, types absents des niveaux livrés, non portée) : type 2 (anneau de lumière), durée 0x28, prend le nœud **sans tester** la liste libre (`y` n'est pas écrit).
+- **Durée** : à la fin de `gm_game_tick` (après la boucle des joueurs), chaque nœud actif perd 1 ; ceux qui passent sous 1 retournent en tête de la liste libre, les autres en tête d'une nouvelle liste active (l'ordre s'inverse à chaque tick ; il compte, le dôme écrasant `y`).
+- **Pas de physique** : seuls les trois projecteurs ci-dessus appellent `004232ac` ; `gm_terrain_height` (sol des objets, collisions, garde-sol de la caméra) ignore les déformations, et la carte 100 n'est pas modifiée. Sans lien avec les éclairs au sol (§6.1) ni avec les cratères.
 
 ## 11. Prototype de vérification
 
@@ -521,7 +529,7 @@ Ce que le prototype **n'a pas** vérifié : l'identité bit à bit avec le jeu (
 ## 12. Points ouverts et écarts avec les documents existants
 
 - **Écarts avec `slv.md`/`models.md` à corriger par le coordinateur** : le bloc 12000 est lu comme 32 tuiles contiguës de 64×64 par le terrain (pas comme un atlas à 256 colonnes) ; le type de face `0x28` est l'**ombre** (silhouettes `SLV 110` + table `SLV 500`), pas un « décalque » ; le type 4 est à clé de transparence (texel 0) non éclairé (ligne 100) ; le type 1 est un masque de flou `SLV 500` lignes 32..47 ; `SLV 106` est une table `[lumière/2][couleur 102]` (64 × 256) pour le terrain de faible détail ; `SLV 500` lignes 0..31 est la table d'assombrissement ; `gm_render_terrain` ne dessine pas le terrain, il collecte les objets ; « grille 7×7 » = compartiments d'objets de 512 unités, pas des cellules de 64.
-- **Hypothèses** : sens de `DAT_00481190` (lissage de caméra), de la touche `0x43`, des types de déformation, de la couleur d'ambiance (accéléré), de la cadence du CRTC (70 Hz non établie), de la ligne 127 des tables de lumière.
+- **Hypothèses** : sens de `DAT_00481190` (lissage de caméra), de la touche `0x43`, de la couleur d'ambiance (accéléré), de la cadence du CRTC (70 Hz non établie), de la ligne 127 des tables de lumière.
 - **Ouverts** : contenu exact des 4 ensembles de tuiles (quel `t` pour quel modèle hors 14..68) ; états de colonne non initialisés (comportement de la première bande) ; dépassement de lumière `> 127` ; `FUN_00436c28` / `FUN_0046ff3c` (chemins accélérés) ; rôle de `DAT_005bc1d4`.
 - **Écarts volontaires conseillés** pour le port : compteur de bande complet (pas 8 bits), tampon linéaire sans marge, états de colonne remis à zéro, pas de gamma, étirement 4:3 à la présentation.
 - **Structure conseillée** : `Framebuffer` 320×400 indexé ; `View`/`Camera` purs ; `TerrainRenderer` (rangées + bandes + lignes d'horizon, tables de lumière et tuiles passées en entrée) ; `ObjectRenderer` (transformation, file, rastériseurs) ; `Sprites` ; chaque brique sans dépendance au DOM, testée par images de référence.
@@ -542,7 +550,7 @@ Ce que le prototype **n'a pas** vérifié : l'identité bit à bit avec le jeu (
 | `004153db` | `gm_vec2_normalize_256` | idem en (x, z) (p) |
 | `0042469c` | `gm_gamma_build` | table de gamma 4×64 `pow` (c) |
 | `0042477c` | `gm_render_init_tables` | réciproques, racines, cercle du rotor (`0052cae8`), pointeurs de colonnes (c) |
-| `004232ac` | `gm_deformers_apply` | ondes / dôme / anneaux sur un sommet (c) |
+| `004232ac` | `gm_deformers_apply` | déformations du terrain (onde, mur d'eau, anneau) sur un sommet (c) |
 | `00423620` | `gm_queue_insert` | insertion triée dans la file des primitives, rejet hors écran (c) |
 | `00422eac` | `gm_queue_reset` | file à zéro (2995 entrées) (c) |
 | `00423974` | `gm_text3d_emit_glyph` | enfile les triangles d'une lettre 3D du bloc 200 (p) |

@@ -6,6 +6,7 @@
 import type { PreparedModel, RenderAssets } from "./assets";
 import type { Projection } from "./camera";
 import type { Columns } from "./columns";
+import { applyDeformers, type DeformedVertex } from "./deformers";
 import {
   KIND_KEYED,
   KIND_ROTOR,
@@ -25,6 +26,7 @@ import {
   SCREEN_WIDTH,
   VIEWPORT,
   wrapDelta,
+  type RenderDeformer,
   type RenderObject,
 } from "./view";
 
@@ -40,6 +42,8 @@ export class ObjectRenderer {
   private time = 0;
   private waterMode = 3;
   private pr!: Projection;
+  private deformers: readonly RenderDeformer[] = [];
+  private readonly dv: DeformedVertex = { x: 0, y: 0, z: 0, light: 0, colour: 0 };
   private readonly sx: Int32Array;
   private readonly sy: Int32Array;
   private readonly depth: Int32Array;
@@ -65,8 +69,9 @@ export class ObjectRenderer {
     this.intensity = new Int32Array(maxNormals);
   }
 
-  begin(pr: Projection, time: number, waterMode: number): void {
+  begin(pr: Projection, time: number, waterMode: number, deformers: readonly RenderDeformer[] = []): void {
     this.pr = pr;
+    this.deformers = deformers;
     this.time = time;
     this.waterMode = waterMode;
     this.queue.reset();
@@ -164,6 +169,15 @@ export class ObjectRenderer {
       if (mode !== 0) {
         const g = this.groundHeight(x, z);
         y = mode === 1 ? g : Math.max(y, g);
+      }
+      if (this.deformers.length > 0) {
+        // Sommet déformé en coordonnées monde, après le placement au sol (seule la hauteur est reprise).
+        const dv = this.dv;
+        dv.x = x;
+        dv.y = y;
+        dv.z = z;
+        applyDeformers(this.deformers, dv);
+        y = dv.y;
       }
       const rx = x - pr.camX;
       const ry = y - pr.camY;

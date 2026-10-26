@@ -122,7 +122,7 @@ Motifs pour les niveaux de puissance atteignables avec les 4 niveaux livrés (0 
 | 4 | 0 | éventail de 5 : cap +10 (E 10), +5 (E 12), 0 (**type 1**, E 10), −5, −10 (E 10) |
 | 5 | 0 | [C] `gm_upd_super_nova` : 4 500, tangage −3/tick (départ 70) pendant 35 ticks ; puis petite explosion, une balle (10001, 25 pv, classe `0x3b`) par ennemi des 5 × 5 cellules (visée à 32 u/tick si < 282 u) et 10 éclats `10005` (15 pv) |
 | 5 | 8 | 3 balles : vert. +300 (E 10) / 0 (E 12) / −300 (E 10) |
-| 6 | 0 | [C] `gm_upd_mortar` : fantôme `0x40` lancé à 32 u/tick dans le cap du joueur, vitesse × 30/32, rase le relief à 90 u ; au 40ᵉ tick 35 éclats `10005` (15 pv, ×16) ; super mortier (16) : +20 éclats `10001` (20 pv) |
+| 6 | 0 | [C] `gm_upd_mortar` : fantôme `0x40` lancé à 32 u/tick dans le cap du joueur, vitesse × 30/32, rase le relief à 90 u ; au 40ᵉ tick (plus tard si aucune des 5 déformations du terrain n'est libre, `render.md` §10) 35 éclats `10005` (15 pv, ×16) ; super mortier (16) : +20 éclats `10001` (20 pv) |
 | 6 | 8 | vert. +400 (E 10), centrale **type 1** (E 12), vert. −400 (E 10) |
 
 Au total le canon tire 2,5 à 5 salves par seconde (grille de 16 ticks, plus des phases intermédiaires). Les niveaux 7 à 19 (jusqu'à 14 projectiles par salve, balles lourdes type 2 d'énergie 20 lancées en cloche, balles à tête chercheuse types 3 et 4 d'énergie 12 à 24, vitesses 4 000 à 8 000) existent dans le code mais ne sont pas atteignables avec les données livrées ; ils s'extraient de `FUN_0046b6fc` (un appel `0046b4b4` par motif dans `disasm.txt`) si une édition complète est visée. [C pour 0 à 6]
@@ -142,7 +142,7 @@ Les noms sont ceux de la table 100 (français / anglais). L'icône du HUD est l'
 | 4 | Rocketpak | MultiTarget | 5 | +2 / 20 | tous | nacelle 854 (80) ; 5 missiles 800 (60) | **5 missiles à tête chercheuse en couronne** (5 directions : table `00484238`) |
 | 5 | Super Nova | Star Burst | 6 | +2 / 20 | tous | 855, 80 | `LAB_0045754c` : vitesse 4 500, après 35 ticks se désintègre en bombelettes (10001 d'énergie 25, 10005 d'énergie 15) |
 | 6 | Bombe Mortier | Mortar Bomb | 7 | +2 / 20 | tous | 811, 30 | `LAB_00457074` : lancée en cloche (gravité double), explose au contact ou après 40 ticks en éclats (10005 énergie 15, 10001 énergie 20) |
-| 7 | Bombe | Smart Bomb | 8 | +1 / 10 | tous | 812, 80 | [C] `gm_upd_bomb_fly` : fantôme rasant (40 u), 40 ticks puis onde de 40 ticks : un tick sur deux, tout objet (joueur compris) des 9 × 9 cellules perd `sin(d)·t>>6` avec `d = (dx²+dz²)>>9 + (t−20)·64 ∈ ]0,255[` (rayon réel ≈ 360 à 850 u, pas 2 048) |
+| 7 | Bombe | Smart Bomb | 8 | +1 / 10 | tous | 812, 80 | [C] `gm_upd_bomb_fly` : fantôme rasant (40 u), 40 ticks (plus si aucune déformation n'est libre) puis onde de 40 ticks, visible comme une onde du terrain (`render.md` §10) : un tick sur deux, tout objet (joueur compris) des 9 × 9 cellules perd `sin(d)·t>>6` avec `d = (dx²+dz²)>>9 + (t−20)·64 ∈ ]0,255[` (rayon réel ≈ 360 à 850 u, pas 2 048) |
 | 8 | Napalm | Napalm | 9 | +2 / 20 | tous | 858, 80 | [C] `gm_upd_napalm` : 4 500, pique du 6ᵉ au 11ᵉ tick, goutte (10005, 50 pv, `00457000`) tous les 4 ticks du 18ᵉ au 119ᵉ ; une goutte au sol creuse un cratère (décalque 901) |
 | 9 | Super Ressort ! | Jump Boost! | 10 | +1 / 10 | 1, 4, 5 | 981 (`0x3d5`), 80 | [C] (véhicules 1, 2, 4, 5) pilote coupé, `classe &= ~4` ; 30 ticks de cabrage (tangage +4 jusqu'à 90, état 2), poussée 9 000 jusqu'au tick 80 (état 3), fin à l'atterrissage (la physique remet l'état à 0), nacelle larguée |
 | 10 | Missiles tri-ogives | Triple Missiles | 11 | +2 / 40 | tous | 800, 70 | version améliorée de 0 |
@@ -152,7 +152,7 @@ Les noms sont ceux de la table 100 (français / anglais). L'icône du HUD est l'
 | 14 | Missiles Apocalypse | MegaTarget | 15 | +2 / 20 | tous | 854 + 801 (80) | version de 4 |
 | 15 | Nucléator | Power Burst | 16 | +1 / 5 | tous | 855, 80 | [C] `gm_upd_nucleator` : 35 ticks puis 3 sous-munitions (10003, 25 pv, vie 30 / 50 / 70, 1 700 u/tick dans 3 caps) qui explosent comme une super nova |
 | 16 | Super mortier | Super Mortar | 17 | +2 / 20 | tous | 811, 30 | version de 6 |
-| 17 | Méga-bombe | Mega Bomb | 18 | +1 / 10 | tous | 812, 80 | [C] `gm_upd_bomb_shockwave` : onde de 60 ticks, plan x : `d = dx/4 + (t−30)·16 + 128`, perte `sin(d)>>2`, rayon 894 u |
+| 17 | Méga-bombe | Mega Bomb | 18 | +1 / 10 | tous | 812, 80 | [C] `gm_upd_bomb_shockwave` : onde de 60 ticks (visible comme un mur d'eau qui balaie l'axe x, `render.md` §10), plan x : `d = dx/4 + (t−30)·16 + 128`, perte `sin(d)>>2`, rayon 894 u |
 | 18 | Super napalm | Super Napalm | 19 | +2 / 20 | tous | 858, 80 | [C] `gm_upd_super_napalm` : 150 u/tick en semant une goutte tous les 4 ticks du 40ᵉ au 149ᵉ |
 | 19 | Accélérateur | Thruster | 20 | **+80 / 500** | 1, 2, 4, 5 | 813 (`0x32d`), 80 | [C] (véhicules 1, 2, 4, 5) tant que le tir spécial est tenu : 1 munition/tick, `vy −= 60`, `v = (2·(sin,cos cap) + v)·14/16` (limite 14 u/tick), fumée ; plus de munition : retrait |
 
@@ -481,7 +481,7 @@ Noms proposés (préfixe `gm_`), à fusionner par le coordinateur dans `keyfuncs
 ## 10. Questions ouvertes
 
 - **Cadence** : 40 ticks par seconde (pas de 25 ms dans `gm_poll_events`) est établi ; la mesure du nombre d'images (`DAT_00480c60`, `DAT_00481188`) n'influence pas la logique (R1).
-- **Armes spéciales** : portées de l'exe (E3b, `launchers.ts`, `special-weapons.ts`). Restent hypothèses : constantes de la forme 3 (reprend celles de l'hélicoptère), signe latéral des nacelles uniques 5-8 / 15-18, déformations du terrain (`gm_deformers_apply`, non portées : leur réserve de 5 nœuds `00587714`, qui conditionne l'explosion du mortier et de la bombe, est supposée jamais vide), pads 7012+ (`004477b0`…).
+- **Armes spéciales** : portées de l'exe (E3b, `launchers.ts`, `special-weapons.ts`), avec la réserve des 5 déformations du terrain qui retarde l'explosion du mortier et des bombes quand elle est vide (`deformers.ts`, `render.md` §10). Restent hypothèses : constantes de la forme 3 (reprend celles de l'hélicoptère), signe latéral des nacelles uniques 5-8 / 15-18, pads 7012+ (`004477b0`…).
 - **Classes des projectiles** [C] : projectiles du joueur et des compagnons `0x3f` (bit `0x04` : les ennemis les voient comme le joueur), projectiles ennemis et balles de nova `0x3b` ; compagnons et bouclier : classe `0x14`.
 - **Dégâts des ennemis** : l'énergie de leurs projectiles est dans chaque comportement (R2) ; la règle `min(A, B, 100)` est établie.
 - **Types 3000 et suivants** : le lien type → comportement vient du code, les noms (char, navire, tourelle…) de R2. Le dépôt de bonus par les cibles 2000 portant un champ 7 de 1000 à 1999 (« secrets ») est probable mais non lu dans le détail.

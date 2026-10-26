@@ -50,11 +50,12 @@ export function createRenderer(assets: RenderAssets): Renderer {
       const headLength = Math.hypot(projection.fx, projection.fz) || 1;
       const targetX = projection.camX + (ROW_TARGET_DISTANCE * projection.fx) / headLength;
       const targetZ = projection.camZ + (ROW_TARGET_DISTANCE * projection.fz) / headLength;
-      terrain.draw(fb, projection, columns, time, waterMode, targetX, targetZ, view.groundFlash ?? null);
+      const deformers = view.deformers ?? [];
+      terrain.draw(fb, projection, columns, time, waterMode, targetX, targetZ, view.groundFlash ?? null, deformers);
 
-      objects.begin(projection, time, waterMode);
+      objects.begin(projection, time, waterMode, deformers);
       for (const object of view.objects) objects.addObject(object);
-      for (const sprite of view.sprites) addSprite(objects.queue, projection, sprite);
+      for (const sprite of view.sprites) addSprite(objects.queue, projection, sprite, deformers);
 
       const queue = objects.queue;
       stats.queued = queue.count;

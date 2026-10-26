@@ -4,7 +4,8 @@
  *
  * Ordre d'un tick (`gm_game_tick`, `0043c234`) : mise à jour des objets (cellules actives autour du joueur : `pos += vel`,
  * fonction `+0x68`, repli dans le tore, âge ; collisions de la cellule ; dépeuplement des cellules moyennes), décroissance des
- * éclairs au sol (`0042fc70`), puis fonction pilote du joueur (entrées), puis caméra.
+ * éclairs au sol (`0042fc70`), puis fonction pilote du joueur (entrées), puis durée des déformations du terrain (`deformers.ts`),
+ * puis caméra.
  *
  * Écarts assumés : un seul joueur (pas de réseau ni d'écran partagé) ; pas de zones temporaires `0058770c` ; l'ordre de parcours
  * des cellules est celui de la table 11×11 (ligne par ligne) ; un objet déjà traité ce tick n'est pas retraité s'il change de
@@ -16,6 +17,7 @@ import { listModels, parseModel, type Model } from "../data/model";
 import { Camera } from "./camera";
 import { collideCell } from "./collisions";
 import { DebrisTable } from "./debris";
+import { Deformers } from "./deformers";
 import { toEffect, FX_MODEL_FIRST, type Effect } from "./effects";
 import type { WorldEvent } from "./events";
 import { GameState } from "./game";
@@ -126,6 +128,8 @@ export class World {
   readonly levelObjects: readonly GameObject[];
   /** Carte d'éclairs au sol 64×64 (`005624c8`), partagée avec le rendu du terrain (`terrain.ts`, `addGroundFlash`). */
   readonly groundFlash = newGroundFlash();
+  /** Réserve de 5 déformations du terrain (`0056f2d8`) et liste active `00587704`, lue par le rendu (`render.md` §10). */
+  readonly deformers = new Deformers();
   /** Ticks de logique exécutés (pause exclue). */
   tickCount = 0;
   /** Événements émis depuis le dernier `drainEvents`. */
@@ -301,8 +305,11 @@ export class World {
     fadeGroundFlash(this.groundFlash);
     advanceEndCounter(this);
     this.updatePlayer(input);
+    this.deformers.tick();
     this.game.tickMessages();
     this.refreshStatus();
+    // « Plan large » de `gm_render_view` tant qu'une déformation est active.
+    this.camera.wideShot = this.deformers.active.length > 0;
     this.camera.setGoal(this.player.obj, this.terrain);
     if (this.options.cameraFps > 0) this.camera.smooth(this.options.cameraFps);
   }

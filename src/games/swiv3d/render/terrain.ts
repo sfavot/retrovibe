@@ -6,8 +6,9 @@
 import type { RenderAssets } from "./assets";
 import type { Columns } from "./columns";
 import type { Projection } from "./camera";
+import { applyDeformers, type DeformedVertex } from "./deformers";
 import { COS, RECIP_16, RECIP_FFFF, SIN, WAVE, idiv, normalize256 } from "./tables";
-import { SCREEN_WIDTH, VIEWPORT } from "./view";
+import { SCREEN_WIDTH, VIEWPORT, type RenderDeformer } from "./view";
 
 interface Vertex {
   x: number;
@@ -49,6 +50,8 @@ export class TerrainRenderer {
   private time = 0;
   private waterMode = 3;
   private flash: Int32Array | null = null;
+  private deformers: readonly RenderDeformer[] = [];
+  private readonly dv: DeformedVertex = { x: 0, y: 0, z: 0, light: 0, colour: 0 };
   private stepX = 0;
   private stepZ = 0;
 
@@ -77,9 +80,11 @@ export class TerrainRenderer {
     targetX: number,
     targetZ: number,
     flash: Int32Array | null = null,
+    deformers: readonly RenderDeformer[] = [],
   ): void {
     this.fb = fb;
     this.flash = flash;
+    this.deformers = deformers;
     this.pr = pr;
     this.cols = cols;
     this.time = time;
@@ -164,7 +169,16 @@ export class TerrainRenderer {
     const index = ((cz & 511) << 9) + (cx & 511);
     let hy = heightmap[index]! << 2;
     if ((this.waterMode & 1) !== 0 && (groundMap[index]! & 0xe0) === 0) hy += this.waveAt(cx, cz);
-    this.project((cx << 6), hy, (cz << 6), out);
+    if (this.deformers.length > 0) {
+      // La lumière et la couleur ne sont pas reprises par la variante sans éclairage.
+      const dv = this.dv;
+      dv.x = cx << 6;
+      dv.y = hy;
+      dv.z = cz << 6;
+      applyDeformers(this.deformers, dv);
+      hy = dv.y;
+    }
+    this.project(cx << 6, hy, cz << 6, out);
     out.visible = !(out.x < VIEWPORT.left || out.x > VIEWPORT.right || out.depth > 1999 || out.depth < 0x65);
   }
 
@@ -202,6 +216,18 @@ export class TerrainRenderer {
       hy += wave;
       light = wave * 2 + 0x50;
       colour = 0;
+    }
+    if (this.deformers.length > 0) {
+      const dv = this.dv;
+      dv.x = cx << 6;
+      dv.y = hy;
+      dv.z = cz << 6;
+      dv.light = light;
+      dv.colour = colour;
+      applyDeformers(this.deformers, dv);
+      hy = dv.y;
+      light = dv.light;
+      colour = dv.colour;
     }
     this.project(cx << 6, hy, cz << 6, out);
     // Brouillard : plafond de lumière `(2000 - D) >> 2`, puis bornes [15, 110].

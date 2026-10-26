@@ -6,9 +6,9 @@
  * (`gm_upd_napalm` `00457784`, `gm_upd_super_napalm` `00457bcc`) et goutte de napalm (`00457000`). Les missiles à tête chercheuse
  * (`gm_upd_missile_*`) sont dans `projectiles.ts`. Voir `docs/swiv3d/rules.md` §3.
  *
- * Écarts assumés : l'exe ne laisse exploser le mortier et ne déclenche l'onde de la bombe que si la réserve de déformations du
- * terrain n'est pas vide (liste libre `00587714` des 5 nœuds de `gm_deformers_apply`, `render.md` §10, rendus au bout de leur
- * durée par `gm_game_tick`) ; le moteur n'a pas ces déformations, la réserve est donc considérée comme toujours disponible.
+ * Le mortier n'éclate et la bombe ne déclenche son onde que si la réserve des 5 déformations du terrain (liste libre `00587714`,
+ * `deformers.ts`) n'est pas vide : sinon ils continuent leur vol et réessaient au tick suivant. La bombe y prend un nœud, pas le
+ * mortier.
  */
 import {
   PROJECTILE_CLASS,
@@ -19,6 +19,7 @@ import {
   nextRandom,
   smokeTrail,
 } from "./combat";
+import { DEFORMER_DOME, DEFORMER_WAVE } from "./deformers";
 import { explodeHeavy } from "./enemies";
 import { ANGLE_MASK, COS, SIN, normalize256 } from "./fixed";
 import { CLASS, FLAG, type GameObject } from "./objects";
@@ -206,7 +207,9 @@ function hit(c: GameObject, damage: number): void {
 /**
  * `gm_upd_bomb_fly` (arme 7) et `gm_upd_bomb_shockwave` (arme 17). Phase de vol (`state` 0) : cap + 10 (15), tangage 20 (40),
  * vitesse × 30/32, lancée à 32 unités/tick dans le cap du joueur au premier tick (la bombe devient un fantôme `0x40`), rasante à
- * 40 unités du relief ; après 40 ticks : éclat, le modèle disparaît, `timer` = 40 (60) et phase d'onde (`state` 1). Onde : un tick
+ * 40 unités du relief ; après 40 ticks, si une déformation est libre : elle est prise (onde de choc de 40 ticks à la position de
+ * la bombe ; méga-bombe : dôme de 60 ticks à la hauteur du sol la plus basse entre la bombe et le joueur), éclat, le modèle
+ * disparaît, `timer` = 40 (60) et phase d'onde (`state` 1) ; sinon le vol continue. Onde : un tick
  * sur deux, chaque objet des 9 × 9 cellules (le joueur compris) à `d = (dx² + dz²) >> 9 + (timer - 20) · 64` dans ]0, 255[ perd
  * `sin(d) · timer >> 6` pv (bombe) ; méga-bombe : `d = dx/4 + (timer - 30) · 16 + 128`, dans la même plage et à moins de 894 unités,
  * perte de `sin(d) >> 2` pv.
@@ -224,7 +227,10 @@ function bomb(world: World, o: GameObject, mega: boolean): void {
       o.vz = COS[o.owner.yaw & ANGLE_MASK]! << 5;
     }
     hoverFollow(world, o, 0x28, 4, 4);
-    if (o.age > 0x27) {
+    if (o.age > 0x27 && world.deformers.available) {
+      let y = world.terrain.height(o.x, o.z);
+      if (mega) y = Math.min(y, world.terrain.height(o.owner.x, o.owner.z));
+      world.deformers.take(o.x, y, o.z, mega ? 0x3c : 0x28, mega ? DEFORMER_DOME : DEFORMER_WAVE);
       burst(world, o);
       o.model = 0;
       o.timer = mega ? 0x3c : 0x28;
@@ -280,8 +286,9 @@ function fragments(world: World, o: GameObject, n: number, model: number, hp: nu
 
 /**
  * `gm_upd_mortar` (`00457074`) : rase le relief à 90 unités, vitesse horizontale × 30/32, lancé à 32 unités/tick dans le cap du
- * joueur au premier tick (devient un fantôme `0x40`). Après 40 ticks : éclat, 35 éclats lourds (`10005`, 15 pv, vitesse × 16) et,
- * pour le super mortier (`state` 1), 20 éclats (`10001`, 20 pv, × 8).
+ * joueur au premier tick (devient un fantôme `0x40`). Après 40 ticks, dès qu'une déformation du terrain est libre (sans la
+ * prendre) : éclat, 35 éclats lourds (`10005`, 15 pv, vitesse × 16) et, pour le super mortier (`state` 1), 20 éclats (`10001`,
+ * 20 pv, × 8).
  */
 export function mortar(world: World, o: GameObject): void {
   o.pitch = 0;
@@ -294,7 +301,7 @@ export function mortar(world: World, o: GameObject): void {
     o.vz = COS[o.owner.yaw & ANGLE_MASK]! << 5;
   }
   hoverFollow(world, o, 0x5a, 4, 4);
-  if (o.age >= 0x28) {
+  if (o.age >= 0x28 && world.deformers.available) {
     burst(world, o);
     o.classe = 0;
     fragments(world, o, 0x23, 10005, 0xf, 4);

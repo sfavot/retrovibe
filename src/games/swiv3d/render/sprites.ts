@@ -6,9 +6,10 @@
 import type { RenderAssets } from "./assets";
 import type { Projection } from "./camera";
 import type { Columns } from "./columns";
+import { applyDeformers, type DeformedVertex } from "./deformers";
 import { KIND_SPRITE_504, KIND_SPRITE_505, type RenderQueue } from "./queue";
 import { idiv } from "./tables";
-import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT, wrapDelta, type RenderSprite } from "./view";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT, wrapDelta, type RenderDeformer, type RenderSprite } from "./view";
 
 export const SPRITE_505_WIDTH = 21;
 export const SPRITE_505_HEIGHT = 35;
@@ -16,11 +17,23 @@ const DEFAULT_SIZE_504 = 23;
 /** Garde-fou : un sprite 504 très proche couvre l'écran, inutile d'aller au-delà. */
 const MAX_HALF_EXTENT = 4000;
 
-/** Met un sprite en file (profondeur `D` avec recul de 0x19) ; ignoré s'il est derrière la caméra ou hors de l'écran. */
-export function addSprite(queue: RenderQueue, pr: Projection, sprite: RenderSprite): void {
+const dv: DeformedVertex = { x: 0, y: 0, z: 0, light: 0, colour: 0 };
+
+/**
+ * Met un sprite en file (profondeur `D` avec recul de 0x19) ; ignoré s'il est derrière la caméra ou hors de l'écran. Sa position
+ * passe d'abord par les déformations du terrain (`gm_render_objects`, `render.md` §10).
+ */
+export function addSprite(queue: RenderQueue, pr: Projection, sprite: RenderSprite, deformers: readonly RenderDeformer[] = []): void {
   const dx = wrapDelta(Math.trunc(sprite.x) - pr.camX);
-  const dy = Math.trunc(sprite.y) - pr.camY;
+  let dy = Math.trunc(sprite.y) - pr.camY;
   const dz = wrapDelta(Math.trunc(sprite.z) - pr.camZ);
+  if (deformers.length > 0) {
+    dv.x = Math.trunc(sprite.x);
+    dv.y = Math.trunc(sprite.y);
+    dv.z = Math.trunc(sprite.z);
+    applyDeformers(deformers, dv);
+    dy = dv.y - pr.camY;
+  }
   const depth = ((dx * pr.fx + dy * pr.fy + dz * pr.fz) >> 8) + 0x19;
   if (depth <= 0 || depth >= 2000) return;
   const sx = idiv(dx * pr.rx + dy * pr.ry + dz * pr.rz, depth) + pr.cx;

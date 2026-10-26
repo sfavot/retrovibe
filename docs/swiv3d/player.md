@@ -300,7 +300,7 @@ rayonH = (COS[V4] * V5) >> 8 ; a = (P.cap + V[3]) & 0x1ff
 œil.x = cible.x - ((SIN[a] * rayonH) >> 8)
 œil.y = cible.y + ((SIN[V4] * V5) >> 8)            // 198 unités au-dessus pour 30/550
 œil.z = cible.z - ((COS[a] * rayonH) >> 8)
-si liste 00587704 non vide : œil.y += 900 (0x480388) et recule une 2e fois de rayonH      // « plan large » des événements (hypothèse)
+si liste 00587704 non vide : œil.y += 900 (0x480388) et recule une 2e fois de rayonH      // « plan large » tant qu'une déformation du terrain est active (render.md §10)
 // garde-sol : œil.y >= max(hauteur_terrain en 5 points : œil et œil ± 30 000 Q8 en x et en z) / 256 + 120
 roulis cible = clamp(-P.roulis * 0.013333, -0.5, 0.5)                              // flottant, pas des unités d'angle
 ```
@@ -537,7 +537,7 @@ Variables globales utiles : `00490010` états de touches, `004841a4` type de con
 - Lecture des types 3, 4 (calibration), 6 (Creative Blaster) : seule `joyGetPosEx` du type 5 est dans `gm_poll_events` ; `FUN_00410b74` lit les trois axes pour la calibration. Les codes `0xf0..0xf7` du type 6 restent inexpliqués.
 - Forme 3 (identique à la 0 pour le pilotage) ; déclencheurs précis des formes 2, 4, 5 (objets bonus), à croiser avec R2/R3. Noms des formes (buggy, motoneige, aéroglisseur) : déduits du comportement (eau, modèles), pas des chaînes du jeu.
 - `+0x94` (cap de tir) est tenu à jour dans `Player.fireYaw` et lu par le canon (`gm_primary_bullet_spawn`, `0046b4b4`). Les constantes de frottement des formes 4 et 5 sont à relire dans `00445a84` / `00445f44` avant portage.
-- Liste `00587704` (« plan large », +900 en hauteur), `+0x190`, `00480c80`, le sens des touches F3/F4 et la condition `profil[+0x28] > 0` : hypothèses.
+- `+0x190`, `00480c80`, le sens des touches F3/F4 et la condition `profil[+0x28] > 0` : hypothèses.
 - `FUN_00443ed0` (effets au choc) non lu ; séquence de mort `00438744` non décrite en détail (R3).
 - La cadence réelle dépend de la résolution de `msg.time` de Windows 95 ; le port devrait utiliser un pas exact de 25 ms avec la même règle de plafond (800 ms).
 - Les simulations par calcul (§3.3, §3.6) n'ont **pas** été recoupées avec une exécution du jeu d'origine : les valeurs d'équilibre sont à valider visuellement.

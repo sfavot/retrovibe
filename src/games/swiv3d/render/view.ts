@@ -76,6 +76,17 @@ export interface RenderSprite {
   size?: number;
 }
 
+/** Déformation active du terrain (nœud de la liste `00587704`, `render.md` §10), en unités monde entières (`Q8 >> 8`). */
+export interface RenderDeformer {
+  x: number;
+  y: number;
+  z: number;
+  /** Ticks restants (`+0x0c`), qui font aussi office de rayon / phase. */
+  life: number;
+  /** 0 : onde de choc, 1 : dôme, 2 : anneau lumineux. */
+  type: number;
+}
+
 export interface RenderView {
   camera: RenderCamera;
   objects: readonly RenderObject[];
@@ -89,4 +100,6 @@ export interface RenderView {
    * s'ajoute à la lumière des sommets du terrain. Absente : aucun éclair.
    */
   groundFlash?: Int32Array;
+  /** Déformations actives, dans l'ordre de la liste : appliquées aux sommets du terrain, des modèles et aux sprites. Absentes : aucune. */
+  deformers?: readonly RenderDeformer[];
 }

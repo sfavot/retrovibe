@@ -1,0 +1,84 @@
+# adresse	nom	taille	groupe	confiance	role	preuve
+00410928	gm_winmain	587	Démarrage, fenêtre et entrées	certain	WinMain : crée la fenêtre « swiv_win », charge swiv.cfg, GLOBAL.BD, SOUNDS.BD, lance gm_main_game, libère tout	Aucun appelant ; appelle 004107a4, 0046e740, 0046fa58, 004134d8, 00421614, 0046fd8c ; message « Could not create main application window... »
+004107a4	gm_create_window	388	Démarrage, fenêtre et entrées	certain	RegisterClass + CreateWindowEx de la fenêtre du jeu	Imports RegisterClassA, CreateWindowExA, LoadIconA « SWIV_ICON1 »
+00410068	gm_enter_fullscreen	408	Démarrage, fenêtre et entrées	probable	Passe en plein écran (_FullScreen32 de DLL32.DLL, ClipCursor, SetWindowPos)	Imports _FullScreen32@4, ClipCursor, SetWindowPos
+00410200	gm_leave_fullscreen	159	Démarrage, fenêtre et entrées	probable	Quitte le plein écran (_FullScreen32, ShowCursor)	Symétrique de 00410068
+004102a0	gm_wndproc	1227	Démarrage, fenêtre et entrées	probable	Procédure de fenêtre ; sur la notification MCI (wParam 1) relance la piste CD courante	Aucun appelant ; DefWindowProcA ; appelle 004115bc avec table de pistes 005bba10[0x484634]
+00410bcc	gm_poll_events	1297	Démarrage, fenêtre et entrées	probable	Pompe de messages + lecture souris/manette (joyGetPosEx), appelée dans les boucles d'attente	Imports PeekMessageA, GetMessageA, joyGetPosEx, timeGetTime
+00410010	gm_clear_keys	87	Démarrage, fenêtre et entrées	certain	Remet à zéro la table des 256 états de touches (00490010)	Boucle 0x100 × dword
+00410770	gm_delay_ms	51	Démarrage, fenêtre et entrées	certain	Attente active de EAX millisecondes (GetTickCount)	Corps trivial
+00411128	gm_load_logo_resource	87	Démarrage, fenêtre et entrées	probable	Charge la ressource Windows « MYLOGO »	FindResourceA/LoadResource, chaîne MYLOGO
+0041139c	gm_paint_logo	454	Démarrage, fenêtre et entrées	probable	WM_PAINT : affiche le logo (StretchDIBits)	Imports BeginPaint, StretchDIBits
+004122b0	gm_mixer_init	913	Audio CD (MCI) et mixeur	certain	Ouvre le mélangeur Windows (winmm mixer*) pour régler le volume	Imports mixerOpen, mixerGetLineInfoA...
+004121dc	gm_mixer_set_volume	210	Audio CD (MCI) et mixeur	probable	Applique un volume au mélangeur	mixerSetControlDetails ; appelée par le menu volume 0041a8c4
+00412644	gm_mixer_close	43	Audio CD (MCI) et mixeur	certain	Ferme le mélangeur	mixerClose
+00411570	gm_cd_open	73	Audio CD (MCI) et mixeur	certain	MCI « open cdaudio » + « set cdaudio time format tmsf »	Chaînes 004800a8/b8
+004115bc	gm_cd_play_track	205	Audio CD (MCI) et mixeur	certain	Joue la piste EAX (« play cdaudio from %d to %d notify », ou « from %d notify » si dernière piste) ; le drapeau 0x40 de GLOBAL id 2 force la piste 2	Chaînes MCI ; compare à « number of tracks »
+0041168c	gm_cd_stop	48	Audio CD (MCI) et mixeur	certain	MCI « stop cdaudio »	Chaîne 00480138
+004116bc	gm_cd_close	44	Audio CD (MCI) et mixeur	certain	MCI « close cdaudio »	Chaîne 00480148
+004134d8	gm_sounds_load	252	SOUNDS.BD et DirectSound	certain	Lit tout SOUNDS.BD en mémoire, localise le répertoire final, initialise DirectSound et construit les tampons	Chaînes « I cant open SOUNDS.bd », « Error starting direct sound » ; appelle 00412bcc, 00412c84
+00412bcc	gm_dsound_init	116	SOUNDS.BD et DirectSound	certain	DirectSoundCreate + SetCooperativeLevel	Import DirectSoundCreate
+00412c84	gm_sounds_build_buffers	447	SOUNDS.BD et DirectSound	certain	Pour chaque entrée du répertoire : id/100 = numéro de son, id%100 = nombre d'instances (tampons dupliqués) ; chaîne de structures de 0x18 octets	Division par 100 et modulo 100 de l'id ; appelle 0041364c
+0041364c	gm_dsound_create_buffer	255	SOUNDS.BD et DirectSound	certain	Crée un tampon DirectSound à partir d'un WAV (format PCM puis données)	CreateSoundBuffer (vtable +0x0c), appelle 00413ecc et 00413e1c
+00413ecc	gm_wav_parse	416	SOUNDS.BD et DirectSound	certain	Analyse un RIFF WAVE : trouve les sous-blocs « fmt » (0x20746d66) et « data » (0x61746164)	Constantes RIFF 0x46464952, WAVE 0x45564157
+00413e1c	gm_dsound_fill_buffer	174	SOUNDS.BD et DirectSound	certain	Verrouille le tampon, copie les données PCM	Lock (+0x2c), Unlock (+0x4c)
+00412b60	gm_sound_find_wav	106	SOUNDS.BD et DirectSound	certain	Retourne le WAV de SOUNDS.BD dont l'id est EAX	Balayage du répertoire (id, 12 octets)
+00412e44	gm_sound_play	128	SOUNDS.BD et DirectSound	certain	Joue le son n° EDX (= id/100) émis par l'objet EAX ; prend une instance libre	Appelée par ~15 fonctions de jeu (ex. gm_frame avec 6000/0x1771)
+00412ec4	gm_sound_loop_start	128	SOUNDS.BD et DirectSound	probable	Démarre un son en boucle (état 0x0b)	Écrit l'état 0xb dans la structure du son
+00412f44	gm_sound_loop_stop	155	SOUNDS.BD et DirectSound	probable	Arrête un son en boucle (état 0x0c)	Vtable +0x48 (Stop)
+00412fe0	gm_sound_stop_all	118	SOUNDS.BD et DirectSound	certain	Arrête tous les sons actifs	Parcours de la liste active
+00413058	gm_sounds_update_3d	971	SOUNDS.BD et DirectSound	certain	Met à jour pan et volume (SetPan +0x40, SetVolume +0x3c) des sons actifs d'après la position relative à la caméra	Calcul distance/pente puis vtable DirectSound
+004135d4	gm_sounds_release	76	SOUNDS.BD et DirectSound	probable	Libère le tampon SOUNDS.BD	Appelle free 00470381
+0046fa58	gm_global_init	819	GLOBAL.BD (chargement, chaînes)	certain	Ouvre GLOBAL.BD, lit le répertoire final, charge et relocalise les blocs (2, 100, 200, 5xx, 600, 700, 800, 1001-1005)	Chaîne « I cant open GLOBAL.bd » ; appels 0046f288 avec les ids
+0046f288	gm_global_load_block	282	GLOBAL.BD (chargement, chaînes)	certain	Charge en mémoire (malloc) le bloc d'id EAX de GLOBAL.BD ; retourne le pointeur	Recherche id dans les entrées de 12 octets (offset, taille, id) ; fseek/malloc/fread
+0046f3a4	gm_global_read_block	259	GLOBAL.BD (chargement, chaînes)	certain	Lit le bloc d'id EAX dans un tampon existant (005bc134, 0x21700 octets)	Même recherche, sans malloc
+0046f834	gm_global_reloc_strings	93	GLOBAL.BD (chargement, chaînes)	certain	Relocalise le bloc 100 : ajoute la base aux pointeurs des tables de chaînes	Boucle sur entrées (clé, ptr) jusqu'à -1
+0046f894	gm_global_reloc_objtable	94	GLOBAL.BD (chargement, chaînes)	certain	Relocalise le bloc 200 : 0x400 enregistrements de 28 octets, champs +4, +0xc, +0x14	Boucle 0x400, pas 0x1c
+0046f8f4	gm_get_string	187	GLOBAL.BD (chargement, chaînes)	certain	Chaîne du groupe EAX, n° EDX dans la langue courante (clé = langue<<16 + groupe)	Messages « Unknown Block » / « Unknown String »
+0046f9b0	gm_get_string_shared	165	GLOBAL.BD (chargement, chaînes)	certain	Idem pour les groupes communs (clé 0x630000 + groupe)	Constante 0x630000
+0046f1e8	gm_set_language	159	GLOBAL.BD (chargement, chaînes)	probable	Applique la langue : table de recodage des caractères 128-255 (005bba28) selon le chiffre de la chaîne partagée (2,0)	Boucle 0x80..0xff, (chiffre<<7)+c
+0046fd8c	gm_global_free	242	GLOBAL.BD (chargement, chaînes)	probable	Libère les blocs de GLOBAL.BD	Appelle free sur les globales
+0046f4a8	gm_screen_grab	900	GLOBAL.BD (chargement, chaînes)	probable	Sauve l'écran en BMP/TGA dans c:\swivgrab\	Chaînes c:\swivgrab\%s.bmp / .tga
+0046e740	gm_cfg_load	419	Configuration (swiv.cfg)	certain	Lit swiv.cfg (swivdemo.cfg si drapeau 1) : 300 enregistrements de 128 octets	Chaînes swiv.cfg ; boucle 300 × 0x80
+0046e8e4	gm_cfg_save	173	Configuration (swiv.cfg)	certain	Écrit swiv.cfg	fwrite 0x80 octets
+0046ea44	gm_profile_record	277	Configuration (swiv.cfg)	probable	Retourne (ou alloue) l'enregistrement de la table 005b20a0 pour la clé de 3 entiers (EAX, EDX, EBX)	300 emplacements de 32 dwords
+00453ac4	gm_slv_alloc	213	Niveaux .SLV et objets	certain	Alloue le tampon de 2 000 000 octets qui contiendra le .SLV et pose les pointeurs de fin	Constantes 2000000, 0x1e8484
+00453bbc	gm_slv_find	90	Niveaux .SLV et objets	certain	Retourne le début du bloc d'id EAX du .SLV	Balayage (offset, taille, id)
+004545a8	gm_slv_load	1797	Niveaux .SLV et objets	certain	Ouvre le .SLV, le lit en entier (refus à 2 000 000 octets), indexe les blocs 100-110, 500, 501, 11003, 11004 et lance l'initialisation	Appelée avec « %s.slv » / « demo.slv » ; boucles sur les ids 100, 102, 103, 105-110
+004543f0	gm_slv_index_models	307	Niveaux .SLV et objets	certain	Indexe les blocs 10xxx (modèles 3D) dans 005b09b0[id%1000] et relocalise leurs champs +0x18/+0x1c	id/1000 == 10
+00453ed4	gm_slv_setup_tiles	1308	Niveaux .SLV et objets	probable	Prépare les textures (blocs 12xxx, 110, 500, 11003) du .SLV	Appelle 0046f0c0, 0046ff9c ; utilise 005b1f9c, 005b1f74, 005b1f98
+00453c18	gm_slv_load_tilesets	670	Niveaux .SLV et objets	certain	Parcourt les blocs 12xxx : copie 0x8000 octets alignés et découpe l'atlas 256x256 en 4x4 tuiles de 64x64	id/1000 == 12, offsets 0x8100, (k&3)*0x40+(k>>2)*0x4000
+00454524	gm_slv_reloc_list	131	Niveaux .SLV et objets	probable	Relocalise une liste chaînée de la carte	Ajoute la base aux pointeurs
+0043e958	gm_level_spawn_objects	11436	Niveaux .SLV et objets	certain	Initialise les pools d'objets puis crée les objets décrits par le bloc 105 (enregistrements de 16 octets, type en tête, fin = -1)	Boucle sur 005b1fc8 pas 0x10 jusqu'à 0xffffffff
+004265ec	gm_object_init	533	Niveaux .SLV et objets	certain	Initialise un objet (type, x, y, z en <<8) ; le type 3 creuse un cratère	Écrit +0x1c/+0x20/+0x24 ; appelle 00424a24
+004256c0	gm_terrain_height	384	Rendu, terrain et boucle de jeu	certain	Hauteur du terrain (carte 512x512 du bloc 100) à (x, z) avec interpolation bilinéaire ; cellule = >>14, fraction = >>6 & 0xff	Masque 0x1ff, *0x200, 005b1fc4
+00425840	gm_terrain_map2_sample	372	Rendu, terrain et boucle de jeu	probable	Même interpolation sur la carte du bloc 102	Même code sur 005b1fa8
+00424a24	gm_terrain_crater	510	Rendu, terrain et boucle de jeu	probable	Abaisse la hauteur autour d'un point (cratère)	Soustractions sur 005b1fc4
+0042f64c	gm_frame	1174	Rendu, terrain et boucle de jeu	probable	Une image : met à jour les sons, rend chaque vue active (0042b31c), HUD, entrées de debug, fait avancer le jeu	Boucle sur 4 vues de 0x1a dwords à 00480e74
+0042b31c	gm_render_view	14496	Rendu, terrain et boucle de jeu	probable	Rendu d'une vue (terrain, objets, sprites)	14 Ko ; appelle gm_render_terrain, gm_terrain_height
+0042718c	gm_render_terrain	10909	Rendu, terrain et boucle de jeu	hypothèse	Parcourt les cellules voisines (grille 7x7 de 64x64) et projette terrain/objets	Lit 005b1fc4 ; grille 0x3f
+0042ec80	gm_draw_hud	2506	Rendu, terrain et boucle de jeu	certain	Affiche le HUD d'un joueur (score « %07d », « %s %2d »)	Chaînes 004803f8, 00480400
+004362b8	gm_draw_overlay_sw	2372	Rendu, terrain et boucle de jeu	probable	Superposition logicielle (HUD/radar) avec les sprites 510-512	Lit 005bc178/70/74
+004229c8	gm_draw_text	519	Texte et sprites	certain	Dessine une chaîne (alignement 0 centré, 1 gauche, 2 droite ; largeur max 0x118) avec la police 507 et les largeurs 508	Utilise 005bc14c, 005bc164
+00422bdc	gm_draw_string_a	308	Texte et sprites	probable	Variante de dessin de chaîne (glyphes RLE via 0041508b)	Appelle 0041508b
+00422d10	gm_draw_string_b	308	Texte et sprites	probable	Variante de dessin de chaîne (glyphes via 00415126)	Même structure
+00422e44	gm_text_width	102	Texte et sprites	certain	Largeur en pixels d'une chaîne (somme des largeurs du bloc 508)	Boucle sur les octets
+0041508b	gm_blit_rle_glyph_a	155	Texte et sprites	certain	Sprite RLE à 4 plans (mode X, ports 3c4h) : table d'offsets, opcodes 0x80+ (saut), 0xff (fin de plan), n<<4|teinte (fondu par table de 64 Ko 005bc180)	Désassemblage : OUT 3C4h, LODSB, test 0x80/0xff
+0046edb8	gm_play_smacker	766	Smacker et fichiers .scr	certain	Joue un .SMK (SmackOpen, boucle SmackWait/DoFrame/NextFrame) ; pour BR_TERn charge le .scr	Chaînes « .smk », « BR_TER » ; imports Smack*
+0046ec40	gm_load_scr	373	Smacker et fichiers .scr	certain	Lit le .scr de la vidéo : fscanf « %d %d %d %d %d %d %s %s »	Chaîne 00480460
+00437e1c	gm_draw_scr_overlay	143	Smacker et fichiers .scr	certain	Affiche les lignes .scr valides pour l'image courante (première <= n <= dernière)	Compare à champs +0xc/+0x10
+00437d68	gm_draw_label	177	Smacker et fichiers .scr	probable	Dessine un texte de .scr (style b/g)	Choisit 00422bdc ou 00422d10
+00421614	gm_main_game	4854	Menus et écrans	certain	Boucle principale des menus et du jeu : démos, intros (intro1/intro2/iplay), niveaux	Chaînes « demo.slv », « %s.slv », intro1, intro2, iplay
+00421100	gm_start_level	1249	Menus et écrans	probable	Lance un niveau (solo ou réseau « netlevNN »)	Chaînes netlev01-12, %s.slv ; appelle 004545a8
+0041d714	gm_menu_main	1741	Menus et écrans	probable	Menu principal (groupe de chaînes 1)	Chargements du groupe 1
+0041b03c	gm_menu_setup	2778	Menus et écrans	probable	Menu Setup (groupe 2)	Chargements du groupe 2
+0041a8c4	gm_menu_volume	1912	Menus et écrans	probable	Menu volumes (groupe 8)	Groupe 8
+0041a560	gm_menu_music	868	Menus et écrans	certain	Menu préférence musicale (groupe 9) : fixe 00484634 et lance la piste	Groupe 9 ; appelle 004115bc
+00417ffc	gm_menu_gamma	1109	Menus et écrans	probable	Réglage gamma (groupe 6)	Groupe 6
+004194b0	gm_screen_level_complete	1904	Menus et écrans	probable	Fin de niveau / scores (groupe 7)	Groupe 7
+00419058	gm_screen_pause	337	Menus et écrans	probable	Écran de pause (groupe 4)	Groupe 4
+0041f8e8	gm_menu_abort	822	Menus et écrans	probable	Confirmation d'abandon (groupe 13)	Groupe 13
+0041dde4	gm_menu_retry	2093	Menus et écrans	probable	Choix de mission à rejouer (groupe 11)	Groupe 11
+0041ff94	gm_menu_multiplayer	733	Menus et écrans	probable	Menu multijoueur (groupe 5)	Groupe 5
+0041bb40	gm_menu_pickups	2793	Menus et écrans	probable	Menu des bonus / triche (groupe 100)	40 lectures du groupe 100
+0041f4d0	gm_menu_screengrab	935	Menus et écrans	probable	Menu capture d'écran (groupe 12)	Groupe 12 ; appelle 0041ee30

@@ -1,0 +1,27 @@
+/* SWIV 3D : écran 320×400 (mode X, pixels non carrés) affiché en 4:3, pixels nets. */
+
+.sw3-canvas {
+  image-rendering: pixelated;
+  background: #000;
+}
+
+.sw3-pause {
+  z-index: 3;
+}
+
+.sw3-pause-hint {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+/* Mesures de la page de dev : en surimpression, hors des colonnes de la disposition tactile. */
+.sw3-stats {
+  position: fixed;
+  top: 4px;
+  left: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}

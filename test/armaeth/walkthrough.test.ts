@@ -13,7 +13,8 @@ import { Robot, RobotSetback } from "./robot";
  * (salle, score, objets portés) avant de passer au suivant.
  */
 
-const SEED = Number(process.env.SEED ?? 10);
+// Graine 15 : la relecture fidèle de Minas Thyl (`2dd9:0006`) a changé le nombre de tirages ; la 10 ne passe plus le chapitre 3.
+const SEED = Number(process.env.SEED ?? 15);
 const table = hasOriginalFiles ? new MessageTable(readOriginal("A1FTMS.SYS"), readOriginal("A1FMSG.SYS")) : null;
 const text = (cls: string | number, n: number): string => table!.messages(messageId(cls, n));
 

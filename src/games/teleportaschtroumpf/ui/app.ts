@@ -37,6 +37,7 @@ export const copy = {
   controlsTitle: "Contrôles",
   controls: [
     "Flèches : se déplacer et choisir.",
+    "Flèche du haut : sauter, sur le plateau.",
     "Espace ou clic gauche : valider.",
     "Entrée ou clic droit : voix d'aide du Grand Schtroumpf.",
     "Échap : passer une séquence.",

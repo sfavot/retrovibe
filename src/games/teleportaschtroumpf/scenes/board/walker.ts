@@ -34,7 +34,7 @@ const JUMP_SOUND_FRAME = 2;
 export interface WalkerInput {
   left: boolean;
   right: boolean;
-  /** « Haut » tenu : avec une direction, c'est un saut. */
+  /** « Haut » tenu : un saut, vers la direction tenue ou, sans direction, du côté où regarde le pion. */
   up: boolean;
   /** Le bouton a été pressé à cette image : le pion s'arrête. */
   press: boolean;
@@ -54,7 +54,8 @@ export interface WalkerStep {
  * Machine à états du Schtroumpf (`2bd4:02bd` + `2bd4:0093`), appelée une fois par image du plateau (4 ticks) :
  *
  * - gauche / droite tenus : marche à 4 px par image ; passé 5 s de marche continue dans le même sens, course à 8 px ;
- * - haut + direction : saut de 10 images (pas d'entrée pendant ce temps), puis déplacement de 68 px à la dernière ;
+ * - haut (+ direction) : saut de 10 images (pas d'entrée pendant ce temps), puis déplacement de 68 px à la dernière ; sans
+ *   direction, l'original ne saute pas, le port saute du côté où regarde le pion ;
  * - immobile : pose d'attente, puis impatience au bout de 8 s ;
  * - le bouton arrête la marche. Le chrono de pose (`slot 6`) repart à chaque changement de pose, sauf marche → course et
  *   attente → impatience.
@@ -141,9 +142,9 @@ export class Walker {
     }
 
     if (!this.busy) {
-      const jumping = input.up && (input.right || input.left);
-      if (jumping && !input.press) {
-        const dir = input.right ? 1 : -1;
+      if (input.up && !input.press) {
+        // Écart : l'original ne saute qu'avec une direction ; « haut » seul saute ici du côté où regarde le pion.
+        const dir = input.right ? 1 : input.left ? -1 : this.facingRight ? 1 : -1;
         this.jumpDir = dir;
         this.setPose(dir === 1 ? POSE_JUMP_RIGHT : POSE_JUMP_LEFT, nowTicks, true);
       } else if (input.press) {

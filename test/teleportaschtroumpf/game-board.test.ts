@@ -133,10 +133,17 @@ describe("Walker : marche, course, saut, attente (2bd4:02bd, 2bd4:0093)", () => 
     expect(walker.pose).not.toBe(POSE_JUMP_RIGHT);
   });
 
-  it("« haut » seul ne fait rien", () => {
-    const { walker, frames } = rig();
-    expect(frames(5, { up: true }).every((s) => !s.walk && !s.jump)).toBe(true);
-    expect(walker.pose).toBe(POSE_IDLE_RIGHT);
+  it("« haut » seul saute du côté où regarde le pion (écart : l'original ne saute qu'avec une direction)", () => {
+    const { walker, frames, step } = rig();
+    step({ up: true });
+    expect(walker.pose).toBe(POSE_JUMP_RIGHT);
+    frames(9);
+    expect(step().jump).toBe(1);
+    frames(2, { left: true });
+    step({ up: true });
+    expect(walker.pose).toBe(POSE_JUMP_LEFT);
+    frames(9);
+    expect(step().jump).toBe(-1);
   });
 
   it("le bruitage du saut ne part qu'à partir du deuxième saut (DS:8FFE nul au démarrage), à la 2e image", () => {

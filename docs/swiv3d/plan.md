@@ -5,7 +5,8 @@ Brief commun des sous-agents. Références : `re-index.md` (fonctions nommées),
 ## Avancement
 
 - Phase 1 faite (commits `96ac665`, `f10ef04`) : extraction, corpus Ghidra de `SWIV_WIN.EXE`, lecteurs de toutes les données, décodeur Smacker partagé, visionneuse.
-- Phase 2 : vagues ci-dessous. R1-R5, S1-S2 faites (`player.md`, `objects.md`, `rules.md`, `render.md`, `screens.md` ; `src/ui/held-input.ts`, `src/ui/touch-controls.ts`), noms Ghidra fusionnés (338 fonctions nommées) et formats corrigés. Prochaine vague : G1-G3.
+- Phase 2 : vagues ci-dessous. R1-R5, S1-S2 faites (`player.md`, `objects.md`, `rules.md`, `render.md`, `screens.md` ; `src/ui/held-input.ts`, `src/ui/touch-controls.ts`), noms Ghidra fusionnés (338 fonctions nommées) et formats corrigés. Vague G faite : monde (`engine/`), rendu (`render/`), son (`audio/`) et première boucle jouable `ui/dev.html` (vol libre dans un niveau). Prochaine vague : H1-H3.
+- À revoir : l'altitude de l'hélicoptère oscille fortement en vol vers l'avant (130 à 440 unités au-dessus du sol) ; les formes véhicule 1-5 sont reconstituées, pas portées (`00443510`, `00445a84` à lire).
 - Rendu établi par R4 : mode X 320×400 8 bits, pixels non carrés (affichage 4:3), terrain en bandes verticales (pas de triangles), palette SLV 11003 et tables de lumière 128×256 des blocs 12xxx. Tick logique 40 Hz (R1).
 
 ## Décisions

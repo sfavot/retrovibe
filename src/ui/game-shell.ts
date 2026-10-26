@@ -38,6 +38,12 @@ export interface GameShellOptions {
    * `css` : la taille vient de la feuille de style du jeu (Lost in Time, 4:3 fluide) ; le shell n'y touche pas.
    */
   fit?: "integer" | "fractional" | "css";
+  /**
+   * Taille du tampon de dessin quand elle diffère du cadre logique (pixels non carrés : un tampon 320×400 affiché en 4:3 avec
+   * `logicalWidth` × `logicalHeight` = 320×240). Sans valeur, le tampon a la taille du cadre logique. Le cadre sert à l'échelle ; le jeu
+   * convertit le pointeur avec la taille du tampon (`toLogical` reçoit le rectangle affiché, donc l'affichage n'a rien à corriger).
+   */
+  buffer?: { width: number; height: number };
   copy: GameShellCopy;
   /** Libellé du lien de retour à l'accueil ; sans valeur, pas de lien (page de dev). */
   backLabel?: string;
@@ -225,8 +231,8 @@ export function mountGameShell(options: GameShellOptions): GameShell {
   const untrackLayout = trackTouchLayout(main);
   const canvas = h("canvas", {
     class: join("game-shell-canvas", classes.canvas),
-    width: logicalWidth,
-    height: logicalHeight,
+    width: options.buffer?.width ?? logicalWidth,
+    height: options.buffer?.height ?? logicalHeight,
     tabindex: 0,
     "aria-label": copy.canvasLabel,
   });

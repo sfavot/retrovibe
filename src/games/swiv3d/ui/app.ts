@@ -48,7 +48,7 @@ export interface AppOptions {
 const GAME_ID = "swiv3d";
 /**
  * Le tampon fait 320×400 (mode X double ligne) mais s'affiche en 4:3 (pixels non carrés) : le shell dimensionne le canvas d'après
- * un cadre logique 320×240, la hauteur du tampon est posée ensuite.
+ * un cadre logique 320×240 (`buffer` donne la taille réelle du tampon).
  */
 const DISPLAY_HEIGHT = 240;
 const BLACK_PALETTE = new Uint32Array(256).fill(0xff000000);
@@ -91,12 +91,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     container,
     logicalWidth: SCREEN_WIDTH,
     logicalHeight: DISPLAY_HEIGHT,
+    buffer: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
     copy,
     backLabel: options.backLabel,
     classes: { root: "sw3", stage: "sw3-stage", canvas: "sw3-canvas" },
     stageChildren: [touch.element, pauseOverlay, startOverlay],
   });
-  shell.canvas.height = SCREEN_HEIGHT;
   const store = localStorageStore();
   const pilotStore = new PilotStore(prefixedStorage(store, `${GAME_ID}:`));
 

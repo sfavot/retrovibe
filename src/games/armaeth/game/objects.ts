@@ -485,12 +485,12 @@ export const prytwen: ObjectHandler = (ctx) => {
 
 // --- 103 · la grille du cachot ---------------------------------------------------------------------------------------------------
 
-const GRATE = { closed: 0, opening: 1, closing: 2, open: 3 } as const;
+export const GRATE = { closed: 0, opening: 1, closing: 2, open: 3 } as const;
 /** Position du trousseau accroché au clou (`1a37:0002`, objects.md § 4.10). */
 const KEYRING_POSITION = { x: 58, y: 49, p: 8 } as const;
 
 /** `2846:0398(grille, cause, piège)` : la grille se met en mouvement (`opening` : 1 ouverture / 2 fermeture). */
-export function startGrate(ctx: HandlerContext, grate: GameObject, opening: boolean, trap = false): void {
+export function startGrate(ctx: BehaviorContext, grate: GameObject, opening: boolean, trap = false): void {
   setState(ctx, grate, { gst: 7, mob: 1, ego: opening ? GRATE.opening : GRATE.closing });
   ctx.sound.effect("B", 102, 0);
   setWord(grate, 0x36, 9); // `Bag`
@@ -578,7 +578,13 @@ export function setDoor(ctx: BehaviorContext, leaf: GameObject, ego: number): vo
   setState(ctx, leaf, { ego, fig: 2 * side + (open ? 1 : 0) });
 }
 
-/** `20b5:000e`. */
+/**
+ * `20b5:000e` (relu dans le désassemblage). Contrôle de la clé (`20b5:018c`) : `4dca` (le candidat indirect est dans l'inventaire) nul,
+ * c'est-à-dire pas d'objet indirect résolu (itération « vide » d'un autre sens du mot `clef`) ou objet hors des poches : `V013`
+ * priorité 3 ; sinon une clé autre que celle de la table donne `V082` si `217d:0002` la reconnaît comme clé, `V014` sinon, priorité 3.
+ * Relevé sous DOSBox-X (`docs/armaeth/dosbox.md` § 4.2) : « ouvrir la porte avec la clef » avec la clef d'or en poche affiche `V082`
+ * puis `V013` (les autres sens de `clef`, sans objet dans la salle, déposent `V013`), jamais `V014`.
+ */
 export const lockedDoor: ObjectHandler = (ctx) => {
   const leaf = direct(ctx);
   if (ctx.verb !== VERB.open && ctx.verb !== VERB.close) return 0;
@@ -589,8 +595,7 @@ export const lockedDoor: ObjectHandler = (ctx) => {
   /** Vrai si la clé tenue est la bonne ; sinon le refus est en file. */
   const rightKey = (): boolean => {
     const tool = ctx.indirect.object;
-    if (!tool) return deny(ctx, 1, 14); // hypothèse (objects.md §4.13) : clé absente, priorité 1
-    if (!ctx.indirect.held) return deny(ctx, 3, 13);
+    if (!tool || !ctx.indirect.held) return deny(ctx, 3, 13);
     if (tool.num === row.key) return true;
     return deny(ctx, 3, isKey(tool.num) ? 82 : 14);
   };
@@ -612,8 +617,8 @@ export const lockedDoor: ObjectHandler = (ctx) => {
   }
   if (leaf.ego === DOOR.locked) return refuse(ctx, 4, 84);
   if (leaf.ego === DOOR.closed) return ctx.preposition === 0 ? refuse(ctx, 3, 91) : lockWithKey();
-  // hypothèse (objects.md §4.13) : la clé est contrôlée avant de refermer, pour qu'un refus ne laisse pas la porte à demi faite
-  if (ctx.preposition === PREP.with && !rightKey()) return 0;
+  // porte ouverte : le battant est refermé AVANT le contrôle de la clé (`20b5:01b8` : `20b5:0248(Num, 1)`, puis `01ce`) ; une mauvaise
+  // clé laisse donc la porte refermée (non verrouillée) et affiche le refus
   setDoor(ctx, leaf, DOOR.closed);
   if (ctx.preposition === PREP.with) return lockWithKey();
   sayDone(ctx);

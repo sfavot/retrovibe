@@ -105,6 +105,7 @@ export const NUM = {
   keyring: 108,
   bronzeKey: 109,
   treasureChest: 110,
+  skeleton: 112,
   dwarfMiner: 201,
   dwarfMiner2: 202,
   dwarfWarrior: 203,
@@ -143,6 +144,10 @@ export const ROOM = {
   minasLair: 301,
   sarhulHall: 309,
   throne: 108,
+  /** Salle de la stèle vue de l'intérieur du château (`2500:0008`). */
+  castleGate: 101,
+  /** Salle extérieure de la stèle (`2500:0008`). */
+  steleOutside: 5,
 } as const;
 
 /** Décalages de l'enregistrement que `characters.md` nomme sans champ dans `GameObject`. */
@@ -693,6 +698,94 @@ export function reachableNum(ctx: BehaviorContext, num: number): GameObject | un
   const hero = ctx.hero;
   if (!hero) return undefined;
   return (hero.room?.listA ?? []).find((o) => o.num === num && o !== hero && inReachOf(o, hero));
+}
+
+// --- passages secrets (`2500:0008`, `27ed:000a`, `29fd:0000`) ---------------------------------------------------------------
+
+/** Passage de la stèle (salle 5 / 101), de la dalle du trône (108 / 202) ou de la herse de granite (202 / 305). */
+export type PassageKind = "stele" | "slab" | "portcullis";
+
+/** Une étape de la fin de mouvement d'un passage, dans l'ordre où l'original l'exécute. */
+export type PassageStep =
+  | { kind: "say"; cls: "V" | "G" | "S"; number: number }
+  /** `14cf:000c(0x29)` : l'écran du score et du verdict, en-tête `S41` (« un des secrets majeurs »). */
+  | { kind: "verdict"; header: number }
+  /** `gm_cm_script_step(6)` : le script `CM3` (écran noir, `fin`, `sys 8`) clôt l'épisode. */
+  | { kind: "episodeEnd" };
+
+export interface PassageInput {
+  /** Salle chargée (`4b84`). */
+  roomId: number;
+  /** `DGROUP:4b4e` : chapitre * 100 + niveau (jeton `niv a0 a1`, `3` dans `CFG`). */
+  chapterLevel: number;
+  /** Le passage vient de s'ouvrir (`SI != 0` : états 3 ou 4) ; faux : il vient de se refermer. */
+  opened: boolean;
+  /** Le drapeau du passage (`4b68`, `4b69` ou `4b6a`) est déjà posé. */
+  discovered: boolean;
+}
+
+/**
+ * Ce que l'original affiche à la fin du mouvement d'un passage, relu dans les trois procédures (`2500:00b3..0156`, `27ed:00cd..017e`,
+ * `29fd:00b6..0164`, mêmes tests dans les trois) :
+ * - **message d'état** dans la salle voisine du mécanisme : `V72` / `V73` (la stèle est ouverte / fermée) salle 101 ; `G113` / `G114`
+ *   (dalle, salle 108), `G115` / `G116` (dalle, salle 202), `G224` / `G225` (herse, 202), `G226` / `G227` (herse, 305). Certaines salles
+ *   sont « de l'autre côté » (`local` : 101, 202 pour la dalle, 305 pour la herse) ;
+ * - **découverte** : si le niveau de jeu (`4b4e % 100`) est sous le seuil du passage (stèle : `4b4e == 0` ; dalle : 2 ; herse : 3) et
+ *   qu'on n'est pas du côté `local`, l'ouverture annonce le passage (`S71`, `S73`, `S75`) puis `S70` (« ces aventures appartiennent à
+ *   d'autres épisodes ») et lance `CM3` ; la fermeture affiche le verdict (`S41`) si le passage n'a pas déjà été découvert ;
+ * - sinon, du côté `local` et au chapitre du passage (stèle : chapitre >= 1 ; dalle : 2 ; herse : 3), l'ouverture annonce `S72`, `S74` ou
+ *   `S76` puis `S70` et `CM3`.
+ * Avec le monde de `CFG` (`niv 0 3`, `4b4e = 3`) seuls les messages d'état s'affichent : ni verdict ni fin d'épisode.
+ */
+export function passageSteps(kind: PassageKind, input: PassageInput): PassageStep[] {
+  const { roomId, chapterLevel, opened, discovered } = input;
+  const steps: PassageStep[] = [];
+  const level = chapterLevel % 100;
+  const chapter = Math.trunc(chapterLevel / 100);
+  const say = (cls: "V" | "G" | "S", number: number) => steps.push({ kind: "say", cls, number });
+  const announce = (number: number) => {
+    say("S", number);
+    say("S", 70);
+    steps.push({ kind: "episodeEnd" });
+  };
+  const verdict = () => {
+    if (!discovered) steps.push({ kind: "verdict", header: 41 });
+  };
+  if (kind === "stele") {
+    const local = roomId === ROOM.castleGate;
+    if (local) say("V", opened ? 72 : 73);
+    if (chapterLevel === 0 && !local) {
+      if (opened) announce(71);
+      else verdict();
+    } else if (chapter > 0 && local && opened) announce(72);
+    return steps;
+  }
+  const slab = kind === "slab";
+  // (salle, ouvert, fermé, côté « local ») des messages d'état
+  const states: readonly (readonly [number, number, number, boolean])[] = slab
+    ? [[ROOM.throne, 113, 114, false], [ROOM.gate202, 115, 116, true]]
+    : [[ROOM.gate202, 224, 225, false], [ROOM.soldiers, 226, 227, true]];
+  const state = states.find(([room]) => room === roomId);
+  const local = state?.[3] ?? false;
+  if (state) say("G", opened ? state[1] : state[2]);
+  const threshold = slab ? 2 : 3;
+  if (level < threshold && !local) {
+    if (opened) announce(slab ? 73 : 75);
+    else verdict();
+  } else if (chapter === threshold && local && opened) announce(slab ? 74 : 76);
+  return steps;
+}
+
+/**
+ * Exécute les étapes d'un passage : messages (fenêtres qui attendent un clic), verdict et `CM3`. `CM3` est lancé par le moteur
+ * (`ctx.runEpisodeEnd()`) une fois les fenêtres lues ; avec le monde de `CFG` l'étape n'existe pas (`passageSteps`).
+ */
+export function runPassageSteps(ctx: BehaviorContext, steps: readonly PassageStep[]): void {
+  for (const step of steps) {
+    if (step.kind === "say") ctx.messages.say(step.cls, step.number);
+    else if (step.kind === "verdict") ctx.score.verdict(step.header);
+    else ctx.runEpisodeEnd();
+  }
 }
 
 // --- déplacements des personnages ------------------------------------------------------------------------------------------

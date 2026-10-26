@@ -11,7 +11,7 @@
 #
 # Usage
 #   scripts/armaeth/dosbox/run.sh [-s scénario] [-d secondes] [-c cycles] [-o dossier] [-p "t1 t2 …"] [-f fps]
-#                                 [-r échelle] [-t essais] [-n] [-k] [-i fichier]…
+#                                 [-r échelle] [-t essais] [-n] [-k] [-x] [-i fichier]…
 #     -s  scénario de touches (format ci-dessous) ; l'introduction est passée automatiquement (sauf avec -n)
 #     -d  durée émulée, en s (défaut 90) ; la session s'arrête à ce moment (ou à la sortie du jeu)
 #     -c  cycles CPU fixes (défaut 25000, voir dosbox.conf)
@@ -21,6 +21,8 @@
 #     -t  nombre d'essais si une attente du scénario (@expect) n'est pas vérifiée (défaut 4, voir « Fiabilité »)
 #     -n  ne passe pas l'introduction (écran titre et récit, ~42 s)
 #     -k  garde le dossier de travail précédent (sauvegardes du jeu, A1FTMP.SVG…) au lieu de le recopier du CD
+#     -x  n'impose pas les deux attentes de l'introduction (S13 / S14) : sur certaines machines elles tombent quelques
+#         centaines de ms hors des fenêtres prévues, l'essai échoue alors à chaque fois (la session est déterministe)
 #     -i  fichier copié dans ARMAETH.FRE avant le lancement (par exemple une sauvegarde SVG00n.STD) ; répétable
 #   Données : archives/armaeth/cd/ARMAETH.FRE (extraction : scripts/armaeth-extract.sh). Jamais modifiées :
 #   le jeu travaille sur une copie ($DX_WORK/c/ARMAETH.FRE).
@@ -64,9 +66,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
 SRC="$ROOT/archives/armaeth/cd/ARMAETH.FRE"
 DX_WORK="${DX_WORK:-${TMPDIR:-/tmp}/armaeth-dosbox}"
-SCENARIO="" SKIP_INTRO=1 DURATION=90 CYCLES=25000 OUT="" SHOTS="" FPS="" SCALE=0.5 KEEP=0 TRIES=4 EXTRA=()
+SCENARIO="" INTRO_EXPECT=1 SKIP_INTRO=1 DURATION=90 CYCLES=25000 OUT="" SHOTS="" FPS="" SCALE=0.5 KEEP=0 TRIES=4 EXTRA=()
 
-while getopts "s:d:c:o:p:f:r:t:kni:" opt; do
+while getopts "s:d:c:o:p:f:r:t:knxi:" opt; do
   case $opt in
     s) SCENARIO="$OPTARG" ;;
     d) DURATION="$OPTARG" ;;
@@ -78,6 +80,7 @@ while getopts "s:d:c:o:p:f:r:t:kni:" opt; do
     t) TRIES="$OPTARG" ;;
     k) KEEP=1 ;;
     n) SKIP_INTRO=0 ;;
+    x) INTRO_EXPECT=0 ;;
     i) EXTRA+=("$OPTARG") ;;
     *) sed -n '2,60p' "$0"; exit 2 ;;
   esac
@@ -112,7 +115,7 @@ if [ "$SKIP_INTRO" = 1 ]; then
   for k in $(seq 0 13); do echo "$(python3 -c "print(11.5 + 1.6 * $k)") enter" >> "$FULL_SCENARIO"; done
   printf '38.4 enter\n40 enter\n41.6 enter\n43.2 enter\n' >> "$FULL_SCENARIO"
   # S14 apparaît (~39,1 s) puis se ferme (~41,1 s) : deux changements d'écran importants, sinon les touches se perdent
-  printf '38.8 39.7 20000\n40.6 41.9 20000\n' >> "$EXPECTS"
+  [ "$INTRO_EXPECT" = 1 ] && printf '38.8 39.7 20000\n40.6 41.9 20000\n' >> "$EXPECTS"
 fi
 if [ -n "$SCENARIO" ]; then
   grep -v '^[[:space:]]*@expect' "$SCENARIO" >> "$FULL_SCENARIO" || true

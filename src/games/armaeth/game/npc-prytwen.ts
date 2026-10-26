@@ -2,12 +2,13 @@ import { EventOp } from "../engine/events";
 import type { BehaviorContext, BehaviorHandler, EventHandler, HandlerRegistry } from "../engine/handlers";
 import { FAMILY } from "../engine/handlers";
 import type { GameObject } from "../engine/state";
-import { flag, NUM, OFF, ROOM, setFlag, word } from "./helpers";
+import { destroy, flag, NUM, OFF, ROOM, setFlag, spawnLike, word } from "./helpers";
 import { type NpcKit, RESTART, UPDATE_OK } from "./npc-kit";
+import { GRATE, startGrate } from "./objects";
 
 /**
  * Prytwen le malfaisant (`Num 101`, `28b1:*`, `characters.md` § 7.2) : décision (voleur), ultimatum, duel et sa table de résolution,
- * événements différés 6 (réveil), 7 (retour au trésor) et 14 (fin de l'ultimatum).
+ * événements différés 6 (réveil), 7 (mort de faim dans la salle au trésor fermée) et 14 (fin de l'ultimatum).
  */
 
 const ANM_DUEL = 13;
@@ -17,11 +18,15 @@ const ANM_DUEL_OTHER = 15;
 const ANM_GONE = 16;
 const ANM_DEVOURED = 41;
 
-/** Événements (`objects.md` § 8) : 6 réveil après KO, 7 retour en salle 110, 14 fin de l'ultimatum ; procédure 101. */
-export const PRYTWEN_EVENT = { wake: 6, home: 7, ultimatum: 14 } as const;
+/** Événements (`objects.md` § 8) : 6 réveil après KO, 7 mort de faim derrière la grille fermée de la salle 110, 14 fin de l'ultimatum ; procédure 101. */
+export const PRYTWEN_EVENT = { wake: 6, starve: 7, ultimatum: 14 } as const;
 const KO_TICKS = 3000;
-const HOME_TICKS = 10000;
+/** Délai de l'événement 7 : Prytwen enfermé dans la salle 110 meurt de faim 10 000 tics plus tard (`28b1:0578`), 1 000 si le héros y est (`28b1:1384`). */
+const STARVE_TICKS = 10000;
+const STARVE_RETRY_TICKS = 1000;
 const ULTIMATUM_TICKS = 20;
+/** `Sol` de la salle au trésor, derrière la grille (`28b1:0557`). */
+const GROUND_BEHIND_GRILLE = 0x45;
 
 const target = (o: GameObject) => ({ typ: o.typ, num: o.num, serial: o.serial });
 
@@ -174,19 +179,16 @@ export function prytwen(kit: NpcKit): BehaviorHandler {
       case 5:
         return endTic(obj);
       case 3: {
-        // mort : hors de la salle chargée il disparaît (lacune : objet de remplacement en salle 110, `1a6b:0006` non relevé)
-        // lacune (characters.md § 7.2) : l'objet de remplacement créé dans la salle 110 n'est pas identifié
-        if (!kit.inLoadedRoom(ctx, obj) && obj.room?.id !== ROOM.treasury) {
-          kit.destroy(ctx, obj, true);
-          return RESTART;
-        }
-        return endTic(obj);
+        // mort (`28b1:0314`) : dans la salle chargée il reste inerte ; ailleurs, dans la salle 110 (ou le coffre `110`), un squelette
+        // (`Num 112`) le remplace (`1a6b:0006`) ; partout ailleurs il est détruit (`19a6:01a5`)
+        if (kit.inLoadedRoom(ctx, obj)) return endTic(obj);
+        const place = obj.holder ?? obj.room;
+        if ((obj.holder ? obj.holder.num : obj.room?.id) === ROOM.treasury && place) entomb(ctx, obj);
+        else kit.destroy(ctx, obj, true);
+        return RESTART;
       }
       case 4:
-        if (kit.leaveRoom(ctx, obj, -1, true)) {
-          armPrytwenHome(ctx, obj);
-          return endTic(obj);
-        }
+        if (kit.leaveRoom(ctx, obj, -1, true)) return endTic(obj);
         obj.path.defined = false;
         kit.wander(ctx, obj);
         return endTic(obj);
@@ -250,9 +252,20 @@ function decide(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): number {
       case NUM.treasureChest:
         if (treasures > 0 && kit.approach(ctx, obj, o)) return endTic(obj);
         break;
-      case NUM.grille:
-        // lacune (characters.md § 7.2) : la comptabilité de la grille 103 (`2846:04d6`, `Sol 0x45`, événement) n'est pas relevée
+      case NUM.grille: {
+        // la grille de la salle 110 (`28b1:050a..0588`) : hors de la salle chargée, Prytwen se case derrière la grille fermée (`Sol 0x45`)
+        // ou, grille ouverte, la referme une fois sur 20 ; enfermé, il meurt de faim (événement 7) et le héros gagne `(1, 2)`
+        const open = o.ego === GRATE.open; // `2846:04d6`
+        if (!kit.inLoadedRoom(ctx, obj)) {
+          if (!open) obj.ground = GROUND_BEHIND_GRILLE;
+          else if (kit.chance(ctx, 20)) startGrate(ctx, o, false);
+        }
+        if (obj.ground === GROUND_BEHIND_GRILLE && !open) {
+          armStarvation(ctx, obj);
+          ctx.score.award(1, 2);
+        }
         break;
+      }
       default:
         if ((o.value >= 10 || o.num === NUM.bronzeKey) && kit.fetch(ctx, obj, o)) return endTic(obj);
     }
@@ -314,22 +327,39 @@ export function prytwenEvent(kit: NpcKit): EventHandler {
       ctx.motion.reset(obj);
       return;
     }
-    if (entry.event === PRYTWEN_EVENT.home) {
-      // retour dans la salle 110 en (X 0x2C, P 0x2F), si le héros n'y est pas
-      const home = ctx.state.roomById(ROOM.treasury);
-      if (!home || ctx.room === home) return;
-      ctx.state.moveToRoom(obj, home);
-      obj.presence = 1;
+    if (entry.event === PRYTWEN_EVENT.starve) {
+      // `28b1:1308` : seulement dans la salle 110, grille fermée ; le héros dans la salle : nouvel essai dans 1 000 tics, sinon Prytwen,
+      // mis en (X 0x2C, P 0x2F), est remplacé par un squelette (contenu laissé sur place)
+      const place = obj.holder ?? obj.room;
+      if ((obj.holder ? obj.holder.num : obj.room?.id) !== ROOM.treasury || !place) return;
+      if (ctx.state.findByNum(NUM.grille)?.ego === GRATE.open) return;
+      if (ctx.room && obj.room === ctx.room) {
+        ctx.events.operate(target(obj), PRYTWEN_EVENT.starve, EventOp.Set, STARVE_RETRY_TICKS, NUM.prytwen);
+        return;
+      }
       obj.x = 0x2c;
       obj.p = 0x2f;
-      kit.setState(ctx, obj, { gst: 7, mob: 2, ego: 0, fig: 0 });
+      entomb(ctx, obj);
     }
   };
 }
 
-/** Programme le retour au trésor (10 000 tics) quand Prytwen s'enfuit (`28b1:0578`). */
-export function armPrytwenHome(ctx: BehaviorContext, obj: GameObject): void {
-  ctx.events.operate(target(obj), PRYTWEN_EVENT.home, EventOp.Set, HOME_TICKS, NUM.prytwen);
+/**
+ * `1a6b:0006(Prytwen, Num 112)` avec le « lieu » en destination (`param_4 = 7`) : un squelette (`Typ 2`, poids 50, tous les autres champs à
+ * zéro) prend sa place et sa position (`+0x52..+0x5F`), son contenu est déposé dans le lieu (`19dc:04f1`), puis il est détruit.
+ */
+function entomb(ctx: BehaviorContext, prytwen: GameObject): void {
+  const skeleton = spawnLike(ctx, prytwen, NUM.skeleton, { gst: 0, mob: 0, dep: 0, txt: 0, ego: 0, fig: 0, weight: 50, capacity: 0, value: 0, light: 0, pickable: 0, canContain: 0 });
+  destroy(ctx, prytwen, true);
+  ctx.refreshObject(skeleton);
+}
+
+/**
+ * `23a2:0002(obj, 7, 0, 10000)` (`28b1:0578`) : opération 0 = lire ou créer ; l'événement 7 est créé avec le compteur passé s'il n'existe
+ * pas, un compteur déjà lancé n'est pas touché.
+ */
+export function armStarvation(ctx: BehaviorContext, obj: GameObject): void {
+  ctx.events.operate(target(obj), PRYTWEN_EVENT.starve, EventOp.Get, STARVE_TICKS, NUM.prytwen);
 }
 
 export function registerPrytwen(registry: HandlerRegistry, kit: NpcKit): void {

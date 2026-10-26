@@ -110,14 +110,35 @@ describe.skipIf(!hasOriginalFiles)("événements différés : jeu complet", () =
     expect(state.findByNum(15)).toBeDefined();
   });
 
-  it("le retour de Prytwen (101, événement 7) le place en salle 110 à X 0x2C, P 0x2F", () => {
+  it("Prytwen (101, événement 7) enfermé dans la salle 110 meurt de faim : un squelette (Num 112) en X 0x2C, P 0x2F, butin laissé", () => {
+    const { engine, run } = start();
+    const state = engine.state!;
+    const prytwen = state.findByNum(101)!;
+    state.moveToRoom(prytwen, state.roomById(110)!);
+    const loot = state.createObject({ typ: 2, num: 105, value: 100 });
+    state.moveToContainer(loot, prytwen);
+    state.events.capacity = 5;
+    state.events.operate(prytwen, 7, EventOp.Set, 1, 101);
+    run(60);
+    expect(state.findByNum(101)).toBeUndefined();
+    const skeleton = state.findByNum(112)!;
+    expect(skeleton.room!.id).toBe(110);
+    expect([skeleton.x, skeleton.p, skeleton.weight]).toEqual([0x2c, 0x2f, 50]);
+    expect(loot.room!.id).toBe(110);
+  });
+
+  it("événement 7 : hors de la salle 110 ou grille ouverte, rien (`28b1:130b`, `28b1:1314`)", () => {
     const { engine, run } = start();
     const state = engine.state!;
     const prytwen = state.findByNum(101)!;
     state.events.capacity = 5;
+    state.events.operate(prytwen, 7, EventOp.Set, 1, 101); // en salle 105 : sans effet
+    run(60);
+    expect(state.findByNum(101)).toBeDefined();
+    state.moveToRoom(prytwen, state.roomById(110)!);
+    state.findByNum(103)!.ego = 3; // grille ouverte
     state.events.operate(prytwen, 7, EventOp.Set, 1, 101);
-    for (let i = 0; i < 60 && prytwen.room!.id !== 110; i++) run(1); // dès l'arrivée, avant que l'IA de Prytwen ne le fasse marcher
-    expect(prytwen.room!.id).toBe(110);
-    expect([prytwen.x, prytwen.p]).toEqual([0x2c, 0x2f]);
+    run(60);
+    expect(state.findByNum(101)).toBeDefined();
   });
 });

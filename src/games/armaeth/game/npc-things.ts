@@ -1,7 +1,7 @@
 import { sequenceFinished } from "../engine/animation";
 import { type BehaviorContext, type BehaviorHandler, FAMILY, type HandlerRegistry } from "../engine/handlers";
 import { type GameObject, RAW_OFFSET, type WorldState } from "../engine/state";
-import { flag, NUM, OFF, ROOM, setFlag, setWord, word } from "./helpers";
+import { flag, NUM, OFF, passageSteps, type PassageKind, ROOM, runPassageSteps, setFlag, setWord, word } from "./helpers";
 import { type NpcKit, RESTART, UPDATE_OK } from "./npc-kit";
 
 /**
@@ -11,6 +11,11 @@ import { type NpcKit, RESTART, UPDATE_OK } from "./npc-kit";
 
 /** Octet de l'en-tête du monde (adresse `DGROUP`) : `4b46` est l'octet 0 de l'en-tête (`headerWords`). */
 const HEADER_BASE = 0x4b46;
+
+function headerByte(state: WorldState, address: number): number {
+  const offset = address - HEADER_BASE;
+  return (state.headerWords[offset >> 1]! >> ((offset & 1) * 8)) & 0xff;
+}
 
 function setHeaderByte(state: WorldState, address: number, value: number): void {
   const offset = address - HEADER_BASE;
@@ -144,17 +149,37 @@ export function splash(kit: NpcKit): BehaviorHandler {
 
 // --- mécanismes de salle ------------------------------------------------------------------------------------------------------
 
+/** Effet sonore du mouvement d'un passage (`'B' 7`, priorité 0) : choisi à chaque appel dans les salles voisines, coupé à la fin. */
+const PASSAGE_SOUND = 7;
+
+/** Salles où chaque procédure choisit l'effet `'B' 7` à chaque appel (`2500:0010`, `27ed:0012`, `29fd:0000`). */
+const PASSAGE_SOUND_ROOMS: Readonly<Record<PassageKind, readonly number[]>> = { stele: [5, 101], slab: [108, 202], portcullis: [202, 305] };
+
+function selectPassageSound(ctx: BehaviorContext, kind: PassageKind): void {
+  const roomId = ctx.room?.id;
+  if (roomId !== undefined && PASSAGE_SOUND_ROOMS[kind].includes(roomId)) ctx.sound.selectTrack("B", PASSAGE_SOUND, 0);
+}
+
 /**
- * Fin commune d'un mouvement de passage (§ 10.2) : l'objet prend son état d'arrivée et s'arrête (`Gst 0`, `Mob 0`), les trajets
- * de la salle sont annulés, le joueur reprend la main si la procédure l'avait suspendu, le drapeau de passage est posé.
+ * Fin commune d'un mouvement de passage (`2500:006d..0160`, `27ed:0090..0182`, `29fd:0078..0168`) : le son s'arrête, les points sont
+ * attribués, l'objet prend son état d'arrivée et s'arrête (`Gst 0`, `Mob 0`), le plan de la salle est recalculé (`147f:000a`), les
+ * trajets de la salle sont annulés, puis les messages de découverte (`passageSteps`) et enfin le drapeau de passage est posé, APRÈS le
+ * verdict qui le teste.
  */
-function finishPassage(kit: NpcKit, ctx: BehaviorContext, obj: GameObject, ego: number, flag: number, award: readonly [number, number]): void {
+function finishPassage(kit: NpcKit, ctx: BehaviorContext, obj: GameObject, kind: PassageKind, ego: number, flag: number, award: readonly [number, number]): void {
+  const steps = passageSteps(kind, {
+    roomId: ctx.room?.id ?? 0,
+    chapterLevel: ctx.state.chapterLevel,
+    opened: ego !== 0,
+    discovered: headerByte(ctx.state, flag) !== 0,
+  });
+  ctx.sound.stopEffect("B", PASSAGE_SOUND);
   ctx.score.award(award[0], award[1]);
   kit.setState(ctx, obj, { gst: 0, mob: 0, ego, fig: 0 });
   ctx.rooms.refreshPlanes(); // `147f:000a` : plans actifs de la salle (stèle, dalle)
-  // lacune (characters.md § 10.2) : `147f:0352` (lumière, introduction de niveau), messages `S` de découverte et script `CM3`
-  // (hors de portée de `BehaviorContext`, inactifs avec le niveau de `CFG`).
+  if (kind !== "portcullis") ctx.enterScene(); // `147f:0352` (appelé par `2500:0099` et `27ed:00bd`, pas par la herse `29fd`)
   cancelRoomPaths(kit, ctx);
+  runPassageSteps(ctx, steps);
   setHeaderByte(ctx.state, flag, 7);
 }
 
@@ -163,6 +188,7 @@ export function stele(kit: NpcKit): BehaviorHandler {
   return (obj, ctx) => {
     const roomId = ctx.room?.id;
     if (roomId === ROOM_STELE_OUTSIDE) ctx.state.moveEnabled = false;
+    selectPassageSound(ctx, "stele");
     let ego = obj.ego;
     if (ego === 2) {
       obj.x += 1;
@@ -174,7 +200,7 @@ export function stele(kit: NpcKit): BehaviorHandler {
       ego = 0;
     }
     ctx.state.moveEnabled = true;
-    finishPassage(kit, ctx, obj, ego, SECRET_FLAG.stele, [0, 3]);
+    finishPassage(kit, ctx, obj, "stele", ego, SECRET_FLAG.stele, [0, 3]);
     return UPDATE_OK;
   };
 }
@@ -182,8 +208,10 @@ export function stele(kit: NpcKit): BehaviorHandler {
 const ROOM_STELE_OUTSIDE = 5;
 
 /** Générateur de la dalle et de la herse de granite : même ossature, axe Y, `Tim` tics (posé par le verbe ou l'événement). */
-function verticalSlider(kit: NpcKit, flag: number, award: readonly [number, number], placeMode = 0xff): BehaviorHandler {
+function verticalSlider(kit: NpcKit, kind: PassageKind, flag: number, award: readonly [number, number], placeMode = 0xff): BehaviorHandler {
   return (obj, ctx) => {
+    if (kind === "slab" && ctx.room?.id === ROOM.throne) ctx.rooms.setPlanes(2); // `27ed:002e` : `4ae0 = 2` à chaque appel dans la salle 108
+    selectPassageSound(ctx, kind);
     let ego = obj.ego;
     if (ego === 0 || ego === 3) {
       obj.gst = 0;
@@ -200,23 +228,31 @@ function verticalSlider(kit: NpcKit, flag: number, award: readonly [number, numb
     }
     obj.tim = Math.max(0, obj.tim - 1);
     if (obj.tim !== 0) return UPDATE_OK;
-    ctx.score.award(award[0], award[1]);
     // dalle : `1a37:003a` (mode déduit de la présence) ; herse : `1a37:007f(2, 1, 0, 0)` (mode 2, aucune recherche de position : la
     // herse relevée reste en haut au lieu d'être reposée sur le sol)
+    const steps = passageSteps(kind, {
+      roomId: ctx.room?.id ?? 0,
+      chapterLevel: ctx.state.chapterLevel,
+      opened: ego !== 0,
+      discovered: headerByte(ctx.state, flag) !== 0,
+    });
+    ctx.sound.stopEffect("B", PASSAGE_SOUND);
+    ctx.score.award(award[0], award[1]);
     kit.setState(ctx, obj, placeMode === 2 ? { ego, fig: 0, dep: 1, txt: 0 } : { ego, fig: 0 }, placeMode);
     ctx.rooms.refreshPlanes(); // `147f:000a`
+    if (kind === "slab") ctx.enterScene(); // `147f:0352` (`27ed:00bd`) ; la herse (`29fd`) ne l'appelle pas
     cancelRoomPaths(kit, ctx);
-    // lacune (characters.md § 10.2) : `147f:0352`, messages `S` et script `CM3` (voir `finishPassage`).
+    runPassageSteps(ctx, steps);
     setHeaderByte(ctx.state, flag, 7);
     return UPDATE_OK;
   };
 }
 
 /** `27ed:000a` (`Num 104`) : la dalle sous le trône s'enfonce / se relève de 1 en Y par tic pendant `Tim` tics. */
-export const slab = (kit: NpcKit): BehaviorHandler => verticalSlider(kit, SECRET_FLAG.slab, [1, 6]);
+export const slab = (kit: NpcKit): BehaviorHandler => verticalSlider(kit, "slab", SECRET_FLAG.slab, [1, 6]);
 
 /** `29fd:0000` (`Num 207`) : la herse de granite des salles 202 et 305 (même mouvement, `Tim = 0x22`). */
-export const portcullis = (kit: NpcKit): BehaviorHandler => verticalSlider(kit, SECRET_FLAG.portcullis, [2, 2], 2);
+export const portcullis = (kit: NpcKit): BehaviorHandler => verticalSlider(kit, "portcullis", SECRET_FLAG.portcullis, [2, 2], 2);
 
 /** Pas (unités d'X) et durée de la grille du cachot : 9 images, 2 pixels par image (`2846:000a`). */
 const GRILLE_STEPS = 9;

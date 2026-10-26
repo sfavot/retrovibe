@@ -1,0 +1,11 @@
+# F3 (restauration) : disque c, répertoire par défaut, sauvegarde svg, numéro 001, puis la commande ; Entrée ferme la première fenêtre.
+46 f3
+49 !c enter
+51 enter
+53 !svg enter
+55 !001 enter
+60 "!ouvrir la porte avec la clef"
+72 enter
+80 enter
+@expect 46 52
+@expect 73 78

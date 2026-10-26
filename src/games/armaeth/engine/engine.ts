@@ -1420,6 +1420,9 @@ export class ArmaethEngine implements TokenHostEngine {
         limits: () => (engine.terrain ? { xMax: engine.terrain.limits.xMax, pMax: engine.terrain.limits.pMax } : null),
         planes: () => engine.terrain?.planes ?? 1,
         refreshPlanes: () => engine.refreshPlanes(),
+        setPlanes: (count) => {
+          if (engine.terrain) engine.terrain.planes = count;
+        },
       },
       motion: {
         reset: (obj) => engine.resetMotion(obj),
@@ -1428,6 +1431,10 @@ export class ArmaethEngine implements TokenHostEngine {
         followPath: (obj) => engine.followHeroPath(obj),
         pathTo: (obj, x, y, p, plane) => engine.pathTo(obj, x, y, p, plane),
         pathEnd: (obj, result) => engine.pathEnd(obj, result),
+      },
+      runEpisodeEnd: () => engine.afterWindows.push(() => engine.runner.runEpisodeEnd()),
+      enterScene: () => {
+        if (engine.state) onFirstDisplay(engine.state);
       },
       get rng() {
         return engine.rng;
@@ -2174,6 +2181,12 @@ class PhraseContext implements HandlerContext {
   }
   get refreshObject() {
     return this.base.refreshObject;
+  }
+  get runEpisodeEnd() {
+    return this.base.runEpisodeEnd;
+  }
+  get enterScene() {
+    return this.base.enterScene;
   }
   get die() {
     return this.base.die;

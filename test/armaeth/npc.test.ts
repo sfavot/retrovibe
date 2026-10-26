@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { parseAni } from "../../src/games/armaeth/data/tables";
 import { Lcg, msvcRand } from "../../src/engine/rng";
 import { ArmaethEngine } from "../../src/games/armaeth/engine/engine";
@@ -457,3 +457,92 @@ describe.skipIf(!hasOriginalFiles)("passage de 3000 tics dans chaque salle peupl
     // Lourd (3000 tics par salle) : le délai par défaut de 5 s ne suffit pas sur les machines de l'intégration continue.
   }, 60000);
 });
+
+describe.skipIf(!hasOriginalFiles)("Prytwen mort et grille 103 (monde réel, rig à part : ces tests consomment du hasard)", () => {
+  let rig: Rig;
+  beforeAll(() => {
+    rig = boot(true);
+  });
+  const state = () => rig.engine.state!;
+  const run = (obj: GameObject) => rig.engine.registry.get(FAMILY.character, obj.num)!(obj, rig.ctx);
+  const room = (id: number): GameRoom => state().roomById(id)!;
+  function stage(num: number, roomId: number): { npc: GameObject; hero: GameObject } {
+    const npc = state().findByNum(num)!;
+    const hero = state().hero!;
+    state().moveToRoom(npc, room(roomId));
+    npc.gst = 7;
+    npc.ego = 0;
+    npc.err = 0;
+    npc.path.defined = false;
+    hero.x = npc.x = 100;
+    hero.p = npc.p = 60;
+    hero.y = npc.y = 100;
+    return { npc, hero };
+  }
+
+  /** Prytwen est détruit par le test précédent : un neuf, comme `gm_create_object` (poids et capacité de la table). */
+  function reviveBoss(): void {
+    if (state().findByNum(NUM.prytwen)) return;
+    const fresh = state().createObject({ typ: 2, num: NUM.prytwen, gst: 7, mob: 2, capacity: 600, weight: 450, pickable: 7 });
+    state().moveToRoom(fresh, room(ROOM.lair));
+  }
+
+  it("Prytwen mort hors de la salle chargée : un squelette (Num 112) le remplace dans la salle 110 (`28b1:0360`), il est détruit ailleurs (`28b1:0358`)", () => {
+    const { npc, hero } = stage(NUM.prytwen, ROOM.treasury);
+    state().moveToRoom(hero, room(1));
+    const loot = state().createObject({ typ: 2, num: 105, value: 100 });
+    state().moveToContainer(loot, npc);
+    npc.ego = 3;
+    run(npc);
+    expect(state().findBySerial(npc.serial)).toBeUndefined();
+    const skeleton = state().findByNum(NUM.skeleton)!;
+    expect([skeleton.room!.id, skeleton.x, skeleton.p, skeleton.weight, skeleton.pickable]).toEqual([ROOM.treasury, 100, 60, 50, 0]);
+    expect(loot.room!.id).toBe(ROOM.treasury); // le butin reste dans la salle
+    state().deleteObject(skeleton);
+    reviveBoss();
+    const { npc: again, hero: h2 } = stage(NUM.prytwen, 201);
+    state().moveToRoom(h2, room(1));
+    again.ego = 3;
+    run(again);
+    expect(state().findByNum(NUM.skeleton)).toBeUndefined();
+  });
+
+  it("Prytwen et la grille 103 (`28b1:050a`) : fermée, il se case derrière (`Sol 0x45`), l'événement 7 est créé sans être relancé et le héros gagne (1, 2) ; ouverte, 1 chance sur 20 de la refermer", () => {
+    reviveBoss();
+    const { npc, hero } = stage(NUM.prytwen, ROOM.treasury);
+    state().moveToRoom(hero, room(1));
+    for (const o of room(ROOM.treasury).listA.filter((x) => x.value >= 10)) state().moveToRoom(o, room(1)); // la pépite (105) passerait avant la grille
+    const grille = state().findByNum(NUM.grille)!;
+    grille.ego = 0;
+    const target = { typ: npc.typ, num: npc.num, serial: npc.serial };
+    state().events.capacity = Math.max(state().events.capacity, 8);
+    const before = state().score;
+    run(npc);
+    expect(npc.ground).toBe(0x45);
+    expect(state().events.find(target, 7)!.counter).toBe(10000);
+    expect(state().score).toBe(before + 30);
+    state().events.find(target, 7)!.counter = 4000;
+    npc.ego = 0;
+    run(npc);
+    expect(state().events.find(target, 7)!.counter).toBe(4000);
+    expect(state().score).toBe(before + 30);
+    // grille ouverte
+    state().events.operate(target, 7, -1);
+    npc.ground = 2;
+    grille.ego = 3;
+    npc.ego = 0;
+    const draw = vi.spyOn(rig.engine.rng, "mod").mockReturnValue(1);
+    run(npc);
+    expect(grille.ego).toBe(3);
+    draw.mockReturnValue(0);
+    npc.ego = 0;
+    npc.path.defined = false;
+    for (const o of room(ROOM.treasury).listA.filter((x) => x.num === NUM.bronzeKey)) state().moveToRoom(o, room(1));
+    run(npc);
+    expect([grille.ego, grille.gst, grille.mob]).toEqual([2, 7, 1]);
+    expect(npc.ground).not.toBe(0x45);
+    vi.restoreAllMocks();
+  });
+
+});
+

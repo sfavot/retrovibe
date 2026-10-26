@@ -111,6 +111,8 @@ export interface HandlerRooms {
   planes(): number;
   /** `147f:000a` : recalcule les plans actifs de la salle chargée après un changement d'état d'un mécanisme. */
   refreshPlanes(): void;
+  /** `4ae0 := n` (écriture directe, sans recalcul) : la dalle du trône impose 2 plans pendant son mouvement (`27ed:002e`). */
+  setPlanes(count: number): void;
 }
 
 export interface HandlerMotion {
@@ -178,6 +180,13 @@ export interface BehaviorContext {
   readonly scene: HandlerScene;
   /** `rand()` du jeu (15 bits, `Lcg` de Microsoft C). */
   readonly rng: Lcg;
+  /**
+   * Script `CM3` (`ScriptRunner.runEpisodeEnd`, état 6 : écran noir, `fin`, `sys 8`) : lancé une fois les fenêtres de messages lues
+   * (`docs/armaeth/screens.md` E14), comme la suite des étapes d'un passage dans l'original.
+   */
+  runEpisodeEnd(): void;
+  /** `147f:0352` (effets d'entrée après un changement de scène), partie générique : introduction de niveau des salles 1, 101, 202 et 305. */
+  enterScene(): void;
 }
 
 /** Variables d'une phrase (`DGROUP:4cba..4dcc`) et services : l'argument de tous les gestionnaires de verbes et d'objets. */

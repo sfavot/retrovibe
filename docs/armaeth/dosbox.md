@@ -10,7 +10,7 @@ Tâche DX1. Un banc d'essai sans fenêtre fait tourner l'*Armaeth* d'origine (CD
 | La cadence dépend-elle du CPU ? | non entre 12 000 et 60 000 cycles (486 DX/33 à Pentium) | certain |
 | « Trop loin » : qui marche ? | **le héros marche vers l'objet**, puis la commande est rejouée ; `V008` n'est pas affiché | certain pour une clef, une armoire (sans Prytwen) |
 | « Trop loin » en présence de Prytwen (salle 105) | le héros ne bouge pas, **Prytwen marche vers le héros** et dit « Prytwen n'aime pas que l'on fouine… » | certain (observé) |
-| Refus parasite (`V014` à côté de `V082`) | **non tranché** : la porte 111 s'est ouverte (« Ok. »), pas de mauvaise clef testée | non vérifié |
+| Mauvaise clef sur une porte verrouillée (§ 4.2 bis) | **`V082` puis `V013`, jamais `V014`** (sauvegarde fabriquée par le port, chargée par F3) ; le port a été corrigé | certain (observé) |
 | Lumière | le décalage mesuré entre 12 h 10 et 0 h 10 est de -47 (le port : -48) ; en dessous de -40 le jeu d'origine est très sombre | probable (un cran de DAC d'écart) |
 | Jetons de débogage `/dgs 99`, `/trf`, `/loc`, `/inf`, `/heu`, `/dlo`, `/ego` | **fonctionnent en jeu** (outil d'observation précieux, § 5) | certain |
 
@@ -55,7 +55,15 @@ Non mesuré : la fréquence réelle des tics BIOS (`wat n`, fenêtres à délai)
 
 ### 4.2 Refus parasite
 
-`ouvrir la porte avec la clef` en tenant la clef d'or (6) devant la porte 111 (salle 105, clef attendue : 109) : la porte **s'est ouverte** avec « Ok. » (`10-porte-ok.png`), sans `V082` ni `V014`. Soit la porte n'est pas verrouillée au départ (`Ego 1`, alors que `characters.md` § 5 la dit fermée à clef), soit la clef d'or convient. Non tranché : on a essayé de forcer `Ego 0` (`/dgs 99` puis `/ego 0 111`, dans la salle 105 juste après l'arrivée, clef d'or en main) à quatre reprises ; chaque fois la ligne de saisie est restée bloquée (« /ego 0… » puis « ouv » sans suite) : après `/trf` ou `/ego` les touches ne sont plus lues avant des dizaines de secondes. La clef de bronze 109 n'a pas été cherchée (`/loc 109`). À refaire avec une meilleure injection de touches (voir § 6).
+`ouvrir la porte avec la clef` en tenant la clef d'or (6) devant la porte 111 (salle 105, clef attendue : 109) : la porte **s'est ouverte** avec « Ok. » (`10-porte-ok.png`), sans `V082` ni `V014`. Explication trouvée au § 4.2 bis : la porte 111 est `Ego 1` (fermée, non verrouillée) dans `CFG`, et l'ouverture d'une porte `Ego 1` ne contrôle pas la clé (`20b5:01a8`). Les essais avec `/ego 0 111` échouaient (touches perdues) : la solution est de fabriquer la sauvegarde.
+
+### 4.2 bis Mauvaise clef sur une porte verrouillée (résolu)
+
+**Méthode.** `scripts/armaeth/dosbox/craft-save.mts` écrit `SVG001.SVG` à partir de `A1FCFG.SYS` (`serializeWorld` du port) : salle 105, porte 111 à `Ego 0`, Prytwen envoyé en 104, héros à (112, 54, 28) avec la clef d'or **dans l'inventaire avec `Pre 8`** (sans cela l'original ne la voit pas « tenue » : `V013` à tort). Le banc la charge (`run.sh -x -s scenarios/wrong-key.txt -i SVG001.SVG`, F3 puis `c`, Entrée (répertoire par défaut), `svg`, `001`) et tape la commande. `-x` retire les deux attentes d'introduction de `run.sh` (sur cette machine elles tombent hors fenêtre à chaque essai, la session étant déterministe) ; dans un scénario les textes à espaces doivent être entre guillemets (`"!ouvrir la porte avec la clef"`).
+
+**Résultat.** Héros à portée : une première fenêtre « Ce n'est pas la bonne clef. » (`V082`), puis après Entrée « Vous ne pouvez utiliser que ce que vous détenez. » (`V013`) ; **jamais `V014`**. Héros hors de portée : la fenêtre `V013` seule (le héros marche vers la porte, la commande est rejouée avec le dernier contexte armé, un sens de `clef` sans objet).
+
+**Cause (désassemblage `20b5:000e`, `22fc:01e7`, `1dd4:0156`).** « clef » a cinq sens (`15006`, `15022`, `15108`, `15109`, `15331`) et la boucle des candidats indirects les essaie tous. Un sens sans objet donne une itération « vide » : `4dca == 0` (`20b5:0171`) et le gestionnaire met en file `V013` priorité 3 (le port mettait `V014` priorité 1 : hypothèse fausse). La clé reconnue (`217d:0002`) mais mauvaise donne `V082` priorité 3 (`V014` si ce n'est pas une clé). La file s'affiche du dernier ajout au premier : l'ordre `V082`, `V013` observé suppose que `V013` soit ajouté **avant** `V082`, donc que les sens soient parcourus dans l'ordre de `gm_dic_lookup` : **dichotomie qui retient un mot, puis balayage vers le début, puis vers la fin** (`[108, 22, 6, 109, 331]` pour « clef », `[103, 9198, 9060, 9014, 111, 207, 210, 329]` pour « porte »), et non dans l'ordre du fichier comme `lookupWord` (`data/dictionary.ts`) : **écart restant, non corrigé ici** (fichier hors périmètre ; test `objects-handlers.test.ts` avec l'ordre d'origine imposé). Autre relevé : une porte ouverte refermée avec la mauvaise clef est refermée AVANT le contrôle de la clé (`20b5:01b8`, la porte reste fermée non verrouillée).
 
 ### 4.3 Lumière (engine.md § 7.5)
 
@@ -78,7 +86,7 @@ La fenêtre d'une ligne (« La porte est fermée. », `08-armoire-v084.png`) occ
 
 ## 6. Ce qui reste invérifiable ou non fait
 
-- Mauvaise clef sur une porte (§ 4.2), rendu des objets invisibles (`Inv`), miroir du masque de profondeur : non mesurés (le banc perd des touches ; les chaînes de commandes tapées de plus de deux étapes sont peu fiables).
+- Rendu des objets invisibles (`Inv`), miroir du masque de profondeur : non mesurés (le banc perd des touches ; les chaînes de commandes tapées de plus de deux étapes sont peu fiables).
 - Fréquence des tics BIOS (`wat`).
 - L'écran de protection `SC0` n'est pas exécuté (la table de nombres n'est pas dans le dépôt).
 - Le CPU 386 (< 12 000 cycles) n'a pas été essayé pour la cadence (une session à 4 000 cycles a été trop lente pour le scénario d'introduction).

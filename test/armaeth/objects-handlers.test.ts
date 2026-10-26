@@ -3,6 +3,9 @@ import { ArmaethEngine } from "../../src/games/armaeth/engine/engine";
 import { FAMILY } from "../../src/games/armaeth/engine/handlers";
 import type { GameObject } from "../../src/games/armaeth/engine/state";
 import { DGROUP_OFFSET, KEY_TABLE_OFFSET, keyTableWords } from "../../src/games/armaeth/game/helpers";
+import { parseDictionary } from "../../src/games/armaeth/data/dictionary";
+import { parseAccentTable, parsePlainMessages } from "../../src/games/armaeth/data/text";
+import { parseCommand } from "../../src/games/armaeth/engine/parser";
 import { registerObjectHandlers } from "../../src/games/armaeth/game/objects";
 import { registerVerbs } from "../../src/games/armaeth/game/verbs";
 import { hasOriginalFiles, readOriginal } from "./helpers";
@@ -101,6 +104,9 @@ describe.skipIf(!hasOriginalFiles)("tables de clés, serrures et portes (DGROUP:
   });
 });
 
+const dictionary = () => parseDictionary(readOriginal("A1FDIC.SYS"));
+const accents = () => parseAccentTable(parsePlainMessages(readOriginal("MSGINT")));
+
 describe.skipIf(!hasOriginalFiles)("gestionnaires d'objet (famille 1)", () => {
   let s: Session;
   beforeAll(() => {
@@ -178,19 +184,47 @@ describe.skipIf(!hasOriginalFiles)("gestionnaires d'objet (famille 1)", () => {
     expect(s.say("eteindre le feu")).toEqual(["V019"]);
   });
 
+  /** Le héros se tient devant le battant (la porte se replace à la position de la table quand elle bouge). */
+  const standAt = (door: GameObject) => {
+    s.hero.x = door.x;
+    s.hero.p = door.p + 2;
+  };
+
   it("porte à serrure : mauvaise clef V082, bonne clef ouvre à la position de la table", () => {
     const door = s.put(111, { ego: 0, pickable: 0 });
     s.give(22);
-    expect(s.say("ouvrir la porte avec la clef")).toEqual(["V082"]);
+    // `V082` (clé reconnue, priorité 3) puis `V013` (les autres sens de « clef », sans objet : `4dca == 0`, `20b5:0171`), jamais `V014`
+    expect(s.say("ouvrir la porte avec la clef")).toEqual(["V082", "V013"]);
     s.give(109);
     expect(s.say("ouvrir la porte avec la clef")).toEqual(["V015"]);
     expect(door.ego).toBe(2);
     expect([door.x, door.p, door.fig]).toEqual([96, 24, 1]) // `Y` est recalculé par `placer`;
-    door.x = s.hero.x;
-    door.p = s.hero.p;
+    standAt(door);
     expect(s.say("ouvrir la porte")).toEqual(["V083"]);
     expect(s.say("fermer la porte avec la clef")).toEqual(["V085"]);
     expect(door.ego).toBe(0);
+  });
+
+  it("porte à serrure : sans clef en main V013 (priorité 3, `20b5:0171`) et non V014 ; fermer une porte ouverte avec la mauvaise clef la referme d'abord (`20b5:01b8`)", () => {
+    const door = s.put(111, { ego: 0, pickable: 0 });
+    expect(s.say("ouvrir la porte avec la clef")).toEqual(["V013"]);
+    door.ego = 2;
+    [door.x, door.p] = [112, 24]; // position du battant fermé côté A : il y reste après avoir été refermé
+    s.hero.x = 112;
+    s.hero.p = 26;
+    s.give(22);
+    expect(s.say("fermer la porte avec la clef")).toEqual(["V082", "V013"]);
+    expect(door.ego).toBe(1); // refermée, non verrouillée
+  });
+
+  it("porte à serrure, candidats de « clef » dans l'ordre de `gm_dic_lookup` (108, 22, 6, 109, 331) : V082 puis V013, comme sous DOSBox-X", () => {
+    s.put(111, { ego: 0, pickable: 0 });
+    s.give(6);
+    const parsed = parseCommand("ouvrir la porte avec la clef", dictionary(), accents(), s.state.dictionaryLetters);
+    expect(parsed.indirect).toEqual([15108, 15022, 15006, 15109, 15331]); // `lookupWord` rend l'ordre de l'original
+    s.shown = [];
+    s.engine.execute(parsed);
+    expect(s.shown).toEqual(["V082", "V013"]);
   });
 
   it("stèle : ouverture à la clef en or devant la serrure ; ailleurs V057", () => {

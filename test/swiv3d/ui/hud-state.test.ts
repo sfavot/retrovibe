@@ -55,32 +55,61 @@ describe.skipIf(!hasOriginalFiles)("HudState d'après le monde", () => {
     expect(state.radar.objectives!.filter((o) => o.current)).toHaveLength(1);
   });
 
-  it("viseur : jaune sur la cible, rouge sur le point visé ; lissage de moitié à chaque image ; absent derrière la caméra", () => {
+  it("viseurs : le jaune suit la cible du joueur, le rouge l'objectif en tête (seulement avec une cible) ; lissage de moitié ; aucun sans cible", () => {
     const s = scenario("TERRAN00", (sx, sz, level) => {
       const yaw = level.objects.find((o) => o.type === 1000)!.angle;
-      return [rec(3000, sx + (SIN[yaw]! * 600) / 256, sz + (COS[yaw]! * 600) / 256, { model: 400, childModel: 401, hitPoints: 100, subtype: 100 })];
+      const at = (d: number, side: number) => [sx + (SIN[yaw]! * d + COS[yaw]! * side) / 256, sz + (COS[yaw]! * d - SIN[yaw]! * side) / 256] as const;
+      const [tx, tz] = at(600, 0);
+      const [ox, oz] = at(900, 150);
+      return [
+        rec(3000, tx, tz, { model: 400, childModel: 401, hitPoints: 100, subtype: 100 }),
+        rec(3000, ox, oz, { model: 400, childModel: 401, hitPoints: 100, subtype: 100 }),
+      ];
     });
     const builder = new HudStateBuilder();
     s.run(80);
     const player = s.world.player.obj;
-    const target = [...s.world.liveObjects()].find((o) => o.classe & 0x1000)!;
-    player.target = target;
+    const [target, objective] = [...s.world.liveObjects()].filter((o) => o.classe & 0x1000);
+    expect(target && objective).toBeTruthy();
     s.world.updateCamera(60);
     const camera = cameraToRender(s.world.camera);
-    const first = builder.build(s.world, camera, OPTIONS).crosshair!;
-    expect(first.redFrame).not.toBeNull();
-    expect(first.yellowFrame).toBeGreaterThanOrEqual(0);
-    expect(first.yellowFrame).toBeLessThanOrEqual(15);
-    // la caméra se déplace : le viseur ne saute pas, il rejoint la nouvelle position par moitiés
-    const moved = { ...camera, yaw: camera.yaw + 10 };
-    const a = builder.build(s.world, moved, OPTIONS).crosshair!;
-    const b = builder.build(s.world, moved, OPTIONS).crosshair!;
-    const c = builder.build(s.world, moved, OPTIONS).crosshair!;
-    const steps = [Math.abs(a.x - first.x), Math.abs(b.x - a.x), Math.abs(c.x - b.x)];
-    expect(steps[0]).toBeGreaterThan(steps[2]!);
-    // sans cible : seul le viseur jaune, au point visé
+
+    // Sans cible : pas de viseur, même avec un objectif.
+    s.world.game.objectives.push({ obj: objective!, group: 0 });
     player.target = player;
-    const none = builder.build(s.world, camera, OPTIONS).crosshair;
-    expect(none?.redFrame ?? null).toBeNull();
+    expect(builder.build(s.world, camera, OPTIONS).crosshair).toBeUndefined();
+
+    // Cible qui n'est pas l'objectif : jaune sur la cible, rouge sur l'objectif, deux positions distinctes.
+    player.target = target!;
+    const first = builder.build(s.world, camera, OPTIONS).crosshair!;
+    expect(first.yellow).not.toBeNull();
+    expect(first.red).not.toBeNull();
+    expect(first.yellow!.frame).toBeGreaterThanOrEqual(0);
+    expect(first.yellow!.frame).toBeLessThanOrEqual(15);
+    expect(first.red!.x).not.toBe(first.yellow!.x);
+
+    // Cible = objectif en tête : les deux viseurs sont alignés (cible verrouillée).
+    player.target = objective!;
+    const locked = new HudStateBuilder().build(s.world, camera, OPTIONS).crosshair!;
+    expect(locked.red).toEqual(locked.yellow);
+
+    // Sans objectif en liste, seul le jaune reste.
+    player.target = target!;
+    s.world.game.objectives.length = 0;
+    const alone = new HudStateBuilder().build(s.world, camera, OPTIONS).crosshair!;
+    expect(alone.yellow).not.toBeNull();
+    expect(alone.red).toBeNull();
+
+    // La caméra se déplace : le viseur ne saute pas, il rejoint la nouvelle position par moitiés.
+    const moved = { ...camera, yaw: camera.yaw + 10 };
+    const a = builder.build(s.world, moved, OPTIONS).crosshair!.yellow!;
+    const b = builder.build(s.world, moved, OPTIONS).crosshair!.yellow!;
+    const c = builder.build(s.world, moved, OPTIONS).crosshair!.yellow!;
+    const steps = [Math.abs(a.x - first.yellow!.x), Math.abs(b.x - a.x), Math.abs(c.x - b.x)];
+    expect(steps[0]).toBeGreaterThan(steps[2]!);
+
+    // Derrière la caméra : l'objet n'a pas de viseur, son état de lissage est perdu.
+    const behind = { ...camera, yaw: camera.yaw + 256 };
+    expect(builder.build(s.world, behind, OPTIONS).crosshair).toBeUndefined();
   });
 });

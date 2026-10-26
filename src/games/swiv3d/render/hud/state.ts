@@ -10,6 +10,10 @@ export interface HudMessage {
   /** Table de chaînes (`gm_get_string(table, id)`) : 100 pour les armes ramassées, 20 pour les objectifs et la mort… */
   textTable: number;
   textId: number;
+  /**
+   * Ticks restants dans la liste du monde. Le HUD ne s'en sert que pour reconnaître un message déjà vu (`tick + ticksLeft` ne change
+   * pas pendant sa vie) : la durée affichée est celle de l'exécutable (`render/text3d/message.ts`), pas celle-ci.
+   */
   ticksLeft: number;
 }
 
@@ -62,6 +66,17 @@ export interface HudState {
     /** Cibles d'objectifs : croix et pointeur. Absent : le pointeur tourne de 8 pas par tick. */
     objectives?: RadarObjective[];
   };
-  /** Viseur (bloc 506) ; absent : non tracé. `x`, `y` : centre à l'écran ; images 0 à 15 (série jaune) et 0 à 15 (série rouge, `null` : pas de cible). */
-  crosshair?: { x: number; y: number; yellowFrame: number; redFrame: number | null };
+  /**
+   * Viseurs du bloc 506 (`gm_render_view` `0042b31c`, `gm_draw_crosshair` `00437c38`) ; absent : aucun. Deux séries de 16 images,
+   * tracées dans cet ordre : jaune (images 0 à 15), sur la cible du joueur (`+0x58`) ; rouge (images 16 à 31), sur la tête de la liste
+   * des objectifs tant que le joueur a une cible. Chacun est `null` quand son objet n'est pas à l'écran.
+   */
+  crosshair?: { yellow: Reticle | null; red: Reticle | null };
+}
+
+/** Un viseur : centre à l'écran (déjà lissé) et image 0..15 de sa série. */
+export interface Reticle {
+  x: number;
+  y: number;
+  frame: number;
 }

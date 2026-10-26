@@ -1,12 +1,12 @@
 /**
  * Monde -> `HudState` (`render/hud/state.ts`) : jauge, armes, score et messages viennent de `world.status`, le radar des objets vivants
- * (champ de classe `+0x04`) et des cibles d'objectif, le viseur de la cible du joueur projetée à l'écran.
+ * (champ de classe `+0x04`) et des cibles d'objectif, les viseurs de la cible du joueur et de l'objectif en tête projetés à l'écran.
  */
 import type { GameObject } from "../engine/objects";
 import type { World } from "../engine/world";
 import { createProjection, projectPoint, setupProjection, type ProjectedPoint, type Projection } from "../render/camera";
-import type { HudState, RadarBlip, RadarObjective } from "../render/hud/state";
-import { wrapDelta, type RenderCamera } from "../render/view";
+import type { HudState, RadarBlip, RadarObjective, Reticle } from "../render/hud/state";
+import { VIEWPORT, wrapDelta, type RenderCamera } from "../render/view";
 
 /** Q8 -> unités monde. */
 const UNIT = 1 / 256;
@@ -14,10 +14,18 @@ const UNIT = 1 / 256;
 const RADAR_CELLS = 4;
 const GRID_MASK = 63;
 
-/** Image du viseur d'après la profondeur `D` : `clamp((D >> 6) - 11, 0, 15)` (`render.md` §9). */
+/** Image du viseur d'après la profondeur `D` de vue (sans le recul de 0x19) : `clamp((D >> 6) - 11, 0, 15)` (`render.md` §9). */
 export function crosshairFrame(depth: number): number {
   return Math.max(0, Math.min(15, (depth >> 6) - 11));
 }
+
+/** Recul de la perspective ajouté à la profondeur projetée (`D + 0x19`). */
+const DEPTH_BIAS = 0x19;
+/** Un objet n'a de viseur que si `-10 < D < 2000` et s'il tombe à moins de cette marge du cadre (`00427ec8`, `00427f7e`). */
+const RETICLE_DEPTH_MIN = -10;
+const RETICLE_DEPTH_MAX = 2000;
+const RETICLE_MARGIN_X = 0x14;
+const RETICLE_MARGIN_Y = 0x1e;
 
 /** Cellule de la grille d'objets (Q8) et distance torique entre deux cellules. */
 const cellOf = (q8: number): number => (q8 >> 17) & GRID_MASK;
@@ -31,13 +39,6 @@ export function isRadarBlip(o: Pick<GameObject, "classe" | "x" | "z">, player: P
   return o.classe !== 0 && cellDistance(cellOf(o.x), cellOf(player.x)) <= RADAR_CELLS && cellDistance(cellOf(o.z), cellOf(player.z)) <= RADAR_CELLS;
 }
 
-/** Un viseur (position à l'écran lissée, image tournante). */
-interface Reticle {
-  x: number;
-  y: number;
-  frame: number;
-}
-
 /** Position torique la plus proche de `value` autour de `around` (unités monde), pour la projection. */
 const nearest = (value: number, around: number): number => around + wrapDelta(value - around);
 
@@ -45,7 +46,7 @@ export class HudStateBuilder {
   private readonly projection: Projection = createProjection();
   private readonly point: ProjectedPoint = { x: 0, y: 0, depth: 0 };
   private readonly blips: RadarBlip[] = [];
-  /** Viseur jaune (extérieur, suit la cible) et rouge (intérieur : point visé), `null` sans cible. */
+  /** Viseur jaune (cible du joueur) et rouge (objectif en tête de liste) : l'état de lissage de chacun, `null` tant qu'il n'est pas à l'écran. */
   private yellow: Reticle | null = null;
   private red: Reticle | null = null;
 
@@ -101,11 +102,11 @@ export class HudStateBuilder {
   }
 
   /**
-   * Viseur (`gm_render_view` `0042b31c`, `00437c38`) : un viseur jaune sur la cible du joueur (`+0x58`) et un viseur rouge sur le point
-   * visé (devant le joueur à la distance de la cible, à sa hauteur : seul le cap se règle à la main, le tangage est automatique,
-   * `rules.md` § 3.3). Alignés = cible verrouillée. Position rejointe par `p += (cible - p) >> 1` à chaque image, image qui tourne d'un pas
-   * par image vers `clamp((D >> 6) - 11, 0, 15)`. L'association des couleurs aux deux positions est une hypothèse (`rules.md` § 7.5).
-   * Sans cible, seul le viseur jaune reste, au point visé à 1 000 unités.
+   * Viseurs (`gm_render_terrain` `0042718c` pose leur cible, `gm_render_view` `0042b31c` les lisse et les trace) : le jaune (images 0 à
+   * 15 du bloc 506) suit la cible du joueur (`+0x58`, choisie par `00438198`) ; le rouge (images 16 à 31) suit l'objet de tête de la
+   * liste des objectifs, mais seulement tant que le joueur a une cible. Alignés, c'est que la cible est l'objectif. Aucun viseur sans
+   * cible. Chacun garde sa position à l'écran : elle rejoint la nouvelle par `p += (cible - p) >> 1` à chaque image, et l'image tourne
+   * d'un pas par image vers `clamp((D >> 6) - 11, 0, 15)`. Un viseur qui sort de l'écran perd son état.
    */
   private crosshair(world: World, camera: RenderCamera): HudState["crosshair"] {
     const player = world.player.obj;
@@ -113,35 +114,23 @@ export class HudStateBuilder {
     const hasTarget = target !== player && target.classe !== 0;
     setupProjection(this.projection, camera);
 
-    const yaw = (player.yaw * 2 * Math.PI) / 512;
-    const px = player.x * UNIT;
-    const pz = player.z * UNIT;
-    let aim: { x: number; y: number; z: number };
-    let yellowAt: { x: number; y: number; z: number };
-    if (hasTarget) {
-      const tx = nearest(target.x * UNIT, px);
-      const tz = nearest(target.z * UNIT, pz);
-      const ty = target.y * UNIT;
-      const reach = Math.hypot(tx - px, tz - pz);
-      yellowAt = { x: tx, y: ty, z: tz };
-      aim = { x: px + Math.sin(yaw) * reach, y: ty, z: pz + Math.cos(yaw) * reach };
-    } else {
-      aim = { x: px + Math.sin(yaw) * 1000, y: player.y * UNIT, z: pz + Math.cos(yaw) * 1000 };
-      yellowAt = aim;
-    }
-    this.yellow = this.follow(this.yellow, yellowAt);
-    this.red = hasTarget ? this.follow(this.red, aim) : null;
-    const yellow = this.yellow;
-    if (!yellow) return undefined;
-    return { x: yellow.x, y: yellow.y, yellowFrame: yellow.frame, redFrame: this.red?.frame ?? null };
+    this.yellow = hasTarget ? this.follow(this.yellow, target) : null;
+    const head = world.game.objectives[0]?.obj;
+    this.red = hasTarget && head ? this.follow(this.red, head) : null;
+    if (!this.yellow && !this.red) return undefined;
+    return { yellow: this.yellow && { ...this.yellow }, red: this.red && { ...this.red } };
   }
 
-  /** Projette `at` (unités monde, replié autour de la caméra) et rapproche le viseur de moitié ; `null` : derrière la caméra. */
-  private follow(current: Reticle | null, at: { x: number; y: number; z: number }): Reticle | null {
+  /** Projette l'origine de `o` (replié autour de la caméra) et rapproche le viseur de moitié ; `null` : hors de la plage du jeu. */
+  private follow(current: Reticle | null, o: Pick<GameObject, "x" | "y" | "z">): Reticle | null {
     const pr = this.projection;
-    const p = projectPoint(pr, nearest(at.x, pr.camX), at.y, nearest(at.z, pr.camZ), this.point);
-    if (p.depth <= 0) return null;
-    const wanted = crosshairFrame(p.depth);
+    const p = projectPoint(pr, nearest(o.x * UNIT, pr.camX), o.y * UNIT, nearest(o.z * UNIT, pr.camZ), this.point);
+    const depth = p.depth - DEPTH_BIAS;
+    if (depth <= RETICLE_DEPTH_MIN || depth >= RETICLE_DEPTH_MAX) return null;
+    const width = VIEWPORT.right - VIEWPORT.left;
+    const height = VIEWPORT.bottom - VIEWPORT.clipTop;
+    if (Math.abs(p.x - pr.cx) >= width + RETICLE_MARGIN_X || Math.abs(pr.cy - p.y) >= height + RETICLE_MARGIN_Y) return null;
+    const wanted = crosshairFrame(depth);
     if (!current) return { x: p.x, y: p.y, frame: wanted };
     current.x += (p.x - current.x) >> 1;
     current.y += (p.y - current.y) >> 1;

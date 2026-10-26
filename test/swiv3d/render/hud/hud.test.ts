@@ -104,7 +104,7 @@ describe.skipIf(!hasOriginalFiles)("HUD (fichiers du jeu)", () => {
       playerX: 20000, playerZ: 20000, playerYaw: 64,
       blips: [{ x: 20500, z: 20300, kind: 0x1001 }, { x: 19400, z: 20100, kind: 0x41 }, { x: 20000, z: 21500, kind: 0x7 }, { x: 90000, z: 0, kind: 0x1001 }],
     },
-    crosshair: { x: 160, y: 140, yellowFrame: 3, redFrame: 3 },
+    crosshair: { yellow: { x: 160, y: 140, frame: 3 }, red: { x: 160, y: 140, frame: 3 } },
   };
 
   it("dessine un HUD fixe avec une somme de contrôle stable", () => {
@@ -173,18 +173,18 @@ describe.skipIf(!hasOriginalFiles)("HUD (fichiers du jeu)", () => {
         blips: Array.from({ length: 50 }, (_, i) => ({ x: i * 1e8 - 1e9, z: -i * 1e8, kind: 0x1001 })),
         objectives: [{ x: -1e7, z: 1e7, current: true }],
       },
-      crosshair: { x: -1e6, y: 1e6, yellowFrame: 99, redFrame: -7 },
+      crosshair: { yellow: { x: -1e6, y: 1e6, frame: 99 }, red: { x: 1e6, y: -1e6, frame: -7 } },
       paused: true,
     };
     const hud = make();
     hud.draw(fb, extreme);
-    hud.draw(fb, { ...extreme, tick: extreme.tick + 5, energy: 1e9, crosshair: { x: 3, y: 2, yellowFrame: 0, redFrame: 0 } });
+    hud.draw(fb, { ...extreme, tick: extreme.tick + 5, energy: 1e9, crosshair: { yellow: { x: 3, y: 2, frame: 0 }, red: null } });
     expect(buffer.subarray(SIZE).every((v) => v === 0xaa)).toBe(true);
   });
 
   it("un viseur au bord gauche ne déborde pas sur le bord droit", () => {
     const fb = new Uint8Array(SIZE);
-    make().draw(fb, { ...base, crosshair: { x: 2, y: 200, yellowFrame: 3, redFrame: 3 } });
+    make().draw(fb, { ...base, crosshair: { yellow: { x: 2, y: 200, frame: 3 }, red: { x: 2, y: 200, frame: 3 } } });
     for (let y = 170; y < 230; y++) expect(fb.subarray(y * SCREEN_WIDTH + 300, y * SCREEN_WIDTH + 320).every((v) => v === 0)).toBe(true);
   });
 

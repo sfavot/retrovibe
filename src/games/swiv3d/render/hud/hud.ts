@@ -6,22 +6,36 @@ import { encodeCp437 } from "../../../../data/cp437";
 import type { GlobalData } from "../../data/global";
 import { blitRows, blitSprite } from "./blit";
 import { drawRadar, stepPointer, type RadarAssets } from "./radar";
-import { SPECIAL_SLOTS, type HudState } from "./state";
+import { SPECIAL_SLOTS, type HudState, type Reticle } from "./state";
+import { messageKey, messageStyle, TINT } from "./messages";
+import { createPauseScreen, type PauseScreen } from "./pause";
 import { ascii, drawText } from "./text";
 import { GAUGE_HEIGHT, GAUGE_WIDTH } from "../../data/global";
+import { createText3d, MessagePool } from "../text3d";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../view";
 
 export interface HudAssets {
-  global: Pick<GlobalData, "weaponIcons" | "radar" | "gauge" | "font" | "strings" | "sprites29x40">;
+  global: Pick<GlobalData, "weaponIcons" | "radar" | "gauge" | "font" | "strings" | "sprites29x40" | "vectorFont">;
   /** Table de mélange de la partie : SLV 108 du niveau (`005bc180`) ; `GLOBAL 800` hors niveau. 65 536 octets. */
   blendTable: Uint8Array;
   /** SLV 109 (128 × 256) : viseur. */
   table109: Uint8Array;
   /** Bloc 103 du niveau (512 × 512). */
   colorMap: Uint8Array;
-  /** 8 Ko à l'offset 0x300 du bloc 11003 du niveau : voir `radarColorTable`. */
+  /** 8 Ko à l'offset 0x300 du bloc 11003 du niveau : voir `radarColorTable`. Sert aussi aux couleurs du texte 3D (`005bc158`). */
   radarColors: Uint8Array;
 }
+
+export interface HudOptions {
+  /** Horloge en millisecondes : les messages 3D de l'écran de pause avancent au rythme de 40 Hz même quand le monde est arrêté. */
+  now?: () => number;
+}
+
+/** Pas de la boucle d'événements de l'exécutable (`0x19` ms) et seuil au-delà duquel le retard est abandonné (800 ms). */
+const EFFECT_TICK_MS = 25;
+const EFFECT_CATCH_UP_MS = 800;
+/** Le monde peut avancer de beaucoup de ticks entre deux images (onglet masqué) : on ne rejoue pas plus d'une durée de vie. */
+const MAX_TICKS_PER_FRAME = 200;
 
 /** Table des couleurs du radar à partir des octets bruts du bloc 11003 (`bd.get(11003)`). */
 export function radarColorTable(block11003: Uint8Array): Uint8Array {
@@ -75,7 +89,7 @@ export function formatAmmo(ammo: number): string {
   return `x${String(Math.trunc(ammo)).padStart(2, "0")}`;
 }
 
-export function createHud(assets: HudAssets): Hud {
+export function createHud(assets: HudAssets, options: HudOptions = {}): Hud {
   const { global: g, blendTable: blend } = assets;
   const radarAssets: RadarAssets = {
     colorMap: assets.colorMap,
@@ -91,9 +105,58 @@ export function createHud(assets: HudAssets): Hud {
   let pointer = 0;
   let lastTick: number | null = null;
 
+  // Messages 3D : le pool de l'exécutable, alimenté par les messages du monde (reconnus par leur clé) et par l'écran de pause.
+  const now = options.now ?? (() => performance.now());
+  const pool = new MessagePool();
+  let glyphPage = 0;
+  const text3d = createText3d({ font: g.vectorFont, glyphIndex: (code) => g.font.glyphIndex(code, glyphPage), colors: assets.radarColors });
+  let seen = new Set<string>();
+  let wasPaused = false;
+  let wallLast = 0;
+  let wallAccumulated = 0;
+  const pauseScreens: Partial<Record<HudState["language"], PauseScreen>> = {};
+
+  /** Un tick des effets (`gm_effects_tick`) par tick du monde ; à l'arrêt (pause), un tick toutes les 25 ms d'horloge. */
+  function advanceMessages(state: HudState, worldTicks: number): void {
+    if (state.paused) {
+      const t = now();
+      if (!wasPaused) wallAccumulated = 0;
+      else wallAccumulated += t - wallLast;
+      wallLast = t;
+      if (wallAccumulated > EFFECT_CATCH_UP_MS) wallAccumulated = 0;
+      for (; wallAccumulated > EFFECT_TICK_MS; wallAccumulated -= EFFECT_TICK_MS) pool.tick();
+    } else {
+      for (let t = 0; t < worldTicks; t++) pool.tick();
+    }
+  }
+
+  /** Crée les messages 3D des nouveaux messages du monde, retire ceux qui ont disparu de la liste, ouvre ou ferme l'écran de pause. */
+  function syncMessages(state: HudState): void {
+    const current = new Set<string>();
+    for (const m of state.messages) {
+      if (m.ticksLeft <= 0) continue;
+      const key = messageKey(m, state.tick);
+      current.add(key);
+      if (seen.has(key)) continue;
+      const { tint, type } = messageStyle(m);
+      pool.spawn(bytesOf(state, m.textTable, m.textId), tint, type);
+    }
+    seen = current;
+    if (state.paused && !wasPaused) pool.spawn(bytesOf(state, 4, 0), TINT.menu, 11);
+    if (!state.paused && wasPaused) pool.releaseTitles();
+  }
+
   function advance(state: HudState): void {
     const target = gaugeTarget(state.energy);
-    const ticks = lastTick === null ? 0 : Math.max(0, Math.min(state.tick - lastTick, 200));
+    if (lastTick !== null && state.tick < lastTick) {
+      // Nouveau niveau : le jeu réinitialise le pool (`gm_message_pool_init`).
+      pool.clear();
+      seen.clear();
+    }
+    const ticks = lastTick === null ? 0 : Math.max(0, Math.min(state.tick - lastTick, MAX_TICKS_PER_FRAME));
+    syncMessages(state);
+    advanceMessages(state, ticks);
+    wasPaused = state.paused;
     if (gaugeFrame < 0 || lastTick === null) gaugeFrame = target;
     for (let t = 1; t <= ticks; t++) {
       pointer = stepPointer(pointer, state.radar);
@@ -145,61 +208,45 @@ export function createHud(assets: HudAssets): Hud {
     if (frame) blitRows(fb, blend, frame, GAUGE_WIDTH, GAUGE_HEIGHT, LAYOUT.gauge.x, LAYOUT.gauge.y);
   }
 
-  /** Viseur : 28 colonnes sur 29 (`00437c38`), tracé à travers la table 109. */
+  /** Viseurs : 28 colonnes sur 29 (`00437c38`), tracés à travers la table 109 ; jaune (images 0 à 15) puis rouge (16 à 31). */
   function drawCrosshair(fb: Uint8Array, state: HudState): void {
     const c = state.crosshair;
     if (!c) return;
-    const draw = (frame: number): void => {
-      const image = g.sprites29x40[frame];
-      if (image) blitRows(fb, assets.table109, image, 29, 40, Math.round(c.x) - 14, Math.round(c.y) - 20, 28);
+    const draw = (reticle: Reticle | null, series: number): void => {
+      if (!reticle) return;
+      const image = g.sprites29x40[series + (reticle.frame & 15)];
+      if (image) blitRows(fb, assets.table109, image, 29, 40, Math.round(reticle.x) - 14, Math.round(reticle.y) - 20, 28);
     };
-    draw(c.yellowFrame & 15);
-    if (c.redFrame !== null) draw(16 + (c.redFrame & 15));
-  }
-
-  function drawMessages(fb: Uint8Array, state: HudState): void {
-    let y = 110;
-    for (const m of state.messages) {
-      if (m.ticksLeft <= 0) continue;
-      const lines = splitLines(bytesOf(state, m.textTable, m.textId));
-      for (const line of lines) {
-        text(fb, state, line, "center", SCREEN_WIDTH / 2, y);
-        y += 22;
-      }
-      y += 10;
-    }
+    draw(c.yellow, 0);
+    draw(c.red, 16);
   }
 
   function drawPause(fb: Uint8Array, state: HudState): void {
-    text(fb, state, bytesOf(state, 4, 0), "center", SCREEN_WIDTH / 2, 170);
-    text(fb, state, bytesOf(state, 4, 1), "center", SCREEN_WIDTH / 2, 200);
+    let screen = pauseScreens[state.language];
+    if (!screen) {
+      const language = GLYPH_PAGE_LANGUAGE[state.language];
+      const hint = g.strings.get(language, 4, 1) ?? "";
+      screen = pauseScreens[state.language] = createPauseScreen(g.font, blend, g.strings.glyphPages[language] ?? 0, hint);
+    }
+    screen.draw(fb);
   }
 
   return {
     draw(fb, state) {
       if (fb.length < SCREEN_WIDTH * SCREEN_HEIGHT) throw new Error("HUD : image trop petite");
+      glyphPage = g.strings.glyphPages[GLYPH_PAGE_LANGUAGE[state.language]] ?? 0;
       advance(state);
       drawCrosshair(fb, state);
-      drawRadar(fb, radarAssets, state.radar, pointer, state.tick);
-      drawWeapons(fb, state);
-      text(fb, state, ascii(formatScore(state.score)), "right", LAYOUT.score.right, LAYOUT.score.y);
-      drawGauge(fb, state);
-      if (state.missionName) text(fb, state, encodeCp437(state.missionName), "center", LAYOUT.mission.x, LAYOUT.mission.y);
-      drawMessages(fb, state);
+      // En pause l'exécutable dessine le décor seul (`gm_frame` sans le drapeau 2) : ni radar, ni jauge, ni score.
+      if (!state.paused) {
+        drawRadar(fb, radarAssets, state.radar, pointer, state.tick);
+        drawWeapons(fb, state);
+        text(fb, state, ascii(formatScore(state.score)), "right", LAYOUT.score.right, LAYOUT.score.y);
+        drawGauge(fb, state);
+        if (state.missionName) text(fb, state, encodeCp437(state.missionName), "center", LAYOUT.mission.x, LAYOUT.mission.y);
+      }
+      text3d.draw(fb, pool);
       if (state.paused) drawPause(fb, state);
     },
   };
-}
-
-/** Sépare une chaîne du jeu sur `|` (saut de ligne). */
-function splitLines(bytes: Uint8Array): Uint8Array[] {
-  const lines: Uint8Array[] = [];
-  let start = 0;
-  for (let i = 0; i <= bytes.length; i++) {
-    if (i === bytes.length || bytes[i] === 0x7c) {
-      lines.push(bytes.subarray(start, i));
-      start = i + 1;
-    }
-  }
-  return lines;
 }

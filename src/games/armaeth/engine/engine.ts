@@ -42,6 +42,7 @@ import {
   InterfaceController,
   type InterfaceWorld,
   type KeyEvent,
+  type NavKey,
   type PointerModifiers,
   type ToolCommand,
 } from "./interface";
@@ -795,6 +796,10 @@ export class ArmaethEngine implements TokenHostEngine {
   }
 
   private dispatchKey(key: HostKey): void {
+    if (key.type === "nav" && key.held === "release") {
+      this.releaseHeroKey(key.key);
+      return;
+    }
     if (this.windows.active || this.runner.status === "waiting-text") {
       const char = key.type === "char" ? key.char : "";
       this.confirmWindow({ type: "key", key: char === "\r" ? "enter" : char === "\x1b" ? "escape" : "other" });
@@ -895,7 +900,7 @@ export class ArmaethEngine implements TokenHostEngine {
           this.execute({ ...action.command, status: "ok", normalized: "" });
           break;
         case "heroKey":
-          this.heroKey(action.dir);
+          this.heroKey(action.dir, action.mode);
           break;
         case "openInputLine":
           this.inputLine = action.recall ? recallInputLine(this.inputLine) : openInputLine(this.inputLine, action.char ?? "");
@@ -920,7 +925,7 @@ export class ArmaethEngine implements TokenHostEngine {
     }
   }
 
-  private heroKey(dir: string): void {
+  private heroKey(dir: string, mode: "toggle" | "start" = "toggle"): void {
     const hero = this.state?.hero;
     if (!hero) return;
     const vector = HERO_KEY_VECTORS[dir as keyof typeof HERO_KEY_VECTORS];
@@ -930,8 +935,8 @@ export class ArmaethEngine implements TokenHostEngine {
     this.resetMotion(hero);
     this.state!.selected = null;
     if (vector) {
-      // rappuyer sur la direction courante arrête le héros
-      if (wasX !== vector[0] || wasP !== vector[1]) {
+      // rappuyer sur la direction courante arrête le héros (sauf flèche tenue : elle ne fait que partir)
+      if (mode === "start" || wasX !== vector[0] || wasP !== vector[1]) {
         hero.speedX = vector[0];
         hero.speedP = vector[1];
       }
@@ -939,6 +944,17 @@ export class ArmaethEngine implements TokenHostEngine {
       const v = dir === "climb" ? -1 : 1;
       hero.speedY = wasY === v ? 0 : v;
     }
+  }
+
+  /**
+   * Flèche tenue relâchée (option du portage) : le héros s'arrête s'il va encore dans cette direction, quels que soient les fenêtres,
+   * la ligne de saisie ou le script en cours (un relâchement n'est jamais une frappe).
+   */
+  private releaseHeroKey(key: NavKey): void {
+    const hero = this.state?.hero;
+    const vector = key === "insert" ? undefined : HERO_KEY_VECTORS[key];
+    if (!hero || !vector || hero.speedX !== vector[0] || hero.speedP !== vector[1]) return;
+    this.resetMotion(hero);
   }
 
   private functionKey(command: string): void {

@@ -1,5 +1,5 @@
 import type { HostInput, HostKey } from "../engine/host";
-import type { NavKey } from "../engine/interface";
+import type { HeroKey, NavKey } from "../engine/interface";
 
 /** Écran logique du jeu (VGA mode 13h). */
 export const SCREEN_WIDTH = 320;
@@ -72,6 +72,48 @@ export function mapKey(event: KeyLike): HostKey | null {
   // Un seul point de code (les touches nommées - « Shift », « Dead », « Tab »... - ont un nom plus long) ; Tab reste au navigateur.
   if ([...event.key].length === 1) return { type: "char", char: event.key };
   return null;
+}
+
+/**
+ * Flèches tenues (option du portage « marcher tant qu'on tient la flèche ») : appui et relâchement des touches de déplacement ->
+ * événements `held` du jeu. Plusieurs flèches tenues : la dernière enfoncée mène ; la relâcher rend la main à la précédente.
+ */
+export class HeldArrows {
+  private readonly held: HeroKey[] = [];
+
+  /** Flèche enfoncée (hors répétition automatique). */
+  press(key: HeroKey): HostKey {
+    this.drop(key);
+    this.held.push(key);
+    return { type: "nav", key, held: "press" };
+  }
+
+  /** Flèche relâchée : reprise de la précédente encore tenue, sinon arrêt ; `null` si la touche n'était pas tenue. */
+  release(key: HeroKey): HostKey | null {
+    if (!this.drop(key)) return null;
+    const previous = this.held[this.held.length - 1];
+    return previous ? { type: "nav", key: previous, held: "press" } : { type: "nav", key, held: "release" };
+  }
+
+  /** Perte du focus ou option coupée : plus rien n'est tenu ; arrêt de la dernière flèche menante. */
+  releaseAll(): HostKey | null {
+    const last = this.held[this.held.length - 1];
+    this.held.length = 0;
+    return last ? { type: "nav", key: last, held: "release" } : null;
+  }
+
+  private drop(key: HeroKey): boolean {
+    const i = this.held.indexOf(key);
+    if (i < 0) return false;
+    this.held.splice(i, 1);
+    return true;
+  }
+}
+
+/** Touche de déplacement du héros (flèches et diagonales, sans Inser) lue d'un `KeyboardEvent`, ou `null`. */
+export function heroKeyOf(event: { key: string }): HeroKey | null {
+  const nav = NAV_KEYS[event.key];
+  return nav && nav !== "insert" ? nav : null;
 }
 
 /** Bouton du DOM (0 gauche, 2 droit) -> masque de boutons du jeu (1 gauche, 2 droit) ; le bouton du milieu n'existe pas. */

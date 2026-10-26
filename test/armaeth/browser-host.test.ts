@@ -3,7 +3,7 @@ import { MemoryStorage } from "../../src/engine/storage";
 import { parsePlainMessages } from "../../src/games/armaeth/data/text";
 import { parseHelp } from "../../src/games/armaeth/data/tables";
 import { hintTexts, menuOptions, open, rootOptions } from "../../src/games/armaeth/ui/help-tree";
-import { InputQueue, type KeyLike, buttonMask, mapKey } from "../../src/games/armaeth/ui/input";
+import { HeldArrows, InputQueue, type KeyLike, buttonMask, heroKeyOf, mapKey } from "../../src/games/armaeth/ui/input";
 import { createSaveStorage, decodeBase64, encodeBase64 } from "../../src/games/armaeth/ui/saves";
 import { MAX_CATCH_UP_TICKS, TICK_MS, TickScheduler } from "../../src/games/armaeth/ui/scheduler";
 import { hasOriginalFiles, readOriginal } from "./helpers";
@@ -126,6 +126,35 @@ describe("InputQueue : souris en échantillons d'état", () => {
     const inputs = q.drain();
     expect(inputs.map((i) => i.type)).toEqual(["key", "pointer", "pointer", "pointer", "key"]);
     expect(inputs[3]).toMatchObject({ buttons: 0 });
+  });
+});
+
+describe("HeldArrows : flèches tenues (option du portage)", () => {
+  it("appui : départ sans bascule ; relâchement : arrêt ; une touche jamais tenue ne fait rien", () => {
+    const arrows = new HeldArrows();
+    expect(arrows.press("left")).toEqual({ type: "nav", key: "left", held: "press" });
+    expect(arrows.release("left")).toEqual({ type: "nav", key: "left", held: "release" });
+    expect(arrows.release("left")).toBeNull();
+    expect(arrows.releaseAll()).toBeNull();
+  });
+
+  it("plusieurs flèches tenues : la dernière mène, la relâcher rend la main à la précédente", () => {
+    const arrows = new HeldArrows();
+    arrows.press("left");
+    arrows.press("up");
+    expect(arrows.release("up")).toEqual({ type: "nav", key: "left", held: "press" });
+    arrows.press("down");
+    // relâcher une flèche qui ne mène pas : la menante est relancée (sans effet si elle allait déjà ainsi)
+    expect(arrows.release("left")).toEqual({ type: "nav", key: "down", held: "press" });
+    expect(arrows.releaseAll()).toEqual({ type: "nav", key: "down", held: "release" });
+    expect(arrows.releaseAll()).toBeNull();
+  });
+
+  it("heroKeyOf : flèches et diagonales, pas Inser ni les autres touches", () => {
+    expect(heroKeyOf(key("ArrowLeft"))).toBe("left");
+    expect(heroKeyOf(key("PageDown"))).toBe("pgdn");
+    expect(heroKeyOf(key("Insert"))).toBeNull();
+    expect(heroKeyOf(key("a"))).toBeNull();
   });
 });
 

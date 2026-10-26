@@ -28,6 +28,8 @@ export interface AppOptions {
 
 /** Identifiant du jeu : préférence « Son » (`retrovibe:armaeth:sound`) et préfixe des sauvegardes (`armaeth:`). */
 const GAME_ID = "armaeth";
+/** Préférence « Flèches tenues » (`"1"` = activée ; désactivée par défaut, comme le jeu d'origine). */
+const HOLD_ARROWS_KEY = `retrovibe:${GAME_ID}:hold-arrows`;
 
 /**
  * Sortie du jeu (`quit()`) : retour à l'accueil du site quand le jeu est monté depuis le site (lien de retour présent), sinon,
@@ -221,7 +223,25 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     { type: "button", class: "toggle aeth-help-link", onclick: () => openHelp() },
     ...withIcons(copy.helpLink, "help"),
   );
-  shell.toggles.append(helpLink);
+  // Flèches tenues : clavier seulement (masqué sur écran tactile, où le héros marche au doigt).
+  const holdArrowsButton = h(
+    "button",
+    { type: "button", class: "toggle aeth-keyboard-only", title: copy.holdArrowsTitle, "aria-pressed": "false" },
+    copy.holdArrows,
+  );
+  const setHoldArrows = (on: boolean): void => {
+    game.setHoldArrows(on);
+    holdArrowsButton.setAttribute("aria-pressed", String(on));
+  };
+  setHoldArrows(store.get(HOLD_ARROWS_KEY) === "1");
+  holdArrowsButton.addEventListener("click", (event) => {
+    const on = holdArrowsButton.getAttribute("aria-pressed") !== "true";
+    setHoldArrows(on);
+    store.set(HOLD_ARROWS_KEY, on ? "1" : "0");
+    // Clic souris (`detail` > 0) : le canvas reprend la main ; activation au clavier : le focus reste sur le bouton.
+    if (event.detail > 0) shell.focusCanvas();
+  });
+  shell.toggles.append(holdArrowsButton, helpLink);
 
   shell.start({
     onPause: (hidden) => {

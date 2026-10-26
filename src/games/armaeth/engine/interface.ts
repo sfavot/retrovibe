@@ -176,7 +176,8 @@ export type InterfaceAction =
   /** Aucun effet ni message : animation des quatre visages rouges. */
   | { type: "refusal" }
   | { type: "system"; command: SystemCommand; delta?: number; mode?: "toggle" | "step" | "normal" }
-  | { type: "heroKey"; dir: HeroMove }
+  /** `toggle` (défaut, jeu d'origine) : rappuyer arrête ; `start` : part sans bascule (flèche tenue, option du portage). */
+  | { type: "heroKey"; dir: HeroMove; mode?: "toggle" | "start" }
   | { type: "openInputLine"; char?: string; recall?: boolean }
   | { type: "functionKey"; n: number; command: string }
   /** F8 pendant un script : saute jusqu'au prochain `fin` (`4b38 = 7`). Le moteur ne l'applique qu'aux scripts non bloquants (`cnt` nul). */
@@ -192,8 +193,11 @@ export type KeyEvent =
   | { type: "function"; n: number; modifier?: "shift" | "ctrl" | "alt" }
   /** Type 3 : Alt + lettre, chiffre, `-` ou `=`. */
   | { type: "alt"; key: string }
-  /** Type 4 : touches de déplacement et Inser. */
-  | { type: "nav"; key: NavKey };
+  /**
+   * Type 4 : touches de déplacement et Inser. `held` (option du portage « marcher tant qu'on tient la flèche ») : `press` fait partir
+   * le héros sans bascule, `release` l'arrête s'il va encore dans cette direction. Sans `held` : comportement du jeu d'origine.
+   */
+  | { type: "nav"; key: NavKey; held?: "press" | "release" };
 
 export interface PointerModifiers {
   ctrl: boolean;
@@ -604,7 +608,8 @@ export class InterfaceController {
       case "nav": {
         if (script) return [];
         if (event.key === "insert") return [{ type: "openInputLine", recall: true }];
-        return canMove ? [{ type: "heroKey", dir: event.key }] : [];
+        if (!canMove) return [];
+        return [event.held === "press" ? { type: "heroKey", dir: event.key, mode: "start" } : { type: "heroKey", dir: event.key }];
       }
     }
   }

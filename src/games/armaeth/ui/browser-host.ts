@@ -3,7 +3,7 @@ import { IndexedPresenter } from "../../../ui/indexed-canvas";
 import { bindCanvasPointer, bindKeyboard } from "../../../ui/pointer";
 import { WebOpl } from "../audio/web-opl";
 import type { ArmaethFrame, ArmaethHost, ArmaethStorage, HostInput, HostKey } from "../engine/host";
-import { InputQueue, SCREEN_HEIGHT, SCREEN_WIDTH, buttonMask, mapKey } from "./input";
+import { HeldArrows, InputQueue, SCREEN_HEIGHT, SCREEN_WIDTH, buttonMask, heroKeyOf, mapKey } from "./input";
 import { createSaveStorage } from "./saves";
 import { HoldToggle, snapTouchTarget } from "./touch";
 
@@ -18,6 +18,8 @@ export class BrowserHost implements ArmaethHost {
   readonly hold = new HoldToggle();
   private readonly presenter: IndexedPresenter;
   private readonly input = new InputQueue();
+  private readonly arrows = new HeldArrows();
+  private holdArrows = false;
   private readonly detach: (() => void)[] = [];
   /** Fichiers du jeu, par nom en minuscules (le moteur demande les noms exacts du CD, on tolère la casse). */
   private readonly files = new Map<string, Uint8Array>();
@@ -67,6 +69,20 @@ export class BrowserHost implements ArmaethHost {
     this.input.key(key);
   }
 
+  /**
+   * Option « marcher tant qu'on tient la flèche » : sinon (défaut, jeu d'origine), une flèche fait partir le héros et la rappuyer
+   * l'arrête. La couper arrête un héros mené par une flèche encore tenue.
+   */
+  setHoldArrows(on: boolean): void {
+    if (on === this.holdArrows) return;
+    this.holdArrows = on;
+    if (!on) this.queueKey(this.arrows.releaseAll());
+  }
+
+  private queueKey(key: HostKey | null): void {
+    if (key) this.input.key(key);
+  }
+
   /** Débloque le son : à appeler depuis un geste de l'utilisatrice. */
   unlock(): void {
     this.opl.unlock();
@@ -76,6 +92,7 @@ export class BrowserHost implements ArmaethHost {
   setPaused(paused: boolean): void {
     if (paused) {
       this.input.releaseAll();
+      this.queueKey(this.arrows.releaseAll());
       this.opl.suspend();
     } else this.opl.resume();
   }
@@ -114,11 +131,23 @@ export class BrowserHost implements ArmaethHost {
           keyDown: (event) => {
             const key = mapKey(event);
             if (!key) return false;
-            input.key(key);
+            const arrow = key.type === "nav" ? heroKeyOf(event) : null;
+            // flèche : la répétition automatique du clavier basculerait marche / arrêt à chaque répétition
+            if (arrow && event.repeat) return true;
+            input.key(arrow && this.holdArrows ? this.arrows.press(arrow) : key);
             return true;
           },
-          // Perdre le focus relâche la souris : sinon un bouton tenu au moment du clic ailleurs resterait enfoncé.
-          blur: () => input.releaseAll(),
+          keyUp: (event) => {
+            const arrow = this.holdArrows ? heroKeyOf(event) : null;
+            if (!arrow) return false;
+            this.queueKey(this.arrows.release(arrow));
+            return true;
+          },
+          // Perdre le focus relâche la souris et les flèches : sinon un bouton tenu au moment du clic ailleurs resterait enfoncé.
+          blur: () => {
+            input.releaseAll();
+            this.queueKey(this.arrows.releaseAll());
+          },
         },
         unlock,
       ),

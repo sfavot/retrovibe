@@ -145,6 +145,10 @@
 }
 
 @media (pointer: coarse) {
+  .aeth-keyboard-only {
+    display: none;
+  }
+
   .aeth-touch-bar {
     display: grid;
     grid-auto-flow: column;

@@ -16,6 +16,7 @@ export const copy = {
   controls: [
     "Souris : cliquer une icône pour choisir l'outil, puis la scène ou un objet. Clic droit : autre sens de l'outil.",
     "Marcher : flèches, Début, Fin, Pg. préc. et Pg. suiv. (8 directions) ; rappuyer sur la même direction arrête. Touche - : monter, touche + : descendre.",
+    "Option « Flèches tenues » (sous l'écran) : le héros marche tant qu'on tient la flèche et s'arrête quand on la lâche.",
     "Taper une phrase (« regarder », « prendre la clef ») puis Entrée. Inser rappelle la dernière, Échap annule.",
     "F1 : aide du jeu. F2 : sauvegarder. F3 : restaurer. F4 : continuer. F5 : recommencer. F6 : score. F10 : inventaire.",
     "Alt + A / Alt + Z : jeu plus lent / plus rapide. Alt + P / Alt + N : pas à pas / vitesse normale.",
@@ -35,6 +36,9 @@ export const copy = {
   cancelLabel: "Annuler la commande (Échap)",
   hold: "Tenir",
   holdLabel: "Tenir un objet : activer, puis toucher l'objet de l'inventaire (Ctrl + clic)",
+  // Option du pied de page, pendant le jeu (clavier).
+  holdArrows: "Flèches tenues",
+  holdArrowsTitle: "Marcher tant qu'on tient la flèche. Désactivé (comme le jeu d'origine) : appuyer pour partir, rappuyer pour s'arrêter.",
   // Lien d'aide du pied de page, pendant le jeu.
   helpLink: "Aide",
   helpResume: "← Retour au jeu",

@@ -5,7 +5,8 @@ Brief commun des sous-agents. Références : `re-index.md` (fonctions nommées),
 ## Avancement
 
 - Phase 1 faite (commits `96ac665`, `f10ef04`) : extraction, corpus Ghidra de `SWIV_WIN.EXE`, lecteurs de toutes les données, décodeur Smacker partagé, visionneuse.
-- Phase 2 : vagues ci-dessous.
+- Phase 2 : vagues ci-dessous. R1-R5, S1-S2 faites (`player.md`, `objects.md`, `rules.md`, `render.md`, `screens.md` ; `src/ui/held-input.ts`, `src/ui/touch-controls.ts`), noms Ghidra fusionnés (338 fonctions nommées) et formats corrigés. Prochaine vague : G1-G3.
+- Rendu établi par R4 : mode X 320×400 8 bits, pixels non carrés (affichage 4:3), terrain en bandes verticales (pas de triangles), palette SLV 11003 et tables de lumière 128×256 des blocs 12xxx. Tick logique 40 Hz (R1).
 
 ## Décisions
 
@@ -19,8 +20,7 @@ Brief commun des sous-agents. Références : `re-index.md` (fonctions nommées),
 
 ## Décisions à prendre
 
-- Résolution d'origine (320×200 ou 320×240 en mode X, option « Screen Size ») : établie en R4, on garde celle du jeu.
-- Sauvegarde : le jeu garde des pilotes (« Select Pilot ») et une progression ; format exact en R5, stockage `localStorage` préfixé `swiv3d:`.
+- Sauvegarde : fiches pilote décrites en R5 (`screens.md`) ; stockage `localStorage` préfixé `swiv3d:`.
 
 ## Vagues
 

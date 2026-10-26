@@ -57,7 +57,7 @@ Drapeaux de EAX : 1 = touches de debug/système, 2 = HUD, 4 = présentation. Dan
 
 ### Tick de logique `FUN_0043c234` [confirmé]
 
-Dans l'ordre : `004841c4++`, `005b0404++` (temps de mission en ticks) ; `FUN_0042a084` (solo) ou `FUN_0042a940` (réseau) = mise à jour des objets (ci-dessus) ; `FUN_0042fc70` (décrémente de 0x1e 4 096 entrées de `005624c8`, plancher 0 : **hypothèse**, intensités de flashs) ; si `005b03e8 >= 0` : `++` (chrono de fin) ; puis **pour chaque joueur** (liste `005af3ac`, suivant en `+0x104`, sauf drapeau `+6 & 0x40`) : fonction pilote `(*(P+0xa8))()` (lit les entrées, §3), `FUN_00459c80` (armes), gestion des fins de mission (`005b0414`, `005b03e8`), `FUN_00438198` (re-visée, §3.8), placement des objets accrochés (`+0x1f8..0x210`, positions relatives au cap : ±`0x40`, ±`0x78`, ±`0x8c`, ±`0xbe` unités de côté), jauge de PV, puis les listes de bonus temporisés `00587704`.
+Dans l'ordre : `004841c4++`, `005b0404++` (temps de mission en ticks) ; `FUN_0042a084` (solo) ou `FUN_0042a940` (réseau) = mise à jour des objets (ci-dessus) ; `FUN_0042fc70` (`gm_ground_flash_fade` : décrémente de 0x1e les 4 096 cases de la carte d'éclairs au sol `005624c8`, plancher 0, `render.md` §6.1) ; si `005b03e8 >= 0` : `++` (chrono de fin) ; puis **pour chaque joueur** (liste `005af3ac`, suivant en `+0x104`, sauf drapeau `+6 & 0x40`) : fonction pilote `(*(P+0xa8))()` (lit les entrées, §3), `FUN_00459c80` (armes), gestion des fins de mission (`005b0414`, `005b03e8`), `FUN_00438198` (re-visée, §3.8), placement des objets accrochés (`+0x1f8..0x210`, positions relatives au cap : ±`0x40`, ±`0x78`, ±`0x8c`, ±`0xbe` unités de côté), jauge de PV, puis la liste des déformations du terrain `00587704` (durée `+0x0c` décrémentée, nœuds échus rendus à la réserve `00587714`, `render.md` §10).
 
 La jauge de PV (`+0x118`, 0..0x1f) suit `clamp(PV >> 5, 0, 0x1f)` d'un cran tous les deux ticks (si > 0xf : +0xc), avec les sons `0xfa1` aux franchissements 0x10 et 0x1a.
 
@@ -95,7 +95,7 @@ Le joueur est un **objet de 0x228 octets** (20 emplacements à `005a936c`, point
 | `+0x118` | jauge de PV affichée |
 | `+0x120` | arme courante (−1 = aucune) ; `+0x128..0x174` : possession/munitions des 20 armes ; `+0x178` : déclencheur spécial |
 | `+0x190` | valeur recalculée chaque tick à partir de la vitesse (`+0x2710 + vy/2 + v²/2^14`) : **hypothèse** (fréquence du son moteur) |
-| `+0x1a8..0x1b4` | objets enfants (roues, type `0x3d4`/`0x3d7`) des formes 1, 2 |
+| `+0x1a8..0x1b4` | objets enfants (roues, type `0x3d4`/`0x3d7`) des formes 1, 2 (§3.6) |
 | `+0x1b8` | 1 = joueur piloté par le réseau |
 | `+0x214/+0x218/+0x21c` | **accumulateurs d'angle** du pilote hélicoptère : cap Q8, tangage Q8, roulis Q7 |
 | `+0x224` | molette (variante réseau) |
@@ -107,7 +107,7 @@ Le joueur est un **objet de 0x228 octets** (20 emplacements à `005a936c`, point
 | Forme | Type | Fonction pilote `+0xa8` | Physique `+0x68` | Son en boucle | Rôle |
 |---|---|---|---|---|---|
 | 0 | 990 | `00439088` (`00439670` si réseau) | `00449aa8` → `FUN_00444af8(obj, 0x50)` | 5000 | **hélicoptère** (forme de départ) |
-| 1 | 991 | `0043a174` | `00445228` | 5001 | buggy : 4 roues enfants `0x3d4` (non portées) ; `+0x190 = 11000` à la création |
+| 1 | 991 | `0043a174` | `00445228` | 5001 | buggy : 4 roues enfants `0x3d4` (§3.6) ; `+0x190 = 11000` à la création |
 | 2 | 991 | `0043a760` | `00445670` | 5001 | motoneige : 2 roues `0x3d4` + ski `0x3d7` ; l'arrière s'enfonce de 2 000 dans l'eau |
 | 3 | 990 | `00439bcc` | `00449ad0` → `FUN_00444af8(obj, 0x50)` | 5002 | hélicoptère, même pilotage que la forme 0 (molette lue dans `+0x224`) |
 | 4 | 991 | `0043ac64` | `00445a84` | 5001 | véhicule nerveux (poussée 210 par touche, frottement 61/64, gravité 120, pas de roues) |
@@ -201,7 +201,7 @@ frein (clavier) : avancer+reculer, ou « frein », ou « latéral gauche » (for
 frein (axe) : « frein » si état == 0 (forme 2 : toujours)
 puis, APRÈS les armes, si état != 1 : avancer += pas, reculer -= pas   // une touche tenue vaut donc 2 pas (0x104) sans frein
 +0x94 = cap tant que « latéral droit » n'est pas tenu (cap de tir des projectiles)
-formes 1, 2 : si vx*SIN[cap] + COS[cap]*vz < -7000 (marche arrière) : cible = -cible ; puis b0 → b4 par pas de 4 ; roues enfants
+formes 1, 2 : si vx*SIN[cap] + COS[cap]*vz < -7000 (marche arrière) : cible = -cible ; puis b0 → b4 par pas de 4 ; roues enfants (§3.6)
 ```
 
 Le doc d'origine (R1) comptait un seul pas de poussée : corrigé, la lecture de la décompilation en montre deux. Les formes 4 et 5 n'ont ni braquage ni roues.
@@ -234,7 +234,28 @@ Aucun garde-fou d'angle dans l'exe (l'ancien `±128` du port est supprimé). **V
 
 Hauteur et type de sol : `gm_terrain_height_water` (`sampleGround`) avec `00577670 & 2` (script : 3 dans TERRAN00-03, donc `water` vaut `true` par défaut dans `World`) : type = octet de la carte 102, coins d'eau relevés de `WAVE[(cz·4 + temps + SIN[(cx&31)·16]) & 31]·256`, `temps` = ticks (`00481154`).
 
-**Non porté** : les roues enfants (`0x3d4`/`0x3d7`, `004446a0`, `gm_upd_wheel`) : décor sans effet sur la physique (`steer` et `wheelSpin` sont tenus à jour pour elles).
+**Roues enfants des formes 1 et 2** [confirmé, porté : `wheels.ts`] : décor sans effet sur la physique.
+
+- **Création** (`0043de0c`) : objets clonés sur le joueur (classe `0x40`, pv 0, comportement vide `004450a8`), rangés en `+0x1a8…+0x1b4`, emplacement dans `+0x50`. Forme 1 : 4 roues `0x3d4` (980) aux emplacements 0-3 si le monde `004841b0` < 2, 7-10 sinon ; forme 2 : roues `0x3d4` 4, 5 et ski `0x3d7` (983) 6. Quitter la forme 1 ou 2 les efface (`+4 = 0`). Le monde est déduit du nom du niveau dans le port (seuls TERRAN00-03 sont livrés).
+- **Emplacements** (table `00484324`, 16 octets : latéral, vertical, avant en Q8, 4ᵉ champ non lu) : 0-3 `(±4800, −1500, +3000 / −3000)` ; 4-5 `(±4800, −1500, −3000)` ; 6 `(0, −1500, +6000)` ; 7-10 `(±5000, −1500, +6000)` et `(±6200, −1500, −4000)` (voie plus large sur la Lune et Mars). L'ancien doc y voyait des « textures » : ce sont des indices d'emplacement.
+- **`gm_wheel_update` (`004446a0`, roue, mode)**, à la fin de la fonction pilote, avec `004841bc = braquage +0xb0` :
+
+```
+vitesse = celle du joueur ; position = joueur + emplacement tourné par tangage, roulis, cap (FUN_004418b0 = gm_attach_offset)
+h = hauteur_eau(x, z) ; si y <= h + 4000 : y = h + 2000          # roue relevée au-dessus du sol
+cap = cap du joueur ; roulis = roulis du joueur
+mode 2 (ski) : tangage = tangage du joueur ; cap += braquage ; modèle 0x3d7 ; fin
+si type de sol < 4 (eau) et y − (h + 1500) < 2000 : y = h ; modèle 0x3d6 ; tangage = 0 ; modes 3, 4 : cap += braquage
+sinon :
+  modes 0, 3, 4 : tangage −= (SIN[cap]·vx + COS[cap]·vz) >> 13      # rotation selon la vitesse le long du cap
+  mode 1 : tangage = tangage du joueur
+  y = (cap & 511) + 1500 < y ? y − 1500 : cap & 511             # bogue de l'exe : la variable du sol est réutilisée pour le cap
+  modèle 0x3d4 ; mode 3 : cap += braquage ; mode 4 : cap −= braquage >> 1
+```
+
+- **Appelants** : forme 1 (`0043a174`) modes 3, 3, 4, 4 ; forme 2 (`0043a760`) modes 1, 1, 2 ; pilote coupé `gm_pilot_wheels` (`00438694`, amarrage au sol par `004482dc`, Super Ressort des formes 1 et 2 par `0045e128`) : braquage vers la cible par pas de **8**, modes 3, 3, 4, 4 sur les **4** pointeurs (la motoneige y passe son ski en roue `0x3d4` et l'exe écrit un 4ᵉ pointeur resté de la forme 1 : ignoré dans le port) ; variante `00438c68` (modes 1, 1, 2, installée par `004495f8`, non porté) ; fins de niveau `00438ec8` / `00438fb8` (non portées). Le pilote de la forme 1 fait en plus tourner les roues arrière à chaque pas de poussée : touche avancer `−13` sur `+0x1b0` et `+0x1b4` (reculer `+13`), deux fois sans frein ; axe : `−axe·30 >> 8` sur `+0x1b0` seule.
+- **Mort** (`0043b4f4`, formes 1 et 2) : après les explosions et les éclats du joueur, chaque roue devient un gros éclat (`0044412c`), vitesse `(x, |y|, z)·9` de la table pseudo-aléatoire, cap = `x` du tirage suivant, modèle `0x3d4`.
+- Rendu : 980 et 982 sont dans les `.SLV` livrés (blocs 10980, 10982) ; **983 (ski) n'est ni dans les `.SLV` ni dans `GLOBAL.BD`** : le port ne dessine pas le ski (aucune mission livrée ne donne la motoneige) ; ce que fait l'exe d'un modèle absent n'est pas lu.
 
 ### 3.7 Collisions et dégâts [confirmé]
 
@@ -468,7 +489,7 @@ Les noms `gm_*` proposés ne sont pas dans `keyfuncs.def.tsv` (le coordinateur f
 | `0043c234` | `gm_game_tick` | un tick de logique (25 ms) : objets, fonctions pilote, mort, jauge de PV |
 | `004234ec` | `gm_effects_tick` | tick de la file d'effets (particules) `005876dc` : `pos += vel`, durée `+0x38` |
 | `004157d0` | `gm_menu_anim_tick` | décompte animé des scores des menus (drapeau 2 de `gm_poll_events`) |
-| `0042fc70` | `gm_decay_flash_table` | décrémente 4 096 entrées de `005624c8` de 0x1e (hypothèse : flashs) |
+| `0042fc70` | `gm_ground_flash_fade` | décrémente de 0x1e les 4 096 cases de la carte d'éclairs au sol `005624c8` (C) |
 | `0042a084` | `gm_objects_update` | mise à jour des objets solo : fenêtre 11 × 11, `pos += vel`, tore, fonction `+0x68`, collisions sphériques |
 | `0042a940` | `gm_objects_update_net` | variante réseau (probable) |
 | `0042a010` | `gm_type_radius2` | rayon² du modèle du type (100 si type 0 ou ≥ 10 000) |
@@ -480,7 +501,7 @@ Les noms `gm_*` proposés ne sont pas dans `keyfuncs.def.tsv` (le coordinateur f
 | `00445670` | `gm_vehicle_physics_2` | physique du véhicule forme 2 |
 | `00445a84` | `gm_vehicle_physics_4` | physique du véhicule forme 4 |
 | `00445f44` | `gm_vehicle_physics_5` | physique du véhicule forme 5 |
-| `004446a0` | `gm_wheel_update` | animation et braquage d'une roue enfant |
+| `004446a0` | `gm_wheel_update` | position, braquage et rotation d'une roue enfant (§3.6) |
 | `0043de0c` | `gm_player_set_form` | change la forme du joueur (type 990/991, fonctions pilote/physique, enfants, sons) |
 | `0043cab4` | `gm_player_init_state` | initialise PV, armes, touches (copiées du profil `(0x14, pilote, 2)`) |
 | `0043ca60` | `gm_player_load_keys` | recopie 11 touches du profil dans le joueur |
@@ -515,8 +536,8 @@ Variables globales utiles : `00490010` états de touches, `004841a4` type de con
 
 - Lecture des types 3, 4 (calibration), 6 (Creative Blaster) : seule `joyGetPosEx` du type 5 est dans `gm_poll_events` ; `FUN_00410b74` lit les trois axes pour la calibration. Les codes `0xf0..0xf7` du type 6 restent inexpliqués.
 - Forme 3 (identique à la 0 pour le pilotage) ; déclencheurs précis des formes 2, 4, 5 (objets bonus), à croiser avec R2/R3. Noms des formes (buggy, motoneige, aéroglisseur) : déduits du comportement (eau, modèles), pas des chaînes du jeu.
-- Roues enfants des formes 1 et 2 non portées (décor). `+0x94` (cap de tir) est tenu à jour dans `Player.fireYaw` et lu par le canon (`gm_primary_bullet_spawn`, `0046b4b4`). Les constantes de frottement des formes 4 et 5 sont à relire dans `00445a84` / `00445f44` avant portage.
-- `FUN_0042fc70` (table `005624c8`), liste `00587704` (« plan large », +900 en hauteur), `+0x190`, `00480c80`, le sens des touches F3/F4 et la condition `profil[+0x28] > 0` : hypothèses.
-- `FUN_004446a0` et `FUN_00443ed0` (effets au choc) non lus ; séquence de mort `00438744` non décrite en détail (R3).
+- `+0x94` (cap de tir) est tenu à jour dans `Player.fireYaw` et lu par le canon (`gm_primary_bullet_spawn`, `0046b4b4`). Les constantes de frottement des formes 4 et 5 sont à relire dans `00445a84` / `00445f44` avant portage.
+- Liste `00587704` (« plan large », +900 en hauteur), `+0x190`, `00480c80`, le sens des touches F3/F4 et la condition `profil[+0x28] > 0` : hypothèses.
+- `FUN_00443ed0` (effets au choc) non lu ; séquence de mort `00438744` non décrite en détail (R3).
 - La cadence réelle dépend de la résolution de `msg.time` de Windows 95 ; le port devrait utiliser un pas exact de 25 ms avec la même règle de plafond (800 ms).
 - Les simulations par calcul (§3.3, §3.6) n'ont **pas** été recoupées avec une exécution du jeu d'origine : les valeurs d'équilibre sont à valider visuellement.

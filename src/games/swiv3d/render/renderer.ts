@@ -50,7 +50,7 @@ export function createRenderer(assets: RenderAssets): Renderer {
       const headLength = Math.hypot(projection.fx, projection.fz) || 1;
       const targetX = projection.camX + (ROW_TARGET_DISTANCE * projection.fx) / headLength;
       const targetZ = projection.camZ + (ROW_TARGET_DISTANCE * projection.fz) / headLength;
-      terrain.draw(fb, projection, columns, time, waterMode, targetX, targetZ);
+      terrain.draw(fb, projection, columns, time, waterMode, targetX, targetZ, view.groundFlash ?? null);
 
       objects.begin(projection, time, waterMode);
       for (const object of view.objects) objects.addObject(object);

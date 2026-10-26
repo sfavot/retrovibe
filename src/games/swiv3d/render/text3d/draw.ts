@@ -8,6 +8,7 @@ import type { VectorFont } from "../../data/global";
 import { COS, idiv, SIN } from "../tables";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../view";
 import type { Message3D, MessagePool } from "./message";
+import { DepthList } from "./depth-list";
 import { fillFlatTriangle } from "./raster";
 
 /** Capacité de la file de primitives (`0xbb3`). */
@@ -53,11 +54,10 @@ export function createText3d(assets: Text3dAssets): Text3d {
 
   // File des faces à tracer.
   let count = 0;
-  const key = new Int32Array(QUEUE_CAPACITY);
   const colour = new Uint8Array(QUEUE_CAPACITY);
   const qx = new Int32Array(QUEUE_CAPACITY * 3);
   const qy = new Int32Array(QUEUE_CAPACITY * 3);
-  const order = new Int32Array(QUEUE_CAPACITY);
+  const list = new DepthList(QUEUE_CAPACITY);
   const triX = new Int32Array(3);
   const triY = new Int32Array(3);
 
@@ -116,7 +116,7 @@ export function createText3d(assets: Text3dAssets): Text3d {
       if ((sx[a]! < CLIP.left && sx[b]! < CLIP.left && sx[c]! < CLIP.left) || (sx[a]! > CLIP.right && sx[b]! > CLIP.right && sx[c]! > CLIP.right)) continue;
       if ((sy[a]! < CLIP.top && sy[b]! < CLIP.top && sy[c]! < CLIP.top) || (sy[a]! > CLIP.bottom && sy[b]! > CLIP.bottom && sy[c]! > CLIP.bottom)) continue;
       const i = count++;
-      key[i] = depth[a]! + depth[b]! + depth[c]!;
+      list.insert(i, depth[a]! + depth[b]! + depth[c]!);
       qx[i * 3] = sx[a]!;
       qx[i * 3 + 1] = sx[b]!;
       qx[i * 3 + 2] = sx[c]!;
@@ -157,12 +157,10 @@ export function createText3d(assets: Text3dAssets): Text3d {
       if (fb.length < SCREEN_WIDTH * SCREEN_HEIGHT) throw new Error("texte 3D : image trop petite");
       colors = table;
       count = 0;
+      list.reset();
       for (const m of pool.active) layout(m);
-      // Du plus loin au plus proche ; à clé égale, dans l'ordre d'empilement.
-      const sorted = order.subarray(0, count);
-      for (let i = 0; i < count; i++) sorted[i] = i;
-      sorted.sort((p, q) => key[q]! - key[p]! || p - q);
-      for (const i of sorted) {
+      // Du plus loin au plus proche, en suivant la liste depuis la sentinelle de tête.
+      for (let i = list.first(); i >= 0; i = list.next(i)) {
         for (let k = 0; k < 3; k++) {
           triX[k] = qx[i * 3 + k]!;
           triY[k] = qy[i * 3 + k]!;

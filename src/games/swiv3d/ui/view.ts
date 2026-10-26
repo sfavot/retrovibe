@@ -140,6 +140,7 @@ export class ViewBuilder {
     }
     this.view.camera = cameraToRender(world.camera);
     this.view.time = world.tickCount;
+    this.view.groundFlash = world.groundFlash;
     return this.view;
   }
 }

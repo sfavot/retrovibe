@@ -6,9 +6,9 @@
  * (`gm_upd_napalm` `00457784`, `gm_upd_super_napalm` `00457bcc`) et goutte de napalm (`00457000`). Les missiles à tête chercheuse
  * (`gm_upd_missile_*`) sont dans `projectiles.ts`. Voir `docs/swiv3d/rules.md` §3.
  *
- * Écarts assumés : l'exe ne laisse exploser le mortier et ne déclenche la bombe que si une réserve d'« éclairs au sol » (`00587714`,
- * objets de lumière du sol dessinés par `gm_ground_flash_add`) n'est pas vide ; le moteur n'a pas ces éclairs (le rendu ne les
- * dessine pas), la réserve est donc considérée comme toujours disponible.
+ * Écarts assumés : l'exe ne laisse exploser le mortier et ne déclenche l'onde de la bombe que si la réserve de déformations du
+ * terrain n'est pas vide (liste libre `00587714` des 5 nœuds de `gm_deformers_apply`, `render.md` §10, rendus au bout de leur
+ * durée par `gm_game_tick`) ; le moteur n'a pas ces déformations, la réserve est donc considérée comme toujours disponible.
  */
 import {
   PROJECTILE_CLASS,
@@ -18,14 +18,10 @@ import {
   localVelocity,
   nextRandom,
   smokeTrail,
-  sound,
-  spawnOnGround,
-  FX_CLASS,
-  SND,
 } from "./combat";
+import { explodeHeavy } from "./enemies";
 import { ANGLE_MASK, COS, SIN, normalize256 } from "./fixed";
-import { CLASS, FLAG, radius2, type GameObject } from "./objects";
-import { digCrater } from "./terrain";
+import { CLASS, FLAG, type GameObject } from "./objects";
 import type { World } from "./world";
 
 /** Classe des projectiles du joueur : `0x3f` = `0x3b` + bit 0x04 (`MOV EAX,0x3f` des clones du joueur et des compagnons). */
@@ -422,16 +418,6 @@ export function superNapalm(world: World, o: GameObject): void {
   smokeTrail(world, o, 6);
 }
 
-/** Cratère et décalque d'une explosion lourde à la position de `o` (`00443ac0` avec le test de décor du site, `00424db4`). */
-function explodeAt(world: World, o: GameObject): void {
-  const r2 = radius2(world.models, o.model);
-  const size: 0 | 1 | 2 = r2 < 1000 ? 0 : r2 < 5000 ? 1 : 2;
-  digCrater(world, o, size);
-  world.emit({ kind: "crater", x: o.x, z: o.z, size });
-  spawnOnGround(world, { x: o.x, z: o.z, classe: FX_CLASS, hp: 3000, model: 900 + size, update: "fx_decal" });
-  sound(world, SND.bigExplosion, o);
-}
-
 /**
  * `00457000` : goutte de napalm. Au sol : devient le décalque 901 (taille d'explosion de ce modèle), cratère, explosion ; blessée
  * (pv ≠ 50 après un contact) : éclat. Gravité de 90 par tick.
@@ -440,7 +426,7 @@ export function napalmDrop(world: World, o: GameObject): void {
   if (world.terrain.height(o.x, o.z) >= o.y) {
     o.model = 0x385;
     o.classe = 0;
-    explodeAt(world, o);
+    explodeHeavy(world, o);
   }
   if (o.hp !== 0x32) {
     o.classe = 0;

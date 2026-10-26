@@ -432,13 +432,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     const view = flow.view;
     if (view !== lastView) {
       if (lastView?.kind === "video") video?.player?.stop();
-      // Titres 3D : en quittant un menu les titres repartent (`gm_title_release`) et le titre du menu suivant arrive ; un écran sans menu les efface.
+      // Titres 3D : en quittant un menu les titres repartent (`gm_title_release`) et le titre du menu suivant arrive ; un écran sans menu
+      // les efface. Les écrans de fin n'ont pas de titre 3D et ne relâchent rien : le message figé du niveau y reste.
       if (view.kind === "menu") {
         glyphPage = global.strings.glyphPages[flow.language] ?? 0;
         titles.release();
-        if (view.title) titles.show(view.title);
-        // Écran de fin : les messages figés du niveau (« Accompli », « Game over ! ») repartent aussi.
-        if (view.backdrop === "level") levelSession?.releaseTitles();
+        if (view.title) titles.show(view.title.text, view.title.tint);
       } else if (lastView?.kind === "menu") titles.clear();
       lastView = view;
     }
@@ -462,26 +461,27 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         }
         break;
       case "menu": {
-        // Les aplats se mélangent à l'image déjà présente : le fond est refait à chaque image.
+        // Les aplats se mélangent à l'image déjà présente : le fond est refait à chaque image. Ordre de `gm_menu_run` : `gm_frame` (décor,
+        // titres 3D) puis les lignes du menu par-dessus.
         if (view.backdrop === "level" && levelSession) {
           // Écran de fin : le niveau continue (monde simulé, joueur sans commandes), le menu et le titre 3D par-dessus.
           text.blend = levelSession.world.level.fadeTable;
           levelSession.onFrame(now);
-          view.menu.draw(framebuffer);
           titles.draw(framebuffer, now, levelSession.textColors);
+          view.menu.draw(framebuffer);
           present(levelLut);
         } else if (view.backdrop === "demo") {
           text.blend = demoTable;
           demo.onFrame(now);
-          view.menu.draw(framebuffer);
           titles.draw(framebuffer, now, demo.textColors);
+          view.menu.draw(framebuffer);
           present(demo.palette);
         } else {
           // Écran d'abandon : dernière image du niveau, figée.
           text.blend = frozenTable;
           framebuffer.set(frozen);
-          view.menu.draw(framebuffer);
           titles.draw(framebuffer, now, levelSession?.textColors ?? demo.textColors);
+          view.menu.draw(framebuffer);
           present(frozenLut);
         }
         break;

@@ -84,4 +84,9 @@ export interface RenderView {
   time: number;
   /** `waterMode` du jeu : bit 0 = vagues sur le terrain, bit 1 = hauteur « avec vagues » pour les objets ; 3 par défaut. */
   waterMode?: number;
+  /**
+   * Carte d'éclairs au sol `005624c8` (64×64 entiers, case `(cz & 63) · 64 + (cx & 63)` pour le sommet `(cx, cz)`) : sa valeur
+   * s'ajoute à la lumière des sommets du terrain. Absente : aucun éclair.
+   */
+  groundFlash?: Int32Array;
 }

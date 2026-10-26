@@ -13,6 +13,7 @@
  * livrées ne la donne) ; le signe latéral des armes à nacelle unique (5 à 8, 15 à 18) est celui de l'ordre des blocs de l'exe (nova +,
  * mortier −, bombe +, napalm −, nucléateur +, super mortier −, méga-bombe −, super napalm +), non vérifié bloc par bloc.
  */
+import { attachTo } from "./attach";
 import { SND, cloneObject, localVelocity, smokeTrail, sound } from "./combat";
 import { ANGLE_MASK, COS, SIN, normalize256 } from "./fixed";
 import { CLASS, FLAG, GRID_SIZE, type GameObject } from "./objects";
@@ -167,22 +168,7 @@ export function launcherOf(form: number, n: number): Launcher | null {
 
 /** `gm_attach_offset` (`004580f0`) : pose `o` à `(lat, vert, fwd)` dans le repère (cap, tangage, roulis) du joueur, étage par étage. */
 export function attachOffset(world: World, o: GameObject, lat: number, vert: number, fwd: number): void {
-  const p = world.player.obj;
-  const sp = SIN[-p.pitch & ANGLE_MASK]!;
-  const cp = COS[-p.pitch & ANGLE_MASK]!;
-  const sr = SIN[-p.roll & ANGLE_MASK]!;
-  const cr = COS[-p.roll & ANGLE_MASK]!;
-  const sy = SIN[-p.yaw & ANGLE_MASK]!;
-  const cy = COS[-p.yaw & ANGLE_MASK]!;
-  const t1 = (vert * cp - fwd * sp) >> 8;
-  const t2 = (vert * sp + fwd * cp) >> 8;
-  const lat2 = (lat * cr - t1 * sr) >> 8;
-  const vert2 = (lat * sr + t1 * cr) >> 8;
-  const x = (lat2 * cy - t2 * sy) >> 8;
-  const z = (lat2 * sy + t2 * cy) >> 8;
-  o.x = p.x + x;
-  o.y = p.y + vert2;
-  o.z = p.z + z;
+  attachTo(world.player.obj, o, lat, vert, fwd);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

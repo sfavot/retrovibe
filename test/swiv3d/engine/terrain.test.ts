@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { Terrain, applyCrater, applyPointCrater, craterSiteClear } from "../../../src/games/swiv3d/engine/terrain";
+import {
+  GROUND_FLASH_SIZE,
+  Terrain,
+  addGroundFlash,
+  applyCrater,
+  applyPointCrater,
+  craterSiteClear,
+  fadeGroundFlash,
+  newGroundFlash,
+} from "../../../src/games/swiv3d/engine/terrain";
 import { loadGlobal } from "../screens/support";
 import { hasOriginalFiles, loadLevel } from "./helpers";
 import { rec, scenario } from "./scenario";
@@ -214,5 +223,72 @@ describe.skipIf(!hasOriginalFiles)("cratères : site libre de décor (`00424db4`
     expect(craterSiteClear(near.world, near.world.player.obj, 0)).toBe(false);
     const solid = scenario("TERRAN00", (sx, sz) => [rec(5000, sx + 50, sz, { model: 500, childModel: 501, hitPoints: 10 })]);
     expect(craterSiteClear(solid.world, solid.world.player.obj, 0)).toBe(true);
+  });
+});
+
+describe("éclairs au sol (`005624c8`)", () => {
+  const at = (map: Int32Array, cx: number, cz: number): number =>
+    map[(cz & (GROUND_FLASH_SIZE - 1)) * GROUND_FLASH_SIZE + (cx & (GROUND_FLASH_SIZE - 1))]!;
+
+  it("gm_ground_flash_add : carré 3×3 (centre, bords ½, coins ¼) et croix de rayon 2 (¼), selon l'intensité", () => {
+    for (const level of [0, 1, 2, 3] as const) {
+      const map = newGroundFlash();
+      addGroundFlash(map, (10 << 14) + 0x3fff, 20 << 14, level); // la fraction de cellule est ignorée
+      const c = 0x100 * (level + 1);
+      expect(at(map, 10, 20)).toBe(c);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) expect(at(map, 10 + dx!, 20 + dz!)).toBe(c >> 1);
+      for (const [dx, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1], [2, 0], [-2, 0], [0, 2], [0, -2]])
+        expect(at(map, 10 + dx!, 20 + dz!)).toBe(c >> 2);
+      expect(map.reduce((a, v) => a + v, 0)).toBe(c + 4 * (c >> 1) + 8 * (c >> 2));
+      expect(at(map, 12, 21)).toBe(0);
+    }
+  });
+
+  it("replie la carte sur 64 cellules (monde de 512 : 8 répétitions) et cumule les éclairs", () => {
+    const map = newGroundFlash();
+    addGroundFlash(map, 64 << 14, 127 << 14, 1); // cellule (0, 63)
+    addGroundFlash(map, 0, -1 << 14, 1); // même case
+    expect(at(map, 0, 63)).toBe(0x400);
+    expect(at(map, 0, 1)).toBe(0x100); // (0, 63 + 2) replié, deux fois 0x80
+    expect(at(map, 62, 63)).toBe(0x100); // (0 - 2, 63)
+    expect(at(map, 63, 0)).toBe(0x100); // coin (-1, 64)
+  });
+
+  it("gm_ground_flash_fade : -0x1e par tick, plancher 0", () => {
+    const map = newGroundFlash();
+    map[0] = 0x40;
+    map[1] = 0x1e;
+    map[2] = 5;
+    fadeGroundFlash(map);
+    expect([...map.subarray(0, 4)]).toEqual([0x22, 0, 0, 0]);
+    fadeGroundFlash(map);
+    expect(map[0]).toBe(4);
+    fadeGroundFlash(map);
+    expect(map[0]).toBe(0);
+    // un éclair d'intensité 3 (centre 0x400) s'éteint en ⌈1024 / 30⌉ = 35 ticks
+    addGroundFlash(map, 0, 0, 3);
+    let ticks = 0;
+    while (map[0]! > 0) {
+      fadeGroundFlash(map);
+      ticks++;
+    }
+    expect(ticks).toBe(35);
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("éclairs au sol : gm_object_explode et tick", () => {
+  it("une explosion lourde ajoute un éclair d'intensité taille + 1, que le tick fait décroître", async () => {
+    const { World } = await import("../../../src/games/swiv3d/engine/world");
+    const { explodeHeavy } = await import("../../../src/games/swiv3d/engine/enemies");
+    const { level, models } = loadLevel("TERRAN00");
+    const world = World.load(level, models);
+    expect(world.groundFlash.every((v) => v === 0)).toBe(true);
+    const p = world.player.obj;
+    const o = world.spawn({ classe: 1, hp: 0, x: p.x + (3 << 14), z: p.z, model: 0 })!; // modèle inconnu : rayon² 100 → taille 0
+    explodeHeavy(world, o);
+    const cell = (((o.z >> 14) & 63) << 6) + ((o.x >> 14) & 63);
+    expect(world.groundFlash[cell]).toBe(0x200);
+    world.tick((await import("../../../src/games/swiv3d/engine/input")).emptyInput());
+    expect(world.groundFlash[cell]).toBe(0x200 - 0x1e);
   });
 });

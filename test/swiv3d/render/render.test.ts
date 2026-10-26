@@ -92,6 +92,33 @@ describe.skipIf(!hasOriginalFiles)("rendu logiciel (fichiers du jeu)", () => {
     expect(hash(a)).not.toBe(hash(b));
   });
 
+  it("éclaircit le terrain sous les éclairs au sol (`005624c8`), dans la borne de lumière [15, 110]", () => {
+    const pal = t00.renderer.palette;
+    const luminance = (fb: Uint8Array): number => {
+      let sum = 0;
+      for (const i of fb) sum += pal[i * 3]! + pal[i * 3 + 1]! + pal[i * 3 + 2]!;
+      return sum;
+    };
+    const plain = new Uint8Array(SIZE);
+    t00.renderer.render({ ...fixed, objects: [], sprites: [] }, plain);
+    const zero = new Uint8Array(SIZE);
+    t00.renderer.render({ ...fixed, objects: [], sprites: [], groundFlash: new Int32Array(4096) }, zero);
+    expect(hash(zero)).toBe(hash(plain));
+
+    const lit = new Uint8Array(SIZE);
+    t00.renderer.render({ ...fixed, objects: [], sprites: [], groundFlash: new Int32Array(4096).fill(0x40) }, lit);
+    expect(luminance(lit)).toBeGreaterThan(luminance(plain));
+    // Ciel intact : seuls les pixels du terrain changent.
+    for (let i = 0; i < SIZE; i++) if (plain[i] === 0) expect(lit[i]).toBe(0);
+
+    // Au-delà de la borne 110, un éclair plus fort ne change plus rien.
+    const strong = new Uint8Array(SIZE);
+    const stronger = new Uint8Array(SIZE);
+    t00.renderer.render({ ...fixed, objects: [], sprites: [], groundFlash: new Int32Array(4096).fill(0x100) }, strong);
+    t00.renderer.render({ ...fixed, objects: [], sprites: [], groundFlash: new Int32Array(4096).fill(0x4000) }, stronger);
+    expect(hash(stronger)).toBe(hash(strong));
+  });
+
   it("n'écrit jamais hors de l'image, quelle que soit la vue", () => {
     // L'image est suivie d'une zone témoin : une écriture au-delà de la dernière ligne la modifierait (les écritures avant la première
     // ligne sont exclues par la découpe à la ligne 0 ; un index négatif serait ignoré par le tableau typé, donc invisible ici).

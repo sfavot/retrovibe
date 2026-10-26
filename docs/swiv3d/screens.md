@@ -100,7 +100,38 @@ Tous les menus partagent un moteur : on remplit un tableau de lignes de 0x60 oct
 
 - **Drapeaux d'appel** (registre EBX) : `0x01` sélection initiale valide (id donné par `00416834`, sinon première ligne sélectionnable) ; `0x02` ne rend pas la main avant une touche (retourne `-1` après une image : sert aux écrans d'attente) ; `0x20` pas d'annulation ; `0x40` retour après chaque réglage de curseur.
 - **Sons** (SOUNDS.BD, numéro de son = id/100 ; `gm_sound_play` `00412e44`) : `6000` ouverture de pause / test, `6002` déplacement, `6003` validation ou annulation, `6004` curseur. `6001` non utilisé par les menus. Les 5 entrées existent (`600002`, `600102`, `600204`, `600304`, `600405`).
-- **Titre 3D** (porté : `render/text3d/titles.ts`, tracé avec la table de couleurs du niveau de fond) : chaque menu crée un texte flottant en police vectorielle du bloc 200 (`FUN_00422f8c(groupe, id)` avec `kind = 0xb`) qui vole vers sa position en 30 images et repart à la fermeture (`FUN_004235d8`). Le titre est la chaîne `(groupe, 0)`. Position, vitesse et échelle : champs établis dans `00422f8c` (hypothèse sur leur sens exact), à porter avec le rendu de la police vectorielle déjà décodée.
+- **Titre 3D** (confirmé ; porté : `render/text3d/titles.ts`, appels dans `screens/flow.ts` `TITLES`, tracé avec la table de couleurs du niveau de fond) : en tête de chaque passage dans sa boucle, un menu appelle `gm_message_spawn(table, id, teinte, 11)` (`00422f8c`, `EAX` = table, `EDX` = id, `EBX` = teinte, `ECX` = type), puis `gm_menu_run`, puis **`gm_title_release`** (`004235d8`) dès que `gm_menu_run` rend la main (avant d'ouvrir un sous-menu) ; au retour d'un sous-menu la boucle recrée le titre. Les menus à curseurs (volume, gamma) le créent une seule fois avant leur boucle. Abandon et Quitter appellent `gm_title_release` **avant** de créer leur titre.
+  - **Trajectoire** (type 11, identique pour tous les menus, `rules.md` § 8.1) : départ pré-simulé de 30 ticks en arrière ; position `P` de `(−192000, 150000, −240000)` à `(0, 0, 0)` par pas `(6400, −5000, 8000)` ; angles `(300, −1350, 0)` → `(300, 0, 0)` (seul le lacet tourne, 45/16 de pas de 1/512 de tour par tick) ; vie 1031 → **figé au tick 31** (vie 1000 : plus de déplacement, la rotation en lacet continue : un tour en 182 ticks, 4,55 s) ; décalage vertical −140 px, donc centre de l'écran `(160, 60)`. Sortie : vie − 980 → 20, il repart du même pas (vers l'œil : la profondeur diminue, il grossit), tourne jusqu'à vie 10 puis file, libéré au **21ᵉ tick**.
+  - **Échelle, lumière, rendu** : projection fixe dans le repère de l'écran (`rules.md` § 8.3), lettres du bloc 200 × 4, perspective `1 / (profondeur + 0xd61)`, lumière par normale tournant avec le lacet ; faces pleines `table[teinte + lumière]`. Le pas est celui des effets : un tick par tranche **strictement** supérieure à 25 ms d'horloge (`gm_poll_events`, retard > 800 ms abandonné), quelle que soit la cadence d'image ; une image de menu = `gm_frame` (décor + messages 3D) puis les lignes du menu **par-dessus** (`gm_menu_run`).
+  - **Ordre** : pool chaîné de 50 messages ; un message créé passe en tête et chaque tick inverse la liste ; les faces de tous les messages vont dans une file triée (`gm_queue_insert`, recherche depuis le dernier point d'arrêt : à clé égale l'ordre dépend du sens de la recherche ; port : `render/text3d/depth-list.ts`).
+  - **Chaîne et teinte par menu** (teinte = ligne × 256 de la table 11003) :
+
+| Menu | Fonction | Titre | Teinte |
+|---|---|---|---|
+| Sélection du pilote | `0041cfac` | `(0, 0)` « Sélectionnez\|un pilote » | `0x1500` |
+| Nouveau pilote | `0041c640` | `(0, 50)` | `0x1400` |
+| Supprimer le pilote | `0041cc78` | `(0, 60)` | `0x1000` |
+| Menu principal | `0041d714` | `(1, 0)` « Menu\|principal » | `0x1000` |
+| Rejouer la mission | `0041dde4` | `(11, 0)` « REJOUER LA\|MISSION » | `0x400` |
+| Tester la mission | `0041e614` | `(11, 20)` | `0x400` |
+| Installer (Setup) | `0041b03c` | `(2, 0)` | `0x1500` |
+| Langue | `004191ac` | `(2, 100)` « Langue » | `0x400` |
+| Contrôleur | `00418454` | `(3, 0)` « Configuration du\|contrôleur » | `0x400` |
+| Type de contrôleur | `004171b4` | `(3, 100)` | `0x1000` |
+| Liens du contrôleur (axes) | `0041797c` | `(3, 1000)` | `0x500` |
+| Capture d'une touche | `004168b0` | `(3, 33)` | `0x1400` |
+| Calibrage | `00416b50` | `(3, 300 + 10·n)` | `0x400` |
+| Volume | `0041a8c4` | `(8, 0)` | `0x1500` |
+| Musique | `0041a560` | `(9, 0)` | `0x1500` |
+| Gamma | `00417ffc` | `(6, 0)` | `0x100` |
+| Pause | `00419058` | `(4, 0)` | `0x400` |
+| Abandonner la mission | `0041f8e8` | `(13, 0)` | `0x1400` |
+| Quitter Swiv | `0041fc20` | `(13, 20)` | `0x1400` |
+| Menu Tricher (bonus) | `0041bb40` | `(100, 1000)` | `0x100` |
+| Multijoueur | `0041ff94`, `004202a8`, `00420cb0` | `(5, 400)`, `(5, 0)`, `(5, 300)` | `0x100` |
+| Statistiques réseau | `00419c20` | `(5, 500)` | `0x1500` |
+
+  Les écrans de fin de mission (§9), `0041ee30` (nom de capture) et `004206f4` n'en créent pas. Port : seuls les menus portés ont un titre ; l'écran de confirmation de suppression (propre au port) reprend celui de « Supprimer le pilote ».
 - **Fond** : pendant les menus, `gm_frame` rend les vues actives du niveau chargé, soit `DEMO.SLV` (chargé avant la boucle de menu, `00421c0e`, confirmé). Pas de minuterie d'attract-mode : le « mode démo » de l'énoncé est ce décor. Le comportement exact du décor (caméra automatique ? ennemis animés ?) : **ouvert**, relève de R1/R2.
 
 ### 4.2 Sélection du pilote (`0041cfac`) et nom du pilote
@@ -286,13 +317,13 @@ Les pistes 7 et 8 (missions 4 et suivantes) sont livrées en MP3 mais inutilisé
 
 Les deux écrans réutilisent le moteur de menu (drapeaux `7`, `Y = 120`, confirmé) ; le monde est toujours rendu derrière.
 
-- **Mission accomplie** (`gm_screen_level_complete` `004194b0`) : titre 3D `(7, 0)` « Mission accomplie ! » ; bandeau = nom de la mission (table 200, mission courante) ; lignes (groupe 7, `sprintf`) : `10` « Score : %d » (niveau), `11` « Score : %d » (total), `12` « Temps : %dh %02dm %02ds » (niveau, `EDX` en secondes), `13` « Durée totale : … » (`EBX`, temps cumulé de la fiche, **toujours affichée**), `14` « Objectifs détruits: %d%% », `15` « Bonus ramassés : %d%% », `16` « Secrets trouvés : %d%% » ; ligne finale `(4, 1)` « N'importe quelle touche pour continuer » (id 99). Menu : couleurs et lignes standard (voile `0xa1`, bandeau `0x76`, traits `0xff`, rangée sélectionnée `3`), `Y = 120`, drapeaux `7`.
+- **Mission accomplie** (`gm_screen_level_complete` `004194b0`) : **pas de titre 3D** (la fonction n'appelle ni `gm_message_spawn` ni `gm_title_release` : le message figé « Accompli » du niveau reste à l'écran, en rotation) ; deux bandeaux encadrés : nom de la mission (table 200, mission courante) puis `(7, 0)` « Mission accomplie ! » ; cadre exact : trait, espaceur 3 px (ligne `0x76`), bandeau, espaceur, trait, espaceur, bandeau, espaceur, trait, espaceur de 10 px (`0xa1`), lignes de bilan, espaceur de 12 px (`0xa1`), ligne finale, sans trait en bas ; lignes (groupe 7, `sprintf`) : `10` « Score : %d » (niveau), `11` « Score : %d » (total), `12` « Temps : %dh %02dm %02ds » (niveau, `EDX` en secondes), `13` « Durée totale : … » (`EBX`, temps cumulé de la fiche, **toujours affichée**), `14` « Objectifs détruits: %d%% », `15` « Bonus ramassés : %d%% », `16` « Secrets trouvés : %d%% » ; ligne finale `(4, 1)` « N'importe quelle touche pour continuer » (id 99). Menu : couleurs et lignes standard (voile `0xa1`, bandeau `0x76`, traits `0xff`, rangée sélectionnée `3`), `Y = 120`, drapeaux `7`.
 - **Pourcentages** (`00419520-004195d2`) : `valeur × 100 / total` en entiers (0 si le total est nul) : objectifs `DAT_005b0400 / DAT_005b03e0`, bonus `joueur+0x198 / DAT_005b03d8`, secrets `joueur+0x194 / DAT_005b03f4`. Les lignes `15` et `16` n'existent **que si leur pourcentage final est non nul** (un niveau avec des bonus dont aucun n'est ramassé n'affiche pas la ligne).
 - **Décompte animé** (confirmé, `004157d0` + asm) : 8 compteurs courants `DAT_00480c1c[i]` tendent vers `DAT_00480bfc[i]` ; seuls les 5 premiers servent : `[0]` score du niveau (`joueur+0x110`, part de 0), `[1]` score total (`+0x108`, part de **total − score du niveau**), `[2]` objectifs %, `[3]` bonus %, `[4]` secrets % (partent de 0). Les lignes de temps sont fixes. Les compteurs avancent **ensemble, à chaque tick de 25 ms (40/s)** — `gm_menu_run` rend la main après une image (drapeau `2`) et `gm_poll_events` joue alors, avec les drapeaux 7, la logique du monde, l'animation et les effets. Pas par compteur selon l'écart restant : `0` → 0, `< 50` → **1**, `< 100` → **3**, `< 1000` → **71** (`0x47`), `< 10 000` → **12** (`0xc`, plus lent que la tranche du dessous : particularité du binaire, vérifiée à l'assembleur, conservée), sinon **673** (`0x2a1`). Aucun plafonnement (le pas est toujours inférieur au seuil, donc pas de dépassement). Conséquence : un score de niveau de 5000 met ~10 s à s'afficher en entier. Pendant le décompte, le texte se réécrit à chaque image (menu reconstruit avec les valeurs courantes).
 - **Touches** : l'écran tourne dans `do { … menu_run(flags 7) … } while (aucune touche)` ; **une touche n'abrège pas le décompte**, elle quitte l'écran (valeurs finales ou non). Garde : si une touche est tombée alors que le compteur de fin `DAT_005b03e8` est `< 110` (`0x6e`), `gm_clear_keys` et on continue. Ce compteur est celui de la boucle de jeu (`+1` par tick, y compris derrière l'écran) ; il vaut **`0x37` (55)** quand une victoire sort de la boucle et **`0x23` (35)** après la mort du joueur : touches ignorées pendant **55 ticks = 1,375 s** (succès) ou **75 ticks = 1,875 s** (game over). Souris, clavier et manette comptent (`DAT_00480aa0`).
 - **Sons : aucun.** Le drapeau `2` de `gm_menu_run` fait sortir la fonction avant le traitement des touches : ni `6002` ni `6003` ne sont joués, ni pendant le décompte, ni à la sortie du menu. La musique de niveau continue (§7) ; `gm_sound_stop_all` et `gm_cd_stop` ne passent qu'après l'écran.
-- **Game over** (`gm_screen_game_over` `00419ed8`) : même mise en page, titre `(7, 1)` « Game over » et bandeau de mission, lignes `10` à `14` seulement (pas de bonus ni de secrets, pourcentage d'objectifs compris), mêmes décompte, garde (110 ticks, départ à 35) et absence de son. La chaîne `20/10` « Game over ! » sert au HUD (non vérifié).
-- **Port** (`screens/end-screen.ts`, `Flow`) : compteurs et horloge de ticks purs (`EndCounters`, 25 ms, accumulateur remis à 0 au-delà de 800 ms comme `gm_poll_events`) ; le menu est reconstruit à chaque tick avec les valeurs courantes ; aucun son à la sortie. Le monde continue d'être simulé derrière l'écran (joueur sans commandes, `LevelSession` après `finish`), le titre est en 3D (type 11) et le menu est à `Y = 120` ; écart connu : le compteur de fin démarre à 55 / 35 sans relire celui du niveau.
+- **Game over** (`gm_screen_game_over` `00419ed8`) : même mise en page, sans titre 3D (« Game over ! » `20/10` du niveau reste figé), bandeaux dans l'ordre inverse : `(7, 1)` « Game over » **puis** le nom de la mission, lignes `10` à `14` seulement (pas de bonus ni de secrets, pourcentage d'objectifs compris), mêmes décompte, garde (110 ticks, départ à 35) et absence de son. La chaîne `20/10` « Game over ! » est le message 3D de type 10 créé à la mort du joueur (`0043c046`).
+- **Port** (`screens/end-screen.ts`, `Flow`) : compteurs et horloge de ticks purs (`EndCounters`, 25 ms, accumulateur remis à 0 au-delà de 800 ms comme `gm_poll_events`) ; le menu est reconstruit à chaque tick avec les valeurs courantes ; aucun son à la sortie. Le monde continue d'être simulé derrière l'écran (joueur sans commandes, `LevelSession` après `finish`), pas de titre 3D (le message figé du niveau reste), décor seul sans radar, jauge ni score (`HudState.inMenu`) et le menu est à `Y = 120` ; écart connu : le compteur de fin démarre à 55 / 35 sans relire celui du niveau.
 - **Fin d'aventure** : aucune vidéo ni écran dans cette édition (l'élément `-2` met `+0x20 = 0xb4c69`). Les vidéos `END_*`/`OUTRO` n'existent pas.
 
 ## 10. Modules à porter (H3) et décisions
@@ -333,7 +364,7 @@ Les deux écrans réutilisent le moteur de menu (drapeaux `7`, `Y = 120`, confir
 | `004158e8` | `gm_menu_add` | Ajoute une ou plusieurs lignes de menu depuis une chaîne (`\|` = saut de ligne) |
 | `00416834` | `gm_menu_select` | Place la sélection initiale sur l'id donné |
 | `004360b0` | `gm_fill_blend` | Remplit un rectangle de la page avec une ligne de la table de mélange (`x0, y0, x1, y1, ligne`) |
-| `00422f8c` | `gm_title_spawn` | Crée le titre 3D (police vectorielle) qui vole vers sa place |
+| `00422f8c` | `gm_message_spawn` | Crée un message 3D (police vectorielle) ; type 11 = titre de menu |
 | `004235d8` | `gm_title_release` | Déclenche la sortie des titres 3D |
 | `0041cfac` | `gm_screen_select_pilot` | Écran de sélection du pilote |
 | `0041c640` | `gm_screen_new_pilot` | Saisie du nom d'un nouveau pilote (15 car., code `SWIV!AndLetDie`) |

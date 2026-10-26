@@ -18,7 +18,7 @@ import { END_MISSION, type MissionScript } from "../data/missions";
 import type { StringTables } from "../data/strings";
 import { BootSequence } from "./boot";
 import { COUNTER, EndCounters } from "./end-screen";
-import { Menu, standardLines, type MenuEvent, type MenuKey, type MenuLine } from "../ui-draw/menu";
+import { Menu, ROW, splitLines, standardLines, type MenuEvent, type MenuKey, type MenuLine } from "../ui-draw/menu";
 import { MissionScriptRunner, replayableMissions, stateVars, type MissionVars } from "./mission-script";
 import {
   ADVENTURE_COMPLETED,
@@ -118,16 +118,45 @@ export type FlowView =
   | { kind: "screen"; id: number }
   /**
    * `backdrop` : `demo` = décor de `DEMO.SLV` ; `frozen` = dernière image du niveau (écran d'abandon) ; `level` = le niveau, qui continue de
-   * tourner derrière (écran de fin). `title` : octets du titre 3D de l'écran (chaîne `(groupe, 0)`), `null` s'il n'y en a pas.
+   * tourner derrière (écran de fin). `title` : titre 3D de l'écran (octets de la chaîne, `|` = saut de ligne, et teinte), `null` s'il
+   * n'y en a pas (écrans de fin de mission).
    */
-  | { kind: "menu"; menu: Menu; backdrop: "demo" | "frozen" | "level"; title: Uint8Array | null }
+  | { kind: "menu"; menu: Menu; backdrop: "demo" | "frozen" | "level"; title: MenuTitle | null }
   | { kind: "level" };
+
+/** Titre 3D d'un menu : texte et teinte (ligne × 256 de la table de couleurs du bloc 11003). */
+export interface MenuTitle {
+  text: Uint8Array;
+  tint: number;
+}
+
+/**
+ * Titres 3D des menus (`gm_message_spawn(table, id, teinte, 11)` en tête de chaque menu, `screens.md` § 4.1) : chaîne et teinte de
+ * l'exécutable. Les teintes `0x1500`, `0x1400`, `0x1000` et `0x400` sont des lignes différentes de la table de couleurs.
+ */
+const TITLES = {
+  selectPilot: [0, 0, 0x1500],
+  newPilot: [0, 50, 0x1400],
+  deletePilot: [0, 60, 0x1000],
+  main: [1, 0, 0x1000],
+  setup: [2, 0, 0x1500],
+  language: [2, 100, 0x400],
+  controller: [3, 0, 0x400],
+  volume: [8, 0, 0x1500],
+  music: [9, 0, 0x1500],
+  retry: [11, 0, 0x400],
+  abort: [13, 0, 0x1400],
+  quit: [13, 20, 0x1400],
+} as const satisfies Record<string, readonly [table: number, id: number, tint: number]>;
 
 /** Crédits : 1003, 1002, 1001 (§4.5). */
 const CREDITS_SCREENS = [1003, 1002, 1001];
 
-/** Ordonnée du premier élément des menus (`Y` passé à `gm_menu_run`, `screens.md` § 4 et 9) : sélection / suppression du pilote 110, écran de fin 120, réglages 160. */
-const MENU_Y = { list: 110, end: 120, language: 140, small: 160 } as const;
+/**
+ * Ordonnée du premier élément des menus (`Y` passé à `gm_menu_run`, `screens.md` § 4 et 9) : commandes 100, sélection / suppression du
+ * pilote, menu principal et rejouer 110, écran de fin 120, langue 140, nouveau pilote et réglages 160.
+ */
+const MENU_Y = { controller: 100, list: 110, end: 120, language: 140, small: 160 } as const;
 const END_MENU_Y = MENU_Y.end;
 
 const SOUND = { move: 6002, validate: 6003, slider: 6004 } as const;
@@ -255,7 +284,9 @@ export class Flow {
     const seconds = Math.round(stats.seconds ?? 0);
     const menu = this.makeMenu(this.endMenuLines(outcome, counters, seconds), { y: END_MENU_Y, noCancel: true });
     this.phase = { kind: "end", outcome, menu, counters, seconds };
-    this.view = { kind: "menu", menu, backdrop: "level", title: this.title(7, outcome === "complete" ? 0 : 1) };
+    // Pas de titre 3D : « Mission accomplie ! » / « Game over » est un bandeau du menu ; le message figé du niveau (« Accompli »,
+    // « Game over ! ») reste affiché, aucun `gm_title_release` n'est appelé par ces écrans.
+    this.view = { kind: "menu", menu, backdrop: "level", title: null };
   }
 
   /** Page de dev : joue un niveau tout de suite, sans menus ni script (à la fin, retour à la sélection du pilote). */
@@ -279,7 +310,7 @@ export class Flow {
       this.view = { kind: "level" };
     };
     this.showMenu({
-      title: [13, 0],
+      title: TITLES.abort,
       banner: [this.s(13, 1)],
       body: [
         { type: "choice", id: 1, text: this.s(13, 10) },
@@ -335,9 +366,10 @@ export class Flow {
     return this.data.strings.get(this.language, table, id) ?? "";
   }
 
-  /** Titre 3D d'un écran : la chaîne `(table, id)` en octets (le dessin la lit telle quelle, `|` = saut de ligne). */
-  private title(table: number, id: number): Uint8Array | null {
-    return this.data.strings.getBytes(this.language, table, id) ?? null;
+  /** Titre 3D d'un écran : la chaîne `(table, id)` en octets (le dessin la lit telle quelle, `|` = saut de ligne) et sa teinte. */
+  private title([table, id, tint]: readonly [table: number, id: number, tint: number]): MenuTitle | null {
+    const text = this.data.strings.getBytes(this.language, table, id);
+    return text ? { text, tint } : null;
   }
 
   private makeMenu(lines: MenuLine[], options: ConstructorParameters<typeof Menu>[1]): Menu {
@@ -345,8 +377,8 @@ export class Flow {
   }
 
   private showMenu(options: {
-    /** Titre 3D `(table, id)` et bandeau(x) de texte sous lui ; `y` : ordonnée du menu (`MENU_Y`). */
-    title: [table: number, id: number];
+    /** Titre 3D `(table, id, teinte)` (`TITLES`) et bandeau(x) de texte sous lui ; `y` : ordonnée du menu (`MENU_Y`). */
+    title: readonly [table: number, id: number, tint: number];
     y?: number;
     banner: string[];
     body: MenuLine[];
@@ -360,7 +392,7 @@ export class Flow {
     const menu = this.makeMenu(standardLines(options.banner, options.body), { y: options.y ?? MENU_Y.small, noCancel: options.noCancel, initial: options.initial });
     const backdrop = options.backdrop ?? "demo";
     this.phase = { kind: "menu", menu, backdrop, choose: options.choose, cancel: options.cancel ?? (() => {}), adjust: options.adjust };
-    this.view = { kind: "menu", menu, backdrop, title: this.title(...options.title) };
+    this.view = { kind: "menu", menu, backdrop, title: this.title(options.title) };
     return menu;
   }
 
@@ -411,7 +443,7 @@ export class Flow {
     const last = this.settings.lastPilot;
     const initial = last !== null && pilots.some((p) => p.slot === last) ? 100 + last : pilots.length > 0 ? 100 + pilots[0]!.slot : 0;
     this.showMenu({
-      title: [0, 0],
+      title: TITLES.selectPilot,
       y: MENU_Y.list,
       banner: [this.s(0, 1)],
       body,
@@ -437,9 +469,9 @@ export class Flow {
   }
 
   private newPilot(): void {
-    const menu = this.makeMenu(standardLines([this.s(0, 51)], this.nameLines("")), { y: MENU_Y.list, noCancel: false });
+    const menu = this.makeMenu(standardLines([this.s(0, 51)], this.nameLines("")), { y: MENU_Y.small, noCancel: false });
     this.phase = { kind: "name", menu, name: "" };
-    this.view = { kind: "menu", menu, backdrop: "demo", title: this.title(0, 50) };
+    this.view = { kind: "menu", menu, backdrop: "demo", title: this.title(TITLES.newPilot) };
   }
 
   private nameLines(name: string): MenuLine[] {
@@ -481,7 +513,7 @@ export class Flow {
   private deletePilot(): void {
     const pilots = this.data.store.list();
     this.showMenu({
-      title: [0, 60],
+      title: TITLES.deletePilot,
       y: MENU_Y.list,
       banner: [this.s(0, 61)],
       body: pilots.map((p): MenuLine => ({ type: "choice", id: p.slot, text: p.name })),
@@ -495,7 +527,7 @@ export class Flow {
     const pilot = this.data.store.get(slot);
     if (!pilot) return this.pilotSelect();
     this.showMenu({
-      title: [0, 60],
+      title: TITLES.deletePilot,
       banner: [pilot.name],
       body: [
         { type: "choice", id: 1, text: this.s(0, 101) },
@@ -534,7 +566,7 @@ export class Flow {
       { type: "choice", id: 80, text: this.s(1, 19) },
     );
     this.showMenu({
-      title: [1, 0],
+      title: TITLES.main,
       y: MENU_Y.list,
       banner: [format(this.s(1, 1), pilot.name)],
       body,
@@ -568,7 +600,7 @@ export class Flow {
     const missions = replayableMissions(this.data.script, pilot.bestMission, pilot.bestMission === ADVENTURE_COMPLETED, (level) => this.host.hasLevel(level));
     const best = missions.includes(pilot.bestMission) ? pilot.bestMission : missions[missions.length - 1];
     this.showMenu({
-      title: [1, 12],
+      title: TITLES.retry,
       y: MENU_Y.list,
       banner: [],
       body: missions.map((n): MenuLine => ({ type: "choice", id: n, text: this.s(200, n) })),
@@ -581,7 +613,7 @@ export class Flow {
   private quitMenu(): void {
     const phrase = this.s(13, 30 + (this.quitCount++ & 3));
     this.showMenu({
-      title: [13, 20],
+      title: TITLES.quit,
       banner: [],
       body: [
         ...phrase.split("|").map((text): MenuLine => ({ type: "text", text })),
@@ -600,7 +632,7 @@ export class Flow {
 
   private setupMenu(initial = 10): void {
     this.showMenu({
-      title: [2, 0],
+      title: TITLES.setup,
       banner: [],
       body: [10, 11, 12, 14].map((id): MenuLine => ({ type: "choice", id, text: this.s(2, id) })),
       initial,
@@ -632,8 +664,8 @@ export class Flow {
     ];
     const back = (): void => this.setupMenu(10);
     this.showMenu({
-      title: [3, 20],
-      y: MENU_Y.list,
+      title: TITLES.controller,
+      y: MENU_Y.controller,
       banner: [],
       body: rows.map(([id, action]): MenuLine => ({ type: "choice", id, text: format(this.s(3, id), this.data.bindingLabel(action, language)) })),
       choose: back,
@@ -651,7 +683,7 @@ export class Flow {
       ];
     };
     const menu = this.showMenu({
-      title: [8, 0],
+      title: TITLES.volume,
       banner: [this.s(8, 1)],
       body: lines(),
       choose: () => this.setupMenu(11),
@@ -670,7 +702,7 @@ export class Flow {
 
   private languageMenu(): void {
     this.showMenu({
-      title: [2, 12],
+      title: TITLES.language,
       y: MENU_Y.language,
       banner: [],
       body: LANGUAGES.map((l): MenuLine => ({ type: "choice", id: l, text: copy.languageNames[l]! })),
@@ -692,7 +724,7 @@ export class Flow {
   private musicMenu(): void {
     const pilot = this.pilot!;
     this.showMenu({
-      title: [9, 0],
+      title: TITLES.music,
       banner: [this.s(9, 1)],
       body: [10, 11, 12].map((id): MenuLine => ({ type: "choice", id, text: this.s(9, id) })),
       initial: 10 + pilot.music,
@@ -783,13 +815,34 @@ export class Flow {
 
   // --- Fin de mission -----------------------------------------------------------------------------------------------
 
-  private endBanner(): string[] {
-    const mission = this.missionIndex;
-    return [this.s(200, mission)];
-  }
-
+  /**
+   * Cadre des écrans de fin (`004194b0`, `00419ed8`) : trait, deux bandeaux encadrés (espaceurs de 3 px de la ligne `0x76`, traits),
+   * espaceur de 10 px, lignes de bilan, espaceur de 12 px, « N'importe quelle touche » ; pas de trait en bas. Succès : nom de la mission
+   * puis `(7, 0)` « Mission accomplie ! » ; échec : `(7, 1)` « Game over » puis le nom de la mission.
+   */
   private endMenuLines(outcome: LevelOutcome, counters: EndCounters, seconds: number): MenuLine[] {
-    return standardLines(this.endBanner(), this.endLines(outcome, counters, seconds));
+    const mission = this.s(200, this.missionIndex);
+    const banners = outcome === "complete" ? [mission, this.s(7, 0)] : [this.s(7, 1), mission];
+    const band = (text: string): MenuLine[] => splitLines(text).map((t): MenuLine => ({ type: "title", text: t }));
+    const rule: MenuLine = { type: "spacer", height: 1, row: ROW.rule };
+    const pad: MenuLine = { type: "spacer", height: 3, row: ROW.banner };
+    const lines = this.endLines(outcome, counters, seconds);
+    const anyKey = lines.pop()!;
+    return [
+      rule,
+      pad,
+      ...band(banners[0]!),
+      pad,
+      rule,
+      pad,
+      ...band(banners[1]!),
+      pad,
+      rule,
+      { type: "spacer", height: 10, row: ROW.veil },
+      ...lines,
+      { type: "spacer", height: 12, row: ROW.veil },
+      anyKey,
+    ];
   }
 
   /**

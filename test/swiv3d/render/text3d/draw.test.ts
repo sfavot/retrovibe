@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseBd } from "../../../../src/games/swiv3d/data/bd";
 import { parseGlobal } from "../../../../src/games/swiv3d/data/global";
 import { radarColorTable } from "../../../../src/games/swiv3d/render/hud";
-import { createText3d, MessagePool } from "../../../../src/games/swiv3d/render/text3d";
+import { createText3d, createTitleLayer, MessagePool } from "../../../../src/games/swiv3d/render/text3d";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../src/games/swiv3d/render/view";
 import { hasOriginalFiles, readOriginal } from "../../helpers";
 
@@ -73,6 +73,31 @@ describe.skipIf(!hasOriginalFiles)("texte 3D (fichiers du jeu)", () => {
       pool.tick();
     }
     expect(buffer.subarray(SIZE).every((v) => v === 0)).toBe(true);
+  });
+
+  it("titre de menu : teinte du menu, arrivée en 31 ticks de 25 ms (strictement), sortie en 21 ticks", () => {
+    const layer = createTitleLayer({ font: global.vectorFont, glyphIndex: (c) => global.font.glyphIndex(c, 0), colors });
+    layer.show(text("Menu|principal"), 0x1000);
+    const frame = (now: number) => {
+      const fb = new Uint8Array(SIZE);
+      layer.draw(fb, now, colors);
+      return fb;
+    };
+    frame(0);
+    // 31 ticks à 776 ms (775 ms n'en donne que 30) : le titre est arrivé, centré au-dessus du centre de l'écran (y = 200 − 140).
+    const arrived = frame(776);
+    const b = bounds(arrived);
+    expect((b.x0 + b.x1) / 2).toBeGreaterThan(140);
+    expect((b.x0 + b.x1) / 2).toBeLessThan(180);
+    expect(b.y0).toBeGreaterThan(20);
+    expect(b.y1).toBeLessThan(110);
+    const row = Array.from({ length: 128 }, (_, l) => colors[0x1000 + l]);
+    for (const v of new Set(arrived.filter((v) => v !== 0))) expect(row.includes(v)).toBe(true);
+    // Sortie du menu : il repart vers l'œil (la profondeur diminue, il grossit) et a disparu après 21 ticks.
+    layer.release();
+    const leaving = bounds(frame(776 + 2 * 25));
+    expect(leaving.y1 - leaving.y0).toBeGreaterThan(b.y1 - b.y0);
+    expect(frame(776 + 21 * 25 + 2).some((v) => v !== 0)).toBe(false);
   });
 
   it("le message de type 0 traverse l'écran puis disparaît", () => {

@@ -10,11 +10,12 @@
  *    tick jusqu'à 37 unités au-dessus de la plate-forme ;
  *  - au sol (`00447080`) : suspension des 4 roues, frottement 14/16 et gravité de 150 comme la forme 1, puis trajet programmé
  *    (le véhicule va au point à 256 unités devant ou derrière la plate-forme selon le plus proche, s'aligne, avance de 4 unités par
- *    tick, s'aligne sur la plate-forme et y entre à moins de 70 unités).
+ *    tick, s'aligne sur la plate-forme et y entre à moins de 70 unités) ; le pilote coupé du véhicule anime ses roues
+ *    (`00438694`, `wheels.ts`).
  *
  * Écarts : la suspension d'amarrage au sol utilise la hauteur du relief sans les vagues d'eau (`00425c94` hors missions à eau :
- * identique) ; les roues du véhicule (objets 980) ne sont pas animées pendant l'amarrage ; les variantes 7012 / 7013 et suivantes
- * (`004477b0`, `00447afc`, `0044878c`, `004490cc`, `004493e8`, `004495f8`) ne sont pas portées (absentes des niveaux livrés).
+ * identique) ; les variantes 7012 / 7013 et suivantes (`004477b0`, `00447afc`, `0044878c`, `004490cc`, `004493e8`, `004495f8`) ne
+ * sont pas portées (absentes des niveaux livrés).
  */
 import { findNearestPlayer } from "./combat";
 import { ANGLE_MASK, COS, SIN } from "./fixed";

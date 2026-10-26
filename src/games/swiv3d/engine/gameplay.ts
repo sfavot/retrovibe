@@ -17,6 +17,7 @@ import * as pw from "./player-weapons";
 import { UPDATE_PLAYER_INERT } from "./player";
 import * as proj from "./projectiles";
 import { MESSAGE_TINT } from "./status";
+import { flingPlayerWheels } from "./wheels";
 import type { Behavior, World } from "./world";
 
 /** Les effets et projectiles n'ont rien à faire pendant leur dépeuplement : ils sont simplement supprimés. */
@@ -123,6 +124,7 @@ function playerDie(world: World): void {
   explosionBig(world, p);
   spawnDebris(world, p);
   smokePlume(world, p);
+  flingPlayerWheels(world, world.player);
   p.age = 0;
   p.model = 0;
   p.pitch = 0;

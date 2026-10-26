@@ -29,6 +29,9 @@
 00412fe0	gm_sound_stop_all	118	SOUNDS.BD et DirectSound	certain	Arrête tous les sons actifs	Parcours de la liste active
 00413058	gm_sounds_update_3d	971	SOUNDS.BD et DirectSound	certain	Met à jour pan et volume (SetPan +0x40, SetVolume +0x3c) des sons actifs d'après la position relative à la caméra	Calcul distance/pente puis vtable DirectSound
 004135d4	gm_sounds_release	76	SOUNDS.BD et DirectSound	probable	Libère le tampon SOUNDS.BD	Appelle free 00470381
+00438694	gm_pilot_wheels	-	Étude du joueur	certain	pilote coupé des formes 1 et 2 (amarrage au sol `004482dc`, Super Ressort `0045e128`) : braquage vers la cible par pas de 8, roues en modes 3, 3, 4, 4	player.md §3.6
+00438c68	gm_pilot_wheels_2	-	Étude du joueur	certain	variante motoneige de `gm_pilot_wheels` (modes 1, 1, 2), installée par `004495f8`	player.md §3.6
+004418b0	gm_wheel_attach	578	Étude du joueur	certain	pose une roue enfant à son emplacement (table `00484324`) dans le repère du joueur, relevée à sol + 2 000 sous sol + 4 000	player.md §3.6
 0046fa58	gm_global_init	819	GLOBAL.BD (chargement, chaînes)	certain	Ouvre GLOBAL.BD, lit le répertoire final, charge et relocalise les blocs (2, 100, 200, 5xx, 600, 700, 800, 1001-1005)	Chaîne « I cant open GLOBAL.bd » ; appels 0046f288 avec les ids
 0046f288	gm_global_load_block	282	GLOBAL.BD (chargement, chaînes)	certain	Charge en mémoire (malloc) le bloc d'id EAX de GLOBAL.BD ; retourne le pointeur	Recherche id dans les entrées de 12 octets (offset, taille, id) ; fseek/malloc/fread
 0046f3a4	gm_global_read_block	259	GLOBAL.BD (chargement, chaînes)	certain	Lit le bloc d'id EAX dans un tampon existant (005bc134, 0x21700 octets)	Même recherche, sans malloc
@@ -114,10 +117,10 @@
 0041fc20	gm_menu_exit	831	Étude des écrans	certain	Confirmation de sortie (groupe 13, phrases 30..33 en rotation)	screens.md §12
 00422eac	gm_queue_reset	121	Étude du rendu	certain	file à zéro (2995 entrées)	render.md §13
 00422f28	gm_message_pool_init	100	Étude des règles	non précisé	initialise les 50 messages flottants	rules.md §9
-00422f8c	gm_message_spawn	702	Étude des règles	non précisé	message flottant 3D (table, id, teinte, type)	rules.md §9 ; autres noms proposés : objects.md : gm_mission_message ; screens.md : gm_title_spawn
+00422f8c	gm_message_spawn	702	Étude des règles	certain	message flottant 3D (EAX table, EDX id, EBX teinte, ECX type) ; type 11 = titre de menu	rules.md §8, screens.md §4.1
 004232ac	gm_deformers_apply	573	Étude du rendu	certain	ondes / dôme / anneaux sur un sommet	render.md §13
-004234ec	gm_effects_tick	233	Étude du joueur	non précisé	tick de la file d'effets (particules) `005876dc` : `pos += vel`, durée `+0x38`	player.md §7
-004235d8	gm_title_release	70	Étude des écrans	certain	Déclenche la sortie des titres 3D	screens.md §12
+004234ec	gm_effects_tick	233	Étude du joueur	certain	tick des messages 3D `005876dc` (25 ms, drapeau 4 de `gm_poll_events`) : vie, rotation, `pos += vel` ; inverse la liste	rules.md §8.1
+004235d8	gm_title_release	70	Étude des écrans	certain	Déclenche la sortie des titres 3D (vie ≥ 1000 : − 0x3d4)	screens.md §4.1
 00423620	gm_queue_insert	682	Étude du rendu	certain	insertion triée dans la file des primitives, rejet hors écran	render.md §13
 00423974	gm_text3d_emit_glyph	2783	Étude du rendu	probable	enfile les triangles d'une lettre 3D du bloc 200	render.md §13
 00424454	gm_message_draw	527	Étude des règles	non précisé	dessin des messages flottants (police vectorielle)	rules.md §9 ; autres noms proposés : render.md : gm_text3d_draw_all
@@ -238,11 +241,11 @@
 0044412c	gm_upd_fx_0044412c	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
 0044420c	gm_upd_fx_0044420c	-	Étude des objets	certain	décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte	objects.md §12
 004442ec	gm_object_debris	948	Étude des objets	certain	épave et éclats du bloc 11004	objects.md §12 ; autres noms proposés : rules.md : gm_spawn_debris
-004446a0	gm_wheel_update	1088	Étude du joueur	non précisé	animation et braquage d'une roue enfant	player.md §7
+004446a0	gm_wheel_update	1088	Étude du joueur	certain	place, oriente et fait tourner une roue enfant du joueur (5 modes : avant, arrière, motoneige, ski ; modèle `0x3d6` dans l'eau)	player.md §3.6
 00444af8	gm_heli_physics	1017	Étude du joueur	non précisé	physique de l'hélicoptère (altitude assistée, poussée par tangage/roulis, choc)	player.md §7 ; autres noms proposés : objects.md : gm_aircraft_fly ; rules.md : gm_vehicle_hover_physics
 00444ef4	gm_hover_follow_terrain	208	Étude des objets	certain	`vy` pour suivre le relief à une hauteur donnée	objects.md §12
-004450a8	gm_upd_player_004450a8	-	Étude des objets	probable	formes du joueur et armes embarquées (voir `player.md`)	objects.md §12
-004450c4	gm_upd_wheel	-	Étude des objets	certain	roue de 5002	objects.md §12
+004450a8	gm_upd_player_004450a8	-	Étude des objets	probable	comportement vide : roues du joueur (`0043de0c`, tout est fait par le pilote via `004446a0`) et un objet du réseau (`004126ec`)	objects.md §12
+004450c4	gm_upd_wheel	-	Étude des objets	certain	roue de 5002 : vitesse du corps, rotation selon la vitesse, posée par `004580f0` dans le repère complet du corps	objects.md §12
 00445228	gm_vehicle_physics_1	-	Étude du joueur	non précisé	physique du véhicule forme 1	player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445228
 00445670	gm_vehicle_physics_2	-	Étude du joueur	non précisé	physique du véhicule forme 2	player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445670
 00445a84	gm_vehicle_physics_4	-	Étude du joueur	non précisé	physique du véhicule forme 4	player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445a84

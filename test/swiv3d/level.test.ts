@@ -205,7 +205,9 @@ describe.skipIf(!hasOriginalFiles)(
         }
         // Tuile du terrain : valeur de la carte 102 >> 3 ; eau (< 0x20) = tuiles 0 à 3, max 0xf0 = tuile 30.
         expect(groundTile(0x1f)).toBe(3);
-        for (const g of l.groundMap) expect(groundTile(g)).toBeLessThan(ground!.tileCount);
+        let maxTile = 0;
+        for (const g of l.groundMap) maxTile = Math.max(maxTile, groundTile(g));
+        expect(maxTile).toBeLessThan(ground!.tileCount);
       }
     });
 

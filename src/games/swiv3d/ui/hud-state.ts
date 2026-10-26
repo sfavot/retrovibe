@@ -52,9 +52,9 @@ export class HudStateBuilder {
 
   /**
    * `camera` : caméra de la vue rendue cette image (le viseur se projette avec elle). `missionName` vide : non tracé.
-   * `paused` : voir `HudState.paused`.
+   * `paused`, `inMenu` : voir `HudState`.
    */
-  build(world: World, camera: RenderCamera, options: { missionName: string; language: "fr" | "en"; paused: boolean }): HudState {
+  build(world: World, camera: RenderCamera, options: { missionName: string; language: "fr" | "en"; paused: boolean; inMenu?: boolean }): HudState {
     const s = world.status;
     const player = world.player.obj;
     return {
@@ -71,6 +71,7 @@ export class HudStateBuilder {
       messages: s.messages,
       tick: world.tickCount,
       paused: options.paused,
+      inMenu: options.inMenu ?? false,
       radar: {
         playerX: player.x * UNIT,
         playerZ: player.z * UNIT,

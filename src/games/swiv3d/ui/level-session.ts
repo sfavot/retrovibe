@@ -101,8 +101,6 @@ export interface LevelSession {
   resume(): void;
   /** Table de couleurs du texte 3D de ce niveau (bloc 11003, `005bc158`) : couleurs des titres de menu devant ce niveau. */
   readonly textColors: Uint8Array;
-  /** Fait repartir les messages 3D figés (ouverture d'un écran de fin). */
-  releaseTitles(): void;
   /** Dev : termine le niveau (F9) ou fait mourir le joueur (F8). */
   complete(): void;
   gameOver(): void;
@@ -228,7 +226,6 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
     },
     resume,
     textColors,
-    releaseTitles: () => hud?.releaseTitles(),
     complete: () => finish("levelComplete"),
     gameOver: () => finish("gameOver"),
     requestQuit: () => emit(events.quit),
@@ -271,6 +268,7 @@ export async function startLevel(services: LevelServices, request: LevelRequest)
           missionName: world.tickCount < MISSION_NAME_TICKS ? missionName : "",
           language: language === 1 ? "fr" : "en",
           paused: userPaused,
+          inMenu: finished,
         }),
       );
       const renderMs = performance.now() - start;

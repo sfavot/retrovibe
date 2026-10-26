@@ -88,7 +88,7 @@ Sont exclus du test : paires où l'un est le propriétaire de l'autre ou le prop
 ### 2.5 Mort, game over
 
 - Condition : `énergie < 1` et `+0x184 == 1` et `DAT_005b03e8 == -1` (aucune séquence de fin en cours), testée dans `FUN_0043c234`. [C]
-- `FUN_0043b4f4` : le véhicule passe en comportement inerte (`LAB_00438678`), explose (`FUN_00443d3c`), éclate en débris (`FUN_004442ec` : modèles de la table 11004, 3, 5 ou 8 morceaux selon le rayon du modèle) ; pour les véhicules 1 et 2 les roues partent en débris ; le son de moteur s'arrête ; `+0x184 = 0`. Message « Game over ! » (table 20, id 10). `DAT_005b0414 = 2`, `DAT_005b03e8 = 0`. [C]
+- `FUN_0043b4f4` : le véhicule passe en comportement inerte (`LAB_00438678`), explose (`FUN_00443d3c`), éclate en débris (`FUN_004442ec` : modèles de la table 11004, 3, 5 ou 8 morceaux selon le rayon du modèle) ; pour les véhicules 1 et 2 les roues partent en débris (gros éclats `0044412c`, vitesse aléatoire × 9 : `player.md` §3.6) ; le son de moteur s'arrête ; `+0x184 = 0`. Message « Game over ! » (table 20, id 10). `DAT_005b0414 = 2`, `DAT_005b03e8 = 0`. [C]
 - **35 ticks plus tard** (`DAT_005b03e8 == 0x23`) : `DAT_00480a9c = 0x34` (game over) : le niveau s'arrête, la boucle de `gm_main_game` ajoute le temps au profil, affiche l'écran « Game over » (`FUN_00419ed8`, § 6.3) puis **revient au menu** (rejouer la mission, continuer…). [C]
 - **Pas de vies, pas de continues, pas de réapparition, pas de temps limite.** Une seule vie par tentative ; aucun test d'invulnérabilité à l'apparition. `DAT_00577670 = 3` du script (variable 3) n'est pas un nombre de vies : ce sont des drapeaux de détail du terrain (bit 0 et bit 1 testés par le tracé du sol et de l'eau, `00425cdd`, `0042695f`). [C]
 - Pendant les séquences de fin (`DAT_005b03e8 ≥ 0`) le joueur ne peut plus mourir (condition `== -1`).
@@ -372,7 +372,7 @@ Seuls trois types sont utilisés ; le spawn n'initialise rien pour les autres. U
 | Objectif final accompli (même fonction, indice 0, `param_2 == 0`) ; zone d'extraction (`0043c314`) | 20, 0 (« Accompli ») | `0x1400` | 10 |
 | Mort du joueur (`0043c046`, `gm_player_die`) | 20, 10 (« Game over ! ») | `0x1000` | 10 |
 | Écran de pause (`gm_screen_pause` `00419058`) | 4, 0 (« Pause ») | `0x400` | 11 |
-| Menus (multijoueur) | 5, … | `0x100` | 11 |
+| Titres de tous les menus (table, id et teinte propres à chaque menu : `screens.md` § 4.1) | … | `0x100` à `0x1500` | 11 |
 
 La teinte est une ligne × 256 de la **table d'attributs du bloc 11003** (`005bc158`, 8 192 octets à `+0x300`, la même que celle des points du radar) : `0x1000` rouge, `0x1400`, `0x400`, `0x100` les autres familles. La couleur d'une face est `table[teinte + lumière]`, lumière de 0 à 127.
 
@@ -481,7 +481,7 @@ Noms proposés (préfixe `gm_`), à fusionner par le coordinateur dans `keyfuncs
 ## 10. Questions ouvertes
 
 - **Cadence** : 40 ticks par seconde (pas de 25 ms dans `gm_poll_events`) est établi ; la mesure du nombre d'images (`DAT_00480c60`, `DAT_00481188`) n'influence pas la logique (R1).
-- **Armes spéciales** : portées de l'exe (E3b, `launchers.ts`, `special-weapons.ts`). Restent hypothèses : constantes de la forme 3 (reprend celles de l'hélicoptère), signe latéral des nacelles uniques 5-8 / 15-18, éclairs au sol (`gm_ground_flash_add`, non rendus : la réserve est supposée non vide), animation des roues pendant l'amarrage, pads 7012+ (`004477b0`…).
+- **Armes spéciales** : portées de l'exe (E3b, `launchers.ts`, `special-weapons.ts`). Restent hypothèses : constantes de la forme 3 (reprend celles de l'hélicoptère), signe latéral des nacelles uniques 5-8 / 15-18, déformations du terrain (`gm_deformers_apply`, non portées : leur réserve de 5 nœuds `00587714`, qui conditionne l'explosion du mortier et de la bombe, est supposée jamais vide), pads 7012+ (`004477b0`…).
 - **Classes des projectiles** [C] : projectiles du joueur et des compagnons `0x3f` (bit `0x04` : les ennemis les voient comme le joueur), projectiles ennemis et balles de nova `0x3b` ; compagnons et bouclier : classe `0x14`.
 - **Dégâts des ennemis** : l'énergie de leurs projectiles est dans chaque comportement (R2) ; la règle `min(A, B, 100)` est établie.
 - **Types 3000 et suivants** : le lien type → comportement vient du code, les noms (char, navire, tourelle…) de R2. Le dépôt de bonus par les cibles 2000 portant un champ 7 de 1000 à 1999 (« secrets ») est probable mais non lu dans le détail.

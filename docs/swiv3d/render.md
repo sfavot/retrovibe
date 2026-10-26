@@ -186,7 +186,7 @@ Les types 1 (rotor), 5, `0x2a`, `0x2d`, `0x2e` sont tracés de la même façon �
 - Hauteur `SLV 100` (512×512 octets, `005b1fc4`), couleur de sol `SLV 102` (`005b1fa8`), indices `& 0x1ff` (monde torique). Une cellule = 64 unités ; une unité de hauteur = 4 unités monde ; le sommet `(cx, cz)` est en `(cx*64, h*4, cz*64)`.
 - Texture de sol : le bloc `12000` est lu comme **32 tuiles 64×64 contiguës** de 4096 octets (`+0x8100`, `DAT_0058369c`), tuile `t = carte102 >> 3` (et non comme un atlas de 256 colonnes : lire ligne `2 * v` d'un atlas large revient à cette tuile, d'où l'observation de `slv.md`). Valeur `< 0x20` = eau : tuiles 0 à 3, la tuile 0 est animée.
 - Table de lumière du sol : celle de l'emplacement 0 (12000).
-- Carte de « flashs » au sol `005624c8` (64×64 entiers, enroulée) : `gm_ground_flash_add` (`004259b4`) y ajoute 0x100/0x80/0x40 en croix 3×3 (+ 4 cases à distance 2) lors d'une explosion, `0042fc70` retire `0x1e` par pas ; elle s'ajoute à la lumière du sommet (§6.2). Hypothèse : éclair d'impact.
+- Carte d'éclairs au sol `005624c8` (64×64 entiers, repliée : case `(cz & 63) · 64 + (cx & 63)` du sommet `(cx, cz)`, soit `pos >> 14` en Q8) (confirmé). Remise à zéro au chargement du niveau (`gm_slv_load`, `004545a8`). `gm_ground_flash_add` (`004259b4`, EAX = x, EDX = z en Q8, EBX = intensité 0..3) ajoute au **carré 3×3** centré sur la cellule `0x100 · (n + 1)` au centre, la moitié aux 4 bords, le quart aux 4 coins et aux 4 cases à distance 2 (croix), sans plafond. Seul appelant : `gm_object_explode` (`00443ac0`), avec `n` = taille d'explosion + 1 (1, 2 ou 3 selon le rayon² `< 1000`, `< 5000`, au-delà) ; l'intensité 0 n'est jamais utilisée. `gm_ground_flash_fade` (`0042fc70`), à chaque tick juste après la mise à jour des objets, retire `0x1e` à chaque case non nulle (plancher 0) : un centre de `0x400` s'éteint en 35 ticks. La valeur s'ajoute à la lumière du sommet avant l'eau et le brouillard (§6.2) : l'eau l'écrase, la borne `[15, 110]` la plafonne (sur sol plat, ≈ 103, l'éclair n'apporte que 7 niveaux ; il se voit surtout sur les pentes sombres). Port : `engine/terrain.ts` (`addGroundFlash`, `fadeGroundFlash`), `World.groundFlash`, `RenderView.groundFlash`.
 
 ### 6.2 Projection et éclairage d'un sommet (`gm_terrain_project_lit`, `00426c14`)
 
@@ -506,7 +506,7 @@ for (nd of liste) {
 }
 ```
 
-Hypothèse sur les rôles (explosion, bouclier de boss, onde) ; formules **confirmées**. À reporter après les missions de la zone tempérée si elles servent (script `100 3` à 3 / bonus).
+Hypothèse sur les rôles (explosion, bouclier de boss, onde) ; formules **confirmées**. Les nœuds viennent d'une réserve de 5 (`0056f2d8`, 0x18 octets, chaînés dans la liste libre `00587714` par `gm_level_spawn_objects`) : la bombe (`gm_upd_bomb_fly`, `gm_upd_bomb_shockwave`), le mortier (`gm_upd_mortar`) et la caméra de scénario 7800 (`00446a7c`) en prennent un (le mortier et la bombe n'explosent pas tant que la réserve est vide) ; `gm_game_tick` décrémente leur durée `+0x0c` et rend à la réserve ceux qui arrivent à 0. Non porté (la réserve est supposée jamais vide). Sans lien avec les éclairs au sol (§6.1). À reporter après les missions de la zone tempérée si elles servent (script `100 3` à 3 / bonus).
 
 ## 11. Prototype de vérification
 
@@ -549,7 +549,7 @@ Ce que le prototype **n'a pas** vérifié : l'identité bit à bit avec le jeu (
 | `00424454` | `gm_text3d_draw_all` | texte 3D des missions (p) |
 | `004359c8` | `gm_draw_flat_tri` | triangle de couleur unie (texte 3D) (c) |
 | `00425c94` | `gm_terrain_height_water` | hauteur bilinéaire 8.8 avec vagues (c) |
-| `004259b4` | `gm_ground_flash_add` | éclair d'impact dans la carte 64×64 `005624c8` (p) |
+| `004259b4` | `gm_ground_flash_add` | éclair d'explosion dans la carte 64×64 `005624c8` (c) |
 | `0042fc70` | `gm_ground_flash_fade` | décroissance de 0x1e par pas (c) |
 | `0041406c` | `gm_fb_clear_sky` | efface les lignes au-dessus de l'horizon (MMX) (c) |
 | `004141d0` | `gm_terrain_strip_scalar` | bande de terrain texturée, entiers (c) |

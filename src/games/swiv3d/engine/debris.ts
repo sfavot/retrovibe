@@ -133,7 +133,7 @@ export function spawnDebris(world: World, o: GameObject): void {
 }
 
 /** Cap aléatoire d'un éclat : `x` du triplet suivant (l'index a déjà avancé). */
-function peekRandomX(world: World): number {
+export function peekRandomX(world: World): number {
   const t = { x: 0, y: 0, z: 0 };
   const saved = world.game.randomIndex;
   nextRandom(world, t);

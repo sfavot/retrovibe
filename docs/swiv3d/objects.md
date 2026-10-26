@@ -263,7 +263,7 @@ Corps (classe `0x1003`, solide) :
 
 Enfants :
 - **Tourelle** (`0044d470`, `5000`, `5002`, `5500`) : colle à la position du corps, cible = cible du corps, vise avec `0044167c` (5 options comme §6.2) et **tire seulement quand l'option « tout droit » est la meilleure** (alignée) ; sans cible, rejoint le cap du corps (±1) ; `00441c00(o, 10, 0)` borne tangage/roulis à ±10 autour de ceux du corps. Si le corps meurt, elle est éjectée comme en §6.2 (sans la fusée finale, ni score).
-- **Roues de `5002`** (`004450c4`, modèle 984, états 0-3) : placées en `(±6000, -4000, +8000 / -4000)` (24.8) du corps par `004580f0`, avec balancement de tangage selon la vitesse ; meurent avec lui.
+- **Roues de `5002`** (`004450c4`, modèle 984, états 0-3 : AG, AD, ArG, ArD) [confirmé, porté : `enemies.wheel`] : vitesse recopiée du corps ; rotation `tangage −= (SIN[cap]·vx + COS[cap]·vz) >> 13` avec le cap **précédent** de la roue ; placées en `(∓6000, -4000, +8000 / -4000)` (latéral, vertical, avant, 24.8) par `004580f0` dans le repère complet du corps (tangage, roulis puis cap : elles suivent l'inclinaison de la suspension) ; cap = cap du corps ; effacées (`+4 = 0`) quand le corps n'existe plus. Le port les plaçait auparavant au seul cap du corps.
 - Pour `5500`, `004263bc` réserve la colonne `+0x18` et les virages passent par `00442eac` / `0044304c`.
 
 Les armes des chars : 100 (`5000`), 111, 400, 101, 405, 110 ; `5500` : 110, 400 ou aucune.
@@ -313,7 +313,7 @@ Objet invisible et inattaquable (classe `0x40`). Toutes les 31 images (`âge > 3
 **7010 naît à l'état 0 (attend un hélicoptère : → véhicule) ; 7011 naît à l'état 5 (attend un véhicule au sol : → hélicoptère)** et crée un hélicoptère posé (modèle 990, classe `0x40`, `0044822c`) décalé de cap + 64, 39 u plus haut, 32 u en arrière. Indestructible (pv 1 000 réécrits). Joueur cherché tous les 32 ticks, `D² < 15 000` (122 u). États `+0x50` : 0 capte un joueur `& 0x21c == 0x214` (pilote coupé, classe `0x40`, `+0x180 = 1` : armes retirées, minuteur 70) ; 1 attend la fin de l'amarrage ; 2 pose le joueur sur la plate-forme et `set_form(1)` (qui rend le pilote, `+0x5c = soi`, `+0x180 = 0`) ; 3 pousse 40 ticks à 4 u/tick le long du cap ; 4 pause 200 ; 5 capte un joueur `& 0x21c == 0x204` ; 6 attend l'arrivée (`+0x50 == 0x20`) ; 7 attend l'objet auxiliaire qui replace le joueur (position, angles) → 8 `set_form(0)`, 200 ticks → 9 → 0.
 
 - **Amarrage en vol** (`00446efc`) : cap vers la plate-forme (pas 4) ; état 0 : vol stationnaire à 130 u du relief, glissement de 1/16 de l'écart vers le point à 32 u de la plate-forme (cap + 0x140), le compteur de 70 baisse de 2 par tick (35 ticks) ; état 1 : descente de 550/256 u par tick jusqu'à 9 500/256 u au-dessus de la plate-forme ; état 2 = arrivé.
-- **Amarrage au sol** (`00447080`) : suspension des 4 roues, frottement 14/16, gravité 150 ; état 0 choisit l'approche par le point à 256 u devant ou derrière (le plus proche du point à 32 u devant le véhicule) ; états 10/0x14 (vise ce point, pas 2), 0xb/0x15 (avance de 4 u par tick jusqu'à 100 u), 0x1e (vise la plate-forme, pas 3), 0x1f (avance jusqu'à 70 u) → 0x20.
+- **Amarrage au sol** (`00447080`) : suspension des 4 roues (le pilote du joueur devient `00438694`, qui anime les roues enfants : `player.md` §3.6), frottement 14/16, gravité 150 ; état 0 choisit l'approche par le point à 256 u devant ou derrière (le plus proche du point à 32 u devant le véhicule) ; états 10/0x14 (vise ce point, pas 2), 0xb/0x15 (avance de 4 u par tick jusqu'à 100 u), 0x1e (vise la plate-forme, pas 3), 0x1f (avance jusqu'à 70 u) → 0x20.
 - Variantes 7012 et suivantes (`004477b0`, `00447afc`, `0044878c`, `004490cc`, `004493e8`, `004495f8`) : non lues. 7010 sans hélicoptère posé reste bloquée à l'état 7 au retour.
 
 ### 6.12 Ce qui n'est pas des « types » mais des objets créés
@@ -456,7 +456,7 @@ Points (confirmé, constantes de chaque fonction) : cible statique **73**, toure
 Sur mort d'une cible lourde (`2000`, `3000` base, `6000`, hangars) : `00443ac0(o)` :
 
 - rayon² du modèle `r2 = modèle[+0x0c]` : `< 1 000` : **petite**, `< 5 000` : **moyenne**, sinon **grande** ;
-- crée un décalque d'explosion (classe `0xe1`, pv 3 000, **modèle 900, 901 ou 902**, `00443a70`, durée 24 images) à la position, appelle `gm_terrain_explosion_crater` (`00424f44`, voir plus bas) et `gm_scorch_mark` (`004259b4`), joue le son 1000.
+- crée un décalque d'explosion (classe `0xe1`, pv 3 000, **modèle 900, 901 ou 902**, `00443a70`, durée 24 images) à la position, appelle `gm_terrain_explosion_crater` (`00424f44`, voir plus bas) et `gm_ground_flash_add` (`004259b4`, éclair au sol d'intensité taille + 1, `render.md` §6.1), joue le son 1000.
 
 `004442ec(o, 0)` :
 1. cherche dans le **bloc 11004** le nœud de clé `modèle` (liste chaînée de `(suivant, sous-liste, clé)`) : s'il existe, crée une **épave** (classe `0x4041`, pv 3 000, modèle = prochain de la sous-liste, en rotation à chaque destruction, upd `00444108` qui la gèle `+6 |= 0x20`, même cap) : la ruine reste définitivement ;
@@ -508,7 +508,7 @@ Noms proposés dans la convention `gm_*` (rien n'a été ajouté à `keyfuncs.de
 | `00425c94` | `gm_terrain_height_waves` | hauteur avec vagues d'eau animées (C) |
 | `00424f44` | `gm_terrain_explosion_crater` | cratère d'explosion (bloc 700) (C) |
 | `00424db4` | `gm_crater_site_ok` | test d'emplacement avant cratère (H) |
-| `004259b4` | `gm_scorch_mark` | accumule la « suie » dans la table 64 × 64 `005624c8` (H : rendu) |
+| `004259b4` | `gm_ground_flash_add` | éclair au sol dans la table 64 × 64 `005624c8`, ajouté à la lumière du terrain (C, `render.md` §6.1) |
 | `00443ac0` | `gm_object_explode` | explosion par classe de rayon (modèles 900-902, son 1000) (C) |
 | `004442ec` | `gm_object_debris` | épave et éclats du bloc 11004 (C) |
 | `00443c88` | `gm_projectile_burst` | petite explosion de projectile (sprite 11000) (C) |
@@ -582,5 +582,4 @@ Fonctions de comportement (champ `+0x68`) :
 - **Sons** : numéros passés à `gm_sound_play` établis (1000 grande explosion, 1001 petite, 1003 chute, 2000-2005 armes, 4000/4002 bonus), correspondance avec les WAV de `SOUNDS.BD` à voir avec `sounds.ts`.
 - **Sprites ≥ 10000** : numérotation et planches (GLOBAL 504/505/506…) à voir avec `render.md` (R4) ; ici seuls le numéro et le rôle de l'image `+0x50` sont établis.
 - `REC[9]`, `REC[10]`, `+0x44`, `+0x6c` : sans effet constaté.
-- La table `005624c8` de suie (rendu ?) n'est pas décodée.
 - Le point exact de gel/dégel d'un objet (drapeau `+6 & 0x20`) est posé par les fonctions de comportement ; seule la base de `00446d24` et des épaves a été lue.

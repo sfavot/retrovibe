@@ -7,8 +7,9 @@
  * Forme 1 : buggy (4 roues). Forme 2 : motoneige (2 roues arrière, un ski : l'arrière est enfoncé de 2 000 dans l'eau). Forme 4 :
  * véhicule plus nerveux (poussée 210, pas de roues). Forme 5 : aéroglisseur (modèle 980, 982 dans l'eau, pas de roues).
  *
- * Non porté : les objets enfants « roues » (`0x3d4`/`0x3d7`, `gm_wheel_update` `004446a0`) : décor qui tourne avec la vitesse, sans
- * effet sur la physique. Le braquage et la rotation de roue (`steer`, `wheelSpin`) sont tenus à jour pour eux.
+ * Les objets enfants « roues » des formes 1 et 2 (`0x3d4`/`0x3d7`, `gm_wheel_update` `004446a0`) sont dans `wheels.ts` : décor sans
+ * effet sur la physique, mis à jour après le pilote avec le braquage `steer` ; le pilote du buggy fait tourner les roues arrière à
+ * chaque pas de poussée (`kickRearWheels`).
  */
 import type { PlayerInput } from "./input";
 import { COS, SIN } from "./fixed";
@@ -53,6 +54,27 @@ const WAVE = Int8Array.from({ length: 32 }, (_, i) => Math.round(16 * Math.sin((
 // Pilote
 // ---------------------------------------------------------------------------------------------------------------------
 
+/** Coup de rotation des roues arrière du buggy (`0043a174`, `+0x1b0`/`+0x1b4`) ; `both` faux : la roue arrière gauche seule. */
+function kickRearWheels(p: Player, d: number, both = true): void {
+  if (p.form !== FORM_BUGGY) return;
+  const rl = p.wheels[2];
+  const rr = p.wheels[3];
+  if (rl) rl.pitch += d;
+  if (both && rr) rr.pitch += d;
+}
+
+/** Touches avancer / reculer : un pas de poussée chacune, et le coup de rotation des roues arrière (−13 / +13). */
+function thrustKeys(p: Player, inp: PlayerInput, step: number): void {
+  if (inp.forward) {
+    p.thrust += step;
+    kickRearWheels(p, -0xd);
+  }
+  if (inp.back) {
+    p.thrust -= step;
+    kickRearWheels(p, 0xd);
+  }
+}
+
 /**
  * Pilote des véhicules (`+0xa8`) : le cap bouge directement (4 pas par tick au clavier, pas d'inertie angulaire), la touche
  * avancer/reculer ajoute à la poussée `+0x74`, le frein est l'état `+0x50 = 1` qui ne dure qu'un tick. Les sélections d'armes
@@ -78,20 +100,17 @@ export function vehiclePilot(p: Player, inp: PlayerInput): void {
       p.steerTarget = 40;
     }
   }
-  // poussée et frein
+  // poussée et frein (buggy : chaque pas fait aussi tourner les roues arrière, de 13 par touche, de 30/256 de l'axe pour la gauche)
   if (ax?.forward) {
     p.thrust += (ax.forward * 0x104) >> 8;
+    kickRearWheels(p, -((ax.forward * 0x1e) >> 8), false);
     if (inp.brake && (f.analogBrakeAlways || o.state === 0)) o.state = 1;
   } else {
-    if (inp.forward) p.thrust += f.thrustStep;
-    if (inp.back) p.thrust -= f.thrustStep;
+    thrustKeys(p, inp, f.thrustStep);
     if ((inp.forward && inp.back) || inp.brake || (f.brakeOnStrafeLeft && inp.strafeLeft)) o.state = 1;
   }
   // seconde application des touches (après les armes dans l'exe) : sans frein, la touche vaut donc deux pas par tick
-  if (o.state !== 1) {
-    if (inp.forward) p.thrust += f.thrustStep;
-    if (inp.back) p.thrust -= f.thrustStep;
-  }
+  if (o.state !== 1) thrustKeys(p, inp, f.thrustStep);
   if (!inp.strafeRight) p.fireYaw = o.yaw;
   if (f.wheels) {
     // marche arrière (vitesse vers l'avant < -7000) : le braquage visuel s'inverse ; puis les roues suivent la cible de 4 en 4

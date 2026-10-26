@@ -22,14 +22,18 @@ import {
 } from "./combat";
 import { spawnDebris } from "./debris";
 import { enemyFire } from "./enemy-fire";
+import { attachTo } from "./attach";
 import { ANGLE_MASK, COS, SIN } from "./fixed";
 import { CLASS, DEPOP_MARK, FLAG, radius2, type GameObject } from "./objects";
 import { unregisterObjective } from "./objectives";
 import { heliPhysics } from "./player";
-import { digCrater } from "./terrain";
+import { addGroundFlash, digCrater } from "./terrain";
 import type { World } from "./world";
 
-/** `gm_object_explode` (`00443ac0`) : décalque d'explosion de taille 900/901/902 selon le rayon², cratère (événement), son 1000. */
+/**
+ * `gm_object_explode` (`00443ac0`) : décalque d'explosion de taille 900/901/902 selon le rayon², cratère (événement), éclair au sol
+ * d'intensité taille + 1 (`gm_ground_flash_add`), son 1000.
+ */
 export function explodeHeavy(world: World, o: GameObject): void {
   const r2 = radius2(world.models, o.model);
   const size: 0 | 1 | 2 = r2 < 1000 ? 0 : r2 < 5000 ? 1 : 2;
@@ -44,6 +48,7 @@ export function explodeHeavy(world: World, o: GameObject): void {
     model: 900 + size,
     update: "fx_decal",
   });
+  addGroundFlash(world.groundFlash, o.x, o.z, (size + 1) as 1 | 2 | 3);
   sound(world, SND.bigExplosion, o);
 }
 
@@ -385,28 +390,22 @@ export function boat(world: World, o: GameObject): void {
   vehicleBody(world, o, true);
 }
 
-/** `gm_upd_wheel` (`004450c4`) : roue décorative de 5002, placée sur le corps ; meurt avec lui. */
+/**
+ * `gm_upd_wheel` (`004450c4`) : roue décorative de 5002 (modèle 984, états 0-3 : AG, AD, ArG, ArD). Vitesse recopiée du corps,
+ * rotation `-(SIN[cap]·vx + COS[cap]·vz) >> 13` avec le cap du tick précédent, position `gm_attach_offset` à `(∓6 000, -4 000,
+ * +8 000 / -4 000)` dans le repère complet du corps (tangage, roulis, cap), puis cap du corps ; s'efface quand le corps a disparu.
+ */
 export function wheel(_world: World, o: GameObject): void {
   const b = o.owner;
-  if (b.classe === 0) {
-    o.classe = 0;
-    return;
-  }
   o.vx = b.vx;
   o.vy = b.vy;
   o.vz = b.vz;
   const s = SIN[o.yaw & ANGLE_MASK]!;
   const c = COS[o.yaw & ANGLE_MASK]!;
-  o.pitch -= (c * b.vz + b.vx * s) >> 13;
-  // position `gm_attach_offset` : (±6000, -4000, +8000 / -4000) dans le repère du corps
-  const lx = o.state & 1 ? 6000 : -6000;
-  const lz = o.state < 2 ? 8000 : -4000;
-  const sy = SIN[b.yaw & ANGLE_MASK]!;
-  const cy = COS[b.yaw & ANGLE_MASK]!;
-  o.x = b.x + ((lx * cy + lz * sy) >> 8);
-  o.y = b.y - 4000;
-  o.z = b.z + ((-lx * sy + lz * cy) >> 8);
+  o.pitch -= (c * o.vz + o.vx * s) >> 13;
+  if (o.state < 4) attachTo(b, o, o.state & 1 ? 6000 : -6000, -4000, o.state < 2 ? 8000 : -4000);
   o.yaw = b.yaw;
+  if (b.classe === 0) o.classe = 0;
 }
 
 /**

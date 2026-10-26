@@ -48,6 +48,7 @@ export class TerrainRenderer {
   private cols!: Columns;
   private time = 0;
   private waterMode = 3;
+  private flash: Int32Array | null = null;
   private stepX = 0;
   private stepZ = 0;
 
@@ -67,8 +68,18 @@ export class TerrainRenderer {
 
   constructor(private readonly assets: RenderAssets) {}
 
-  draw(fb: Uint8Array, pr: Projection, cols: Columns, time: number, waterMode: number, targetX: number, targetZ: number): void {
+  draw(
+    fb: Uint8Array,
+    pr: Projection,
+    cols: Columns,
+    time: number,
+    waterMode: number,
+    targetX: number,
+    targetZ: number,
+    flash: Int32Array | null = null,
+  ): void {
     this.fb = fb;
+    this.flash = flash;
     this.pr = pr;
     this.cols = cols;
     this.time = time;
@@ -182,6 +193,8 @@ export class TerrainRenderer {
     let light = (Math.imul(normal[1]!, 0x93) - Math.imul(normal[0]!, 0x93) + Math.imul(normal[2]!, 0x93)) >> 9;
     if (light < 0) light = 0;
     light += 0x1e;
+    // Éclairs au sol (`005624c8`) : sans plafond ici, la borne [15, 110] du brouillard s'applique après ; l'eau les écrase.
+    if (this.flash) light += this.flash[((cz & 63) << 6) + (cx & 63)]!;
     let colour = groundMap[((cz & 511) << 9) + (cx & 511)]!;
     let hy = at(cx, cz) << 2;
     if ((this.waterMode & 1) !== 0 && (colour & 0xe0) === 0) {

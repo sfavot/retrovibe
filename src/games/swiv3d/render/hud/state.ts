@@ -57,6 +57,8 @@ export interface HudState {
   /** Compteur de ticks logiques (40 Hz) : clignotement, animation de la jauge et du radar. */
   tick: number;
   paused: boolean;
+  /** Un écran de fin est ouvert par-dessus : comme en pause, le décor est dessiné seul (`gm_frame` sans le drapeau 2). */
+  inMenu: boolean;
   radar: {
     playerX: number;
     playerZ: number;

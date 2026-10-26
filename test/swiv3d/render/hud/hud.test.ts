@@ -99,7 +99,7 @@ describe.skipIf(!hasOriginalFiles)("HUD (fichiers du jeu)", () => {
   [0, 1, 2, 4, 5, 6, 8, 9].forEach((slot, i) => (ammo[slot] = 3 + i));
   const base: HudState = {
     energy: 496, maxEnergy: 496, shield: 0, score: 12340, cannonPower: 0, special: 1, specialAmmo: ammo, specialArmed: false,
-    missionName: "Fastoche", language: "fr", messages: [], tick: 3, paused: false,
+    missionName: "Fastoche", language: "fr", messages: [], tick: 3, paused: false, inMenu: false,
     radar: {
       playerX: 20000, playerZ: 20000, playerYaw: 64,
       blips: [{ x: 20500, z: 20300, kind: 0x1001 }, { x: 19400, z: 20100, kind: 0x41 }, { x: 20000, z: 21500, kind: 0x7 }, { x: 90000, z: 0, kind: 0x1001 }],
@@ -111,6 +111,18 @@ describe.skipIf(!hasOriginalFiles)("HUD (fichiers du jeu)", () => {
     const fb = new Uint8Array(SIZE);
     make().draw(fb, base);
     expect(hash(fb)).toBe("1a8fd8e74e60a13940325b09c66e1b5c4d098b68");
+  });
+
+  it("derrière un écran de fin, ne dessine que les viseurs (ni radar, ni jauge, ni score)", () => {
+    const hud = new Uint8Array(SIZE);
+    const menu = new Uint8Array(SIZE);
+    make().draw(hud, base);
+    make().draw(menu, { ...base, inMenu: true });
+    expect(hash(menu)).not.toBe(hash(hud));
+    expect(hud.subarray(370 * SCREEN_WIDTH + 200, 390 * SCREEN_WIDTH).some((v) => v !== 0)).toBe(true);
+    // Zone du score et des armes : vide derrière l'écran de fin.
+    expect(menu.subarray(370 * SCREEN_WIDTH + 200, 390 * SCREEN_WIDTH).every((v) => v === 0)).toBe(true);
+    expect(menu.subarray(130 * SCREEN_WIDTH, 150 * SCREEN_WIDTH).some((v) => v !== 0)).toBe(true);
   });
 
   it("est déterministe et ne touche que les zones du HUD", () => {

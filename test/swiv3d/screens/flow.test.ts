@@ -125,23 +125,45 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     host = new FakeHost();
   });
 
-  it("chaque menu a un titre 3D (chaîne `(groupe, 0)`) et un bandeau sans le titre ; l'écran de fin garde le niveau derrière", () => {
+  it("chaque menu a le titre 3D et la teinte de l'exécutable, et un bandeau sans le titre", () => {
     const strings = loadGlobal().strings;
-    const bytes = (table: number, id: number): Uint8Array | undefined => strings.getBytes(1, table, id);
+    const title = (table: number, id: number, tint: number) => ({ text: strings.getBytes(1, table, id), tint });
     const d = mainMenuAs();
-    const view = (): { title: Uint8Array | null; menu: { texts(): string[] } } => d.flow.view as never;
-    expect(view().title).toEqual(bytes(1, 0));
+    const view = (): { title: unknown; menu: { texts(): string[] } } => d.flow.view as never;
+    expect(view().title).toEqual(title(1, 0, 0x1000));
     expect(view().menu.texts()[0]).toBe("Menu principal pour les"); // le bandeau (1, 1), pas le titre
     d.choose(40); // Installer
-    expect(view().title).toEqual(bytes(2, 0));
+    expect(view().title).toEqual(title(2, 0, 0x1500));
     expect(view().menu.texts()).toContain("Volume");
     expect(view().menu.texts()).not.toContain("Installer");
+    d.choose(11);
+    expect(view().title).toEqual(title(8, 0, 0x1500));
     d.press("escape");
+    d.choose(12);
+    expect(view().title).toEqual(title(2, 100, 0x400)); // « Langue »
+    d.press("escape");
+    d.choose(14);
+    expect(view().title).toEqual(title(9, 0, 0x1500));
+    d.press("escape");
+    d.choose(10);
+    expect(view().title).toEqual(title(3, 0, 0x400)); // « Configuration du|contrôleur »
+    d.press("escape");
+    d.press("escape");
+    d.choose(80);
+    expect(view().title).toEqual(title(13, 20, 0x1400));
+    d.press("escape");
+    d.choose(70);
+    expect(view().title).toEqual(title(0, 0, 0x1500));
+  });
+
+  it("écran de fin : pas de titre 3D, bandeaux encadrés (mission puis « Mission accomplie ! », ou « Game over » puis mission)", () => {
+    const d = mainMenuAs();
     d.choose(10);
     d.flow.videoEnded(false);
     d.flow.levelEnded("gameOver", { seconds: 5 });
-    expect((d.flow.view as { title: Uint8Array | null }).title).toEqual(bytes(7, 1));
-    expect(d.flow.view).toMatchObject({ backdrop: "level" });
+    const view = d.flow.view as { title: unknown; backdrop: string; menu: { texts(): string[] } };
+    expect(view).toMatchObject({ backdrop: "level", title: null });
+    expect(view.menu.texts().slice(0, 2)).toEqual(["Game over", "Fastoche"]);
   });
 
   it("sans pilote : la sélection propose seulement « Nouveau pilote », musique des menus", () => {

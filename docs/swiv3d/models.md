@@ -69,7 +69,7 @@ Rastériseur logiciel en script jetable (3 vues orthographiques + perspective, r
 
 ## Identification (probable, d'après le code et les rendus)
 
-- Le joueur : `FUN_0043de0c` (changement de forme du joueur) pose `objet+0x4c = 0x3de` (**990**, forme 0, hélicoptère) ou `0x3df` (**991**, forme 1, véhicule) ; `0x3d4` (980), 982 et 983 apparaissent dans `0043b4f4` et `004446a0` (états secondaires du joueur, hypothèse).
+- Le joueur : `FUN_0043de0c` (changement de forme du joueur) pose `objet+0x4c = 0x3de` (**990**, forme 0, hélicoptère) ou `0x3df` (**991**, forme 1, véhicule) ; `0x3d4` (980), 982 et 983 sont les roues enfants des formes 1 et 2 (`004446a0` : roue, roue dans l'eau, ski de la motoneige ; `0043b4f4` : roues éjectées à la mort, `player.md` §3.6) ; 980/982 servent aussi de corps à la forme 5.
 - 101xx : grands appareils volants (10100 hélicoptère, 10101 bimoteur à hélices) ; 102xx : véhicules terrestres (10203 char) et blocs ; 103xx : navires (10300 vedette) ; 104xx : petits objets/tourelles (non identifiés) ; 105xx : bâtiments (10504 hangar) ; 10552-10565 : pylônes, sapins et arbres (une seule normale, ambiant 100) ; 106xx : bonus et caisses (10607 caisse, 10608 étoile ; 10600-10604 et 10609 sans rayon de collision) ; 107xx : débris/fragments (700-712 cités par 11004) et effets sans éclairage (757-770, une normale) ; 108xx : 10800, 10801, 10855, 10857, 10858 partagent la même géométrie (avion/missile à ailes delta, rayons différents), 10810-10856 : blocs et rochers posés avec ombre ; 109xx : 10900-10902 quadrilatères plats (sans rayon), 10980-10984 objets du joueur, 10990/10991 joueur.
 
 ## Modèles (identiques dans TERRAN00-03 et DEMO) : `emplacement sommets/triangles/normales`

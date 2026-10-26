@@ -3,8 +3,8 @@
  * Aucune dépendance au DOM, à `Date` ni à `Math.random`. Voir `docs/swiv3d/player.md` §2 et `objects.md` §2.
  *
  * Ordre d'un tick (`gm_game_tick`, `0043c234`) : mise à jour des objets (cellules actives autour du joueur : `pos += vel`,
- * fonction `+0x68`, repli dans le tore, âge ; collisions de la cellule ; dépeuplement des cellules moyennes), puis fonction pilote
- * du joueur (entrées), puis caméra.
+ * fonction `+0x68`, repli dans le tore, âge ; collisions de la cellule ; dépeuplement des cellules moyennes), décroissance des
+ * éclairs au sol (`0042fc70`), puis fonction pilote du joueur (entrées), puis caméra.
  *
  * Écarts assumés : un seul joueur (pas de réseau ni d'écran partagé) ; pas de zones temporaires `0058770c` ; l'ordre de parcours
  * des cellules est celui de la table 11×11 (ligne par ligne) ; un objet déjà traité ce tick n'est pas retraité s'il change de
@@ -52,7 +52,8 @@ import {
 } from "./player";
 import { demoPilotUpdate } from "./demo-pilot";
 import { vehiclePhysics } from "./vehicle";
-import { Terrain, applyCrater } from "./terrain";
+import { UPDATE_PLAYER_WHEEL, playerWheelsTick, setPlayerWheels } from "./wheels";
+import { Terrain, applyCrater, fadeGroundFlash, newGroundFlash } from "./terrain";
 import { emptyInput } from "./input";
 
 /** Fonction de comportement d'un objet (`+0x68`), appelée après `pos += vel`. H1 en enregistre via `registerBehavior`. */
@@ -123,6 +124,8 @@ export class World {
   readonly status: PlayerStatus = newStatus();
   /** Objets posés par le niveau (un par enregistrement du bloc 105 hors départ du joueur), dans l'ordre du bloc. */
   readonly levelObjects: readonly GameObject[];
+  /** Carte d'éclairs au sol 64×64 (`005624c8`), partagée avec le rendu du terrain (`terrain.ts`, `addGroundFlash`). */
+  readonly groundFlash = newGroundFlash();
   /** Ticks de logique exécutés (pause exclue). */
   tickCount = 0;
   /** Événements émis depuis le dernier `drainEvents`. */
@@ -170,6 +173,7 @@ export class World {
       demoPilotUpdate(this.player, this.playerContext),
     );
     this.registerBehavior(UPDATE_PLAYER_INERT, () => {});
+    this.registerBehavior(UPDATE_PLAYER_WHEEL, () => {});
 
     const ctx = {
       terrain: this.terrain,
@@ -220,6 +224,7 @@ export class World {
       opts.startForm ??
         (rec.type === 1001 ? FORM_DEMO : rec.type === 1002 ? FORM_DYING : 0),
     );
+    setPlayerWheels(this, p);
     this.events.length = 0; // le changement de forme initial n'est pas un événement de jeu
     return p;
   }
@@ -252,6 +257,7 @@ export class World {
   /** Change la forme du joueur (plate-forme de transformation, menu de bonus). */
   setPlayerForm(form: number): void {
     setForm(this.player, form, (e) => this.events.push(e));
+    setPlayerWheels(this, this.player);
   }
 
   /** Crée un objet du pool à l'état « neuf » (point d'entrée pour les projectiles et effets de H1). */
@@ -292,6 +298,7 @@ export class World {
     if (input.pause) return;
     this.tickCount++;
     this.updateObjects();
+    fadeGroundFlash(this.groundFlash);
     advanceEndCounter(this);
     this.updatePlayer(input);
     this.game.tickMessages();
@@ -311,6 +318,7 @@ export class World {
     const flying =
       g.endState === "victory" && g.endCounter >= 0x19 ? emptyInput() : input;
     pilot(this.player, flying, (e) => this.events.push(e));
+    playerWheelsTick(this.player, this.playerContext);
     playerTick(this, input);
   }
 

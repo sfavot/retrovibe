@@ -67,6 +67,17 @@ describe("messages 3D : trajectoires de gm_message_spawn", () => {
     expect(m.life).toBe(65);
   });
 
+  it("liste chaînée du jeu : un nouveau message passe en tête, chaque tick inverse la liste", () => {
+    const pool = new MessagePool();
+    const a = pool.spawn(text("a"), 0, 0)!;
+    const b = pool.spawn(text("b"), 0, 11)!;
+    expect(pool.active).toEqual([b, a]);
+    pool.tick();
+    expect(pool.active).toEqual([a, b]);
+    pool.tick();
+    expect(pool.active).toEqual([b, a]);
+  });
+
   it("types inconnus ignorés ; pool de 50 messages", () => {
     const pool = new MessagePool();
     expect(pool.spawn(text("x"), 0, 3)).toBeNull();

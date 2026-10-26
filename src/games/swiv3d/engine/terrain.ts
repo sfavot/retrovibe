@@ -162,3 +162,46 @@ export function applyPointCrater(heightmap: Uint8Array, x: number, z: number, de
     heightmap[i] = heightmap[i]! < depth ? 0 : heightmap[i]! - depth;
   }
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Éclairs au sol (`005624c8`)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Côté de la carte d'éclairs au sol `005624c8` : 64×64 entiers, repliée sur la carte de terrain (cellule `& 63`). */
+export const GROUND_FLASH_SIZE = 64;
+const FLASH_MASK = GROUND_FLASH_SIZE - 1;
+/** Baisse d'une case par tick (`gm_ground_flash_fade`). */
+const FLASH_FADE = 0x1e;
+/** Motif de `gm_ground_flash_add`, dans l'ordre de l'exe : `[dx, dz, poids]`, poids 0 = centre, 1 = bord, 2 = coin ou distance 2. */
+const FLASH_PATTERN = [
+  [-1, -1, 2], [0, -1, 1], [1, -1, 2],
+  [-1, 0, 1], [0, 0, 0], [1, 0, 1],
+  [-1, 1, 2], [0, 1, 1], [1, 1, 2],
+  [0, -2, 2], [0, 2, 2], [-2, 0, 2], [2, 0, 2],
+] as const;
+
+/** Nouvelle carte d'éclairs, à zéro comme après `gm_slv_load` (`004545a8` efface les 4 096 cases au chargement du niveau). */
+export const newGroundFlash = (): Int32Array => new Int32Array(GROUND_FLASH_SIZE * GROUND_FLASH_SIZE);
+
+/**
+ * `gm_ground_flash_add` (`004259b4`) : éclair d'explosion autour de la cellule de `(x, z)` Q8 (`x >> 14`, `& 63`). Intensité
+ * `level` 0..3 : centre `0x100 · (level + 1)`, 4 bords la moitié, 4 coins et 4 cases à distance 2 le quart (carré 3×3 plus une
+ * croix de rayon 2). Les cases s'ajoutent sans plafond. `gm_object_explode` passe `level` = taille d'explosion + 1 (1..3).
+ */
+export function addGroundFlash(map: Int32Array, x: number, z: number, level: 0 | 1 | 2 | 3): void {
+  const cx = x >> 14;
+  const cz = z >> 14;
+  const centre = 0x100 * (level + 1);
+  for (const [dx, dz, weight] of FLASH_PATTERN) {
+    const i = ((cz + dz) & FLASH_MASK) * GROUND_FLASH_SIZE + ((cx + dx) & FLASH_MASK);
+    map[i] = map[i]! + (centre >> weight);
+  }
+}
+
+/** `gm_ground_flash_fade` (`0042fc70`, chaque tick de jeu) : chaque case non nulle perd `0x1e`, plancher 0. */
+export function fadeGroundFlash(map: Int32Array): void {
+  for (let i = 0; i < map.length; i++) {
+    const v = map[i]!;
+    if (v !== 0) map[i] = v - FLASH_FADE < 1 ? 0 : v - FLASH_FADE;
+  }
+}

@@ -45,8 +45,6 @@ export function radarColorTable(block11003: Uint8Array): Uint8Array {
 export interface Hud {
   /** Dessine le HUD par-dessus `fb` (`320 × 400` indices). */
   draw(fb: Uint8Array, state: HudState): void;
-  /** Fait repartir les messages 3D figés (« Accompli », « Game over ! ») : `gm_title_release`, à l'ouverture d'un écran de fin. */
-  releaseTitles(): void;
 }
 
 /** Position de la jauge, des armes, du score et du nom de mission (`rules.md` § 7). */
@@ -229,14 +227,13 @@ export function createHud(assets: HudAssets, options: HudOptions = {}): Hud {
   }
 
   return {
-    releaseTitles: () => pool.releaseTitles(),
     draw(fb, state) {
       if (fb.length < SCREEN_WIDTH * SCREEN_HEIGHT) throw new Error("HUD : image trop petite");
       glyphPage = g.strings.glyphPages[GLYPH_PAGE_LANGUAGE[state.language]] ?? 0;
       advance(state);
       drawCrosshair(fb, state);
-      // En pause l'exécutable dessine le décor seul (`gm_frame` sans le drapeau 2) : ni radar, ni jauge, ni score.
-      if (!state.paused) {
+      // En pause et derrière un écran de fin, l'exécutable dessine le décor seul (`gm_frame` sans le drapeau 2) : ni radar, ni jauge, ni score.
+      if (!state.paused && !state.inMenu) {
         drawRadar(fb, radarAssets, state.radar, pointer, state.tick);
         drawWeapons(fb, state);
         text(fb, state, ascii(formatScore(state.score)), "right", LAYOUT.score.right, LAYOUT.score.y);

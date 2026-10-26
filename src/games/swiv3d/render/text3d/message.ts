@@ -56,6 +56,11 @@ const TRAJECTORIES: Record<MessageType, Trajectory> = {
 };
 
 export class MessagePool {
+  /**
+   * Liste chaînée des messages actifs (`DAT_005876dc`), dans l'ordre où `gm_message_draw` les parcourt : un message créé passe en tête,
+   * et chaque tick reconstruit la liste en remettant les survivants en tête un à un, ce qui l'inverse. L'ordre ne compte que pour les
+   * faces de même profondeur (insertion dans la file triée).
+   */
   readonly active: Message3D[] = [];
 
   /** Ajoute un message ; `null` si le type n'existe pas dans le jeu ou si le pool de 50 est plein. */
@@ -78,11 +83,11 @@ export class MessagePool {
         m.pos[a]! -= m.vel[a]!;
       }
     }
-    this.active.push(m);
+    this.active.unshift(m);
     return m;
   }
 
-  /** Un tick logique (40 Hz) : décompte, rotation tant que la vie dépasse 10, déplacement sauf figé. */
+  /** Un tick logique (40 Hz, `gm_effects_tick`) : décompte, rotation tant que la vie dépasse 10, déplacement sauf figé ; la liste s'inverse. */
   tick(): void {
     let kept = 0;
     for (const m of this.active) {
@@ -93,6 +98,7 @@ export class MessagePool {
       if (m.life !== HOLD_LIFE) for (let a = 0; a < 3; a++) m.pos[a]! += m.vel[a]!;
     }
     this.active.length = kept;
+    this.active.reverse();
   }
 
   /** Fait repartir les messages figés (sortie d'un menu) : `gm_title_release`. */

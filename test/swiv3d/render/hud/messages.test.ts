@@ -33,7 +33,7 @@ describe.skipIf(!hasOriginalFiles)("HUD : messages 3D et écran de pause (fichie
   const hudWith = (now = () => 0) => createHud({ global, blendTable: level.fadeTable, table109: level.lightTable109, colorMap: level.colorMap, radarColors }, { now });
   const base: HudState = {
     energy: 496, maxEnergy: 496, shield: 0, score: 0, cannonPower: 0, special: -1, specialAmmo: Array(20).fill(0), specialArmed: false,
-    missionName: "", language: "fr", messages: [], tick: 0, paused: false,
+    missionName: "", language: "fr", messages: [], tick: 0, paused: false, inMenu: false,
     radar: { playerX: 20000, playerZ: 20000, playerYaw: 0, blips: [] },
   };
   /**

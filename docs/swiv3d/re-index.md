@@ -172,9 +172,11 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `00410b74` | `gm_joy_read_axes` | 85 | 1 | lit 'joyGetPosEx' pour la calibration | player.md §7 | non précisé |
 | `00411eb8` | `gm_net_receive` | 605 | 1 | reçoit les messages DirectPlay (joueurs distants) | player.md §7 | non précisé |
 | `004157d0` | `gm_menu_anim_tick` | 228 | 1 | décompte animé des scores des menus (drapeau 2 de 'gm_poll_events') | player.md §7 | non précisé |
-| `004234ec` | `gm_effects_tick` | 233 | 1 | tick de la file d'effets (particules) '005876dc' : 'pos += vel', durée '+0x38' | player.md §7 | non précisé |
+| `004234ec` | `gm_effects_tick` | 233 | 1 | tick des messages 3D '005876dc' (25 ms, drapeau 4 de 'gm_poll_events') : vie, rotation, 'pos += vel' ; inverse la liste | rules.md §8.1 | certain |
 | `00438678` | `gm_pilot_none` | 26 | 0 | fonction pilote vide (formes '0x2a', '0x63') | player.md §7 | non précisé |
+| `00438694` | `gm_pilot_wheels` | 176 | 0 | pilote coupé des formes 1 et 2 (amarrage au sol '004482dc', Super Ressort '0045e128') : braquage vers la cible par pas de 8, roues en modes 3, 3, 4, 4 | player.md §3.6 | certain |
 | `00438744` | `gm_pilot_dying` | 1285 | 0 | séquence de mort/fin (forme '0x2b') | player.md §7 | non précisé |
+| `00438c68` | `gm_pilot_wheels_2` | 157 | 0 | variante motoneige de 'gm_pilot_wheels' (modes 1, 1, 2), installée par '004495f8' | player.md §3.6 | certain |
 | `00439088` | `gm_pilot_heli` | 1511 | 0 | pilote de l'hélicoptère, forme 0 | player.md §7 | non précisé |
 | `00439670` | `gm_pilot_heli_net` | 1369 | 0 | même, joueur réseau (entrées '+0xe4..') | player.md §7 | non précisé |
 | `00439bcc` | `gm_pilot_heli_3` | 1447 | 0 | pilote forme 3 | player.md §7 | non précisé |
@@ -188,7 +190,8 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `0043db98` | `gm_net_send_state_host` | 628 | 1 | émission réseau (hypothèse) | player.md §7 | hypothèse |
 | `0043e5c4` | `gm_player_join_local` | 530 | 2 | place un joueur sur un point de départ | player.md §7 | non précisé |
 | `0043e7d8` | `gm_player_join_net` | 383 | 2 | idem, joueur réseau | player.md §7 | non précisé |
-| `004446a0` | `gm_wheel_update` | 1088 | 4 | animation et braquage d'une roue enfant | player.md §7 | non précisé |
+| `004418b0` | `gm_wheel_attach` | 578 | 1 | pose une roue enfant à son emplacement (table '00484324') dans le repère du joueur, relevée à sol + 2 000 sous sol + 4 000 | player.md §3.6 | certain |
+| `004446a0` | `gm_wheel_update` | 1088 | 4 | place, oriente et fait tourner une roue enfant du joueur (5 modes : avant, arrière, motoneige, ski ; modèle '0x3d6' dans l'eau) | player.md §3.6 | certain |
 | `00444af8` | `gm_heli_physics` | 1017 | 0 | physique de l'hélicoptère (altitude assistée, poussée par tangage/roulis, choc) | player.md §7 ; autres noms proposés : objects.md : gm_aircraft_fly ; rules.md : gm_vehicle_hover_physics | non précisé |
 | `00445228` | `gm_vehicle_physics_1` | 1096 | 0 | physique du véhicule forme 1 | player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445228 | non précisé |
 | `00445670` | `gm_vehicle_physics_2` | 1042 | 0 | physique du véhicule forme 2 | player.md §7 ; autres noms proposés : objects.md : gm_upd_player_00445670 | non précisé |
@@ -214,7 +217,7 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `00423974` | `gm_text3d_emit_glyph` | 2783 | 1 | enfile les triangles d'une lettre 3D du bloc 200 | render.md §13 | probable |
 | `0042469c` | `gm_gamma_build` | 223 | 1 | table de gamma 4×64 'pow' | render.md §13 | certain |
 | `0042477c` | `gm_render_init_tables` | 631 | 1 | réciproques, racines, cercle du rotor ('0052cae8'), pointeurs de colonnes | render.md §13 | certain |
-| `004259b4` | `gm_ground_flash_add` | 716 | 1 | éclair d'impact dans la carte 64×64 '005624c8' | render.md §13 ; autres noms proposés : objects.md : gm_scorch_mark | probable |
+| `004259b4` | `gm_ground_flash_add` | 716 | 1 | éclair d'explosion dans la carte 64×64 '005624c8' | render.md §13 | certain |
 | `00425c94` | `gm_terrain_height_water` | 1101 | 4 | hauteur bilinéaire 8.8 avec vagues | render.md §13 ; autres noms proposés : objects.md : gm_terrain_height_waves | certain |
 | `004268fc` | `gm_terrain_project_flat` | 789 | 2 | projection d'un sommet sans éclairage, drapeau visible, horizon | render.md §13 | certain |
 | `00426c14` | `gm_terrain_project_lit` | 1361 | 1 | projection + éclairage + vagues d'un sommet | render.md §13 | certain |
@@ -223,7 +226,7 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `0042b05c` | `gm_terrain_pick_row_dir` | 670 | 1 | direction de rangée parmi 8 d'après la droite de la caméra | render.md §13 | certain |
 | `0042faf0` | `gm_vec3_normalize_f` | 103 | 1 | normalise un vecteur flottant | render.md §13 | certain |
 | `0042fba8` | `gm_vec3_cross_f` | 119 | 1 | produit vectoriel flottant | render.md §13 | certain |
-| `0042fc70` | `gm_ground_flash_fade` | 57 | 1 | décroissance de 0x1e par pas | render.md §13 ; autres noms proposés : player.md : gm_decay_flash_table | certain |
+| `0042fc70` | `gm_ground_flash_fade` | 57 | 1 | décroissance de 0x1e par pas | render.md §13 | certain |
 | `0042fcac` | `gm_detect_mmx` | 80 | 1 | CPUID bit 23 → '00484620'/'00484624' | render.md §13 | certain |
 | `0042fd24` | `gm_screen_load_planes` | 102 | 2 | copie un écran 320×400 planaire (bloc 100x) dans le tampon | render.md §13 | certain |
 | `0042fd8c` | `gm_fb_clear_all` | 38 | 2 | efface le tampon (sans MMX) | render.md §13 | certain |
@@ -270,7 +273,7 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `0041e614` | `gm_menu_test_mission` | 2074 | 1 | Menu de mission de test (groupe 11, ids 20/21) | screens.md §12 | certain |
 | `0041ee30` | `gm_menu_grab_name` | 1694 | 1 | Saisie du nom de fichier de capture (groupe 12) | screens.md §12 | probable |
 | `0041fc20` | `gm_menu_exit` | 831 | 1 | Confirmation de sortie (groupe 13, phrases 30..33 en rotation) | screens.md §12 | certain |
-| `004235d8` | `gm_title_release` | 70 | 26 | Déclenche la sortie des titres 3D | screens.md §12 | certain |
+| `004235d8` | `gm_title_release` | 70 | 26 | Déclenche la sortie des titres 3D (vie ≥ 1000 : − 0x3d4) | screens.md §4.1 | certain |
 | `004360b0` | `gm_fill_blend` | 519 | 1 | Remplit un rectangle de la page avec une ligne de la table de mélange ('x0, y0, x1, y1, ligne') | screens.md §12 | certain |
 | `00437eac` | `gm_smk_present` | 191 | 1 | Présente une image Smacker : attente verticale, copie, tracé du '.SCR', bascule | screens.md §12 | certain |
 | `0046e994` | `gm_cfg_save_exit` | 26 | 1 | Appelle 'gm_cfg_save' à la sortie | screens.md §12 | certain |
@@ -344,8 +347,8 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 | `0044420c` | `gm_upd_fx_0044420c` | 224 | 0 | décalque d'explosion, sprites d'explosion, fumées, épave gelée, éclats, objet inerte | objects.md §12 | certain |
 | `004442ec` | `gm_object_debris` | 948 | 2 | épave et éclats du bloc 11004 | objects.md §12 ; autres noms proposés : rules.md : gm_spawn_debris | certain |
 | `00444ef4` | `gm_hover_follow_terrain` | 208 | 0 | 'vy' pour suivre le relief à une hauteur donnée | objects.md §12 | certain |
-| `004450a8` | `gm_upd_player_004450a8` | 26 | 0 | formes du joueur et armes embarquées (voir 'player.md') | objects.md §12 | probable |
-| `004450c4` | `gm_upd_wheel` | 339 | 0 | roue de 5002 | objects.md §12 | certain |
+| `004450a8` | `gm_upd_player_004450a8` | 26 | 0 | comportement vide : roues du joueur ('0043de0c', tout est fait par le pilote via '004446a0') et un objet du réseau ('004126ec') | objects.md §12 | probable |
+| `004450c4` | `gm_upd_wheel` | 339 | 0 | roue de 5002 : vitesse du corps, rotation selon la vitesse, posée par '004580f0' dans le repère complet du corps | objects.md §12 | certain |
 | `004463c0` | `gm_pickup_update` | 1290 | 0 | comportement d'un bonus : flotte, attiré, appliqué | objects.md §12 ; autres noms proposés : rules.md : gm_pickup_behavior | certain |
 | `004468cc` | `gm_upd_pickup_after_all` | 149 | 0 | attend '005af3a4 == 1' puis crée le bonus (7001) | objects.md §12 | certain |
 | `00446964` | `gm_upd_pickup_after_group9` | 149 | 0 | attend '005b03e4 == 9' (7002) | objects.md §12 | certain |
@@ -398,7 +401,7 @@ Les groupes « Étude … » viennent des cinq études détaillées (tables « F
 |---|---|---:|---:|---|---|---|
 | `00419ed8` | `gm_screen_game_over` | 1669 | 1 | écran de fin « Game over » | rules.md §9 | non précisé |
 | `00422f28` | `gm_message_pool_init` | 100 | 2 | initialise les 50 messages flottants | rules.md §9 | non précisé |
-| `00422f8c` | `gm_message_spawn` | 702 | 28 | message flottant 3D (table, id, teinte, type) | rules.md §9 ; autres noms proposés : objects.md : gm_mission_message ; screens.md : gm_title_spawn | non précisé |
+| `00422f8c` | `gm_message_spawn` | 702 | 28 | message flottant 3D (EAX table, EDX id, EBX teinte, ECX type) ; type 11 = titre de menu | rules.md §8, screens.md §4.1 | certain |
 | `00424454` | `gm_message_draw` | 527 | 1 | dessin des messages flottants (police vectorielle) | rules.md §9 ; autres noms proposés : render.md : gm_text3d_draw_all | non précisé |
 | `00437af0` | `gm_draw_energy_gauge` | 113 | 1 | jauge d'énergie (bloc 503) | rules.md §9 | non précisé |
 | `00437c38` | `gm_draw_crosshair` | 301 | 1 | une moitié du viseur (bloc 506) | rules.md §9 | non précisé |

@@ -55,6 +55,8 @@ export class Player {
   wheelSpin = 0;
   steer = 0;
   steerTarget = 0;
+  /** Roues enfants (`+0x1a8`, `+0x1ac`, `+0x1b0`, `+0x1b4`) : 4 pour la forme 1, 3 pour la forme 2, aucune sinon (`wheels.ts`). */
+  wheels: GameObject[] = [];
   /** `+0x190` : valeur qui suit la vitesse (hauteur du son moteur, hypothèse). */
   soundPitch = 0;
   /** `+0x94` : cap de tir du canon (`gm_primary_bullet_spawn`, `0046b4b4`) : celui du tick, figé tant que « latéral droit » est tenu pour les véhicules. */
@@ -124,7 +126,7 @@ export const UPDATE_PLAYER_INERT = "player_inert";
  * `gm_player_set_form` (`0043de0c`) : type/classe/physique/pilote selon la forme ; hélicoptères : accumulateurs d'angle recalés sur
  * les angles (`+0x214 = cap << 8`, `+0x218 = tangage << 8`, `+0x21c = roulis << 7`) ; formes 1 et 2 : `+0x190 = 11000`, roues droites.
  * Comme dans l'exe, la poussée, la vitesse de roue et l'état `+0x50` ne sont pas remis à zéro (les plates-formes posent l'état
- * elles-mêmes). Les roues enfants des formes 1 et 2 ne sont pas créées (`vehicle.ts`).
+ * elles-mêmes). Les roues enfants des formes 1 et 2 sont créées par `World` (`setPlayerWheels`, `wheels.ts`).
  */
 export function setForm(
   p: Player,

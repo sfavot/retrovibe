@@ -23,7 +23,8 @@ import {
 import { hintVoice, introVoice, zoneHelpVoice } from "../../src/games/teleportaschtroumpf/scenes/board/voices";
 import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
 import { zoneIndex } from "../../src/games/teleportaschtroumpf/game/board";
-import { DOORS, SCREEN_COUNT } from "../../src/games/teleportaschtroumpf/game/tables";
+import { DOORS, SCREEN_COUNT, TURN_AUTO_SECONDS } from "../../src/games/teleportaschtroumpf/game/tables";
+import { TIMER_BLINK_SECONDS, timerBlinkOff } from "../../src/games/teleportaschtroumpf/scenes/s01-board";
 import { Session } from "./game-helpers";
 import { hasOriginalFiles, readData } from "./helpers";
 import { longPress, swipe, tap, touchDown, touchUp } from "./touch";
@@ -311,6 +312,52 @@ describe.skipIf(!hasOriginalFiles)("plateau : marche, course, saut sur la partie
     await s.run(200);
     expect(s.game.player).toMatchObject({ screen: 1, row: "bottom" });
   }, 60_000);
+});
+
+describe("minuteur de tour : clignotement avant l'action automatique (ajout du port)", () => {
+  it("toujours allumé avant 30 s de tour, puis éteint une demi-seconde (30 ticks) sur deux", () => {
+    expect(TURN_AUTO_SECONDS - TIMER_BLINK_SECONDS).toBe(30);
+    for (const t of [0, 10, 27, 29]) for (const ticks of [0, 30, 45, 1000]) expect(timerBlinkOff(t, ticks)).toBe(false);
+    for (const t of [30, 35]) {
+      expect(timerBlinkOff(t, 0)).toBe(false);
+      expect(timerBlinkOff(t, 29)).toBe(false);
+      expect(timerBlinkOff(t, 30)).toBe(true);
+      expect(timerBlinkOff(t, 59)).toBe(true);
+      expect(timerBlinkOff(t, 60)).toBe(false);
+    }
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("minuteur de tour sur le plateau (multijoueur)", () => {
+  it("le minuteur plein clignote à partir de 30 s de tour", async () => {
+    const s = await Session.start({ players: [{ character: 0 }, { character: 3 }] });
+    await s.ready();
+    /** Pixels du coin du minuteur (bas-droit) dans l'écran affiché. */
+    const corner = () => {
+      const work = s.ctx.surface.work;
+      const out: number[] = [];
+      for (let y = 0xa0; y <= 0xc6; y++) for (let x = 0x124; x < 320; x++) out.push(work[y * 320 + x]);
+      return out.join(",");
+    };
+    const at = async (seconds: number) => {
+      await s.until(() => s.game.state.turn.elapsed >= seconds);
+      return corner();
+    };
+    const full = await at(28);
+    const shown = new Set<string>();
+    // Avant 30 s : le minuteur plein ne bouge pas.
+    while (s.game.state.turn.elapsed < 30) {
+      expect(corner()).toBe(full);
+      await s.run(100);
+    }
+    // De 30 à 36 s : il s'éteint et se rallume.
+    for (let i = 0; i < 40 && s.game.state.turn.elapsed < 35; i++) {
+      shown.add(corner() === full ? "on" : "off");
+      await s.run(100);
+    }
+    expect([...shown].sort()).toEqual(["off", "on"]);
+    expect(s.game.state.current).toBe(0);
+  }, 120_000);
 });
 
 describe.skipIf(!hasOriginalFiles)("plateau au doigt (ajout du port)", () => {

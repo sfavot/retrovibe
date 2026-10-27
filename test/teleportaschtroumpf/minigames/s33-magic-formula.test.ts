@@ -88,7 +88,7 @@ describe("S33 : règles de la formule (pur, `1ceb:000c`)", () => {
     expect(Math.max(...SYMBOL_VOICES) + 3).toBe(14);
   });
 
-  it("doigt : chaque ligne de la liste désigne son symbole, chaque cadre du bas son emplacement, le reste rien", () => {
+  it("doigt : chaque ligne de la liste désigne son symbole, chaque cadre du bas son emplacement, le parchemin au-dessus propose, le reste rien", () => {
     for (let i = 0; i < 6; i++) {
       expect(formulaTargetAt(40, 0x18 + i * 0x16, 6)).toEqual({ kind: "symbol", index: i });
       expect(formulaTargetAt(12, 0x18 + i * 0x16 - 10, 6)).toEqual({ kind: "symbol", index: i });
@@ -100,7 +100,9 @@ describe("S33 : règles de la formule (pur, `1ceb:000c`)", () => {
       expect(formulaTargetAt(0x69 + j * 0x41 + 0x1e, 0xa8, 6)).toEqual({ kind: "slot", index: j });
       expect(formulaTargetAt(0x69 + j * 0x41 + 2, 0xa1, 6)).toEqual({ kind: "slot", index: j });
     }
-    expect(formulaTargetAt(200, 60, 6)).toBeNull();
+    expect(formulaTargetAt(200, 60, 6)).toEqual({ kind: "submit" });
+    expect(formulaTargetAt(300, 10, 6)).toEqual({ kind: "submit" });
+    expect(formulaTargetAt(0x69 + 2, 0xa0 - 7, 6)).toEqual({ kind: "submit" });
     expect(formulaTargetAt(200, 0xb1 + 20, 6)).toBeNull();
     expect(formulaTargetAt(0x5a, 0xa8, 6)).toBeNull();
   });
@@ -314,7 +316,7 @@ describe.skipIf(!hasOriginalFiles)("S33 La Formule Magique : au doigt (ajout du 
     expect(await run.finish(120_000)).toEqual({ kind: "ingredient", success: true });
   }, 180_000);
 
-  it("le doigt qui se pose ne propose rien ; toucher le parchemin, glisser ailleurs ou vers le bas ne fait rien", async () => {
+  it("le doigt qui se pose ne propose rien ; glisser ailleurs ou vers le bas ne fait rien", async () => {
     const run = await launch({ level: 0 });
     const scene = run.scene as MagicFormulaScene;
     await run.until(() => scene.stage === "play");
@@ -323,8 +325,6 @@ describe.skipIf(!hasOriginalFiles)("S33 La Formule Magique : au doigt (ajout du 
     expect(scene.attemptCount).toBe(0);
     touchUp(run.host.input, 200, 0xa8 + 30);
     await run.run(TAP_MS);
-    await touch(run, 200, 60);
-    await touch(run, 300, 10);
     swipe(run.host.input, 40, 0x60, 0, -50);
     await run.run(TAP_MS);
     swipe(run.host.input, 200, 0x40, 0, 50);
@@ -337,6 +337,25 @@ describe.skipIf(!hasOriginalFiles)("S33 La Formule Magique : au doigt (ajout du 
     // Un toucher sous la liste (au-delà du dernier symbole du niveau) ne choisit rien non plus.
     await touch(run, 40, 0x18 + scene.symbols * 0x16);
     expect(scene.guess).toEqual([0, 0, 0]);
+  }, 60_000);
+
+  it("toucher le parchemin au-dessus de la proposition la propose, comme Espace", async () => {
+    const run = await launch({ level: 0 });
+    const scene = run.scene as MagicFormulaScene;
+    await run.until(() => scene.stage === "play");
+    const picks = wrongPicks(scene, 0);
+    for (let column = 0; column < 3; column++) {
+      await touch(run, ...slotPoint(column));
+      await touch(run, ...symbolPoint(picks[column]));
+    }
+    expect(scene.attemptCount).toBe(0);
+    await touch(run, 200, 60);
+    expect(scene.attemptCount).toBe(1);
+    expect(scene.answering).toBe(true);
+    // Pendant l'animation, un autre toucher du parchemin ne propose rien de plus.
+    await touch(run, 200, 60);
+    await run.until(() => !scene.answering, 30_000);
+    expect(scene.attemptCount).toBe(1);
   }, 60_000);
 
   it("pendant l'animation d'une réponse, les touchers sont ignorés comme les flèches", async () => {

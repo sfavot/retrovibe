@@ -2,6 +2,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../data/mcg";
 import type { Voc } from "../data/voc";
 import { TICKS_PER_SECOND } from "../engine/clock";
 import { Menu, paletteBounds, paletteHighlight, type MenuArea } from "../engine/menu";
+import { fillRect } from "./minigames/common";
 import { isLocked } from "../engine/options";
 import { musicName, voiceName } from "../engine/paths";
 import type { Scene, SceneContext } from "../engine/scene";
@@ -41,6 +42,15 @@ function buttonAreas(ctx: SceneContext): (MenuArea | null)[] {
 export const PARENTS_HOLD_SECONDS = 4;
 
 /**
+ * Jauge de l'appui tenu sur Parents (ajout du port) : rien au repos, l'accès reste caché ; passé `GAUGE_DELAY_SECONDS` de
+ * maintien (un toucher bref ne montre rien), un trait se remplit sous le texte du bouton jusqu'à l'ouverture. Il prend la
+ * couleur du texte en surbrillance, `GAUGE_GAP` pixels sous lui, sur `GAUGE_HEIGHT` pixels.
+ */
+export const GAUGE_DELAY_SECONDS = 0.5;
+const GAUGE_GAP = 3;
+const GAUGE_HEIGHT = 2;
+
+/**
  * Menu principal S07 (engine.md §1.2, `21ee:0e8f`) : fond `s07a001d.mcg`, musique de fond `s52m00Nm.voc` tirée une fois
  * (conservée tant qu'elle joue sur la voie), six boutons. Haut / bas changent de bouton avec rebouclage et le bip de
  * navigation `s07a001b.voc` (pas de son à l'entrée) ; Espace valide, Entrée joue la voix d'aide.
@@ -49,6 +59,7 @@ export const PARENTS_HOLD_SECONDS = 4;
  * fait rien non plus (l'original n'affiche aucun message).
  *
  * Ajout au port, pour la souris et le doigt (l'original n'a que le clavier) : toucher un bouton le valide (`buttonAreas`), et un appui tenu 4 s sur le bouton Parents l'ouvre.
+ * Pendant le maintien (touche, souris ou doigt), une jauge se remplit sous Parents (`renderParentsGauge`).
  */
 export function createMenuScene(): Scene {
   return new MenuScene();
@@ -59,6 +70,8 @@ class MenuScene implements Scene {
   private mcg!: Mcg;
   private music: Voc | null = null;
   private holdStart: number | null = null;
+  /** Texte du bouton Parents (sans marge), relevé à l'entrée : la jauge se dessine dessous. */
+  private parentsText: MenuArea | null = null;
   private readonly menu = new Menu({
     axis: "vertical",
     items: HELP_VOICES.map((n) => ({ voice: voiceName("s07v", n) })),
@@ -81,6 +94,7 @@ class MenuScene implements Scene {
     ctx.fade.blackout();
     ctx.fade.in();
     this.menu.enter(ctx);
+    this.parentsText = paletteBounds(ctx.surface.work, TEXT_PALETTE_FIRST + MENU_PARENTS);
     if (this.music) ctx.voice.setMusic(this.music);
     this.holdStart = null;
   }
@@ -96,6 +110,17 @@ class MenuScene implements Scene {
   render(ctx: SceneContext): void {
     ctx.surface.restoreBackground();
     this.menu.render(ctx);
+    this.renderParentsGauge(ctx);
+  }
+
+  private renderParentsGauge(ctx: SceneContext): void {
+    const text = this.parentsText;
+    if (this.holdStart === null || !text) return;
+    const held = ctx.clock.ticks - this.holdStart;
+    if (held < GAUGE_DELAY_SECONDS * TICKS_PER_SECOND) return;
+    const width = Math.ceil(((text.x1 - text.x0 + 1) * held) / (PARENTS_HOLD_SECONDS * TICKS_PER_SECOND));
+    const y = text.y1 + GAUGE_GAP;
+    fillRect(ctx.surface.work, text.x0, y, text.x0 + width - 1, y + GAUGE_HEIGHT - 1, TEXT_PALETTE_FIRST + MENU_PARENTS);
   }
 
   exit(ctx: SceneContext): void {

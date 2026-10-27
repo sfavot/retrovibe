@@ -8,7 +8,7 @@ import type { SceneContext } from "../engine/scene";
 import { boundsOf, placeFrame } from "../engine/sprites";
 import { TICKS_PER_SECOND } from "../engine/clock";
 import type { Game, GameEvent } from "../game/rules";
-import { HAZARDS, ROW_Y, SCREEN_COUNT, type Position, type Row } from "../game/tables";
+import { HAZARDS, ROW_Y, SCREEN_COUNT, TURN_AUTO_SECONDS, type Position, type Row } from "../game/tables";
 import { loadDefaultFont } from "./common/text";
 import { Ambient } from "./board/ambient";
 import { drawHud } from "./board/hud";
@@ -105,6 +105,19 @@ const TIMER_LAST_STEP = 9;
 const TIMER_X = 0x124;
 const TIMER_BOTTOM = 0xc6;
 const TIMER_SECONDS_PER_STEP = 3;
+/**
+ * Ajout du port : le minuteur plein ne bouge plus de 27 s à l'action automatique des 36 s. Pendant ses `TIMER_BLINK_SECONDS`
+ * dernières secondes, il clignote (affiché une demi-seconde sur deux) pour prévenir que le jeu va appuyer à la place du joueur.
+ */
+export const TIMER_BLINK_SECONDS = 6;
+
+/**
+ * Le minuteur est-il masqué (phase éteinte du clignotement) ? `turnSeconds` : secondes entières du tour (`Game`), `ticks` : horloge
+ * du moteur, qui cadence la demi-seconde.
+ */
+export function timerBlinkOff(turnSeconds: number, ticks: number): boolean {
+  return turnSeconds >= TURN_AUTO_SECONDS - TIMER_BLINK_SECONDS && Math.floor(ticks / (TICKS_PER_SECOND / 2)) % 2 === 1;
+}
 
 /** Bandeau du bas (le même que celui que S48 recopie, `y ≥ 0x98`) : le toucher met en pause. */
 const HUD_TOP = 0x98;
@@ -275,7 +288,7 @@ export class Board {
       const at = SIPHONS[this.view.screen];
       if (at) surface.drawSprite(sprites, this.view.facingRight ? SPRITE_SIPHON_RIGHT : SPRITE_SIPHON_LEFT, at[0], at[1]);
     }
-    if (this.timerVisible) {
+    if (this.timerVisible && !timerBlinkOff(this.turnSeconds, ctx.clock.ticks)) {
       const step = Math.min(TIMER_LAST_STEP, Math.floor(this.turnSeconds / TIMER_SECONDS_PER_STEP));
       const image = sprites.images[TIMER_FIRST_IMAGE + step];
       if (image) surface.blitImage(image, TIMER_X, TIMER_BOTTOM - image.height + 1);

@@ -507,7 +507,7 @@ Voir §7 pour les voix `sNNv%dt.voc`.
 4. **Chrono global et pause** : le chrono 0 est-il gelé pendant S48 ? Seul le slot 1 est sauvegardé/restauré dans ce qui a été lu.
 5. **Musique des mini-jeux** : confirmer par fonction qu'aucun ne change `DS:6F04`.
 6. **Flags du MUX** (§2.3) : chaque bit est probable ; une recherche par fichier (qui passe quels flags) manque.
-7. **Bouton « Schtroumpf » (S07, index 2)** : nom et intention du mode `1a3c:002a` (mode libre ?) à valider visuellement ; le texte à afficher est dans le MCG.
+7. ~~**Bouton « Schtroumpf » (S07, index 2)**~~ : **réglée** (vu en jeu le 2026-10-27) : il ouvre la carte S02 en mode libre (`1a3c:002a`), où toucher un lieu lance son mini-jeu.
 8. **`30d4` (curseur 16×16)** : confirmer qu'il n'est vraiment affiché que dans les écrans d'erreur.
 9. **Retour 10 du verrou parental** : pas de message d'explication repéré (l'utilisateur voit seulement que « Jouer » ne démarre pas).
 10. **Structure joueur** (+0xC, +0x10, +0x12/0x13) et `DS:7E18/7E19` : interprétation à confirmer par la tâche 2.3.

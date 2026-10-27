@@ -1,6 +1,6 @@
 # Le Téléportaschtroumpf : plan d'implémentation
 
-**État** : jeu jouable, 20 mini-jeux portés (`src/games/teleportaschtroumpf/scenes/minigames/`). Ce document est le plan d'origine ; l'état courant est dans `engine-ts.md`.
+**État** : jeu complet et jouable au clavier, à la souris et au doigt, 20 mini-jeux portés (`src/games/teleportaschtroumpf/scenes/minigames/`). Ce document est le plan d'origine ; le suivi est dans « Avancement » ci-dessous, l'état du moteur dans `engine-ts.md`.
 
 Jeu : *Les Schtroumpfs : Le Téléportaschtroumpf* (Infogrames Multimedia, 1995), version CD DOS.
 Principe du jeu : un jeu de plateau (S01) sur la carte du Pays Schtroumpf (S02). Les cases mènent à une trentaine de mini-jeux (S15 à S42).
@@ -55,6 +55,16 @@ Ce document sert de brief commun aux sous-agents. Chaque tâche indique ses entr
   - La notice PDF a perdu la mise en forme du .doc.
   - La jaquette fournie est celle de l'édition CD-i, avec un filigrane.
   - Préférence de son en double avec Lost in Time : pourrait passer dans `src/ui/`.
+- **Tactile et souris** (remplace la décision « clavier seul » ci-dessus pour le doigt et le clic) : menus validés au toucher ou au clic (`bf8a141`), chaque écran jouable par gestes (`22fd322`) : toucher, appui long (voix d'aide), glissement.
+- Finitions du 2026-10-27 :
+  - menu Parents : une jauge se remplit sous le bouton pendant l'appui tenu de 4 s (rien au repos : l'accès reste caché) ;
+  - choix des personnages : glisser vers la droite garde « personnage suivant », comme la flèche droite (pas d'inversion façon carrousel) ;
+  - S33 : toucher le parchemin propose la formule, en plus du glissement vers le haut ;
+  - S30 et S31 revus en jeu avec la règle d'ancrage des images stockées en miroir (`hy8.md`) : saut de S30 continu, S31 inchangé à l'œil ;
+  - « mini-jeu lancé en marchant » : c'est l'action automatique des 36 s à plusieurs (`rules.md`, question 10), comportement d'origine gardé ;
+  - S23 et S27 : la poussée de la souris contre un bord n'est pas portée (clavier et doigt suffisent, voir leurs docs).
+  - à plusieurs, le minuteur du plateau (l'horloge à coucou) clignote de 30 à 36 s pour annoncer l'action automatique, sans son.
+- Reste ouvert : les questions de `rules.md` et `engine.md` § 8.
 - Limite d'hébergement : le site publié pèse environ 320 Mo ; ajouter `mathemagique` et `zoombinis` tels quels dépasserait le 1 Go de GitHub Pages.
 
 ## État au 2026-10-22 (étude d'extraction)

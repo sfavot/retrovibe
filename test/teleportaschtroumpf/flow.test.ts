@@ -3,7 +3,7 @@ import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
 import { isLocked, saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
 import type { GameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
 import { paletteBounds } from "../../src/games/teleportaschtroumpf/engine/menu";
-import { MENU_PARENTS, MENU_QUIT, PARENTS_HOLD_SECONDS, createMenuScene } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
+import { GAUGE_DELAY_SECONDS, MENU_PARENTS, MENU_QUIT, PARENTS_HOLD_SECONDS, createMenuScene } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles } from "./helpers";
 
@@ -235,6 +235,35 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
     t.host.input.mouseUp(0);
     await t.settle("ParentsScene");
   }, 60_000);
+
+  it("Parents tenu : une jauge se remplit sous le bouton passé une demi-seconde, rien au repos ni au relâchement (ajout du port)", async () => {
+    const t = await startMenu();
+    t.host.audio.enabled = false;
+    await t.settle("MenuScene");
+    const mcg = await t.engine.ctx.resources.mcg("s07a001d.mcg");
+    const text = paletteBounds(mcg.pixels, 120 + MENU_PARENTS)!;
+    /** Pixels de la jauge : couleur du texte Parents, sous lui. */
+    const gauge = () => {
+      const work = t.engine.ctx.surface.work;
+      let count = 0;
+      for (let y = text.y1 + 1; y <= text.y1 + 8; y++) for (let x = text.x0; x <= text.x1; x++) if (work[y * 320 + x] === 120 + MENU_PARENTS) count++;
+      return count;
+    };
+    await t.select(MENU_PARENTS);
+    expect(gauge()).toBe(0);
+    t.host.input.keyDown("ArrowRight");
+    await runFor(t.engine, t.host, GAUGE_DELAY_SECONDS * 1000 - 200);
+    expect(gauge()).toBe(0);
+    await runFor(t.engine, t.host, 1000);
+    const early = gauge();
+    expect(early).toBeGreaterThan(0);
+    await runFor(t.engine, t.host, 1500);
+    expect(gauge()).toBeGreaterThan(early);
+    t.host.input.keyUp("ArrowRight");
+    await runFor(t.engine, t.host, 100);
+    expect(gauge()).toBe(0);
+    expect(t.top()).toBe("MenuScene");
+  });
 
   it("toucher un bouton du menu le valide (ajout du port) ; toucher ailleurs ne fait rien", async () => {
     const t = await startMenu();

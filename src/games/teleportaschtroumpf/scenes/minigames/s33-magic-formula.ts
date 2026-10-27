@@ -21,8 +21,8 @@ import { Clip, SoundHush, drawFrame, goalClip, ingredientOutcome, minigameLevel,
  * - joue : un Mastermind à trois emplacements. Une formule secrète de trois symboles est tirée parmi `N` symboles ; le joueur choisit un
  *   symbole par emplacement (haut / bas dans la liste de gauche, gauche / droite pour changer d'emplacement, Espace pour proposer) et
  *   obtient, pour chacun, « bien placé » (2), « présent ailleurs » (1) ou « absent » (0). Il a six essais et 120 secondes. Au doigt (ajout
- *   du port) : toucher un emplacement le choisit, toucher un symbole de la liste le met dans l'emplacement choisi, glisser vers le haut
- *   depuis la proposition (ou le parchemin au-dessus) la propose ;
+ *   du port) : toucher un emplacement le choisit, toucher un symbole de la liste le met dans l'emplacement choisi, toucher le parchemin
+ *   au-dessus de la proposition, ou glisser vers le haut depuis la proposition ou le parchemin, la propose ;
  * - rend : `onDone(ctx, { kind: "ingredient", success })` à la fin de la vidéo de fin (passable par Échap ou Espace) ; `Game.resolveMinigame`
  *   donne l'ingrédient 7.
  */
@@ -137,16 +137,20 @@ const REPEAT_CENTISECONDS = 0x32;
 /** Marge (pixels) des zones du doigt autour des cadres de la liste et des emplacements. */
 const TOUCH_MARGIN = 6;
 
+export type FormulaTarget = { kind: "symbol" | "slot"; index: number } | { kind: "submit" };
+
 /**
  * Ce que le doigt désigne en (x, y) : un symbole de la liste (`count` lignes, bandes de `ROW_HEIGHT` centrées sur le cadre du curseur),
- * un emplacement de la proposition (sous chacun des trois cadres), ou rien.
+ * un emplacement de la proposition (sous chacun des trois cadres), le parchemin au-dessus (proposer), ou rien.
  */
-export function formulaTargetAt(x: number, y: number, count: number): { kind: "symbol" | "slot"; index: number } | null {
+export function formulaTargetAt(x: number, y: number, count: number): FormulaTarget | null {
   if (x <= 0x47 + TOUCH_MARGIN) {
     const index = Math.floor((y - (0x10 + 0x11 / 2 - ROW_HEIGHT / 2)) / ROW_HEIGHT);
     return index >= 0 && index < count ? { kind: "symbol", index } : null;
   }
-  if (y < 0xa0 - TOUCH_MARGIN || y > 0xb1 + TOUCH_MARGIN || x < SLOT_X0 - TOUCH_MARGIN) return null;
+  if (x < SLOT_X0 - TOUCH_MARGIN) return null;
+  if (y < 0xa0 - TOUCH_MARGIN) return { kind: "submit" };
+  if (y > 0xb1 + TOUCH_MARGIN) return null;
   const index = Math.min(SLOTS - 1, Math.floor((x - SLOT_X0 + (SLOT_DX - 0x3c) / 2) / SLOT_DX));
   return { kind: "slot", index };
 }
@@ -195,7 +199,7 @@ export class MagicFormulaScene implements Scene {
   private stampHorizontal = 0;
   private seen = { up: false, down: false, left: false, right: false, validate: false };
   /** Symbole ou emplacement touché depuis le dernier pas de la logique (le dernier toucher l'emporte). */
-  private touched: { kind: "symbol" | "slot"; index: number } | null = null;
+  private touched: FormulaTarget | null = null;
   private lastLogic = 0;
 
   // Essais
@@ -399,15 +403,18 @@ export class MagicFormulaScene implements Scene {
     this.seen.down ||= input.justPressed("down");
     this.seen.left ||= input.justPressed("left");
     this.seen.right ||= input.justPressed("right");
-    // Le doigt qui se pose ne propose rien : seul son geste compte (toucher une cible, glisser vers le haut).
+    // Le doigt qui se pose ne propose rien : seul son geste compte (toucher une cible ou le parchemin, glisser vers le haut).
     this.seen.validate ||= input.validateNotTouch;
     this.collectTouch(input);
   }
 
   private collectTouch(input: Input): void {
     const gesture = input.touchGesture;
-    if (gesture?.kind === "tap") this.touched = formulaTargetAt(gesture.x, gesture.y, this.symbolCount) ?? this.touched;
-    else if (gesture?.kind === "swipe" && isSubmitSwipe(gesture)) this.seen.validate = true;
+    if (gesture?.kind === "tap") {
+      const target = formulaTargetAt(gesture.x, gesture.y, this.symbolCount);
+      if (target?.kind === "submit") this.seen.validate = true;
+      else this.touched = target ?? this.touched;
+    } else if (gesture?.kind === "swipe" && isSubmitSwipe(gesture)) this.seen.validate = true;
   }
 
   private logicStep(ctx: SceneContext): void {

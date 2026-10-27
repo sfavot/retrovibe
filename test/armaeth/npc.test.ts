@@ -4,6 +4,8 @@ import { Lcg, msvcRand } from "../../src/engine/rng";
 import { ArmaethEngine } from "../../src/games/armaeth/engine/engine";
 import { FAMILY, type BehaviorContext } from "../../src/games/armaeth/engine/handlers";
 import type { GameObject, GameRoom } from "../../src/games/armaeth/engine/state";
+import type { DeferredEvent } from "../../src/games/armaeth/data/world";
+import { PRYTWEN_EVENT } from "../../src/games/armaeth/game/npc-prytwen";
 import { type DuelGear, registerNpcs, resolveDuel } from "../../src/games/armaeth/game/npc";
 import { NUM, ROOM } from "../../src/games/armaeth/game/helpers";
 import { createAnimations, instantAnimations, NpcKit } from "../../src/games/armaeth/game/npc-kit";
@@ -185,6 +187,26 @@ describe.skipIf(!hasOriginalFiles)("scénarios (monde réel)", () => {
     state().setHero(null);
   });
 
+  const fire = (procedure: number, event: number, obj: GameObject) =>
+    rig.engine.registry.get(FAMILY.event, procedure)!(rig.ctx, { event } as DeferredEvent, obj);
+  const awarded = (id: number) => state().scoreTable.some((e) => e.id === id && e.points < 0);
+
+  it("Prytwen assommé se réveille à terre : debout et mobile (`28b1:12e0`, `Gst 7, Mob 2, Ego 0`), pas en fuite (`Ego 4`)", () => {
+    const { npc } = stage(NUM.prytwen, 104);
+    npc.ego = 2;
+    npc.mob = 0;
+    fire(NUM.prytwen, PRYTWEN_EVENT.wake, npc);
+    calm(rig.engine);
+    expect([npc.gst, npc.mob, npc.ego, npc.fig]).toEqual([7, 2, 0, 0]);
+  });
+
+  it("soldat endormi réveillé (`2a44:12fc`, événements 3 et 4) : `Gst 7, Mob 2`, il reprend ses déplacements", () => {
+    const { npc } = stage(NUM.soldier, ROOM.soldiers);
+    Object.assign(npc, { ego: 7, fig: 1, mob: 1 });
+    fire(NUM.dwarfMiner, 3, npc);
+    expect([npc.gst, npc.mob, npc.ego, npc.fig]).toEqual([7, 2, 0, 0]);
+  });
+
   it("animations des personnages : `Ver` vaut 1 par défaut (`16f5:0132`), sans quoi la séquence n'avance pas", () => {
     // régression du robot : les animations scénarisées des nains n'avançaient pas
     const ani = parseAni(readOriginal("A1FANI.SYS"));
@@ -312,6 +334,32 @@ describe.skipIf(!hasOriginalFiles)("scénarios (monde réel)", () => {
     expect(hero.animId).toBe(41);
   });
 
+  it("Sarhûls et jambon : on rejoint celui qui mange (`Ego 2`, `22ef:0000` suivi) et on attend contre lui tant qu'il mange (`21e7:003c`)", () => {
+    const s = state();
+    const [eater, other] = s.objects.filter((o) => o.num === NUM.sarhul);
+    for (const o of [eater, other]) {
+      s.moveToRoom(o, room(310));
+      Object.assign(o, { gst: 7, ego: 0, err: 0, x: 100, p: 60, y: 100 });
+      o.path.defined = false;
+    }
+    other.x = 180;
+    eater.ego = 2;
+    run(other);
+    expect(other.path.defined).toBe(true);
+    expect(other.path.target).toMatchObject({ x: eater.x, p: eater.p });
+    // au contact d'un Sarhûl qui mange, il attend son tour (`Ego 3`) ; il attend tant qu'un Sarhûl de la salle est en `Ego 2`
+    touch(other, eater);
+    run(other);
+    expect(other.ego).toBe(3);
+    other.path.defined = false;
+    run(other, 3);
+    expect(other.ego).toBe(3);
+    // un Sarhûl qui dévore une proie (`Ego 1`) ne le retient pas (le port testait `Ego 1`)
+    eater.ego = 1;
+    run(other);
+    expect(other.ego).toBe(0);
+  });
+
   it("feu, torche, ronces, éclaboussure, dalle : cycles de vie", () => {
     const s = state();
     const fire = s.findByNum(NUM.fire)!;
@@ -377,6 +425,8 @@ describe.skipIf(!hasOriginalFiles)("scénarios (monde réel)", () => {
     run(g);
     expect(g.ego).toBe(3);
     expect(g.gst).toBe(0);
+    // `2846:0084..00b5` : la fin de course arme l'événement 17 (16 à la fermeture) qui recharge la scène et, héros devant, rapporte (1, 5)
+    expect(s.events.entries.some((e) => e.num === NUM.grille && e.event === 17)).toBe(true);
   });
 
   it("dépouille : cinq étapes puis disparition", () => {
@@ -387,6 +437,24 @@ describe.skipIf(!hasOriginalFiles)("scénarios (monde réel)", () => {
     run(r);
     expect(r.fig).toBe(1);
     expect(r.tim).toBe(1600);
+  });
+
+  it("soldat contre bouclier + épée : pas de tirage (`2a44:0359`), et le dernier soldat de la salle 305 rapporte (3, 9) (`2a44:02d5`)", () => {
+    const { npc, hero } = stage(NUM.soldier, ROOM.soldiers);
+    for (const other of state().objects.filter((o) => o.num === NUM.soldier && o !== npc)) state().moveToRoom(other, room(1));
+    give(hero, NUM.shield);
+    give(hero, NUM.sword);
+    touch(npc, hero);
+    run(npc);
+    expect(hero.ego).toBe(6);
+    const seed = rig.engine.rng.state;
+    run(npc); // résolution : victoire sans `rand()`
+    expect(rig.engine.rng.state).toBe(seed);
+    expect(npc.ego).toBe(3);
+    expect(awarded(309)).toBe(false);
+    run(npc, 5); // dernier test du bloc : le soldat disparaît, les autres ont quitté la salle
+    expect(state().findBySerial(npc.serial)).toBeUndefined();
+    expect(awarded(309)).toBe(true);
   });
 });
 

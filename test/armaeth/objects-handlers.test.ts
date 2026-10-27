@@ -171,9 +171,10 @@ describe.skipIf(!hasOriginalFiles)("gestionnaires d'objet (famille 1)", () => {
   });
 
   it("torche : éteindre, puis V018 si déjà éteinte", () => {
-    const torch = s.give(12, { ego: 2 });
+    // `2420:0398` lit `Fig` (égal à `Ego` pour une torche allumée) : `Ego` et `Fig` passent à 6
+    const torch = s.give(12, { ego: 2, fig: 2 });
     expect(s.say("eteindre la torche")).toEqual(["V015"]);
-    expect(torch.ego).toBe(6);
+    expect([torch.ego, torch.fig]).toEqual([6, 6]);
     expect(s.say("eteindre la torche")).toEqual(["V018"]);
   });
 

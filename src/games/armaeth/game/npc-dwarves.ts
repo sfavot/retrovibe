@@ -3,6 +3,7 @@ import { FAMILY } from "../engine/handlers";
 import type { GameObject } from "../engine/state";
 import { flag, NUM, OFF, ROOM, setWord, word } from "./helpers";
 import { type NpcKit, RESTART, UPDATE_OK } from "./npc-kit";
+import { doorState, moveDoor } from "./objects";
 
 /**
  * Nains et soldats (`Num 201..204`, `301`, `2a44:*`, `characters.md` § 7.3) : décision, contact avec le héros, résolution du duel
@@ -85,8 +86,28 @@ export function aggro(kit: NpcKit, ctx: BehaviorContext, dwarf: GameObject, targ
   return true;
 }
 
-/** `2a44:0ae6` : contact (`Ego` 0 ou >= 4). Faux = la procédure rend 0. */
-function dwarfContact(kit: NpcKit, ctx: BehaviorContext, dwarf: GameObject): boolean {
+/**
+ * Contact avec une porte à serrure (`Mob 0`, `2a44:0d80`..`0ead`, objet hors des cas du héros, de Prytwen et des nains). Rend vrai si le
+ * nain a agi (`Err` remis à 0), faux sinon. Selon son `Ego` d'entrée : `Ego 4` (en fuite) ouvre toujours (`20b5:055e(Num, 2)`) ; un
+ * soldat (`Num 301`) ne referme à clé que les portes 309 et 329 qui ne sont pas verrouillées (`055e(Num, 0)`) ; tout autre nain
+ * ouvre une porte fermée ou verrouillée une fois sur deux. Passe par `moveDoor`, comme Minas Thyl et Prytwen.
+ */
+function dwarfDoorContact(kit: NpcKit, ctx: BehaviorContext, dwarf: GameObject, door: GameObject): boolean {
+  const state = doorState(ctx, door.num);
+  if (dwarf.ego === 4) return moveDoor(ctx, door.num, 2, dwarf);
+  if (dwarf.num === NUM.soldier) {
+    if (door.num !== 309 && door.num !== 329) return false;
+    return state !== 0 && moveDoor(ctx, door.num, 0, dwarf);
+  }
+  if (state >= 2) return false;
+  return kit.chance(ctx, 2) && moveDoor(ctx, door.num, 2, dwarf);
+}
+
+/**
+ * `2a44:0ae6` : contact (`Ego` 0 ou >= 4). Faux = la procédure rend 0. Le contact d'un `Err 8/9` n'y mène que pour `Ego 0` ou >= 5
+ * (`2a44:0020`) ; `Ego 4` (en fuite) y arrive en fin de trajet suivi.
+ */
+export function dwarfContact(kit: NpcKit, ctx: BehaviorContext, dwarf: GameObject): boolean {
   if (dwarf.ego !== 0 && dwarf.ego < 4) return true;
   const other = kit.touched(ctx, dwarf);
   if (!other) {
@@ -127,6 +148,8 @@ function dwarfContact(kit: NpcKit, ctx: BehaviorContext, dwarf: GameObject): boo
   } else if (isDwarf(other.num) || other.num === NUM.soldier) {
     if (dwarf.ego === 4 || dwarf.ego > 6) return true;
     kit.faceOff(ctx, other, dwarf);
+  } else if (other.mob === 0 && doorState(ctx, other.num) >= 0) {
+    if (!dwarfDoorContact(kit, ctx, dwarf, other)) return true;
   } else {
     // objet convoité : il le ramasse (`Val >= 10`, sauf pour le premier mineur), hypothèse : liste `DGROUP:0676` non relevée
     if (other.value >= 10 && dwarf.num !== NUM.dwarfMiner && kit.fits(dwarf, other)) ctx.state.moveToContainer(other, dwarf);
@@ -159,7 +182,9 @@ function resolveDuelEnd(kit: NpcKit, ctx: BehaviorContext, dwarf: GameObject): v
   }
   const hero = partner;
   const type = dwarfType(dwarf.num);
-  const outcome = resolveDuel(type, gearOf(hero), ctx.rng.mod(4));
+  // `2a44:0359..0372` : avec le bouclier et l'épée la victoire est acquise sans tirage ; `rand() % 4` (`2a44:037c`) sinon seulement
+  const gear = gearOf(hero);
+  const outcome = resolveDuel(type, gear, gear.shield && gear.sword ? 0 : ctx.rng.mod(4));
   const soldier = type === 2;
   const x = dwarf.num - NUM.dwarfMiner;
   switch (outcome) {
@@ -218,7 +243,11 @@ export function dwarf(kit: NpcKit): BehaviorHandler {
           return UPDATE_OK;
         }
         if (id === ANM_VANISH) {
+          // `2a44:028e..02d5` : destruction (contenu laissé dans le conteneur) ; si c'était dans la salle de garde 305 et qu'il n'y
+          // reste plus aucun soldat (`21e7:003c(liste de la salle, 301, -1, -1)`), points `(3, 9)`
+          const room = obj.room;
           kit.destroy(ctx, obj, true);
+          if (room?.id === ROOM.soldiers && !room.listA.some((o) => o.num === NUM.soldier)) ctx.score.award(3, 9);
           return RESTART;
         }
         if (id >= 24 && id <= 27 || id === 38) {

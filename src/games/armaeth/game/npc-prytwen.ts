@@ -4,7 +4,7 @@ import { FAMILY } from "../engine/handlers";
 import type { GameObject } from "../engine/state";
 import { destroy, flag, NUM, OFF, ROOM, setFlag, spawnLike, word } from "./helpers";
 import { type NpcKit, RESTART, UPDATE_OK } from "./npc-kit";
-import { GRATE, startGrate } from "./objects";
+import { GRATE, doorState, moveDoor, startGrate } from "./objects";
 
 /**
  * Prytwen le malfaisant (`Num 101`, `28b1:*`, `characters.md` § 7.2) : décision (voleur), ultimatum, duel et sa table de résolution,
@@ -101,6 +101,12 @@ function prytwenContact(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): boo
       break;
     }
     default:
+      if (other.mob === 0 && doorState(ctx, other.num) >= 0) {
+        // porte à serrure (`28b1:0a94`) : fermée ou verrouillée, elle s'ouvre (`20b5:055e`) ; un tirage une fois sur deux seulement si Prytwen est `Ego 0`
+        if ((obj.ego === 0 && !kit.chance(ctx, 2)) || doorState(ctx, other.num) === 2) return true;
+        if (!moveDoor(ctx, other.num, 2, obj)) return true;
+        break;
+      }
       if (other.pickable === 0 || other.hidden !== 0) return true;
       if ((other.value >= 10 || other.num === NUM.bronzeKey) && kit.fits(obj, other)) ctx.state.moveToContainer(other, obj);
       else return true;
@@ -301,27 +307,33 @@ export function prytwenEvent(kit: NpcKit): EventHandler {
     if (entry.event === PRYTWEN_EVENT.wake) {
       const carried = hero !== null && obj.holder === hero;
       if (!carried) {
-        kit.setState(ctx, obj, { gst: 7, mob: 2, ego: 4, fig: 0 });
-        kit.sayHere(ctx, obj, "G", 103);
+        // `28b1:12e0..1305` : à terre (ou dans un autre contenant que le héros), il se relève et reprend ses décisions :
+        // `1a37:003a(Gst 7, Mob 2, Ego 0, Fig 0)`, `G122`
+        kit.setState(ctx, obj, { gst: 7, mob: 2, ego: 0, fig: 0 });
+        kit.sayHere(ctx, obj, "G", 122);
         ctx.motion.reset(obj);
         return;
       }
-      // porté par le héros : déposé dans la salle, puis un tirage `rand() % 4`
+      // porté par le héros : déposé dans la salle (`19dc:0000`), `G103`, puis un tirage `rand() % 4` (`28b1:1224..12dd`)
       if (hero.room === null && hero.holder === null) return;
       const room = hero.room;
       if (room) {
         ctx.state.moveToRoom(obj, room);
         kit.copyPosition(hero, obj);
       }
-      kit.sayHere(ctx, obj, "G", 104);
-      // `28b1:11e0` (décompilat) : `rand() % 4 == 1` le laisse repartir et libère le héros (`246c:0240`), les autres tirages (0, 2, 3)
-      // l'agrippent dans une animation à deux : une chance sur quatre seulement de s'en tirer
-      if (ctx.rng.mod(4) === 1) {
-        kit.setState(ctx, obj, { gst: 7, mob: 2, ego: 0, fig: 0 });
+      kit.sayHere(ctx, obj, "G", 103);
+      const roll = ctx.rng.mod(4);
+      if (roll === 1) {
+        // il s'en va (`Ego 4`) et le héros reprend la marche (`246c:0240(héros, 7, G106)`)
+        kit.setState(ctx, obj, { gst: 7, mob: 2, ego: 4, fig: 0 });
         kit.releaseHero(ctx, hero);
+        kit.sayNear(ctx, hero, "G", 106);
       } else {
-        // hypothèse (characters.md § 7.2) : il agrippe le héros (animation à deux)
-        kit.startAnimation(ctx, obj, { id: ANM_DUEL, ego: 1, partner: hero });
+        // 0 : il agrippe le héros, duel (animation 13, 14 dans l'antre, `G104`) ; 2 et 3 : animation 15 (`G105`) (`2594:0004` puis
+        // `16f5:0132`, `28b1:1428`)
+        const id = roll === 0 ? (obj.room?.id === ROOM.lair ? ANM_DUEL_END[1] : ANM_DUEL) : ANM_DUEL_OTHER;
+        kit.sayNear(ctx, hero, "G", roll === 0 ? 104 : 105);
+        kit.startAnimation(ctx, obj, { id, ego: 1, partner: hero });
         kit.holdHero(ctx, hero);
       }
       ctx.motion.reset(obj);

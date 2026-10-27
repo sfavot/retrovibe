@@ -11,6 +11,7 @@ Tâche DX1. Un banc d'essai sans fenêtre fait tourner l'*Armaeth* d'origine (CD
 | « Trop loin » : qui marche ? | **le héros marche vers l'objet**, puis la commande est rejouée ; `V008` n'est pas affiché | certain pour une clef, une armoire (sans Prytwen) |
 | « Trop loin » en présence de Prytwen (salle 105) | le héros ne bouge pas, **Prytwen marche vers le héros** et dit « Prytwen n'aime pas que l'on fouine… » | certain (observé) |
 | Mauvaise clef sur une porte verrouillée (§ 4.2 bis) | **`V082` puis `V013`, jamais `V014`** (sauvegarde fabriquée par le port, chargée par F3) ; le port a été corrigé | certain (observé) |
+| Couloir de la pile de bois, salle 8 (§ 4.5) | de (216, 146, 127) (X pair) le héros s'arrête en haut de l'escalier vers X 196, comme le port ; de (217, 146, 127) (X impair) il arrive au coffret | certain (observé) |
 | Lumière | le décalage mesuré entre 12 h 10 et 0 h 10 est de -47 (le port : -48) ; en dessous de -40 le jeu d'origine est très sombre | probable (un cran de DAC d'écart) |
 | Jetons de débogage `/dgs 99`, `/trf`, `/loc`, `/inf`, `/heu`, `/dlo`, `/ego` | **fonctionnent en jeu** (outil d'observation précieux, § 5) | certain |
 
@@ -76,6 +77,12 @@ La fenêtre d'une ligne (« La porte est fermée. », `08-armoire-v084.png`) occ
 ### 4.4 Jetons de débogage (parser.md § 17, 6)
 
 `/dgs 99` rouvre bien tout l'interpréteur ; ce niveau **retombe à 0 à chaque script** (donc après chaque `/trf`) : retaper `/dgs 99`. Confirmés en jeu : `/trf n` (téléportation, héros compris), `/loc n` (« Salle 105 » pour l'armoire 113 et Prytwen 101, « Salle 011 » pour la clef 6), `/inf n` (fenêtre de tous les champs : `X`, `Y`, `P`, `Sol`, `dpX`…), `/heu`, `/dlo`. `F8` n'a pas pu sauter l'introduction (la touche n'est pas lue pendant les attentes de `tta`).
+
+### 4.5 Salle 8 : la pile de bois et le coffret (walkthrough.md, (0, 0))
+
+**Méthode.** `scripts/armaeth/dosbox/craft-room8.mts <dossier> <X>` écrit `SVG001.SVG` : salle 8, héros sur la pile de bois (sol 65) en `(X, 146, 127)`, la clef d'or en poche (`Pre 8`) ; `run.sh -x -s scripts/armaeth/dosbox/scenarios/coffret.txt -i <dossier>/SVG001.SVG -d 100` la charge et tape « ouvrir le coffret avec la clef » (le coffret est trop loin : le héros marche vers lui, puis la commande est rejouée).
+
+**Résultat.** `X = 216` (la position où le robot arrivait, X pair) : le héros monte l'escalier et s'arrête en haut, vers `(196, 80)` (lu sur l'image), à l'endroit exact où le port l'arrête (`game.test.ts`) ; une seule fenêtre, « Vous êtes trop loin. » (`V008`), puis plus rien après Entrée. `X = 217` : il arrive au coffret ; la commande rejouée donne `V046` (« Inutile d'essayer de forcer ce coffre... ») et le coffret reste fermé, comme dans le port (la commande rejouée ne garde que le dernier sens de « clef » essayé, sans objet : même mécanisme que le § 4.2 bis) ; tapée une seconde fois, à portée, elle l'ouvre (port). **Conclusion** : le blocage du couloir selon la parité de X est celui de l'original, pas un défaut d'empreinte du port ; le joueur passe en X impair (entrée de la salle 14 par la droite, `walkthrough.test.ts`). **Écart restant** : en X pair le port affiche `G44` (« Impossible d'aller plus loin ! », deux blocages du trajet) là où l'original affiche `V008` ; non corrigé (`walkthrough.md`, points ouverts).
 
 ## 5. Changements recommandés pour le port (non faits)
 

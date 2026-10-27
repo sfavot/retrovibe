@@ -139,6 +139,21 @@ describe("placement : recherche sur terrain synthétique", () => {
     expect(refused.x).toBe(60); // déjà sur une case de type 2
   });
 
+  it("succès dans la salle chargée : le type trouvé passe par 13a8:000a avec l'effet 7 (`1b11:05a8`), pas hors salle", () => {
+    const mixed = syntheticTerrain(concat(record(2, 0, 3, 10, 179, 100, 20, 179, 100), record(35, 0, 3, 30, 179, 100, 40, 179, 100)));
+    const calls: [number, number][] = [];
+    const acceptsGround = (type: number, effect: number): boolean => {
+      calls.push([type, effect]);
+      return true;
+    };
+    searchPosition(walker(60, 100, 24), envOf(mixed, { acceptsGround }), { ...SEARCH_FREE, type: 35 });
+    expect(calls.at(-1)).toEqual([35, 7]);
+    expect(calls.filter(([, effect]) => effect === 7)).toHaveLength(1);
+    calls.length = 0;
+    searchPosition(walker(60, 100, 24), envOf(mixed, { acceptsGround, inRoom: false }), { ...SEARCH_FREE, type: 35 });
+    expect(calls.some(([, effect]) => effect === 7)).toBe(false);
+  });
+
   it("quirk : la spirale ne visite jamais la case (même rangée, colonne - 1)", () => {
     // seule la case 49 de la rangée 5 est praticable ; la cible est dans la colonne 50 de la même rangée
     const lone = syntheticTerrain(concat(record(2, 0, 5, 49, 179, 100, 49, 179, 100), record(2, 0, 6, 49, 179, 100, 49, 179, 100)));

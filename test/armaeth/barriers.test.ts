@@ -21,7 +21,7 @@ interface WorldOptions {
   night?: boolean;
   chance?: boolean;
   room?: number;
-  guard?: Partial<Record<309 | 329, boolean>>;
+  guard?: Partial<Record<111 | 309 | 329, boolean>>;
   doorP?: number;
 }
 
@@ -104,9 +104,11 @@ describe("codes de barrage : prédicats", () => {
     expect(blocked(102, subject({ isHero: false, p: 120 }), inFront)).toBe(true);
   });
 
-  it("103 : bloque si l'entité 329 n'est pas dans l'état voulu", () => {
-    expect(blocked(103, subject(), worldOf({ guard: { 329: false } }))).toBe(true);
-    expect(blocked(103, subject(), worldOf({ guard: { 329: true } }))).toBe(false);
+  it("103 : bloque si la porte 111 n'est pas franchissable (`1414:0284`, `AX = 0x6F`)", () => {
+    expect(blocked(103, subject(), worldOf({ guard: { 111: false } }))).toBe(true);
+    expect(blocked(103, subject(), worldOf({ guard: { 111: true } }))).toBe(false);
+    // régression : le port testait la porte 329 de la salle de garde
+    expect(blocked(103, subject(), worldOf({ guard: { 111: true, 329: false } }))).toBe(false);
     expect(blocked(103, subject({ txt: 2 }), worldOf())).toBe(false);
   });
 

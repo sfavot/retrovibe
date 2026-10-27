@@ -1,4 +1,5 @@
 import type { Lcg } from "../../../engine/rng";
+import type { RoomLimits } from "../data/scene";
 import type { AniTable } from "../data/tables";
 import type { DeferredEvent } from "../data/world";
 import type { SpriteLibrary } from "./animation";
@@ -105,8 +106,8 @@ export interface HandlerRooms {
   want(room: GameRoom): void;
   /** `186d:000c` : franchit la sortie `Inf` de l'objet (`Err 0x0B`). */
   exit(obj: GameObject): ExitResult;
-  /** Limites de marche `4aca` (X max) et `4ad6` (P max) de la salle chargée, `null` sans salle. */
-  limits(): { xMax: number; pMax: number } | null;
+  /** Limites de marche de la salle chargée (`4ac8`..`4ad6`), `null` sans salle. */
+  limits(): RoomLimits | null;
   /** `4ae0` : nombre de plans actifs de la salle chargée. */
   planes(): number;
   /** `147f:000a` : recalcule les plans actifs de la salle chargée après un changement d'état d'un mécanisme. */

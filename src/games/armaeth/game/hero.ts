@@ -12,6 +12,7 @@ import { FOLLOW_WALKING } from "../engine/paths";
 import { SEARCH_FREE } from "../engine/placement";
 import { type GameObject, type GameRoom, type WorldState, rawU16, rawU8, setRawU16, setRawU8 } from "../engine/state";
 import { EngineAbort, UPDATE_OK } from "../engine/update";
+import { GRATE, startGrate } from "./objects";
 
 /**
  * Le héros d'*Armaeth* (`Num 1`, `Fct` `246c:000a`) : répartiteur `Err` puis `Ego` 0..8, réactions au type de sol, chutes,
@@ -378,7 +379,10 @@ export type AnimationOutcome =
   | { kind: "teleport" }
   | { kind: "waterLanding" };
 
-/** Les animations du héros qui ont une conséquence (`characters.md` § 6.2). Les autres ids : retour à la marche (hypothèse). */
+/**
+ * Les animations du héros qui ont une conséquence (`characters.md` § 6.2, table de sauts `2594:0276` indexée par `id - 2`, 42 mots).
+ * Tout autre id (1, 7 à 11, 13 à 16, 20 à 31, 34, 36 à 38, 40, 42 et au-delà de 43) pointe sur `2594:025c` : `gm_abort(0x42)`.
+ */
 export const HERO_ANIMATIONS: Readonly<Record<number, AnimationOutcome>> = {
   2: { kind: "die", message: 23, keep: false },
   3: { kind: "immolation", message: 22 },
@@ -400,7 +404,9 @@ export const HERO_ANIMATIONS: Readonly<Record<number, AnimationOutcome>> = {
 function finishAnimation(h: H, id: number): number {
   const o = h.obj;
   h.ctx.state.moveEnabled = true;
-  const outcome = HERO_ANIMATIONS[id] ?? ({ kind: "walk" } as const); // hypothèse (characters.md § 6.2) : id inconnu = reprise de la marche
+  const outcome = HERO_ANIMATIONS[id];
+  // `2594:025c` : `gm_abort(0x42)` (arrêt du jeu, « * Err 066 * » sous DOS) ; `4b50 = 7` (`moveEnabled`) est posé avant l'aiguillage
+  if (!outcome) throw new EngineAbort(0x42, `Fin de l'animation ${id} du héros sans conséquence (table 2594:0276)`);
   switch (outcome.kind) {
     case "die":
       return die(h, outcome.message, outcome.keep);
@@ -1085,6 +1091,8 @@ export interface GroundWorld {
   hasKey?: () => boolean;
   /** Messages (`Z1`, `Z301`) et points (`3, 4`) demandés avec `effect != 0`. */
   say?: (cls: string, n: number) => void;
+  /** Case piège 38 franchie avec `effect != 0` : la grille de la geôle (`Num 103`) se referme (`2846:0398(grille, objet, 0, 7)`). */
+  trap?: () => void;
   award?: (chapter: number, index: number) => void;
 }
 
@@ -1120,7 +1128,10 @@ export function acceptsGround(num: number, ego: number, sol: number, subject: Gr
     case 37:
       return num === 4 || (num === 1 && (ego === 0 || (ego === 6 && (anm === 4 || anm === 5))));
     case 38:
-      return !(num >= 201 && num <= 204) && num !== 301;
+      // `13a8:00b2..00ec` : refusée aux nains ; sinon acceptée, et le passage réel referme la grille de la geôle
+      if ((num >= 201 && num <= 204) || num === 301) return false;
+      if (effect !== 0) world.trap?.();
+      return true;
     case 39:
       return num === 1;
     case 52:
@@ -1193,6 +1204,11 @@ export function acceptsGroundFor(obj: GameObject, sol: number, effect: number, s
     hasKey: () => obj.contents.length > 0,
     say: (cls, n) => ctx?.messages.say(cls, n),
     award: (c, i) => void ctx?.score.award(c, i),
+    trap: () => {
+      // `2846:0398` : seule une grille ouverte (`Ego 3`) se referme ; `V118` si c'est le héros qui l'a déclenchée
+      const bars = ctx ? state.findByNum(103) : undefined;
+      if (ctx && bars?.ego === GRATE.open) startGrate(ctx, bars, false, obj === ctx.hero);
+    },
   };
   return acceptsGround(obj.num, obj.ego, sol, { anm: obj.animId, mob: obj.mob, txt: obj.txt, ground: obj.ground }, world, effect);
 }

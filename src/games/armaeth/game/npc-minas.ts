@@ -6,6 +6,7 @@ import type { GameObject } from "../engine/state";
 import { turnIntoToad } from "./npc-creatures";
 import { flag, NUM, OFF, playAnim, ROOM, setFlag, word } from "./helpers";
 import { type NpcKit, RESTART, UPDATE_OK } from "./npc-kit";
+import { doorState, moveDoor } from "./objects";
 
 /**
  * Minas Thyl la sorcière (`Num 303`, `2dd9:*`, `characters.md` § 7.5), relue ligne à ligne dans `disasm.txt` (`2dd9:0006` à
@@ -166,8 +167,18 @@ function minasContact(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): boole
     kit.faceOff(ctx, other, obj);
     return done();
   };
-  /** `2dd9:0d0c` : tout autre objet. `Mob 2` : face-à-face. `Mob 0` : les portes à serrure s'ouvrent parfois (`20b5:0516`, `20b5:055e`) : lacune. */
-  const other0 = (): boolean => (other.mob === 2 ? faceOff() : true);
+  /**
+   * `2dd9:0d0c` : tout autre objet. `Mob 2` : face-à-face. `Mob 0` : une porte à serrure fermée ou verrouillée (`20b5:0516` < 2) s'ouvre
+   * une fois sur deux (`gm_chance_one_in(2)`, tiré avant de tester l'état) si elle a la clé ou si la porte est déverrouillée
+   * (`20b5:055e(Num, 2, Minas)`, `moveDoor`) ; les autres `Mob 0` (ni porte, ni ouverte, ni tirage gagné) ne remettent pas `Err` à 0.
+   */
+  const other0 = (): boolean => {
+    if (other.mob === 2) return faceOff();
+    if (other.mob !== 0) return true;
+    const state = doorState(ctx, other.num);
+    if (state < 0 || !kit.chance(ctx, 2) || state === 2) return true;
+    return moveDoor(ctx, other.num, 2, obj) ? done() : true;
+  };
   /** `2dd9:0b9a` / `0b94` : nains, soldat, Prytwen (`G330`), ours (`G350`) : on leur fait les poches, sort s'ils sont libres. */
   const creature = (message: number): boolean => {
     if (other.hidden !== 0) return true;
@@ -312,12 +323,12 @@ export function minas(kit: NpcKit): BehaviorHandler {
         if (!sequenceFinished(obj, active)) return endTic(obj);
         setMinas(kit, ctx, obj, 7, 0, 2);
         if (kit.leaveRoom(ctx, obj)) return endTic(obj);
-        // lacune : le test suivant (`2dd9:01c3`) lit `[BP-0xe]`, jamais écrit dans cette branche (reste de pile) ; le port teste la baguette
-        if (wandOf(obj)) {
-          vanishAndReset(kit, ctx, obj);
-          return endTic(obj);
-        }
-        kit.wander(ctx, obj);
+        // `2dd9:01c3` teste le pointeur `[BP-0xe]:[BP-0xc]`, jamais écrit dans cette branche (il ne l'est que par la décision, `041b`) : c'est
+        // un reste de pile. Le cadre de `2dd9:0006` est exactement celui de `animStep` (`1833:0006`) que `majObjet` (`1890:0006`, `Mob 1`)
+        // vient d'appeler avec le même nombre d'octets d'arguments : `[BP-0xc]` y est le décalage de l'enregistrement d'image
+        // (`1833:004c`, `Fig * 12 + défs + 0x10`), écrit avant toute sortie anticipée, donc non nul. Elle disparaît (animation 45) ;
+        // le chemin « errer » (`2dd9:0834`) n'est jamais pris (`characters.md` § 7.5).
+        vanishAndReset(kit, ctx, obj);
         return endTic(obj);
       case 2:
         // arrivée par téléportation : elle apparaît (`2dd9:0390`)

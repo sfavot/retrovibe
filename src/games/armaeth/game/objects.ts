@@ -3,6 +3,7 @@ import { FAMILY, type BehaviorContext, type HandlerContext, type HandlerRegistry
 import type { GameObject } from "../engine/state";
 import { setHeroCarrying, startHeroFall } from "./hero";
 import {
+  DOORS,
   HANDLED,
   NUM,
   OK,
@@ -209,8 +210,7 @@ export const torch: ObjectHandler = (ctx) => {
     }
     case VERB.extinguish: {
       if (lamp.ego >= 4) return refuse(ctx, 3, 18);
-      setState(ctx, lamp, { gst: 0, mob: 0, ego: lamp.ego + 4 });
-      lamp.light = 0;
+      extinguishTorch(ctx, lamp);
       sayDone(ctx);
       return OK;
     }
@@ -223,6 +223,17 @@ export const torch: ObjectHandler = (ctx) => {
       return 0;
   }
 };
+
+/**
+ * `2420:0398` : éteint une torche allumée. Le test et la nouvelle valeur viennent de `Fig` (+0x2E, pas de `Ego`) : `Fig` 0..3 devient
+ * `Fig + 4`, copié dans `Ego`, `Lum := 0`, puis `1a37:003a` (`Gst 0`, `Mob 0`, replacement). Sans effet si `Fig` n'est pas 0..3.
+ */
+export function extinguishTorch(ctx: BehaviorContext, lamp: GameObject): void {
+  const level = lamp.fig;
+  if (level > 3) return;
+  lamp.light = 0;
+  setState(ctx, lamp, { gst: 0, mob: 0, ego: level + 4, fig: level + 4 });
+}
 
 /** Réserve de torches : `bois` (`Num 17`) parmi les frères du héros, `Sol 0x41` pour s'y servir. */
 function takeTorchFromPile(ctx: HandlerContext): number {
@@ -576,6 +587,53 @@ export function setDoor(ctx: BehaviorContext, leaf: GameObject, ego: number): vo
   leaf.y = y;
   leaf.p = p;
   setState(ctx, leaf, { ego, fig: 2 * side + (open ? 1 : 0) });
+}
+
+/**
+ * `20b5:0516(Num)` : `Ego` de la porte à serrure de ce `Num` (0 verrouillée, 1 fermée, 2 ouverte), -1 si ce n'est pas une porte de la
+ * table `DGROUP:0694`. `gm_abort(0x91)` (`217d:0088`) si l'objet manque.
+ */
+export function doorState(ctx: BehaviorContext, num: number): number {
+  if (!DOORS.some((row) => row.door === num)) return -1;
+  return requireNum(ctx, num, 0x91).ego;
+}
+
+/**
+ * `20b5:055e(Num, état voulu, porteur)` : un personnage amène la porte à `wanted` (0 verrouillée, 1 fermée, 2 ouverte). Rend vrai (7)
+ * sauf si ce n'est pas une porte ou si le porteur n'a pas la clé de la porte (`21e7:0022` sur ses poches, tout `Ego`) : faux (0), et dans
+ * ce cas, quand il voulait verrouiller (`wanted == 0`) une porte qui n'est pas fermée, la porte est seulement refermée (`20b5:0248(Num, 1)`).
+ * Transitions (`20b5:05c3..0629`) :
+ * - porte verrouillée : `wanted` 0 = rien ; sinon `05d9` ;
+ * - porte fermée : `wanted` 0 = `05d9`, 1 = rien, 2 = l'état est posé **sans clé** ; au-delà rien ;
+ * - porte ouverte : `wanted` 0 = `05d9`, 1 = l'état est posé sans clé ; au-delà rien ;
+ * - autre `Ego` : `05d9`.
+ * `05d9` : l'état est posé si la porte n'a pas de clé ou si le porteur l'a.
+ */
+export function moveDoor(ctx: BehaviorContext, num: number, wanted: number, carrier: GameObject): boolean {
+  const row = DOORS.find((r) => r.door === num);
+  if (!row) return false;
+  const leaf = requireNum(ctx, num, 0x91);
+  const set = (): boolean => {
+    setDoor(ctx, leaf, wanted);
+    return true;
+  };
+  const needsKey = (): boolean => {
+    if (row.key === 0 || carrier.contents.some((o) => o.num === row.key)) return set();
+    if (wanted === 0 && leaf.ego !== DOOR.closed) setDoor(ctx, leaf, DOOR.closed);
+    return false;
+  };
+  switch (leaf.ego) {
+    case DOOR.locked:
+      return wanted === 0 ? true : needsKey();
+    case DOOR.closed:
+      if (wanted === 0) return needsKey();
+      return wanted === 2 ? set() : true;
+    case DOOR.open:
+      if (wanted === 0) return needsKey();
+      return wanted === 1 ? set() : true;
+    default:
+      return needsKey();
+  }
 }
 
 /**

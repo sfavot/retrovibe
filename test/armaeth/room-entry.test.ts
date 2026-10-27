@@ -64,8 +64,39 @@ describe.skipIf(!hasOriginalFiles)("salle de garde 305 : soldats endormis à l'e
         p.drain(2);
       }
       expect(sleeper.ego).not.toBe(7);
+      // réveillé mobile (`Gst 7, Mob 2`) : resté `Mob 1`, il ne bougeait plus
+      expect([sleeper.gst, sleeper.mob]).toEqual([7, 2]);
       return;
     }
     throw new Error("aucune graine n'endort un soldat sur la chaise");
+  });
+});
+
+/** Autres effets d'entrée de `147f:000a` : la porte 111 des salles 104 et 105 (`147f:00b2`), les points de la salle 208 (`147f:0130`). */
+describe.skipIf(!hasOriginalFiles)("effets d'entrée des salles 104, 105 et 208", () => {
+  function enter(room: number) {
+    const p = new Player({ seed: 10 });
+    p.skipIntro();
+    p.engine.sendToRoom(room, true);
+    for (let i = 0; i < 60 && p.state.loadedRoom?.id !== room; i++) {
+      p.run(2);
+      p.drain(3);
+    }
+    expect(p.state.loadedRoom?.id).toBe(room);
+    return p;
+  }
+
+  it("la porte 111 est ramenée dans la salle 104 comme dans l'antre de Prytwen (105)", () => {
+    for (const room of [104, 105]) {
+      const p = enter(room);
+      expect(p.state.loadedRoom!.listA.some((o) => o.num === 111)).toBe(true);
+    }
+  });
+
+  it("entrer dans la salle 208 rapporte (2, 5), une seule fois", () => {
+    const p = enter(208);
+    const entry = p.state.scoreTable.find((e) => e.id === 205)!;
+    expect(entry.points).toBeLessThan(0);
+    expect(p.state.score).toBe(10);
   });
 });

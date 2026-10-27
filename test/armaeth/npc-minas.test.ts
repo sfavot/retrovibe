@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MessageTable, messageId } from "../../src/games/armaeth/data/text";
 import { loadWorldState, serializeWorld } from "../../src/games/armaeth/engine/save";
 import type { GameObject, WorldState } from "../../src/games/armaeth/engine/state";
+import { EngineAbort } from "../../src/games/armaeth/engine/update";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 import { Player } from "./player";
 
@@ -377,6 +378,39 @@ describe.skipIf(!hasOriginalFiles)("Minas Thyl : la décision (2dd9:03e0..0842)"
     expect(key.ground).toBe(0x53);
     expect(s.state.findByNum(109)!.room?.id).toBe(LAIR);
     expect(holds(s.minas, 320) && holds(s.minas, 321)).toBe(true);
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("Minas Thyl : fin d'attente (2dd9:0182) et animation 1 du héros sans fin (2594:0276)", () => {
+  it("Ego 5, séquence finie, aucune sortie possible : elle disparaît (animation 45), baguette ou non (le pointeur de pile lu en 2dd9:01c3 n'est jamais nul)", () => {
+    for (const withWand of [false, true]) {
+      const s = quietScene(HALL, (w, _hero, minas) => {
+        const lair = w.roomById(LAIR)!;
+        lair.exits.fill(0); // `228e:0000` n'a aucune sortie à choisir : il rend 0 et `2dd9:01c3` est atteint
+        w.moveToRoom(minas, lair); // hors de la salle chargée : la séquence est finie d'office (`1833:0336`)
+        minas.ego = 5;
+        minas.fig = 5;
+        minas.mob = 1;
+        if (withWand) give(w, minas, 320);
+      });
+      expect(until(s, () => s.minas.animId === 45, 200)).toBe(true);
+      expect(s.minas.ego).toBe(6);
+      expect(field(s.minas, 0x2c)).toBe(0);
+    }
+  });
+
+  it("animation 1 du héros capturé : si Minas Thyl n'arrive jamais au chaudron, la table 2594:0276 n'a pas d'issue pour l'id 1 : gm_abort(0x42) (« * Err 066 * »)", () => {
+    const s = scene(LAIR);
+    expect(until(s, () => s.hero.animId === 1, 400)).toBe(true);
+    s.minas.gst = 0; // Minas Thyl ne bouge plus : l'animation de 10 pas de 250 tics va à son terme
+    let failure: unknown;
+    try {
+      pump(s, 20000); // 2500 tics de monde à 7 images ; les fenêtres de message arrêtent le monde : `pump` les lit
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(EngineAbort);
+    expect((failure as EngineAbort).code).toBe(0x42);
   });
 });
 

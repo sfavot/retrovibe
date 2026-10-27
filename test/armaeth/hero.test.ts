@@ -281,4 +281,28 @@ describe.skipIf(!hasOriginalFiles)("héros complet (fichiers du jeu)", () => {
     expect(acceptsGround(1, 0, 2)).toBe(true);
     expect(acceptsGround(4, 0, 12)).toBe(true);
   });
+
+  it("case piège 38 de la geôle (`13a8:00b2`) : le passage réel (effet non nul) referme la grille, pas le simple essai ; refusée aux nains", () => {
+    const trap = vi.fn();
+    expect(acceptsGround(1, 0, 38, {}, { trap }, 0)).toBe(true);
+    expect(trap).not.toHaveBeenCalled();
+    expect(acceptsGround(1, 0, 38, {}, { trap }, 7)).toBe(true);
+    expect(trap).toHaveBeenCalledTimes(1);
+    expect(acceptsGround(301, 0, 38, {}, { trap }, 7)).toBe(false);
+    expect(trap).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("fin des animations du héros : table de sauts 2594:0276", () => {
+  it("les ids qui ont une issue sont exactement ceux dont l'entrée n'est pas 2594:025c (gm_abort(0x42)) dans AM1.EXE ; tous les autres arrêtent le jeu", () => {
+    const exe = readOriginal("AM1.EXE");
+    const view = new DataView(exe.buffer, exe.byteOffset, exe.byteLength);
+    // segment de code 2594 (base Ghidra 1000) : en-tête MZ puis (2594 - 1000) paragraphes ; table de 42 mots indexée par `id - 2`
+    const table = view.getUint16(8, true) * 16 + (0x2594 - 0x1000) * 16 + 0x276;
+    expect(view.getUint16(table, true)).toBe(0x134);
+    const handled: number[] = [];
+    for (let id = 2; id <= 43; id++) if (view.getUint16(table + 2 * (id - 2), true) !== 0x25c) handled.push(id);
+    expect(Object.keys(HERO_ANIMATIONS).map(Number).sort((a, b) => a - b)).toEqual(handled);
+    expect(handled).not.toContain(1);
+  });
 });

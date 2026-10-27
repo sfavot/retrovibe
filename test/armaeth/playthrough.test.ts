@@ -167,8 +167,10 @@ describe.skipIf(!hasOriginalFiles)("partie au hasard", () => {
     const roomIds = p.state.rooms.map((r) => r.id).filter((id) => !NOT_PLAYABLE.has(id));
     for (let tick = 0; tick < 20000; tick++) {
       // toutes les 800 images le héros est envoyé dans une salle tirée au hasard (comme le jeton `trf` d'un script) : sans cela le
-      // hasard ne sortirait guère de la salle de départ et les personnages des autres chapitres ne tourneraient jamais
-      if (tick % 800 === 799 && p.state.hero) p.engine.sendToRoom(roomIds[rng.mod(roomIds.length)]!, true);
+      // hasard ne sortirait guère de la salle de départ et les personnages des autres chapitres ne tourneraient jamais. Seulement un
+      // héros libre (`Ego 0`) : envoyé pendant une animation (`Ego 6`, dévoré...), il n'a pas toujours de place dans la salle d'arrivée
+      // (puits 212) et le moteur s'arrête sur `0x101` (abandon du placement d'entrée) ; les scripts n'envoient pas un héros tenu
+      if (tick % 800 === 799 && p.state.hero && p.hero.ego === 0) p.engine.sendToRoom(roomIds[rng.mod(roomIds.length)]!, true);
       if (tick % 20 === 0) {
         const roll = rng.mod(100);
         if (p.engine.windows.active) {

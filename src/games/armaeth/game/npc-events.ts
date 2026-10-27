@@ -36,12 +36,15 @@ export function bearEvent(kit: NpcKit): EventHandler {
   };
 }
 
-/** `2a44:12fc` : 3 et 4 = réveil d'un nain endormi (`Ego >= 7 -> 0`). */
+/**
+ * `2a44:12fc` : 3 et 4 = réveil d'un nain endormi (`Ego >= 7 -> 0`) : `1a37:003a(Gst 7, Mob 2, Ego 0, Fig 0)` ; le nain redevient mobile
+ * (endormi, il était `Mob 1`, `147f:016a`).
+ */
 export function dwarfEvent(kit: NpcKit): EventHandler {
   return (ctx, entry, dwarf) => {
     if (!dwarf || (entry.event !== 3 && entry.event !== 4)) return;
     if (dwarf.ego > 6) {
-      kit.setState(ctx, dwarf, { ego: 0, fig: 0 });
+      kit.setState(ctx, dwarf, { gst: 7, mob: 2, ego: 0, fig: 0 });
       ctx.motion.reset(dwarf);
       kit.sayHere(ctx, dwarf, "G", 342);
     }

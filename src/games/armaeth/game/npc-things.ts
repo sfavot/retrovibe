@@ -1,7 +1,8 @@
 import { sequenceFinished } from "../engine/animation";
+import { EventOp } from "../engine/events";
 import { type BehaviorContext, type BehaviorHandler, FAMILY, type HandlerRegistry } from "../engine/handlers";
 import { type GameObject, RAW_OFFSET, type WorldState } from "../engine/state";
-import { flag, NUM, OFF, passageSteps, type PassageKind, ROOM, runPassageSteps, setFlag, setWord, word } from "./helpers";
+import { eventTarget, flag, NUM, OFF, passageSteps, type PassageKind, ROOM, runPassageSteps, setFlag, setWord, word } from "./helpers";
 import { type NpcKit, RESTART, UPDATE_OK } from "./npc-kit";
 
 /**
@@ -272,6 +273,10 @@ export function grille(kit: NpcKit): BehaviorHandler {
         return UPDATE_OK;
       }
     }
+    // `2846:0084..00b5` : à l'arrêt, fermée, piste `B103` ; puis l'événement différé (opération 0 « lire ou créer », procédure 103) qui
+    // rend la main au joueur (`2846:042c`, `game/events.ts`) : 16 dans 16 tics (fermée : `G112`) ou 17 au tic suivant (ouverte)
+    if (target === 0) ctx.sound.effect("B", 103, 0);
+    ctx.events.operate(eventTarget(obj), target === 0 ? 16 : 17, EventOp.Get, target === 0 ? 16 : 1, NUM.grille);
     kit.setState(ctx, obj, { gst: 0, mob: 0, dep: 1, txt: 0, ego: target, fig: target !== 0 ? 8 : 0 }, 2);
     cancelRoomPaths(kit, ctx);
     return RESTART;

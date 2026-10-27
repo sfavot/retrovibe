@@ -313,4 +313,198 @@ export class Robot extends Player {
     }
     throw new RobotSetback(`salle ${room} encombrée`);
   }
+
+  // --- itinéraires de la solution (`docs/armaeth/walkthrough.md`) ------------------------------------------------------------
+
+  /** Le héros porte-t-il un objet de ce `Num` ? */
+  has(num: number): boolean {
+    return !!this.state.hero && this.hero.contents.some((o) => o.num === num);
+  }
+
+  /** Le premier objet de ce `Num` (il doit exister). */
+  object(num: number): GameObject {
+    return this.state.objects.find((o) => o.num === num)!;
+  }
+
+  /** Attend `ticks` images en lisant les messages qui tombent. */
+  wait(ticks: number): string[] {
+    const read: string[] = [];
+    for (let i = 0; i < ticks; i += 5) {
+      this.run(5);
+      read.push(...this.drain(2));
+    }
+    return read;
+  }
+
+  /** Le héros vivant, sinon contretemps `why`. */
+  private alive(why: string): GameObject {
+    if (!this.state.hero) throw new RobotSetback(why);
+    return this.hero;
+  }
+
+  /** Une condition attendue d'un passage : sinon contretemps (l'essai recommence depuis la sauvegarde). */
+  need(condition: boolean, why: string): void {
+    if (!condition || !this.state.hero) throw new RobotSetback(why);
+  }
+
+  /** De la salle du trône à la corniche d'arrivée du dôme : les cases 81 sous la dalle ouverte descendent vers le fond (bord bas -> 202). */
+  enterDome(): void {
+    for (const [x, y] of [[160, 100], [160, 125], [160, 135]]) {
+      if (this.hero.ground === 81) break;
+      this.walkTo(x, y, 4000);
+      this.drain();
+    }
+    this.need(this.hero.ground === 81, "pas sur la dalle ouverte");
+    this.arrow("up");
+    this.until(() => this.roomId !== 108, 1500);
+    this.stop();
+    this.run(30);
+  }
+
+  /** Quitte la corniche d'arrivée par le haut : en marchant vers la gauche le sol monte au-dessus du bord haut (Y 14), salle 108. */
+  leaveDomeUp(): void {
+    this.arrow("left");
+    this.until(() => this.roomId !== 202, 2500);
+    this.stop();
+    this.run(30);
+  }
+
+  /** Franchit l'éboulement de la salle 202 de la corniche d'arrivée (à gauche) vers la rampe (à droite), puis laisse le héros se remettre. */
+  crossGapDown(): void {
+    const why = "mort sur l'éboulement";
+    for (let k = 0; k < 4 && this.alive(why).ground !== 7; k++) this.walkTo(152, 33, 4000);
+    this.need(this.alive(why).ground === 7, "pas au pied de l'échelle de gauche"); // cases 7 de X 144 à 159
+    this.vertical("-");
+    this.need(this.until(() => this.alive(why).y <= 28, 600), "échelle de gauche");
+    this.vertical("-"); // arrêt à la hauteur de la barre (zone de Y 18 à 41)
+    this.arrow("right");
+    this.need(this.until(() => this.alive(why).x >= 192, 1200), "barre");
+    this.arrow("right");
+    this.vertical("="); // l'échelle de droite : arrêt en bas (case 11, Y 42)
+    this.need(this.until(() => this.alive(why).ego === 0, 600), "échelle de droite");
+    // le pied de l'échelle de droite (cases 7, Y 44) donne sur la rampe (cases de sol du plan 1, Y 47 et plus) : on y marche, sans chute
+    this.run(10);
+  }
+
+  /** Quitte la rampe du dôme par l'échelle de droite, la barre et l'échelle de gauche, dont le pied donne sur la corniche d'arrivée. */
+  crossGapUp(): void {
+    for (const [x, y] of [[230, 62], [200, 45], [194, 42]]) {
+      if (this.hero.ground === 7) break;
+      this.walkTo(x, y, 4000);
+      this.drain();
+    }
+    this.need(this.hero.ground === 7, "pas au pied de l'échelle de droite");
+    this.vertical("-");
+    this.need(this.until(() => this.hero.y <= 28, 600), "échelle de droite");
+    this.vertical("-"); // arrêt à la hauteur de la barre
+    this.arrow("left");
+    this.need(this.until(() => this.hero.x <= 152, 1500), "barre");
+    this.arrow("left");
+    this.run(10);
+    this.vertical("="); // l'échelle de gauche : arrêt en bas (case 11), le pied donne sur la corniche d'arrivée
+    this.need(this.until(() => this.hero.ego === 0, 900), "échelle de gauche");
+    this.run(10);
+  }
+
+  /** Nains de la salle chargée (le joueur les voit en entrant). */
+  dwarvesHere(): boolean {
+    return this.state.objects.some((o) => ((o.num >= 201 && o.num <= 204) || o.num === 301) && o.room === this.state.loadedRoom);
+  }
+
+  /** Descend de la salle du trône à la rampe du dôme (sans nain en vue, sinon on remonte attendre) puis franchit l'éboulement. */
+  downToRamp(patience = 2000): void {
+    for (let k = 0; k < 12; k++) {
+      this.enterDome();
+      if (!this.dwarvesHere()) break;
+      this.leaveDomeUp();
+      this.goTo(101);
+      this.wait(patience);
+      this.alive("mort en attendant");
+      this.goTo(108);
+    }
+    this.need(this.roomId === 202, `salle ${this.roomId}`);
+    this.crossGapDown();
+  }
+
+  /** Remonte de la rampe du dôme à la salle du trône. */
+  upToThrone(): void {
+    this.crossGapUp();
+    this.leaveDomeUp();
+    this.need(this.roomId === 108, `salle ${this.roomId}`);
+  }
+
+  /**
+   * La lave (cases 52) tue le héros, et le trajet d'une commande la traverse si c'est le plus court (`13a8:000a` l'accepte pour `Num 1`) :
+   * on longe la salle par le milieu, de proche en proche, à la hauteur du sol de chaque case.
+   */
+  lavaWalk(path: readonly (readonly [number, number])[]): void {
+    for (const [x, depth] of path) {
+      for (let k = 0; k < 4 && this.state.hero && Math.abs(this.hero.p - depth) > 6; k++) {
+        this.walkTo(x, this.floor(x, depth), 1500);
+        this.drain(2);
+      }
+    }
+  }
+
+  /** Le tunnel du fond de la salle 302 mène à la lave (304) : on se place dessous (P 23), flèche haut, puis on longe la salle. */
+  enterLava(): void {
+    this.walkTo(95, 60, 1500);
+    this.arrow("up");
+    this.until(() => this.roomId !== 302, 600);
+    this.stop();
+    this.run(30);
+    this.need(this.roomId === 304, `salle ${this.roomId}`);
+    this.lavaWalk(LAVA_PATH);
+  }
+
+  /** Revient du fond de la salle 304 à la salle 302 par le chemin sûr. */
+  leaveLava(): void {
+    this.lavaWalk([...LAVA_PATH].reverse().slice(1));
+    this.goTo(302, new Set(), true);
+  }
+
+  /** Pose les torches (salle 302) avant d'entrer dans la salle 304, dont les vapeurs les éteindraient (`147f:0352`, `G373`). */
+  dropTorches(): void {
+    for (let k = 0; k < 4 && this.has(12); k++) this.say("jeter la torche");
+  }
+
+  /** Reprend les torches posées par `dropTorches`. */
+  takeTorches(): void {
+    for (let k = 0; k < 4 && this.state.loadedRoom!.listA.some((o) => o.num === 12); k++) this.say("prendre la torche");
+  }
+
+  /**
+   * Passe dans la salle voisine `room` : sauvegarde (F2) à l'entrée de la salle précédente, et, si le héros y meurt (un nain, un
+   * duel perdu), restauration (F3) puis nouvel essai de cette seule salle. Sauvegarder à chaque salle et ne refaire que la dernière
+   * est ce qui rend fiable la traversée des cinq salles de nains (`attempt`).
+   */
+  crossTo(room: number): void {
+    this.attempt(`traversée de la salle ${room}`, 40, () => this.hop(room, 4), () => this.roomId === room);
+  }
+
+  /**
+   * La herse de granite (`Num 207`, entre 202 et 305) : un nain qui la voit ouverte crie « Armaëth ! » et la referme (`2a44:0a60`) ; on la
+   * rouvre par « tinhuel », dit de l'une des deux salles (`3443:0028`), et on attend la fin du coulissement (`Tim = 0x22`).
+   */
+  portcullisOpen(): void {
+    for (let k = 0; k < 6 && this.object(207).ego !== 3; k++) {
+      this.say("tinhuel");
+      this.wait(700);
+    }
+  }
+
+  /** Marche jusqu'à la salle `target`, salle par salle (`crossTo`) ; la herse est rouverte en route si les nains l'ont refermée. */
+  crossAll(target: number): void {
+    this.forgetFailures();
+    for (let k = 0; k < 30 && this.roomId !== target; k++) {
+      if (this.object(207).ego !== 3 && (this.roomId === 202 || this.roomId === 305)) this.attempt("herse", 20, () => this.portcullisOpen(), () => this.object(207).ego === 3);
+      const route = this.route(target) ?? this.route(202);
+      if (!route) throw new Error(`aucune route de la salle ${this.roomId} à ${target}`);
+      this.crossTo(route[0]!);
+    }
+    if (this.roomId !== target) throw new Error(`salle ${target} non atteinte (en ${this.roomId})`);
+  }
 }
+
+/** Chemin sûr de la salle 304 (cases claires, `[X, P]`) : du bas (arrivée) au fond (la planche). */
+export const LAVA_PATH: readonly (readonly [number, number])[] = [[93, 136], [104, 124], [104, 112], [100, 100], [100, 88], [96, 76], [92, 64], [90, 52], [88, 40], [88, 28], [88, 16]];

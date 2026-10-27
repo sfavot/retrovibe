@@ -81,7 +81,7 @@ const HAZARD_OBJECTS: Record<string, string> = {
  * seuls), 101 à 104 (dalles de la salle 5 et de la salle 108), 301 à 309 (herses et portails du chapitre 3).
  */
 const CLOSED_EXITS = [
-  "1:2", "2:0", "4:0", "5:3", "8:3", "9:1", "9:2", "10:0", "10:1", "10:2", "10:3", "11:1", "104:0", "105:2", "109:2", "110:0", "202:0",
+  "1:2", "2:0", "4:0", "5:3", "8:3", "9:1", "9:2", "10:0", "10:1", "10:2", "10:3", "11:1", "109:2", "110:0", "202:0",
   "305:0", "305:2", "309:2", "314:2",
 ];
 
@@ -91,6 +91,8 @@ const CLOSED_EXITS = [
  */
 const GATED_EXITS: Record<string, string> = {
   "309:0": "code 308 : la herse (`Num 317`, `Ego 3`) doit être ouverte, et le héros du bon côté de la grille 316 (sol 57/113 ou 58/112)",
+  "104:0": "code 103 (porte 111, `Ego 1` : franchissable) mais le battant fermé, ramené dans la salle par `147f:00b2`, barre le seuil : il faut l'ouvrir",
+  "105:2": "idem, côté salle 105 (le battant fermé est au seuil, en (112, 52, 24))",
 };
 
 /** Sorties dont le côté n'a aucun sol de marche (falaise, eau, vide) : franchies autrement (chute, escalade, vol). */

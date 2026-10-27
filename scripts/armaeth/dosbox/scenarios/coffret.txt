@@ -1,0 +1,11 @@
+# F3 (restauration) : disque c, répertoire par défaut, sauvegarde svg, numéro 001 ; la commande fait marcher le héros vers le coffret,
+# Entrée ferme la fenêtre qui suit (« Vous êtes trop loin. » si le couloir de la pile l'arrête, `V046` s'il arrive au coffret).
+46 f3
+49 !c enter
+51 enter
+53 !svg enter
+55 !001 enter
+60 "!ouvrir le coffret avec la clef" enter
+84 enter
+90 enter
+@expect 46 52

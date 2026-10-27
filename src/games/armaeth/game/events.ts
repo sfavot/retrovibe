@@ -46,7 +46,7 @@ function openGrate(ctx: Parameters<EventHandler>[0], grate: GameObject): void {
   ctx.sound.effect("B", 102, 0);
 }
 
-/** `2846:042c` : 15 ouvre la grille, 16 la serrure se referme et le joueur reprend la main, 17 passage de la grille. */
+/** `2846:042c` : 15 ouvre la grille ; 16 (grille refermée) et 17 (grille ouverte, armés par `2846:000a`) rendent la main au joueur. */
 const grateEvent: EventHandler = (ctx, entry, grate) => {
   if (!grate) return;
   switch (entry.event) {
@@ -54,12 +54,15 @@ const grateEvent: EventHandler = (ctx, entry, grate) => {
       openGrate(ctx, grate);
       break;
     case 16:
+      // `2846:046e` : le message, puis la suite commune avec 17 (`2846:047f`)
       sayHere(ctx, grate, "G", 112);
       ctx.state.moveEnabled = true;
+      ctx.enterScene();
       break;
     case 17: {
+      // `2846:047f..04be` : le joueur reprend la main, `147f:0352`, puis, si le héros est devant la grille (P plus grand), points `(1, 5)`
       ctx.state.moveEnabled = true;
-      // `147f:0352` (nouvelle scène) n'est pas portée ; le héros passé devant la grille (P plus grand) rapporte des points
+      ctx.enterScene();
       const hero = ctx.hero;
       if (hero && hero.p > grate.p) award(ctx, 1, 5);
       break;

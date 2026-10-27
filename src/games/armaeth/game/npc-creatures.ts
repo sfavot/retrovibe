@@ -395,8 +395,9 @@ export function sarhul(kit: NpcKit): BehaviorHandler {
       obj.speedY = 0;
       kit.setState(ctx, obj, { gst: 7, mob: 2, ego: 0, fig: 0 });
     } else if (obj.ego === 3) {
-      // occupé tant qu'un autre Sarhûl dévore ou attend de la proie dans la salle (hypothèse : `21e7:003c`, bornes cachées)
-      const busy = obj.room?.listA.some((o) => o !== obj && o.num === NUM.sarhul && o.ego === 1);
+      // il attend son tour tant qu'un Sarhûl de la salle mange le jambon : `21e7:003c(liste, AX = 302, DX = BX = 2)` cherche un
+      // `Ego` compris entre 2 et 2 (`2cdf:0193..019b`) ; le port testait `Ego 1` (un Sarhûl qui dévore une proie)
+      const busy = obj.room?.listA.some((o) => o.num === NUM.sarhul && o.ego === 2);
       if (busy) {
         obj.err = 0;
         return UPDATE_OK;
@@ -410,8 +411,8 @@ export function sarhul(kit: NpcKit): BehaviorHandler {
     for (const o of obj.room?.listA ?? []) {
       if (o === obj) continue;
       if (o.num === NUM.sarhul) {
-        // un autre Sarhûl « attend son tour » (`Ego 2`) : on l'approche
-        if (o.ego === 2 && kit.chase(ctx, obj, o)) return endTic(obj);
+        // un autre Sarhûl mange le jambon (`Ego 2`) : on le rejoint, sans condition de vue (`22ef:0000` avec `AX = 7`, `2cdf:020e`)
+        if (o.ego === 2 && kit.approach(ctx, obj, o, true)) return endTic(obj);
         continue;
       }
       if (!SARHUL_PREY.includes(o.num) || o.num === followedNum) continue;

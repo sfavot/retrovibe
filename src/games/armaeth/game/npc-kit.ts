@@ -363,12 +363,24 @@ export class NpcKit {
     return false;
   }
 
-  /** `2273:000c(a, b)` : `b` se tourne vers `a` et s'en approche (hypothèse : cible = position de `a`). */
+  /**
+   * `2273:000c(a, b)` : les deux s'arrêtent (`2273:0190`, le héros perd aussi son trajet) ; si `b` est mobile (`Mob 2`), il
+   * **s'écarte** de `a` : errance `2151:0006` avec, sur le premier axe où ils diffèrent (P, sinon X, sinon Y pour un `Dep` non
+   * nul), un intervalle du côté opposé à `a` (`[min, b)` si `a` est au-delà, `[b, max)` sinon : borne -1, `2273:008b..0154`), les
+   * autres axes tirés librement. Le port faisait approcher `b` de `a` : deux Sarhûls qui se touchaient restaient face à face.
+   */
   faceOff(ctx: BehaviorContext, a: GameObject, b: GameObject): void {
     if (ctx.hero === a || ctx.hero === b) ctx.motion.reset(ctx.hero);
-    this.stop(a);
     this.stop(b);
-    if (b.mob === 2) this.approach(ctx, b, a);
+    this.stop(a);
+    if (b.mob === 2) {
+      const away = (from: number, to: number): WanderRange => (to > from ? [-1, from] : [from, -1]);
+      const range: { x?: WanderRange; y?: WanderRange; p?: WanderRange } = {};
+      if (a.p !== b.p) range.p = away(b.p, a.p);
+      else if (a.x !== b.x) range.x = away(b.x, a.x);
+      else if (b.dep !== 0 && a.y !== b.y) range.y = away(b.y, a.y);
+      this.wander(ctx, b, range);
+    }
     b.err = 0;
   }
 

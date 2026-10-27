@@ -174,6 +174,8 @@ export interface ArmaethEngineOptions {
   onPathEnd?: (obj: GameObject, ctx: BehaviorContext, result: number, replay: () => boolean) => void;
   /** `147f:000a` (effets d'entrée des personnages) : appelé une fois la salle chargée, avant l'arrivée du héros et le placement des objets. */
   onEnterRoom?: (ctx: BehaviorContext) => void;
+  /** `147f:0352` (effets d'entrée propres à une salle, hors introductions de niveau) : appelé à la première image de la salle et par `enterScene`. */
+  onEnterScene?: (ctx: BehaviorContext) => void;
   /** Services fournis par les modules de jeu : mort (`die`) et animation à deux (`playAnimation`), appelés avec le contexte. */
   services?: EngineServices;
   /**
@@ -257,6 +259,7 @@ export class ArmaethEngine implements TokenHostEngine {
   private readonly panelColors: Uint8Array;
   private readonly continueHook: ((ctx: BehaviorContext) => void) | undefined;
   private readonly enterRoomHook: ((ctx: BehaviorContext) => void) | undefined;
+  private readonly enterSceneHook: ((ctx: BehaviorContext) => void) | undefined;
   private readonly groundRule: ArmaethEngineOptions["acceptsGround"];
   private readonly pathEndHook: ArmaethEngineOptions["onPathEnd"];
   private readonly extraServices: EngineServices | undefined;
@@ -346,6 +349,7 @@ export class ArmaethEngine implements TokenHostEngine {
     this.panelColors = exe.slice(DGROUP_IMAGE_OFFSET + 0xe30, DGROUP_IMAGE_OFFSET + 0xe35);
     this.continueHook = options.onContinue ?? game.onContinue;
     this.enterRoomHook = options.onEnterRoom ?? game.onEnterRoom;
+    this.enterSceneHook = options.onEnterScene ?? game.onEnterScene;
     this.groundRule = options.acceptsGround ?? game.acceptsGround;
     this.pathEndHook = options.onPathEnd ?? game.onPathEnd;
     this.extraServices = options.services ?? game.services;
@@ -1237,9 +1241,10 @@ export class ArmaethEngine implements TokenHostEngine {
       const side = loaded ? this.terrain!.permutation[slot]! : slot;
       let x = 1000;
       let p = 1000;
-      const halfX = loaded && limits ? (limits.xMax - limits.xMin) >> 1 : 160;
-      const halfP = loaded && limits ? (limits.pMax - limits.pMin) >> 1 : 128;
-      const halfY = loaded && limits ? (limits.yMax - limits.yMin) >> 1 : 100;
+      // moitiés des étendues : salle chargée `4aca - 4ac8`..., sinon `4acc`, `4ad8`, `4ad2` (319, 255, 199) divisés par 2 (`228e:00f0..0160`)
+      const halfX = loaded && limits ? (limits.xMax - limits.xMin) >> 1 : 159;
+      const halfP = loaded && limits ? (limits.pMax - limits.pMin) >> 1 : 127;
+      const halfY = loaded && limits ? (limits.yMax - limits.yMin) >> 1 : 99;
       let metric: 1 | 2 = 2;
       let ok = true;
       switch (side) {
@@ -1417,7 +1422,7 @@ export class ArmaethEngine implements TokenHostEngine {
       rooms: {
         want: (room: GameRoom) => void (engine.state!.wantedRoom = room),
         exit: (obj: GameObject) => engine.exitObject(obj),
-        limits: () => (engine.terrain ? { xMax: engine.terrain.limits.xMax, pMax: engine.terrain.limits.pMax } : null),
+        limits: () => engine.terrain?.limits ?? null,
         planes: () => engine.terrain?.planes ?? 1,
         refreshPlanes: () => engine.refreshPlanes(),
         setPlanes: (count) => {
@@ -1433,9 +1438,7 @@ export class ArmaethEngine implements TokenHostEngine {
         pathEnd: (obj, result) => engine.pathEnd(obj, result),
       },
       runEpisodeEnd: () => engine.afterWindows.push(() => engine.runner.runEpisodeEnd()),
-      enterScene: () => {
-        if (engine.state) onFirstDisplay(engine.state);
-      },
+      enterScene: () => engine.enterScene(),
       get rng() {
         return engine.rng;
       },
@@ -1566,6 +1569,14 @@ export class ArmaethEngine implements TokenHostEngine {
     if (!queue) return undefined;
     this.growEvents(op !== EventOp.Remove && op !== EventOp.Subtract && op !== EventOp.Other && !queue.find(target, event));
     return queue.operate(target, event, op, value, procedure);
+  }
+
+  /** `147f:0352` : introduction de niveau (`onFirstDisplay`), puis les effets propres à la salle (`onEnterScene` du jeu). */
+  private enterScene(): void {
+    const state = this.state;
+    if (!state) return;
+    onFirstDisplay(state);
+    this.enterSceneHook?.(this.services);
   }
 
   private growEvents(creating: boolean): void {
@@ -1781,7 +1792,7 @@ export class ArmaethEngine implements TokenHostEngine {
     if (this.firstDisplay) {
       this.firstDisplay = false;
       this.growEvents(true);
-      onFirstDisplay(state);
+      this.enterScene();
     }
   }
 
@@ -2053,12 +2064,12 @@ export class ArmaethEngine implements TokenHostEngine {
   }
 
   /**
-   * `20b5:03bc` (`G(o, k)`), état de la porte `k` (309 ou 329) vu de l'objet `o` : vrai (7) si la porte est dans l'état `Ego` 1 ou 2
+   * `20b5:03bc` (`G(o, k)`), état de la porte `k` (111, 309 ou 329) vu de l'objet `o` : vrai (7) si la porte est dans l'état `Ego` 1 ou 2
    * (fermée non verrouillée, ouverte) ou `Ego` 0 (verrouillée) quand elle n'exige pas de clef ou que `o` porte la clef de la table
    * `DGROUP:0694` ; faux sinon. Non porté : l'ouverture automatique par `20b5:0248` quand `o` traverse (`mode` 2) avec un tirage
    * `gm_chance_one_in(2)` ou `(mot)`, et le message `S48`, qui relèvent du module des portes.
    */
-  private doorGuard(subject: BarrierSubject, key: 309 | 329): boolean {
+  private doorGuard(subject: BarrierSubject, key: 111 | 309 | 329): boolean {
     const row = this.doors.find((d) => d.door === key);
     const door = this.state?.findByNum(key);
     if (!row || !door) return false;

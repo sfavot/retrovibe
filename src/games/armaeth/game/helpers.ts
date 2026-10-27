@@ -143,6 +143,8 @@ export const ROOM = {
   soldiers: 305,
   minasLair: 301,
   sarhulHall: 309,
+  /** Salle de la lave et des fumerolles. */
+  lava: 304,
   throne: 108,
   /** Salle de la stèle vue de l'intérieur du château (`2500:0008`). */
   castleGate: 101,
@@ -802,22 +804,34 @@ export function approach(ctx: BehaviorContext, chaser: GameObject, target: GameO
   return true;
 }
 
-/** Intervalle imposé à un axe de `2151:0006` (mode > 0 : `rand() % (hi - lo) + lo`, la position courante si `hi <= lo`). */
+/**
+ * Intervalle imposé à un axe de `2151:0006` (drapeau d'axe non nul, `2151:01b4`) : `rand() % (hi - lo) + lo`, la position courante
+ * si `hi <= lo` ; une borne négative (-1) est remplacée par la borne élargie de la fenêtre (`min - 20` ou `max + 20`).
+ */
 export type WanderRange = readonly [lo: number, hi: number];
 
 /**
- * `2151:0006` / `2151:02a0` : cible aléatoire dans la salle. `override` : intervalle imposé par axe (`2151:01b4`, un poste de garde) ;
- * sans lui, fenêtre de tirage type d'une salle (hypothèse, `movement.md` § 1 : X 0..319, P 8..159, bornes élargies de 20). Les volants
- * (`Dep 1`) tirent aussi Y. Postes des soldats (`2a44:0a3b`, relus dans le désassemblage) : `Ego 5` X `[100, 170)` P `[50, 52)` ;
- * `Ego 6` X `[57, 95)` P `[18, 20)`.
+ * Fenêtre de tirage (hypothèse conservée, `movement.md` § 1 : X 0..319, P 8..159) ; l'original prend les limites de la salle chargée
+ * (`4ac8`..`4ad6`) ou `[0, 4acc]`, `[0, 4ad8]` hors salle chargée (`2151:0094..01ac`, `walkthrough.md`, écart connu non corrigé).
+ */
+const WANDER_WINDOW = { xMin: 0, xMax: 319, pMin: 8, pMax: 159 } as const;
+
+/**
+ * `2151:0006` / `2151:02a0` : cible aléatoire, `rand() % (max - min + 40) + min - 20` par axe. `override` : intervalle imposé par axe
+ * (`2151:01b4` : un poste de garde, l'écart d'un face-à-face) ; les volants (`Dep 1`) tirent aussi Y. Postes des soldats (`2a44:0a3b`,
+ * relus dans le désassemblage) : `Ego 5` X `[100, 170)` P `[50, 52)` ; `Ego 6` X `[57, 95)` P `[18, 20)`.
  */
 export function wander(ctx: BehaviorContext, obj: GameObject, override?: { x?: WanderRange; y?: WanderRange; p?: WanderRange }): boolean {
   const range = (min: number, max: number) => ctx.rng.mod(max - min + 40) + min - 20;
-  const fixed = (axis: WanderRange, current: number) => (axis[1] > axis[0] ? ctx.rng.mod(axis[1] - axis[0]) + axis[0] : current);
-  const x = override?.x ? fixed(override.x, obj.x) : range(0, 319);
-  const p = override?.p ? fixed(override.p, obj.p) : range(8, 159);
+  const fixed = (axis: WanderRange, current: number, min: number, max: number) => {
+    const lo = axis[0] < 0 ? min - 20 : axis[0];
+    const hi = axis[1] < 0 ? max + 20 : axis[1];
+    return hi > lo ? ctx.rng.mod(hi - lo) + lo : current;
+  };
+  const x = override?.x ? fixed(override.x, obj.x, WANDER_WINDOW.xMin, WANDER_WINDOW.xMax) : range(WANDER_WINDOW.xMin, WANDER_WINDOW.xMax);
+  const p = override?.p ? fixed(override.p, obj.p, WANDER_WINDOW.pMin, WANDER_WINDOW.pMax) : range(WANDER_WINDOW.pMin, WANDER_WINDOW.pMax);
   let y = 0;
-  if (override?.y) y = fixed(override.y, obj.y);
+  if (override?.y) y = fixed(override.y, obj.y, 0, 179);
   else if (obj.dep === 1) {
     y = range(0, 179);
     if (y < obj.height) y = 30;

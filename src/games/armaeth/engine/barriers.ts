@@ -41,8 +41,8 @@ export interface BarrierWorld {
   isNight(): boolean;
   /** `1e08:0000` : tirage `rand() % n == 0` ; `n` n'est pas relevé (`movement.md` § 8, question 2). */
   chance(): boolean;
-  /** `20b5:03bc` : état d'une entité de la table `DGROUP:0694` de clé 309 ou 329 (non lu en entier, `movement.md` § 8, question 1). */
-  guard(subject: BarrierSubject, key: 309 | 329): boolean;
+  /** `20b5:03bc` : état d'une entité de la table `DGROUP:0694` de clé 111, 309 ou 329 (non lu en entier, `movement.md` § 8, question 1). */
+  guard(subject: BarrierSubject, key: 111 | 309 | 329): boolean;
 }
 
 export interface BarrierVerdict {
@@ -113,7 +113,8 @@ const RULES: Record<number, Rule> = {
     if (w.currentRoom === 110 && o.inRoom && o.p < w.objectP(103)) return free;
     return block();
   },
-  103: (o, w) => (!immaterial(o) && !w.guard(o, 329) ? block() : free),
+  // `1414:0284..0297` : la porte 111 (entre les salles 104 et 105, `AX = 0x6F`), et non la 329
+  103: (o, w) => (!immaterial(o) && !w.guard(o, 111) ? block() : free),
   104: stateGate(slabE, 101, { speedX: -1, speedP: 0 }),
   105: () => free,
   201: stateGate(gateA, 201, { speedX: 1, speedP: 0 }),

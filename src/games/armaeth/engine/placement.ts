@@ -649,7 +649,12 @@ export function searchPosition(body: PlaceBody, env: PlaceEnv, request: SearchAr
     body.p = found.p;
     body.plane = found.plane;
     body.presence = inRoom ? 2 : 1;
-    if (inRoom) body.ground = found.type;
+    if (inRoom) {
+      // `1b11:05a8..05c2` : dans la salle chargée, le type de case trouvé passe par `13a8:000a(type, 7, o)` avec les effets de bord
+      // (messages, points, piège de la geôle) avant d'être écrit dans `Sol`
+      env.acceptsGround?.(found.type, 7, body);
+      body.ground = found.type;
+    }
     memory.code = body.ground === originalGround ? PLACE_OK : PLACE_TYPE_CHANGED;
     memory.found = true;
   } else {

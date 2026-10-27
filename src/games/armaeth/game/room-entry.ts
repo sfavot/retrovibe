@@ -1,7 +1,8 @@
+import { EventOp } from "../engine/events";
 import type { BehaviorContext } from "../engine/handlers";
 import type { GameObject } from "../engine/state";
-import { NUM, ROOM, setState } from "./helpers";
-import { setDoor } from "./objects";
+import { NUM, ROOM, eventTarget, requireNum, setState } from "./helpers";
+import { extinguishTorch, setDoor } from "./objects";
 
 /**
  * Effets d'entrée dans une salle (`147f:000a`, fin de `gm_load_scene`, `engine.md` § 5.5). Les plans actifs et la lumière sont dans
@@ -61,9 +62,84 @@ function enterGuardRoom(ctx: BehaviorContext, room: { listA: readonly GameObject
   }
 }
 
-/** `147f:000a` : effets d'entrée propres aux personnages, appelés une fois la salle chargée et avant l'arrivée du héros. */
+/** Salle 208 (au bout de la rivière souterraine de la salle 207) : y entrer rapporte les points `(2, 5)` (`147f:0130`). */
+const HIDDEN_CAVE = 208;
+/** Salles de part et d'autre de la porte 111 (`DGROUP:0694` : salle A 105, salle B 104). */
+const CELL_DOOR_ROOMS = [104, 105] as const;
+const CELL_DOOR = 111;
+
+/**
+ * `147f:000a` : effets d'entrée propres aux personnages, appelés une fois la salle chargée et avant l'arrivée du héros.
+ * - salles 104 et 105 (`147f:0043` -> `147f:00b2`) : la porte 111 est ramenée dans la salle chargée avec son état (`20b5:0248(111, -1)`),
+ *   du côté de cette salle ; sans elle, on ne peut ni l'ouvrir depuis la salle 104 ni entrer dans l'antre de Prytwen ;
+ * - salle 208 (`0xD0`, `147f:002e` -> `147f:0130..0136`) : `2255:00e8(2, 5)` à chaque chargement (les points ne comptent qu'une fois).
+ */
 export function onEnterRoom(ctx: BehaviorContext): void {
   const room = ctx.state.loadedRoom;
   if (!room) return;
   if (room.id === ROOM.soldiers) enterGuardRoom(ctx, room);
+  else if ((CELL_DOOR_ROOMS as readonly number[]).includes(room.id)) {
+    const leaf = ctx.state.findByNum(CELL_DOOR);
+    if (leaf) setDoor(ctx, leaf, leaf.ego);
+  } else if (room.id === HIDDEN_CAVE) ctx.score.award(2, 5);
+}
+
+// --- effets d'entrée propres à une salle (`147f:0352`) ------------------------------------------------------------------------
+
+/** Musiques de la salle 110 (`147f:041e`, `147f:0465`) : `gm_sound_play(id, 'M', id)`. */
+const TREASURY_MUSIC = { heroBehind: 108, prytwenBehind: 109 } as const;
+/** Délai de l'événement 2 du héros en salle 304 (asphyxie, `2683:017a`) : 1000 tics. */
+const GAS_DELAY = 1000;
+
+/** Conteneur d'un objet : l'objet qui le porte, sinon sa salle (`+0x5C`, `21fb:011e`). */
+const containerOf = (obj: GameObject): GameObject | GameObject["room"] => obj.holder ?? obj.room;
+
+/**
+ * Salle 110 (`147f:03a6`..`04e5`) : la musique dit de quel côté de la grille 103 se trouvent le héros et Prytwen.
+ * - grille ouverte (`Ego 3`, `2846:04d6`) : la musique de la salle reprend (`2f33:04e0`, identifiant `+0x08`, classe `+0x05`, numéro
+ *   `+0x06` de l'enregistrement de la salle, sans boucle) ;
+ * - sinon, si le héros est dans la même salle que la grille et que `P` de la grille est plus petit que le sien (il est devant) : `M108` ;
+ * - sinon, si Prytwen est avec la grille (`21fb:005a`, `Num 101`) et que son `P` est plus grand que celui de la grille : `M109`.
+ * `1a7b:03b0(103, 0x89)` : `gm_abort(0x89)` si la grille n'existe pas.
+ */
+function enterTreasury(ctx: BehaviorContext, room: NonNullable<BehaviorContext["room"]>): void {
+  const bars = requireNum(ctx, NUM.grille, 0x89);
+  if (bars.ego === 3) {
+    ctx.sound.play(room.musicId, String.fromCharCode(room.musicClass), room.musicNumber);
+    return;
+  }
+  const hero = ctx.hero;
+  if (hero && containerOf(hero) === containerOf(bars) && bars.p < hero.p) {
+    ctx.sound.play(TREASURY_MUSIC.heroBehind, "M", TREASURY_MUSIC.heroBehind);
+    return;
+  }
+  const siblings = bars.holder ? bars.holder.contents : (bars.room?.listA ?? []);
+  const prytwen = siblings.find((o) => o.num === NUM.prytwen);
+  if (prytwen && prytwen.p > bars.p) ctx.sound.play(TREASURY_MUSIC.prytwenBehind, "M", TREASURY_MUSIC.prytwenBehind);
+}
+
+/**
+ * Salle 304 (`147f:0470`..`04e5`) : le héros (`Num 1`) reçoit l'événement différé 2 (asphyxie, procédure 1) de 1000 tics (`23a2:0002(héros,
+ * 2, fixer, 1000)`), puis toutes les torches allumées de ses poches (`21e7:0022(héros, 12, Ego 0..3)`) sont éteintes (`2420:0398`) ; s'il y
+ * en avait, `G373` s'affiche (`200c:0004`). Sans héros, rien.
+ */
+function enterGasRoom(ctx: BehaviorContext): void {
+  const hero = ctx.hero;
+  if (!hero) return;
+  if (hero.num === NUM.hero) ctx.events.operate(eventTarget(hero), 2, EventOp.Set, GAS_DELAY, NUM.hero);
+  let extinguished = false;
+  for (const lamp of [...hero.contents]) {
+    if (lamp.num !== NUM.torch || lamp.ego > 3) continue;
+    extinguishTorch(ctx, lamp);
+    extinguished = true;
+  }
+  if (extinguished) ctx.messages.say("G", 373);
+}
+
+/** `147f:0352` : effets d'entrée propres à la salle chargée, après son premier affichage (les introductions de niveau sont dans `engine/room.ts`). */
+export function onEnterScene(ctx: BehaviorContext): void {
+  const room = ctx.state.loadedRoom;
+  if (!room) return;
+  if (room.id === ROOM.treasury) enterTreasury(ctx, room);
+  else if (room.id === ROOM.lava) enterGasRoom(ctx);
 }

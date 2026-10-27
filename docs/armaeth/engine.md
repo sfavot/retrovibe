@@ -125,8 +125,8 @@ Les salles sont repérées par leur **indice** dans la table (`indice * 0x2a + 4
 | +0x02 | s16 | **décalage de lumière** de la salle (0 sauf salle 7 : -32 = 0xFFE0) ; § 7.5 |
 | +0x04 | u8 | **extérieur** (non nul = reçoit la lumière du jour, `0x01` partout sauf la salle 0) |
 | +0x05 | u8 | classe de la musique de la salle (`0x4D` = `M` partout) |
-| +0x06 | u16 | identifiant de la musique (avec +0x05 et +0x08 : `gm_sound_play`, `audio.md`) |
-| +0x08 | u16 | numéro de la musique |
+| +0x06 | u16 | numéro de la musique (`gm_sound_play(+0x08, +0x05, +0x06)`, `1cc3:0033..0049`, `audio.md`) |
+| +0x08 | u16 | identifiant de la musique |
 | +0x0A | 6 x u16 | **sorties** : indice de la salle voisine par emplacement 0..5, 0 = pas de sortie |
 | +0x16 | 6 x u16 | **codes de barrage** par emplacement : 0 = libre, sinon code évalué par `1414:0006` (§ 5.4) |
 | +0x22 | far | tête de la liste **A** (objets de type 2 de la salle, chaînés par `Lis` +0x80) |
@@ -140,7 +140,7 @@ Argument `AX` : **0** = chargement complet de la salle `4b80` ; **non nul** = se
 
 Chargement complet :
 
-1. Pilote `+0x62` (annule les sprites), `2f9b:040f`. Musique de la salle voulue : si `+0x06`/`+0x08` sont nuls ou si la piste demandée ne joue pas déjà (`300b:0102` = 0), la musique en cours est arrêtée (`gm_sound_stop(7)`) et la nouvelle sera lancée en fin de chargement ; sinon elle continue.
+1. Pilote `+0x62` (annule les sprites), `2f9b:040f`. Musique de la salle voulue : si `+0x08` ou `+0x06` est nul ou si la piste demandée ne joue pas déjà (`300b:0102` = 0), la musique en cours est arrêtée (`gm_sound_stop(7)`) et la nouvelle sera lancée en fin de chargement ; sinon elle continue.
 2. `4b84 := 4b80`. `gm_destroy_scene_objects` détruit tous les décors (type 1, liste `4c06`). Pour l'ancienne et la nouvelle salle : `1833:01fc` (charge ou libère la ressource sprite de chaque objet), et pour l'**ancienne** salle `gm_reset_object_motion` (annule les trajets). `1cc3:0852` libère les tampons de la scène précédente, `1664:08e1` réinitialise le volet `TMP.SCR`.
 3. Ouverture du fichier de scènes (`A1F` + centaine + lettre `'A' + (id % 100) / 5` + `.vga`), table de 5 entrées de 10 octets, lecture de l'en-tête de 0x30 octets (`graphics.md`) :
    - fenêtre de l'image : pilote `+0x1e = x`, `+0x20 = y` (décalage ajouté aux sprites des listes de scène), `+0x1a = largeur`, `+0x1c = hauteur` ; contrôles `x + largeur <= 320`, `y + hauteur <= 200` ;

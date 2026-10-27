@@ -79,7 +79,7 @@ export interface WorldRoom {
   lightOffset: number;
   /** +0x04 : non nul = extérieur (reçoit la lumière du jour). */
   outdoor: number;
-  /** +0x05, +0x06, +0x08 : classe (`M`), identifiant et numéro de la musique (`audio.md`). */
+  /** +0x05 classe (`M`), +0x08 identifiant et +0x06 numéro de la musique (`audio.md` ; `1cc3:0033..0049` : `gm_sound_play(+0x08, +0x05, +0x06)`). */
   musicClass: number;
   musicId: number;
   musicNumber: number;
@@ -218,8 +218,8 @@ export function parseWorld(bytes: Uint8Array): World {
       lightOffset: (roomWords[1] << 16) >> 16,
       outdoor: roomWords[2] & 0xff,
       musicClass: roomWords[2] >> 8,
-      musicId: roomWords[3],
-      musicNumber: roomWords[4],
+      musicId: roomWords[4],
+      musicNumber: roomWords[3],
       exits: slots(5),
       barriers: slots(11),
       words: roomWords,

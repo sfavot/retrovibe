@@ -124,8 +124,8 @@ export function serializeWorld(state: WorldState): Uint8Array {
     roomWords[0] = room.id;
     roomWords[1] = room.lightOffset;
     roomWords[2] = (room.musicClass << 8) | (room.outdoor & 0xff);
-    roomWords[3] = room.musicId;
-    roomWords[4] = room.musicNumber;
+    roomWords[3] = room.musicNumber;
+    roomWords[4] = room.musicId;
     room.exits.forEach((v, i) => (roomWords[5 + i] = v));
     room.barriers.forEach((v, i) => (roomWords[11 + i] = v));
     roomWords.forEach(w16);

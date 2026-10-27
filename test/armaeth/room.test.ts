@@ -16,6 +16,7 @@ import {
   planRoomLoad,
   roomMusic,
 } from "../../src/games/armaeth/engine/room";
+import { findBank, mixKey, parseMix } from "../../src/games/armaeth/data/mix";
 import { loadWorldState } from "../../src/games/armaeth/engine/save";
 import { RAW_OFFSET, type GameObject, WorldState, rawU8, setRawU8 } from "../../src/games/armaeth/engine/state";
 import { hasOriginalFiles, readOriginal } from "./helpers";
@@ -258,5 +259,17 @@ describe.skipIf(!hasOriginalFiles)("plans actifs des salles (147f:000a)", () => 
     expect(activePlanes(s, 202, 2)).toBe(3);
     s.chapterLevel = 100; // sous-niveau 0 : la salle 205 garde le compte du fichier
     expect(activePlanes(s, 205, 2)).toBe(2);
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("musique des salles (fichiers du jeu)", () => {
+  it("chaque salle musicale trouve sa banque : identifiant en +0x08, numéro en +0x06 (`1cc3:0033..0049`) ; 305 et 309 jouent `M201` de la banque 308", () => {
+    const mix = parseMix(readOriginal("A1FMIX.SYS"));
+    const state = loadWorldState(readOriginal("A1FCFG.SYS"));
+    for (const room of state.rooms) {
+      const music = roomMusic(room);
+      if (music) expect(findBank(mix, music.id, mixKey(music.soundClass, music.number)), `salle ${room.id}`).toBeDefined();
+    }
+    for (const id of [305, 309]) expect(roomMusic(state.roomById(id)!)).toEqual({ soundClass: "M", id: 308, number: 201 });
   });
 });

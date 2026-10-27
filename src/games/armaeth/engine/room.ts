@@ -23,16 +23,15 @@ export type RoomRequest =
   | { type: "loadScene"; sceneId: number }
   | { type: "playMusic"; soundClass: string; id: number; number: number; loop: true };
 
-/** Musique de la salle (+0x05 classe, +0x06 identifiant, +0x08 numéro), ou `null` si l'identifiant et le numéro sont nuls. */
+/** Musique de la salle (+0x05 classe, +0x08 identifiant, +0x06 numéro), ou `null` si l'un des deux est nul (`1cc3:0033..0047`, `1cc3:080d..0817`). */
 export function roomMusic(room: GameRoom): MusicKey | null {
-  if (room.musicId === 0 && room.musicNumber === 0) return null;
+  if (room.musicId === 0 || room.musicNumber === 0) return null;
   return { soundClass: String.fromCharCode(room.musicClass), id: room.musicId, number: room.musicNumber };
 }
 
 /**
  * Requêtes du chargement de la salle voulue (`gm_load_scene`, `1cc3:000e`) : musique arrêtée si la salle n'en a pas ou si
  * elle ne joue pas déjà (`playing`), scène à lire, puis musique lancée en boucle en fin de chargement.
- * hypothèse (engine.md §5.2) : « +0x06/+0x08 nuls » veut dire les deux nuls.
  */
 export function planRoomLoad(state: WorldState, playing: MusicKey | null): RoomRequest[] {
   const room = state.wantedRoom;

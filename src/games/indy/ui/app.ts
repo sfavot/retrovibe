@@ -21,6 +21,7 @@ import { nearestPreset, nextPreset, speedSetting } from "./game-speed";
 import { MoveKeys } from "./move-keys";
 import { renderManual } from "./manual";
 import { stepToward, WalkCursors } from "./walk-cursor";
+import { indyAudioPrefs } from "./audio-prefs";
 import { progressStore } from "./progress";
 import { saveSlot } from "./save";
 import { Sidebar } from "./sidebar";
@@ -68,6 +69,8 @@ export class App {
     this.assets = new Assets(data);
     this.palette = new PaletteAnimation(basePalette);
     this.audio = new AudioPlayer(data.sounds, `${import.meta.env.BASE_URL}indy/`, exe);
+    this.audio.soundEnabled = indyAudioPrefs.readSound();
+    this.audio.musicEnabled = indyAudioPrefs.readMusic();
     this.view = new GameView(this.palette, this.audio);
     this.view.onEnded = (kind) => {
       if (kind === "lose") {
@@ -88,11 +91,13 @@ export class App {
       onToggleSound: () => {
         this.audio.soundEnabled = !this.audio.soundEnabled;
         this.sidebar.soundButton.setAttribute("aria-pressed", String(this.audio.soundEnabled));
+        indyAudioPrefs.writeSound(this.audio.soundEnabled);
       },
       onToggleMusic: () => {
         this.audio.musicEnabled = !this.audio.musicEnabled;
         if (!this.audio.musicEnabled) this.audio.stopMusic();
         this.sidebar.musicButton.setAttribute("aria-pressed", String(this.audio.musicEnabled));
+        indyAudioPrefs.writeMusic(this.audio.musicEnabled);
       },
       onHelp: () => void this.showHelp(),
       onCycleSpeed: () => this.setSpeed(nextPreset(this.tickMs)),
@@ -130,6 +135,8 @@ export class App {
     // Toute la page du jeu (écran, boutons tactiles, panneau) passe en plein écran, en paysage sur écran tactile.
     this.fullscreen = createFullscreen(this.gameScreen, { label: shared.fullscreen, landscape: true });
     this.sidebar.addCommand(this.fullscreen.button);
+    this.sidebar.soundButton.setAttribute("aria-pressed", String(this.audio.soundEnabled));
+    this.sidebar.musicButton.setAttribute("aria-pressed", String(this.audio.musicEnabled));
     this.root = h("div", { class: "app" });
     container.replaceChildren(this.root);
     this.bindInput();

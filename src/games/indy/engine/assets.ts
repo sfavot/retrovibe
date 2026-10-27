@@ -37,6 +37,10 @@ export const IndySounds = {
   Door: 6,
   NoGo: 8,
   Flourish: 14,
+  /**
+   * THEME.MID. Sous Windows 3.0 / 3.1x seulement, l'original ouvre THEMW3.MID à sa place (`GetVersion` en 1010:d8e6,
+   * choix du fichier en 1010:e264) : on suit Windows 95, THEMW3.MID n'est jamais joué.
+   */
   Theme: 15,
   Defeat: 16,
   Victory: 17,

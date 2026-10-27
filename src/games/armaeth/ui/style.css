@@ -145,8 +145,9 @@
 }
 
 @media (pointer: coarse) {
+  /* `!important` : en paysage tactile, le pied de page du shell remet ses boutons en `inline-flex` avec un sélecteur plus fort. */
   .aeth-keyboard-only {
-    display: none;
+    display: none !important;
   }
 
   .aeth-touch-bar {

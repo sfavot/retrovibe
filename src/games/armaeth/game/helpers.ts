@@ -806,38 +806,44 @@ export function approach(ctx: BehaviorContext, chaser: GameObject, target: GameO
 
 /**
  * Intervalle imposé à un axe de `2151:0006` (drapeau d'axe non nul, `2151:01b4`) : `rand() % (hi - lo) + lo`, la position courante
- * si `hi <= lo` ; une borne négative (-1) est remplacée par la borne élargie de la fenêtre (`min - 20` ou `max + 20`).
+ * si `hi <= lo` ; une borne négative (-1) est remplacée par la borne élargie de la salle (`min - 20` ou `max + 20`).
  */
 export type WanderRange = readonly [lo: number, hi: number];
 
-/**
- * Fenêtre de tirage (hypothèse conservée, `movement.md` § 1 : X 0..319, P 8..159) ; l'original prend les limites de la salle chargée
- * (`4ac8`..`4ad6`) ou `[0, 4acc]`, `[0, 4ad8]` hors salle chargée (`2151:0094..01ac`, `walkthrough.md`, écart connu non corrigé).
- */
-const WANDER_WINDOW = { xMin: 0, xMax: 319, pMin: 8, pMax: 159 } as const;
+/** Étendues hors de la salle chargée (`DGROUP:4acc`, `4ad2`, `4ad8`, minimum 0 ; `engine.md` § 2). */
+const OUTSIDE_LIMITS = { xMin: 0, xMax: 319, yMin: 0, yMax: 199, pMin: 0, pMax: 255 } as const;
 
 /**
- * `2151:0006` / `2151:02a0` : cible aléatoire, `rand() % (max - min + 40) + min - 20` par axe. `override` : intervalle imposé par axe
- * (`2151:01b4` : un poste de garde, l'écart d'un face-à-face) ; les volants (`Dep 1`) tirent aussi Y. Postes des soldats (`2a44:0a3b`,
- * relus dans le désassemblage) : `Ego 5` X `[100, 170)` P `[50, 52)` ; `Ego 6` X `[57, 95)` P `[18, 20)`.
+ * `2151:0006` / `2151:02a0` : cible aléatoire. Pour chaque axe (X, Y, P, dans cet ordre) la fenêtre est celle de la salle chargée
+ * (`4ac8`..`4ad6`, celles de l'objet hors salle chargée : `[0, 4acc]`, `[0, 4ad2]`, `[0, 4ad8]`), élargie de 20 de chaque côté
+ * (`2151:00e1`) ; sans intervalle imposé la cible est `rand() % (max - min) + min` dans cette fenêtre, sinon voir `WanderRange`.
+ * Y n'est tiré que pour les volants `Dep 1` (sinon 0, `2151:0110`), puis ramené : sans sortie haute, `Y < Hau` donne 30 ; avec
+ * une sortie haute, `0 < Y < Hau` donne `Hau + 10` (`2151:0236..026b`). Postes des soldats (`2a44:0a3b`) : `Ego 5` X `[100, 170)`
+ * P `[50, 52)` ; `Ego 6` X `[57, 95)` P `[18, 20)`.
  */
 export function wander(ctx: BehaviorContext, obj: GameObject, override?: { x?: WanderRange; y?: WanderRange; p?: WanderRange }): boolean {
-  const range = (min: number, max: number) => ctx.rng.mod(max - min + 40) + min - 20;
-  const fixed = (axis: WanderRange, current: number, min: number, max: number) => {
-    const lo = axis[0] < 0 ? min - 20 : axis[0];
-    const hi = axis[1] < 0 ? max + 20 : axis[1];
-    return hi > lo ? ctx.rng.mod(hi - lo) + lo : current;
+  const loaded = inLoadedRoom(ctx, obj);
+  const limits = (loaded ? ctx.rooms.limits() : null) ?? OUTSIDE_LIMITS;
+  const draw = (min: number, max: number, axis: WanderRange | undefined, current: number): number => {
+    const lo = min - 20;
+    const hi = max + 20;
+    if (!axis) return ctx.rng.mod(hi - lo) + lo;
+    const from = axis[0] < 0 ? lo : axis[0];
+    const to = axis[1] < 0 ? hi : axis[1];
+    return to > from ? ctx.rng.mod(to - from) + from : current;
   };
-  const x = override?.x ? fixed(override.x, obj.x, WANDER_WINDOW.xMin, WANDER_WINDOW.xMax) : range(WANDER_WINDOW.xMin, WANDER_WINDOW.xMax);
-  const p = override?.p ? fixed(override.p, obj.p, WANDER_WINDOW.pMin, WANDER_WINDOW.pMax) : range(WANDER_WINDOW.pMin, WANDER_WINDOW.pMax);
+  const x = draw(limits.xMin, limits.xMax, override?.x, obj.x);
   let y = 0;
-  if (override?.y) y = fixed(override.y, obj.y, 0, 179);
-  else if (obj.dep === 1) {
-    y = range(0, 179);
-    if (y < obj.height) y = 30;
+  if (obj.dep === 1) {
+    y = draw(limits.yMin, limits.yMax, override?.y, obj.y);
+    const upExit = (obj.room?.exits[4] ?? 0) !== 0; // `[salle + 0x12]` : sortie haute
+    if (!upExit) {
+      if (y < obj.height) y = 30;
+    } else if (y > 0 && y < obj.height) y = obj.height + 10;
   }
+  const p = draw(limits.pMin, limits.pMax, override?.p, obj.p);
   setWord(obj, OFF.followed, 0);
-  if (inLoadedRoom(ctx, obj)) return ctx.motion.pathTo(obj, x, y, p, 0);
+  if (loaded) return ctx.motion.pathTo(obj, x, y, p, 0);
   obj.path.target = { x, y, p, plane: 0 };
   obj.path.defined = true;
   return true;

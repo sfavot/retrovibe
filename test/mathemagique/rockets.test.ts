@@ -3,7 +3,7 @@
  * `NIM.DAT`, et une partie complète jouée au clic sur le moteur (TestHost) jusqu'à la victoire de l'enfant.
  */
 import { describe, expect, it } from "vitest";
-import { TAG_SCR, TAG_SHAP, TAG_SND, MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
+import { TAG_SCR, TAG_SHAP, TAG_SND, MohawkArchive } from "../../src/data/mohawk/mohawk";
 import { Engine } from "../../src/games/mathemagique/engine/engine";
 import { Archive } from "../../src/games/mathemagique/engine/resources";
 import { MsvcRandom, NoRepeatPool } from "../../src/games/mathemagique/engine/rng";

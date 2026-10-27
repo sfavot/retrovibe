@@ -106,6 +106,8 @@ export interface HandlerRooms {
   want(room: GameRoom): void;
   /** `186d:000c` : franchit la sortie `Inf` de l'objet (`Err 0x0B`). */
   exit(obj: GameObject): ExitResult;
+  /** `228e:0000(obj ; roomId, respectBarriers)` : l'objet part vers une sortie de sa salle (`ArmaethEngine.walkToExit`). */
+  walkToExit(obj: GameObject, roomId: number, respectBarriers: boolean): boolean;
   /** Limites de marche de la salle chargée (`4ac8`..`4ad6`), `null` sans salle. */
   limits(): RoomLimits | null;
   /** `4ae0` : nombre de plans actifs de la salle chargée. */

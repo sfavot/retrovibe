@@ -2,7 +2,7 @@
  * Mise en page et dessin du Bowling (`bowling.md` §4) : rectangles, ids de ressources et fonctions de dessin pures (surface + archive),
  * sans état de scène. Les rectangles sont `{ x, y, w, h }` (tables de l'original `[gauche, haut, droite, bas[`).
  */
-import { TAG_SHAP } from "../data/mohawk";
+import { TAG_SHAP } from "../../../data/mohawk/mohawk";
 import { drawMask, drawShape } from "../engine/graphics/blit";
 import type { FonFont } from "../engine/graphics/fon";
 import { Surface, type Rect } from "../engine/graphics/surface";

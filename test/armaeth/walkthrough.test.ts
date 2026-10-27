@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MessageTable, messageId } from "../../src/games/armaeth/data/text";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 import { LAVA_PATH, Robot, RobotSetback } from "./robot";
-import { castle, chapiterAndCrown, craterTrap, guardRoom, penSarhuls, riverAndLair, talisman, toSarhulPit, witchLair } from "./solution";
+import { castle, chapiterAndCrown, craterTrap, guardRoom, penSarhuls, riverAndLair, talisman, toSarhulPit, warriorDuel, witchLair } from "./solution";
 
 /**
  * Solution complète d'*Armaeth* jouée par un robot sur le moteur sans tête, du titre jusqu'au couronnement (`docs/armaeth/walkthrough.md`).
@@ -14,10 +14,10 @@ import { castle, chapiterAndCrown, craterTrap, guardRoom, penSarhuls, riverAndLa
  * (salle, score, objets portés) avant de passer au suivant.
  */
 
-// Graine 36 : le face-à-face `2273:000c` fidèle (le personnage mobile s'écarte, bug 39) change les déplacements de tous les personnages,
-// donc tout le déroulé du hasard ; la 10 échoue dès le chapitre 0. Parmi les graines 1 à 36, 16 et 36
-// passent jusqu'au verdict ; 36 est la plus rapide.
-const SEED = Number(process.env.SEED ?? 36);
+// Graine 27 : les déplacements fidèles des personnages (sortie `228e:0000`, errance `2151:0006`, poursuites `22ef:0000` et marche hors
+// salle `30d9:08c8`, bugs 42 à 45) changent tout le déroulé du hasard. Parmi les graines 1 à 64, 2 et 27 passent jusqu'au verdict ;
+// 27 est la plus rapide.
+const SEED = Number(process.env.SEED ?? 27);
 const table = hasOriginalFiles ? new MessageTable(readOriginal("A1FTMS.SYS"), readOriginal("A1FMSG.SYS")) : null;
 const text = (cls: string | number, n: number): string => table!.messages(messageId(cls, n));
 
@@ -384,9 +384,8 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
     );
     expect(has(308)).toBe(true);
     expect(p.roomId).toBe(302);
-    // un nain guerrier tué en duel sur la route de la mine (`2a44:06c6`, +10)
-    expect(awarded(204)).toBe(true);
-    expect(p.state.score).toBe(315);
+    // un nain guerrier tué en duel sur la route de la mine (`2a44:06c6`, +10) selon le hasard : sinon, à l'étape (e) (`warriorDuel`)
+    expect(p.state.score).toBe(awarded(204) ? 315 : 305);
   }, 120_000);
 
   it("chapitre 3 (d) : la salle de garde et la mine, la planche posée en travers du gouffre, l'épée d'orichalque et l'émeraude (score 335)", () => {
@@ -418,11 +417,14 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
       () => has(314) && has(313) && has(205) && has(25) && has(206),
     );
     expect(object(308).ego).toBe(1);
-    expect(p.state.score).toBe(335);
+    expect(p.state.score).toBe(awarded(204) ? 335 : 325);
   }, 120_000);
 
   it("chapitre 3 (e) : le garde du cellier, la clef ouvragée, la grille de fer, la vanne du puits et les soldats de la salle de garde (score 365)", () => {
-    // l'épée et le bouclier donnent toujours la victoire en duel (`2a44:02de`) : on traverse sans attendre les nains
+    // l'épée et le bouclier donnent toujours la victoire en duel (`2a44:02de`) : on va au-devant d'un nain guerrier si aucun n'a été tué
+    // en route (+10), puis on traverse sans attendre les nains
+    warriorDuel(p);
+    expect(awarded(204)).toBe(true);
     p.crossAll(305);
     p.attempt(
       "garde du cellier",

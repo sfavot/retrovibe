@@ -13,6 +13,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | Math Workshop / Mathémagique (Broderbund, 1994) | jouable (en cours de validation) |
 | Armaeth (Grandslam Video, 1994) | jouable (en cours de validation) |
 | SWIV 3D (SCi, 1997) | jouable (en cours de validation) |
+| L'Odyssée des Zoombinis (Broderbund / TERC, 1996) | en préparation (données et études faites, moteur à venir) |
 
 ## Déploiement
 
@@ -62,6 +63,7 @@ Réimplémentation du moteur d'*Indiana Jones and his Desktop Adventures* (Lucas
   référencé dans `registry.ts`. Les routes sont `#/` (accueil) et `#/<id>` (jeu). Indy est dans `src/games/indy/`.
 - `src/games/indy/ui/` — interface d'Indy (écran titre, vue de jeu, bulles, inventaire, carte). Ses textes sont dans `copy.ts`.
 - `src/ui/` — éléments communs : page d'accueil, helper DOM, styles, textes de l'accueil.
+- `src/engine/mohawk/` et `src/ui/mohawk/` — audio partagé des jeux Mohawk (Mathémagique, Zoombinis) : séquenceur MIDI, lecteur SMF, `AudioSink` et inventaire des timbres (`engine/mohawk/audio/`), `AudioSink` du navigateur (`ui/mohawk/web-sink.ts`).
 
 ## Lost in Time
 
@@ -126,7 +128,7 @@ Ils viennent de l'image ISO du CD : `scripts/mathemagique-extract.sh [archive.zi
 
 ### Son (soundfont)
 
-Le MIDI est joué par `spessasynth_lib` avec la soundfont General MIDI *GeneralUser GS* (non versionnée dans `archives/mathemagique/soundfont/`), réduite aux timbres des 66 MIDI du jeu : `npx vite-node scripts/mathemagique/soundfont.mts` produit `original/mathemagique/mathemagique-gm.sf2` (environ 18 Mo) et copie sa licence à côté (`mathemagique-gm-LICENSE.txt`). Le script d'extraction du CD conserve ces deux fichiers. Détails : `docs/mathemagique/audio.md`.
+Le MIDI est joué par `spessasynth_lib` avec la soundfont General MIDI *GeneralUser GS* (non versionnée dans `archives/mathemagique/soundfont/`), réduite aux timbres des 66 MIDI du jeu : `npx vite-node scripts/mathemagique/soundfont.mts` (réduction partagée : `scripts/lib/soundfont.mts`) produit `original/mathemagique/mathemagique-gm.sf2` (environ 18 Mo) et copie sa licence à côté (`mathemagique-gm-LICENSE.txt`). Le script d'extraction du CD conserve ces deux fichiers. Détails : `docs/mathemagique/audio.md`.
 
 ### Jaquette
 
@@ -190,13 +192,29 @@ Ils viennent de l'image ISO du CD : `scripts/armaeth-extract.sh [archive.7z]` li
 
 `docs/swiv3d/` : inventaire (`files.md`), rétro-ingénierie (`re-index.md`, régénérée par `scripts/swiv3d/re/run.sh`), formats (`global-bd.md`, `slv.md`, `models.md`, `smacker.md`), joueur (`player.md`), objets (`objects.md`), règles (`rules.md`), rendu (`render.md`), écrans (`screens.md`) et plan (`plan.md`).
 
+## L'Odyssée des Zoombinis
+
+*L'Odyssée des Zoombinis* (*Logical Journey of the Zoombinis*, Broderbund / TERC, 1996, CD pour Windows 3.1 / 95), version française. Comme Mathémagique, c'est un jeu du moteur « Mohawk » de Broderbund : la logique est compilée dans l'exécutable 16 bits `ZOOMBINI.EXE` (Borland C++), étudié avec Ghidra, et les données sont des archives Mohawk (`*.MHK`). Le portage commence : extraction, rétro-ingénierie (moteur, parcours, les 12 épreuves), lecteurs de données et visionneuse faits ; le moteur jouable est à venir (voir `docs/zoombinis/plan.md`).
+
+### Fichiers de données
+
+`scripts/zoombinis-extract.sh [jeu.7z [installeur.exe [manuel.7z]]]` lit les archives placées dans `archives/zoombinis/` (non versionnées) : il extrait le CD complet dans `archives/zoombinis/cd/`, l'installation DOSBox d'Abandonware France (Windows 3.1 avec le jeu installé, utile pour les fichiers de sauvegarde `ZOOMBINI.WHO` / `ZOOMBINI.CFG`) dans `archives/zoombinis/setup/`, le manuel PDF dans `archives/zoombinis/manuel/`, et ne garde dans `original/zoombinis/` que la version française : les archives `FRENCH/*.MHK` (sauf `MIDIMAC.MHK`), `MIDIMAP.DAT`, `CORNER.TTF` et `files.json`. Le script régénère aussi l'inventaire `docs/zoombinis/files.md`.
+
+### Documentation
+
+`docs/zoombinis/` : inventaire (`files.md`), rétro-ingénierie (`re-index.md`, régénérée par `scripts/zoombinis/re/run.sh`), moteur (`engine.md`), formats (`formats.md`), parcours et sauvegardes (`screens.md`), les 12 épreuves (`puzzles/`) et plan (`plan.md`).
+
+### Pages de développement
+
+Avec `npm run dev` : `src/games/zoombinis/ui/asset-viewer.html` est une visionneuse des ressources des archives Mohawk (images et planches avec leur palette, scripts animés `SCRB` / `SCRS`, sons, MIDI à télécharger, textes, chemins et régions superposés au décor, curseurs).
+
 ## Code commun aux jeux
 
-- `src/data/` — lecture binaire (`reader.ts`), page de code 437, liste des fichiers d'un jeu (`game-files.ts`), fichiers RIFF WAVE (`riff-wave.ts`), vidéos Smacker (`smacker.ts`).
+- `src/data/` — lecture binaire (`reader.ts`), page de code 437, Mac OS Roman (`mac-roman.ts`), archives et ressources du moteur Mohawk de Broderbund partagées par Mathémagique et Zoombinis (`mohawk/`), liste des fichiers d'un jeu (`game-files.ts`), fichiers RIFF WAVE (`riff-wave.ts`), vidéos Smacker (`smacker.ts`).
 - `src/audio/` — conversion PCM et création des `AudioBuffer` (`pcm.ts`), lecture en flux des pistes de musique (`track-player.ts`).
 - `src/ui/` — page d'accueil, écran titre, chargement des fichiers (`files.ts`), images indexées et palettes VGA (`indexed-canvas.ts`), coquille des visionneuses de ressources (`asset-viewer/`).
 - `scripts/lib/` — extraction des CD (images BIN/CUE et pistes audio, lecture ISO 9660, inventaire `files.md`, remplacement atomique de `original/<jeu>/`) et encodeur PNG ; `scripts/manifest.py` écrit `files.json`.
-- `scripts/re/` — socle Ghidra headless (recherche de Ghidra et du JDK, exports, génération des index) ; chaque jeu garde ses scripts dans `scripts/<jeu>/re/`.
+- `scripts/re/` — socle Ghidra headless (recherche de Ghidra et du JDK, exports, génération des index), dont les briques des exécutables NE Mohawk partagées par Mathémagique et Zoombinis (`ne_dump.py`, `SeedFunctions.java`, `ExportTags.java`, `make_index_ne.py`) ; chaque jeu garde ses scripts dans `scripts/<jeu>/re/`.
 - `test/support/original.ts` — accès aux fichiers d'origine dans les tests, ignorés quand ils sont absents.
 
 ## Ce qui a été reconstitué

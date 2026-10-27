@@ -5,8 +5,8 @@
  * Les ressources `UNIT`/`TARG` sont des tableaux de `u32` gros-boutistes, complétés par du bourrage : on prend le nombre
  * d'éléments dans la `STRL` du même id (une unité par chaîne de `STRL 1000+k`, un groupe de colonnes par chaîne de `STRL 1005+k`).
  */
-import { MohawkArchive, TAG_STRL } from "../../data/mohawk";
-import { parseStrl } from "../../data/strl";
+import { MohawkArchive, TAG_STRL } from "../../../../data/mohawk/mohawk";
+import { parseStrl } from "../../../../data/mohawk/strl";
 import { STRL_RANKS, STRL_TARGETS_BASE, STRL_UNITS_BASE } from "./tables";
 
 export const TAG_UNIT = "UNIT";

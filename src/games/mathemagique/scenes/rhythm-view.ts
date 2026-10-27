@@ -2,7 +2,7 @@
  * Rhythm Shop : constantes d'écran et aides pures de la scène (`docs/mathemagique/screens/rhythm.md` §1.1, §1.4, §4).
  * Rien ici ne touche au moteur : géométrie, ids de ressources, dessin des bacs et des animations d'outils, étiquettes des boutons d'outils.
  */
-import type { Shape } from "../data/shap";
+import type { Shape } from "../../../data/mohawk/shap";
 import { drawShape } from "../engine/graphics/blit";
 import type { FonFont } from "../engine/graphics/fon";
 import { Surface, type Rect } from "../engine/graphics/surface";

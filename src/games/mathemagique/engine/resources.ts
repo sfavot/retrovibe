@@ -1,11 +1,11 @@
-import { MohawkArchive, TAG_SCR, TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL, TAG_STRL } from "../data/mohawk";
-import { decodeShap, type Shape } from "../data/shap";
+import { MohawkArchive, TAG_SCR, TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL, TAG_STRL } from "../../../data/mohawk/mohawk";
+import { decodeShap, type Shape } from "../../../data/mohawk/shap";
 import { parseScr, type ScrScript } from "../data/scr";
-import { parseShpl, type ShapeList } from "../data/shpl";
-import { parseSndl } from "../data/sndl";
-import { parseStrl } from "../data/strl";
-import { isMidi, parseMidi, type MidiResource } from "../data/midi";
-import { isWave, parseWave, type Wave } from "../data/wave";
+import { parseShpl, type ShapeList } from "../../../data/mohawk/shpl";
+import { parseSndl } from "../../../data/mohawk/sndl";
+import { parseStrl } from "../../../data/mohawk/strl";
+import { isMidi, parseMidi, type MidiResource } from "../../../data/mohawk/midi";
+import { isWave, parseWave, type Wave } from "../../../data/mohawk/wave";
 import type { Host } from "./host";
 
 /**

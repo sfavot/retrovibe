@@ -2,7 +2,7 @@
  * Puzzle Patterns : données de présentation pures (identifiants de ressources, boutons, zones d'aide, cyclage de palette).
  * Aucune dépendance au moteur : la scène (`patterns.ts`) les assemble. Comportement d'origine : `docs/mathemagique/screens/patterns.md`.
  */
-import type { ShapeList } from "../data/shpl";
+import type { ShapeList } from "../../../data/mohawk/shpl";
 import { edgesContain, edges, type Edges, type PatternsPiece, patternsRect } from "../game/puzzle-kit";
 import { POLY_ZONE } from "../game/poly-config";
 

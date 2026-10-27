@@ -218,14 +218,14 @@ export class NpcKit {
     return approach(ctx, chaser, target, follow);
   }
 
-  /** `219b:0092` : visible puis approche. */
+  /** `219b:0092` : visible puis poursuite (`22ef:0000` avec `AX = 7`, `219b:00b8` : le contact a lieu à l'arrivée). */
   chase(ctx: BehaviorContext, chaser: GameObject, target: GameObject): boolean {
-    return this.sees(ctx, chaser, target) && this.approach(ctx, chaser, target);
+    return this.sees(ctx, chaser, target) && this.approach(ctx, chaser, target, true);
   }
 
-  /** `219b:00d0` : ramassage : visible, ramassable, le poids passe, puis approche. */
+  /** `219b:00d0` : ramassage : visible, ramassable, le poids passe, puis poursuite (`219b:0111` : `AX = 7`). */
   fetch(ctx: BehaviorContext, taker: GameObject, item: GameObject): boolean {
-    return this.sees(ctx, taker, item) && item.pickable !== 0 && this.fits(taker, item) && this.approach(ctx, taker, item);
+    return this.sees(ctx, taker, item) && item.pickable !== 0 && this.fits(taker, item) && this.approach(ctx, taker, item, true);
   }
 
   /** `20ac:0060` (`helpers.canCarry`). */
@@ -290,12 +290,19 @@ export class NpcKit {
     return result;
   }
 
-  /** `30d9:08c8` : marche en ligne droite hors de la salle chargée ; 0 en marche, 1 arrivé, 2 arrivé sur l'objet suivi. */
+  /**
+   * `30d9:08c8` : marche en ligne droite hors de la salle chargée ; 0 en marche, 1 arrivé, 2 arrivé sur l'objet suivi, 5 bloqué. Aiguillage
+   * sur `Err` (table `30d9:0984`) : 8 (contact bloquant) fait le pas que le déplacement a refusé (`dpX`, 1 en P, `dpY` pour un volant) :
+   * hors de la salle chargée les personnages passent les uns à travers les autres ; 0, 9, 0x0A et 0x11 ne bougent pas (le déplacement
+   * l'a fait) ; tout autre `Err` rend 5.
+   */
   private offscreenStep(obj: GameObject, target: GameObject | undefined): number {
     const flier = obj.dep !== 0;
-    obj.p += sign(obj.speedP);
-    obj.x += obj.stepX * sign(obj.speedX);
-    if (flier) obj.y += obj.stepY * sign(obj.speedY);
+    if (obj.err === 8) {
+      obj.p += sign(obj.speedP);
+      obj.x += obj.stepX * sign(obj.speedX);
+      if (flier) obj.y += obj.stepY * sign(obj.speedY);
+    } else if (!(obj.err === 0 || obj.err === 9 || obj.err === 0x0a || obj.err === 0x11)) return 5;
     const goal = target ?? obj.path.target;
     if (!goal) return 1;
     const gx = goal.x;
@@ -317,50 +324,17 @@ export class NpcKit {
   }
 
   /**
-   * `228e:0000(obj ; want, respectBarriers)` : choisit au hasard une sortie existante (de la salle voulue si `want` n'est pas -1,
-   * non barrée si `respectBarriers`). Hors salle chargée : franchit tout de suite ; en salle chargée : marche vers l'arête.
-   * Rend vrai si une sortie a été choisie.
-   * hypothèse (characters.md § 1.5) : un code de barrage non nul compte comme barré (le test `1414:0006` n'est pas exposé).
+   * `228e:0000(obj ; want, respectBarriers)` : choisit au hasard une sortie existante (de la salle voulue si `want` n'est pas -1, non
+   * barrée par `1414:0006` mode 0 si `respectBarriers`) et y envoie l'objet : c'est `ArmaethEngine.walkToExit`, commun avec le clic droit
+   * du héros (côtés permutés de la scène, cible à ±1000 au-delà du bord ; hors salle chargée, cible posée pour les côtés 0 à 3 et
+   * sortie immédiate pour le haut et le bas). Tous les personnages l'appellent avec `DX = 7` (barrages respectés : `26da`, `2774`,
+   * `28b1`, `2a44`, `2cdf`, `2d52`, `2dd9`) ; seul le clic droit du héros (`1504:0325`) passe `DX = 0`.
    */
-  leaveRoom(ctx: BehaviorContext, obj: GameObject, want = -1, respectBarriers = false): boolean {
-    const room = obj.room;
-    if (!room || obj.holder) return false;
-    const loaded = this.inLoadedRoom(ctx, obj);
-    const slots: number[] = [];
-    for (let slot = 5; slot >= 0; slot--) {
-      const dest = ctx.state.neighbour(room, slot);
-      if (!dest) continue;
-      if (want !== -1 && dest.id !== want) continue;
-      if (respectBarriers && ctx.state.barrier(room, slot) !== 0) continue;
-      slots.push(slot);
-    }
-    obj.path.defined = false;
-    while (slots.length > 0) {
-      const pick = ctx.rng.mod(slots.length);
-      const slot = slots[pick]!;
-      if (!loaded) {
-        obj.info = slot;
-        ctx.rooms.exit(obj);
-        return true;
-      }
-      // côtés : 0 fond, 1 droite, 2 avant, 3 gauche ; les sorties haut / bas ne servent pas en salle chargée
-      let x = 160;
-      let p = 80;
-      let usable = true;
-      if (slot === 0) p = -1000;
-      else if (slot === 1) x = 1000;
-      else if (slot === 2) p = 1000;
-      else if (slot === 3) x = -1000;
-      else usable = false;
-      if (usable) {
-        setWord(obj, OFF.followed, 0);
-        if (ctx.motion.pathTo(obj, x, 90, p, 0)) return true;
-      }
-      slots[pick] = slots[slots.length - 1]!;
-      slots.pop();
-    }
-    obj.path.defined = false;
-    return false;
+  leaveRoom(ctx: BehaviorContext, obj: GameObject, want = -1, respectBarriers = true): boolean {
+    if (!obj.room || obj.holder) return false;
+    const left = ctx.rooms.walkToExit(obj, want, respectBarriers);
+    if (left) setWord(obj, OFF.followed, 0); // `Cib`, `Ser` (+0x78, +0x7A) remis à 0 avec la cible (`228e:0236`)
+    return left;
   }
 
   /**

@@ -30,13 +30,13 @@ bash scripts/mathemagique/re/run.sh
 | `project/` | projet Ghidra (`mathemagique`), ouvrable dans l'interface (`ghidraRun`) |
 | `run.log` | journal complet de Ghidra |
 
-Les scripts propres au jeu sont dans `scripts/mathemagique/re/` : `ne_dump.py` + `ne.py` (exports et ressources, Python), `ExportImports.java`, `ExportTags.java`, `SeedFunctions.java` (amorçage des fonctions, lancé avant les exports) et `make_index.py` (met à jour ce document). Ils s'appuient sur le socle commun `scripts/re/` (`run-lib.sh`, `ReCommon.java` en mode NE, `ExportStrings.java`, `ExportDecompiled.java`, `ExportDisasm.java`, `make_index_lib.py`), partagé avec le Téléportaschtroumpf et Armaeth, sans `SetDS` ni `IdentifyLibs` (propres au DOS : le loader NE gère les segments et les relocations). `SeedFunctions.java` est repris dans son principe mais réécrit : voir « Amorçage des fonctions ».
+Le script propre au jeu est `scripts/mathemagique/re/make_index.py` (met à jour ce document, via `scripts/re/make_index_ne.py`) ; `run.sh` passe à `SeedFunctions.java` la table des scènes de `MATH` (`RE_SCENE_TABLE`, `RE_SCENE_NAMES`). Tout le reste est dans le socle commun `scripts/re/` : les briques des exécutables NE Mohawk, partagées avec Zoombinis (`ne_dump.py` + `ne.py` pour les exports et ressources, `ExportImports.java`, `ExportTags.java`, `SeedFunctions.java`, lancé avant les exports, `make_index_ne.py`), et celles de tous les jeux (`run-lib.sh`, `ReCommon.java` en mode NE, `ExportStrings.java`, `ExportDecompiled.java`, `ExportDisasm.java`, `make_index_lib.py`), sans `SetDS` ni `IdentifyLibs` (propres au DOS : le loader NE gère les segments et les relocations). `SeedFunctions.java` est repris dans son principe mais réécrit : voir « Amorçage des fonctions ».
 
 ## Statistiques
 
 <!-- GEN:stats -->
 - Outils : ghidra 12.2 ; JDK : openjdk version "25.0.5" 2026-10-20.
-- Durée de la dernière régénération (6 programmes) : 92 s.
+- Durée de la dernière régénération (6 programmes) : 130 s.
 
 | Programme | Octets | Fonctions | Octets de code | Décomp. ok | Partielle | Erreur | Taux ok | Chaînes (référencées) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -63,7 +63,7 @@ Les scripts propres au jeu sont dans `scripts/mathemagique/re/` : `ne_dump.py` +
 - **Loader NE de Ghidra.** Il crée un bloc par segment du fichier avec un sélecteur par segment (mode protégé 16 bits : `1000`, `1008`, `1010`... pour les segments 1, 2, 3... de `MATH` ; les segments de données suivent : `1108` est le segment de données automatique de `MATH`, `Data34`). Les adresses de ce document sont des `sélecteur:offset` de Ghidra, pas des adresses réelles : le sélecteur n = 0x1000 + 8 × (n - 1). Les appels aux imports passent par un thunk du bloc `EXTERNAL` (`1120:xxxx` pour `MATH`), qui porte le nom `MODULE::NOM`.
 - **Un seul script de correction.** Contrairement à la version DOS, l'auto-analyse par défaut suffit presque : elle crée 1515 fonctions pour `MATH`, et `SeedFunctions.java` ajoute celles que seuls des pointeurs de données atteignent (voir ci-dessous). Taux de décompilation dans les statistiques. Les « partielles » contiennent du code que Ghidra n'a pas su lire (`Bad instruction`, table de saut non reconstruite) : lire alors `disasm.txt`.
 - **Références aux chaînes.** Le code passe les chaînes par `PUSH DS ; PUSH offset` ; Ghidra ne les relie pas toujours. `ExportStrings.java` associe tout `PUSH`/`MOV`/`LEA` dont la constante 16 bits est l'offset d'une chaîne du segment de données à la fonction qui le contient (type `imm`), plus les opérandes mémoire absolus (`mem`) et les références posées par Ghidra (`ref`). Les types `imm` et `mem` sont **heuristiques** : un offset inférieur à `0x200` n'est retenu que près d'un `PUSH DS`/`PUSH SS`. Des chaînes mal découpées ou référencées par calcul d'offset peuvent manquer.
-- **Tags Mohawk.** `ExportTags.java` cherche chaque type de ressource (`'SCR '`, `'\0SND'`, `'SHAP'`, `'SHPL'`, `'SNDL'`, `'STRL'`, `'PUZZ'`, `'PTRN'`, `'PLST'`, `'TARG'`, `'UNIT'`, `'CURS'`, `'SYSX'`, `'RSFL'`, `'tBMP'`, `'tPAL'`, `'tWAV'`) comme constante 32 bits (dans les deux ordres d'octets) ou comme deux moitiés de 16 bits dans une fenêtre de 8 instructions, et en clair dans les segments de données. Seul l'ordre « gros-boutiste » (`'CURS'` = `0x43555253`) a donné des résultats ; les moitiés 16 bits et les tags en clair n'ont rien donné dans `MATH`. Tags absents du code de `MATH` : `'SCR '`, `'SYSX'`, `'RSFL'`, `'tBMP'`, `'tPAL'` (hypothèse : lus par des tables ou des fonctions génériques qui reçoivent le tag en paramètre, ou par `MPC/PVG.MHK` hors de `MATH`). Les autres sont dans la table plus bas.
+- **Tags Mohawk.** `ExportTags.java` cherche chaque type de ressource (`'SCR '`, `'\0SND'`, `'SHAP'`, `'SHPL'`, `'SNDL'`, `'STRL'`, `'PUZZ'`, `'PTRN'`, `'PLST'`, `'TARG'`, `'UNIT'`, `'CURS'`, `'SYSX'`, `'RSFL'`, `'tBMP'`, `'tPAL'`, `'tWAV'`, et depuis Zoombinis `'tMID'`, `'SCRB'`, `'SCRS'`, `'NODE'`, `'PATH'`, `'REGS'`) comme constante 32 bits (dans les deux ordres d'octets) ou comme deux moitiés de 16 bits dans une fenêtre de 8 instructions, et en clair dans les segments de données. Seul l'ordre « gros-boutiste » (`'CURS'` = `0x43555253`) a donné des résultats ; les moitiés 16 bits et les tags en clair n'ont rien donné dans `MATH`. Tags absents du code de `MATH` : `'SCR '`, `'SYSX'`, `'RSFL'`, `'tBMP'`, `'tPAL'` (hypothèse : lus par des tables ou des fonctions génériques qui reçoivent le tag en paramètre, ou par `MPC/PVG.MHK` hors de `MATH`). Les autres sont dans la table plus bas.
 - **Imports.** Voir « Imports et DLL » plus bas pour la couverture des noms.
 - **Fonctions sans appelant.** Beaucoup de fonctions de l'interface (par exemple `1028:0f99`, `1010:306c`) n'ont aucun appelant direct : elles sont atteintes par des pointeurs de fonction (table de dispatch, messages Windows). Leur appelant n'est donc pas visible dans `functions.tsv`.
 
@@ -151,6 +151,7 @@ Tags Mohawk trouvés comme constantes dans le code de `MATH` (fonctions distinct
 | Tag | Fonctions | Liste |
 |---|---:|---|
 | `\0SND` | 97 | `1008:0000`, `1008:0522`, `1010:0000`, `1010:03a3`, `1010:0959`, `1010:09a4`, `1010:0a70`, `1010:0b5d`, `1010:0e23`, `1010:28b9`, `1010:2a83`, `1010:3bfc` … |
+| `tMID` | 16 | `1010:0000`, `1020:1e35`, `1028:0f99`, `1030:0000`, `1030:1db5`, `1040:0000`, `1040:14e3`, `1048:0000`, `1048:17a7`, `1060:06f4`, `1060:0d22`, `1068:0364` … |
 | `STRL` | 4 | `1010:306c`, `1018:0518`, `1028:0f99`, `1060:06f4` |
 | `SHAP` | 3 | `1018:0ac2`, `1088:1a35`, `10a8:0379` |
 | `PUZZ` | 3 | `1030:18eb`, `1040:0543`, `1048:0556` |
@@ -168,30 +169,30 @@ Fonctions qui référencent un nom de fichier `.DAT` (chaîne passée en immédi
 | Fonction | Octets | DAT | Tags dans la même fonction |
 |---|---:|---|---|
 | `1008:0000` | 730 | milkyway.dat | `CURS`, `\0SND` |
-| `1010:0000` | 931 | bowling.dat | `\0SND` |
+| `1010:0000` | 931 | bowling.dat | `\0SND`, `tMID` |
 | `1010:3adc` | 288 | milkyway.dat | - |
 | `1010:4363` | 202 | polly.dat | - |
 | `1010:44ef` | 139 | gus.dat | - |
 | `1010:457a` | 161 | gus.dat | - |
 | `1028:0000` | 1471 | milkyway.dat, RSHELP.DAT | `\0SND` |
-| `1028:0f99` | 1118 | MidiMPC.DAT, RHYTHM.DAT, RSHELP.DAT | `STRL`, `\0SND` |
-| `1030:0000` | 322 | hidden.dat | `\0SND` |
+| `1028:0f99` | 1118 | MidiMPC.DAT, RHYTHM.DAT, RSHELP.DAT | `STRL`, `\0SND`, `tMID` |
+| `1030:0000` | 322 | hidden.dat | `\0SND`, `tMID` |
 | `1030:1f86` | 241 | polly.dat | - |
-| `1040:0000` | 303 | patterns.dat | `\0SND` |
+| `1040:0000` | 303 | patterns.dat | `\0SND`, `tMID` |
 | `1040:1692` | 183 | milkyway.dat | `\0SND` |
 | `1040:17c7` | 241 | polly.dat | - |
-| `1048:0000` | 341 | stickler.dat | `\0SND` |
+| `1048:0000` | 341 | stickler.dat | `\0SND`, `tMID` |
 | `1048:192e` | 143 | milkyway.dat | `\0SND` |
 | `1048:19f4` | 241 | polly.dat | - |
-| `1060:06f4` | 884 | PatFill.DAT | `PTRN`, `STRL`, `\0SND` |
-| `1068:0364` | 417 | title.dat | `\0SND` |
-| `1070:0a37` | 1062 | Nim.DAT | `\0SND` |
+| `1060:06f4` | 884 | PatFill.DAT | `PTRN`, `STRL`, `\0SND`, `tMID` |
+| `1068:0364` | 417 | title.dat | `\0SND`, `tMID` |
+| `1070:0a37` | 1062 | Nim.DAT | `\0SND`, `tMID` |
 | `1070:1778` | 463 | milkyway.dat | `\0SND` |
 | `1070:1d25` | 424 | milkyway.dat | - |
 | `1078:0019` | 203 | milkyway.dat | - |
 | `1078:00e4` | 263 | credits.dat | - |
 | `1078:0523` | 274 | trophy.dat | - |
-| `1090:0094` | 910 | milkyway.dat | `\0SND` |
+| `1090:0094` | 910 | milkyway.dat | `\0SND`, `tMID` |
 | `10d0:1a78` | 204 | MIDIMAP.DAT | - |
 | `10d8:38e8` | 438 | mainscrn.dat | - |
 | `10d8:6d22` | 123 | mainscrn.dat | - |
@@ -200,7 +201,7 @@ Fonctions qui référencent un nom de fichier `.DAT` (chaîne passée en immédi
 
 Noms de fichiers `.DAT` présents dans le segment de données sans aucune référence immédiate trouvée : aucun.
 
-Fonctions référençant un tag sans nom de DAT dans la même fonction : 92 sur 106 fonctions à tags (voir `MATH/tags.tsv`).
+Fonctions référençant un tag sans nom de DAT dans la même fonction : 95 sur 109 fonctions à tags (voir `MATH/tags.tsv`).
 <!-- /GEN:dats -->
 
 Lecture de cette table :

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { extractMidi, isMidi, parseMidi } from "../../src/games/mathemagique/data/midi";
-import { MohawkArchive, TAG_SND, TAG_SNDL, TAG_STRL } from "../../src/games/mathemagique/data/mohawk";
-import { parseSndl } from "../../src/games/mathemagique/data/sndl";
-import { parseStrl } from "../../src/games/mathemagique/data/strl";
-import { isWave, parseWave, waveDuration, waveToFloat32 } from "../../src/games/mathemagique/data/wave";
+import { extractMidi, isMidi, parseMidi } from "../../src/data/mohawk/midi";
+import { MohawkArchive, TAG_SND, TAG_SNDL, TAG_STRL } from "../../src/data/mohawk/mohawk";
+import { parseSndl } from "../../src/data/mohawk/sndl";
+import { parseStrl } from "../../src/data/mohawk/strl";
+import { isWave, parseWave, waveDuration, waveToFloat32 } from "../../src/data/mohawk/wave";
 import { archivePaths, hasOriginalFiles, readOriginal } from "./helpers";
 
 const text = (s: string) => [...new TextEncoder().encode(s)];

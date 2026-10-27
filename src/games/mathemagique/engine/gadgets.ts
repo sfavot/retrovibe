@@ -23,7 +23,7 @@
  *    restauré avant de poser la nouvelle forme ; ce fond doit donc être capturé **sans** les formes des boutons (les gadgets posent aussi la forme
  *    normale). La forme « appuyé » peut avoir sa propre origine (`pressedRect`, second rectangle de la table de l'original, `1038:01af`).
  */
-import type { Shape } from "../data/shap";
+import type { Shape } from "../../../data/mohawk/shap";
 import { drawShape } from "./graphics/blit";
 import type { Rect, SavedRect, Surface } from "./graphics/surface";
 import type { CursorKind } from "./host";

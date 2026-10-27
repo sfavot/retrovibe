@@ -7,7 +7,7 @@
  * Dessin : `base` = décor fixe (fond, Gus, étiquette, boutons de niveau) ; `canvas` = `base` + éléments vivants (nom, rang, pions,
  * question, réponses, barre, œil) ; `screen` reçoit des rectangles de `canvas` (les animations de quilles ne sont jamais écrasées).
  */
-import { TAG_SHAP } from "../data/mohawk";
+import { TAG_SHAP } from "../../../data/mohawk/mohawk";
 import { drawShape } from "../engine/graphics/blit";
 import { parseFon } from "../engine/graphics/fon";
 import type { PaletteCycler } from "../engine/graphics/palette";

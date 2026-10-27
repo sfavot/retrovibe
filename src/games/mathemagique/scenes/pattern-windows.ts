@@ -11,7 +11,7 @@
  * (un point par pixel parcouru) ; la pastille de nom ouvre le moniteur de connexion avec la palette du hub le temps du dialogue ;
  * Imprimer télécharge un PNG de la fenêtre (pas de boîte d'impression).
  */
-import { TAG_SHAP } from "../data/mohawk";
+import { TAG_SHAP } from "../../../data/mohawk/mohawk";
 import { drawMask, drawShape, hitTestShape } from "../engine/graphics/blit";
 import { parseFon, type FonFont } from "../engine/graphics/fon";
 import type { PaletteCycler } from "../engine/graphics/palette";

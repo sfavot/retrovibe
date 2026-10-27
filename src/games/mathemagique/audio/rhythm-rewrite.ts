@@ -6,8 +6,8 @@
  * 1. ne garde qu'**une mesure** : de la 1re à la 2e apparition des repères `a` / `1` (coupure à la plus proche des deux) ;
  * 2. met à **vélocité 0** les Note On de chaque emplacement vide (la note existe mais ne sonne pas, les durées restent).
  */
-import type { MarkerEvent, SongEvent } from "./smf";
-import type { SongRewrite } from "./sequencer";
+import type { MarkerEvent, SongEvent } from "../../../engine/mohawk/audio/smf";
+import type { SongRewrite } from "../../../engine/mohawk/audio/sequencer";
 
 const CUE_META_TYPE = 0x07;
 

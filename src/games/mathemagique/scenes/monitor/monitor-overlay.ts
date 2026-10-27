@@ -35,7 +35,7 @@ import { SCR_FLAG } from "../../engine/scr-player";
 import type { SceneContext } from "../../engine/scene";
 import type { MathServices } from "../../engine/services";
 import type { SoundHandle } from "../../engine/sound";
-import { TAG_SCR, TAG_SND } from "../../data/mohawk";
+import { TAG_SCR, TAG_SND } from "../../../../data/mohawk/mohawk";
 import { MONITOR_NAME_RULES } from "./name-text";
 import { NULL_TEXT_INPUT, type TextInputPort } from "./text-input";
 

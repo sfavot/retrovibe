@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
+import { MohawkArchive } from "../../src/data/mohawk/mohawk";
 import { Engine } from "../../src/games/mathemagique/engine/engine";
 import { SceneId } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";

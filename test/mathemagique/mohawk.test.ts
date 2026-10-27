@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MohawkArchive, TAG_SHAP, TAG_SND } from "../../src/games/mathemagique/data/mohawk";
+import { MohawkArchive, TAG_SHAP, TAG_SND } from "../../src/data/mohawk/mohawk";
 import { archivePaths, hasOriginalFiles, readOriginal } from "./helpers";
 
 /** Archive minimale : un type `TEST` à deux ressources (ids 7 et 9). */

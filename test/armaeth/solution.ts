@@ -191,9 +191,9 @@ export function bottle(p: Robot): number[] {
 }
 
 /**
- * Prytwen, sorti de son antre à la suite du héros (`bottle`), parcourt le château et ramasse les objets de valeur. Le héros l'attend dans
- * la salle 104 (en lui parlant s'il passe sans venir, `V110`) ; hors de l'antre le duel se joue au hasard (`28b1:0114`) : sauvegarde,
- * « attaquer Prytwen » à portée (+10, `28b1:0e7d`), et s'il n'est pas mis KO (+40, `28b1:02b8`) le héros assommé est dépouillé :
+ * Prytwen, sorti de son antre à la suite du héros (`bottle`), parcourt le château, ramasse les objets de valeur et poursuit le héros, qui
+ * l'attend dans la salle 104 ; hors de l'antre le duel se joue au hasard (`28b1:0114`) : sauvegarde dès son entrée, « attaquer Prytwen »
+ * à portée avant son contact (+10, `28b1:0e7d`), et s'il n'est pas mis KO (+40, `28b1:02b8`) le héros assommé est dépouillé :
  * restauration et nouvel essai.
  */
 export function knockOutPrytwen(p: Robot): void {
@@ -201,18 +201,19 @@ export function knockOutPrytwen(p: Robot): void {
   const thief = (): GameObject => p.object(PRYTWEN);
   const here = (): boolean => !!p.state.hero && thief().room === p.state.loadedRoom;
   const attacked = (): boolean => p.state.scoreTable.some((e) => e.id === 100 && e.points < 0);
-  for (let k = 0; k < 240 && !here(); k++) p.wait(250);
+  // image par image : Prytwen poursuit le héros (`22ef:0000`, `AX = 7`) et l'atteint vite ; attendu par tranches, il aurait déjà posé son
+  // ultimatum quand l'essai sauvegarde
+  p.until(here, 60000);
   p.need(here(), "Prytwen ne vient pas");
   p.attempt(
     "duel contre Prytwen",
     40,
     () => {
-      // à portée (il erre dans la salle) : de loin, la commande mènerait le héros à lui et le duel viendrait de son contact, sans les points
-      // de l'attaque ; à son contact hors de son antre, Prytwen pose son ultimatum (`Ego 5` : le héros perd la main, Prytwen attend l'or
-      // 20 tics, puis le duel) : on attaque aussi à ce moment-là
-      const inReach = (): boolean => here() && thief().ego !== 1 && (p.engine as unknown as { inReach(o: unknown): boolean }).inReach(thief());
-      if (!p.until(inReach, 20000)) throw new RobotSetback("Prytwen hors de portée");
-      p.drain(2);
+      // on attaque dès qu'il est à portée et libre (`Ego 0`) : à son contact hors de son antre il pose son ultimatum (`Ego 5` : le héros perd
+      // la main, « Pas maintenant ! »), puis le duel vient de ce contact, sans les points de l'attaque. La ligne de saisie arrête le monde :
+      // la commande part dans le tic même
+      const inReach = (): boolean => here() && thief().ego === 0 && (p.engine as unknown as { inReach(o: unknown): boolean }).inReach(thief());
+      if (!p.until(() => inReach() || !p.state.hero || thief().ego !== 0, 20000) || !inReach()) throw new RobotSetback("Prytwen hors de portée");
       p.host.type("attaquer Prytwen\r");
       if (!p.until(() => !p.state.hero || thief().ego === 1 || attacked(), 300)) throw new RobotSetback("pas de duel");
       p.until(() => !p.state.hero || thief().ego !== 1, 3000);
@@ -288,6 +289,33 @@ export function castle(p: Robot): void {
     p.goTo(104);
   }
   p.need(!p.has(105) && [6, 108, 205, 206, 25].every((num) => p.has(num)), `affaires non reprises : ${[6, 108, 205, 206, 25].filter((num) => !p.has(num)).map((num) => `${num}@${p.object(num)?.room?.id ?? p.object(num)?.holder?.num}`).join(" ")}`);
+}
+
+/**
+ * Entrée de score (2, 4) : un nain guerrier (`Num 203`, `204`) tué en duel (+10, `2a44:06c6`). Sur la route de la mine (étape (c)) la
+ * rencontre dépend du hasard ; sinon, armé de l'épée et du bouclier (chaque duel est gagné, `2a44:02de`), le héros va dans la salle d'un
+ * guerrier et l'attend : le nain qui le voit vient à lui (`2a44:135a`) et le duel naît de son contact.
+ */
+export function warriorDuel(p: Robot): void {
+  const awarded = (): boolean => p.state.scoreTable.some((e) => e.id === 204 && e.points < 0);
+  if (awarded()) return;
+  p.need(p.has(314) && p.has(205), "ni épée ni bouclier");
+  const warrior = (): GameObject | undefined =>
+    p.state.objects.find((o) => (o.num === 203 || o.num === 204) && o.room && o.holder === null && o.gst === 7 && o.room.id >= 200 && o.room.id < 400);
+  p.attempt(
+    "nain guerrier",
+    20,
+    () => {
+      for (let k = 0; k < 6 && !awarded(); k++) {
+        const target = warrior();
+        if (!target) throw new Error("plus de nain guerrier");
+        if (target.room!.id !== p.roomId) p.crossAll(target.room!.id);
+        p.until(() => awarded() || !p.state.hero || warrior()?.room !== p.state.loadedRoom, 3000);
+        p.drain();
+      }
+    },
+    awarded,
+  );
 }
 
 /** Soldiers (`Num 301`) encore dans la salle de garde. */

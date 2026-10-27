@@ -28,10 +28,10 @@
  * interrompue), `onEnd` est appelé depuis le tick, avant `Scene.tick`.
  */
 import { isModifierOnlyKey, type Input } from "./input";
-import { TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL } from "../data/mohawk";
+import { TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL } from "../../../data/mohawk/mohawk";
 import { resolveScrResources, SCR_CELL_COUNT, SCR_INITIAL_FLAGS, SCR_OFFSCREEN, type ScrClip, type ScrOp, type ScrScript } from "../data/scr";
-import type { ShapeList } from "../data/shpl";
-import type { Shape } from "../data/shap";
+import type { ShapeList } from "../../../data/mohawk/shpl";
+import type { Shape } from "../../../data/mohawk/shap";
 import { drawShape } from "./graphics/blit";
 import type { Rect, SavedRect, Surface } from "./graphics/surface";
 import { defineService } from "./scene";

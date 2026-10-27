@@ -21,7 +21,7 @@ vi.mock("spessasynth_lib", () => ({
   },
 }));
 
-const { WebAudioSink } = await import("../../src/games/mathemagique/audio/web-sink");
+const { WebAudioSink } = await import("../../src/ui/mohawk/web-sink");
 
 function fakeContext() {
   const gain = { gain: { value: 1 }, connect: () => {} };

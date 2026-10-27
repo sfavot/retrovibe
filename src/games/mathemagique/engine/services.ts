@@ -22,8 +22,8 @@ import { POINTER, PointerService } from "./pointer";
 import { SCR_PLAYER, ScrPlayer } from "./scr-player";
 import { defineService } from "./scene";
 import { SOUND, SoundService, type WaveArchive } from "./sound";
-import { TAG_SHAP } from "../data/mohawk";
-import type { Shape } from "../data/shap";
+import { TAG_SHAP } from "../../../data/mohawk/mohawk";
+import type { Shape } from "../../../data/mohawk/shap";
 
 export interface GraphicsService {
   /** Surface de jeu 576×432 : ce que `host.present` reçoit. Les scènes y dessinent (ou y copient leur propre surface). */

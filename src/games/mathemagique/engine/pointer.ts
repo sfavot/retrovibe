@@ -21,7 +21,7 @@
  * via le moteur ; le sablier est imposé par le moteur pendant un chargement. Les bitmaps `CURS` de `MILKYWAY.DAT` se décodent par
  * `decodeCursor` (format : formats.md « CURS ») et s'exposent à l'hôte navigateur en PNG (`loadCursorImages`).
  */
-import type { Shape } from "../data/shap";
+import type { Shape } from "../../../data/mohawk/shap";
 import { hitTestShape } from "./graphics/blit";
 import { PLAY_HEIGHT, PLAY_WIDTH } from "./graphics/frame";
 import type { Rect } from "./graphics/surface";

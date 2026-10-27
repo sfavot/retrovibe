@@ -1,5 +1,5 @@
 /**
- * Dessin des formes `SHAP` décodées (`../../data/shap.ts`) dans une `Surface` (`docs/mathemagique/shap.md`, « Dessin, modes et transparence »).
+ * Dessin des formes `SHAP` décodées (`src/data/mohawk/shap.ts`) dans une `Surface` (`docs/mathemagique/shap.md`, « Dessin, modes et transparence »).
  *
  * - **mode 0** : copie brute (`10d8:4438`, mode 0) ;
  * - **mode 8** : copie en sautant les pixels d'index 0, transparents (mode 8 de la même table ; le mode utilisé par les sprites) ;
@@ -8,7 +8,7 @@
  *
  * Tout est découpé par le rectangle (et le masque) de la surface de destination.
  */
-import type { Shape } from "../../data/shap";
+import type { Shape } from "../../../../data/mohawk/shap";
 import type { Surface } from "./surface";
 
 export type BlitMode = 0 | 8;

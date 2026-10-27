@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
+import { MohawkArchive } from "../../src/data/mohawk/mohawk";
 import type { Cell } from "../../src/games/mathemagique/game/puzz";
 import {
   expectedShapeCount,

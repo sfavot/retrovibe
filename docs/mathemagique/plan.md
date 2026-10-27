@@ -10,7 +10,7 @@ Ce document sert de brief commun aux sous-agents. Les références font foi sur 
 
 - Vagues F à J terminées : moteur, graphismes, audio (soundfont GeneralUser GS réduite), services, intégration au site, les 11 scènes jouables, manuel français validé (`original/mathemagique/MANUEL.html`), contrôles et tactile, robot de partie (`PLAY=1`), corrections de la revue (focus du champ de saisie, Tab, chargement en échec, sauvegarde de secours du roster, requêtes de scène idempotentes).
 - Reste : vérifications à l'oreille et sur téléphone ; traduction en attente du CD français.
-- Vagues A à E terminées (commit `e56ebd4`) : extraction, lecteurs de données (`src/games/mathemagique/data/`),
+- Vagues A à E terminées (commit `e56ebd4`) : extraction, lecteurs de données (`src/data/mohawk/` et `src/games/mathemagique/data/`),
   visionneuse (`ui/asset-viewer.html`), rétro-ingénierie Ghidra, études du moteur et des 8 écrans.
 - Vague H terminée (câblage) : les écrans Hidden, Patterns, Sticklers, Rockets et Hall of Fame sont enregistrés ; le hub pose son
   moniteur (`MonitorOverlay`, touches, ticks, `monitorClosed`) ; polices en Mac Roman (`encodeText`) ; tri des joueurs sans accents ;

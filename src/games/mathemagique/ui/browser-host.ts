@@ -1,4 +1,4 @@
-import { WebAudioSink } from "../audio/web-sink";
+import { WebAudioSink } from "../../../ui/mohawk/web-sink";
 import type { GameFiles } from "../data/files";
 import type { Frame } from "../engine/graphics/frame";
 import type { CursorKind, Host } from "../engine/host";

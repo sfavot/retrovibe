@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
-import { parseMidi } from "../../src/games/mathemagique/data/midi";
+import { MohawkArchive } from "../../src/data/mohawk/mohawk";
+import { parseMidi } from "../../src/data/mohawk/midi";
 import { keepFirstMeasure } from "../../src/games/mathemagique/audio/rhythm-rewrite";
-import { MidiPlayer, parsePrograms, parseSysx } from "../../src/games/mathemagique/audio/sequencer";
-import type { MidiSink } from "../../src/games/mathemagique/audio/sink";
-import { type MarkerEvent, type Song, parseSong } from "../../src/games/mathemagique/audio/smf";
+import { MidiPlayer, parsePrograms, parseSysx } from "../../src/engine/mohawk/audio/sequencer";
+import type { MidiSink } from "../../src/engine/mohawk/audio/sink";
+import { type MarkerEvent, type Song, parseSong } from "../../src/engine/mohawk/audio/smf";
 import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
 import {
   LEVEL_COUNT,

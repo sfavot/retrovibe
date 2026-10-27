@@ -158,6 +158,27 @@ def mo(n, ko=False):
     return '%.1f Mo' % (n / 1048576)
 
 
+def mohawk_types(chemin):
+    """[(tag, nombre de ressources)] d'une archive Mohawk (MHWK/RSRC, Broderbund), ou None si ce n'en est pas une."""
+    with open(chemin, 'rb') as f:
+        d = f.read()
+    if d[:4] != b'MHWK' or d[8:12] != b'RSRC':
+        return None
+    absoff, = struct.unpack('>I', d[20:24])
+    n, = struct.unpack('>H', d[absoff + 2:absoff + 4])
+    types = []
+    for i in range(n):
+        tag, rto, _ = struct.unpack('>4sHH', d[absoff + 4 + i * 8:absoff + 12 + i * 8])
+        c, = struct.unpack('>H', d[absoff + rto:absoff + rto + 2])
+        types.append((tag, c))
+    return types
+
+
+def echappe_tag(tag):
+    """Tag de 4 octets lisible : les octets non imprimables sont échappés (`\\x00SND`)."""
+    return ''.join(chr(b) if 32 <= b < 127 else '\\x%02x' % b for b in tag)
+
+
 def liste_fichiers(racine):
     """Génère (chemin absolu, chemin relatif à '/') de tous les fichiers sous racine, triés par dossier."""
     for dossier, _, noms in os.walk(racine):

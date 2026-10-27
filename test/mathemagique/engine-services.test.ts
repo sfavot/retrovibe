@@ -1,9 +1,9 @@
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { parseSong } from "../../src/games/mathemagique/audio/smf";
-import { parseMidi } from "../../src/games/mathemagique/data/midi";
-import { MohawkArchive, TAG_SND } from "../../src/games/mathemagique/data/mohawk";
-import type { Shape } from "../../src/games/mathemagique/data/shap";
+import { parseSong } from "../../src/engine/mohawk/audio/smf";
+import { parseMidi } from "../../src/data/mohawk/midi";
+import { MohawkArchive, TAG_SND } from "../../src/data/mohawk/mohawk";
+import type { Shape } from "../../src/data/mohawk/shap";
 import { Engine } from "../../src/games/mathemagique/engine/engine";
 import {
   GadgetManager,

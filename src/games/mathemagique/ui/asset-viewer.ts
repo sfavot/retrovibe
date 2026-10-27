@@ -8,17 +8,17 @@
  */
 import { parseMidi as parseMidiNotes } from "../../indy/audio/midi";
 import { baseName, fetchGameFiles, type GameFiles } from "../data/files";
-import { extractMidi, isMidi } from "../data/midi";
-import { MohawkArchive, TAG_SCR, TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL, TAG_STRL } from "../data/mohawk";
+import { extractMidi, isMidi } from "../../../data/mohawk/midi";
+import { MohawkArchive, TAG_SCR, TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL, TAG_STRL } from "../../../data/mohawk/mohawk";
 import { applyShpl, createPalette, type Palette } from "../data/palette";
 import { parseScr, resolveScrResources, type ScrEvent, type ScrScript } from "../data/scr";
-import { decodeShap, type Shape } from "../data/shap";
-import { parseShpl, type ShapeList } from "../data/shpl";
-import { parseSndl } from "../data/sndl";
-import { parseStrl } from "../data/strl";
-import { decodeTbmp } from "../data/tbmp";
-import { parseTpal } from "../data/tpal";
-import { isWave, parseWave, waveDuration, waveToFloat32 } from "../data/wave";
+import { decodeShap, type Shape } from "../../../data/mohawk/shap";
+import { parseShpl, type ShapeList } from "../../../data/mohawk/shpl";
+import { parseSndl } from "../../../data/mohawk/sndl";
+import { parseStrl } from "../../../data/mohawk/strl";
+import { decodeTbmp } from "../../../data/mohawk/tbmp";
+import { parseTpal } from "../../../data/mohawk/tpal";
+import { isWave, parseWave, waveDuration, waveToFloat32 } from "../../../data/mohawk/wave";
 
 const BASE = "/mathemagique";
 const TAG_TBMP = "tBMP";

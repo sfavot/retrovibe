@@ -2,7 +2,7 @@
  * Palette de 256 couleurs de Math Workshop. Il n'y a pas de palette codée en dur : elle est construite en mémoire par les
  * ressources `SHPL` (voir `shpl.ts`) chargées avec un écran, chacune écrasant une plage d'index (`docs/mathemagique/shap.md`).
  */
-import type { ShapeList } from "./shpl";
+import type { ShapeList } from "../../../data/mohawk/shpl";
 
 export const PALETTE_SIZE = 256;
 

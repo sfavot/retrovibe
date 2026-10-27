@@ -5,7 +5,7 @@
  * cycle de vie, les sons et les services. Sources : `docs/mathemagique/screens/hidden.md` §1.7 (boutons), §2.2 (révélation), §2.4 (bordures),
  * §3.1 (rectangles), §3.2 (cadre de survol des vignettes).
  */
-import type { Shape } from "../data/shap";
+import type { Shape } from "../../../data/mohawk/shap";
 import { drawShape } from "../engine/graphics/blit";
 import { ClipMask, type Rect, type Surface } from "../engine/graphics/surface";
 import { edgesToRect, hiddenBounds, hiddenCellRects, thumbHoverFrame, thumbRect, THUMB_LAYOUTS, type HiddenPiece } from "../game/puzzle-kit";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
-import type { ShapeList } from "../../src/games/mathemagique/data/shpl";
+import { MohawkArchive } from "../../src/data/mohawk/mohawk";
+import type { ShapeList } from "../../src/data/mohawk/shpl";
 import { Engine } from "../../src/games/mathemagique/engine/engine";
 import { Palette } from "../../src/games/mathemagique/engine/graphics/palette";
 import { Archive } from "../../src/games/mathemagique/engine/resources";

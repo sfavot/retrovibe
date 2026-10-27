@@ -12,7 +12,7 @@
  *
  * Copy : aucune (tout est voix ou dessin).
  */
-import { TAG_SND } from "../data/mohawk";
+import { TAG_SND } from "../../../data/mohawk/mohawk";
 import { POLY_ZONE, ROCKETS_POLY } from "../game/poly-config";
 import { PolyHelper, rosterIntroFlag, type PolyAnimation, type PolyPorts } from "../game/poly";
 import { drawShape } from "../engine/graphics/blit";

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/games/mathemagique/data/mohawk";
+import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/data/mohawk/mohawk";
 import { applyShpl, brighten, createPalette, PALETTE_SIZE } from "../../src/games/mathemagique/data/palette";
-import { decodeShap, unpackLz } from "../../src/games/mathemagique/data/shap";
-import { parseShpl } from "../../src/games/mathemagique/data/shpl";
-import { decodeTbmp } from "../../src/games/mathemagique/data/tbmp";
-import { parseTpal } from "../../src/games/mathemagique/data/tpal";
+import { decodeShap, unpackLz } from "../../src/data/mohawk/shap";
+import { parseShpl } from "../../src/data/mohawk/shpl";
+import { decodeTbmp } from "../../src/data/mohawk/tbmp";
+import { parseTpal } from "../../src/data/mohawk/tpal";
 import { archivePaths, hasOriginalFiles, readOriginal } from "./helpers";
 
 describe("SHAP (données synthétiques)", () => {

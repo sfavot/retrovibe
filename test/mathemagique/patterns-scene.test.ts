@@ -23,9 +23,9 @@ import {
 } from "../../src/games/mathemagique/scenes/patterns-view";
 import { FRAME_MS, TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
-import { MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
+import { MohawkArchive } from "../../src/data/mohawk/mohawk";
 import { Archive } from "../../src/games/mathemagique/engine/resources";
-import { parseShpl } from "../../src/games/mathemagique/data/shpl";
+import { parseShpl } from "../../src/data/mohawk/shpl";
 
 // =====================================================================================================================================
 // Aides pures (sans fichiers du jeu)

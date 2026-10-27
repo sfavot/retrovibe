@@ -75,7 +75,10 @@ re_run_headless() {
   rm -rf "$stage"
   mkdir -p "$stage"
   cp "$RE_SHARED"/*.java "$stage"/
-  cp "$SCRIPTS"/*.java "$stage"/
+  # scripts propres au jeu, facultatifs (Zoombinis n'utilise que les scripts communs)
+  for s in "$SCRIPTS"/*.java; do
+    [ -e "$s" ] && cp "$s" "$stage"/
+  done
   rm -rf "$RE_OUT${RE_PROG:+/$RE_PROG}/decomp"
   local start
   start=$(date +%s)

@@ -14,12 +14,12 @@
  *    reprise quand le synthétiseur devient prêt).
  * Rien n'utilise de minuteur : le moteur appelle `tick()` à chaque tick (voir `installServices`).
  */
-import { loadPcm } from "../audio/pcm";
-import { MidiPlayer, parsePrograms, parseSysx, type PlayOptions, type ProgramEntry } from "../audio/sequencer";
-import { parseSong, type Song } from "../audio/smf";
-import type { AudioSink, WaveHandle } from "../audio/sink";
-import { isMidi, parseMidi } from "../data/midi";
-import { TAG_SND, type MohawkArchive } from "../data/mohawk";
+import { loadPcm } from "../../../engine/mohawk/audio/pcm";
+import { MidiPlayer, parsePrograms, parseSysx, type PlayOptions, type ProgramEntry } from "../../../engine/mohawk/audio/sequencer";
+import { parseSong, type Song } from "../../../engine/mohawk/audio/smf";
+import type { AudioSink, WaveHandle } from "../../../engine/mohawk/audio/sink";
+import { isMidi, parseMidi } from "../../../data/mohawk/midi";
+import { TAG_SND, type MohawkArchive } from "../../../data/mohawk/mohawk";
 import { defineService } from "./scene";
 
 /** Tout ce qui porte une archive Mohawk (`Archive` de `resources.ts` en est une). */

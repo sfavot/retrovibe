@@ -1,7 +1,7 @@
 # Math Workshop : audio (WAVE, MIDI, soundfont)
 
 Tâche F3 du [plan](plan.md). Références sur l'original : [engine.md](engine.md) §6, [screens/rhythm.md](screens/rhythm.md) §2.3, §2.4 et §3, [formats.md](formats.md).
-Code : `src/games/mathemagique/audio/`. Tests : `test/mathemagique/audio-engine.test.ts`.
+Code : `src/engine/mohawk/audio/` (partagé avec Zoombinis : `sink.ts`, `pcm.ts`, `smf.ts`, `sequencer.ts`, `programs.ts`), `src/ui/mohawk/web-sink.ts` (navigateur, partagé) et `src/games/mathemagique/audio/rhythm-rewrite.ts` (propre au jeu). Tests : `test/mathemagique/audio-engine.test.ts`.
 
 ## Architecture
 
@@ -71,7 +71,7 @@ Le `MidiPlayer` appartient au `SoundService` (`engine/sound.ts`), et aucune scè
 - le son coupé est un réglage du puits (`AudioSink.setMuted`) : il s'applique à tout ce que le séquenceur envoie ;
 - **reprise quand le synthétiseur devient prêt** : `restartMusic()` rejoue aussi un morceau lancé par `playSong`, avec les mêmes options, donc la même réécriture (celle du Rhythm Shop est pure : rejouer la mesure donne les mêmes notes). Les repères déjà passés sont signalés de nouveau et `onEnd` n'arrive qu'à la fin de la lecture rejouée.
 
-## Navigateur : `web-sink.ts`
+## Navigateur : `web-sink.ts` (`src/ui/mohawk/`)
 
 - **Déblocage** : le `AudioContext` est créé au premier `unlock()` (à appeler depuis un geste). Avant, `now()` vaut 0 et rien ne sort ; le MIDI n'est pas initialisé. `suspend()` / `resume()` (onglet masqué) suspendent le contexte : l'horloge `now()` s'arrête avec lui, la musique et les repères restent cohérents. Les transitions `suspend` / `resume` sont chaînées (le dernier appel gagne), comme dans le Téléportaschtroumpf.
 - **Son coupé** : gain maître à 0 pour les WAVE et le MIDI ; la lecture continue (le moteur suit les repères et les fins de sons à l'identique).
@@ -85,10 +85,10 @@ Le `MidiPlayer` appartient au `SoundService` (`engine/sound.ts`), et aucune scè
 
 Source : *GeneralUser GS* v2.0.3 de S. Christian Collins (`archives/mathemagique/soundfont/GeneralUser-GS.sf2`, 30,8 Mo, non versionnée), choisie pour sa licence et sa couverture GM complète (décision du [plan](plan.md)).
 
-`npx vite-node scripts/mathemagique/soundfont.mts [source.sf2]` :
+`npx vite-node scripts/mathemagique/soundfont.mts [source.sf2]` (collecte les MIDI de Mathémagique, puis la réduction elle-même est dans `scripts/lib/soundfont.mts`, réutilisable par un autre jeu) :
 
 1. lit les 66 MIDI de tous les `original/mathemagique/*.DAT` ;
-2. `collectPrograms` (`programs.ts`) dresse l'inventaire des timbres réellement joués : 31 470 Note On, 399 pitch bends, **80 timbres mélodiques**, **5 kits de batterie** (canal 10, le programme choisit le kit), **41 touches de batterie** ; les 45 morceaux du Rhythm Shop retrouvent les totaux documentés (15 931 notes, 367 pitch bends) ;
+2. `collectPrograms` (`src/engine/mohawk/audio/programs.ts`) dresse l'inventaire des timbres réellement joués : 31 470 Note On, 399 pitch bends, **80 timbres mélodiques**, **5 kits de batterie** (canal 10, le programme choisit le kit), **41 touches de batterie** ; les 45 morceaux du Rhythm Shop retrouvent les totaux documentés (15 931 notes, 367 pitch bends) ;
 3. `BasicMIDI.getUsedProgramsAndKeys` (spessasynth_core) donne pour chaque morceau les presets et les couples touche / vélocité utilisés ; fusion sur les 66 MIDI ; `BasicSoundBank.trim` retire presets, instruments et échantillons inutiles ;
 4. écriture en SF2 (`writeSF2`) : `original/mathemagique/mathemagique-gm.sf2`, plus `mathemagique-gm-LICENSE.txt` (copie de `LICENSE.txt`) et `files.json` régénéré (`scripts/manifest.py`).
 

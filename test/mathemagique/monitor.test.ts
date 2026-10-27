@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MohawkArchive } from "../../src/games/mathemagique/data/mohawk";
+import { MohawkArchive } from "../../src/data/mohawk/mohawk";
 import { Engine } from "../../src/games/mathemagique/engine/engine";
 import type { GadgetGroup } from "../../src/games/mathemagique/engine/gadgets";
 import { parseFon, type FonFont } from "../../src/games/mathemagique/engine/graphics/fon";

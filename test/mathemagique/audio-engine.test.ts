@@ -3,14 +3,14 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SoundBankLoader } from "spessasynth_core";
 import { SoundPrefs, soundPrefKey } from "../../src/ui/sound-prefs";
-import { parseMidi } from "../../src/games/mathemagique/data/midi";
-import { MohawkArchive, TAG_SND } from "../../src/games/mathemagique/data/mohawk";
-import { loadPcm, pcmFromWave } from "../../src/games/mathemagique/audio/pcm";
-import { collectPrograms, presetKey } from "../../src/games/mathemagique/audio/programs";
+import { parseMidi } from "../../src/data/mohawk/midi";
+import { MohawkArchive, TAG_SND } from "../../src/data/mohawk/mohawk";
+import { loadPcm, pcmFromWave } from "../../src/engine/mohawk/audio/pcm";
+import { collectPrograms, presetKey } from "../../src/engine/mohawk/audio/programs";
 import { rhythmRewrite } from "../../src/games/mathemagique/audio/rhythm-rewrite";
-import { MidiPlayer, parsePrograms, parseSysx, type PlayOptions } from "../../src/games/mathemagique/audio/sequencer";
-import type { MidiSink } from "../../src/games/mathemagique/audio/sink";
-import { type Song, bpmOf, isNoteOn, parseSong } from "../../src/games/mathemagique/audio/smf";
+import { MidiPlayer, parsePrograms, parseSysx, type PlayOptions } from "../../src/engine/mohawk/audio/sequencer";
+import type { MidiSink } from "../../src/engine/mohawk/audio/sink";
+import { type Song, bpmOf, isNoteOn, parseSong } from "../../src/engine/mohawk/audio/smf";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 
 // --- Données synthétiques ------------------------------------------------------------------------------------------

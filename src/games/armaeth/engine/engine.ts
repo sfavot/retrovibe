@@ -1422,6 +1422,7 @@ export class ArmaethEngine implements TokenHostEngine {
       rooms: {
         want: (room: GameRoom) => void (engine.state!.wantedRoom = room),
         exit: (obj: GameObject) => engine.exitObject(obj),
+        walkToExit: (obj: GameObject, roomId: number, respectBarriers: boolean) => engine.walkToExit(obj, roomId, respectBarriers),
         limits: () => engine.terrain?.limits ?? null,
         planes: () => engine.terrain?.planes ?? 1,
         refreshPlanes: () => engine.refreshPlanes(),

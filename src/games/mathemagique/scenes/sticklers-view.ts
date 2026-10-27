@@ -2,8 +2,8 @@
  * Super Sticklers : constantes d'écran et aides pures de la scène (`docs/mathemagique/screens/sticklers.md` §1.6, §2.3, §3).
  * Rien ici ne touche au moteur : géométrie, palette partielle, test de prise au pixel avec hystérésis, rectangles à redessiner.
  */
-import type { Shape } from "../data/shap";
-import type { ShapeList } from "../data/shpl";
+import type { Shape } from "../../../data/mohawk/shap";
+import type { ShapeList } from "../../../data/mohawk/shpl";
 import { hitTestShape } from "../engine/graphics/blit";
 import type { Rect } from "../engine/graphics/surface";
 import { rectFromEdges } from "../engine/gadgets";

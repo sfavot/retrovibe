@@ -6,7 +6,7 @@
  * Machine à états (aucune boucle bloquante) : `logo` → `logoOut` → `intro` → `title` → `door` → `leaving`. Les fondus sont ceux du palette
  * (30 ticks) ; l'ouverture de la porte (`SCR` 10000) est une lecture bloquante non interruptible.
  */
-import { loadPcm } from "../audio/pcm";
+import { loadPcm } from "../../../engine/mohawk/audio/pcm";
 import { TICK_MS, type Deadline } from "../engine/clock";
 import { rectFromEdges, type GadgetGroup } from "../engine/gadgets";
 import { drawShape } from "../engine/graphics/blit";

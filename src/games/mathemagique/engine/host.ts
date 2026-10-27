@@ -1,5 +1,5 @@
 import type { BaseHost } from "../../../engine/host";
-import type { AudioSink } from "../audio/sink";
+import type { AudioSink } from "../../../engine/mohawk/audio/sink";
 import type { Frame } from "./graphics/frame";
 import type { Input } from "./input";
 

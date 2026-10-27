@@ -12,22 +12,22 @@ import {
   MohawkArchive,
   TAG_SHAP,
   TAG_SHPL,
-} from "../../src/games/mathemagique/data/mohawk";
+} from "../../src/data/mohawk/mohawk";
 import {
   applyShpl,
   createPalette,
   type Palette,
 } from "../../src/games/mathemagique/data/palette";
-import { decodeShap, type Shape } from "../../src/games/mathemagique/data/shap";
-import { decodeTbmp } from "../../src/games/mathemagique/data/tbmp";
-import { parseTpal } from "../../src/games/mathemagique/data/tpal";
-import { parseShpl } from "../../src/games/mathemagique/data/shpl";
+import { decodeShap, type Shape } from "../../src/data/mohawk/shap";
+import { decodeTbmp } from "../../src/data/mohawk/tbmp";
+import { parseTpal } from "../../src/data/mohawk/tpal";
+import { parseShpl } from "../../src/data/mohawk/shpl";
 import {
   parseScr,
   resolveScrResources,
   type ScrScript,
 } from "../../src/games/mathemagique/data/scr";
-import { TAG_SCR, TAG_SNDL } from "../../src/games/mathemagique/data/mohawk";
+import { TAG_SCR, TAG_SNDL } from "../../src/data/mohawk/mohawk";
 import { encodePng } from "../lib/png.mjs";
 
 const original = resolve(import.meta.dirname, "../../original/mathemagique");

@@ -6,10 +6,10 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
-import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/games/mathemagique/data/mohawk";
+import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/data/mohawk/mohawk";
 import { applyShpl, createPalette } from "../../src/games/mathemagique/data/palette";
-import { decodeShap } from "../../src/games/mathemagique/data/shap";
-import { parseShpl } from "../../src/games/mathemagique/data/shpl";
+import { decodeShap } from "../../src/data/mohawk/shap";
+import { parseShpl } from "../../src/data/mohawk/shpl";
 
 const root = resolve(import.meta.dirname, "../..");
 const dir = resolve(root, "original/mathemagique");

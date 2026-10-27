@@ -2,7 +2,7 @@
  * Données du Rhythm Shop (rhythm.md §2) : `STLV` (couples morceau MIDI ↔ `PLST`), `PLST` (motif cible, variantes, outils) et liste des 45 morceaux
  * (noms de `STRL` 30001). Pur : les parseurs prennent des octets, les chargeurs un `RawArchive` (l'`Archive` du moteur convient).
  */
-import { parseStrl } from "../../data/strl";
+import { parseStrl } from "../../../../data/mohawk/strl";
 import { MEASURE, SLOT_COUNT, TOOL_BUTTONS, type Tool } from "./pieces";
 
 export const TAG_STLV = "STLV";

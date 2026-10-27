@@ -8,8 +8,8 @@
  * n'est vide, `1028:079b`).
  */
 import { rhythmRewrite } from "../../audio/rhythm-rewrite";
-import { type PlayOptions, type ProgramEntry } from "../../audio/sequencer";
-import { type MarkerEvent, type Song, bpmOf, initialMicrosPerQuarter } from "../../audio/smf";
+import { type PlayOptions, type ProgramEntry } from "../../../../engine/mohawk/audio/sequencer";
+import { type MarkerEvent, type Song, bpmOf, initialMicrosPerQuarter } from "../../../../engine/mohawk/audio/smf";
 import { type PlaySongOptions } from "../../engine/sound";
 import { MEASURE } from "./pieces";
 import { filledSlots, isPatternComplete } from "./logic";

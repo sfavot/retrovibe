@@ -261,7 +261,7 @@ function magpieDecide(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): numbe
     if (o.num === NUM.nest) {
       // le nid : si elle fuit, s'il fait sombre, ou 1 fois sur 4 (`rand() % 4`) au repos
       if (obj.ego === 3 || ctx.state.darkRoom || (obj.ego === 0 && ctx.rng.mod(4) === 0)) {
-        if (kit.approach(ctx, obj, o)) return endTic(obj);
+        if (kit.approach(ctx, obj, o, true)) return endTic(obj); // `2774:02c0` : `AX = 7`, poursuite
       }
     } else if (o.num === NUM.goldKey) {
       if (kit.fetch(ctx, obj, o)) return endTic(obj);

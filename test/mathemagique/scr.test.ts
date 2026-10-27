@@ -4,14 +4,14 @@ import {
   TAG_SCR,
   TAG_SHPL,
   TAG_SNDL,
-} from "../../src/games/mathemagique/data/mohawk";
+} from "../../src/data/mohawk/mohawk";
 import {
   parseScr,
   resolveScrResources,
   SCR_OFFSCREEN,
 } from "../../src/games/mathemagique/data/scr";
-import { parseShpl } from "../../src/games/mathemagique/data/shpl";
-import { parseSndl } from "../../src/games/mathemagique/data/sndl";
+import { parseShpl } from "../../src/data/mohawk/shpl";
+import { parseSndl } from "../../src/data/mohawk/sndl";
 import { archivePaths, hasOriginalFiles, readOriginal } from "./helpers";
 
 /** Zone (haut 10, gauche 20, bas 30, droite 40) puis `ops`, en petit-boutiste. */

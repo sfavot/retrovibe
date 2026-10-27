@@ -25,7 +25,7 @@ Le moteur ne touche ni au DOM, ni à `fetch`, ni à `Date`, ni à `localStorage`
 
 - `loadFile(path)` : chemin relatif à `original/mathemagique/` (`BOWLING.DAT`, `MPC/PVG.MHK`), résolution insensible à la casse par `GameFiles.resolve` (l'EXE demande `nim.DAT`, `PatFill.DAT`, `milkyway.dat`). Rejette si le fichier manque.
 - `now()` (ms monotones), `unixMillis()` (horloge murale, graine du hasard).
-- `input` (un objet `Input` que l'hôte alimente), `audio` (`AudioSink`, `audio/sink.ts`), `storage`.
+- `input` (un objet `Input` que l'hôte alimente), `audio` (`AudioSink`, `src/engine/mohawk/audio/sink.ts`), `storage`.
 - `present(frame)` (`Frame` de `graphics/frame.ts`, tampons réutilisés : copier pour garder), `setCursor(kind)` (`arrow`, `busy`, `help`, `hidden`), `exit()`.
 
 ## Temps : tick de 17 ms
@@ -177,7 +177,7 @@ Contrat des scènes : dans `enter`, `services.useArchive(archive)` (formes et so
 
 - `playSound(archive, id, options)` joue un `\0SND` **sans en connaître le type** (WAVE ou MIDI, détecté à l'en-tête, comme `1088:1498`) ; `playWave` / `playMusic` si on le sait. Retourne un `SoundHandle` (ou `null` si un son `ambient` est demandé alors que « Ambient Sounds » est coupé).
 - Canaux : `effect` (plusieurs en parallèle) et `voice` (une seule, la nouvelle remplace l'ancienne : Poly, Gus). `stopVoice`, `stopAll` (WAVE), `stopMusic`, `stopAmbient` (coupe ce qui est marqué `ambient` quand la préférence est décochée), `isPlaying(handle)`, `anyPlaying`, `voicePlaying`, `musicPlaying`, `releaseAll`.
-- `preload(archive, ids)` / `preloadSndl(archive, sndlId)` convertissent les WAVE à l'avance (cache par archive de `pcm.ts`) et rendent un `PreloadSet` à `release()` ; les MIDI et les ids absents sont ignorés.
+- `preload(archive, ids)` / `preloadSndl(archive, sndlId)` convertissent les WAVE à l'avance (cache par archive de `src/engine/mohawk/audio/pcm.ts`) et rendent un `PreloadSet` à `release()` ; les MIDI et les ids absents sont ignorés.
 - MIDI : une musique à la fois, `loop` entre `setup end` / `loop start` et `loop end` ; `loadMidiMap(archive)` lit `SYSX` 1 de `MIDIMAP.DAT` (G2 l'appelle une fois, l'archive est à ouvrir). `tick()` avance le séquenceur (fait par `installServices`).
 - « Ambient Sounds » : la préférence du roster (`roster.ambient`) est relue à chaque demande ; l'option `ambient: true` d'un son ou d'une musique de fond (MIDI 100, 2000–2003, 201, MIDI 65000 du hub, bavardages) le soumet à cette préférence.
 

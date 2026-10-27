@@ -8,7 +8,7 @@
  * Couleurs système : index 0 noir et 255 blanc (hypothèse `SYSPAL_NOSTATIC`, voir `data/palette.ts`), les autres à 0 tant qu'un SHPL ne les définit pas.
  */
 import { applyShpl, createPalette, PALETTE_SIZE } from "../../data/palette";
-import type { ShapeList } from "../../data/shpl";
+import type { ShapeList } from "../../../../data/mohawk/shpl";
 
 export const PALETTE_BYTES = PALETTE_SIZE * 3;
 

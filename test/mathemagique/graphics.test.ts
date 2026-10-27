@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/games/mathemagique/data/mohawk";
+import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/data/mohawk/mohawk";
 import { applyShpl, brighten, createPalette } from "../../src/games/mathemagique/data/palette";
-import { decodeShap, type Shape } from "../../src/games/mathemagique/data/shap";
-import { parseShpl, type ShapeList } from "../../src/games/mathemagique/data/shpl";
+import { decodeShap, type Shape } from "../../src/data/mohawk/shap";
+import { parseShpl, type ShapeList } from "../../src/data/mohawk/shpl";
 import { drawMask, drawShape, hitTestShape } from "../../src/games/mathemagique/engine/graphics/blit";
 import { parseFon } from "../../src/games/mathemagique/engine/graphics/fon";
 import { Palette } from "../../src/games/mathemagique/engine/graphics/palette";

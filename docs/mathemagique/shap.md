@@ -1,6 +1,6 @@
 # Images `SHAP`, formes et palettes `SHPL` (Math Workshop)
 
-Lecteurs : `src/games/mathemagique/data/{shap,shpl,palette,tbmp,tpal}.ts`, tests : `test/mathemagique/images.test.ts`, rendu de contrôle : `scripts/mathemagique/render-samples.mts`. Adresses `sélecteur:offset` de la décompilation de `MATH` (voir [re-index.md](re-index.md)). « Hypothèse » marque ce qui n'est pas prouvé par le code de `MATH`.
+Lecteurs : `src/data/mohawk/{shap,shpl,tbmp,tpal}.ts` et `src/games/mathemagique/data/palette.ts`, tests : `test/mathemagique/images.test.ts`, rendu de contrôle : `scripts/mathemagique/render-samples.mts`. Adresses `sélecteur:offset` de la décompilation de `MATH` (voir [re-index.md](re-index.md)). « Hypothèse » marque ce qui n'est pas prouvé par le code de `MATH`.
 
 Résultat : les **16 258** `SHAP` des 18 `.DAT` se décodent sans erreur ; les 844 `SHPL` se lisent ; les écrans rendus (titre, hall, logo, photos) ont les bonnes couleurs et aucun cisaillement.
 

@@ -1,0 +1,312 @@
+/**
+ * `AudioSink` pour le navigateur (partagé par Mathémagique et Zoombinis) : Web Audio pour les WAVE, `spessasynth_lib` (soundfont General MIDI) pour le MIDI.
+ *
+ * - Le contexte n'est créé qu'au premier `unlock()` (geste de l'utilisateur). Avant, `now()` vaut 0 et rien ne sort.
+ * - WAVE : un `AudioBufferSourceNode` par voix (plusieurs en même temps, boucle, détection de fin par `onended`).
+ * - MIDI : le synthétiseur (`WorkletSynthesizer`) est créé quand `unlock()` a eu lieu **et** que `startMidiLoading()` a été demandé
+ *   (l'app attend la première image pour ne pas concurrencer le chargement du jeu) ; la soundfont réduite (18 Mo) se charge en tâche
+ *   de fond (`scripts/lib/soundfont.mts`). Tant qu'il n'est pas prêt, les messages MIDI sont ignorés sans erreur ;
+ *   `onReady` signale le moment où il le devient.
+ * - `close()` libère tout (voix, synthétiseur, contexte) quand la page est quittée.
+ * - Les messages MIDI datés partent vers le worklet au plus `FLUSH_WINDOW_MS` avant leur heure : le worklet ne sait pas
+ *   annuler un message planifié, alors que `reset()` doit pouvoir couper net ce que le séquenceur a planifié d'avance. Les note-on
+ *   déjà partis mais pas encore joués reçoivent de `reset()` un note-off à la même heure : sinon la note démarre après la coupure et
+ *   reste tenue sans fin.
+ * - Muet = gain maître à 0 (WAVE et MIDI) ; la lecture continue, comme le moteur l'attend.
+ */
+import { WorkletSynthesizer } from "spessasynth_lib";
+// Le processeur du worklet est un fichier à part : `?url` le fait copier par Vite dans les assets (chemin relatif à `base`).
+import processorUrl from "spessasynth_lib/dist/spessasynth_processor.min.js?url";
+import { createMonoBuffer } from "../../audio/pcm";
+import type { AudioSink, MidiSink, PcmSound, WaveHandle } from "../../engine/mohawk/audio/sink";
+
+/** Soundfont réduite, servie par `publicDir` (`original/mathemagique/`). */
+export const SOUNDFONT_URL = `${import.meta.env.BASE_URL}mathemagique/mathemagique-gm.sf2`;
+
+/** Au plus cette avance (ms) entre l'envoi au worklet et l'heure d'un message. */
+const FLUSH_WINDOW_MS = 30;
+const FLUSH_INTERVAL_MS = 8;
+
+export interface WebAudioSinkOptions {
+  soundfontUrl?: string;
+  /** Crée le contexte audio (par défaut `new AudioContext()`), pour les essais. */
+  createContext?: () => AudioContext;
+}
+
+interface QueuedMessage {
+  at: number;
+  message: Uint8Array;
+}
+
+export class WebAudioSink implements AudioSink {
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private muted = false;
+  private suspended = false;
+  private resuming = 0;
+  private transition: Promise<unknown> = Promise.resolve();
+  private transitions = 0;
+
+  private nextHandle = 1;
+  private readonly voices = new Map<WaveHandle, AudioBufferSourceNode>();
+  private readonly buffers = new WeakMap<PcmSound, AudioBuffer>();
+
+  private synth: WorkletSynthesizer | null = null;
+  private midiReady = false;
+  private midiStarted = false;
+  private midiWanted = false;
+  private closed = false;
+  private readonly readyListeners = new Set<() => void>();
+  private queue: QueuedMessage[] = [];
+  /** Note-on confiés au worklet avec une heure encore à venir (le worklet les jouera même après `reset()`). */
+  private posted: QueuedMessage[] = [];
+  private flushTimer: ReturnType<typeof setInterval> | undefined;
+
+  readonly midi: MidiSink = {
+    send: (message, atMs) => this.sendMidi(message, atMs),
+    reset: () => this.resetMidi(),
+  };
+
+  constructor(private readonly options: WebAudioSinkOptions = {}) {}
+
+  unlock(): void {
+    if (this.closed) return;
+    if (!this.ctx) {
+      this.ctx = this.options.createContext?.() ?? new AudioContext();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.muted ? 0 : 1;
+      this.master.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === "suspended" && !this.suspended) this.startResume(this.ctx);
+    this.tryStartMidi();
+  }
+
+  /**
+   * Demande le chargement du synthétiseur et de la soundfont. Sans effet répété ; si le son n'est pas encore débloqué, le chargement
+   * démarre à l'`unlock()`.
+   */
+  startMidiLoading(): void {
+    this.midiWanted = true;
+    this.tryStartMidi();
+  }
+
+  /** Le synthétiseur est chargé : les messages MIDI sont joués. */
+  get ready(): boolean {
+    return this.midiReady;
+  }
+
+  /**
+   * `listener` est appelé une fois, quand le synthétiseur devient prêt (tout de suite s'il l'est déjà). Ne l'est jamais en cas d'échec
+   * du chargement. Renvoie la fonction qui retire l'écouteur.
+   */
+  onReady(listener: () => void): () => void {
+    if (this.midiReady) {
+      listener();
+      return () => {};
+    }
+    this.readyListeners.add(listener);
+    return () => this.readyListeners.delete(listener);
+  }
+
+  private tryStartMidi(): void {
+    if (this.closed || !this.midiWanted || this.midiStarted || !this.ctx || !this.master) return;
+    this.midiStarted = true;
+    void this.startMidi(this.ctx, this.master);
+  }
+
+  now(): number {
+    return (this.ctx?.currentTime ?? 0) * 1000;
+  }
+
+  // --- WAVE ---------------------------------------------------------------------------------------------------
+
+  playWave(sound: PcmSound, loop: boolean): WaveHandle {
+    const handle = this.nextHandle++;
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== "running" || !this.master || sound.samples.length === 0) return handle;
+    const source = ctx.createBufferSource();
+    source.buffer = this.bufferOf(ctx, sound);
+    source.loop = loop;
+    source.connect(this.master);
+    source.onended = () => {
+      if (this.voices.get(handle) === source) this.voices.delete(handle);
+    };
+    this.voices.set(handle, source);
+    source.start();
+    return handle;
+  }
+
+  stopWave(handle: WaveHandle): void {
+    const source = this.voices.get(handle);
+    if (!source) return;
+    this.voices.delete(handle);
+    source.onended = null;
+    try {
+      source.stop();
+    } catch {
+      // déjà arrêté
+    }
+  }
+
+  isWavePlaying(handle: WaveHandle): boolean {
+    return this.voices.has(handle) && this.live;
+  }
+
+  private bufferOf(ctx: AudioContext, sound: PcmSound): AudioBuffer {
+    let buffer = this.buffers.get(sound);
+    if (!buffer) {
+      buffer = createMonoBuffer(ctx, sound.samples, sound.sampleRate);
+      this.buffers.set(sound, buffer);
+    }
+    return buffer;
+  }
+
+  /** Sortie utilisable : contexte démarré, ou figé / en reprise (les voix y sont seulement en pause). */
+  private get live(): boolean {
+    return this.ctx?.state === "running" || ((this.suspended || this.resuming > 0) && this.ctx !== null);
+  }
+
+  // --- MIDI ---------------------------------------------------------------------------------------------------
+
+  private async startMidi(ctx: AudioContext, output: AudioNode): Promise<void> {
+    try {
+      await ctx.audioWorklet.addModule(processorUrl);
+      if (this.closed) return;
+      const synth = new WorkletSynthesizer(ctx);
+      try {
+        synth.connect(output);
+        const response = await fetch(this.options.soundfontUrl ?? SOUNDFONT_URL);
+        if (!response.ok) throw new Error(`soundfont : HTTP ${response.status}`);
+        const bank = await response.arrayBuffer();
+        if (this.closed) throw new Error("fermé");
+        await synth.soundBankManager.addSoundBank(bank, "main");
+        await synth.isReady;
+        if (this.closed) throw new Error("fermé");
+      } catch (error) {
+        synth.destroy();
+        throw error;
+      }
+      this.synth = synth;
+      this.midiReady = true;
+      const listeners = [...this.readyListeners];
+      this.readyListeners.clear();
+      for (const listener of listeners) listener();
+    } catch (error) {
+      // Le jeu reste jouable sans musique MIDI (et rien à signaler si la page a été quittée pendant le chargement).
+      if (!this.closed) console.warn("Mathémagique : synthétiseur MIDI indisponible", error);
+    }
+  }
+
+  private sendMidi(message: Uint8Array, atMs?: number): void {
+    if (!this.midiReady || !this.synth) return;
+    if (atMs === undefined || atMs - this.now() <= FLUSH_WINDOW_MS) {
+      this.post(message, atMs);
+      return;
+    }
+    this.queue.push({ at: atMs, message });
+    this.queue.sort((a, b) => a.at - b.at);
+    this.flushTimer ??= setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
+  }
+
+  private post(message: Uint8Array, atMs?: number): void {
+    this.synth?.sendMessage(message, 0, atMs === undefined ? undefined : { time: atMs / 1000 });
+    if (atMs === undefined || (message[0] & 0xf0) !== 0x90 || message[2] === 0) return;
+    const now = this.now();
+    this.posted = this.posted.filter((m) => m.at > now);
+    if (atMs > now) this.posted.push({ at: atMs, message });
+  }
+
+  private flush(): void {
+    const limit = this.now() + FLUSH_WINDOW_MS;
+    while (this.queue.length > 0 && this.queue[0].at <= limit) {
+      const { at, message } = this.queue.shift()!;
+      this.post(message, at);
+    }
+    if (this.queue.length === 0 && this.flushTimer !== undefined) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = undefined;
+    }
+  }
+
+  private resetMidi(): void {
+    this.queue = [];
+    if (this.flushTimer !== undefined) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = undefined;
+    }
+    const synth = this.synth;
+    const posted = this.posted;
+    this.posted = [];
+    if (!this.midiReady || !synth) return;
+    synth.stopAll(true);
+    // Le worklet garde ses messages datés : chaque note-on encore à venir reçoit son note-off à la même heure (traité juste après lui).
+    const now = this.now();
+    for (const { at, message } of posted) {
+      if (at > now) this.post(Uint8Array.of(0x80 | (message[0] & 0x0f), message[1], 0), at);
+    }
+    for (let channel = 0; channel < 16; channel++) {
+      this.post(Uint8Array.of(0xb0 | channel, 123, 0)); // toutes les notes coupées
+      this.post(Uint8Array.of(0xb0 | channel, 121, 0)); // contrôleurs remis à zéro
+    }
+  }
+
+  // --- Préférence « Son » et cycle de vie ------------------------------------------------------------------------
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (this.master) this.master.gain.value = muted ? 0 : 1;
+  }
+
+  suspend(): void {
+    this.suspended = true;
+    const ctx = this.ctx;
+    if (!ctx) return;
+    void this.enqueue(() => (ctx.state === "running" ? ctx.suspend() : undefined));
+  }
+
+  resume(): void {
+    this.suspended = false;
+    if (this.ctx) this.startResume(this.ctx);
+  }
+
+  /** Exécute `op` tout de suite si aucune transition n'est en cours, sinon à la suite : le dernier appel gagne. */
+  /**
+   * Libère toute la sortie (page quittée) : voix WAVE arrêtées, MIDI coupé, synthétiseur détruit, contexte fermé. Définitif et
+   * idempotent ; `unlock()` ne fait plus rien ensuite.
+   */
+  close(): void {
+    if (this.closed) return;
+    this.resetMidi();
+    this.closed = true;
+    this.readyListeners.clear();
+    for (const handle of [...this.voices.keys()]) this.stopWave(handle);
+    const { synth, ctx } = this;
+    this.synth = null;
+    this.midiReady = false;
+    this.master = null;
+    this.ctx = null;
+    try {
+      synth?.destroy();
+    } catch {
+      // déjà libéré
+    }
+    // Derrière les transitions suspend / resume en cours : fermer un contexte en pleine transition lèverait.
+    if (ctx) void this.enqueue(() => (ctx.state === "closed" ? undefined : ctx.close()));
+  }
+
+  private enqueue(op: () => Promise<void> | undefined): Promise<unknown> {
+    const run = (): Promise<unknown> => Promise.resolve(op()).catch(() => undefined);
+    this.transitions++;
+    this.transition = (this.transitions === 1 ? run() : this.transition.then(run)).finally(() => {
+      this.transitions--;
+    });
+    return this.transition;
+  }
+
+  private startResume(ctx: AudioContext): void {
+    this.resuming++;
+    void this.enqueue(() => ctx.resume()).finally(() => {
+      this.resuming--;
+    });
+  }
+}

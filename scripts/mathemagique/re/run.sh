@@ -22,7 +22,7 @@ re_setup_tools
 
 # --- Exports NE et ressources (Python, avant Ghidra : les exports nomment les imports) -----------
 mkdir -p "$RE_OUT"
-python3 -I "$SCRIPTS/ne_dump.py" "$CD" "$RE_OUT" $PROGRAMS
+python3 -I "$ROOT/scripts/re/ne_dump.py" "$CD" "$RE_OUT" $PROGRAMS
 
 # --- Import + analyse + exports, un programme à la fois dans le même projet ----------------------
 # Le loader et le processeur sont détectés par Ghidra (NE) ; sorties dans $RE_OUT/<programme>/ (RE_PROG).
@@ -31,6 +31,12 @@ export RE_LOG_APPEND=1
 START=$(date +%s)
 for p in $PROGRAMS; do
   export RE_PROG="${p%.*}"
+  # Table des scènes de MATH (docs/mathemagique/engine.md §1.4), amorcée et nommée par SeedFunctions.java.
+  if [ "$RE_PROG" = MATH ]; then
+    export RE_SCENE_TABLE=1108:1b22 RE_SCENE_NAMES=hub,bowling,rhythm,patwin,hidden,patterns,sticklers,rockets,title,credits,trophy
+  else
+    unset RE_SCENE_TABLE RE_SCENE_NAMES
+  fi
   echo "== $p =="
   re_run_headless "$CD/$p" "" "" \
     SeedFunctions.java \

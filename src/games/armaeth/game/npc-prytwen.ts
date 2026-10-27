@@ -88,7 +88,7 @@ function prytwenContact(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): boo
       else if (other.ego !== 2) return true;
       if (kit.steal(ctx, obj, other) === 0) return true;
       kit.sayHere(ctx, obj, "G", 0);
-      kit.leaveRoom(ctx, obj, -1, true);
+      kit.leaveRoom(ctx, obj);
       break;
     case NUM.treasureChest: {
       // il y range son butin (sauf la clef de bronze) ; verrouillé, il lui faut la clef
@@ -128,7 +128,7 @@ function resolveDuel(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): void {
     kit.setState(ctx, obj, { gst: 7, mob: 2, ego: 0, fig: 0 });
     const remains = kit.replaceWithRemains(ctx, hero, 0, { cls: "G", number: 101 });
     if (remains) kit.steal(ctx, obj, remains);
-    kit.leaveRoom(ctx, obj, -1, true);
+    kit.leaveRoom(ctx, obj);
   } else if (d === 1) {
     kit.setState(ctx, obj, { gst: 0, mob: 1, ego: 2, fig: 1 });
     ctx.events.operate(target(obj), PRYTWEN_EVENT.wake, EventOp.Set, KO_TICKS, NUM.prytwen);
@@ -176,7 +176,7 @@ export function prytwen(kit: NpcKit): BehaviorHandler {
             kit.startAnimation(ctx, hero, { id: ANM_HERO_KO, ego: 6 });
             kit.steal(ctx, obj, hero);
           }
-          kit.leaveRoom(ctx, obj, -1, true);
+          kit.leaveRoom(ctx, obj);
           return endTic(obj);
         }
         break;
@@ -194,7 +194,7 @@ export function prytwen(kit: NpcKit): BehaviorHandler {
         return RESTART;
       }
       case 4:
-        if (kit.leaveRoom(ctx, obj, -1, true)) return endTic(obj);
+        if (kit.leaveRoom(ctx, obj)) return endTic(obj);
         obj.path.defined = false;
         kit.wander(ctx, obj);
         return endTic(obj);
@@ -219,7 +219,7 @@ function decide(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): number {
   const treasures = obj.contents.filter((o) => o.value >= 10).length;
   const hasKey = obj.contents.some((o) => o.num === NUM.bronzeKey);
   // butin et clef en poche hors de sa tanière : il rentre (`228e`)
-  if (treasures > 0 && hasKey && !inLair && kit.leaveRoom(ctx, obj, -1, true)) return endTic(obj);
+  if (treasures > 0 && hasKey && !inLair && kit.leaveRoom(ctx, obj)) return endTic(obj);
   const followedNum = ctx.state.findBySerial(word(obj, OFF.followed))?.num ?? 0;
   const tossUp = kit.chance(ctx, 2);
   for (const o of room?.listA ?? []) {
@@ -240,23 +240,25 @@ function decide(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): number {
         if (o.ego !== 0 && o.ego !== 2 && o.ego !== 4) break;
         if (inLair) {
           if (kit.approach(ctx, obj, o, true)) return approached(kit, ctx, obj, 0);
-        } else if (o.ego === 0 && kit.leaveRoom(ctx, obj, -1, true)) {
+        } else if (o.ego === 0 && kit.leaveRoom(ctx, obj)) {
           kit.sayHere(ctx, obj, "G", 0);
           return endTic(obj);
         }
         break;
       case NUM.sarhul:
       case NUM.minas:
-        if (kit.leaveRoom(ctx, obj, -1, true)) {
+        if (kit.leaveRoom(ctx, obj)) {
           kit.sayHere(ctx, obj, "G", 0);
           return endTic(obj);
         }
         break;
       case NUM.oakChest:
-        if (tossUp && o.num !== followedNum && kit.approach(ctx, obj, o)) return endTic(obj);
+        // les approches de la décision passent par `22ef:0000` avec `AX = 7` (`28b1:04db`) : poursuite, d'où le contact à l'arrivée,
+        // y compris hors de la salle chargée
+        if (tossUp && o.num !== followedNum && kit.approach(ctx, obj, o, true)) return endTic(obj);
         break;
       case NUM.treasureChest:
-        if (treasures > 0 && kit.approach(ctx, obj, o)) return endTic(obj);
+        if (treasures > 0 && kit.approach(ctx, obj, o, true)) return endTic(obj);
         break;
       case NUM.grille: {
         // la grille de la salle 110 (`28b1:050a..0588`) : hors de la salle chargée, Prytwen se case derrière la grille fermée (`Sol 0x45`)
@@ -277,7 +279,7 @@ function decide(kit: NpcKit, ctx: BehaviorContext, obj: GameObject): number {
     }
   }
   // une fois sur 4 (`28b1:0703`) il quitte la salle, sinon il erre
-  if (!(kit.chance(ctx, 4) && kit.leaveRoom(ctx, obj, -1, true))) kit.wander(ctx, obj);
+  if (!(kit.chance(ctx, 4) && kit.leaveRoom(ctx, obj))) kit.wander(ctx, obj);
   return endTic(obj);
 }
 

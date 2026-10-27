@@ -1,6 +1,6 @@
 # Formats de données de Math Workshop (Mathémagique)
 
-Broderbund, 1994, Windows 3.x. Inventaire des fichiers : [files.md](files.md). Lecteurs : `src/games/mathemagique/data/`, tests : `test/mathemagique/` (lisent les vrais fichiers de `original/mathemagique/`, ignorés s'ils sont absents).
+Broderbund, 1994, Windows 3.x. Inventaire des fichiers : [files.md](files.md). Lecteurs : `src/data/mohawk/` (communs au moteur Mohawk) et `src/games/mathemagique/data/` (`scr.ts`, `palette.ts`, `files.ts`), tests : `test/mathemagique/` (lisent les vrais fichiers de `original/mathemagique/`, ignorés s'ils sont absents).
 
 Les fichiers de données sont des archives **Mohawk** (moteur Cyan/Broderbund, documenté par le moteur Mohawk de ScummVM). Tout y est **big-endian**, sauf indication contraire pour certaines ressources.
 

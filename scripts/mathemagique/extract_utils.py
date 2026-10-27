@@ -7,8 +7,6 @@ Sous-commandes :
   inventaire <dest> <sortie_md>
 """
 import os
-import shutil
-import struct
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'lib'))  # -I : pas de PYTHONPATH
@@ -59,27 +57,8 @@ def cmd_copier(cd, dest):
     ec.copier_filtre(cd, dest, classer)
 
 
-def mohawk(chemin):
-    """Retourne {tag: nombre de ressources} d'une archive Mohawk (MHWK/RSRC), ou None."""
-    d = open(chemin, 'rb').read()
-    if d[:4] != b'MHWK' or d[8:12] != b'RSRC':
-        return None
-    absoff, = struct.unpack('>I', d[20:24])
-    n, = struct.unpack('>H', d[absoff + 2:absoff + 4])
-    types = []
-    for i in range(n):
-        tag, rto, _ = struct.unpack('>4sHH', d[absoff + 4 + i * 8:absoff + 12 + i * 8])
-        c, = struct.unpack('>H', d[absoff + rto:absoff + rto + 2])
-        types.append((tag, c))
-    return types
-
-
 def mo(n):
     return ec.mo(n, ko=True)
-
-
-def echappe(tag):
-    return ''.join(chr(b) if 32 <= b < 127 else '\\x%02x' % b for b in tag)
 
 
 def cmd_inventaire(dest, sortie):
@@ -101,12 +80,12 @@ def cmd_inventaire(dest, sortie):
     mhk = sorted(r for r in tailles if os.path.splitext(r)[1].upper() in ('.DAT', '.MHK'))
     lignes_mhk = []
     for rel in mhk:
-        types = mohawk(os.path.join(dest, rel))
+        types = ec.mohawk_types(os.path.join(dest, rel))
         if types is None:
             lignes_mhk.append(('`%s`' % rel, mo(tailles[rel]), 'pas une archive Mohawk'))
         else:
             lignes_mhk.append(('`%s`' % rel, mo(tailles[rel]),
-                               ', '.join('`%s` : %d' % (echappe(t), c) for t, c in types)))
+                               ', '.join('`%s` : %d' % (ec.echappe_tag(t), c) for t, c in types)))
     ec.rendre_inventaire(sortie, 'Inventaire des fichiers de Math Workshop (Mathémagique)',
                          'scripts/mathemagique-extract.sh', [
         ('Taille', [

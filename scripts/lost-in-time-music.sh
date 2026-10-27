@@ -12,7 +12,8 @@ racine="$(cd "$(dirname "$0")/.." && pwd)"
 sortie="$racine/original/lost-in-time/MUSIC.mp3"
 mkdir -p "$(dirname "$sortie")"
 
-# MP3 stéréo 44,1 kHz, 128 kbps CBR ; en-tête Xing pour un seek précis.
+# MP3 joint stereo 44,1 kHz, 96 kbps CBR (≈ 36 Mo) ; en-tête Xing pour un seek précis.
+# CBR obligatoire : le jeu saute par `currentTime` et suppose secteur ↔ temps linéaire.
 # -fflags +bitexact et pas de filtre : durée conservée, sans padding ni coupe.
-ffmpeg -y -i "$1" -vn -map_metadata -1 -c:a libmp3lame -b:a 128k -ar 44100 -ac 2 \
-  -write_xing 1 -fflags +bitexact "$sortie"
+ffmpeg -y -i "$1" -vn -map_metadata -1 -c:a libmp3lame -b:a 96k -joint_stereo 1 \
+  -ar 44100 -ac 2 -write_xing 1 -fflags +bitexact "$sortie"

@@ -3,7 +3,7 @@ import type { CdBackend } from "./backend";
 import type { Mutable } from "./prefs";
 
 /**
- * Piste CD de Lost in Time : un seul fichier (MUSIC.mp3, 48 Mo) lu en flux par le lecteur partagé,
+ * Piste CD de Lost in Time : un seul fichier (MUSIC.mp3, 36 Mo) lu en flux par le lecteur partagé,
  * de `startSec` à `endSec` (arrêt automatique en fin de plage).
  */
 export class HtmlCdBackend implements CdBackend, Mutable {

@@ -1,5 +1,7 @@
 # Le Téléportaschtroumpf : plan d'implémentation
 
+**État** : jeu jouable, 20 mini-jeux portés (`src/games/teleportaschtroumpf/scenes/minigames/`). Ce document est le plan d'origine ; l'état courant est dans `engine-ts.md`.
+
 Jeu : *Les Schtroumpfs : Le Téléportaschtroumpf* (Infogrames Multimedia, 1995), version CD DOS.
 Principe du jeu : un jeu de plateau (S01) sur la carte du Pays Schtroumpf (S02). Les cases mènent à une trentaine de mini-jeux (S15 à S42).
 Toute la logique est codée en dur dans `SMURF.EXE` (16 bits, Borland C++). Il n'y a pas de scripts dans les données.
@@ -74,7 +76,7 @@ Ce document sert de brief commun aux sous-agents. Chaque tâche indique ses entr
     - Les sections `[2]` et `[3]` sont inconnues.
   - **VOC.** Creative Voice File, 8 bits ; le time constant 0xCB donne 18 868 Hz.
 - **Formats que l'EXE n'utilise pas** (à ignorer) : OPT, CC, MCC, LBM, PCM/UER (AIFF), MOL, MUK, FRM, TRP, TMP, OLD, LSR, MX, XA2, DP_PREFS.
-- **Formats utilisés mais pas encore compris** : MUT et PRC (S36, la mine), PFN (polices).
+- **Formats utilisés, compris depuis** : MUT et PRC (S36, la mine) dans `mut.md`, PFN (polices) dans `pfn.md`.
 
 ## Règles pour tous les sous-agents
 

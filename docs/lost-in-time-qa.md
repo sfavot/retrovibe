@@ -1,6 +1,12 @@
-# QA Lost in Time (passe 2, jouée avec walkthrough Sierra Help)
+# QA Lost in Time (passes 1 à 5, jouées avec walkthrough Sierra Help)
 
-**Progression atteinte** : navire complet (cale, pont, porte du marin, cinématique), arrivée au manoir (chapitre 2) : portail (batterie, pipette/acide, pomme, cheval, mot, cadenas), jardin, entrée du manoir (bûche, portrait), caveau (portrait posé, plaque 1812-1840 résolue avec 28, monte-charge arrivé, bouton « hors d'usage » comme prévu), façade nord du phare (vinaigre, fléchette sur le tonneau, tonneau en main, soupirail découvert). Arrêt volontaire là : environ un tiers du jeu, pas de blocage rencontré.
+**Synthèse (passe 5, 2026-10-24)**
+- Validé : partie complète jouée, de l'épave à l'écran de fin « La partie est terminée » ; console sans erreur ni avertissement.
+- Validé : bloquant 10 (continuité 2 -> 3) corrigé par `Game.relaunchForPart`, vérifié en jeu réel ; transition 3 -> 4 et chargements croisés OK.
+- Constats restants : 3 mineurs (11, 12, 13), 3 cosmétiques/UX (14, 15, 16), tous conformes au script ou corrigés (voir passe 5).
+- À vérifier : jokers, écoute audio réelle, minuterie exacte du pont, « Rejouer » en fin de partie, tenailles sur le râtelier (taquet), performances sur machine lente, test sur vrai téléphone.
+
+**Progression atteinte** : navire complet (cale, pont, porte du marin, cinématique), arrivée au manoir (chapitre 2) : portail (batterie, pipette/acide, pomme, cheval, mot, cadenas), jardin, entrée du manoir (bûche, portrait), caveau (portrait posé, plaque 1812-1840 résolue avec 28, monte-charge arrivé, bouton « hors d'usage » comme prévu), façade nord du phare (vinaigre, fléchette sur le tonneau, tonneau en main, soupirail découvert). Arrêt volontaire là à la passe 2 (environ un tiers du jeu, pas de blocage) ; la suite et la fin du jeu sont aux passes 3 à 5 plus bas.
 
 ## Méthode et limites de l'environnement
 - Le volet navigateur est souvent masqué ou recouvert : `requestAnimationFrame` tombe alors à ~1,5 fps, même quand `document.visibilityState` vaut « visible ». Le moteur est cadencé par rAF, donc le jeu devient ~100 fois trop lent (clics ignorés, curseur et libellés en retard, textes qui semblent bloqués). Pour jouer à vitesse normale, j'ai remplacé `window.requestAnimationFrame` par un `setTimeout(16)` dans la page (aucun fichier modifié). Les « bugs » de latence vus au début de la session venaient de cet état et ne sont pas des bugs du jeu.

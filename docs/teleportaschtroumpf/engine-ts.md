@@ -28,7 +28,7 @@ Brief pour les phases 3 (écrans) et 4 (mini-jeux). Spec de comportement : `engi
 | `scenes/game.ts`, `scenes/s01-board.ts`, `scenes/board/` | Partie (`28a3:00ad`) et plateau S01 (`291e:0401`) ; écrans empilés `s02-map.ts`, `events.ts`, `grand-schtroumpf.ts` et `minigames.ts` + `minigames/` (voir « Partie et plateau » et « Écrire un mini-jeu »). |
 | `ui/app.ts`, `ui/browser-host.ts`, `ui/dev.html`, `ui/dev.ts`, `ui/style.css` | Hôte navigateur, canvas à l'échelle entière, boucle `requestAnimationFrame`, page de dev. |
 | `scenes/save.ts` | Sauvegarde de la partie en cours (voir « Reprise d'une partie interrompue »). |
-| `index.ts` | `GameDefinition` `teleportaschtroumpf` (pas encore dans `src/games/registry.ts`). |
+| `index.ts` | `GameDefinition` `teleportaschtroumpf`. |
 
 Page de dev : `npx vite`, puis `/src/games/teleportaschtroumpf/ui/dev.html` (hors build). Les fichiers du jeu sont servis en `/teleportaschtroumpf/…` depuis `original/teleportaschtroumpf/`.
 

@@ -494,7 +494,7 @@ Tire une cible `(Xc, Yc, Pc)` : `rand() % (max - min + 40) + min - 20` pour X (`
 11. **Rythme** : durée d'un tic et donc vitesse réelle de marche (2 px par tic pour le héros) : voir `engine.md` § 3 (à valider en DOSBox).
 12. **Masque de profondeur** : l'appel du pilote (`pilote[+0x2e]`) n'est pas lu en entier ; son défaut de miroir est reproduit (§ 3.2).
 13. **Repli aléatoire du placement du héros** : compté par `heroPlacementFallbacks` dans le port ; **ne se déclenche jamais** sur les 56 salles jouables (test).
-14. **Salle 8, tas de bois** : le couloir ne laisse passer que `X` 197..199 à `P` 56 ; un `X` pair finit donc en `G44`, comme dans l'original (`characters.md` § 4.4 ; test).
+14. **Salle 8, tas de bois** : le couloir ne laisse passer que `X` 197..199 à `P` 56 ; un `X` pair s'arrête donc en haut de l'escalier, comme dans l'original (`characters.md` § 4.4 ; test) ; le port affiche alors `G44` là où l'original affiche `V008` (`dosbox.md` § 4.5, non corrigé).
 
 ## 9. Corrections à reporter
 

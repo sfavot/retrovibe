@@ -8,15 +8,15 @@
  * Les règles (collage, éparpillement, rotation) sont dans `SticklersBoard` (`game/puzzle-kit.ts`) ; la scène fait le rendu, les sons, les groupes
  * de gadgets et l'aide de Poly. Aucune copy visible : tout est dessin ou audio.
  */
-import { drawShape } from "../engine/graphics/blit";
-import { Surface, intersectRect, type Rect } from "../engine/graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import { Surface, intersectRect, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
-import type { Archive } from "../engine/resources";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
 import { ScreenTransition } from "./screen-transition";
-import type { KeyEvent } from "../engine/input";
+import type { KeyEvent } from "../../../engine/mohawk/input";
 import { PUZZLES_PER_LEVEL, parseSticklersPuzz, puzzId, rewardId, sticklersMenuShplId } from "../game/puzz";
 import { PolyHelper, createScrPolyPorts, openPolyArchive, rosterIntroFlag } from "../game/poly";
 import { POLY_ZONE, STICKLERS_POLY } from "../game/poly-config";
@@ -57,6 +57,7 @@ import {
   unionRect,
   type ButtonRole,
 } from "./sticklers-view";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 /** Photographie de l'état pour les tests et le débogage (ne sert pas à la scène). */
 export interface SticklersSnapshot {
@@ -104,8 +105,8 @@ export function createSticklersScene(services: MathServices): SticklersScene {
   let thumbsGroup!: GadgetGroup;
   let replayGroup!: GadgetGroup;
   /** Arrière-plan fixe (SHPL 104) et composition statique : fond + boutons + gabarit ou vignettes. L'écran = base + fragments / cadre de survol. */
-  const background = new Surface();
-  const base = new Surface();
+  const background = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
+  const base = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   const hysteresis = new HitHysteresis();
   let hoverThumb = -1;
   let hoverPiece: StickPiece | null = null;

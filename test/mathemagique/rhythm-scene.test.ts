@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import { SceneId, type Scene } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import { ERROR_LINES } from "../../src/games/mathemagique/game/rhythm/errors";
@@ -7,7 +7,7 @@ import { type BinId, BIN_EDGES, pieceSpan } from "../../src/games/mathemagique/g
 import { createRhythmScene, type RhythmScene } from "../../src/games/mathemagique/scenes/rhythm";
 import { ALGEBIRD_CLEAN, BUTTONS, edgesRect, toolRect } from "../../src/games/mathemagique/scenes/rhythm-view";
 import { dancePoses, planDance } from "../../src/games/mathemagique/scenes/rhythm-dance";
-import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
+import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles } from "./helpers";
 
@@ -23,7 +23,7 @@ class HubStub implements Scene {
 async function boot(options: { drag?: boolean } = {}) {
   const host = new TestHost();
   host.audio.unlock();
-  const engine = new Engine(host, { seed: 5 });
+  const engine = new MathEngine(host, { seed: 5 });
   const services = installServices(engine);
   let scene!: RhythmScene;
   engine.register(SceneId.hub, () => new HubStub(() => services));

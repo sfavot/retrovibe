@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Clock, MAX_CATCH_UP_TICKS, TICK_MS, msToTicks } from "../../src/games/mathemagique/engine/clock";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
-import type { Frame } from "../../src/games/mathemagique/engine/graphics/frame";
-import { MsvcRandom, NoRepeatPool } from "../../src/games/mathemagique/engine/rng";
+import { Clock, MAX_CATCH_UP_TICKS, TICK_MS, msToTicks } from "../../src/engine/mohawk/clock";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
+import type { Frame } from "../../src/engine/mohawk/graphics/frame";
+import { MsvcRandom, NoRepeatPool } from "../../src/engine/mohawk/rng";
 import {
   BONUS_LEVEL,
   LATIN1_NAME_RULES,
@@ -20,10 +20,11 @@ import {
   isValidPlayerName,
   type RosterFieldName,
 } from "../../src/games/mathemagique/engine/roster";
-import type { KeyEvent } from "../../src/games/mathemagique/engine/input";
+import type { KeyEvent } from "../../src/engine/mohawk/input";
 import { SCENE_NAMES, SceneId, defineService, type Scene, type SceneContext } from "../../src/games/mathemagique/engine/scene";
 import { FRAME_MS, TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles } from "./helpers";
+import { scr } from "../../src/games/mathemagique/engine/scr";
 
 /** Archive Mohawk minimale : un type `TEST` à deux ressources (ids 7 et 9). */
 function tinyArchive(): Uint8Array {
@@ -80,9 +81,9 @@ class LogScene implements Scene {
   }
 }
 
-function setup(): { host: TestHost; engine: Engine } {
+function setup(): { host: TestHost; engine: MathEngine } {
   const host = new TestHost();
-  return { host, engine: new Engine(host, { seed: 0 }) };
+  return { host, engine: new MathEngine(host, { seed: 0 }) };
 }
 
 describe("Clock", () => {
@@ -217,7 +218,7 @@ describe("SceneManager et Engine", () => {
   it("échec de load : l'ancienne scène reprend et l'erreur est remontée", async () => {
     const host = new TestHost();
     const errors: [unknown, number][] = [];
-    const engine = new Engine(host, { seed: 0, onError: (e, id) => errors.push([e, id]) });
+    const engine = new MathEngine(host, { seed: 0, onError: (e, id) => errors.push([e, id]) });
     const log: string[] = [];
     engine.register(SceneId.hub, () => new LogScene("hub", log, (ctx, n) => n === 1 && ctx.scenes.request(SceneId.hidden)));
     engine.register(SceneId.hidden, () => new LogScene("hidden", log, undefined, () => Promise.reject(new Error("boum"))));
@@ -251,7 +252,7 @@ describe("SceneManager et Engine", () => {
 
   it("présente seulement quand une scène le demande", async () => {
     const { host, engine } = setup();
-    const frame: Frame = { pixels: new Uint8Array(576 * 432), palette: new Uint8Array(768) };
+    const frame: Frame = { width: 576, height: 432, pixels: new Uint8Array(576 * 432), palette: new Uint8Array(768) };
     engine.setFrameSource(() => frame);
     engine.register(SceneId.title, () => new LogScene("t", [], (ctx, n) => n === 10 && ctx.requestPresent()));
     engine.start();
@@ -336,7 +337,7 @@ describe("SceneManager et Engine", () => {
   it("la graine par défaut vient de l'horloge murale de l'hôte", () => {
     const host = new TestHost();
     host.unix = 1_700_000_123_456;
-    const engine = new Engine(host);
+    const engine = new MathEngine(host);
     expect(engine.ctx.rng.current).toBe(1_700_000_123_456 >>> 0);
   });
 });
@@ -698,13 +699,13 @@ describe("Roster", () => {
 
   it("le contexte du moteur charge le roster enregistré et le sauvegarde", () => {
     const host = new TestHost();
-    const first = new Engine(host, { seed: 0 });
+    const first = new MathEngine(host, { seed: 0 });
     const added = first.ctx.roster.roster.addPlayer("Ana");
     expect(added.ok).toBe(true);
     first.ctx.roster.currentPlayerId = 1;
     expect(first.ctx.roster.currentPlayer?.name).toBe("Ana");
     expect(first.ctx.roster.save()).toBe(true);
-    const second = new Engine(host, { seed: 0 });
+    const second = new MathEngine(host, { seed: 0 });
     expect(second.ctx.roster.loadStatus).toBe("ok");
     expect(second.ctx.roster.roster.players().map((p) => p.name)).toEqual(["Ana"]);
   });
@@ -774,7 +775,7 @@ describe.skipIf(!hasOriginalFiles)("Resources (fichiers du jeu)", () => {
     expect(bowling.strl(5000)).toHaveLength(25);
     expect(bowling.strl(5000)[0]).toMatch(/\w/);
     const scrId = bowling.ids("\0SCR")[0]!;
-    expect(bowling.scr(scrId).frames.length).toBeGreaterThan(0);
+    expect(scr(bowling, scrId).frames.length).toBeGreaterThan(0);
     expect(() => bowling.shap(999999)).toThrow(/introuvable/);
     expect(host.loaded).toEqual(["Bowling.dat"]);
   });

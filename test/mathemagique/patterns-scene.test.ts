@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
-import { PALETTE_BYTES } from "../../src/games/mathemagique/engine/graphics/palette";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
+import { PALETTE_BYTES } from "../../src/engine/mohawk/graphics/palette";
 import type { Scene } from "../../src/games/mathemagique/engine/scene";
 import { SceneId } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import type { PlaySoundOptions } from "../../src/games/mathemagique/engine/sound";
 import { parsePatternsPuzz, patternsPuzzId, patternsRewardId } from "../../src/games/mathemagique/game/puzz";
 import { PATTERNS, THUMB_LAYOUTS, dealPatterns, patternsRect, thumbRect, type PatternsPiece } from "../../src/games/mathemagique/game/puzzle-kit";
-import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
+import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import { PatternsScene, createPatternsScene } from "../../src/games/mathemagique/scenes/patterns";
 import {
   BACKGROUND_ID,
@@ -24,7 +24,7 @@ import {
 import { FRAME_MS, TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 import { MohawkArchive } from "../../src/data/mohawk/mohawk";
-import { Archive } from "../../src/games/mathemagique/engine/resources";
+import { Archive } from "../../src/engine/mohawk/resources";
 import { parseShpl } from "../../src/data/mohawk/shpl";
 
 // =====================================================================================================================================
@@ -100,7 +100,7 @@ function buttonCenter(role: ButtonRole): [number, number] {
 
 interface Rig {
   host: TestHost;
-  engine: Engine;
+  engine: MathEngine;
   services: MathServices;
   scene: PatternsScene;
   /** Sons demandés au service sonore, dans l'ordre. */
@@ -117,7 +117,7 @@ interface Rig {
 async function boot(options: { clickAndStick?: boolean; player?: boolean } = {}): Promise<Rig> {
   const host = new TestHost();
   host.audio.unlock();
-  const engine = new Engine(host, { seed: 11 });
+  const engine = new MathEngine(host, { seed: 11 });
   const services = installServices(engine);
   if (options.clickAndStick === false) engine.ctx.roster.roster.clickAndStick = false;
   if (options.player) {
@@ -235,7 +235,7 @@ real("Puzzle Patterns : scène complète sur PATTERNS.DAT", () => {
   it("Ambient Sounds coupé : pas de musique de fond", async () => {
     const host = new TestHost();
     host.audio.unlock();
-    const engine = new Engine(host, { seed: 3 });
+    const engine = new MathEngine(host, { seed: 3 });
     const services = installServices(engine);
     engine.ctx.roster.roster.ambient = false;
     engine.register(SceneId.patterns, () => createPatternsScene(services));

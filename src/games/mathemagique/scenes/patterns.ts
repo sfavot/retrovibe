@@ -6,12 +6,12 @@
  * Dessin : le décor (fond + vignettes ou cadre-indice) est recomposé dans `decor`, `paint()` y pose le cadre de survol ou les pièces puis
  * laisse les boutons (gadgets) se redessiner par-dessus. Aucune copy : tout est image ou voix.
  */
-import { drawMask, drawShape } from "../engine/graphics/blit";
-import type { PaletteCycler } from "../engine/graphics/palette";
-import { Surface, type Rect } from "../engine/graphics/surface";
+import { drawMask, drawShape } from "../../../engine/mohawk/graphics/blit";
+import type { PaletteCycler } from "../../../engine/mohawk/graphics/palette";
+import { Surface, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { rectFromEdges, type GadgetGroup, type GadgetRecord } from "../engine/gadgets";
-import type { KeyEvent } from "../engine/input";
-import type { Archive } from "../engine/resources";
+import type { KeyEvent } from "../../../engine/mohawk/input";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
 import { SCR_FLAG } from "../engine/scr-player";
@@ -56,6 +56,7 @@ import {
   thumbShapeId,
 } from "./patterns-view";
 import { ScreenTransition } from "./screen-transition";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 /** Fondu d'entrée et de sortie (30 ticks, `1088:1b25`). */
 const FADE_TICKS = 30;
@@ -90,9 +91,9 @@ export class PatternsScene implements Scene {
   private archive!: Archive;
   private polyArchive!: Archive;
   /** Fond 103, sans bouton : sert de fond aux gadgets (`captureBackground`). */
-  private readonly base = new Surface();
+  private readonly base = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   /** Fond + vignettes du niveau, ou cadre-indice du puzzle. */
-  private readonly decor = new Surface();
+  private readonly decor = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   private session = new PuzzleSession();
   private board: PatternsBoard | null = null;
   private puzzleShpl: ShapeList | null = null;

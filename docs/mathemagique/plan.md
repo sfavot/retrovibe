@@ -14,7 +14,7 @@ Ce document sert de brief commun aux sous-agents. Les références font foi sur 
   visionneuse (`ui/asset-viewer.html`), rétro-ingénierie Ghidra, études du moteur et des 8 écrans.
 - Vague H terminée (câblage) : les écrans Hidden, Patterns, Sticklers, Rockets et Hall of Fame sont enregistrés ; le hub pose son
   moniteur (`MonitorOverlay`, touches, ticks, `monitorClosed`) ; polices en Mac Roman (`encodeText`) ; tri des joueurs sans accents ;
-  hôte navigateur : champ invisible du clavier mobile (`ui/text-input.ts`), téléchargement du certificat (`ui/certificate-download.ts`),
+  hôte navigateur : champ invisible du clavier mobile (`src/ui/mohawk/text-input.ts`), téléchargement du certificat (`ui/certificate-download.ts`),
   appui long de 500 ms = Ctrl + clic, joueurs enregistrés en quittant et à `pagehide`.
 - Vague I terminée (commits `9bc5e28`, `4005534`) : Bowling for Numbers, Rhythm Shop et Pattern Windows portés.
 

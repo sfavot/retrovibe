@@ -15,11 +15,11 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/data/mohawk/mohawk";
-import { applyShpl, createPalette, type Palette } from "../../src/games/mathemagique/data/palette";
+import { applyShpl, createPalette, type Palette } from "../../src/engine/mohawk/graphics/palette-data";
 import { decodeShap } from "../../src/data/mohawk/shap";
 import { parseShpl } from "../../src/data/mohawk/shpl";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
-import { PLAY_HEIGHT, PLAY_WIDTH, type Frame } from "../../src/games/mathemagique/engine/graphics/frame";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
+import { PLAY_HEIGHT, PLAY_WIDTH, type Frame } from "../../src/engine/mohawk/graphics/frame";
 import { SceneId } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import { THUMB_LAYOUTS, thumbRect } from "../../src/games/mathemagique/game/puzzle-kit";
@@ -104,7 +104,7 @@ class ShotHost extends TestHost {
 
 interface Game {
   host: ShotHost;
-  engine: Engine;
+  engine: MathEngine;
   services: MathServices;
   /** Scène courante, typée à la demande. */
   scene<T>(): T;
@@ -125,7 +125,7 @@ interface BootOptions {
 async function boot(options: BootOptions = {}): Promise<Game> {
   const host = new ShotHost();
   host.audio.unlock();
-  const engine = new Engine(host, { seed: 3 });
+  const engine = new MathEngine(host, { seed: 3 });
   const services = installServices(engine);
   registerScenes(engine, services);
   const { roster } = engine.ctx.roster;

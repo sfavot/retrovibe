@@ -15,11 +15,11 @@
  * Aucune copy nouvelle : le Teletune affiche les noms de `STRL` 30001 et le format d'origine `(%d) %d/%d bar(s)` ; le reste est dessin et voix.
  */
 import { parseFon, type FonFont } from "../engine/graphics/fon";
-import { drawShape } from "../engine/graphics/blit";
-import { Surface, intersectRect, type Rect } from "../engine/graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import { Surface, intersectRect, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
-import type { KeyEvent } from "../engine/input";
-import type { Archive } from "../engine/resources";
+import type { KeyEvent } from "../../../engine/mohawk/input";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type AnimationHandle, type ScrStartOptions } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices, SceneArchive } from "../engine/services";
@@ -85,6 +85,7 @@ import {
   type ButtonRole,
   type Sprite,
 } from "./rhythm-view";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 export type RhythmState = "entering" | "idle" | "animating" | "reacting" | "playing" | "finale" | "help" | "exiting";
 
@@ -202,8 +203,8 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   let state: RhythmState = "entering";
   let leaving = false;
   let exitFading = false;
-  const background = new Surface();
-  const base = new Surface();
+  const background = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
+  const base = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   let teletune: ReturnType<typeof teletuneLines> = [];
   let helpHand = false;
   let heldRect: Rect | null = null;

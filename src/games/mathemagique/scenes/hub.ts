@@ -18,18 +18,19 @@
  * Poly est un jeu de clips (`SCR` de `MAINSCRN.DAT`) : avant chaque clip, la zone sous Poly est remise à l'état « sans Poly » (rectangle
  * sauvegardé à l'entrée, `DS:0c50`) ; à la fin du clip, Poly au repos (SHAP 104) est redessinée.
  */
-import { NoRepeatPool } from "../engine/rng";
+import { NoRepeatPool } from "../../../engine/mohawk/rng";
 import { rectContains, rectFromEdges, type GadgetGroup, type GadgetRecord } from "../engine/gadgets";
-import { drawShape } from "../engine/graphics/blit";
-import type { Rect, SavedRect } from "../engine/graphics/surface";
-import type { Archive } from "../engine/resources";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import type { Rect, SavedRect } from "../../../engine/mohawk/graphics/surface";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
-import type { Deadline } from "../engine/clock";
-import type { KeyEvent } from "../engine/input";
+import type { Deadline } from "../../../engine/mohawk/clock";
+import type { KeyEvent } from "../../../engine/mohawk/input";
 import type { FonFont } from "../engine/graphics/fon";
-import { MonitorOverlay, loadMonitorFont, type MonitorMode as OverlayMode, type TextInputPort } from "./monitor";
+import { MonitorOverlay, loadMonitorFont, type MonitorMode as OverlayMode } from "./monitor";
+import type { TextInputPort } from "../../../engine/mohawk/text-input";
 import {
   createHubHelpTable,
   HUB_CHATTER_COUNT,

@@ -1,8 +1,8 @@
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
-import { hitTestShape } from "../../src/games/mathemagique/engine/graphics/blit";
-import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
+import { hitTestShape } from "../../src/engine/mohawk/graphics/blit";
+import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import { SceneId, type Scene } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import type { PlaySoundOptions } from "../../src/games/mathemagique/engine/sound";
@@ -342,7 +342,7 @@ const hubStub: Scene = { enter() {}, leave() {}, tick() {} };
 real("PTRN : géométrie des dix motifs", () => {
   it("cellules par motif : 400, 336, 468, 412, 276, 522, 255, 176, 405, 252 ; octets de stockage = ⌈cellules / 2⌉ (+1 pour 5 et 8)", async () => {
     const host = new TestHost();
-    const engine = new Engine(host, {});
+    const engine = new MathEngine(host, {});
     const archive = await engine.ctx.resources.open("PATFILL.DAT");
     const counts: number[] = [];
     for (let pattern = 0; pattern < 10; pattern++) {
@@ -364,7 +364,7 @@ real("PTRN : géométrie des dix motifs", () => {
   });
 
   it("Checker : 4 cellules par tuile, pas de 34 px, 10 × 10 tuiles dès (52, 46)", async () => {
-    const engine = new Engine(new TestHost(), {});
+    const engine = new MathEngine(new TestHost(), {});
     const archive = await engine.ctx.resources.open("PATFILL.DAT");
     const geometry = parsePtrn(archive.raw("PTRN", 40500));
     expect([geometry.cellsPerTile, geometry.tileHeight, geometry.tileWidth, geometry.rows]).toEqual([4, 35, 35, 10]);
@@ -377,12 +377,12 @@ real("PTRN : géométrie des dix motifs", () => {
 
 interface Rig {
   host: TestHost;
-  engine: Engine;
+  engine: MathEngine;
   services: MathServices;
   scene: PatternWindowsScene;
   downloads: { blob: Blob; filename: string }[];
   sounds: { id: number; options?: PlaySoundOptions }[];
-  roster: Engine["ctx"]["roster"];
+  roster: MathEngine["ctx"]["roster"];
   tick(n?: number): Promise<void>;
   until(done: () => boolean, limitMs?: number): Promise<void>;
   click(x: number, y: number): Promise<void>;
@@ -409,7 +409,7 @@ const BUTTON_CENTER: Record<string, [number, number]> = {
 async function boot(options: { clickAndStick?: boolean; player?: boolean; download?: boolean; ctrl?: boolean; ambient?: boolean } = {}): Promise<Rig> {
   const host = new TestHost();
   host.audio.unlock();
-  const engine = new Engine(host, { seed: 5 });
+  const engine = new MathEngine(host, { seed: 5 });
   const services = installServices(engine);
   if (options.clickAndStick === false) engine.ctx.roster.roster.clickAndStick = false;
   if (options.ambient === false) engine.ctx.roster.roster.ambient = false;

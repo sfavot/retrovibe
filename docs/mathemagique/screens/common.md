@@ -744,7 +744,7 @@ Il n'y a ni boîte « Voulez-vous quitter ? » ni sauvegarde automatique : la co
 
 ## Implémentation (moniteur)
 
-Code : `src/games/mathemagique/scenes/monitor/` (`monitor-overlay.ts`, `name-text.ts`, `text-input.ts`, `index.ts`). Tests : `test/mathemagique/monitor.test.ts` (les parties qui lisent `MAINSCRN.DAT` sont ignorées sans `original/mathemagique/`). Le moniteur de §3 et la Math Trivia de §4.2 sont un composant `MonitorOverlay` posé sur la scène courante (accueil, plus tard Bowling et Pattern Windows).
+Code : `src/games/mathemagique/scenes/monitor/` (`monitor-overlay.ts`, `name-text.ts`, `index.ts`). Tests : `test/mathemagique/monitor.test.ts` (les parties qui lisent `MAINSCRN.DAT` sont ignorées sans `original/mathemagique/`). Le moniteur de §3 et la Math Trivia de §4.2 sont un composant `MonitorOverlay` posé sur la scène courante (accueil, plus tard Bowling et Pattern Windows).
 
 ### Brancher le moniteur dans une scène
 
@@ -764,7 +764,7 @@ Dans la scène : `tick()` du moniteur dans `Scene.tick` (après le crochet des s
 
 ### Saisie du nom et accents
 
-Le nom se tape dans le canvas (police `NCSclB10`, curseur `|` clignotant, 15 ticks) ; le champ HTML invisible n'existe que pour ouvrir le clavier virtuel : `TextInputPort` (`text-input.ts`) est une interface pure (`focus()`, `blur()`, `onText(cb)` ; `"\b"` = retour arrière, `"\n"` = Entrée), l'implémentation navigateur est dans `ui/`. Le port ne doit relayer que ce qui n'arrive pas déjà par `Input.keyDown`, sinon un caractère serait saisi deux fois. `focus()` est appelé au clic sur New Player / Add et en entrant dans les préférences (geste du joueur), `blur()` à la fin de la saisie.
+Le nom se tape dans le canvas (police `NCSclB10`, curseur `|` clignotant, 15 ticks) ; le champ HTML invisible n'existe que pour ouvrir le clavier virtuel : `TextInputPort` (`src/engine/mohawk/text-input.ts`, commun aux jeux Mohawk) est une interface pure (`focus()`, `blur()`, `onText(cb)` ; `"\b"` = retour arrière, `"\n"` = Entrée), l'implémentation navigateur est `src/ui/mohawk/text-input.ts`. Le port ne doit relayer que ce qui n'arrive pas déjà par `Input.keyDown`, sinon un caractère serait saisi deux fois. `focus()` est appelé au clic sur New Player / Add et en entrant dans les préférences (geste du joueur), `blur()` à la fin de la saisie.
 
 - Règles de `roster.ts` étendues par un paramètre **`NameRules`** (`isLetter`) passé à `isNameChar`, `canAppendNameChar`, `formatPlayerName`, `isValidPlayerName`, `Roster.addPlayer` et `renamePlayer` ; défaut `ASCII_NAME_RULES` (comportement d'origine, tests inchangés), `LATIN1_NAME_RULES` = `À`–`ÿ` sauf `×` et `÷`. Le roster garde un octet par caractère (Latin-1 = Windows-1252 sur ces lettres) : rien d'autre ne change dans le format de `MWRoster`. La mise en majuscule (`toUpperCase`) ne sort jamais du Latin-1 (`ÿ`, `ß` restent tels quels).
 - **Les polices `.FON` du jeu sont en Mac Roman, pas en Windows-1252** (le glyphe 0x8E est « é », 0xCB « À », 0xE9 « È » ; `÷` en 0xD6 y est le `÷` Mac Roman, ce que `graphics.md` notait comme une particularité). `encodeText` (`graphics/text.ts`) convertit vers Mac Roman (tâche H7) ; le moniteur passe directement ses chaînes à `drawText` / `measureText`. Les règles du moniteur (`MONITOR_NAME_RULES`, déduites de la table de `encodeText`) sont le sous-ensemble du Latin-1 dont la police a le glyphe : sans `Ð ð Þ þ Ý ý`, `×`, `÷`. `NCSCLB10` et `NCSCLB12` ont les glyphes ; `0xCA` (espace insécable) est vide.

@@ -4,7 +4,7 @@
  */
 import { HotspotTable } from "../engine/gadgets";
 import { SceneId } from "../engine/scene";
-import type { KeyEvent } from "../engine/input";
+import type { KeyEvent } from "../../../engine/mohawk/input";
 
 /** Rectangle `[gauche, haut, droite, bas]` des tables de l'original. */
 export type Edges = readonly [number, number, number, number];

@@ -4,13 +4,15 @@
 #    (Windows 3.1 avec le jeu installé : ZOOMBINI.EXE, ZOOMBINI.CFG, ZOOMBINI.WHO) et le manuel PDF dans
 #    archives/zoombinis/manuel/ (non versionnés, références de rétro-ingénierie) ;
 #  - uniquement les fichiers utiles au jeu dans original/zoombinis/ (version française, à plat) avec files.json :
-#    les archives Mohawk FRENCH/*.MHK (sauf MIDIMAC.MHK), MIDIMAP.DAT et CORNER.TTF ;
+#    les archives Mohawk FRENCH/*.MHK (sauf MIDIMAC.MHK), MIDIMAP.DAT, CORNER.TTF et LOGO025.mp4 (FRENCH/LOGO025.MOV converti par ffmpeg) ;
 #  - l'inventaire docs/zoombinis/files.md.
+# La soundfont réduite zoombinis-gm.sf2 et sa licence (scripts/zoombinis/soundfont.mts) et la jaquette COVER.png (scripts/zoombinis/cover.mts)
+# ne viennent pas du CD : conservées telles quelles.
 # Usage : scripts/zoombinis-extract.sh [jeu.7z [installeur.exe [manuel.7z]]]
 #   (défauts : archives/zoombinis/jeu-02069-odyssee_des_zoombinis-pcwin.7z, setup-02069-Zoombinis_Logique-Dosbox.exe,
 #    man-02069-l_odyssee_des_zoombinis.7z)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
-# Outils requis : 7zz, innoextract, python3.
+# Outils requis : 7zz, innoextract, python3, ffmpeg (avec libx264).
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
@@ -24,7 +26,7 @@ utils="$racine/scripts/zoombinis/extract_utils.py"
 
 # shellcheck source=lib/extract-common.sh
 source "$racine/scripts/lib/extract-common.sh"
-ec_verifier_outils 7zz innoextract python3
+ec_verifier_outils 7zz innoextract python3 ffmpeg
 for f in "$archive" "$installeur" "$manuel"; do
   [ -f "$f" ] || { echo "Fichier introuvable : $f" >&2; exit 1; }
 done
@@ -53,6 +55,14 @@ mkdir "$tmp/manuel"
 echo "Fichiers utiles..."
 mkdir "$tmp/out"
 py copier "$tmp/cd" "$tmp/out"
+
+# Logo (écran 0) : film QuickTime au codec cdtoons (640 x 480, 10 images/s, 139 s, PCM 8 bits) -> H.264 + AAC lisible par un <video> (4,6 Mo).
+echo "Logo (LOGO025.MOV -> LOGO025.mp4)..."
+logo="$(find "$tmp/cd/FRENCH" -maxdepth 1 -iname 'LOGO025.MOV' | head -1)"
+[ -n "$logo" ] || { echo "FRENCH/LOGO025.MOV introuvable" >&2; exit 1; }
+ffmpeg -hide_banner -loglevel error -y -i "$logo" -c:v libx264 -preset slow -tune animation -crf 23 -pix_fmt yuv420p \
+  -c:a aac -b:a 48k -ar 22050 -ac 1 -movflags +faststart "$tmp/out/LOGO025.mp4"
+ec_conserver "$sortie" "$tmp/out" zoombinis-gm.sf2 zoombinis-gm-LICENSE.txt COVER.png
 
 # Substitution d'un bloc, seulement maintenant que tout a réussi (files.json est généré avant).
 mkdir -p "$dossier_archives"

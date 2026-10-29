@@ -13,7 +13,7 @@
  * - Pas spécial (`DS:13a6 + 24 (n - 1)`, 1 à 14) : table de 12 poses étalées sur les `n` pas de la mesure (`1028:2c32` n'est lu que dans le principe :
  *   **hypothèse** sur l'étalement quand `n` ≠ 12).
  */
-import type { MsvcRandom } from "../engine/rng";
+import type { MsvcRandom } from "../../../engine/mohawk/rng";
 
 /** Nombre de poses de la `SHPL` 31000. */
 export const DANCE_POSE_COUNT = 174;

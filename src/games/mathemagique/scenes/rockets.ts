@@ -15,10 +15,11 @@
 import { TAG_SND } from "../../../data/mohawk/mohawk";
 import { POLY_ZONE, ROCKETS_POLY } from "../game/poly-config";
 import { PolyHelper, rosterIntroFlag, type PolyAnimation, type PolyPorts } from "../game/poly";
-import { drawShape } from "../engine/graphics/blit";
-import type { Rect } from "../engine/graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import type { Rect } from "../../../engine/mohawk/graphics/surface";
 import { HotspotTable, rectFromEdges, type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
-import type { Resources } from "../engine/resources";
+import type { Resources } from "../../../engine/mohawk/resources";
+import { scr } from "../engine/scr";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
@@ -337,7 +338,7 @@ class RocketsSceneImpl implements RocketsScene {
   // --- Disposition et dessin ---
 
   private layoutFor(total: number): LayoutCell[] {
-    return parseLayout(this.archive.scr(layoutScrId(total)), total);
+    return parseLayout(scr(this.archive, layoutScrId(total)), total);
   }
 
   private shape(id: number) {

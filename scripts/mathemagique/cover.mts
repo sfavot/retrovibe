@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/data/mohawk/mohawk";
-import { applyShpl, createPalette } from "../../src/games/mathemagique/data/palette";
+import { applyShpl, createPalette } from "../../src/engine/mohawk/graphics/palette-data";
 import { decodeShap } from "../../src/data/mohawk/shap";
 import { parseShpl } from "../../src/data/mohawk/shpl";
 

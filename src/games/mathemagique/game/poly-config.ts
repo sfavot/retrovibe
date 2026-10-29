@@ -21,7 +21,7 @@
  * exceptions de Sticklers (`sticklers.md` §5.4), seule fiche qui les donne.
  */
 import type { RosterFieldName } from "../engine/roster";
-import type { MsvcRandom } from "../engine/rng";
+import type { MsvcRandom } from "../../../engine/mohawk/rng";
 
 export type PolyActivityId = "hidden" | "patterns" | "sticklers" | "bowling" | "patternWindows" | "rockets" | "rhythm";
 

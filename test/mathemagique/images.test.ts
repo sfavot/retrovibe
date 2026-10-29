@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/data/mohawk/mohawk";
-import { applyShpl, brighten, createPalette, PALETTE_SIZE } from "../../src/games/mathemagique/data/palette";
+import { applyShpl, brighten, createPalette, PALETTE_SIZE } from "../../src/engine/mohawk/graphics/palette-data";
 import { decodeShap, unpackLz } from "../../src/data/mohawk/shap";
 import { parseShpl } from "../../src/data/mohawk/shpl";
 import { decodeTbmp } from "../../src/data/mohawk/tbmp";

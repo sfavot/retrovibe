@@ -23,14 +23,14 @@
  * Aucune copy : tout est dessin et audio.
  */
 import { Blinds, revealRects } from "../engine/graphics/transitions";
-import { drawShape } from "../engine/graphics/blit";
-import { Surface, type Rect } from "../engine/graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import { Surface, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { rectFromEdges, type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
-import type { KeyEvent } from "../engine/input";
+import type { KeyEvent } from "../../../engine/mohawk/input";
 import { SCR_FLAG } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
-import type { Archive } from "../engine/resources";
+import type { Archive } from "../../../engine/mohawk/resources";
 import type { SoundHandle } from "../engine/sound";
 import { HIDDEN_POLY, POLY_ZONE } from "../game/poly-config";
 import { createScrPolyPorts, openPolyArchive, PolyHelper, rosterIntroFlag } from "../game/poly";
@@ -56,6 +56,7 @@ import {
   HIDDEN_WELCOME_SCR,
   type HiddenShapes,
 } from "./hidden-view";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 export type HiddenPhase = "welcome" | "menu" | "launching" | "transition" | "playing" | "jingle" | "reward" | "solved" | "resetting" | "leaving";
 
@@ -95,8 +96,8 @@ class HiddenSceneImpl implements HiddenScene {
   private archive!: Archive;
   private polly!: Archive;
 
-  private readonly backdrop = new Surface();
-  private readonly work = new Surface();
+  private readonly backdrop = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
+  private readonly work = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   private readonly session = new PuzzleSession();
   private readonly selection = new HiddenSelection();
 

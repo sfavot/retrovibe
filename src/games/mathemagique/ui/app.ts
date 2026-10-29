@@ -4,17 +4,17 @@ import { localStorageStore as createLocalStorageStore } from "../../../ui/local-
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
 import { copy } from "../copy";
 import { fetchGameFiles } from "../data/files";
-import { Engine } from "../engine/engine";
+import { MathEngine } from "../engine/engine";
 import { installServices, type MathServices } from "../engine/services";
 import { cssCursor, loadCursorImages } from "../engine/pointer";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../render/canvas-presenter";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../engine/graphics/play-area";
 import { SceneId } from "../engine/scene";
 import { registerScenes } from "../scenes";
 import type { HubScene } from "../scenes/hub";
 import { MissingFilesError } from "../../../ui/files";
-import { BrowserHost } from "./browser-host";
+import { createMathBrowserHost, type MathBrowserHost } from "./browser-host";
 import { createCertificateDownload } from "./certificate-download";
-import { createBrowserTextInput, type BrowserTextInput } from "./text-input";
+import { createBrowserTextInput, type BrowserTextInput } from "../../../ui/mohawk/text-input";
 
 export interface AppOptions {
   /** URL du dossier des fichiers du jeu, sans barre finale (ex. `./mathemagique`). */
@@ -61,8 +61,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   });
   const canvas = shell.canvas;
 
-  let host: BrowserHost;
-  let engine: Engine;
+  let host: MathBrowserHost;
+  let engine: MathEngine;
   let services: MathServices;
   let textInput: BrowserTextInput;
   /** Appui long reçu de l'hôte, traité au début de l'image suivante (jamais en plein milieu d'un tick). */
@@ -72,7 +72,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     const files = await fetchGameFiles(options.base).catch((error: unknown) => {
       throw new MissingFilesError(error instanceof Error ? error.message : String(error));
     });
-    host = new BrowserHost(options.base, files, canvas, () => {
+    host = createMathBrowserHost(options.base, files, canvas, () => {
       // Quitter enregistre les joueurs (l'original n'écrit qu'aux moments listés dans `RosterState.save`).
       engine.ctx.roster.save();
       leave(container, options);
@@ -83,7 +83,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     textInput = createBrowserTextInput({ canvas, bindKeyboard: (target) => host.bindKeyboard(target) });
     // Débloque le son tant que l'activation du clic (« Jouer ») est valable.
     host.audio.unlock();
-    engine = new Engine(host);
+    engine = new MathEngine(host);
     services = installServices(engine);
     if (engine.ctx.roster.loadStatus === "invalid") console.warn("Math Workshop : les joueurs enregistrés sont illisibles ; une copie de secours sera gardée avant tout écrasement.");
     // Archives gardées toute la partie : curseurs d'origine (sablier, aide) et réglages d'initialisation du MIDI.

@@ -12,21 +12,22 @@
  * Imprimer télécharge un PNG de la fenêtre (pas de boîte d'impression).
  */
 import { TAG_SHAP } from "../../../data/mohawk/mohawk";
-import { drawMask, drawShape, hitTestShape } from "../engine/graphics/blit";
+import { drawMask, drawShape, hitTestShape } from "../../../engine/mohawk/graphics/blit";
 import { parseFon, type FonFont } from "../engine/graphics/fon";
-import type { PaletteCycler } from "../engine/graphics/palette";
-import { Surface } from "../engine/graphics/surface";
+import type { PaletteCycler } from "../../../engine/mohawk/graphics/palette";
+import { Surface } from "../../../engine/mohawk/graphics/surface";
 import { drawText, measureText } from "../engine/graphics/text";
 import { HotspotTable, rectFromEdges, type GadgetActivation, type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
-import type { KeyEvent } from "../engine/input";
-import type { Archive } from "../engine/resources";
+import type { KeyEvent } from "../../../engine/mohawk/input";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
 import type { SoundHandle } from "../engine/sound";
 import { PATTERN_WINDOWS_POLY, POLY_ZONE } from "../game/poly-config";
 import { PolyHelper, createScrPolyPorts, openPolyArchive, rosterIntroFlag } from "../game/poly";
 import type { CertificatePort } from "./certificate";
-import { MonitorOverlay, loadMonitorFont, type MonitorResult, type TextInputPort } from "./monitor";
+import { MonitorOverlay, loadMonitorFont, type MonitorResult } from "./monitor";
+import type { TextInputPort } from "../../../engine/mohawk/text-input";
 import {
   BLANK_BYTE,
   COLOR_COUNT,
@@ -62,6 +63,7 @@ import {
   type PatternGeometry,
   type Stroke,
 } from "./pattern-windows-logic";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 // --- Ressources et constantes (pattern-windows.md §2, §3, §4) ---
 
@@ -207,8 +209,8 @@ export class PatternWindowsScene implements Scene {
   private actions!: GadgetGroup;
   private picks!: GadgetGroup;
   /** Fond seul (sert aux gadgets) et fond + texte + cellules + panneau. */
-  private readonly base = new Surface();
-  private readonly canvas = new Surface();
+  private readonly base = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
+  private readonly canvas = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
 
   private flow: Flow = { kind: "entering", jingle: null, ticks: 0 };
   private local = localSave();

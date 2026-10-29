@@ -6,8 +6,8 @@
  * §3.1 (rectangles), §3.2 (cadre de survol des vignettes).
  */
 import type { Shape } from "../../../data/mohawk/shap";
-import { drawShape } from "../engine/graphics/blit";
-import { ClipMask, type Rect, type Surface } from "../engine/graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import { ClipMask, type Rect, type Surface } from "../../../engine/mohawk/graphics/surface";
 import { edgesToRect, hiddenBounds, hiddenCellRects, thumbHoverFrame, thumbRect, THUMB_LAYOUTS, type HiddenPiece } from "../game/puzzle-kit";
 import { PUZZLES_PER_LEVEL } from "../game/puzz";
 

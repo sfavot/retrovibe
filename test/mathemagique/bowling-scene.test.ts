@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { MohawkArchive } from "../../src/data/mohawk/mohawk";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import { SceneId } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import type { PlaySoundOptions } from "../../src/games/mathemagique/engine/sound";
 import { STRIKE_SCRIPTS, STRIKE_WITHOUT_EPILOGUE, strikeScriptId } from "../../src/games/mathemagique/game/bowling";
 import { BowlingScene, createBowlingScene, gusExitId, gusReactionId, helpZoneAt } from "../../src/games/mathemagique/scenes/bowling";
 import { registerScenes } from "../../src/games/mathemagique/scenes";
-import type { Surface } from "../../src/games/mathemagique/engine/graphics/surface";
+import type { Surface } from "../../src/engine/mohawk/graphics/surface";
 import { EXIT_RECT, GUS_ZONE } from "../../src/games/mathemagique/scenes/bowling-view";
 import { FRAME_MS, TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
@@ -51,7 +51,7 @@ describe("Bowling : tables de Gus et de Polly", () => {
 
 interface Rig {
   host: TestHost;
-  engine: Engine;
+  engine: MathEngine;
   services: MathServices;
   scene: BowlingScene;
   sounds: { id: number; options?: PlaySoundOptions }[];
@@ -95,7 +95,7 @@ const GUS_PIXELS = 2000;
 async function boot(options: { seconds?: number; player?: boolean; real?: boolean } = {}): Promise<Rig> {
   const host = new TestHost();
   host.audio.unlock();
-  const engine = new Engine(host, { seed: 7 });
+  const engine = new MathEngine(host, { seed: 7 });
   const services = installServices(engine);
   if (options.seconds) engine.ctx.roster.roster.setBowlingSeconds(options.seconds);
   if (options.player !== false) {

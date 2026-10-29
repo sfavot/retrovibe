@@ -3,7 +3,7 @@
  * (`popcount`), `1010:2f34` (rejet), `1010:2fb8` (`scatteredMask`), simplification de fraction `1018:064d`.
  * Un masque de `n` cellules (8, 12 ou 24) est un entier dont le bit `i` dit si la cellule `i` est coloriée.
  */
-import { MsvcRandom } from "../../engine/rng";
+import { MsvcRandom } from "../../../../engine/mohawk/rng";
 
 function fullMask(cells: number): number {
   return cells >= 32 ? 0xffffffff : (1 << cells) - 1;

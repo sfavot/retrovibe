@@ -22,11 +22,11 @@
  * `decodeCursor` (format : formats.md « CURS ») et s'exposent à l'hôte navigateur en PNG (`loadCursorImages`).
  */
 import type { Shape } from "../../../data/mohawk/shap";
-import { hitTestShape } from "./graphics/blit";
-import { PLAY_HEIGHT, PLAY_WIDTH } from "./graphics/frame";
-import type { Rect } from "./graphics/surface";
+import { hitTestShape } from "../../../engine/mohawk/graphics/blit";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "./graphics/play-area";
+import type { Rect } from "../../../engine/mohawk/graphics/surface";
 import type { CursorKind } from "./host";
-import type { ButtonEvent, MouseButton } from "./input";
+import type { ButtonEvent, MouseButton } from "../../../engine/mohawk/input";
 import { defineService } from "./scene";
 
 export type PointerMode = "clickAndStick" | "drag";

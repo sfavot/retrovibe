@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GadgetManager, type GadgetSpec } from "../../src/games/mathemagique/engine/gadgets";
-import { isModifierOnlyKey, type ButtonEvent } from "../../src/games/mathemagique/engine/input";
+import { isModifierOnlyKey, type ButtonEvent } from "../../src/engine/mohawk/input";
 import { gameModifiers, gameOwnsKey, isComposedKey, keepsInputOnBlur, type KeyInfo } from "../../src/games/mathemagique/ui/browser-host";
 import { TestHost } from "./engine-test-host";
 

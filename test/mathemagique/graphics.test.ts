@@ -2,16 +2,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MohawkArchive, TAG_SHAP, TAG_SHPL } from "../../src/data/mohawk/mohawk";
-import { applyShpl, brighten, createPalette } from "../../src/games/mathemagique/data/palette";
+import { applyShpl, brighten, createPalette } from "../../src/engine/mohawk/graphics/palette-data";
 import { decodeShap, type Shape } from "../../src/data/mohawk/shap";
 import { parseShpl, type ShapeList } from "../../src/data/mohawk/shpl";
-import { drawMask, drawShape, hitTestShape } from "../../src/games/mathemagique/engine/graphics/blit";
+import { drawMask, drawShape, hitTestShape } from "../../src/engine/mohawk/graphics/blit";
 import { parseFon } from "../../src/games/mathemagique/engine/graphics/fon";
-import { Palette } from "../../src/games/mathemagique/engine/graphics/palette";
-import { ClipMask, Surface } from "../../src/games/mathemagique/engine/graphics/surface";
+import { Palette } from "../../src/engine/mohawk/graphics/palette";
+import { ClipMask, Surface } from "../../src/engine/mohawk/graphics/surface";
 import { drawText, encodeText, measureText } from "../../src/games/mathemagique/engine/graphics/text";
 import { Blinds, revealRects, transitionFrames, Wipe, type WipeDirection } from "../../src/games/mathemagique/engine/graphics/transitions";
 import { hasOriginalFiles, readOriginal } from "./helpers";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../../src/games/mathemagique/engine/graphics/play-area";
 
 function shape(width: number, height: number, pixels: number[], bitsPerPixel: 1 | 8 = 8): Shape {
   return { width, height, pitch: width, flags: 0, bitsPerPixel, pixels: Uint8Array.from(pixels), consumed: 0, declaredEnd: 0 };
@@ -340,7 +341,7 @@ describe.skipIf(!hasOriginalFiles)("données réelles : MAINSCRN SHAP 100", () =
     const shpl = parseShpl(archive.get(TAG_SHPL, 100));
     expect([background.width, background.height]).toEqual([576, 432]);
 
-    const surface = new Surface();
+    const surface = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
     drawShape(surface, background, 0, 0, 0);
     const palette = new Palette();
     palette.loadShpl(shpl);
@@ -357,7 +358,7 @@ describe.skipIf(!hasOriginalFiles)("données réelles : MAINSCRN SHAP 100", () =
     }
     expect(Array.from(surface.pixels)).toEqual(Array.from(background.pixels));
     // Le fond n'utilise jamais l'index 0 : le mode 8 donne la même image.
-    const surface8 = new Surface();
+    const surface8 = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
     drawShape(surface8, background, 0, 0, 8);
     expect(Array.from(surface8.pixels)).toEqual(Array.from(background.pixels));
   });

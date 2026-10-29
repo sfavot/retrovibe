@@ -18,7 +18,7 @@ import { fetchGameFiles, type GameFileEntry, type GameFiles } from "../../../dat
 import { paintIndexed } from "../../../ui/indexed-canvas";
 import { formatSize, h, hexDump, paletteSwatch } from "../../../ui/asset-viewer/helpers";
 import { mountAssetViewer, type Panel, type PanelContext } from "../../../ui/asset-viewer/viewer";
-import { applyShpl, createPalette } from "../../mathemagique/data/palette";
+import { applyShpl, createPalette } from "../../../engine/mohawk/graphics/palette-data";
 import {
   ARCHIVE_NAMES,
   BACKGROUND_ID,

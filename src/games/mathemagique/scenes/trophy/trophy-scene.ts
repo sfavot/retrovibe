@@ -9,12 +9,12 @@
  * Écarts : la sortie revient au hub (`exitTo`, défaut `SceneId.hub`) alors que l'original retourne au Bowling (`1078:06d9`, `1b20 = 1`) ; l'original
  * n'est accessible que depuis le Bowling. Le cadre de survol et de sélection est un choix (la forme exacte de `1078:0b48` n'est pas relue).
  */
-import { drawShape } from "../../engine/graphics/blit";
+import { drawShape } from "../../../../engine/mohawk/graphics/blit";
 import { parseFon, type FonFont } from "../../engine/graphics/fon";
-import { Surface } from "../../engine/graphics/surface";
+import { Surface } from "../../../../engine/mohawk/graphics/surface";
 import { drawText } from "../../engine/graphics/text";
 import { rectFromEdges, type GadgetGroup } from "../../engine/gadgets";
-import type { Archive } from "../../engine/resources";
+import type { Archive } from "../../../../engine/mohawk/resources";
 import { SceneId, type Scene, type SceneContext } from "../../engine/scene";
 import type { MathServices } from "../../engine/services";
 import { OPERATION_COUNT } from "../../engine/roster";

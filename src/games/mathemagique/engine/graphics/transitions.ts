@@ -16,7 +16,7 @@
  *   (arrêt à la hauteur du rectangle). Appels du jeu : bandes de 10 lignes, 15 ticks (menus et choix de puzzle) ou 30 ticks (niveau, mélange).
  *   `finish()` = ce que fait l'original quand le joueur clique pendant la transition : `0889` termine d'un coup (restaure le port de travail).
  */
-import type { Rect, Surface } from "./surface";
+import type { Rect, Surface } from "../../../../engine/mohawk/graphics/surface";
 
 /** 0 : de haut en bas ; 1 : de bas en haut ; 2 : de gauche à droite ; 3 : de droite à gauche. */
 export type WipeDirection = 0 | 1 | 2 | 3;

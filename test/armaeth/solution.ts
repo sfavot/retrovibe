@@ -1,5 +1,6 @@
+import { cellIndex, GRID_COLUMNS, GRID_ROWS, isWalkable, type WalkGrid } from "../../src/games/armaeth/engine/ground";
 import type { GameObject } from "../../src/games/armaeth/engine/state";
-import { type Robot, RobotSetback } from "./robot";
+import { LAVA_PATH, type Robot, RobotSetback } from "./robot";
 
 /**
  * Passages de la solution d'*Armaeth* ajoutés pour le score maximal (`docs/armaeth/walkthrough.md`, § Score) : chacun part d'un état
@@ -16,6 +17,38 @@ export function walkPath(p: Robot, path: readonly (readonly [number, number])[],
     p.walkTo(x, p.floor(x, depth), maxTicks);
     p.drain(2);
   }
+}
+
+/** Cases de pose de la salle 104 (`[X, P]`), une par objet. */
+const CASTLE_SPOTS: readonly (readonly [number, number])[] = Array.from({ length: 20 }, (_, k) => [40 + (k % 6) * 18, k < 6 ? 96 : 80] as const);
+
+/**
+ * `count` cases `[X, P]` où poser des objets dans la salle chargée sans boucher un passage (les objets posés bloquent le héros à leur
+ * profondeur) : les plus dégagées du plan 0 (au moins 90 % de cases praticables à ±24 pixels en X et en P), les plus proches du
+ * héros d'abord, à 20 pixels au moins les unes des autres.
+ */
+function dropSpots(p: Robot, count: number): [number, number][] {
+  const { types } = (p.engine as unknown as { terrain: { grid: WalkGrid } }).terrain.grid;
+  const open = (row: number, col: number): boolean => row >= 0 && row < GRID_ROWS && col >= 0 && col < GRID_COLUMNS && isWalkable(types[cellIndex(0, row, col)] ?? 0);
+  const cells: { x: number; depth: number; clear: number; away: number }[] = [];
+  for (let row = 0; row < GRID_ROWS; row++) {
+    for (let col = 0; col < GRID_COLUMNS; col++) {
+      if (!open(row, col)) continue;
+      let clear = 0;
+      for (let dr = -3; dr <= 3; dr++) for (let dc = -6; dc <= 6; dc++) if (open(row + dr, col + dc)) clear++;
+      const x = col * 4 + 2;
+      const depth = row * 8 + 4;
+      cells.push({ x, depth, clear: clear / 91, away: Math.hypot(x - p.hero.x, depth - p.hero.p) });
+    }
+  }
+  const spots: [number, number][] = [];
+  for (const threshold of [0.9, 0.7, 0.5]) {
+    for (const c of cells.filter((cell) => cell.clear >= threshold).sort((a, b) => a.away - b.away)) {
+      if (spots.length >= count) return spots;
+      if (spots.every(([x, depth]) => Math.abs(x - c.x) >= 20 || Math.abs(depth - c.depth) >= 20)) spots.push([c.x, c.depth]);
+    }
+  }
+  return spots;
 }
 
 /**
@@ -191,19 +224,153 @@ export function bottle(p: Robot): number[] {
 }
 
 /**
+ * Passe de la salle courante à sa voisine `next` (`Robot.goTo`) : la voûte du fond de la salle 106 (sortie haute vers 103) est à gauche,
+ * les clics de bord n'y mènent pas (ils mènent à la sortie de droite) ; le héros libre se place dessous (P 15) puis flèche haut, comme à
+ * l'étape (c). Chargé de Prytwen il ne suit pas les clics (`26ab:01fc`) : `Robot.goTo` seul.
+ */
+function hopTo(p: Robot, next: number, avoid: ReadonlySet<number> = new Set(), quick = false): void {
+  if (p.roomId !== 106 || next !== 103 || p.hero.ego !== 0) {
+    p.goTo(next, avoid, quick);
+    return;
+  }
+  p.stop(); // le héros garde son élan en entrant
+  p.run(15);
+  for (let k = 0; k < 3 && p.state.hero && (p.roomId as number) === 106; k++) {
+    p.walkTo(36, 44, 1500);
+    // le clic peut laisser le héros à côté du couloir de la voûte (X 37 à 44) : on s'y place aux flèches
+    if (p.state.hero && p.hero.x < 38) {
+      p.arrow("right");
+      p.until(() => !p.state.hero || p.hero.x >= 39, 200);
+      p.arrow("right");
+      p.run(5);
+    }
+    p.arrow("up");
+    p.until(() => p.roomId !== 106 || !p.state.hero, 600);
+  }
+  if (!p.state.hero) throw new RobotSetback("héros mort sous la voûte de la salle 106");
+  p.need((p.roomId as number) === 103, `voûte de la salle 106 : salle ${p.roomId}`);
+  p.stop();
+  p.run(30); // fin de l'animation de refus du curseur : un clic envoyé dedans serait perdu
+  p.drain();
+}
+
+/**
+ * Les salles du château assez larges pour y combattre Prytwen puis y poser des objets sans boucher un passage : la 104 (cases de pose
+ * connues), le hall 103, la salle 111 (carrefour du château) et la 101 (arrivée de la forêt). Les autres sont des boyaux (106 et 108 :
+ * un objet posé y barre le passage) ou l'antre (105, duel mortel).
+ */
+const FIGHT_ROOMS: ReadonlySet<number> = new Set([104, 103, 111, 101]);
+/** Les salles du château où le héros va chercher Prytwen (ni son antre 105, ni la geôle 110, ni la mine). */
+const CHASE_ROOMS: ReadonlySet<number> = new Set([101, 102, 103, 104, 106, 107, 108, 109, 111]);
+
+/** Marche jusqu'à la salle `target` de salle en salle (`hopTo`), le héros étant libre. */
+function goVia(p: Robot, target: number): void {
+  for (let guard = 0; p.roomId !== target && guard < 60; guard++) {
+    const route = p.route(target);
+    if (!route) throw new Error(`aucune route de la salle ${p.roomId} à ${target}`);
+    hopTo(p, route[0]!);
+  }
+}
+
+/** La salle de `FIGHT_ROOMS` la plus proche du héros (en nombre de salles à traverser). */
+function nearestFightRoom(p: Robot): number {
+  let best = 104;
+  let bestLength = Number.POSITIVE_INFINITY;
+  for (const room of FIGHT_ROOMS) {
+    const length = room === p.roomId ? 0 : (p.route(room)?.length ?? Number.POSITIVE_INFINITY);
+    if (length < bestLength) [best, bestLength] = [room, length];
+  }
+  return best;
+}
+
+/** Salles interdites au héros qui cherche Prytwen : son antre (duel mortel) et la mine. */
+const PRYTWEN_AVOID: ReadonlySet<number> = new Set([105, ...Array.from({ length: 200 }, (_, k) => 200 + k)]);
+
+/** Route du héros jusqu'à la salle de Prytwen, ou `null` si elle est hors d'atteinte (forêt, mine, antre). */
+function prytwenWay(p: Robot): number[] | null {
+  const room = p.object(PRYTWEN).room?.id;
+  return room !== undefined && CHASE_ROOMS.has(room) ? p.route(room, PRYTWEN_AVOID) : null;
+}
+
+/**
+ * Prytwen, sorti de son antre, n'est plus dans la salle chargée : il n'y fait que changer de salle (il reste environ 900 images dans
+ * chacune puis prend une sortie tirée au hasard, `228e:0000`, aussi hors de la salle chargée) et ne poursuit le héros que dans la salle
+ * de celui-ci (`22ef:0000`). Le château lui est ouvert, jusqu'à la dalle de la salle 5 (`barrier` 104) et celle du trône : une fois
+ * parti dans la forêt ou la mine il ne revient guère (la marche au hasard couvre toute la carte). Le héros va donc le trouver là où il
+ * est, d'une salle à l'autre sans rien faire entre-temps (il rejoint la salle de Prytwen avant qu'il en reparte) ; hors d'atteinte (forêt,
+ * mine, antre : route fermée au héros ou évitée) il l'attend au carrefour 111, où il finit par passer s'il revient au château.
+ *
+ * Le dernier pas, vers la salle voisine de Prytwen, est sauvegardé : Prytwen, qui poursuit le héros, peut le croiser à la sortie et le duel
+ * s'achever hors de la salle chargée (Prytwen KO, mais sans les points de l'attaque, et le héros qui n'a plus de sauvegarde d'avant le
+ * duel) ; le joueur recharge alors et recommence ce pas.
+ */
+function meetPrytwen(p: Robot, here: () => boolean, retake: () => void): void {
+  const prytwen = (): GameObject | undefined => p.state.objects.find((o) => o.num === PRYTWEN);
+  const dueled = (): boolean => (prytwen()?.ego ?? 0) !== 0;
+  // Prytwen parti au loin (forêt, mine) sans revenir, dévoré par l'ours ou héros mort : le joueur recharge sa dernière sauvegarde (le
+  // hasard continue, Prytwen ne repart pas forcément de même). C'est celle du dernier pas vers sa salle (`hopped`) ou, avant, celle de
+  // la reprise des torches et du trousseau, qu'il faut alors refaire (`retake`).
+  let hopped = false;
+  let rewinds = 0;
+  let settled = false;
+  const rewind = (why: string): number => {
+    if (++rewinds > 30) throw new RobotSetback(why);
+    p.restore();
+    if (!hopped) retake();
+    settled = false;
+    return 0;
+  };
+  for (let round = 0; round < 600 && !here(); round++) {
+    if (!p.state.hero || !prytwen()) {
+      round = rewind(!p.state.hero ? "héros mort en cherchant Prytwen" : "Prytwen dévoré");
+      continue;
+    }
+    const way = prytwenWay(p);
+    const from = p.roomId;
+    if (way?.length === 1) {
+      p.save();
+      hopped = true;
+      hopTo(p, way[0]!, PRYTWEN_AVOID, true);
+      if (!p.state.hero || (here() && dueled())) {
+        p.restore();
+        continue;
+      }
+    } else if (way && way.length > 0) hopTo(p, way[0]!, PRYTWEN_AVOID, true);
+    else if (!FIGHT_ROOMS.has(from)) hopTo(p, p.route(111, PRYTWEN_AVOID)![0]!, PRYTWEN_AVOID, true);
+    // arrivé dans sa salle, pas une image à perdre : il vient au contact et pose son ultimatum
+    if (here()) break;
+    // le héros garde son élan en entrant ; arrêté, un clic sous ses pieds pourrait le mener à une autre profondeur de même hauteur
+    if (p.roomId !== from) p.stop();
+    // le héros qui attend se met au large : le duel à deux corps (`Ego 1` / `Ego 6`, positions superposées) ne s'achève pas dans un
+    // passage étroit (le seuil de l'antre, où `bottle` laisse le héros, la voûte d'une salle...)
+    if (!settled && FIGHT_ROOMS.has(p.roomId)) {
+      const [x, depth] = dropSpots(p, 1)[0] ?? [p.hero.x, p.hero.p];
+      placeAt(p, x, depth);
+      settled = true;
+    }
+    p.until(here, 100);
+    if (round === 599 && !here()) round = rewind("Prytwen ne vient pas") - 1;
+  }
+  if (!here()) throw new RobotSetback("Prytwen ne vient pas");
+  // les sorties ratées en route (Prytwen parti entre-temps) ne disent rien du château : le joueur les oublie
+  p.forgetFailures();
+}
+
+/**
  * Prytwen, sorti de son antre à la suite du héros (`bottle`), parcourt le château, ramasse les objets de valeur et poursuit le héros, qui
  * l'attend dans la salle 104 ; hors de l'antre le duel se joue au hasard (`28b1:0114`) : sauvegarde dès son entrée, « attaquer Prytwen »
  * à portée avant son contact (+10, `28b1:0e7d`), et s'il n'est pas mis KO (+40, `28b1:02b8`) le héros assommé est dépouillé :
  * restauration et nouvel essai.
  */
-export function knockOutPrytwen(p: Robot): void {
+export function knockOutPrytwen(p: Robot, retake: () => void = () => undefined): void {
   if (!p.state.objects.some((o) => o.num === PRYTWEN)) throw new Error("Prytwen a disparu (dévoré ?)");
   const thief = (): GameObject => p.object(PRYTWEN);
-  const here = (): boolean => !!p.state.hero && thief().room === p.state.loadedRoom;
+  const here = (): boolean => !!p.state.hero && p.state.objects.some((o) => o.num === PRYTWEN && o.room === p.state.loadedRoom);
   const attacked = (): boolean => p.state.scoreTable.some((e) => e.id === 100 && e.points < 0);
   // image par image : Prytwen poursuit le héros (`22ef:0000`, `AX = 7`) et l'atteint vite ; attendu par tranches, il aurait déjà posé son
-  // ultimatum quand l'essai sauvegarde
-  p.until(here, 60000);
+  // ultimatum quand l'essai sauvegarde. Hors de la salle chargée Prytwen reste figé après une restauration (observé, non expliqué) : l'essai ne peut sauvegarder qu'une
+  // fois Prytwen et le héros dans la même salle (la restauration le rend alors tel quel, en marche)
+  meetPrytwen(p, here, retake);
   p.need(here(), "Prytwen ne vient pas");
   p.attempt(
     "duel contre Prytwen",
@@ -213,7 +380,8 @@ export function knockOutPrytwen(p: Robot): void {
       // la main, « Pas maintenant ! »), puis le duel vient de ce contact, sans les points de l'attaque. La ligne de saisie arrête le monde :
       // la commande part dans le tic même
       const inReach = (): boolean => here() && thief().ego === 0 && (p.engine as unknown as { inReach(o: unknown): boolean }).inReach(thief());
-      if (!p.until(() => inReach() || !p.state.hero || thief().ego !== 0, 20000) || !inReach()) throw new RobotSetback("Prytwen hors de portée");
+      if (!inReach() && !p.until(() => inReach() || !p.state.hero || thief().ego !== 0, 20000)) throw new RobotSetback("Prytwen hors de portée");
+      if (!inReach()) throw new RobotSetback("Prytwen hors de portée");
       p.host.type("attaquer Prytwen\r");
       if (!p.until(() => !p.state.hero || thief().ego === 1 || attacked(), 300)) throw new RobotSetback("pas de duel");
       p.until(() => !p.state.hero || thief().ego !== 1, 3000);
@@ -246,25 +414,47 @@ export function robPrytwen(p: Robot): number[] {
  * `28b1:12e0`, décide, se voit derrière la grille fermée : +30, `28b1:0583`), puis revient reprendre ses affaires dans la salle 104.
  */
 export function castle(p: Robot): void {
+  // les affaires du héros restent dans la salle 104 : Prytwen est attendu les mains vides (il aborde alors toujours le héros), et le
+  // temps passé à les ramasser le laisserait partir et poser son ultimatum avant l'attaque
   const dropped = bottle(p);
-  takeAll(p, dropped);
-  knockOutPrytwen(p);
+  // seuls sont repris les torches (les salles du château sont sombres : « Je ne vois rien, il fait trop noir », plus de clic de marche) et
+  // le trousseau, seul objet de valeur : Prytwen aborde alors toujours le héros (une chance sur n, n = 1), et ce qu'il faut pour la geôle
+  // est là au réveil de Prytwen (environ 20 000 images après le KO) ; le reste est repris au retour
+  // Prytwen, qui parcourt le château et poursuit le héros, peut arriver pendant la reprise et poser son ultimatum avant l'attaque (le duel
+  // vient alors de son contact, sans les points de l'attaque) : la reprise est un essai, recommencé depuis la sauvegarde
+  const carried = dropped.filter((num) => num === 12 || num === 108);
+  p.attempt(
+    "reprise du trousseau et des torches",
+    20,
+    () => takeAll(p, carried),
+    () => p.roomId === 104 && carried.every((num) => p.has(num)) && p.object(PRYTWEN).ego === 0,
+  );
+  knockOutPrytwen(p, () => takeAll(p, carried));
   robPrytwen(p);
-  // le héros ne porte Prytwen (450) qu'en n'ayant presque rien d'autre (`20ac:0060`, charge 500) : il garde les objets légers (clefs,
-  // torches, bouteille) et pose les autres
+  // le héros ne porte Prytwen (450) qu'en n'ayant presque rien d'autre (`20ac:0060`, charge 500) : il pose le butin repris à Prytwen,
+  // sauf les objets légers
   const left: number[] = [];
-  for (let k = 0; k < 20; k++) {
-    // les plus lourds d'abord, jusqu'à ce que Prytwen passe (`20ac:0060` : poids du contenu + Prytwen <= charge)
-    const load = p.hero.contents.reduce((sum, o) => sum + o.weight, 0);
-    if (load + p.object(PRYTWEN).weight <= p.hero.capacity) break;
-    const extra = [...p.hero.contents].filter((o) => ITEM_NAMES[o.num]).sort((a, b) => b.weight - a.weight)[0];
-    if (!extra) break;
-    walkPath(p, [[40 + (k % 6) * 18, k < 6 ? 96 : 80]], 1500);
-    const before = [...p.hero.contents];
-    p.say(`jeter ${ITEM_NAMES[extra.num]}`);
-    for (const o of before) if (!p.hero.contents.includes(o)) left.push(o.num);
-    if (p.hero.contents.includes(extra)) throw new RobotSetback(`${extra.num} non posé`);
+  // Prytwen est mis KO dans la salle où le héros l'a rejoint (`meetPrytwen`), pas forcément la 104 ni une salle large : le butin est posé
+  // dans la salle large la plus proche (`dropSpots` : cases dégagées), le héros revient chercher Prytwen, puis reprend le butin au retour
+  const fightRoom = p.roomId;
+  const leftRoom = nearestFightRoom(p);
+  const load = (): number => p.hero.contents.reduce((sum, o) => sum + o.weight, 0);
+  const overweight = (): boolean => load() + p.object(PRYTWEN).weight > p.hero.capacity;
+  if (overweight()) {
+    goVia(p, leftRoom);
+    const spots = leftRoom === 104 ? CASTLE_SPOTS : dropSpots(p, 12);
+    for (let k = 0; k < 20 && overweight(); k++) {
+      // les plus lourds d'abord, jusqu'à ce que Prytwen passe (`20ac:0060` : poids du contenu + Prytwen <= charge)
+      const extra = [...p.hero.contents].filter((o) => ITEM_NAMES[o.num]).sort((a, b) => b.weight - a.weight)[0];
+      if (!extra) break;
+      placeAt(p, ...spots[k % spots.length]!);
+      const before = [...p.hero.contents];
+      p.say(`jeter ${ITEM_NAMES[extra.num]}`);
+      for (const o of before) if (!p.hero.contents.includes(o)) left.push(o.num);
+      if (p.hero.contents.includes(extra)) throw new RobotSetback(`${extra.num} non posé`);
+    }
   }
+  goVia(p, fightRoom);
   p.need(p.say("prendre Prytwen").length > 0 && p.has(PRYTWEN), "Prytwen trop lourd");
   jail(p);
   // le héros sort de la salle avec la pépite : à son réveil, hors de la salle chargée, Prytwen décide et se voit derrière la grille
@@ -277,7 +467,12 @@ export function castle(p: Robot): void {
   p.goTo(104);
   walkPath(p, [[96, 72]]);
   p.say("jeter la pepite");
-  takeAll(p, left.filter((num) => num !== 10 && num !== 11));
+  takeAll(p, [...dropped, ...left].filter((num) => num !== 10 && num !== 11));
+  if (left.length > 0 && leftRoom !== 104) {
+    goVia(p, leftRoom);
+    takeAll(p, left.filter((num) => num !== 10 && num !== 11));
+    goVia(p, 104);
+  }
   // ce que Prytwen a rangé dans son gros coffre de bronze (`Num 110`, antre 105 ; il y dépose son butin au contact, `28b1:04db`) :
   // la clef de bronze (`Num 109`, reprise sur Prytwen assommé) l'ouvre
   const stashed = [205, 206, 25, 6, 108].filter((num) => p.object(num).holder?.num === 110);
@@ -315,6 +510,146 @@ export function warriorDuel(p: Robot): void {
       }
     },
     awarded,
+  );
+}
+
+/**
+ * Marche jusqu'à la case `[X, P]` : le clic des bottes choisit la profondeur d'après la hauteur du sol, et sur un sol plat il ne bouge pas
+ * le héros en profondeur ; on finit donc aux flèches (haut / bas) jusqu'à la profondeur voulue.
+ */
+function placeAt(p: Robot, x: number, depth: number): void {
+  walkPath(p, [[x, depth]], 1500);
+  if (!p.state.hero || Math.abs(p.hero.p - depth) <= 6) return;
+  const key = depth > p.hero.p ? "down" : "up";
+  p.arrow(key);
+  p.until(() => !p.state.hero || (key === "down" ? p.hero.p >= depth : p.hero.p <= depth), 600);
+  p.arrow(key);
+  p.run(5);
+}
+
+/** Geysers (`Num 304`) de la salle chargée (la salle 304 : décors fixes, jets au hasard). */
+function geysers(p: Robot): GameObject[] {
+  const room = p.state.loadedRoom!;
+  return [...room.listA, ...room.listB].filter((o) => o.num === 304);
+}
+
+/**
+ * Images au plus tôt avant le prochain jet mortel d'un geyser (`decor.ts` `geyser`, `33ef:0004`) : au repos (`Ego 0`) il attend sa
+ * minuterie (une unité de `Tim` dure plus de 6 images) puis jaillit (`Ego 1`, 90 images au moins) et tue celui qui est à portée à la
+ * fin du jet ; il retombe ensuite (`Ego 2`) avant de tirer au sort son prochain état. Le jaillissement en cours (`Ego 1`) peut finir
+ * d'un instant à l'autre : aucune marge.
+ */
+function geyserQuiet(g: GameObject): number {
+  if (g.ego === 0) return g.tim * 6 + 90;
+  if (g.ego === 2) return 90;
+  return 0;
+}
+
+/** La case `[X, P]` est à portée de brûlure du geyser (24 pixels en X, 10 en profondeur, plus une marge pour la dérive du héros). */
+function inGeyserReach(g: GameObject, x: number, depth: number, margin = 4): boolean {
+  return Math.abs(g.x - x) <= 24 + margin && Math.abs(g.p - depth) <= 10 + margin;
+}
+
+/**
+ * Un pas du chemin de la salle 304 jusqu'à la case `[X, P]` : le joueur voit les jets et ne s'avance dans la zone d'un geyser que si
+ * celui-ci est au repos pour de bon (`geyserQuiet` plus long que la marche). Le héros qui attend est mis à l'abri : il ne reste que
+ * hors de portée de tous les geysers, sinon il avance (ou recule) sans attendre ; `careful` : il n'avance pas non plus vers un geyser en plein
+ * jet qui ne le menace pas encore (il le tuerait en retombant).
+ */
+function geyserStep(p: Robot, x: number, depth: number, from: readonly [number, number] | null, careful: boolean): void {
+  const targetY = p.floor(x, depth);
+  // durée maximale d'un pas (images) : le geyser doit rester au repos tout ce temps-là
+  const walk = 140;
+  for (let k = 0; k < 400 && p.state.hero; k++) {
+    const hx = p.hero.x;
+    const hp = p.hero.p;
+    const onPath = [0, 0.25, 0.5, 0.75, 1].map((t) => [hx + (x - hx) * t, hp + (depth - hp) * t] as const);
+    const risky = geysers(p).filter((g) => onPath.some(([px, pd]) => inGeyserReach(g, px, pd)));
+    const exposed = geysers(p).some((g) => inGeyserReach(g, hx, hp));
+    if (risky.every((g) => geyserQuiet(g) >= walk)) break;
+    // à découvert : mieux vaut avancer tant que le jet du geyser le plus proche n'est pas imminent que rester sur place, mais pas vers un
+    // geyser en plein jet qui ne menace pas encore le héros (il le tuerait en retombant)
+    if (exposed) {
+      const jetting = careful && risky.some((g) => g.ego === 1 && !inGeyserReach(g, hx, hp));
+      const imminent = geysers(p).some((g) => inGeyserReach(g, hx, hp) && geyserQuiet(g) < 40);
+      if (!imminent && !jetting) break;
+      if (imminent && from) {
+        p.walkTo(from[0], p.floor(from[0], from[1]), 600);
+        p.drain(2);
+        continue;
+      }
+    }
+    p.run(5);
+    p.drain(2);
+  }
+  p.walkTo(x, targetY, 1500);
+  p.drain(2);
+}
+
+/** Longe la salle 304 de case en case en évitant les jets des geysers (`geyserStep`). */
+function lavaWalkSafely(p: Robot, path: readonly (readonly [number, number])[], careful: boolean): void {
+  let previous: readonly [number, number] | null = null;
+  for (const [x, depth] of path) {
+    for (let k = 0; k < 3 && p.state.hero && Math.abs(p.hero.p - depth) > 6; k++) geyserStep(p, x, depth, previous, careful);
+    previous = [x, depth];
+  }
+}
+
+/**
+ * La planche de la salle 304 (`Num 308`, au fond de la salle de lave) : le trajet de la rampe du dôme à la salle 302 se fait salle par
+ * salle (`Robot.crossTo` : une sauvegarde avant chaque salle de nains), les torches sont posées en 302, puis la salle de lave est
+ * longée case par case en évitant les jets des geysers ; Minas Thyl propose son pacte puis attend (`Ego 5`, elle n'empêche pas de
+ * prendre la planche). Chaque essai de la lave repart de la salle 302 (sauvegardée une fois les torches posées) ; au retour on reprend
+ * les torches.
+ */
+export function plank(p: Robot): void {
+  p.attempt(
+    "approche de la rampe du dôme",
+    20,
+    () => {
+      p.goTo(106);
+      // la voûte du fond (sortie haute vers 103) est à gauche : les clics de bord mènent à la sortie de droite (107) ; on se place sous la
+      // voûte (P 15) puis flèche haut
+      p.walkTo(36, 44, 1500);
+      p.arrow("up");
+      p.until(() => p.roomId !== 106, 600);
+      p.stop();
+      p.run(30);
+      p.goTo(108);
+      p.downToRamp();
+      p.walkTo(230, 62, 4000);
+      p.drain();
+    },
+    () => p.roomId === 202,
+  );
+  for (const room of p.route(302)!) p.crossTo(room);
+  // les vapeurs de la salle 304 éteignent les torches (`147f:0352`, `G373`) : on les laisse ici, allumées
+  p.dropTorches();
+  // les premiers essais se fient aux seuls jets au repos ; après vingt morts le joueur attend aussi qu'aucun geyser en plein jet ne soit devant lui
+  let tries = 0;
+  p.attempt(
+    "planche",
+    40,
+    () => {
+      p.walkTo(95, 60, 1500);
+      p.arrow("up");
+      p.until(() => p.roomId !== 302, 600);
+      p.stop();
+      p.run(30);
+      p.need(p.roomId === 304, `salle ${p.roomId}`);
+      lavaWalkSafely(p, LAVA_PATH, ++tries > 20);
+      // Minas Thyl vient à la rencontre du héros (sans baguette elle ne propose que son pacte : `G325`, puis attend : `Ego 5`)
+      for (let k = 0; k < 8 && p.state.hero && !p.has(308); k++) p.say("prendre la planche");
+      p.need(p.has(308), "pas de planche");
+      // retour par le même chemin (les geysers de la salle tuent parfois : l'essai recommence depuis la sauvegarde)
+      lavaWalkSafely(p, [...LAVA_PATH].reverse().slice(1), tries > 20);
+      p.goTo(302, new Set(), true);
+      // Minas Thyl, sortie du tunnel sur les pas du héros, peut barrer le chemin des torches : sans elles les salles du château et de la
+      // mine sont dans le noir, l'essai recommence
+      p.takeTorches();
+    },
+    // Minas Thyl, restée où le héros l'a laissée, ne doit pas être dans son antre (301) : elle y capturerait le héros
+    () => p.has(308) && p.roomId === 302 && p.has(12),
   );
 }
 
@@ -366,10 +701,22 @@ export function riverAndLair(p: Robot): void {
     p.walkTo(76, 120, 3000);
     p.drain();
   }
+  // des nains morts à sa profondeur le bloquent : on s'écarte vers le bas puis on repart
+  for (let k = 0; k < 3 && p.hero.ground !== 7; k++) {
+    p.stepAway();
+    p.walkTo(76, 120, 3000);
+    p.drain();
+  }
   p.need(p.hero.ground === 7, "pas au pied de la paroi");
   p.run(20);
   p.vertical("-");
-  p.need(p.until(() => p.hero.y <= 54, 800), "escalade");
+  let climbed = p.until(() => p.hero.y <= 54, 800);
+  // un nain tué par l'épée au pied de la paroi interrompt la montée : on reprend l'escalade
+  for (let k = 0; k < 3 && !climbed && p.state.hero && p.hero.ground === 7 && p.hero.ego === 0; k++) {
+    p.vertical("-");
+    climbed = p.until(() => p.hero.y <= 54, 800);
+  }
+  p.need(climbed, "escalade");
   p.vertical("-");
   p.arrow("left");
   p.until(() => p.hero.ground === 82 && p.hero.ego === 0, 1200);
@@ -397,6 +744,31 @@ export function riverAndLair(p: Robot): void {
   p.goTo(207);
 }
 
+/** Salle et position de Minas Thyl : change dès qu'elle marche, même hors de la salle chargée. */
+function minasSpot(p: Robot): string {
+  const minas = p.state.findByNum(303);
+  return `${minas?.room?.id}:${minas?.x}:${minas?.p}`;
+}
+
+/**
+ * Réveille Minas Thyl arrêtée hors de la salle chargée (après une restauration, ou une fois son trajet hors salle tari, elle n'a plus de pas et
+ * ne bouge plus tant qu'elle n'est pas chargée) : le héros entre dans sa salle `room` (voisine), le temps qu'elle se mette en marche (vers lui, ou
+ * au hasard), puis revient d'où il est venu ; elle poursuit sa marche hors de la salle chargée. Rend faux si elle ne s'est pas ébranlée.
+ */
+function wakeMinas(p: Robot, room: number): boolean {
+  const from = p.roomId;
+  const before = minasSpot(p);
+  // les vapeurs de la salle 304 éteignent les torches (`G373`) et les salles du château sont dans le noir sans elles : on les pose avant
+  if (room === 304) p.dropTorches();
+  p.goTo(room, new Set(), true);
+  p.stop();
+  const moved = p.until(() => !p.state.hero || minasSpot(p) !== before, 150);
+  p.goTo(from, new Set(), true);
+  p.stop();
+  if (room === 304) p.takeTorches();
+  return moved;
+}
+
 /**
  * L'antre de Minas Thyl (salle 301), avec la baguette et en son absence (dans l'antre elle capture le héros au contact, `2dd9:0858`) : le
  * grimoire, ouvert puis lu avec la baguette (+10, `2b87:00f0`), la fiole de sang de dragon, changée en élixir d'invisibilité par
@@ -408,15 +780,25 @@ export function witchLair(p: Robot): void {
     "antre de Minas Thyl",
     20,
     () => {
-      // on attend dans la salle 302 qu'elle ne soit pas dans son antre ; dans le couloir 303 on regarde si elle y est visible (une fois
-      // arrêtée hors de la salle chargée, elle peut rester hors des limites de la scène : invisible et immobile)
-      for (let k = 0; k < 40 && minas()?.room?.id === 301; k++) p.wait(300);
-      p.need(minas()?.room?.id !== 301, "Minas Thyl dans son antre");
+      // elle erre de salle en salle (301 à 304) ; hors de la salle chargée elle ne marche pas tant qu'elle n'a pas été chargée (après une
+      // restauration elle reste arrêtée, au bord du couloir 303 ou dans son antre) : on l'attend dans le couloir, où elle agit, jusqu'à ce
+      // qu'elle soit partie ailleurs que dans son antre ou le couloir
       p.goTo(303, new Set(), true);
       p.stop();
-      const limits = (p.engine as unknown as { terrain: { limits: { xMax: number } } }).terrain.limits;
-      const inCorridor = minas()?.room === p.state.loadedRoom && (minas()?.x ?? 0) <= limits.xMax;
-      p.need(!inCorridor, "Minas Thyl dans le couloir");
+      let still = 0;
+      for (let k = 0, last = minasSpot(p); k < 100 && (minas()?.room?.id === 301 || minas()?.room?.id === 303); k++) {
+        p.wait(100);
+        still = minasSpot(p) === last ? still + 1 : 0;
+        last = minasSpot(p);
+        // arrêtée dans son antre (le couloir la charge, elle y agit)
+        if (still >= 5 && minas()?.room?.id === 301) {
+          wakeMinas(p, 301);
+          // à l'écart de la sortie de l'antre, que Minas Thyl doit pouvoir franchir
+          walkPath(p, [[110, 72]], 1500);
+          still = 0;
+        }
+      }
+      p.need(minas()?.room?.id !== 301 && minas()?.room?.id !== 303, "Minas Thyl dans son antre ou le couloir");
       p.goTo(301, new Set(), true);
       p.stop();
       p.need(minas()?.room?.id !== 301, "Minas Thyl dans son antre");
@@ -430,6 +812,8 @@ export function witchLair(p: Robot): void {
       walkPath(p, [[100, 40], [100, 80]], 2000);
       p.goTo(303, new Set(), true);
       p.goTo(302, new Set(), true);
+      // le héros garde son élan en entrant : sans arrêt il traverse la salle et sort (et l'étape suivante sauvegarde en pleine course)
+      p.stop();
     },
     () => p.roomId === 302 && p.has(304) && p.object(304).ego === 1,
   );
@@ -442,30 +826,32 @@ export function witchLair(p: Robot): void {
  */
 export function talisman(p: Robot): void {
   const minas = (): GameObject | undefined => p.state.findByNum(303);
-  const reach = (): boolean => !!p.state.hero && minas()?.room === p.state.loadedRoom && (p.engine as unknown as { inReach(o: unknown): boolean }).inReach(minas);
-  const limits = (): { xMax: number } => (p.engine as unknown as { terrain: { limits: { xMax: number } } }).terrain.limits;
+  const loaded = (): boolean => !!p.state.hero && !!minas() && minas()!.room === p.state.loadedRoom;
+  const reach = (): boolean => loaded() && (p.engine as unknown as { inReach(o: unknown): boolean }).inReach(minas());
   p.attempt(
     "talisman",
     20,
     () => {
-      for (let k = 0; k < 16 && !p.has(321); k++) {
+      let still = 0;
+      for (let k = 0, last = minasSpot(p); k < 40 && !p.has(321); k++) {
         const where = minas()?.room?.id ?? 0;
-        // on la cherche dans la salle 302 ou le couloir 303 ; dans son antre (capture au contact) ou sur la lave (geysers), on l'attend
-        if (p.roomId !== where && (where === 302 || where === 303)) {
-          p.goTo(where, new Set(), true);
+        still = minasSpot(p) === last ? still + 1 : 0;
+        last = minasSpot(p);
+        if (!loaded()) {
+          // hors de la salle chargée elle ne marche que sur un reste d'élan : arrêtée, elle ne bouge plus tant qu'elle n'est pas chargée. On la
+          // cherche dans le couloir 303 (où elle agit) ; arrêtée dans son antre ou dans la salle de lave, on la réveille ; sinon on l'attend
+          if (where === 303) p.goTo(303, new Set(), true);
+          else if (still >= 3 && (where === 301 || where === 304)) wakeMinas(p, where);
+          else if (p.roomId !== 302) p.goTo(302, new Set(), true);
           p.stop();
-        }
-        if (minas()?.room !== p.state.loadedRoom || (minas()?.x ?? 0) > limits().xMax) {
-          // pas là, ou pas encore entrée dans la salle chargée (hors des limites de la scène) : on attend
-          if (p.roomId !== 302) p.goTo(302, new Set(), true);
           p.wait(400);
           continue;
         }
         // elle approche (`G316`, `G317`), puis exige la baguette (`G327`) : on la lui donne dès qu'elle est à portée de main
-        for (let i = 0; i < 20 && !p.has(321) && minas()?.room === p.state.loadedRoom; i++) {
-          if (!p.until(() => reach() || !p.state.hero || minas()?.room !== p.state.loadedRoom, 600)) {
+        for (let i = 0; i < 20 && !p.has(321) && loaded(); i++) {
+          if (!p.until(() => reach() || !p.state.hero || !loaded(), 600)) {
             // elle s'est arrêtée à quelques pas (elle attend ce qu'il a à offrir) : la commande la fait venir (`V317`)
-            if (minas()?.room !== p.state.loadedRoom) break;
+            if (!loaded()) break;
             p.say("donner la baguette à Minas");
             continue;
           }
@@ -484,7 +870,7 @@ export function talisman(p: Robot): void {
  * l'émeraude sur l'îlot du cratère (`Sol 61` : le placement passe par `13a8:000a` avec ses effets, +20) et revient ; Minas Thyl, qui
  * convoite l'émeraude, marche sur la lave pour la prendre et s'y engloutit (+40, `2dd9:0358`). Part de la salle 302 et y revient.
  */
-export function craterTrap(p: Robot): void {
+export function craterTrap(p: Robot, round = 0): void {
   const minas = (): GameObject | undefined => p.state.findByNum(303);
   p.attempt(
     "cratère",
@@ -510,10 +896,53 @@ export function craterTrap(p: Robot): void {
       p.need(p.hero.ground !== 52, "sur la lave");
       p.goTo(302, new Set(), true);
     },
-    () => p.roomId === 302 && !p.has(313),
+    () => p.roomId === 302 && !p.has(313) && p.state.hero?.num === 1,
   );
   // Minas Thyl vient chercher l'émeraude, et s'engloutit
-  p.need(p.until(() => !minas(), 40000), "Minas Thyl ne vient pas chercher l'émeraude");
+  // le héros garde son élan en entrant dans la salle 302 : sans arrêt il la traverse et sort
+  p.stop();
+  // en errant, Minas Thyl passe par la salle 302 où le héros attend : elle l'avertit puis le change en crapaud (`2dd9:14cc`, `Num 327`), ou
+  // il meurt. Le joueur recharge alors sa sauvegarde. Après une restauration elle ne marche plus hors de la salle chargée : arrêtée
+  // dans sa salle d'origine, hors de portée du héros (salle 8, sans route), elle n'en bougerait jamais. On sauvegarde donc quand elle est
+  // dans son antre ou la salle de lave (301, 304), où on sait la réveiller (`wakeMinas`) ; avant cela, un héros perdu reprend l'essai
+  // du cratère depuis le début. Les torches brûlent pendant l'attente (36 000 images neuves, 90 000 en tout) et il en faut encore pour le château :
+  // au-delà de 500 attentes de 100 images on recharge la sauvegarde, comme si Minas Thyl ne venait pas.
+  const lost = (): boolean => p.state.hero?.num !== 1;
+  let saved = false;
+  for (let restores = 0; minas() && restores < 40; ) {
+    let still = 0;
+    let last = minasSpot(p);
+    for (let k = 0; k < 500 && minas() && !lost(); k++) {
+      p.wait(100);
+      if (!lost()) relightTorch(p);
+      still = minasSpot(p) === last ? still + 1 : 0;
+      last = minasSpot(p);
+      const where = minas()?.room?.id ?? 0;
+      // hors de la salle chargée Minas Thyl ne marche que sur un reste d'élan : arrêtée dans son antre ou la salle de lave, on la réveille ; sinon elle erre au hasard de salle en salle et finit par revenir (longue attente)
+      if (still >= 30 && (where === 301 || where === 304)) {
+        wakeMinas(p, where);
+        still = 0;
+      } else if (still >= 30 && where !== 303 && p.roomId !== 302) {
+        p.goTo(302, new Set(), true);
+        p.stop();
+        still = 0;
+      } else if (!saved && !lost() && (where === 301 || where === 304) && p.roomId === 302) {
+        p.save();
+        saved = true;
+      }
+    }
+    // Minas Thyl engloutie mais le héros changé en crapaud par son sort (`Num 327`) : la partie est perdue, la sauvegarde est rechargée
+    if (!minas() && !lost()) break;
+    restores++;
+    p.restore();
+    if (!saved) {
+      // pas de sauvegarde sûre : on rejoue le cratère depuis sa sauvegarde
+      p.need(round < 15, "cratère : Minas Thyl introuvable");
+      craterTrap(p, round + 1);
+      return;
+    }
+  }
+  p.need(!minas() && !lost(), "Minas Thyl ne vient pas chercher l'émeraude");
   p.wait(200);
 }
 
@@ -530,6 +959,7 @@ function sarhulsAway(p: Robot, x: number, depth: number, margin = 28): boolean {
  */
 export function toSarhulPit(p: Robot): void {
   p.need(p.roomId === 305, `salle ${p.roomId}`);
+  p.need(p.hero.num === 1, `héros ${p.hero.num}`);
   walkPath(p, [[72, 30], [72, 20]]);
   p.say("ouvrir la porte avec la clef");
   p.need(p.object(329).ego === 2, "porte de fer fermée");
@@ -600,6 +1030,8 @@ export function chapiterAndCrown(p: Robot): void {
       p.say("ouvrir la grille avec la clef");
       p.need(p.until(() => p.object(316).ego === 3, 400), "grille ouvragée fermée");
       walkPath(p, [[100, 88], [96, 56], [96, 28]], 1500);
+      // un message de la torche qui se consume (fenêtre) interrompt parfois le trajet : on le reprend
+      for (let k = 0; k < 3 && p.hero.p > 32; k++) walkPath(p, [[96, 28]], 1500);
       p.need(p.hero.ground === 56 && p.hero.p <= 32, `pas devant la herse (sol ${p.hero.ground})`);
       p.say("ouvrir la herse avec la clef");
       p.need(p.until(() => p.object(317).ego === 3, 600), "herse fermée");
@@ -628,4 +1060,32 @@ export function chapiterAndCrown(p: Robot): void {
     },
     () => p.state.hero?.num === 333,
   );
+}
+
+/**
+ * Rallume une torche neuve à la torche qui brûle encore : les torches se consument pendant les longues attentes (36 000 images neuves, `2420:000e`),
+ * et la lueur faible d'une torche presque consumée ne suffit plus à voir (« Je ne vois rien, il fait trop noir », plus de clic de marche).
+ */
+export function relightTorch(p: Robot): void {
+  const torches = (): GameObject[] => p.hero.contents.filter((o) => o.num === 12);
+  if (torches().some((o) => o.ego >= 2 && o.ego < 4) || !torches().some((o) => o.ego >= 4)) return;
+  p.say("allumer la torche avec la torche");
+}
+
+/** Les crapauds de la salle chargée. */
+function toads(p: Robot): GameObject[] {
+  return p.state.objects.filter((o) => o.num === 327 && o.room === p.state.loadedRoom && o.holder === null);
+}
+
+/**
+ * Écarte les crapauds de la salle chargée (`Num 327`, `2d52:0496` : « tuer » les détruit) : l'un d'eux, dans le couloir étroit de la salle 302,
+ * bouche la sortie vers 205 (le héros bute dessus, `Err 0x11`, et le trajet de sortie échoue).
+ */
+export function clearToads(p: Robot): void {
+  for (let k = 0; k < 6 && toads(p).length > 0; k++) {
+    const toad = toads(p)[0]!;
+    p.say("tuer le crapaud");
+    if (toads(p).length === 0) break;
+    p.walkTo(Math.max(4, toad.x - 10), p.floor(Math.max(4, toad.x - 10), toad.p), 1500);
+  }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import { SceneId, type Scene } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import { clockFrame } from "../../src/games/mathemagique/scenes/title";
@@ -193,7 +193,7 @@ describe("horloge du titre (1068:0785)", () => {
 
 interface Game {
   host: TestHost;
-  engine: Engine;
+  engine: MathEngine;
   services: MathServices;
   monitor: { mode: MonitorMode; detail: MonitorDetail | undefined }[];
 }
@@ -203,7 +203,7 @@ function boot(options: RegisterScenesOptions = {}, setup?: (host: TestHost) => v
   const host = new TestHost();
   host.audio.unlock();
   setup?.(host);
-  const engine = new Engine(host, { seed: 3 });
+  const engine = new MathEngine(host, { seed: 3 });
   const services = installServices(engine);
   const monitor: Game["monitor"] = [];
   registerScenes(engine, services, { openMonitor: (mode, detail) => monitor.push({ mode, detail }), ...options });

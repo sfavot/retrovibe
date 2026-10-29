@@ -9,7 +9,7 @@
  * Largeur d'un texte = somme des avances des glyphes (police bitmap sans crénage : `GetTextExtent`). Position `y` = haut de la cellule.
  */
 import type { FonFont } from "./fon";
-import type { Surface } from "./surface";
+import type { Surface } from "../../../../engine/mohawk/graphics/surface";
 
 /** Mac Roman : caractères Unicode des codes 0x80 à 0xFF (0xCA = espace insécable, 0xF0 = pomme, réservée). */
 const MAC_ROMAN_HIGH =

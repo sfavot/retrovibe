@@ -20,7 +20,7 @@
   aspect-ratio: 4 / 3;
 }
 
-/* Champ invisible qui fait monter le clavier virtuel pendant la saisie du nom (`text-input.ts`). 16 px : iOS ne zoome pas dessus. */
+/* Champ invisible qui fait monter le clavier virtuel pendant la saisie du nom (`src/ui/mohawk/text-input.ts`). 16 px : iOS ne zoome pas dessus. */
 .mw-text-input {
   position: absolute;
   left: 0;

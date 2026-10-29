@@ -1,4 +1,4 @@
-import { Engine } from "../../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../../src/games/mathemagique/engine/engine";
 import { Roster, ROSTER_STORAGE_KEY, RosterStore } from "../../../src/games/mathemagique/engine/roster";
 import { SCENE_NAMES, SceneId, type Scene } from "../../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../../src/games/mathemagique/engine/services";
@@ -131,7 +131,7 @@ interface SceneLife {
  */
 export class Robot {
   readonly host = new RobotHost();
-  readonly engine: Engine;
+  readonly engine: MathEngine;
   readonly services: MathServices;
   readonly rng: Rng;
   readonly certificates = new FakeCertificates();
@@ -161,7 +161,7 @@ export class Robot {
   constructor(readonly options: RobotOptions) {
     this.rng = new Rng(options.seed * 7919 + 17);
     this.host.audio.unlock();
-    this.engine = new Engine(this.host, {
+    this.engine = new MathEngine(this.host, {
       seed: options.seed,
       onError: (error, sceneId) => this.violate(`chargement de scène ${SCENE_NAMES[sceneId]}`, "chargement", `${describeError(error)}`),
     });

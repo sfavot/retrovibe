@@ -8,14 +8,14 @@
  * question, réponses, barre, œil) ; `screen` reçoit des rectangles de `canvas` (les animations de quilles ne sont jamais écrasées).
  */
 import { TAG_SHAP } from "../../../data/mohawk/mohawk";
-import { drawShape } from "../engine/graphics/blit";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
 import { parseFon } from "../engine/graphics/fon";
-import type { PaletteCycler } from "../engine/graphics/palette";
-import { Surface, type Rect } from "../engine/graphics/surface";
+import type { PaletteCycler } from "../../../engine/mohawk/graphics/palette";
+import { Surface, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { HotspotTable, rectFromEdges, type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
-import type { KeyEvent } from "../engine/input";
-import { NoRepeatPool } from "../engine/rng";
-import type { Archive } from "../engine/resources";
+import type { KeyEvent } from "../../../engine/mohawk/input";
+import { NoRepeatPool } from "../../../engine/mohawk/rng";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import type { MathServices } from "../engine/services";
@@ -43,7 +43,8 @@ import {
   type BowlingQuestion,
   type StrikeResult,
 } from "../game/bowling";
-import { MonitorOverlay, loadMonitorFont, type MonitorResult, type TextInputPort } from "./monitor";
+import { MonitorOverlay, loadMonitorFont, type MonitorResult } from "./monitor";
+import type { TextInputPort } from "../../../engine/mohawk/text-input";
 import {
   ANSWER_BOXES,
   CREAM,
@@ -81,6 +82,7 @@ import {
   drawTimeBar,
   type ViewFonts,
 } from "./bowling-view";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 // --- Ressources et constantes (bowling.md §3 à §6) ---
 
@@ -187,10 +189,10 @@ export class BowlingScene implements Scene {
   private controls!: GadgetGroup;
   private misc!: GadgetGroup;
   private answers!: GadgetGroup;
-  private readonly base = new Surface();
-  private readonly canvas = new Surface();
+  private readonly base = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
+  private readonly canvas = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   /** Fond des animations : `canvas` et les boutons (`animationBackground`). */
-  private readonly animationCanvas = new Surface();
+  private readonly animationCanvas = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
 
   private progress = BowlingProgress.empty();
   private picker!: QuestionPicker;

@@ -1,7 +1,7 @@
 /**
  * Câblage des services du moteur (tâche G1) : surface de jeu + palette, son, lecteur de scripts, gadgets, pointeur.
  *
- * `installServices(engine)` est à appeler une fois, après `new Engine(host)` et avant `engine.start()` (G2). Il
+ * `installServices(engine)` est à appeler une fois, après `new MathEngine(host)` et avant `engine.start()` (G2). Il
  *  - crée la surface 576×432 (`GRAPHICS.screen`, le port de travail visible) et la palette, et branche `engine.setFrameSource` ;
  *  - enregistre les services (`GRAPHICS`, `SOUND`, `SCR_PLAYER`, `GADGETS`, `POINTER`) dans `engine.services` ;
  *  - ajoute **un** crochet de tick, dans cet ordre : palette (fondus, cycles) → séquenceur MIDI → lecteur de scripts (interruptions, étapes,
@@ -13,17 +13,18 @@
  * Contrat des scènes : dans `enter`, `services.useArchive(archive)` (formes et sons des gadgets), création des groupes, `captureBackground` ;
  * dans `leave`, `services.endScene()` (arrête les animations, vide les gadgets, abandonne la pièce portée, coupe les sons).
  */
-import type { Engine } from "./engine";
+import type { MathEngine } from "./engine";
 import { GADGETS, GadgetManager } from "./gadgets";
-import { Palette, PALETTE_BYTES } from "./graphics/palette";
-import type { Frame } from "./graphics/frame";
-import { Surface } from "./graphics/surface";
+import { Palette, PALETTE_BYTES } from "../../../engine/mohawk/graphics/palette";
+import type { Frame } from "../../../engine/mohawk/graphics/frame";
+import { Surface } from "../../../engine/mohawk/graphics/surface";
 import { POINTER, PointerService } from "./pointer";
 import { SCR_PLAYER, ScrPlayer } from "./scr-player";
 import { defineService } from "./scene";
 import { SOUND, SoundService, type WaveArchive } from "./sound";
 import { TAG_SHAP } from "../../../data/mohawk/mohawk";
 import type { Shape } from "../../../data/mohawk/shap";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "./graphics/play-area";
 
 export interface GraphicsService {
   /** Surface de jeu 576×432 : ce que `host.present` reçoit. Les scènes y dessinent (ou y copient leur propre surface). */
@@ -54,12 +55,12 @@ export interface MathServices {
   endScene(options?: { keepMusic?: boolean }): void;
 }
 
-export function installServices(engine: Engine): MathServices {
+export function installServices(engine: MathEngine): MathServices {
   const { ctx } = engine;
-  const screen = new Surface();
+  const screen = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   const palette = new Palette();
   const graphics: GraphicsService = { screen, palette };
-  const frame: Frame = { pixels: screen.pixels, palette: new Uint8Array(PALETTE_BYTES) };
+  const frame: Frame = { width: PLAY_WIDTH, height: PLAY_HEIGHT, pixels: screen.pixels, palette: new Uint8Array(PALETTE_BYTES) };
   const scratch = new Uint8Array(PALETTE_BYTES);
 
   const sound = new SoundService(ctx.host.audio, { ambientEnabled: () => ctx.roster.roster.ambient });

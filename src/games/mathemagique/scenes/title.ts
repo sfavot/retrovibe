@@ -7,10 +7,10 @@
  * (30 ticks) ; l'ouverture de la porte (`SCR` 10000) est une lecture bloquante non interruptible.
  */
 import { loadPcm } from "../../../engine/mohawk/audio/pcm";
-import { TICK_MS, type Deadline } from "../engine/clock";
+import { TICK_MS, type Deadline } from "../../../engine/mohawk/clock";
 import { rectFromEdges, type GadgetGroup } from "../engine/gadgets";
-import { drawShape } from "../engine/graphics/blit";
-import type { Archive } from "../engine/resources";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";

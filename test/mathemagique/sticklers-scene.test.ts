@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { MohawkArchive } from "../../src/data/mohawk/mohawk";
 import type { ShapeList } from "../../src/data/mohawk/shpl";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
-import { Palette } from "../../src/games/mathemagique/engine/graphics/palette";
-import { Archive } from "../../src/games/mathemagique/engine/resources";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
+import { Palette } from "../../src/engine/mohawk/graphics/palette";
+import { Archive } from "../../src/engine/mohawk/resources";
 import { SceneId } from "../../src/games/mathemagique/engine/scene";
 import { installServices } from "../../src/games/mathemagique/engine/services";
 import { parseSticklersPuzz, puzzId, rewardId } from "../../src/games/mathemagique/game/puzz";
@@ -89,7 +89,7 @@ type Mode = "clickAndStick" | "drag";
 
 async function boot(options: { mode?: Mode; ambient?: boolean; player?: boolean } = {}) {
   const host = new TestHost();
-  const engine = new Engine(host, { seed: 11 });
+  const engine = new MathEngine(host, { seed: 11 });
   const services = installServices(engine);
   const roster = engine.ctx.roster;
   roster.roster.clickAndStick = (options.mode ?? "clickAndStick") === "clickAndStick";
@@ -233,7 +233,7 @@ real("Super Sticklers : entrée et menu", () => {
 
   it("peint tout l'écran à l'entrée : aucun pixel de l'image précédente ne survit", async () => {
     const host = new TestHost();
-    const engine = new Engine(host, { seed: 11 });
+    const engine = new MathEngine(host, { seed: 11 });
     const services = installServices(engine);
     // Une couleur que le décor n'emploie nulle part (le fond SHPL 104 et ses vignettes).
     const archive = new Archive("STICKLER.DAT", MohawkArchive.parse(readOriginal("STICKLER.DAT")));

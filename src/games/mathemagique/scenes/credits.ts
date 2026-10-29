@@ -7,15 +7,16 @@
  * plaque vierge sauvegardée, puis la page suivante est dessinée dans le port de travail et révélée de même. La direction avance d'un cran
  * toutes les deux transitions (hypothèse sur « tourne tous les deux appels »).
  */
-import type { Deadline } from "../engine/clock";
+import type { Deadline } from "../../../engine/mohawk/clock";
 import { rectFromEdges, type GadgetGroup } from "../engine/gadgets";
-import { drawShape } from "../engine/graphics/blit";
-import { Surface, type Rect, type SavedRect } from "../engine/graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import { Surface, type Rect, type SavedRect } from "../../../engine/mohawk/graphics/surface";
 import { revealRects, Wipe, type WipeDirection } from "../engine/graphics/transitions";
-import type { Archive } from "../engine/resources";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 const ARCHIVE = "CREDITS.DAT";
 const MIDI_ARCHIVE = "MILKYWAY.DAT";
@@ -52,7 +53,7 @@ type Phase =
 
 class CreditsScene implements Scene {
   private archive!: Archive;
-  private work = new Surface();
+  private work = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   private blank!: SavedRect;
   private phase: Phase = "page";
   private page = 0;

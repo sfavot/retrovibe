@@ -2,7 +2,7 @@
  * Choix du problème suivant (`1010:0f18`, screens/bowling.md §1.4 et §1.5) : sous-type (niveau ou bonus), indice dans l'espace
  * énuméré du sous-type avec historique anti-répétition, file de reprise des problèmes manqués.
  */
-import type { MsvcRandom } from "../../engine/rng";
+import type { MsvcRandom } from "../../../../engine/mohawk/rng";
 import type { EstimationTables } from "./estimation";
 import { type BowlingQuestion, buildQuestion } from "./questions";
 import { BONUS, ESTIMATION, PROBLEM_MAX, SUBTYPE_COUNTS } from "./tables";

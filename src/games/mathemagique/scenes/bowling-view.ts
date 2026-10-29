@@ -3,12 +3,12 @@
  * sans état de scène. Les rectangles sont `{ x, y, w, h }` (tables de l'original `[gauche, haut, droite, bas[`).
  */
 import { TAG_SHAP } from "../../../data/mohawk/mohawk";
-import { drawMask, drawShape } from "../engine/graphics/blit";
+import { drawMask, drawShape } from "../../../engine/mohawk/graphics/blit";
 import type { FonFont } from "../engine/graphics/fon";
-import { Surface, type Rect } from "../engine/graphics/surface";
+import { Surface, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { drawText, measureText } from "../engine/graphics/text";
 import { rectFromEdges } from "../engine/gadgets";
-import type { Archive } from "../engine/resources";
+import type { Archive } from "../../../engine/mohawk/resources";
 import type { BowlingQuestion, Choice } from "../game/bowling";
 
 // --- Ressources de BOWLING.DAT ---

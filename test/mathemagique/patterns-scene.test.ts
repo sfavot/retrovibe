@@ -422,7 +422,7 @@ real("Puzzle Patterns : scène complète sur PATTERNS.DAT", () => {
     }
   });
 
-  it("stores vénitiens : 15 ticks vers un autre menu ou un puzzle, 30 puis 15 depuis un puzzle actif et 30 au Reset ; un clic les achève", async () => {
+  it("stores vénitiens : 15 ticks vers un autre menu, 15 puis 30 vers un puzzle, 30 puis 15 depuis un puzzle actif et 30 au Reset ; un clic les achève", async () => {
     const rig = await boot();
     await rig.until(() => rig.scene.flowKind === "free");
     const between = (n: number, min: number, max: number) => {
@@ -443,7 +443,7 @@ real("Puzzle Patterns : scène complète sur PATTERNS.DAT", () => {
     const [gx, gy] = buttonCenter("orange");
     between(await blinds(gx, gy), 13, 18);
     const t = thumbRect(THUMB_LAYOUTS.patterns, 0);
-    between(await blinds(t.x + 36, t.y + 36), 13, 18);
+    between(await blinds(t.x + 36, t.y + 36), 43, 50);
     expect(rig.scene.puzzleSession.mode).toBe("playing");
     const [rx, ry] = buttonCenter("reset");
     between(await blinds(rx, ry), 28, 33);
@@ -458,6 +458,36 @@ real("Puzzle Patterns : scène complète sur PATTERNS.DAT", () => {
     await rig.tick(3);
     expect(rig.scene.flowKind).toBe("free");
     expect(rig.scene.puzzleSession.level).toBe(1);
+  });
+
+  it("choix d'un puzzle : la palette 154–225 change d'un coup entre le cadre vide (15 ticks) et la révélation de l'écran entier (30 ticks), sans fondu", async () => {
+    const rig = await boot();
+    await rig.until(() => rig.scene.flowKind === "free");
+    const before = rig.services.graphics.palette.snapshot(154, 72);
+    const t = thumbRect(THUMB_LAYOUTS.patterns, 1);
+    rig.host.click(t.x + 36, t.y + 36);
+    await rig.tick(1);
+    const same = (a: ArrayLike<number>, b: ArrayLike<number>) => a.length === b.length && Array.from(a).every((v, i) => v === b[i]);
+    // Une valeur par tick : `true` tant que la palette est celle du menu.
+    const old: boolean[] = [];
+    let after: ArrayLike<number> | null = null;
+    for (let n = 0; n < 200 && rig.scene.flowKind === "transition"; n++) {
+      const now = rig.services.graphics.palette.snapshot(154, 72);
+      const isOld = same(now, before);
+      if (!isOld) after ??= now;
+      else if (after) throw new Error("la palette est revenue en arrière");
+      // Jamais de valeur intermédiaire : soit l'ancienne, soit la définitive.
+      if (!isOld) expect(same(now, after!)).toBe(true);
+      old.push(isOld);
+      await rig.tick(1);
+    }
+    const switchTick = old.indexOf(false);
+    // 15 ticks de cadre vide avec l'ancienne palette, puis 30 ticks avec la nouvelle.
+    expect(switchTick).toBeGreaterThanOrEqual(13);
+    expect(switchTick).toBeLessThanOrEqual(18);
+    expect(old.length - switchTick).toBeGreaterThanOrEqual(28);
+    expect(old.length - switchTick).toBeLessThanOrEqual(33);
+    expect(old.slice(0, switchTick).every(Boolean)).toBe(true);
   });
 
   it("Reset : nouveau mélange du même puzzle, son 6505 ; sans effet dans le menu", async () => {

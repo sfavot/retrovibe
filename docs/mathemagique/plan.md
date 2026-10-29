@@ -60,6 +60,6 @@ Chaque vague se termine par `npm run typecheck`, `npm test`, `npm run build` et,
 - **Joueurs** : `localStorage`, 40 au maximum, sauvegarde aussi en quittant (correction d'un défaut de l'original).
 - **Quitter** (hub, après la confirmation par sifflet) : retour à l'accueil du site.
 - **Ctrl + clic** sur tactile : appui long de 500 ms (comme Lost in Time).
-- **Séquences secrètes** : les 12 décodées, au clavier ; les 7 partielles restent à retrouver.
+- **Séquences secrètes** : les 19 au clavier : 12 décodées, 7 reconnues par leur couple `(X, H)` relu dans `MATH` (préfixe d'origine non identifiable mais sans effet, voir `screens/common.md` §4.3).
 - **Rockets** : le compteur de victoires de Poly jamais remis à zéro est reproduit (défaut documenté).
 - **Textes du site validés** : `src/games/mathemagique/copy.ts`.

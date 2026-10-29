@@ -555,7 +555,7 @@ real("Super Sticklers : puzzle", () => {
     expect(rig.scene.inspect().transitioning).toBe(false);
   });
 
-  it("stores vénitiens : 15 ticks entre deux menus, 30 puis 15 depuis un puzzle actif, un clic les achève", async () => {
+  it("stores vénitiens : 15 ticks entre deux menus, 15 puis 30 vers un puzzle, 30 puis 15 depuis un puzzle actif, un clic les achève", async () => {
     const rig = await boot();
     const run = async (click: { x: number; y: number }) => {
       rig.host.click(click.x, click.y);
@@ -572,10 +572,10 @@ real("Super Sticklers : puzzle", () => {
     expect(menuToMenu).toBeGreaterThanOrEqual(13);
     expect(menuToMenu).toBeLessThanOrEqual(18);
     expect(rig.scene.inspect()).toMatchObject({ mode: "menu", level: 1 });
-    // Vignette → puzzle : 15 ticks sur le chevalet, fragments gelés pendant ce temps.
+    // Vignette → puzzle : chevalet vide en 15 ticks puis écran entier en 30 ticks (`1048:0556` → `1048:0cf8`), fragments gelés pendant ce temps.
     const toPuzzle = await run(thumbCenter(0));
-    expect(toPuzzle).toBeGreaterThanOrEqual(13);
-    expect(toPuzzle).toBeLessThanOrEqual(18);
+    expect(toPuzzle).toBeGreaterThanOrEqual(43);
+    expect(toPuzzle).toBeLessThanOrEqual(50);
     expect(rig.scene.inspect().mode).toBe("playing");
     // Puzzle actif → autre niveau : effacement sur l'écran entier (30 ticks) puis vignettes (15 ticks).
     const back = await run(buttonCenter(1));
@@ -590,6 +590,32 @@ real("Super Sticklers : puzzle", () => {
     await frames(rig, 3);
     expect(rig.scene.inspect().transitioning).toBe(false);
     expect(rig.scene.inspect()).toMatchObject({ mode: "menu", level: 2 });
+  });
+
+  it("vignette → puzzle : la palette 154–185 change d'un coup entre le chevalet vide (15 ticks) et la révélation de l'écran entier (30 ticks), sans fondu", async () => {
+    const rig = await boot();
+    const before = Array.from(rig.services.graphics.palette.snapshot(154, 32));
+    const c = thumbCenter(0);
+    rig.host.click(c.x, c.y);
+    await frames(rig, 1);
+    const same = (a: ArrayLike<number>, b: number[]) => a.length === b.length && b.every((v, i) => v === a[i]);
+    const old: boolean[] = [];
+    let after: number[] | null = null;
+    for (let n = 0; n < 200 && rig.scene.inspect().transitioning; n++) {
+      const now = Array.from(rig.services.graphics.palette.snapshot(154, 32));
+      const isOld = same(now, before);
+      if (!isOld) {
+        after ??= now;
+        expect(same(now, after)).toBe(true);
+      } else expect(after).toBeNull();
+      old.push(isOld);
+      await frames(rig, 1);
+    }
+    const switchTick = old.indexOf(false);
+    expect(switchTick).toBeGreaterThanOrEqual(13);
+    expect(switchTick).toBeLessThanOrEqual(18);
+    expect(old.length - switchTick).toBeGreaterThanOrEqual(28);
+    expect(old.length - switchTick).toBeLessThanOrEqual(33);
   });
 
   it("Exit rend la main au hub", async () => {

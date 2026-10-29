@@ -263,7 +263,8 @@ export function createSticklersScene(services: MathServices): SticklersScene {
         EASEL,
         EASEL_BLINDS_TICKS,
         () => {
-          // Hypothèse : la palette change au début de la dernière transition (l'original fait un fondu `10a8:0dc4` autour d'elle).
+          // `1048:0816` : `10a8:0dc4(32, 154)` installe d'un coup (sans fondu) la palette des vignettes juste avant la dernière transition,
+          // après l'effacement qui s'est fait avec l'ancienne palette.
           restoreScenePalette();
           paintMenuBase();
           composeAll(old);
@@ -292,42 +293,55 @@ export function createSticklersScene(services: MathServices): SticklersScene {
     const id = puzzId(session.level, k);
     const puzz = parseSticklersPuzz(archive.raw("PUZZ", id));
     shplFirst = archive.shpl(id).firstShapeId;
-    hysteresis.reset();
-    board = new SticklersBoard(session.level, puzz, sizeOf, (piece, x, y) => hysteresis.test(piece, shapeOf(piece), x, y));
-    board.scatter(ctx.rng);
     hoverThumb = -1;
     hoverPiece = null;
     heldRect = null;
-    attachBoard<StickPiece>(pointer, gate(board), {
-      picked(piece) {
-        if (!regrabbing) play(SND.grab);
-        hoverPiece = null;
-        const now = pieceRect(piece);
-        compose(heldRect ? unionRect(heldRect, now) : now);
-        heldRect = now;
-      },
-      moved(piece) {
-        const now = pieceRect(piece);
-        compose(heldRect ? unionRect(heldRect, now) : now);
-        heldRect = now;
-      },
-      dropped(piece, outcome) {
-        if (pointer.mode === "clickAndStick") play(SND.drop);
-        const now = pieceRect(piece);
-        compose(heldRect ? unionRect(heldRect, now) : now);
-        heldRect = null;
-        if (outcome.complete) win();
-      },
-    });
-    // `1048:0556` : le puzzle est composé puis révélé sur le chevalet en 15 ticks ; la zone de dispersion apparaît tout de suite.
+    // `1048:0556` : (1) `1048:17f9` retire les vignettes, `1018:09b8` révèle le chevalet vide en 15 ticks, encore avec la palette du menu ;
+    // (2) `10a8:0dc4(32, 154)` installe d'un coup les couleurs du puzzle (sans fondu), le gabarit est dessiné, puis `1048:0cf8` disperse les
+    // fragments et les révèle sur l'écran entier en 30 ticks (`1018:09b8`, `8bce`).
+    board = null;
     blinds(
       EASEL,
       EASEL_BLINDS_TICKS,
       () => {
-        paintPuzzleBase(id, puzz);
+        resetBase(EASEL);
+        resetBase(SCATTER);
         composeAll();
       },
-      endTransition,
+      () =>
+        blinds(
+          FULL,
+          SCREEN_BLINDS_TICKS,
+          () => {
+            hysteresis.reset();
+            board = new SticklersBoard(session.level, puzz, sizeOf, (piece, x, y) => hysteresis.test(piece, shapeOf(piece), x, y));
+            board.scatter(ctx.rng);
+            paintPuzzleBase(id, puzz);
+            attachBoard<StickPiece>(pointer, gate(board), {
+              picked(piece) {
+                if (!regrabbing) play(SND.grab);
+                hoverPiece = null;
+                const now = pieceRect(piece);
+                compose(heldRect ? unionRect(heldRect, now) : now);
+                heldRect = now;
+              },
+              moved(piece) {
+                const now = pieceRect(piece);
+                compose(heldRect ? unionRect(heldRect, now) : now);
+                heldRect = now;
+              },
+              dropped(piece, outcome) {
+                if (pointer.mode === "clickAndStick") play(SND.drop);
+                const now = pieceRect(piece);
+                compose(heldRect ? unionRect(heldRect, now) : now);
+                heldRect = null;
+                if (outcome.complete) win();
+              },
+            });
+            composeAll();
+          },
+          endTransition,
+        ),
     );
   }
 

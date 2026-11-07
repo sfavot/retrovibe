@@ -1104,6 +1104,22 @@ a.button:hover {
   display: none;
 }
 
+/* En jeu (`start`), le message de chargement est une pastille dans le coin de l'écran, hors du flux de la page. */
+.game-shell-stage > .game-shell-status {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #000c;
+  color: #fff;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  pointer-events: none;
+  /* au-dessus des vidéos et couches que le jeu ajoute à l'écran */
+  z-index: 1;
+}
+
 .game-shell-overlay {
   position: absolute;
   inset: 0;

@@ -316,6 +316,8 @@ export function mountGameShell(options: GameShellOptions): GameShell {
       toggles.append(fullscreen.button);
       main.prepend(stage, ...(options.afterStage ?? []));
       main.append(footer);
+      // En jeu, le chargement est une pastille posée sur l'écran : dans le flux, il décalerait le pied de page et l'échelle du canvas.
+      stage.append(status);
 
       let lastScale = 0;
       const resize = (): void => {

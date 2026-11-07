@@ -30,7 +30,8 @@ import { Walker, type WalkerInput } from "./board/walker";
  *
  * - toucher le décor : le pion marche jusque-là sur sa rangée (près d'un bord d'écran : jusqu'au bord, puis s'arrête sur la
  *   rangée où il arrive), comme si la flèche était tenue ; toucher ailleurs change de but, une flèche du clavier l'annule ;
- * - toucher le pion : le bouton (entrer dans la porte, déclencher l'événement) ;
+ * - toucher le pion : le bouton (entrer dans la porte, déclencher l'événement), sauf dans la bande d'un bord au-delà du milieu
+ *   du pion, qui reste la marche vers ce bord ;
  * - glisser vers le haut : le saut, du côté du glissement (ou du côté où regarde le pion s'il est vertical) ;
  * - toucher le bandeau du bas : la pause (touche P) ; appui long : la voix d'aide (clic droit).
  *
@@ -365,11 +366,15 @@ export class Board {
       return this.view.facingRight ? 1 : -1;
     }
     if (gesture.y >= HUD_TOP) return "pause";
-    if (this.onPawn(gesture.x, gesture.y)) {
+    const edge = gesture.x < EDGE_TOUCH ? -1 : gesture.x >= SCREEN_WIDTH - EDGE_TOUCH ? 1 : 0;
+    // Près d'un bord, le pion (et sa marge) couvre presque toute la bande : du côté du bord par rapport à son milieu, le doigt
+    // demande d'y marcher, pas le bouton (qui, sous le Turlusiphon, le reprendrait en le faisant marcher dans l'autre sens).
+    const towardEdge = edge !== 0 && Math.sign(gesture.x - (this.view.x + this.pawnHalfWidth())) === edge;
+    if (!towardEdge && this.onPawn(gesture.x, gesture.y)) {
       this.touchTarget = null;
       return "press";
     }
-    const x = gesture.x < EDGE_TOUCH ? -Infinity : gesture.x >= SCREEN_WIDTH - EDGE_TOUCH ? Infinity : gesture.x - this.pawnHalfWidth();
+    const x = edge !== 0 ? edge * Infinity : gesture.x - this.pawnHalfWidth();
     this.touchTarget = { screen: this.view.screen, row: this.view.row, x, stuck: 0 };
     return null;
   }

@@ -472,6 +472,24 @@ describe("événements du plateau", () => {
     }
   });
 
+  it("un événement qui finit le tour ne se rejoue pas sur le pion du joueur suivant (bouton ou marche)", () => {
+    // Le joueur 1 attend devant le Turlusiphon (libéré, x = 0x109 + 0x14) ou dans sa plage de marche.
+    for (const [x0, x1, act] of [
+      [0x120, 0x11d, (g: Game) => g.press()],
+      [0xfd, 0x108, (g: Game) => g.walk(1)],
+    ] as const) {
+      const game = duo();
+      const round = game.state.round;
+      Object.assign(game.state.players[1], { screen: 3, row: "bottom", x: x1 });
+      place(game, 3, "bottom", x0);
+      const events = act(game);
+      expect(events.filter((e) => e.type === "hazard"), `x1=${x1.toString(16)}`).toEqual([expect.objectContaining({ player: 0, kind: "turlusiphon" })]);
+      expect(game.state.players[0].status).toBe(4);
+      expect(game.state).toMatchObject({ current: 1, round, phase: "turn" });
+      expect(game.state.players[1]).toMatchObject({ status: 0, x: x1 });
+    }
+  });
+
   it("Turlusiphon : relâché au tour suivant (6 → 5), le pion recule de 20 px", () => {
     const game = duo();
     place(game, 3, "bottom", 0x120);

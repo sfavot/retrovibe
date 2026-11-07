@@ -274,6 +274,36 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     expect(r.board.shown).toMatchObject({ x: 0x109 - 0x14, look: "normal" });
   }, 120_000);
 
+  it("doigt, à deux sous le Turlusiphon : reprendre l'un ne reprend pas l'autre, et toucher le bord droit au-delà du pion l'y fait marcher", async () => {
+    const s = await Session.start({ players: TWO });
+    await s.ready();
+    // Joueur 0 pris en venant de la gauche, joueur 1 en venant de la droite : libérés en 0x109 ∓ 0x14.
+    s.place({ screen: 3, row: "bottom", x: 0xe8 });
+    s.host.input.keyDown("ArrowRight");
+    await s.until(() => s.top() === "BoardEventScene");
+    s.host.input.keyUp("ArrowRight");
+    await s.ready();
+    s.place({ screen: 3, row: "bottom", x: 0x130 }, false);
+    s.host.input.keyDown("ArrowLeft");
+    await s.until(() => s.top() === "BoardEventScene");
+    s.host.input.keyUp("ArrowLeft");
+    await s.ready();
+    expect(s.game.state.current).toBe(0);
+    expect(s.game.state.players[1]).toMatchObject({ status: 6, x: 0x109 });
+    // Joueur 0 libéré (0xF5, dans la plage du bouton) : toucher le pion le fait reprendre ; le joueur 1, libéré à son tour, garde la main.
+    tap(s.host.input, s.board.shown.x + 8, 0x70);
+    await s.until(() => s.game.state.current === 1 && s.board.playing && s.top() === "GameScene");
+    expect(s.game.state.players[0].status).toBe(4);
+    expect(s.game.player).toMatchObject({ status: 0, x: 0x109 + 0x14, facingRight: false });
+    // Bord droit, à droite du milieu du pion (dans sa marge de toucher) : le pion part vers la droite, sans retourner au Turlusiphon.
+    tap(s.host.input, 0x132, 0x70);
+    await s.run(300);
+    expect(s.game.player.status).toBe(0);
+    expect(s.board.shown.x).toBeGreaterThan(0x109 + 0x14);
+    await s.until(() => s.game.state.current !== 1 || s.game.player.row !== "bottom" || s.game.player.screen !== 3, 10_000);
+    expect(s.game.state.players[1].status).toBe(0);
+  }, 120_000);
+
   it("S13 interactif : la porte du puits ouvert lance l'animation puis le puits (code 14)", async () => {
     const s = await Session.start();
     await s.ready();

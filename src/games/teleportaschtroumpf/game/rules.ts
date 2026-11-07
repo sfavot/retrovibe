@@ -609,7 +609,10 @@ export class Game {
   /** Cherche un événement à déclencher à la position du pion ; renvoie `true` si un événement a été joué. */
   private runHazards(trigger: "frame" | "press" | "timeout"): boolean {
     let played = false;
-    for (let guard = 0; guard < 8 && this.state.phase === "turn"; guard++) {
+    // Seulement pendant le tour qui a déclenché l'événement : un événement qui finit le tour (prison, Turlusiphon) lance déjà le
+    // tour suivant (`completeTurn`), et la même pression ou le même pas ne doit pas prendre le pion du joueur suivant.
+    const turn = this.state.turn;
+    for (let guard = 0; guard < 8 && this.state.phase === "turn" && this.state.turn === turn; guard++) {
       const h = this.findHazard(trigger);
       if (!h) break;
       this.applyHazard(h);

@@ -37,4 +37,10 @@ export type Host = MohawkHost<CursorKind> & {
    * facultative : absente, la saisie ne passe que par les touches du moteur.
    */
   readonly textInput?: TextInputPort;
+  /**
+   * Le dernier appui venait d'un doigt. Capacité facultative (absente : souris). La « souris aimantée » (le Zoombini porté reste collé au
+   * pointeur après le relâchement, l'appui suivant le dépose) est faite pour une souris : au doigt, un glisser-déposer doit déposer au
+   * relâchement, sinon la pièce reste en l'air sous un doigt déjà levé (`game.ts`).
+   */
+  readonly pointerIsTouch?: boolean;
 };

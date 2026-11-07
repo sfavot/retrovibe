@@ -349,7 +349,8 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
   }
 
   // --- Kit des épreuves ---
-  const seatTargets: DropTarget[] = raft.seats.map((seat) => createTarget(seat.anchor, seat.index));
+  // Au doigt, toucher l'image d'un tabouret libre y assied aussi le Zoombini (`DropTarget.area`, extension tactile du port).
+  const seatTargets: DropTarget[] = raft.seats.map((seat) => createTarget(seat.anchor, seat.index, () => seatFeatures[seat.index]?.rect ?? null));
   const seatOf = (target: DropTarget | null): number | null => (target && seatTargets.includes(target) ? (target.tag as number) : null);
 
   // Voix du narrateur de l'entrée (`DS:a2c4`, `1108:035b`) : 20074 à la première visite du niveau 1, sinon 20073 au niveau 0, sinon l'une des deux.

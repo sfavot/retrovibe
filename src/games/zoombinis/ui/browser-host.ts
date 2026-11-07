@@ -90,6 +90,8 @@ export class ZoombinisBrowserHost extends BrowserHost<CursorKind> {
   textInput?: BrowserTextInput;
 
   text?: HostText;
+  /** Le dernier appui sur le canvas venait d'un doigt (`Host.pointerIsTouch`). */
+  pointerIsTouch = false;
   private readonly videoBase: string;
   private readonly videoFiles: FileResolver;
   private readonly videoCanvas: HTMLCanvasElement;
@@ -101,6 +103,8 @@ export class ZoombinisBrowserHost extends BrowserHost<CursorKind> {
     this.videoFiles = options.files;
     this.videoCanvas = options.canvas;
     this.videoAudio = options.audio instanceof ZoombinisAudio ? options.audio : null;
+    // En phase de capture : lu avant que le pointeur commun ne traduise l'appui en clic.
+    options.canvas.addEventListener("pointerdown", (event) => (this.pointerIsTouch = event.pointerType === "touch"), { capture: true });
   }
 
   playVideo(path: string): VideoPlayback {

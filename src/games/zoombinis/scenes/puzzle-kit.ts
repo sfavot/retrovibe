@@ -53,7 +53,7 @@ import type { Input } from "../../../engine/mohawk/input";
 import { DIALOG, confirmLeaveToMap } from "../engine/dialog";
 import { FEATURES, FeatureFlag, type Feature } from "../engine/features";
 import { ZOOMBINIS_GAME } from "../engine/game";
-import type { CursorKind } from "../engine/host";
+import type { CursorKind, Host } from "../engine/host";
 import type { SceneContext } from "../engine/scene";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../engine/services";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
@@ -107,6 +107,9 @@ export const BUTTON_GO: Readonly<Rect> = { left: 600, top: 441, right: 639, bott
 /** Zone où un Zoombini transporté peut aller (`DS:6092` par défaut dans l'original) : l'écran entier. */
 export const SCREEN_BOUNDS: Readonly<Rect> = { left: 0, top: 0, right: SCREEN_WIDTH - 1, bottom: SCREEN_HEIGHT - 1 };
 
+/** Écart (pixels de l'écran) en deçà duquel un doigt relâché n'a pas glissé : c'est un toucher (prise en main, `updateCarry`). */
+const TAP_SLOP = 4;
+
 /** Curseur masqué pendant le transport (`11e8:77bc`) : `hidden` de `CursorKind`, associé à `none` par l'hôte du navigateur. */
 export const HIDDEN_CURSOR: CursorKind = "hidden";
 
@@ -158,10 +161,15 @@ export interface DropTarget {
   owner: KitMember | null;
   /** Donnée libre de l'épreuve (zone de pont, radeau…). */
   readonly tag?: unknown;
+  /**
+   * Rectangle de l'image de la cible (le tabouret du bac…), lu au moment du test. Extension tactile du port : au doigt, qui cache le
+   * Zoombini porté, une cible libre est aussi prise quand le doigt est sur son image (voir `findIn`).
+   */
+  readonly area?: () => Rect | null;
 }
 
-export function createTarget(point: Point, tag?: unknown): DropTarget {
-  return { x: point.x, y: point.y, owner: null, tag };
+export function createTarget(point: Point, tag?: unknown, area?: () => Rect | null): DropTarget {
+  return { x: point.x, y: point.y, owner: null, tag, area };
 }
 
 /** Un Zoombini de l'épreuve : sa fiche (copie de la scène), son personnage, la place qu'il occupe. */
@@ -921,7 +929,8 @@ export class PuzzleKit {
     const direction = input.mouseX < carry.lastX ? -1 : input.mouseX > carry.lastX ? 1 : 0;
     carry.lastX = input.mouseX;
     carry.spec.onMove?.({ x, y }, direction);
-    const hover = findIn(carry.targets, carry.radius, { x, y }, carry.member);
+    const finger = this.touchPoint(input);
+    const hover = findIn(carry.targets, carry.radius, { x, y }, carry.member, finger);
     if (hover !== carry.hover) {
       carry.hover = hover;
       carry.spec.onHover?.(hover);
@@ -933,7 +942,9 @@ export class PuzzleKit {
       if (!down) {
         const { game } = this.zoombinis;
         const quick = game.options.autoMagnet && this.ctx.clock.ticks - carry.startedAt < game.unknown02;
-        if (quick) {
+        // Au doigt, un toucher sans glissement prend le Zoombini en main : le toucher suivant le dépose (prise puis toucher de la cible).
+        const tapped = finger !== null && Math.abs(finger.x - carry.origin.x - carry.grab.x) <= TAP_SLOP && Math.abs(finger.y - carry.origin.y - carry.grab.y) <= TAP_SLOP;
+        if (quick || tapped) {
           carry.sticky = true;
           carry.held = false;
         } else {
@@ -945,12 +956,17 @@ export class PuzzleKit {
       if (carry.held && !down) carry.held = false;
       if (!carry.held && down) done = true;
     }
-    if (done) this.drop(carry, { x, y });
+    if (done) this.drop(carry, { x, y }, finger);
   }
 
-  private drop(carry: Carry, position: Point): void {
+  /** Point du doigt quand le dernier appui vient d'un doigt (`Host.pointerIsTouch`), sinon null (souris : la règle de l'original seule). */
+  private touchPoint(input: Input): Point | null {
+    return (this.ctx.host as Host).pointerIsTouch ? { x: input.mouseX, y: input.mouseY } : null;
+  }
+
+  private drop(carry: Carry, position: Point, finger: Point | null = null): void {
     const { spec } = carry;
-    const target = findIn(carry.targets, carry.radius, position, carry.member);
+    const target = findIn(carry.targets, carry.radius, position, carry.member, finger);
     const info: ObjectDrop = { target, from: carry.from, position, origin: carry.origin };
     // La décision se prend le transport déjà fini (`kit.carrying` est nul pour l'épreuve), sauf si elle garde l'objet en main.
     this.carry = null;
@@ -1272,12 +1288,21 @@ export class PuzzleKit {
 }
 
 /** Première cible libre (ou à `own`) de `targets` dans le carré de demi-côté `radius` autour de `point` (`1168:1742`). */
-function findIn(targets: readonly DropTarget[], radius: number, point: Point, own: KitMember | null): DropTarget | null {
-  for (const target of targets) {
-    if (target.owner !== null && target.owner !== own) continue;
-    if (target.x >= point.x - radius && target.x <= point.x + radius && target.y >= point.y - radius && target.y <= point.y + radius) return target;
-  }
-  return null;
+/**
+ * Cible libre prise au dépôt (`1168:1742`) : la première dont l'ancre est dans le carré de prise autour de `point`. Au doigt (`finger`),
+ * à défaut, la première dont l'image (`area`) contient le doigt : sous le doigt, le joueur ne voit pas le Zoombini porté et vise
+ * l'image de la cible, alors que l'ancre est la position du Zoombini posé (extension tactile, sans effet à la souris).
+ */
+function findIn(targets: readonly DropTarget[], radius: number, point: Point, own: KitMember | null, finger: Point | null = null): DropTarget | null {
+  const free = targets.filter((target) => target.owner === null || target.owner === own);
+  const near = free.find((t) => t.x >= point.x - radius && t.x <= point.x + radius && t.y >= point.y - radius && t.y <= point.y + radius);
+  if (near || !finger) return near ?? null;
+  return (
+    free.find((target) => {
+      const area = target.area?.();
+      return area !== null && area !== undefined && finger.x >= area.left && finger.x < area.right && finger.y >= area.top && finger.y < area.bottom;
+    }) ?? null
+  );
 }
 
 /** Tri croissant stable par abscisse (insertion avant le premier plus grand, comme `1168:280c`). */

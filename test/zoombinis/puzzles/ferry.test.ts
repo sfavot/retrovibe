@@ -388,6 +388,69 @@ describe.skipIf(!original.has)("écran du bac (createFerryScene)", () => {
     expect(t.engine.error).toBeNull();
   });
 
+  it("au doigt (bug 18) : glisser le doigt sur l'image d'un tabouret libre, ou toucher le Zoombini puis le tabouret, l'y assied ; à la souris, la règle de l'original (ancre à 15 pixels) reste seule", async () => {
+    // Le doigt cache le Zoombini porté : on vise le milieu de l'image du tabouret, 20 à 30 pixels sous l'ancre (position du Zoombini assis).
+    const stoolCenter = (probe: FerryProbe, seat: number) => {
+      const r = probe.seatFeatures[seat]!.rect!;
+      return { x: Math.floor((r.left + r.right) / 2), y: Math.floor((r.top + r.bottom) / 2) };
+    };
+    const grabOf = (probe: FerryProbe, i: number) => {
+      const r = probe.kit.members[i]!.snoid.feature.rect!;
+      return { x: Math.floor((r.left + r.right) / 2), y: Math.floor((r.top + r.bottom) / 2) };
+    };
+    for (const mode of ["glisser", "toucher-toucher", "souris"] as const) {
+      const t = await start();
+      const probe = t.probe();
+      (t.host as { pointerIsTouch?: boolean }).pointerIsTouch = mode !== "souris";
+      // L'option « souris aimantée » d'une partie neuve : au doigt, elle est coupée (le relâchement d'un glisser dépose).
+      t.zoombinis.game.options.magneticMouse = true;
+      const member = probe.kit.members[0]!;
+      const target = stoolCenter(probe, 0);
+      const grab = grabOf(probe, 0);
+      const anchor = t.seatPoint(0);
+      // Pieds du Zoombini si le doigt est au milieu du tabouret : hors du carré de 15 pixels de l'ancre.
+      const feet = { x: target.x - (grab.x - member.snoid.position.x), y: target.y - (grab.y - member.snoid.position.y) };
+      expect(Math.abs(feet.y - anchor.y)).toBeGreaterThan(15);
+      t.host.input.moveMouse(grab.x, grab.y);
+      t.host.input.mouseDown("left");
+      await t.ticks(3);
+      if (mode === "toucher-toucher") {
+        t.host.input.mouseUp("left");
+        await t.ticks(4);
+        expect(probe.kit.carrying).toBe(member);
+        // Le toucher suivant arrive sans survol : le pointeur saute sur le tabouret au moment de l'appui.
+        t.host.input.moveMouse(target.x, target.y);
+        t.host.input.mouseDown("left");
+        await t.ticks(3);
+        t.host.input.mouseUp("left");
+      } else {
+        t.host.input.moveMouse(target.x, target.y);
+        await t.ticks(6);
+        t.host.input.mouseUp("left");
+        if (mode === "souris") {
+          // Souris aimantée : le Zoombini reste collé jusqu'au clic suivant, au même endroit.
+          await t.ticks(3);
+          t.host.input.mouseDown("left");
+          await t.ticks(3);
+          t.host.input.mouseUp("left");
+        }
+      }
+      await t.ticks(10);
+      expect(probe.kit.carrying).toBeNull();
+      if (mode === "souris") {
+        // Comme dans l'original : hors du ponton et loin de l'ancre, il rejoint à pied une place du ponton (vers la gauche).
+        expect(probe.play.seatOf[0]).toBeNull();
+        expect(member.walking).toBe(true);
+      } else {
+        expect(probe.play.seatOf[0], mode).toBe(0);
+        expect(member.snoid.position).toEqual(anchor);
+        expect(member.walking).toBe(false);
+        expect(probe.kit.goEnabled).toBe(true);
+      }
+      expect(t.engine.error).toBeNull();
+    }
+  });
+
   it("lâché sur le ponton hors d'un tabouret, le Zoombini reste là où il est tombé (sa place d'attente n'est plus à lui)", async () => {
     const t = await start();
     const probe = t.probe();

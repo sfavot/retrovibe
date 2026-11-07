@@ -7,6 +7,7 @@ import { SaveStore } from "../game/saves";
 import { createSession, newGame, prefsFromOptions, type GameState, type Session } from "../game/state";
 import type { ZoombinisContext } from "./context";
 import type { ZoombinisEngine } from "./engine";
+import type { Host } from "./host";
 import { defineService } from "./scene";
 import type { ScreenId } from "./scene";
 import { ZOOMBINIS_TEXT } from "./text";
@@ -49,6 +50,8 @@ export function installGame(engine: ZoombinisEngine): ZoombinisGame {
   engine.services.provide(ZOOMBINIS_GAME, zoombinis);
   engine.addTickHook((c) => {
     Object.assign(c.prefs, prefsFromOptions(zoombinis.game.options));
+    // Au doigt, le transport dépose au relâchement : l'option « souris aimantée » (clic-clic) ne s'applique qu'à la souris.
+    if ((c.host as Host).pointerIsTouch) c.prefs.magneticMouse = false;
   });
   return zoombinis;
 }

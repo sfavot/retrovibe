@@ -158,7 +158,8 @@ export function mountTouchControls(options: TouchControlsOptions): TouchControls
       "pointerdown",
       (e) => {
         e.preventDefault();
-        if (stickPointer !== null) return;
+        // Un nouveau doigt reprend le stick : le relâchement de l'ancien a pu se perdre (geste système, couche masquée), et l'ignorer
+        // bloquerait le stick pour de bon.
         stickPointer = e.pointerId;
         const rect = stick.getBoundingClientRect();
         origin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };

@@ -286,6 +286,21 @@ describe.skipIf(!original.has)("Zoombinis à l'écran (snoid)", () => {
       expect(random).not.toHaveBeenCalled();
     });
 
+    it("en mode petit (`DS:239a`, ville / hôtel / XFER) : le compteur tourne mais aucune animation d'attente n'est tirée ni jouée", async () => {
+      let snoid!: Snoid;
+      const { host, engine } = await start((ctx) => {
+        snoid = createSnoid(ctx, traits, { position: { x: 300, y: 400 }, waitAnimations: true, small: true });
+      });
+      const random = vi.spyOn(engine.ctx.rng, "range");
+      for (let i = 0; i < 3000; i++) {
+        expect(snoid.tickWait()).toBe(false);
+        await runFor(engine, host, TICK);
+      }
+      expect(snoid.playingWait).toBe(false);
+      expect(snoid.scriptId).toBe(100);
+      expect(random).not.toHaveBeenCalled();
+    });
+
     it("playWait joue le SCRS 130 + n une fois, met une voix de code 4 ou 5 en file, puis revient à l'attente sans rappel de l'écran", async () => {
       let snoid!: Snoid;
       const ended: number[] = [];

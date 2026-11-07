@@ -25,10 +25,15 @@
  *   le niveau (2004, `niveau + 2`) et la date `"%d %s %d"` (jour, mois de 2010, année). Textes cernés de quatre copies décalées d'un pixel (`10a8:0cd2`), couleurs de
  *   palette (contour, texte) 199 / 45, 199 / 45, 212 / 45 et 45 / 205 selon le style. Un clic quelconque la ferme. Ouverte, la fiche gèle les habitants, l'horloge et
  *   les objets décoratifs (`1188:08bb`) et suspend les évènements, les phrases et les objets décoratifs.
- * - **Habitants** : au plus 20 (les plus récents de la population), positions tirées dans l'anneau (`x` −320 à 1 599, `y` 410 à 475). Dans l'original ils sont créés à
- *   l'état 0 de `1168:0ba8` : ils **ne marchent pas** ; ils restent sur place (avec une animation d'attente occasionnelle, non portée). Seuls les évènements de
- *   `1188:0ce5` les animent : un habitant visible (20 < x < 620) joue son `SCRS` de danse 4999 + pieds (5000 à 5004 de `TOWN.MHK`), le budget d'évènements étant 1 (1 à 156),
- *   4 (157 à 312), 6 (313 à 624) ou 8 (625 habitants) et l'intervalle de 120 ticks (600 avec « moins d'action »). Un clic sur un habitant le fait glisser dans l'original (non porté).
+ * - **Habitants** : au plus 20 (les plus récents de la population), positions tirées dans l'anneau (`x` −320 à 1 599, `y` 410 à 475), en petit. Dans l'original ils sont créés à
+ *   l'état 0 de `1168:0ba8` : ils **ne marchent pas** et n'ont **aucune animation d'attente** (`1168:5a13(0)`, appelé à `1188:018b`, met `DS:239a` à 1 et l'état 0 ne tire alors
+ *   rien, `1168:1176` : c'est `Snoid.tickWait` qui reprend cette règle pour tout Zoombini `small`). Seuls les évènements de `1188:0ce5` les animent : un habitant visible (20 < x < 620)
+ *   joue son `SCRS` de danse 4999 + pieds (5000 à 5004 de `TOWN.MHK`), le budget d'évènements étant 1 (1 à 156), 4 (157 à 312), 6 (313 à 624) ou 8 (625 habitants) et l'intervalle de
+ *   120 ticks (600 avec « moins d'action »).
+ * - **Glissement d'un habitant** (`1188:1071`, `11a8:0d61`, `1168:1742`) : un appui sur le plus en avant des habitants sous le pointeur le prend, avant l'horloge, les bâtiments et
+ *   le défilement. Il passe devant tout, délai 3, animation de transport `145 + pieds`, suit le pointeur (bornes de l'écran, tourné du côté où va la souris) selon le protocole de
+ *   `1168:58c7` des épreuves (souris aimantée : un clic prend, le suivant dépose ; auto-aimantation ; curseur masqué). Aucune zone de dépôt (**probable**) : lâché avec 410 < y < 476 il garde
+ *   sa nouvelle place (`1188:1071` copie sa position dans sa destination `+0x116`), sinon il retourne d'un coup où il a été pris (variante d'attente 1, tourné à droite).
  * - **Objets décoratifs** (`1188:1cdf`) : `SCRB` 8000 à 8043 (oiseaux, papillons… `tBMP` 8000), jusqu'à 3 en même temps, un tirage 51 % de 8022 à 8043 et 49 % de 8000 à 8021,
  *   `x` 100 à 540 et `y` dans une plage qui dépend du script ; ils jouent une fois (sons dans le `SCRB`) et disparaissent. Le nombre total à produire est 1, 3, 6, 10 ou 15
  *   (population > 100, 200, 300, 400, 500) ; 20 à la fin du jeu, puis 40 quand la phrase finale est finie.
@@ -42,13 +47,15 @@
  *
  * ## Écarts
  *
+ * - Transport d'un habitant : la boucle reprend celle de `PuzzleKit` (constantes partagées, logique dupliquée : voir `engine-ts.md`) ; pendant le transport la danse ne choisit pas l'habitant porté (l'original bloque dans `1168:1742`, ce que fait alors `1188:0ce5` n'est pas établi) ; le retour est immédiat (l'état 4 attend l'échéance suivante, ≤ 6 ticks).
  * - Curseurs : l'original affiche des curseurs en image (`tBMP` 2000 : flèche gauche, flèche droite, loupe, `11a8:0fe9`) ; l'hôte n'a pas de curseur « image », la main (`curs1`) sert
  *   de loupe et les flèches de bord ne sont pas affichées.
- * - Animations d'attente des habitants, glissement d'un habitant, fondu d'entrée de palette, musique (aucun appel dans `1188:*`, elle continue) non portés. L'horloge est relue
+ * - Fondu d'entrée de palette (`1188:0128` appelle `11a8:302b`) et musique (aucun appel dans `1188:*`, elle continue) non portés. L'horloge est relue
  *   dès la première image (l'original attend 30 s d'horloge de programme à cause d'une comparaison non signée), le son d'une phrase fini est détecté par la file des effets entière
  *   (pas par identifiant), le survol d'un bâtiment est calculé au clic et non à chaque tick.
  */
 import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import type { Point } from "../data/zoombini";
 import { TAG_SND } from "../../../data/mohawk/mohawk";
 import { loadPcm } from "../../../engine/mohawk/audio/pcm";
 import { NoRepeatPool } from "../../../engine/mohawk/rng";
@@ -74,6 +81,7 @@ import {
   TOWN_END_GAME_DECOR_BURST,
 } from "../game/team";
 import { closeScreen, openScreen } from "./screen-kit";
+import { CARRY_DELAY, CARRY_DEPTH, CARRY_SCRIPT_BASE, HIDDEN_CURSOR, SCREEN_BOUNDS, SNAP_IDLE_VARIANT } from "./puzzle-kit";
 import { createSnoid, screenScripts, type Snoid } from "./snoid";
 import { dialogChoice } from "./xfer";
 
@@ -115,6 +123,9 @@ const STRL_WHEN = 2012;
 const STRL_TYPES = 2014;
 const STRL_FEATS = 2016;
 export const DATE_FORMAT = "%d %s %d";
+
+/** Un habitant lâché (`1188:1071`) garde sa place si ses pieds sont dans cette bande d'ordonnées (exclusive : `0x199 < y < 0x1dc`), sinon il retourne où il a été pris. */
+const RESIDENT_HOME_BAND = { min: 0x199, max: 0x1dc } as const;
 
 /** Anneau du décor : positions de −320 à 1 599, pas de défilement de 320. */
 const RING_STEP = 320;
@@ -280,6 +291,22 @@ interface Resident {
   snoid: Snoid;
 }
 
+/** Habitant porté par le pointeur (`1168:1742` + `1168:58c7`, voir l'en-tête). */
+interface Carry {
+  resident: Resident;
+  /** Pieds à la prise, écart pointeur / pieds à la prise, abscisse du pointeur au tour précédent. */
+  origin: Point;
+  grab: Point;
+  lastX: number;
+  /** Transport collé (`DS:9b40`) et bouton tenu depuis la prise (`DS:9b3e`). */
+  sticky: boolean;
+  held: boolean;
+  startedAt: number;
+  hidden: boolean;
+  /** Profondeur rendue au dépôt. */
+  depth: number;
+}
+
 /** Objet en monde (petit décor animé, objet décoratif) : sa feature a une position relative dans l'anneau. */
 interface WorldItem {
   feature: Feature;
@@ -387,6 +414,7 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
   const items: WorldItem[] = [];
   const decor: (DecorSlot | null)[] = Array.from({ length: DECOR_SLOTS }, () => null);
   let frozen: { feature: Feature; active: boolean }[] | null = null;
+  let carry: Carry | null = null;
 
   const dialogOpen = (): boolean => ctx.services.tryGet(DIALOG)?.isOpen ?? false;
   const now = (): number => ctx.clock.ticks;
@@ -655,6 +683,7 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
     eventPool ??= new NoRepeatPool(Math.min(residents.length, 32), 0);
     for (let tries = 0; tries < EVENT_ATTEMPTS; tries++) {
       const resident = residents[eventPool.pick(rng)]!;
+      if (resident === carry?.resident) continue;
       const x = resident.snoid.position.x;
       if (x > EVENT_VISIBLE.min && x < EVENT_VISIBLE.max) {
         resident.snoid.play(4999 + resident.snoid.traits.feet, FeatureFlag.stopAtEnd);
@@ -732,6 +761,9 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
       features.invalidate();
       return;
     }
+    // `11a8:0d61` : la feature « cliquable » (drapeaux 2) la plus en avant sous le pointeur ; un habitant se prend avant tout le reste.
+    const resident = residentAt(x, y);
+    if (resident) return pickResident(resident, x, y);
     if (clockRect && spins === 0 && contains(clockRect, x, y)) spins = -1;
     const spot = hotspotAt(x, y);
     if (spot) return openCard(spot.slot);
@@ -742,6 +774,93 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
     clockPresent = false;
     shiftWorld(direction === 1 ? 1 : -1);
     showColumn();
+  }
+
+
+  // --- Glissement d'un habitant (`1188:1071` → `1168:1742` / `1168:58c7`) ---
+  /** L'habitant sous le point : le plus en avant (`11a8:0d61` parcourt la liste à partir de la feature la plus devant). */
+  function residentAt(x: number, y: number): Resident | null {
+    let found: Resident | null = null;
+    for (const resident of residents) {
+      const rect = resident.snoid.feature.rect;
+      if (resident.snoid.destroyed || !rect) continue;
+      if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) continue;
+      if (!found || resident.snoid.feature.depth >= found.snoid.feature.depth) found = resident;
+    }
+    return found;
+  }
+
+  function pickResident(resident: Resident, x: number, y: number): void {
+    const { snoid } = resident;
+    const at = snoid.position;
+    const hidden = ctx.prefs.hideCursorWhileCarrying;
+    carry = {
+      resident,
+      origin: { x: at.x, y: at.y },
+      grab: { x: x - at.x, y: y - at.y },
+      lastX: x,
+      sticky: ctx.prefs.magneticMouse,
+      held: true,
+      startedAt: now(),
+      hidden,
+      depth: snoid.feature.depth,
+    };
+    // Devant tout, délai 3, animation de transport `145 + pieds` (état 5).
+    features.restack(snoid.feature, CARRY_DEPTH);
+    snoid.delay = CARRY_DELAY;
+    snoid.play(CARRY_SCRIPT_BASE + snoid.traits.feet);
+    ctx.setCursor(hidden ? HIDDEN_CURSOR : "system");
+  }
+
+  /** Un tour de `1168:1742` : l'habitant suit le pointeur (borné à l'écran, tourné du côté où il va) ; `1168:58c7` décide de la fin. */
+  function updateCarry(pressed: boolean): void {
+    const current = carry!;
+    const { input } = ctx;
+    const x = Math.max(SCREEN_BOUNDS.left, Math.min(SCREEN_BOUNDS.right, input.mouseX - current.grab.x));
+    const y = Math.max(SCREEN_BOUNDS.top, Math.min(SCREEN_BOUNDS.bottom, input.mouseY - current.grab.y));
+    if (input.mouseX < current.lastX) current.resident.snoid.setFacing(1);
+    else if (input.mouseX > current.lastX) current.resident.snoid.setFacing(0);
+    current.lastX = input.mouseX;
+    current.resident.snoid.setPosition({ x, y });
+    let down = input.isButtonDown("left");
+    let done = false;
+    if (!current.sticky) {
+      if (!down) {
+        if (game.options.autoMagnet && now() - current.startedAt < game.unknown02) {
+          current.sticky = true;
+          current.held = false;
+        } else {
+          done = true;
+        }
+      }
+    } else {
+      if (pressed) down = true;
+      if (current.held && !down) current.held = false;
+      if (!current.held && down) done = true;
+    }
+    if (done) dropResident({ x, y });
+  }
+
+  /**
+   * Fin du transport. La ville ne déclare aucune zone de dépôt (**probable** : `1520:0000` n'est posé par aucun code de `1188`), l'habitant n'est donc jamais
+   * « accepté » : `1188:1071` ne retient sa nouvelle place que si ses pieds sont dans la bande 410 à 475 ; sinon il retourne d'un coup où il a été pris
+   * (état 4 de `1168:0ba8` : variante d'attente 1, tourné à droite).
+   */
+  function dropResident(at: Point): void {
+    const current = carry!;
+    carry = null;
+    if (current.hidden) ctx.setCursor("system");
+    const { snoid } = current.resident;
+    features.restack(snoid.feature, current.depth);
+    snoid.delay = 6;
+    if (at.y > RESIDENT_HOME_BAND.min && at.y < RESIDENT_HOME_BAND.max) {
+      snoid.moveTo(at);
+    } else {
+      snoid.idleVariant = SNAP_IDLE_VARIANT;
+      snoid.setFacing(0);
+      snoid.moveTo(current.origin);
+    }
+    snoid.idle();
   }
 
   function updateCursor(): void {
@@ -798,17 +917,22 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
       // `SCRB` 6000 n'a qu'une image : le moteur l'arrête après la première lecture ; l'horloge est relue à son délai (2 ou 6 ticks) tant que la ville n'est pas gelée.
       if (!frozen) clock.active = true;
       if (!dialogOpen()) {
+        let pressed = false;
         for (const event of ctx.input.buttonEvents) {
           if (left) return;
-          if (event.down && event.button === "left") click(event.x, event.y);
+          if (!event.down) continue;
+          // La boucle de `1168:1742` est bloquante : pendant un transport, un appui (quel que soit le bouton) ne fait que décider du dépôt.
+          if (carry) pressed = true;
+          else if (event.button === "left") click(event.x, event.y);
         }
+        if (carry) updateCarry(pressed);
         if (!card) {
           if (decorBudget > 0) spawnDecor();
           runPhrases();
           runEvents();
         }
       }
-      updateCursor();
+      if (!carry) updateCursor();
     },
     key(code: string, ctrl: boolean, alt: boolean): boolean {
       if (!game.options.testMode || ctrl || alt) return false;
@@ -823,6 +947,8 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
         game.group.flagB = true;
       }
       left = true;
+      if (carry?.hidden) leaveCtx.setCursor("system");
+      carry = null;
       closeScreen(leaveCtx);
     },
   };

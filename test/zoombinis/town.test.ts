@@ -290,6 +290,113 @@ describe.skipIf(!original.has)("Zoombiniville (écran 6)", () => {
     expect(engine.error).toBeNull();
   });
 
+  it("les habitants sont en mode petit (`DS:239a`) : aucune animation d'attente (130 à 145), seulement les danses des évènements", { timeout: 60_000 }, async () => {
+    const { engine, host, residents, services } = await start({ population: 300, monuments: 12, scroll: 0 });
+    // Pas d'évènement de danse : seules des animations d'attente apparaîtraient.
+    services.game.game.options.lessAction = true;
+    const seen = new Set<number>();
+    for (let i = 0; i < 400; i++) {
+      await runFor(engine, host, 100);
+      for (const f of residents()) if (f.scriptId >= 130 && f.scriptId <= 145) seen.add(f.scriptId);
+    }
+    expect([...seen]).toEqual([]);
+  });
+
+  describe("glissement d'un habitant (`1188:1071` → `1168:1742`)", () => {
+    /** Ville de 300 habitants, souris non aimantée (un appui prend, le relâchement dépose). */
+    async function drag() {
+      const t = await start({ population: 300, monuments: 0, scroll: 0, setup: (g) => void (g.options.magneticMouse = false) });
+      const { host, engine, residents, features } = t;
+      const rectOf = (f: Feature) => ({ ...f.rect! });
+      // Un habitant bien visible, qu'aucun autre ne recouvre en son centre.
+      const centre = (f: Feature) => ({ x: (f.rect!.left + f.rect!.right) >> 1, y: (f.rect!.top + f.rect!.bottom) >> 1 });
+      const target = residents().find((f) => {
+        const r = f.rect;
+        if (!r || r.left < 60 || r.right > 560) return false;
+        const c = centre(f);
+        return residents().every((o) => o === f || !o.rect || c.x < o.rect.left || c.x >= o.rect.right || c.y < o.rect.top || c.y >= o.rect.bottom);
+      });
+      expect(target).toBeDefined();
+      return { ...t, target: target!, rectOf, centre, features, host, engine };
+    }
+
+    it("un appui sur un habitant le prend : devant tout, délai 3, animation de transport 145 + pieds, curseur masqué ; il suit le pointeur", async () => {
+      const { host, engine, target, centre, rectOf } = await drag();
+      const before = rectOf(target);
+      const at = centre(target);
+      host.input.moveMouse(at.x, at.y);
+      host.input.mouseDown("left");
+      await runFor(engine, host, 100);
+      expect(target.scriptId).toBeGreaterThanOrEqual(146);
+      expect(target.scriptId).toBeLessThanOrEqual(150);
+      expect(target.depth).toBe(1000);
+      expect(target.delay).toBe(3);
+      expect(host.cursor).toBe("hidden");
+      host.input.moveMouse(at.x - 20, at.y);
+      await runFor(engine, host, 100);
+      // Les poses (transport, sens) n'ont pas toutes la même emprise : tolérance de quelques points.
+      expect(Math.abs(target.rect!.left - (before.left - 20))).toBeLessThanOrEqual(12);
+      host.input.moveMouse(at.x - 20, at.y - 5);
+      await runFor(engine, host, 100);
+      expect(Math.abs(target.rect!.top - (before.top - 5))).toBeLessThanOrEqual(12);
+      host.input.mouseUp("left");
+      await runFor(engine, host, 100);
+      expect(target.depth).toBeLessThan(1000);
+      expect(host.cursor).toBe("system");
+    });
+
+    it("lâché dans la bande 410 à 475 : il garde sa nouvelle place (+0x116) et repasse en attente", async () => {
+      const { host, engine, target, centre, rectOf } = await drag();
+      const before = rectOf(target);
+      const at = centre(target);
+      host.input.moveMouse(at.x, at.y);
+      host.input.mouseDown("left");
+      await runFor(engine, host, 100);
+      host.input.moveMouse(at.x - 25, at.y);
+      await runFor(engine, host, 100);
+      host.input.mouseUp("left");
+      await runFor(engine, host, 200);
+      expect(target.scriptId).toBe(100);
+      expect(target.delay).toBe(6);
+      expect(Math.abs(target.rect!.left - (before.left - 25))).toBeLessThanOrEqual(12);
+      expect(Math.abs(target.rect!.top - before.top)).toBeLessThanOrEqual(12);
+    });
+
+    it("lâché hors de la bande : il retourne d'un coup où il a été pris (variante d'attente 1, tourné à droite)", async () => {
+      const { host, engine, target, centre, rectOf } = await drag();
+      const before = rectOf(target);
+      const at = centre(target);
+      host.input.moveMouse(at.x, at.y);
+      host.input.mouseDown("left");
+      await runFor(engine, host, 100);
+      host.input.moveMouse(at.x + 40, 120);
+      await runFor(engine, host, 100);
+      expect(target.rect!.top).toBeLessThan(before.top - 100);
+      host.input.mouseUp("left");
+      await runFor(engine, host, 200);
+      expect(target.scriptId).toBe(101);
+      expect(target.rect!.top).toBe(before.top);
+      expect(target.rect!.left).toBe(before.left);
+    });
+
+    it("avec la souris aimantée, le premier clic prend l'habitant et le suivant le dépose", async () => {
+      const t = await start({ population: 300, monuments: 0, scroll: 0, setup: (g) => void (g.options.magneticMouse = true) });
+      const { host, engine, residents } = t;
+      const target = residents().find((f) => f.rect && f.rect.left > 60 && f.rect.right < 560)!;
+      const c = { x: (target.rect!.left + target.rect!.right) >> 1, y: (target.rect!.top + target.rect!.bottom) >> 1 };
+      host.click(c.x, c.y);
+      await runFor(engine, host, 100);
+      const carried = residents().filter((f) => f.depth === 1000);
+      expect(carried).toHaveLength(1);
+      host.input.moveMouse(c.x - 10, c.y);
+      await runFor(engine, host, 100);
+      expect(carried[0]!.depth).toBe(1000);
+      host.click(c.x - 10, c.y);
+      await runFor(engine, host, 100);
+      expect(residents().some((f) => f.depth === 1000)).toBe(false);
+    });
+  });
+
   it("objets décoratifs : aucun sous 101 habitants, jusqu'à 3 à la fois au-dessus, ils disparaissent à la fin de leur animation", { timeout: 120_000 }, async () => {
     const few = await start({ population: 100, monuments: 4 });
     await runFor(few.engine, few.host, 3000);

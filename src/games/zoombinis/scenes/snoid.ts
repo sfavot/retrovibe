@@ -32,6 +32,10 @@
  * fois puis revient à l'attente (état 6, `1168:4231`). Si les voix et effets sont actifs, l'entrée de l'état 6 met aussi en file une voix de
  * Zoombini de code 4 (tirage de 1 à 100 ≤ 50) ou 5 (`1168:575b`). Rien ne tourne pendant un autre script, une marche ou un transport.
  *
+ * **Mode petit** : l'état 0 ne lance aucune animation tant que `DS:239a` est non nul (`1168:0ba8` à `1168:1176`). `1168:5a13(0)` met `DS:239a` à 1
+ * (et `5a13(1)` le remet à 0) : Zoombiniville (`1188:018b` / `1188:0c43`), l'hôtel (`10e8:0144` / `10e8:07a5`) et XFER (`11b0:0c91` / `11b0:1352`) l'appellent
+ * à l'entrée et à la sortie. Un Zoombini `small` n'a donc pas d'animation d'attente : `tickWait` fait avancer le compteur mais ne tire rien.
+ *
  * Limites : la profondeur est fixée à la création (`Features` n'ordonne qu'à l'insertion) ; une image dont la première case est vide
  * n'appelle pas `onImage` (comme dans `Features`, l'image précédente reste à l'écran).
  */
@@ -354,6 +358,8 @@ export class Snoid {
     this.waitCounter += 1;
     if (period === 0 || before <= period) return false;
     this.waitCounter = 0;
+    // `DS:239a` (mode petit, `1168:5a13(0)`, posé par la ville, l'hôtel et XFER) : le compteur repart à 0 mais rien n'est tiré ni joué.
+    if (this.isSmall) return false;
     if (this.ctx.rng.range(0, 100) >= WAIT_CHANCE) return false;
     this.playWait(this.ctx.rng.range(0, WAIT_ANIMATIONS - 1));
     return true;

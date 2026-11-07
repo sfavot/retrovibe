@@ -382,7 +382,9 @@ export function createPizzaScene(): Scene {
   function drawFlight(mask: number): void {
     if (flight && !flight.destroyed) features.destroy(flight);
     const hook: FeatureImageHook = (_f, parts) => plateLayers(parts, mask, level());
-    flight = features.create({ script: FLIGHT_FIRST, delay: DELAY, flags: PLAYING, depth: DEPTH.flight, onImage: hook });
+    // `0x108000` sans `0x2000`, mais la feature, ajoutée en fin de liste pendant le tour du four, est lue dans le même passage de `11a8:04b9` : sa
+    // première image (la pizza dans la bouche du four) s'affiche dans le tick même de l'évènement 33, pas au suivant.
+    flight = features.create({ script: FLIGHT_FIRST, delay: DELAY, flags: PLAYING | FeatureFlag.firstImage, depth: DEPTH.flight, onImage: hook });
   }
 
   function removeFlight(): void {

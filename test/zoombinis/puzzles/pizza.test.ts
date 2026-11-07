@@ -683,6 +683,31 @@ describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", 
     expect(plateAt - lastImageAt).toBeLessThanOrEqual(8);
   });
 
+  it("service : la pizza (SCRB 12000) sort de la bouche du four dans le tick même de l'évènement 33 du four (SCRB 7066, image 5), pas après le four (1130:367c)", async () => {
+    const { clickIngredients, serveClick, ticks, intro, engine, features } = await start(0, { liked: [mask(0, 1)], lessAction: true });
+    await intro();
+    await clickIngredients(mask(2));
+    await serveClick();
+    let spitAt = -1;
+    let pizzaAt = -1;
+    const oven = () => features.features.find((f) => f.scriptId === 7066);
+    const watch = () => {
+      const o = oven();
+      if (o && o.image === 5 && spitAt < 0) spitAt = engine.ctx.clock.ticks;
+      const pizza = features.features.find((f) => f.scriptId === 12000);
+      if (pizza && pizza.parts.length > 0 && pizzaAt < 0) pizzaAt = engine.ctx.clock.ticks;
+    };
+    // Un tick à la fois : un crochet après les features relève l'instant exact.
+    engine.addTickHook(watch);
+    for (let t = 0; t < 400 && pizzaAt < 0; t++) await ticks(1);
+    expect(spitAt).toBeGreaterThan(0);
+    expect(pizzaAt).toBe(spitAt);
+    // Première image dans la bouche du four, (167, 136).
+    const pizza = features.features.find((f) => f.scriptId === 12000)!;
+    expect(pizza.image).toBe(0);
+    expect(pizza.rect!.left).toBeLessThan(200);
+  });
+
   it("places d'attente lues dans l'exécutable (1478:0a04) : chaque Zoombini du groupe sauf le livreur reste sur la sienne", async () => {
     const { ticks, intro, features } = await start(0, { liked: [mask(0, 1)], lessAction: true });
     await intro();

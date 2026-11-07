@@ -271,7 +271,10 @@ class SlidesRun implements SlidesProbe {
     });
   }
 
-  /** Un anneau par emplacement (`SCRB` 7013, créé avec le drapeau `0x2000`), invisible au repos ; il ondule quand un Zoombini survole l'emplacement (**probable**). */
+  /**
+   * Un anneau par emplacement (`SCRB` 7013, `1170:0000` : `0x188a000`) : le bit `0x1000000` (`playOnly`) le rend invisible au repos ; il ondule quand un Zoombini
+   * survole l'emplacement (**probable**), le temps de son script.
+   */
   private createRings(): void {
     const F = FeatureFlag;
     this.board.slots.forEach((stone) => {
@@ -279,7 +282,7 @@ class SlidesRun implements SlidesProbe {
       const ring = this.features.create({
         script: SCRB.ring,
         delay: DELAY,
-        flags: F.relative | F.stopAtEnd | F.noDraw,
+        flags: F.playOnly | F.relative | F.stopAtEnd,
         depth: this.stoneDepth(stone) + DEPTH.ring,
         position: { x: p.x + RING_OFFSET.x, y: p.y + RING_OFFSET.y },
         onImage: (_feature, parts) => this.ringParts(stone, parts),
@@ -368,14 +371,6 @@ class SlidesRun implements SlidesProbe {
     if (!target || this.went) return;
     const ring = this.rings[target.tag as number];
     if (!ring) return;
-    const F = FeatureFlag;
-    ring.flags &= ~F.noDraw;
-    ring.onEvent = (_image, n) => {
-      if (n === FEATURE_END) {
-        ring.flags |= F.noDraw;
-        this.features.invalidate();
-      }
-    };
     this.features.setScript(ring, SCRB.ring);
   }
 

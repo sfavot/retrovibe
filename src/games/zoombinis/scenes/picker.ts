@@ -71,7 +71,11 @@ const ROCKS = [4106, 4107, 4108, 4109] as const;
 const ARCH_FLAGS = 0x64000000;
 const BUTTON_LAYER_FLAGS = 0x4001000;
 /** `0x108a000` : image fixe jouée une fois, dès la création. */
-const DETAIL_FLAGS = FeatureFlag.staticFirst | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
+/**
+ * Détail de l'arche (4110) : `0x108a000` dans l'original (`1128:006d`), donc avec le bit `0x1000000`. **Écart provisoire** : il reste dessiné (`still`) en attendant que
+ * l'utilisatrice confirme l'aspect de l'original (l'ouverture sombre de la roche n'est pas dans le fond).
+ */
+const DETAIL_FLAGS = FeatureFlag.still | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
 
 /** Profondeurs : décor 0, décors animés créés par `Ctrl+W` 0,01 (ils sont créés avant les boutons à l'entrée), boutons 0,5, Zoombinis de 1 à 2. */
 const BUTTON_LAYER_DEPTH = 0.5;

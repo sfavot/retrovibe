@@ -107,10 +107,10 @@ const FLAG_SHELF = F.region | FLAG_DOOR;
  * Socles de dépôt (`0x508a000`, niveau 3 : `0x108a000`) : le bit `0x1000000` fait que le rappel de dessin `11a0:0126` ne dessine l'objet que
  * pendant qu'il joue (`+0xe0 ≠ 0`) ; il s'arrête dès sa première image (`11a0:033a`), donc il n'est jamais dessiné hors du survol (non porté).
  * Ce sont des surbrillances (planche pointillée posée sur l'étagère), pas des étagères : dessinés en permanence, ils cachaient l'étagère qui
- * bascule au refus et celles qui se replient à la fin (`3ace`). Le port n'interprète pas encore ce bit au dessin : `noDraw` le remplace ici.
+ * bascule au refus et celles qui se replient à la fin (`3ace`). Le moteur applique ce bit (`FeatureFlag.playOnly`).
  */
-const FLAG_BASE = F.flag4000000 | F.staticFirst | F.noReplay | F.active | F.firstImage | F.noDraw;
-const FLAG_BASE_L3 = F.staticFirst | F.noReplay | F.active | F.firstImage | F.noDraw;
+const FLAG_BASE = F.flag4000000 | F.playOnly | F.noReplay | F.active | F.firstImage;
+const FLAG_BASE_L3 = F.playOnly | F.noReplay | F.active | F.firstImage;
 const FLAG_WALL = F.flag4000000 | F.active;
 const FLAG_BARRIER = F.relative | F.active;
 const FLAG_PLAY = F.stopAtEnd | F.active;

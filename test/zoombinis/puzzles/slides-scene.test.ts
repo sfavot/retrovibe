@@ -212,11 +212,13 @@ describe.skipIf(!original.has)("monte-pierre : écran sur les vrais fichiers (SL
     await wait(4);
     host.input.moveMouse(point.x - member.snoid.position.x + slot.x, point.y - member.snoid.position.y + slot.y);
     await wait(4);
+    // Bit `0x1000000` (`playOnly`) : dessiné pendant qu'il joue, plus après sa fin.
     expect(ring.active).toBe(true);
-    expect((ring.flags & 0x4000) === 0).toBe(true);
+    expect(ring.hasFlag(0x1000000)).toBe(true);
     await until(() => queued.includes(7002), 40);
     host.input.mouseUp("left");
-    await until(() => !ring.active && (ring.flags & 0x4000) !== 0, 200);
+    await until(() => !ring.active, 200);
+    expect(ring.hasFlag(0x1000000)).toBe(true);
   });
 
   it("reprise : un Zoombini posé se reprend, la liaison redescend (8500), il se pose ailleurs ou revient en attente", async () => {

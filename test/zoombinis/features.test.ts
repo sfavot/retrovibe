@@ -265,7 +265,7 @@ describe("features : lecteur de scripts (scripts synthétiques)", () => {
     const quiet = new Harness();
     quiet.features.setGroup(0, sheet());
     quiet.spawn([{ cells: [[1, 0, 0]], sound: 1200 }, { cells: [[2, 0, 0]] }], {
-      flags: FeatureFlag.staticFirst,
+      flags: FeatureFlag.playOnly,
     });
     quiet.trace(4, () => 0);
     expect(quiet.queued).toEqual([]);
@@ -385,16 +385,35 @@ describe("features : lecteur de scripts (scripts synthétiques)", () => {
     expect(f.hasFlag(FeatureFlag.random)).toBe(true);
   });
 
-  it("firstImage joue la première image dès la création ; staticFirst s'arrête après elle", () => {
+  it("firstImage joue la première image dès la création ; playOnly s'arrête après elle", () => {
     const h = new Harness();
     h.features.setGroup(0, sheet());
     const f = h.spawn([{ cells: [[1, 7, 7]] }, { cells: [[2, 7, 7]] }], {
-      flags: FeatureFlag.firstImage | FeatureFlag.staticFirst,
+      flags: FeatureFlag.firstImage | FeatureFlag.playOnly,
     });
     expect(f.parts).toEqual([{ w: 1, x: 7, y: 7 }]);
     expect(f.active).toBe(false);
     h.trace(5, () => 0);
     expect(f.image).toBe(0);
+  });
+
+  it("playOnly (bit 0x1000000, 11a0:0126) : dessiné seulement pendant qu'il joue ; invisible au repos et après sa fin", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    h.features.setBackground(new Surface(32, 32));
+    const f = h.spawn([{ cells: [[1, 7, 7]] }, { cells: [[2, 7, 7]] }], { flags: FeatureFlag.firstImage | FeatureFlag.playOnly });
+    expect(f.active).toBe(false);
+    h.features.compose();
+    expect(h.screen.pixels.some((p) => p !== 0)).toBe(false);
+    h.features.setScript(f, 0, true);
+    f.flags |= FeatureFlag.stopAtEnd;
+    f.flags &= ~FeatureFlag.noReplay;
+    h.trace(1, () => 0);
+    expect(f.active).toBe(true);
+    expect(h.screen.pixels.some((p) => p !== 0)).toBe(true);
+    h.trace(40, () => 0);
+    expect(f.active).toBe(false);
+    expect(h.screen.pixels.some((p) => p !== 0)).toBe(false);
   });
 
   it("still (image fixe du port, 0x400000, absente de l'original) : comme le bit 0x1000000 à la lecture, arrêt après la première image", () => {
@@ -723,7 +742,7 @@ describe.skipIf(!original.has)("features : décor animé de BASECAMP", () => {
       features.create({
         delay: 1000,
         script: id,
-        flags: FeatureFlag.staticFirst,
+        flags: FeatureFlag.still,
       });
     tick();
     const expected = reference(archive, background, ids);

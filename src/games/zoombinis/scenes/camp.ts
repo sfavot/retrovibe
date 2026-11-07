@@ -115,8 +115,12 @@ const EXIT_X = 0x2a8;
 const EXIT_GAP = 45;
 
 /** Les 16 features d'emplacement : images fixes jouées une fois dès la création (`0x108a000`). */
-const PLACE_FLAGS = FeatureFlag.staticFirst | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
-const { staticFirst, stopAtEnd, noReplay, active, random, queueScript, stopEachImage } = FeatureFlag;
+/**
+ * Les 16 emplacements : `0x108a000` dans l'original (`10b0:01ee`, `10b8:01e9`), donc avec le bit `0x1000000` : ils ne seraient dessinés que pendant leur surbrillance
+ * (non portée). **Écart provisoire** : ils restent dessinés (`still`) en attendant que l'utilisatrice confirme l'aspect de l'original, le fond n'ayant pas ces pierres.
+ */
+const PLACE_FLAGS = FeatureFlag.still | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
+const { playOnly, stopAtEnd, noReplay, active, random, queueScript, stopEachImage } = FeatureFlag;
 /** Drapeaux de tri de `11a8:231b` : `0x1000` (feature 1107 de `BASECAMP`), `0x50000000` (1110) et `0x4000000` (6002, 6004, 6006 à 6008 de `BCTWO`). */
 const { overlay, limitLeft, limitRight, flag4000000 } = FeatureFlag;
 const UNREAD_1000 = overlay;
@@ -210,11 +214,11 @@ const BCTWO_PLACES: readonly Point[] = [
 /** `BASECAMP` : `0x1180000` etc., relevés dans `10b0:0027` (1106, 1108, 1109, 1110, 1107, 1104, puis 1100 à 1103 ; délai 6 sauf 0 pour 1100 à 1103). */
 const BASECAMP_DECOR: DecorSpec = {
   features: [
-    { script: 1106, delay: 6, flags: staticFirst | stopAtEnd | noReplay },
-    { script: 1108, delay: 6, flags: staticFirst | stopAtEnd | noReplay },
+    { script: 1106, delay: 6, flags: playOnly | stopAtEnd | noReplay },
+    { script: 1108, delay: 6, flags: playOnly | stopAtEnd | noReplay },
     { script: 1109, delay: 6, flags: stopAtEnd | noReplay },
     { script: 1110, delay: 6, flags: UNREAD_5 | stopAtEnd | noReplay },
-    { script: 1107, delay: 6, flags: staticFirst | stopAtEnd | UNREAD_1000 },
+    { script: 1107, delay: 6, flags: playOnly | stopAtEnd | UNREAD_1000 },
     { script: 1104, delay: 6, flags: random | queueScript },
     { script: 1100, delay: 0, flags: 0 },
     { script: 1101, delay: 0, flags: 0 },
@@ -238,10 +242,10 @@ const BCTWO_DECOR: DecorSpec = {
   features: [
     { script: 6005, delay: 6, flags: 0x188000 },
     { script: 6011, delay: 6, flags: 0x188000 },
-    { script: 6010, delay: 6, flags: staticFirst | stopAtEnd | noReplay | active },
+    { script: 6010, delay: 6, flags: playOnly | stopAtEnd | noReplay | active },
     { script: 6002, delay: 6, flags: UNREAD_4 | stopAtEnd | noReplay | active },
     { script: 6004, delay: 6, flags: UNREAD_4 | stopAtEnd | noReplay },
-    { script: 6009, delay: 6, flags: staticFirst | stopAtEnd | noReplay | active },
+    { script: 6009, delay: 6, flags: playOnly | stopAtEnd | noReplay | active },
     { script: 6006, delay: 6, flags: UNREAD_4 | 0x1000000 | stopAtEnd | noReplay | active },
     { script: 6007, delay: 6, flags: UNREAD_4 | 0x1000000 | stopAtEnd | noReplay | active },
     { script: 6008, delay: 6, flags: UNREAD_4 | 0x1000000 | stopAtEnd | noReplay | active },

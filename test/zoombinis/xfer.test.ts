@@ -260,7 +260,7 @@ describe.skipIf(!original.has)("transition XFER", () => {
     const { host, engine } = await begin({ from: ScreenId.picker, to: ScreenId.bridge, seed: 3 });
     const features = engine.services.get(FEATURES);
     await runFor(engine, host, TICK_MS * 3);
-    const playOnly = () => features.features.filter((f) => f.scriptId >= 5102 && f.scriptId <= 5108 && f.hasFlag(FeatureFlag.staticFirst));
+    const playOnly = () => features.features.filter((f) => f.scriptId >= 5102 && f.scriptId <= 5108 && f.hasFlag(FeatureFlag.playOnly));
     expect(playOnly()).toHaveLength(7);
     // Au départ, aucune n'est dessinée : leurs pixels sont ceux du fond.
     const { screen } = engine.services.get(GRAPHICS);
@@ -274,8 +274,8 @@ describe.skipIf(!original.has)("transition XFER", () => {
     for (let t = 0; t < 1400 && engine.scenes.currentId === ScreenId.xfer; t += 2) {
       await runFor(engine, host, TICK_MS * 2);
       for (const f of playOnly()) {
-        // Dessinée si et seulement si elle joue.
-        expect(f.hasFlag(FeatureFlag.noDraw), `${f.scriptId} t=${t}`).toBe(!f.active);
+        // Le bit `0x1000000` reste posé (sauf 5102 et 5103 après leurs événements 10 et 11) : le moteur ne la dessine que pendant qu'elle joue.
+        if (f.scriptId >= 5104) expect(f.hasFlag(FeatureFlag.playOnly), `${f.scriptId} t=${t}`).toBe(true);
         if (f.active && f.scriptId >= 5104 && f.scriptId <= 5107) {
           flown.add(f.scriptId);
           if (!images.has(f.scriptId)) images.set(f.scriptId, new Set());

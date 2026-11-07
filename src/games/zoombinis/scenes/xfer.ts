@@ -34,7 +34,7 @@
  */
 import type { Rect, Surface } from "../../../engine/mohawk/graphics/surface";
 import type { Archive } from "../../../engine/mohawk/resources";
-import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeatureOptions, type FeaturePart } from "../engine/features";
+import { FEATURES, FeatureFlag, type Feature, type FeatureOptions, type FeaturePart } from "../engine/features";
 import { ZOOMBINIS_GAME } from "../engine/game";
 import { ScreenId, type Scene, type SceneContext } from "../engine/scene";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
@@ -384,22 +384,16 @@ export function createXferScene(): Scene {
   /**
    * Objet `0x1188000` (`11b0:0c01`, `0c37`, `0c68`, `0d88` : 5102 à 5108, 6108). Le bit `0x1000000` fait que `11a0:033a` l'arrête dès sa première image et
    * que le rappel de dessin `11a0:0126` ne le dessine que pendant qu'il joue (`+0xe0 ≠ 0`) : invisible au repos, il n'apparaît que le temps de son
-   * animation (mouettes 5104 à 5107, bug 16). Le moteur du port dessine `staticFirst` au repos : `noDraw` le remplace ici, levé par `launch`.
+   * animation (mouettes 5104 à 5107, bug 16). Le moteur applique ce bit (`FeatureFlag.playOnly`).
    */
   function createPlayOnly(ctx: SceneContext, script: number): Feature {
-    const feature = createFeature(ctx, { script, delay: 6, flags: FeatureFlag.staticFirst | FeatureFlag.stopAtEnd | FeatureFlag.noReplay | FeatureFlag.active });
-    feature.flags |= FeatureFlag.noDraw;
-    return feature;
+    return createFeature(ctx, { script, delay: 6, flags: FeatureFlag.playOnly | FeatureFlag.stopAtEnd | FeatureFlag.noReplay | FeatureFlag.active });
   }
 
   /** Relance un objet de `createPlayOnly` (`11a8:1b89`) : dessiné jusqu'à sa fin, puis de nouveau invisible tant que le bit `0x1000000` est posé. */
   function launch(ctx: SceneContext, feature: Feature, onEvent?: (n: number) => void): void {
-    feature.flags &= ~FeatureFlag.noDraw;
     feature.notifyEnd = true;
-    feature.onEvent = (_image, n) => {
-      if (n === FEATURE_END && feature.hasFlag(FeatureFlag.staticFirst)) feature.flags |= FeatureFlag.noDraw;
-      onEvent?.(n);
-    };
+    feature.onEvent = (_image, n) => onEvent?.(n);
     ctx.services.get(FEATURES).setScript(feature, 0, true);
   }
 

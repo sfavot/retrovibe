@@ -293,7 +293,7 @@ class Maze2Run implements Maze2Probe {
     // `1118:0000` : calques (`0x4008000`, `0x4000000`), marques (`0x4108000`) et rampes (`0x4988000`) sans le bit `0x1000000` ; plaques (`0x508a000`) et caches
     // des rampes (`0x5988000`, `0x5980000`) avec : ceux-là ne sont dessinés que pendant qu'ils jouent (survol, passage).
     const still = F.flag4000000 | F.still | F.noReplay | F.active | F.firstImage;
-    const stillBit = F.flag4000000 | F.staticFirst | F.noReplay | F.active | F.firstImage;
+    const stillBit = F.flag4000000 | F.playOnly | F.noReplay | F.active | F.firstImage;
     f.create({ script: 0, delay: 0, depth: DEPTH.cells, flags: 0, onAfterDraw: (_feature, screen) => this.drawCells(screen) });
     const active = new Set(this.world.ramps);
     // Machines à bulles des falaises (`SCRB 9005 + falaise`, première image) : la falaise 0 toujours, les falaises 1 et 2 si elles ont une rampe active (`1118:0000`).
@@ -556,7 +556,8 @@ class Maze2Run implements Maze2Probe {
     object.flags = (object.flags & ~(FeatureFlag.still | FeatureFlag.noReplay)) | FeatureFlag.stopAtEnd;
     this.features.setScript(object, launch.ramp.script);
     if (view.front) {
-      view.front.flags = (view.front.flags & ~(FeatureFlag.staticFirst | FeatureFlag.noReplay)) | FeatureFlag.stopAtEnd;
+      // Le cache garde son bit `0x1000000` (`1118:*` ne touche pas à ses drapeaux) : il n'est dessiné que pendant le passage.
+      view.front.flags = (view.front.flags & ~FeatureFlag.noReplay) | FeatureFlag.stopAtEnd;
       this.features.setScript(view.front, launch.ramp.script + 1);
     }
   }
@@ -623,7 +624,8 @@ class Maze2Run implements Maze2Probe {
   private hovered(target: DropTarget | null): void {
     if (!target) return;
     const view = this.rampView(target.tag as number);
-    view.plate.flags = (view.plate.flags & ~(FeatureFlag.staticFirst | FeatureFlag.noReplay)) | FeatureFlag.stopAtEnd;
+    // La plaque garde son bit `0x1000000` : elle ne s'allume que le temps de son script.
+    view.plate.flags = (view.plate.flags & ~FeatureFlag.noReplay) | FeatureFlag.stopAtEnd;
     this.features.setScript(view.plate, SCRB.plate + view.ramp.number - 1);
   }
 

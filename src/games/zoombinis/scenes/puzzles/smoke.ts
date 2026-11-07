@@ -245,7 +245,7 @@ const F = FeatureFlag;
 /** Décor figé que `1158:0000` crée sans le bit `0x1000000` (piédestal `0x4188000`, poulie `0x4000000`, avant-plans `0x4100000`, levier `0x4180000`, wagonnets `0x4108000`). */
 const STILL = F.flag4000000 | F.still | F.stopAtEnd | F.noReplay | F.active | F.firstImage;
 /** Objets que `1158:0000` crée avec le bit `0x1000000` (`0x5188000`, `0x5180000`, `0xd180000`, zone de dépôt `0x108a000`) : vert, lampes, faisceaux, wagonnet sortant. */
-const STILL_BIT = F.flag4000000 | F.staticFirst | F.stopAtEnd | F.noReplay | F.active | F.firstImage;
+const STILL_BIT = F.flag4000000 | F.playOnly | F.stopAtEnd | F.noReplay | F.active | F.firstImage;
 /** Feature qui joue ses scripts une fois (puis s'arrête sur la dernière image). */
 const PLAYS = F.flag4000000 | F.stopAtEnd | F.active;
 
@@ -400,7 +400,9 @@ class SmokeRun implements SmokeProbe {
     this.lever = f.create({ script: SCRB.leverTest, delay: DELAY.lever, flags: STILL });
     if (low) {
       this.wagonA = f.create({ script: SCRB.emptyWagon, delay: DELAY.default, flags: STILL });
-      f.create({ script: SCRB.dropZone, delay: 7, flags: STILL_BIT });
+      // Zone de dépôt (le wagonnet de gauche) : `0x108a000` dans l'original (`1158:07c7`), avec le bit. **Écart provisoire** : dessinée (`STILL`) en attendant que
+      // l'utilisatrice confirme l'aspect de l'original (le fond n'a pas ce wagonnet).
+      f.create({ script: SCRB.dropZone, delay: 7, flags: STILL });
     } else {
       this.wagonA = f.create({ script: SCRB.arrivalA, delay: DELAY.default, flags: STILL });
       this.wagonB = f.create({ script: SCRB.arrivalB, delay: DELAY.default, flags: STILL });
@@ -513,7 +515,7 @@ class SmokeRun implements SmokeProbe {
     feature.scriptId = id;
     feature.replacing = true;
     feature.active = true;
-    feature.flags = (feature.flags & ~(F.staticFirst | F.still)) | (bit ? F.staticFirst : F.still) | F.noReplay | F.stopAtEnd;
+    feature.flags = (feature.flags & ~(F.playOnly | F.still)) | (bit ? F.playOnly : F.still) | F.noReplay | F.stopAtEnd;
     this.features.invalidate();
   }
 

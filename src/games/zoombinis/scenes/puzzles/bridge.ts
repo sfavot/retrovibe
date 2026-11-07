@@ -223,9 +223,9 @@ class BridgeRun implements BridgeProbe {
     f.addScripts(GROUP_ZONES, 2);
     const F = FeatureFlag;
     for (const bridge of [1, 2] as const) {
-      f.create({ script: GROUP_ZONES + bridge - 1, delay: ZONE_DELAY, flags: F.staticFirst | F.noReplay | F.active | F.firstImage });
+      f.create({ script: GROUP_ZONES + bridge - 1, delay: ZONE_DELAY, flags: F.playOnly | F.noReplay | F.active | F.firstImage });
     }
-    this.face = f.create({ script: SCRB.face, delay: PIECE_DELAY, flags: F.staticFirst | F.stopAtEnd | F.noReplay | F.queueScript | F.active });
+    this.face = f.create({ script: SCRB.face, delay: PIECE_DELAY, flags: F.playOnly | F.stopAtEnd | F.noReplay | F.queueScript | F.active });
     this.fence = f.create({ script: SCRB.fence, delay: PIECE_DELAY, flags: F.stopAtEnd | F.active });
     this.socket = {
       1: f.create({ script: SCRB.upperSocket, delay: PIECE_DELAY, flags: F.stopAtEnd | F.active }),

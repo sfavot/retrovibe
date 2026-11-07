@@ -54,7 +54,7 @@ export const FEATURE_END = 0xffff;
 
 /**
  * Drapeaux d'une feature (`+0x20`, `engine.md` §3.5). Interprétés : `firstImage`, `noDraw`, `active`, `resetOnce`, `stopEachImage`,
- * `queueScript`, `noReplay`, `stopAtEnd`, `relative`, `staticFirst`, `random`, et `still` (extension du port : image fixe dessinée, pour les décors que
+ * `queueScript`, `noReplay`, `stopAtEnd`, `relative`, `playOnly` (dessiné seulement pendant qu'il joue), `random`, et `still` (extension du port : image fixe dessinée, pour les décors que
  * l'original crée sans le bit `0x1000000`). Stockés sans effet (« non interprétés ») : `snoid`
  * et `other` (taille de l'objet et tables `SCRS` de l'original, mais lus par `Features.reorder` pour reconnaître un personnage
  * mobile), `region` (région attachée, `11d8:0958`). Lus seulement par `Features.reorder` (`11a8:231b`) : `overlay`, `active`,
@@ -88,8 +88,12 @@ export const FeatureFlag = {
    * décors que l'original crée sans `0x1000000` (et que le port veut figer sur leur première image).
    */
   still: 0x400000,
-  /** Bit `0x1000000` de l'original : arrêt dès la première image, sans son (`11a0:033a`). */
-  staticFirst: 0x1000000,
+  /**
+   * Bit `0x1000000` de l'original : **dessiné seulement pendant qu'il joue**. `11a0:033a` arrête l'objet dès sa première image (sans son), et le rappel de
+   * dessin `11a0:0126` ne le dessine que si l'objet est actif (`+0xe0 ≠ 0`) : invisible au repos, il n'apparaît que le temps d'une animation lancée par
+   * l'écran (surbrillance d'une zone de dépôt, mouette, éclaboussure…), puis disparaît à sa fin.
+   */
+  playOnly: 0x1000000,
   /** Lecture aléatoire : l'image suivante est tirée par `10a8:04e8(dernière, 0)`. */
   random: 0x2000000,
   /** « Déjà trié » : `11a8:231b` le pose sur un objet fixe à sa première mise en ordre, et ne le déplace plus ensuite. */
@@ -545,6 +549,8 @@ export class Features {
     if (this.background) screen.copyFrom(this.background);
     for (const feature of [...this.list]) {
       if (feature.hasFlag(FeatureFlag.noDraw)) continue;
+      // `11a0:0126` : un objet `0x1000000` n'est dessiné que pendant qu'il joue.
+      if (feature.hasFlag(FeatureFlag.playOnly) && !feature.active) continue;
       feature.onBeforeDraw?.(feature, screen);
       for (const part of feature.parts) {
         const sheet = part.sheet ?? this.groups[feature.group];
@@ -626,6 +632,8 @@ export class Features {
           ended = true;
           feature.active = false;
           if (atEnd) {
+            // Un objet `playOnly` disparaît à sa fin (`11a0:0126`) : l'écran est à recomposer.
+            if (feature.hasFlag(FeatureFlag.playOnly)) this.dirty = true;
             this.finish(feature);
             return;
           }
@@ -646,7 +654,7 @@ export class Features {
         feature.hasFlag(FeatureFlag.stopEachImage)
       )
         feature.active = false;
-      if (!feature.hasFlag(FeatureFlag.staticFirst | FeatureFlag.still)) {
+      if (!feature.hasFlag(FeatureFlag.playOnly | FeatureFlag.still)) {
         feature.redraw = true;
         silent = false;
       } else {

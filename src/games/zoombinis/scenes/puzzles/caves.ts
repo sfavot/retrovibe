@@ -228,7 +228,9 @@ class CavesRun implements CavesProbe {
     const fillers = Math.min(4, SLOT_COUNT - this.party.length);
     if (fillers > 0) f.create({ script: SCRB.filler + fillers, delay: DELAY.default, flags: F.flag4000000 | F.stopAtEnd | F.active, depth: DEPTH.filler });
     for (let s = 1; s <= SLOT_COUNT; s++) {
-      this.tiles[s] = f.create({ script: SCRB.tile + s, delay: DELAY.tile, flags: F.flag4000000 | F.staticFirst | F.noReplay | F.active | F.firstImage });
+      // Dalles : `0x508a000` dans l'original (`10c8:0000`), donc avec le bit `0x1000000`. **Écart provisoire** : elles restent dessinées (`still`) en attendant que
+      // l'utilisatrice confirme l'aspect de l'original (sans elles, le fond montre des dalles dorées en pointe de diamant).
+      this.tiles[s] = f.create({ script: SCRB.tile + s, delay: DELAY.tile, flags: F.flag4000000 | F.still | F.noReplay | F.active | F.firstImage });
     }
     f.create({ script: SCRB.decor, delay: 0, flags: F.flag4000000 });
 

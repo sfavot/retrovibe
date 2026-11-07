@@ -27,9 +27,14 @@
  *   font rien (`11b0:1748`). Le son d'ambiance `ad24` (20000 à 20100) est tiré au hasard (`10a8:04e8`, bornes 1…n) d'après région, destination, niveau et mémoire de dialogue.
  * - La mémoire de dialogue `S+0x28 + 2k` est lue puis passée à `1168:5c57` **sur une copie** : XFER n'écrit pas le résultat dans la partie (l'écran d'arrivée le fait).
  *
+ * - Fondus de palette (`screen-kit.ts`) : l'Enter appelle `11a8:302b` juste après le premier dessin (`1058:0ad3`) et la voix mise en file ; il bloque 30 ticks (500 ms, entrées
+ *   1 à 254, du noir vers la palette de l'écran) et `11a8:2278` pose le début de la minuterie des 300 ticks ensuite ; l'Exit (`11b0:1326`) fait `11a8:3065` (fondu vers le noir,
+ *   30 ticks, bloquant) avant de quitter. Le fondu de sortie est tenu noir jusqu'à l'ouverture de l'écran suivant.
+ * - Pas d'animation d'attente des Zoombinis : l'Enter met `DS:235c` à 0 (`11b0:0093`), ce qui coupe l'état 0 de `1168:0ba8`, et l'Exit le remet à `0x40` (`11b0:1385`).
+ *
  * ## Écarts
  *
- * - Fondu de palette d'entrée (`11a8:302b`) et animation d'attente des Zoombinis (état 0) non portés. Titre et texte de population : police et couleurs de l'original non relevées
+ * - Pendant le fondu d'entrée, les features décoratives créées par l'Enter tournent déjà (l'original bloque tout) ; les Zoombinis et la minuterie, eux, attendent. Titre et texte de population : police et couleurs de l'original non relevées
  *   (grande police, blanc cerné de noir), rectangle de population déduit du `SCRB` 6105.
  */
 import type { Rect, Surface } from "../../../engine/mohawk/graphics/surface";
@@ -42,7 +47,8 @@ import { TextFlags, ZOOMBINIS_TEXT } from "../engine/text";
 import { TRANSFER_ROUTES, currentLevel, dialogMemoryIndex } from "../game/route";
 import { createSnoid, screenScripts, type Snoid } from "./snoid";
 import { TrailColoring, TRAIL_DELAY, TRAIL_STARTS, trailStartIndex } from "./xfer-trail";
-import { closeScreen, openScreen } from "./screen-kit";
+import type { Fade } from "../../../engine/mohawk/graphics/palette";
+import { closeScreen, fadeInScreen, fadeOutScreen, openScreen } from "./screen-kit";
 
 const ARCHIVE = "XFER.MHK";
 /** Fonds de chaque région (`DS:ad26` 0 à 5) : `tBMP` et `SHPL` du jeu de décors. */
@@ -349,6 +355,10 @@ export function createXferScene(): Scene {
   let target: number = ScreenId.map;
   let previous = 0;
   let startTick = 0;
+  /** Fondu d'entrée (`11a8:302b`, bloquant dans l'original) puis fondu de sortie (`11a8:3065`) : rien ne tourne avant la fin du premier ni après le début du second. */
+  let fadeIn: Fade | undefined;
+  let fadeOut: Fade | undefined;
+  let begun = false;
   let voice = 0;
   let left = false;
   let nextTimer = 0;
@@ -414,14 +424,18 @@ export function createXferScene(): Scene {
     drawer.drawText(surface, "large", text, rect, flags, TEXT_COLOR);
   }
 
+  /** `11b0:1326` : fondu vers le noir (bloquant), puis envoi à la destination (au tick où le fondu est fini). */
   function finish(ctx: SceneContext): void {
     if (left) return;
     left = true;
-    const zoombinis = ctx.services.get(ZOOMBINIS_GAME);
-    // `11b0:139b` / `11b0:16e9` : après un trajet forcé, retour à la carte (`[8554] = 1`) et `DS:4180` remis à 0.
-    const forced = zoombinis.session.forcedTransfer !== 0;
-    zoombinis.session.forcedTransfer = 0;
-    zoombinis.goTo(ctx, forced ? ScreenId.map : target);
+    fadeOut = fadeOutScreen(ctx);
+  }
+
+  /** Fin du fondu d'entrée : `11a8:2278` pose le début de la minuterie, `1168:2982` les départs échelonnés (régions 1 à 4), en temps de la fin du fondu. */
+  function begin(ctx: SceneContext): void {
+    begun = true;
+    startTick = ctx.clock.ticks;
+    if (region >= 1 && region <= 4) members.forEach((member, i) => (member.startAt = startTick + STAGGER_TICKS * (members.length - 1 - i)));
   }
 
   return {
@@ -448,6 +462,9 @@ export function createXferScene(): Scene {
       arrivals = 0;
       finalStarted = false;
       wasIdle = false;
+      begun = false;
+      fadeIn = undefined;
+      fadeOut = undefined;
       onceFlags = [true, true];
       nextTimer = 0;
       population = game.counters.town;
@@ -549,10 +566,6 @@ export function createXferScene(): Scene {
           },
         });
         addMembers(present.map(() => ({ ...ROAD_START })));
-        present.forEach((_, i) => {
-          // Le dernier du groupe part le premier (`1168:2982` parcourt la liste à rebours, probable).
-          members[i]!.startAt = ctx.clock.ticks + STAGGER_TICKS * (present.length - 1 - i);
-        });
         createFeature(ctx, { script: bg + 101, delay: 0, flags: 0, depth: FRONT });
         createFeature(ctx, { script: bg + 102, delay: 0, flags: 0, depth: FRONT });
         const title = ctx.services.tryGet(ZOOMBINIS_TEXT)?.strings.get(STRL_TITLES, region) ?? "";
@@ -562,7 +575,8 @@ export function createXferScene(): Scene {
 
       features.invalidate();
       if (voice !== 0) sound.queue(voice);
-      startTick = ctx.clock.ticks;
+      // `11a8:302b` juste après le premier dessin et la voix mise en file ; le reste (`begin`) attend la fin du fondu.
+      fadeIn = fadeInScreen(ctx);
       ctx.requestPresent();
     },
 
@@ -572,7 +586,21 @@ export function createXferScene(): Scene {
     },
 
     tick(ctx: SceneContext) {
+      if (fadeOut) {
+        if (!fadeOut.done) return;
+        fadeOut = undefined;
+        const zoombinis = ctx.services.get(ZOOMBINIS_GAME);
+        // `11b0:139b` / `11b0:16e9` : après un trajet forcé, retour à la carte (`[8554] = 1`) et `DS:4180` remis à 0.
+        const forced = zoombinis.session.forcedTransfer !== 0;
+        zoombinis.session.forcedTransfer = 0;
+        zoombinis.goTo(ctx, forced ? ScreenId.map : target);
+        return;
+      }
       if (left) return;
+      if (!begun) {
+        if (fadeIn && !fadeIn.done) return;
+        begin(ctx);
+      }
       if (ctx.input.buttonEvents.some((event) => event.down && event.button === "left")) return finish(ctx);
 
       const now = ctx.clock.ticks;

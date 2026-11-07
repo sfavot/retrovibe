@@ -18,6 +18,7 @@ import {
   translateSlots,
   XFER_BACKGROUNDS,
 } from "../../src/games/zoombinis/scenes/xfer";
+import { SCREEN_FADE_TICKS } from "../../src/games/zoombinis/scenes/screen-kit";
 import { originalFiles } from "../support/original";
 import { runFor, TestHost } from "./engine-test-host";
 
@@ -27,6 +28,8 @@ vi.setConfig({ testTimeout: 20_000 });
 const original = originalFiles("zoombinis", "files.json");
 
 const TICK_MS = 17;
+/** Fondu d'entrée puis de sortie (`11a8:302b`, `11a8:3065`) : 30 ticks chacun. */
+const FADE = SCREEN_FADE_TICKS;
 
 /** Cinq Zoombinis variés (cheveux, yeux, nez, pieds). */
 function group(count = 5): Zoombini[] {
@@ -219,15 +222,15 @@ describe.skipIf(!original.has)("transition XFER", () => {
       return engine.services.get(FEATURES).features.filter((f) => f.hasFlag(FeatureFlag.snoid));
     };
     // Falaise : le premier part tout de suite (SCRS 5199 + pieds) ; les autres attendent.
-    const cliff = await positions(ScreenId.picker, ScreenId.bridge, 20);
+    const cliff = await positions(ScreenId.picker, ScreenId.bridge, FADE + 20);
     expect(cliff.some((f) => f.scriptId >= 5200 && f.scriptId <= 5204)).toBe(true);
     expect(cliff.filter((f) => f.scriptId >= 5200).length).toBeLessThan(cliff.length);
     // Route : le dernier du groupe part le premier, les autres 90 ticks plus tard chacun.
-    const road = await positions(ScreenId.pizza, ScreenId.baseCamp, 100);
+    const road = await positions(ScreenId.pizza, ScreenId.baseCamp, FADE + 100);
     const walking = road.filter((f) => f.scriptId >= 105 && f.scriptId <= 129);
     expect(walking).toHaveLength(2);
     // Ville : SCRS 6200 + pieds.
-    const town = await positions(ScreenId.maze2, ScreenId.town, 20);
+    const town = await positions(ScreenId.maze2, ScreenId.town, FADE + 20);
     expect(town.some((f) => f.scriptId >= 6200 && f.scriptId <= 6204)).toBe(true);
   });
 
@@ -302,7 +305,7 @@ describe.skipIf(!original.has)("transition XFER", () => {
     const first = colored();
     expect(first.before).toBeGreaterThan(1000);
     expect(first.after).toBeLessThan(first.before / 10);
-    await runFor(engine, host, TICK_MS * 230);
+    await runFor(engine, host, TICK_MS * (FADE + 200));
     const later = colored();
     expect(later.after).toBeGreaterThan(first.after + 100);
     expect(later.after + later.before).toBe(first.before + first.after);
@@ -329,7 +332,7 @@ describe.skipIf(!original.has)("transition XFER", () => {
 
   it("un clic gauche écourte la transition, une touche ne fait rien", async () => {
     const { host, engine } = await begin({ from: ScreenId.pizza, to: ScreenId.baseCamp });
-    await runFor(engine, host, TICK_MS * 30);
+    await runFor(engine, host, TICK_MS * (FADE + 30));
     host.press("Space");
     host.press("Enter", { key: "Enter" });
     await runFor(engine, host, TICK_MS * 10);
@@ -338,7 +341,10 @@ describe.skipIf(!original.has)("transition XFER", () => {
     await runFor(engine, host, TICK_MS * 10);
     expect(engine.scenes.currentId).toBe(ScreenId.xfer);
     host.click(320, 240);
-    await runFor(engine, host, TICK_MS * 6);
+    // Le clic lance le fondu de sortie (30 ticks, l'écran reste) avant l'envoi à la destination.
+    await runFor(engine, host, TICK_MS * 10);
+    expect(engine.scenes.currentId).toBe(ScreenId.xfer);
+    await runFor(engine, host, TICK_MS * (FADE + 5));
     expect(engine.error).toBeNull();
     expect(engine.scenes.currentId).toBe(ScreenId.baseCamp);
   });
@@ -372,8 +378,9 @@ describe.skipIf(!original.has)("transition XFER", () => {
     const { host, engine, zoombinis } = await begin({ from: ScreenId.tunnels, to: ScreenId.pizza, members: [] });
     zoombinis.game.options.effects = false;
     const elapsed = await playOut(engine, host);
-    expect(elapsed).toBeGreaterThanOrEqual(MIN_TICKS - 10);
-    expect(elapsed).toBeLessThan(MIN_TICKS + 20);
+    // Fondu d'entrée (la minuterie des 300 ticks démarre après lui) + 300 ticks + fondu de sortie.
+    expect(elapsed).toBeGreaterThanOrEqual(FADE + MIN_TICKS - 10);
+    expect(elapsed).toBeLessThan(2 * FADE + MIN_TICKS + 20);
     expect(engine.scenes.currentId).toBe(ScreenId.pizza);
   });
 
@@ -403,5 +410,44 @@ describe.skipIf(!original.has)("transition XFER", () => {
       const { palette } = engine.services.get(GRAPHICS);
       expect(palette.colors.slice(10 * 3, 246 * 3).some((v) => v !== 0)).toBe(true);
     }
+  });
+
+  it("fondu d'entrée (11a8:302b) : du noir vers la palette, entrées 1 à 254, en 30 ticks, sans rien animer ; fondu de sortie tenu noir (11a8:3065)", async () => {
+    const { host, engine } = await begin({ from: ScreenId.picker, to: ScreenId.bridge });
+    const { palette } = engine.services.get(GRAPHICS);
+    await runFor(engine, host, TICK_MS * 2);
+    const level = () => host.frames[host.frames.length - 1]!.palette;
+    const lum = () => level().slice(3, 255 * 3).reduce((sum, v) => sum + v, 0);
+    expect(engine.scenes.currentId).toBe(ScreenId.xfer);
+    const early = lum();
+    const full = palette.colors.slice(3, 255 * 3).reduce((sum, v) => sum + v, 0);
+    expect(early).toBeLessThan(full / 3);
+    // Entrées 0 et 255 hors du fondu.
+    expect(Array.from(level().slice(255 * 3, 256 * 3))).toEqual(Array.from(palette.colors.slice(255 * 3, 256 * 3)));
+    await runFor(engine, host, TICK_MS * 14);
+    const middle = lum();
+    expect(middle).toBeGreaterThan(early);
+    // Pendant le fondu : pas de Zoombini lâché, pas de minuterie.
+    expect(engine.services.get(FEATURES).features.filter((f) => f.hasFlag(FeatureFlag.snoid) && f.scriptId >= 5200)).toHaveLength(0);
+    await runFor(engine, host, TICK_MS * 20);
+    expect(lum()).toBeGreaterThan(middle);
+    expect(Array.from(level())).toEqual(Array.from(palette.colors));
+    expect(palette.fade).toBeNull();
+    // Clic : fondu vers le noir, tenu jusqu'à l'ouverture de l'écran suivant (factice, qui n'ouvre rien).
+    host.click(320, 240);
+    await runFor(engine, host, TICK_MS * 12);
+    expect(lum()).toBeLessThan(full);
+    expect(lum()).toBeGreaterThan(0);
+    await runFor(engine, host, TICK_MS * (FADE + 5));
+    expect(engine.scenes.currentId).toBe(ScreenId.bridge);
+    expect(lum()).toBe(0);
+  });
+
+  it("pas d'animation d'attente des Zoombinis dans XFER (DS:235c vaut 0)", async () => {
+    const { host, engine } = await begin({ from: ScreenId.maze2, to: ScreenId.town });
+    await runFor(engine, host, TICK_MS * (FADE + 100));
+    const snoids = engine.services.get(FEATURES).features.filter((f) => f.hasFlag(FeatureFlag.snoid));
+    // Aucun SCRS d'attente 130 à 145 : seulement l'attente (100 à 104) ou la marche (6200 à 6204).
+    expect(snoids.every((f) => f.scriptId < 130 || f.scriptId >= 6200 || f.scriptId < 100)).toBe(true);
   });
 });

@@ -271,7 +271,7 @@ Le clic n'est accepté que si `82ec == 0`, si l'objet n'est pas déjà actif (`+
 
 ### 4.5 Clavier
 
-`10f8:41be(touche)` ne traite que le code `0x016f` : il appelle `11a0:155e` (rejoue la voix d'accueil `DS:a2c4`, ou l'interrompt si elle joue). Autres touches : raccourcis généraux (engine.md §7.2). Quelle touche produit `0x016f` n'est pas établi (§7).
+`10f8:41be(touche)` ne traite que le code `0x016f` : il appelle `11a0:155e` (rejoue la voix d'accueil `DS:a2c4`, ou l'interrompt si elle joue). Autres touches : raccourcis généraux (engine.md §7.2). **Aucune touche du mode de test** (**sûr**, handler de 38 octets relu en lot 3) : il ne lit même pas `[a43f]`. Rien à porter. Quelle touche produit `0x016f` n'est pas établi (§7).
 
 ## 5. Animations et sons
 

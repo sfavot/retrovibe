@@ -7,10 +7,12 @@ import { DIALOG } from "../../../src/games/zoombinis/engine/dialog";
 import { createZoombinisEngine } from "../../../src/games/zoombinis/engine/engine";
 import { FEATURES } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId, type Scene } from "../../../src/games/zoombinis/engine/scene";
-import { installServices } from "../../../src/games/zoombinis/engine/services";
+import { GRAPHICS, installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
 import {
+  MUD_TOTAL,
   NET_LEVELS,
+  ROLE_NAMES,
   SELECTOR_ORDERS,
   aim,
   aimedTile,
@@ -25,6 +27,8 @@ import {
   netRobot,
   newNet,
   placeGroups,
+  refill,
+  roleNames,
   selectorCount,
   selectorRoles,
   setSelector,
@@ -329,6 +333,38 @@ describe("règles de la muraille de signes : tir, impact, munitions", () => {
       // 16 tirs pour 16 Zoombinis aux niveaux 0 à 2, 17 au niveau 3.
       expect(totalShots(state)).toBe(level === 3 ? 17 : 16);
     }
+  });
+
+  it("mode de test : rôles `[89cc]`, `[89ce]`, `[89d0]` tirés à l'entrée (niveaux 0 à 2 : (2, 1, 0) ou (1, 2, 0) ; niveau 3 : une permutation de 0 à 2) et noms affichés par `L`", () => {
+    expect(ROLE_NAMES).toEqual(["SC", "SH", "MC"]);
+    for (let seed = 1; seed <= 20; seed++) {
+      for (const level of [0, 1, 2]) {
+        const state = newNet(new MsvcRandom(seed), level, 16);
+        expect(state.roles).toEqual(state.swap ? [2, 1, 0] : [1, 2, 0]);
+      }
+      const state = newNet(new MsvcRandom(seed), 3, 16);
+      expect([...state.roles].sort()).toEqual([0, 1, 2]);
+      expect(roleNames(state)).toEqual(state.roles.map((role) => ROLE_NAMES[role]));
+    }
+    // Avant le niveau 2 la troisième case porte « PR » (`DS:1a66`).
+    const low = newNet(new MsvcRandom(1), 1, 16);
+    expect(roleNames(low)).toEqual([ROLE_NAMES[low.roles[0]], ROLE_NAMES[low.roles[1]], "PR"]);
+    expect(roleNames(newNet(new MsvcRandom(1), 2, 16))[2]).toBe(ROLE_NAMES[0]);
+  });
+
+  it("mode de test, espace : munitions remises au départ ; le jeu repart seulement s'il était arrêté", () => {
+    const state = newNet(new MsvcRandom(1), 0, 16);
+    endOfShot(state);
+    endOfShot(state);
+    expect(state.ammo).toBe(state.startAmmo - 2);
+    expect(refill(state)).toBe(false);
+    expect(state.ammo).toBe(state.startAmmo);
+    for (let shot = 1; shot <= totalShots(state); shot++) endOfShot(state);
+    expect(state.exhausted).toBe(true);
+    expect(refill(state)).toBe(true);
+    expect(state.exhausted).toBe(false);
+    expect(state.ammo).toBe(state.startAmmo);
+    expect(MUD_TOTAL).toBe(17);
   });
 
   it("fin : tous libérés = victoire ; les perdus sont ceux qui n'ont pas franchi le mur ; la voix de regret suppose un échec partiel", () => {
@@ -787,6 +823,55 @@ describe.skipIf(!original.has)("muraille de signes : écran (écran 15, NET.MHK)
     // Dernière épreuve de l'étape 3 sans perdus : le monument est posé.
     expect(zoombinis.game.monuments.some((m) => m !== null && m.stage === 3 && m.level === level + 1)).toBe(true);
   }, 120000);
+
+  it("touches du mode de test (`1120:10cd`) : sans le mode de test, ni espace ni L n'agissent", async () => {
+    const { host, probe, ticks, engine, ready } = await start(0);
+    await ready();
+    const { screen } = engine.services.get(GRAPHICS);
+    const before = screen.pixels[3 * 640 + 502];
+    probe().state.ammo = 3;
+    for (const [code, key] of [["Space", " "], ["KeyL", "l"], ["KeyL", "L"]] as const) {
+      host.press(code, { key });
+      await ticks(2);
+    }
+    expect(probe().state.ammo).toBe(3);
+    expect(screen.pixels[3 * 640 + 502]).toBe(before);
+    expect(engine.error).toBeNull();
+  });
+
+  it("mode de test : espace remet les munitions et, le jeu arrêté, relance le rechargement ; L écrit le bandeau des rôles ; F1 reste l'aide", async () => {
+    const { host, probe, ticks, engine, zoombinis, ready, scripts, sound } = await start(0);
+    zoombinis.game.options.testMode = true;
+    await ready();
+    const state = probe().state;
+    // Munitions entamées, jeu en cours : seules les munitions changent.
+    state.ammo = 3;
+    host.press("Space", { key: " " });
+    await ticks(2);
+    expect(state.ammo).toBe(state.startAmmo);
+    // Jeu arrêté : le rechargement repart (le bras reprend une boule : `SCRB 7031 + tas`, tas = 17 − munitions), le tir est permis ensuite.
+    state.ammo = -1;
+    state.exhausted = true;
+    host.press("Space", { key: " " });
+    await ticks(2);
+    expect(state.exhausted).toBe(false);
+    expect(state.ammo).toBe(state.startAmmo);
+    expect(scripts()).toContain(7031 + 17 - state.startAmmo);
+    await ready();
+    // L : bandeau (fond 0xe, cadre noir).
+    const { screen } = engine.services.get(GRAPHICS);
+    host.press("KeyL", { key: "L", shift: true });
+    await ticks(1);
+    expect(screen.pixels[3 * 640 + 502]).toBe(0xe);
+    expect(screen.pixels[1 * 640 + 500]).toBe(0);
+    // F1 : voix d'introduction.
+    const waves = host.audio.waves.length;
+    host.press(HELP_KEY, { key: HELP_KEY });
+    await ticks(4);
+    expect(host.audio.waves.length).toBeGreaterThan(waves);
+    expect(sound.lastMusicId).toBe(0);
+    expect(engine.error).toBeNull();
+  });
 
   it("F1 rejoue la voix d'introduction (20064) ; aucune musique", async () => {
     const { host, sound, ticks } = await start(0);

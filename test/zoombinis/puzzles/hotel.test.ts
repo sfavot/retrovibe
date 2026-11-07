@@ -14,14 +14,17 @@ import {
   DEFEAT_STEP,
   DIM_PERCENT,
   EXPLAIN_SCRIPT,
+  ATTRIBUTE_LETTERS,
   FREE_STEPS,
   HALL_PLACES,
   INTRO_SCRIPT,
   MAX_ERRORS,
   PILE_MAX,
+  TEST_SCENE_START,
   ROOM_COUNTS,
   ROOM_POINTS_125,
   ROOM_POINTS_25,
+  attributeLetters,
   axisIndices,
   blockedArt,
   blockedRooms,
@@ -36,7 +39,9 @@ import {
   isValid,
   lostMembers,
   memberValues,
+  nextTestScene,
   place,
+  resetClock,
   robot,
   robotPlan,
   roomOfAxes,
@@ -352,6 +357,45 @@ describe("règles de l'hôtel (hotel.ts)", () => {
     expect(stackPosition(3, 0, { x: 16, y: 40 }, 3)).toEqual({ x: 21 - 4, y: 23 - 2 });
     // `SCRS` de montée : trois familles par colonne au niveau 0 à 2, une par colonne de pas 5 au niveau 3.
     expect([acceptScript(1, 0, 0, 1), acceptScript(1, 10, 10, 3), acceptScript(1, 20, 20, 5), acceptScript(3, 7, 7, 2)]).toEqual([13030, 13037, 13044, 13056]);
+  });
+
+  it("mode de test, touche R (`DS:74a8`) : toute pose est acceptée aux niveaux 1 à 3, pas au niveau 0 ; elle pose quand même les étiquettes du Zoombini", () => {
+    for (const level of [1, 2, 3] as const) {
+      const state = createHotel(new MsvcRandom(2), level, variedGroup(12));
+      const rooms = Array.from({ length: ROOM_COUNTS[level]! }, (_, r) => r).filter((r) => state.piles[r] !== BLOCKED);
+      const first = rooms[0]!;
+      place(state, 0, first);
+      expect(refuseOnce(state, first)).toMatchObject({ kind: "refused" });
+      state.acceptAll = true;
+      expect(place(state, 2, first)).toMatchObject({ kind: "accepted", free: false });
+      // Les étiquettes de la chambre sont celles du dernier Zoombini accepté (`2156`, `2229`).
+      axisIndices(level, first).forEach((index, axis) => expect(state.labels[axis]![index]).toBe(memberValues(state, 2)[axis]));
+    }
+    const state = createHotel(new MsvcRandom(2), 0, variedGroup(12));
+    place(state, 0, 0);
+    state.acceptAll = true;
+    expect(place(state, 1, 0)).toMatchObject({ kind: "refused" });
+  });
+
+  it("mode de test, espace : le cran revient à 1 sans toucher à la défaite ni à la première pose ; lettres de `A` (H, E, N, F) ; défilement de `W` (0 à 9) et `E` (10 à 17)", () => {
+    const state = createHotel(new MsvcRandom(2), 1, variedGroup(12));
+    place(state, 0, 0);
+    refuseOnce(state, 0);
+    state.lost = true;
+    resetClock(state);
+    expect(state.step).toBe(1);
+    expect(state.lost).toBe(true);
+    expect(state.firstPose).toBe(false);
+    expect(errorsMade(state)).toBe(0);
+    expect(ATTRIBUTE_LETTERS).toEqual(["H", "E", "N", "F"]);
+    expect(attributeLetters(state)).toEqual(state.chosen.slice(0, 2).map((a) => "HENF"[a]));
+    expect(attributeLetters(createHotel(new MsvcRandom(2), 3, variedGroup(12)))).toHaveLength(3);
+    // Les deux compteurs valent 25 à l'Enter : le premier appui donne le début de la plage.
+    expect(nextTestScene(TEST_SCENE_START, 0, 9)).toBe(0);
+    expect(nextTestScene(TEST_SCENE_START, 10, 0x11)).toBe(10);
+    expect(nextTestScene(9, 0, 9)).toBe(0);
+    expect(nextTestScene(0x11, 10, 0x11)).toBe(10);
+    expect(nextTestScene(3, 0, 9)).toBe(4);
   });
 });
 
@@ -790,6 +834,120 @@ describe.skipIf(!original.has)("écran de l'hôtel (createHotelScene, HOTEL.MHK)
     t.host.click(BUTTON_MAP.left + 5, BUTTON_MAP.top + 5);
     await t.wait(10);
     expect(t.engine.services.get(DIALOG).isOpen).toBe(true);
+  });
+
+  it("touches du mode de test (`10e8:2289`) : sans le mode de test, aucune n'agit (F1 reste l'aide vocale)", async () => {
+    const t = await start({ level: 1, visits: 5 });
+    await t.toPlay();
+    const probe = t.probe();
+    const { screen } = t.engine.services.get(GRAPHICS);
+    const banner = screen.pixels[3 * 640 + 502];
+    const scene = probe.lastScene;
+    probe.state.step = 6;
+    const colors = t.palette();
+    dimPalette(colors, 88);
+    const dimmed = colors.slice();
+    for (const [code, key] of [["Space", " "], ["KeyA", "a"], ["KeyE", "e"], ["KeyH", "h"], ["KeyI", "i"], ["KeyR", "R"], ["KeyW", "w"], ["KeyW", "W"], ["KeyZ", "z"]] as const) {
+      t.host.press(code, { key });
+      await t.wait(2);
+    }
+    expect(probe.state.step).toBe(6);
+    expect(probe.state.acceptAll).toBe(false);
+    expect(probe.demo).toBe(0);
+    expect(probe.testScenes).toEqual({ w: TEST_SCENE_START, e: TEST_SCENE_START });
+    expect(probe.lastScene).toBe(scene);
+    expect(Array.from(colors)).toEqual(Array.from(dimmed));
+    expect(screen.pixels[3 * 640 + 502]).toBe(banner);
+  });
+
+  it("mode de test : espace remet le cran à 1, le cadran sur son cran et la lumière d'origine ; R accepte tout (pas r) ; H et I changent `DS:74c6` ; A écrit le bandeau des lettres", async () => {
+    const t = await start({ level: 1, visits: 5 });
+    t.zoombinis.game.options.testMode = true;
+    await t.toPlay();
+    await t.until(() => !t.probe().busy);
+    const probe = t.probe();
+    const colors = t.palette();
+    const bright = colors.slice();
+    dimPalette(colors, 88);
+    dimPalette(colors, 88);
+    probe.state.step = 7;
+    t.host.press("Space", { key: " " });
+    await t.wait(2);
+    expect(probe.state.step).toBe(1);
+    expect(probe.clockScript).toBe(6001);
+    expect(Array.from(colors.slice(30, 30 + 236 * 3 - 30))).toEqual(Array.from(bright.slice(30, 30 + 236 * 3 - 30)));
+    expect(probe.dims).toBe(0);
+    // R : tout est accepté ; la minuscule n'est pas dans la table.
+    t.host.press("KeyR", { key: "r" });
+    await t.wait(2);
+    expect(probe.state.acceptAll).toBe(false);
+    t.host.press("KeyR", { key: "R", shift: true });
+    await t.wait(2);
+    expect(probe.state.acceptAll).toBe(true);
+    // I ne fait rien tant que DS:74c6 vaut 0 ; H le met à 1, I l'augmente.
+    t.host.press("KeyI", { key: "I", shift: true });
+    await t.wait(1);
+    expect(probe.demo).toBe(0);
+    t.host.press("KeyH", { key: "h" });
+    await t.wait(1);
+    expect(probe.demo).toBe(1);
+    t.host.press("KeyH", { key: "H", shift: true });
+    await t.wait(1);
+    expect(probe.demo).toBe(1);
+    t.host.press("KeyI", { key: "i" });
+    await t.wait(1);
+    expect(probe.demo).toBe(2);
+    // A : bandeau en haut à droite (fond 0xe, cadre noir).
+    const { screen } = t.engine.services.get(GRAPHICS);
+    t.host.press("KeyA", { key: "a" });
+    await t.wait(1);
+    expect(screen.pixels[3 * 640 + 502]).toBe(0xe);
+    expect(screen.pixels[1 * 640 + 500]).toBe(0);
+    // F1 reste l'aide vocale.
+    t.host.press("F1");
+    await t.wait(5);
+    expect(t.queued).toContain(20081);
+    expect(t.engine.error).toBeNull();
+  });
+
+  it("mode de test : W et E font défiler les scénettes de l'écureuil (7000 à 7009, 7010 à 7017) sur le même objet", async () => {
+    const t = await start({ level: 1, visits: 5 });
+    t.zoombinis.game.options.testMode = true;
+    await t.toPlay();
+    const probe = t.probe();
+    const features = t.engine.services.get(FEATURES);
+    const squirrel = () => features.features.filter((f) => f.scriptId >= 7000 && f.scriptId <= 7017);
+    t.host.press("KeyW", { key: "w" });
+    await t.wait(1);
+    expect(probe.testScenes.w).toBe(0);
+    expect(probe.lastScene).toBe(7000);
+    expect(squirrel().map((f) => f.scriptId)).toEqual([7000]);
+    t.host.press("KeyW", { key: "W", shift: true });
+    await t.wait(1);
+    expect(probe.lastScene).toBe(7001);
+    expect(squirrel().map((f) => f.scriptId)).toEqual([7001]);
+    for (let i = 0; i < 8; i++) {
+      t.host.press("KeyW", { key: "w" });
+      await t.wait(1);
+    }
+    expect(probe.testScenes.w).toBe(9);
+    t.host.press("KeyW", { key: "w" });
+    await t.wait(1);
+    expect(probe.testScenes.w).toBe(0);
+    t.host.press("KeyE", { key: "e" });
+    await t.wait(1);
+    expect(probe.testScenes.e).toBe(10);
+    expect(probe.lastScene).toBe(7010);
+    for (let i = 0; i < 7; i++) {
+      t.host.press("KeyE", { key: "E", shift: true });
+      await t.wait(1);
+    }
+    expect(probe.testScenes.e).toBe(17);
+    t.host.press("KeyE", { key: "e" });
+    await t.wait(1);
+    expect(probe.testScenes.e).toBe(10);
+    await t.wait(5);
+    expect(t.engine.error).toBeNull();
   });
 
   it("enregistrer pendant l'épreuve rend tout le groupe à la réserve, comme avant l'épreuve", async () => {

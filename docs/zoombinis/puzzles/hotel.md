@@ -22,7 +22,7 @@ Les rappels d'événements `10e8:0674`, `35cb`, `3aa6` et la table de `switch` d
 | Enter | `10e8:0000` | 1471 octets |
 | Exit | `10e8:06f5` | 213 octets |
 | Tick | `10e8:07ca` | 2860 octets ; garde `[132a]` (réentrance) et `[74a4]` (scène prête) |
-| Key | `10e8:2289` | 78 octets, aucun effet en jeu |
+| Key | `10e8:2289` | 78 octets ; hors mode de test seul `F1` (aide vocale) agit ; mode de test : voir 8.6 |
 | Clic (région 1 carte, 2 Go, 3 scène) | `10e8:1cea(n)` | 1431 octets |
 | Mise en place du jeu (tirage des attributs, étiquettes pré-établies, chambres bloquées) | `10e8:1896` | 1108 octets |
 | Comptage des valeurs distinctes par attribut | `10e8:2784` | 206 octets ; appelle `1168:365d` |
@@ -244,3 +244,22 @@ Voir l'en-tête de `scenes/puzzles/hotel.ts` : entrée (5000 + scénette), relan
 ### 8.5 Copy
 
 Aucun texte visible : l'épreuve ne contient que des images et des voix de l'original.
+
+### 8.6 Touches du mode de test (`10e8:2289`, `[a43f]`)
+
+Le gestionnaire de touches (`Key`) ne lit sa table que si `[a43f] ≠ 0` ou si la touche est `F1` (0x16f). La table est dans le segment de code, `CS:2462` (13 codes, puis 13 adresses de saut `CS:247c`), lue dans `ZOOMBINI._EX` (octets, pas dans le désassemblage, qui ne suit que le premier saut). Les lettres sont comparées telles quelles (`R` n'a pas de minuscule). Tout le reste rend 0 (touche non consommée). **Sûr** pour la table et le code des cibles (relu à l'octet près) ; les appels lointains sans adresse dans le désassemblage sont identifiés par leurs arguments (**probable**, indiqué).
+
+| Touche | Cible | Effet | Confiance | Porté |
+|---|---|---|---|---|
+| `F1` | `22c9` | aide vocale `11a0:155e` (appel lointain, `AX = 1`) | sûr | oui (`kit.key`, hors mode de test aussi) |
+| espace | `2412` | `[74ee] = [74f2]` (1, valeur de l'`Enter`), `[74f0] = [74f4]` (`F`) ; hors niveau 3 : l'objet `[74ea]` (cadran) rejoue `SCRB 0x1770 + [74ee]` = 6000 + cran sans lecture (appel `(objet, id, 0, 0)`) ; puis restauration de la palette des entrées 10 à 245 (`DS:7586`, 10, 0xec) | sûr (variables), probable (les deux appels lointains : cadran fixe et palette, d'après `10e8:2698`) | oui |
+| `A`, `a` | `22d4` | `10e8:2852` : bandeau en haut à droite (rectangles `DS:1340` 500–600 × 1–27, `1348` moitié gauche, `1350` moitié droite) avec la lettre (`H`, `E`, `N`, `F` : `DS:1358`) de `[74ce]` à gauche, de `[74d0]` au milieu et, niveau 3 seulement, de `[74d2]` à droite | sûr (lettres, rectangles, niveau 3), probable (fond 0xe, cadre, encre) | oui |
+| `E`, `e` | `2395` | `[74b6]++`, au-delà de 17 repasse à 10 ; joue `SCRB 7000 + [74b6]` sur l'objet `[74aa]` (script changé s'il existe, sinon créé `0x8108000`) | sûr | oui |
+| `W`, `w` | `2317` | idem avec `[74b4]` : 0 à 9, `SCRB 7000 + [74b4]` | sûr | oui |
+| `H`, `h` | `22df` | `[74c6] = 1` s'il vaut 0 | sûr | oui (variable seule) |
+| `I`, `i` | `22f2` | `[74c6]++` s'il n'est pas nul (reste 0 sinon) | sûr | oui (variable seule) |
+| `R` | `230b` | `[74a8] = 1` : toute pose est acceptée aux niveaux 1 à 3 (le niveau 0 ne lit pas ce mot) ; les étiquettes du Zoombini sont tout de même posées (`2156`, `2229`) | sûr | oui (`HotelState.acceptAll`) |
+
+`[74b4]` et `[74b6]` valent 25 à l'`Enter` : le premier appui donne 0 (`W`) et 10 (`E`). `[74c6]` n'est lu qu'en `10e8:12d4` (fin de `12f6`, qui ne se rejoue pas) pour lancer `3e14` quand il vaut 2 au niveau 1 : aucun effet visible après la mise en place.
+
+Écarts du port : les touches ne marchent pas pendant la scénette d'entrée (le kit commun n'existe qu'après la relance) ; le bandeau est dessiné sur le fond (il reste jusqu'au changement de fond, l'original dessine sur l'écran) avec un fond 0xe, un cadre noir et une encre 0 déduits des appels `11e8:3034`, `60e8`, `7c08` (couleurs non vérifiées) ; la restauration de la palette recopie celle chargée à la relance (l'original copie `DS:7586`, dont l'écriture n'est pas dans le corpus) ; `W`/`E` n'ont pas de fin de scénette dédiée (comme l'original, l'objet reste à sa dernière image) ; `E` joue des ids 7011 à 7017 hors de la plage chargée par l'`Enter` (7000 à 7010) : « script factice », la scénette s'arrête (comportement de l'original, **probable**). Textes : seules les lettres `H E N F` du programme, en mode de test.

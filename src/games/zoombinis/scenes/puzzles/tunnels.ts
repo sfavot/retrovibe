@@ -44,6 +44,7 @@ import { FEATURE_END, FEATURES, FeatureFlag, type Feature } from "../../engine/f
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import { node, path, scrs } from "../../engine/resources";
 import { ScreenId, type Scene, type SceneContext } from "../../engine/scene";
+import { showDebugMessage } from "../../engine/shortcuts";
 import { ZOOMBINIS_SOUND } from "../../engine/sound";
 import { bridgeAvoidCount, dialogMemoryIndex, currentLevel } from "../../game/route";
 import type { Zoombini } from "../../game/state";
@@ -239,6 +240,21 @@ const TALK_OUTRO_COLLAPSED: readonly Talk[] = [
   { a: [0, 4033] },
 ];
 
+/**
+ * Touches du mode de test (`1190:1199`, table `CS:148c`). `C`, `F`, `I`, `O` font défiler les `SCRB` d'un gardien (`1190:1381`) : gardien (index du pilier), premier
+ * script et dernier (`4000` à `4038`, `4200` à `4226`, `4400` à `4423`, `4600` à `4617`). Tous partagent le compteur `DS:a1b8`.
+ */
+const PROBE_PILLARS = {
+  C: { pillar: 0, first: 4000, last: 4038 },
+  F: { pillar: 2, first: 4200, last: 4226 },
+  I: { pillar: 3, first: 4400, last: 4423 },
+  O: { pillar: 1, first: 4600, last: 4617 },
+} as const;
+/** Textes de `a` (`1190:121f`, `DS:3c89…3cec`) d'après les deux règles : gauche / bas, gauche / haut, droite / bas, droite / haut, droite seule, gauche seule. */
+const ACCEPT_TEXTS = ["Left / Bottom accept:", "Left / Top accept:", "Right / Bottom accept:", "Right / Top accept:", "Right accepts:", "Left accepts:"] as const;
+/** Quota ajouté à `a1a8` par `H`. */
+const DANCE_BONUS = 4;
+
 /** Compteur de visites de l'exécution (`DS:a18e`, remis à 0 au lancement du programme seulement) : la première visite a une introduction plus courte. */
 let visits = 0;
 /** Pour les tests : remet le compteur de visites comme au lancement du programme. */
@@ -361,6 +377,8 @@ export function createTunnelsScene(): TunnelsScene {
   let danceQuota = 0;
   let dancePlayed = 0;
   let danceAt = 0;
+  /** `DS:a1b8` : dernier script joué par `C`, `F`, `I`, `O`. */
+  let probeScript = 0;
   let entranceTargets: DropTarget[] = [];
   let pillars: Feature[] = [];
   let ceiling: Feature | null = null;
@@ -401,6 +419,7 @@ export function createTunnelsScene(): TunnelsScene {
         danceQuota = 0;
         dancePlayed = 0;
         danceAt = 0;
+        probeScript = 0;
         pools.clear();
 
         // `1190:0107` : niveau, archive, palette et fond, groupes de formes et plages de `SCRB`.
@@ -470,7 +489,7 @@ export function createTunnelsScene(): TunnelsScene {
           if (index >= 0 && (game.dialogMemory[index]! & 0xfff) < 0xfff) game.dialogMemory[index] = game.dialogMemory[index]! + 1;
         }
         // `2137(1)` (introduction) puis `a0f0`.
-        queueTalk(ctx, visits === 1 ? pick("introFirst", TALK_INTRO_FIRST, rng) : pick("introLater", TALK_INTRO_LATER, rng));
+        queueTalk(ctx, introTalk(rng));
         encourageAfter = drawEncouragementDelay(rng);
         lastAction = ctx.clock.ticks;
         kit.playMusic();
@@ -503,6 +522,7 @@ export function createTunnelsScene(): TunnelsScene {
         if (!kit || kit.left) return false;
         if (event.ctrl || event.alt) return false;
         if (ctx.services.tryGet(DIALOG)?.isOpen) return false;
+        if (kit.testKey(event, debugKeys(ctx))) return true;
         return kit.key(event);
       },
   };
@@ -575,11 +595,70 @@ export function createTunnelsScene(): TunnelsScene {
     busy = false;
     talkToken += 1;
     if (!kit.pressGo()) return true;
+    queue.unshift(talkEntry(outroTalk(ctx)));
+    return true;
+  }
+
+  /** `2137(3)` : phrase de sortie (tous sauvés, avec perdus, ou après l'effondrement). */
+  function outroTalk(ctx: SceneContext): Talk {
     const st = state!;
     const table = collapseDone ? TALK_OUTRO_COLLAPSED : st.saved === st.total ? TALK_OUTRO_ALL : TALK_OUTRO_SOME;
     const key = collapseDone ? "outroCollapsed" : st.saved === st.total ? "outroAll" : "outroSome";
-    queue.unshift(talkEntry(pick(key, table, ctx.rng)));
-    return true;
+    return pick(key, table, ctx.rng);
+  }
+
+  /** `2137(1)` : introduction, plus courte à la première visite de l'exécution (`DS:a18e`). */
+  function introTalk(rng: SceneContext["rng"]): Talk {
+    return visits === 1 ? pick("introFirst", TALK_INTRO_FIRST, rng) : pick("introLater", TALK_INTRO_LATER, rng);
+  }
+
+  // -------------------------------------------------------------------------------------------------------------------------
+  // Touches du mode de test (`1190:1199`) : aucune ne consomme la touche (la fonction rend 0), hors `F1`, traitée par le kit.
+
+  /**
+   * `a` (`1190:121f`) : message de la ligne d'état sur les entrées qui acceptent la règle, d'après `a02a` (nombre de règles), `a02c` et `a039`. **Écart** : l'original
+   * dessine aussi, sous la ligne d'état, les icônes d'attributs des conditions de chaque règle (`1168:5e91`) ; elles ne sont pas portées.
+   */
+  function showAccepts(ctx: SceneContext): boolean {
+    const [first, second] = rules!.rules;
+    const left = first!.w;
+    const index = rules!.rules.length === 1 ? (left ? 5 : 4) : left ? (second!.w ? 1 : 0) : second!.w ? 3 : 2;
+    showDebugMessage(ctx, { text2: ACCEPT_TEXTS[index]!, n: -1 });
+    return false;
+  }
+
+  /** `C`, `F`, `I`, `O` (`1190:1381`) : le gardien joue le script suivant de sa série (le compteur partagé repart au premier hors série), « SCRB id: » le nomme. */
+  function probeGuard(ctx: SceneContext, letter: keyof typeof PROBE_PILLARS): boolean {
+    const { pillar, first, last } = PROBE_PILLARS[letter];
+    if (!pillars[pillar]) return false;
+    let script = probeScript + 1;
+    if (script < first || script > last) script = first;
+    speak(ctx, pillar, script);
+    probeScript = script;
+    showDebugMessage(ctx, { text2: "SCRB id:", n: script });
+    return false;
+  }
+
+  /** Touches du mode de test, par code d'origine. */
+  function debugKeys(ctx: SceneContext): Readonly<Record<number, () => boolean>> {
+    const code = (letter: string): number => letter.charCodeAt(0);
+    const talk = (make: () => Talk) => () => (queueTalk(ctx, make()), false);
+    return {
+      [code("a")]: () => showAccepts(ctx),
+      [code("C")]: () => probeGuard(ctx, "C"),
+      [code("F")]: () => probeGuard(ctx, "F"),
+      [code("I")]: () => probeGuard(ctx, "I"),
+      [code("O")]: () => probeGuard(ctx, "O"),
+      // `H` : quatre animations de victoire de plus (`a1a8 += 4`).
+      [code("H")]: () => ((danceQuota += DANCE_BONUS), false),
+      // `W` : `a18e ← 1` (les introductions suivantes sont les « suivantes ») puis introduction ; `w` : introduction seule.
+      [code("W")]: () => ((visits = Math.max(visits, 2)), queueTalk(ctx, introTalk(ctx.rng)), false),
+      [code("w")]: talk(() => introTalk(ctx.rng)),
+      // `t` : encouragement ; `T` : phrase d'effondrement ; `e` : phrase de sortie.
+      [code("t")]: talk(() => pick("encourage", TALK_ENCOURAGE, ctx.rng)),
+      [code("T")]: talk(() => pick("collapse", TALK_COLLAPSE, ctx.rng)),
+      [code("e")]: talk(() => outroTalk(ctx)),
+    };
   }
 
   // -------------------------------------------------------------------------------------------------------------------------

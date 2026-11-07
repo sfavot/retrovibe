@@ -19,7 +19,7 @@ Confiance : **sûr** = lu dans le code ; **probable** = déduit de plusieurs ind
 | Enter | `1130:0000` |
 | Exit | `1130:0d28` (→ `11a8:021c` → `1168:36e1(0, 1)`) |
 | Tick | `1130:0d85` (machine d'états d'animations) |
-| Key | `1130:1a66` (touche `0x16f` seulement : aide vocale `DS:a2c4`) |
+| Key | `1130:1a66` (aide vocale `0x16f` ; touches du mode de test, §4.4) |
 | Clic de région | `1130:1803(id)` (table copiée de `seg144` à `DS:…`, `1038:0000(0xc000, 1, 0x1b44)`) |
 | Repas : génération | `1130:35e6` (ensemble de base), `1130:2669` (répartition entre trolls), `1130:2a29` (indice aléatoire) |
 | Repas : verdict | `1130:2a9d(troll)` ; doublon `1130:3b38` ; historique `1130:3aa6` |
@@ -160,9 +160,32 @@ Protégé contre la ré-entrée (`DS:1b86`) ; ne tourne que si `8d1e ≠ 0`. Dan
 4. **Tous contents** (`8d9c = 1`) : `3893` (scène de départ) et `8d20 = 1`.
 5. Animations d'attente : un Zoombini du groupe (hors livreur) joue un script `SCRS` dépendant de son pied : **13034 + pied**, soit 13035…13039 toutes les 30 ticks tant que le quota `8e76` n'est pas atteint (`8e76` = 3, ou taille du groupe − 1 une fois tous les trolls contents).
 
-### 4.4 Clavier
+### 4.4 Clavier (`1130:1a66`)
 
-Aucun raccourci, sauf `0x16f` : coupe ou rejoue la consigne vocale `DS:a2c4 = 0x4e67` (niveau 0, `\0SND` 20071) ou `0x4e68` (20072) (`11a0:155e`). Mode de débogage : `1130:3355` affiche les quatre lignes `Arno / Willa / Shyler / Meal` de 8 entiers (ensembles aimés et repas).
+Hors du mode de test (`DS:a43f = 0`), seule `0x16f` (F1) agit : coupe ou rejoue la consigne vocale `DS:a2c4 = 0x4e67` (niveau 0, `\0SND` 20071) ou `0x4e68` (20072) (`11a0:155e`). En mode de test, `1130:1a66` cherche le code dans la table `CS:1c1c` (15 mots) ; les cibles sont les 15 mots de `CS:1c3a`. Les touches sont des caractères `WM_CHAR` (majuscules et minuscules sont deux codes distincts : `R`, `O`, `D` n'existent qu'en majuscule). Relevé sur les octets de l'exécutable (la cible n'est pas dans le désassemblage : le désassembleur ne suit pas le saut indirect), **sûr**.
+
+`DS:8d22` est un « déverrouillage » (remis à 0 par `1130:0000` ; modifié seulement par `R`, `O`, `D` ; lu par le clic de la région 13, qui exige plus de 5, `§4.2`) : les touches `N`, `n`, `S`, `s`, `W`, `w`, `P`, `p` et Espace n'agissent qu'à partir de 3 (sinon la fonction rend 0 : la touche n'est pas consommée).
+
+| Touche | Adresse | Effet | Confiance | Porté |
+|---|---|---|---|---|
+| `F1` (`0x16f`) | `1ab2` | `11a0:155e` (aide vocale), rend 1, **même hors mode de test** | sûr | oui (`kit.key`) |
+| `A`, `a` | `1abd` | `1130:3355` : affiche une ligne `Arno / Willa / Shyler` (8 drapeaux 0 / 1 des ensembles aimés `8dc0`, `8dd0`, `8de0`, seulement pour les trolls à l'état « présent » `8d52…8d56 = 1`) et la ligne `Meal` (8 drapeaux du repas en préparation `8e04`), via `wsprintf`, `DrawText` dans un cadre ; rend 1 | sûr (chaînes `DS:1bc2…1c22`) | oui, avec écart (ci-dessous) |
+| `R` | `1ac8` | si `8d22 ≤ 2` : `8d22 ← 1`, sinon `8d22 += 1` ; rend 1 | sûr | oui |
+| `O` | `1ae1` | si `8d22 = 1` : `8d22 ← 2` ; rend 1 | sûr | oui |
+| `D` | `1af2` | si `8d22 = 2` : `8d22 ← 3` ; rend 1 | sûr | oui |
+| `P`, `p` | `1b03` | si `8d22 ≥ 3` : `1130:3893` (scène de départ des trolls présents, `8d26 ← 0`), rend 1 ; sinon 0 | sûr | oui (`playDeparture`) |
+| `N`, `n` | `1b1e` | si `8d22 ≥ 3` : l'objet d'Arno (`8d48`) joue le `SCRB` `8000 + k` (`11a8:1be6(1, 0x1f40 + k, objet)`), `k` = compteur `CS:1b88` (remis à 0 quand il atteint `0x24` : 36 scripts), puis `1130:54c8` ; sinon 0 | sûr | oui, sans `54c8` |
+| `W`, `w` | `1baf` | idem pour Willa (`8d4a`), `9000 + k`, `CS:1b8a`, 34 scripts (`0x23`) | sûr | oui, sans `54c8` |
+| `S`, `s` | `1b67` | idem pour Shyler (`8d4c`), `10000 + k`, `CS:1b8c`, 39 scripts (`0x27`) | sûr | oui, sans `54c8` |
+| Espace | `1bf6` | si `8d22 ≥ 3` : `8d5a ← 8d6e` (le budget de repas manqués redevient celui du début de l'écran ; `8d6e` en est la copie faite par `1130:0000`) | sûr | oui (`state.budget`) |
+
+Toutes les touches du tableau consomment la touche (rendent 1) quand elles agissent. Les touches non consommées (0) passent ensuite aux raccourcis généraux.
+
+**Écarts** :
+
+- `A` : l'original dessine les lignes dans un cadre dont les rectangles sont lus dans `DS:1b8e…1bb6` (non relus) avec des fonds `0xb` / `0xe` ; le port écrit une ligne de texte par ligne de l'original, en haut à gauche (310 × 16, fond `0xff`), effacée au prochain redessin de la zone.
+- `N`, `W`, `S` : l'original enchaîne sur `1130:54c8` (remet le son d'assiette `8d9e` et l'ordre de dessin des objets, `11a8:2a0a`), non porté. Les compteurs `CS:1b88…1b8c` sont dans le segment de code (conservés d'un écran à l'autre) : le port les garde le temps de la scène. Un troll absent du niveau n'a pas d'objet dans le port : sa touche ne joue rien (le compteur avance).
+- `P` : `8d26 ← 0` (état de la chaîne d'animations) n'a pas de pendant dans le port, qui n'a pas de chaîne d'états globale ; la scène de départ ne rend pas « go » actif (la fonction `3893` ne touche pas `8d20`, c'est le tick `0d85` qui le fait à la fin normale).
 
 ### 4.5 Historique des assiettes
 

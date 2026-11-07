@@ -34,10 +34,11 @@
  *  - rayon de surbrillance des emplacements (`SCRB` 11006 / 11007) et dalle verte (11076) : jouées une fois au début du transport ;
  *  - les objets de puzzle (silhouettes, filtres, cristaux, fiches) sont de simples dessins ; le glisser suit le protocole du kit (`carryObject`) : relâcher dépose, ou, avec la souris
  *    aimantée, le clic suivant ;
- *  - les touches de débogage (`1158:2504`) ne sont pas portées.
+ *  - mode de test (`[a43f]`, `1158:2504`) : voir `testKeys` ; le texte va sur la ligne d'état commune (`showDebugLine`), dont le fond et le cadre ne sont pas ceux, locaux, de l'original (`11e8:3034(…, 0x0b)`).
  */
 import { drawShape } from "../../../../engine/mohawk/graphics/blit";
 import type { Surface } from "../../../../engine/mohawk/graphics/surface";
+import type { KeyEvent } from "../../../../engine/mohawk/input";
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { NoRepeatPool } from "../../../../engine/mohawk/rng";
 import { screenInfo } from "../../data/archives";
@@ -46,6 +47,7 @@ import { FEATURES, FeatureFlag, type Feature, type Features } from "../../engine
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import { regs, scrs } from "../../engine/resources";
 import type { Scene, SceneContext } from "../../engine/scene";
+import { showDebugLine } from "../../engine/shortcuts";
 import { currentLevel, dialogMemoryIndex } from "../../game/route";
 import {
   SILHOUETTES,
@@ -1159,6 +1161,28 @@ class SmokeRun implements SmokeProbe {
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
+  // Mode de test (`DS:a43f`, `Key` `1158:2504`, table de 5 touches `CS:26af`)
+
+  /**
+   * Touches du mode de test (sans effet hors de ce mode, `PuzzleKit.testKey`) : Espace consommée sans rien faire (cible `1158:25b3`), L « Level n »
+   * (`"Level x "`, `x = "01234"[[93ac]]`), F4 `[950a] = 1` + message « Cheat on » (`DS:22d7`), F5 `[950a] = 0` (sans message), F1 aide (traitée par le kit).
+   * `[950a]` empêche le mélange des étagères de cristaux au levier « nouveau tirage » (`1158:236b`, niveaux 3-4).
+   */
+  testKeys(event: KeyEvent): boolean {
+    return this.kit.testKey(event, {
+      0x20: () => {},
+      0x4c: () => showDebugLine(this.ctx, `Level ${this.state.level} `),
+      0x172: () => {
+        this.state.keepShelves = true;
+        showDebugLine(this.ctx, " Cheat on ");
+      },
+      0x173: () => {
+        this.state.keepShelves = false;
+      },
+    });
+  }
+
+  // ------------------------------------------------------------------------------------------------------------------------
   // Tick
 
   tick(): void {
@@ -1256,6 +1280,7 @@ export function createSmokeScene(): SmokeScene {
       if (!run || run.kit.left) return false;
       if (event.ctrl || event.alt) return false;
       if (ctx.services.tryGet(DIALOG)?.isOpen) return false;
+      if (run.testKeys(event)) return true;
       return run.kit.key(event);
     },
   };

@@ -181,6 +181,8 @@ export interface HotelState {
   accepted: number;
   /** `DS:74d6` : épreuve perdue. */
   lost: boolean;
+  /** `DS:74a8` : mode de test (touche `R`), accepte toute pose aux niveaux 1 à 3 (le niveau 0 ne lit pas ce mot, `10e8:1cea`). */
+  acceptAll: boolean;
   /** Chambre de chaque membre accepté, ou `null`. */
   readonly placed: (number | null)[];
 }
@@ -243,6 +245,7 @@ export function createHotel(rng: MsvcRandom, level: Level, group: readonly Trait
     firstPose: true,
     accepted: 0,
     lost: false,
+    acceptAll: false,
     placed: group.map(() => null),
   };
   if (level === 2) {
@@ -355,7 +358,9 @@ export function place(state: HotelState, member: number, room: number): PlaceRes
   if (state.lost || state.placed[member] !== null || room < 0 || room >= state.rooms) return { kind: "ignored" };
   if (state.piles[room] === BLOCKED) return { kind: "blocked" };
   const free = state.firstPose;
-  if (!free && !isValid(state, member, room)) {
+  // `10e8:2526` / `2e3f` : `DS:74a8 ≠ 0` répond « accepté » avant toute lecture des étiquettes ; l'appelant pose alors celles du Zoombini (`2156`, `2229`).
+  const everything = state.acceptAll && state.level > 0;
+  if (!free && !everything && !isValid(state, member, room)) {
     state.step += 1;
     if (state.step >= DEFEAT_STEP) state.lost = true;
     return { kind: "refused", step: state.step, lost: state.lost };
@@ -388,7 +393,36 @@ export function lostMembers(state: HotelState): number[] {
 
 /** Erreurs commises depuis la première pose (`DS:74ee − F`). */
 export function errorsMade(state: HotelState): number {
-  return state.firstPose ? 0 : state.step - state.base;
+  return state.firstPose ? 0 : Math.max(0, state.step - state.base);
+}
+
+// --- Mode de test (touches de `10e8:2289`, `[a43f]`) ---
+
+/** `DS:74ee ← DS:74f2` (touche espace, `10e8:2412`) : le cran de l'horloge revient à sa valeur de l'`Enter` (1) ; `DS:74f0 ← DS:74f4` (`F`) ne change pas. */
+export const TEST_RESET_STEP = 1;
+
+/** Touche espace : le compteur d'erreurs repart de 1 (`10e8:2412`). La défaite déjà acquise (`lost`) et la première pose (`firstPose`) ne sont pas touchées. */
+export function resetClock(state: HotelState): void {
+  state.step = TEST_RESET_STEP;
+}
+
+/** Lettres des quatre attributs (`DS:1358`, quatre chaînes d'un caractère) que la touche `A` affiche pour `A`, `B` et `C` (`10e8:2852`). */
+export const ATTRIBUTE_LETTERS: readonly string[] = ["H", "E", "N", "F"];
+
+/** Lettres affichées par la touche `A`, une par axe tiré (`DS:74ce`, `74d0`, `74d2`) : les trois, `C` seulement au niveau 3 (`10e8:2980`). */
+export function attributeLetters(state: HotelState): string[] {
+  const count = state.level === 3 ? 3 : 2;
+  return state.chosen.slice(0, count).map((attribute) => ATTRIBUTE_LETTERS[attribute]!);
+}
+
+/**
+ * Touches `W` et `E` (`10e8:2317`, `2395`) : essai des scénettes de l'écureuil sur l'objet `DS:74aa`. `W` fait défiler `DS:74b4` de 0 à 9 (`SCRB 7000 + …`),
+ * `E` fait défiler `DS:74b6` de 10 à 17 (`SCRB 7000 + …`) ; les deux valent 25 à l'`Enter` (donc 0 et 10 au premier appui).
+ */
+export const TEST_SCENE_START = 0x19;
+export function nextTestScene(current: number, first: number, last: number): number {
+  const next = current + 1;
+  return next > last ? first : next;
 }
 
 // --- Hasard des scénettes ---

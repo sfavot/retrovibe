@@ -392,6 +392,21 @@ describe("niveaux 3 et 4 : cristaux, tirage et résolubilité", () => {
     expect(newRound(s, rng)).toBe(false);
   });
 
+  it("mode de test (`[950a]`, F4) : le nouveau tirage laisse les étagères dans l'ordre et ne tire pas leur permutation ; sinon elles sont mélangées", () => {
+    const run = (keepShelves: boolean) => {
+      const rng = new MsvcRandom(8);
+      const s = createSmoke(rng, 3, randomGroup(rng, 4));
+      expect(s.keepShelves).toBe(false);
+      s.keepShelves = keepShelves;
+      expect(robotApply(s, robotPlan(s)!)!.saved).toBe(true);
+      endTurn(s, rng);
+      expect(newRound(s, rng)).toBe(true);
+      return s;
+    };
+    expect(run(true).shelf).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(run(false).shelf).not.toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
   it("niveau 4 : le second de la paire est testé sans geste, avec la même disposition, contre la cible 8", () => {
     const rng = new MsvcRandom(15);
     const group = randomGroup(rng, 4);

@@ -503,6 +503,91 @@ describe.skipIf(!original.has)("monte-pierre : écran sur les vrais fichiers (SL
     // Les sons de bilan 8500 à 8505 sont dans l'archive de l'écran.
     for (const id of [7000, 7001, 7002, 8000, 8500, 8501, 8502, 8504, 8505]) expect(archive.has("\0SND", id)).toBe(true);
   });
+
+  describe("touches du mode de test (1170:1740)", () => {
+    const testLevel = (level: number, testMode: boolean) => (game: GameState) => {
+      setLevel(level)(game);
+      game.options.testMode = testMode;
+    };
+    /** Frappe les caractères un à un. */
+    const type = async (t: Awaited<ReturnType<typeof start>>, keys: string) => {
+      for (const key of keys) {
+        t.host.press(`Key${key.toUpperCase()}`, { key });
+        await t.wait(3);
+      }
+    };
+    const solutionSeats = (t: Awaited<ReturnType<typeof start>>) => t.probe().board.solution;
+    const placed = (t: Awaited<ReturnType<typeof start>>) => t.probe().play.seat.filter((m) => m >= 0).length;
+
+    // Le code d'origine avance à `s`, `o`, `v`, `l`, `e` (`DS:9c7e`, table `CS:1810`) ; le mot « solve » n'est pas la séquence.
+    it("niveau 3 : s, o, v, l, e posent la solution du générateur : tout le groupe est relié, « go » actif, la danse part", async () => {
+      const t = await start(testLevel(3, true));
+      expect(t.probe().level).toBe(3);
+      await type(t, "sovle");
+      const { seat } = t.probe().play;
+      // Les membres de la solution sont sur leur emplacement ; celui que le générateur du port laisse sans emplacement prend l'emplacement resté libre.
+      solutionSeats(t).forEach((m, k) => m >= 0 && expect(seat[k]).toBe(m));
+      expect(placed(t)).toBe(16);
+      expect(t.probe().ev.connected).toHaveLength(16);
+      expect(t.probe().ev.victory).toBe(true);
+      expect(t.probe().kit.goEnabled).toBe(true);
+      expect(t.probe().celebrating).toBe(true);
+      // Chaque membre est sur son emplacement.
+      t.probe().play.seat.forEach((m, k) => {
+        if (m < 0) return;
+        const member = t.probe().kit.members[m]!;
+        expect(member.target).toBe(t.probe().slots[k]);
+        expect(member.snoid.position).toEqual({ x: t.probe().slots[k]!.x, y: t.probe().slots[k]!.y });
+      });
+    });
+
+    it("la séquence est stricte : « solve », une lettre manquante ou dans le désordre ne fait rien ; les autres touches ne la remettent pas à zéro", async () => {
+      // « solve » : s, o, v avancent, puis l (attendu après v) puis e : seules s, o, v sont reconnues dans cet ordre ; `l` et `e` arrivent trop tôt.
+      const wrong = await start(testLevel(3, true));
+      await type(wrong, "solve");
+      expect(placed(wrong)).toBe(0);
+      const partial = await start(testLevel(3, true));
+      await type(partial, "sovl");
+      await type(partial, "ovl");
+      expect(placed(partial)).toBe(0);
+      // Des touches étrangères et des répétitions ne remettent rien à zéro ; la dernière lettre déclenche.
+      const strict = await start(testLevel(3, true));
+      await type(strict, "xsqoozvvwlle");
+      expect(placed(strict)).toBe(16);
+    });
+
+    it("hors du mode de test, la séquence ne fait rien", async () => {
+      const t = await start(testLevel(3, false));
+      await type(t, "sovle");
+      expect(placed(t)).toBe(0);
+    });
+
+    it.each([0, 1, 2])("niveau %i : la séquence est reconnue mais ne pose rien (la pose n'existe qu'au niveau 3)", async (level) => {
+      const t = await start(testLevel(level, true));
+      await type(t, "sovle");
+      expect(placed(t)).toBe(0);
+    });
+
+    it("la solution reprend un plateau entamé : l'intrus qui occupait un emplacement visé et le membre posé au mauvais endroit rejoignent leur place", async () => {
+      const t = await start(testLevel(3, true));
+      const solution = solutionSeats(t);
+      const stranger = [...Array(16).keys()].find((i) => !solution.includes(i))!;
+      const free = solution.indexOf(-1);
+      const wanted = solution.findIndex((m) => m >= 0);
+      expect(stranger).toBeDefined();
+      expect(free).toBeGreaterThanOrEqual(0);
+      // L'intrus sur l'emplacement d'un membre de la solution, et ce membre sur l'emplacement laissé libre.
+      await t.seat(stranger, wanted);
+      await t.seat(solution[wanted]!, free);
+      expect(t.probe().play.seat[wanted]).toBe(stranger);
+      await type(t, "sovle");
+      solution.forEach((m, k) => m >= 0 && expect(t.probe().play.seat[k]).toBe(m));
+      expect(t.probe().play.seat[free]).toBe(stranger);
+      expect(t.probe().kit.members[stranger]!.target).toBe(t.probe().slots[free]);
+      expect(t.probe().kit.waitingPlaces.every((place) => place.owner === null)).toBe(true);
+      expect(t.probe().ev.victory).toBe(true);
+    });
+  });
 });
 
 /** Une pose du plan appliquée à une partie neuve (évaluation d'un état intermédiaire, hors de l'écran). */

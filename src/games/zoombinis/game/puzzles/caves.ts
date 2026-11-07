@@ -269,7 +269,10 @@ export function drawHints(rng: MsvcRandom, level: CavesLevel, rule: CavesRule): 
 // --- État ---
 
 export interface CavesState {
+  /** Niveau courant (`[7106]`) : règle les lignes de tri (`10c8:21c4`), les indices (`10c8:2279`) et la phrase de consolation. Le mode de test peut le changer (touches 1 à 4). */
   level: CavesLevel;
+  /** Niveau dont les paramètres du lion sont en vigueur (`[0c0a]`, `[0c08]`) : celui de `Enter`, remis à `level` par `resetCaves` (`10c8:1f37`). */
+  lionLevel: CavesLevel;
   rows: 1 | 2;
   rule: CavesRule;
   layout: Layout;
@@ -292,6 +295,7 @@ export function createCaves(rng: MsvcRandom, level: CavesLevel, attrs: readonly 
   const hints = drawHints(rng, level, rule);
   return {
     level,
+    lionLevel: level,
     rows: SORT_ROWS[level],
     rule,
     layout,
@@ -356,7 +360,7 @@ export function placeMember(state: CavesState, rng: MsvcRandom, member: number, 
 
 /** Cran maximal du lion de ce niveau (`[0c0a]`). */
 export function lionLimit(state: CavesState): number {
-  return LION_STEPS[state.level];
+  return LION_STEPS[state.lionLevel];
 }
 
 /**
@@ -365,7 +369,7 @@ export function lionLimit(state: CavesState): number {
  */
 export function wakeLion(state: CavesState): number | null {
   state.lion += 1;
-  return state.lion <= lionLimit(state) ? LION_BASE_SCRIPT[state.level] + state.lion : null;
+  return state.lion <= lionLimit(state) ? LION_BASE_SCRIPT[state.lionLevel] + state.lion : null;
 }
 
 /** Le lion est au dernier cran : la pose est verrouillée (`[0bf8] = ([0c0c] == [0c0a])`, `10c8:1137` cas 0x14). */
@@ -425,4 +429,73 @@ export function robot(state: CavesState): number[] {
     }
     throw new Error("tanière du sphinx : le robot ne trouve pas de dalle");
   });
+}
+
+// --- Mode de test (`DS:a43f`, touches de `10c8:1cf5`) ---
+
+/** Un Zoombini déjà posé que `relayout` a déplacé d'une dalle à une autre. */
+export interface SlotMove {
+  member: number;
+  from: number;
+  to: number;
+}
+
+/**
+ * Touches 1 à 4 (`[7106]` = niveau) et F5 à F8 (`[7108]` = attribut A) : `10c8:27d7`. Rejoue la disposition des dalles pour le groupe, avec les lignes de tri du niveau
+ * courant (`10c8:21c4`, `10c8:2508`) ; la permutation des valeurs ne change pas. `attrA` (F5 à F8, 0 à 3) fixe l'attribut A : si B est le même, B passe au suivant (0 après 3).
+ * Les Zoombinis déjà posés sont reposés dans l'ordre des dalles : sur leur dalle si elle leur convient encore, sinon sur une dalle libre valable tirée au hasard
+ * (`10c8:2635`) ; le nombre de posés ne change pas. Les indices sont retirés (`10c8:2279`). Renvoie les déplacements.
+ */
+export function relayout(state: CavesState, rng: MsvcRandom, attrA?: number): SlotMove[] {
+  if (attrA !== undefined) {
+    state.rule.attrA = attrA;
+    if (state.rule.attrB === attrA) state.rule.attrB += 1;
+    if (state.rule.attrB > 3) state.rule.attrB = 0;
+  }
+  const before = state.occupant.slice();
+  state.layout = layoutSlots(state.rule, state.level, state.attrs);
+  state.rows = SORT_ROWS[state.level];
+  state.occupant.fill(-1);
+  state.slotOf.fill(0);
+  const moves: SlotMove[] = [];
+  for (let slot = state.layout.first; slot <= SLOT_COUNT; slot++) {
+    const member = before[slot]!;
+    if (member === -1) continue;
+    let to = slot;
+    if (!slotFits(state, slot, member)) {
+      const choices = fittingSlots(state, member);
+      to = choices.length === 0 ? 1 : choices[rng.range(0, choices.length - 1)]!;
+    }
+    state.occupant[to] = member;
+    state.slotOf[member] = to;
+    if (to !== slot) moves.push({ member, from: slot, to });
+  }
+  state.hints = drawHints(rng, state.level, state.rule);
+  return moves;
+}
+
+/**
+ * Touche Espace (`10c8:299c`) : `10c8:1f37([7106])`, remise à zéro des compteurs (posés `[0c16]`, cran du lion `[0c0c]`), une seule ligne de tri (`[0bfc] = 1`,
+ * jusqu'au prochain `relayout`) et les paramètres du lion du niveau courant. Les dalles occupées ne sont pas touchées.
+ */
+export function resetCaves(state: CavesState): void {
+  state.placed = 0;
+  state.lion = 0;
+  state.rows = 1;
+  state.lionLevel = state.level;
+}
+
+/** Script du lion remis au repos par `10c8:299c` : `[0c08]`, ou `[0c08] − 1` quand il atteint 6004 (`11a8:1be6(1, …)`). */
+export function lionRestScript(state: CavesState): number {
+  const base = LION_BASE_SCRIPT[state.lionLevel];
+  return base < 6004 ? base : base - 1;
+}
+
+/** Touche F3 (`10c8:2b46`) : toutes les dalles redeviennent libres (`[717a + 2s] = 0`), puis `resetCaves`. Renvoie les membres qui étaient posés. */
+export function clearSlots(state: CavesState): number[] {
+  const posed = savedMembers(state);
+  state.occupant.fill(-1);
+  state.slotOf.fill(0);
+  resetCaves(state);
+  return posed;
 }

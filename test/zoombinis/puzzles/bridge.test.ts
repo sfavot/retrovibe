@@ -6,6 +6,7 @@ import { FEATURES } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
+import { ZOOMBINIS_TEXT } from "../../../src/games/zoombinis/engine/text";
 import { bridgeAvoidCount, nextScreen, setBridgeMemory } from "../../../src/games/zoombinis/game/route";
 import { makeZoombini, type GameState, type Session, type Zoombini } from "../../../src/games/zoombinis/game/state";
 import { MohawkArchive } from "../../../src/data/mohawk/mohawk";
@@ -722,6 +723,54 @@ describe.skipIf(!original.has)("gorges : écran sur les vrais fichiers (BRIDGE.M
       await wait(60);
     }
   }, 60_000);
+
+  describe("touches du mode de test (`10c0:0d20`)", () => {
+    /** Presse une touche et renvoie les textes dessinés dans la foulée (ligne d'état du mode de test). */
+    async function pressKey(t: Awaited<ReturnType<typeof start>>, key: string): Promise<string[]> {
+      const text = t.engine.services.get(ZOOMBINIS_TEXT);
+      const drawn: string[] = [];
+      const draw = text.drawText.bind(text);
+      const spy = vi.spyOn(text, "drawText").mockImplementation((surface, font, value, ...rest) => {
+        drawn.push(value);
+        return draw(surface, font, value, ...rest);
+      });
+      t.host.press(`Key${key.toUpperCase()}`, { key });
+      await t.wait(2);
+      spy.mockRestore();
+      return drawn;
+    }
+
+    it("A écrit le pont qui accepte la règle et ajoute les icônes des conditions (a et A)", async () => {
+      const t = await start((game) => void (game.options.testMode = true));
+      await t.until(() => t.probe().kit.walking === 0, 3000);
+      const features = t.engine.services.get(FEATURES);
+      const before = features.features.length;
+      const expected = t.probe().state.rule.upperAccepts ? "Upper bridge accepts:" : "Lower bridge accepts:";
+      expect(await pressKey(t, "a")).toContain(expected);
+      expect(features.features.length).toBe(before + 1);
+      expect(await pressKey(t, "A")).toContain(expected);
+      // Un seul objet d'icônes, réutilisé.
+      expect(features.features.length).toBe(before + 1);
+      expect(t.engine.error).toBeNull();
+    });
+
+    it("R écrit « Type: -1 Snoid Script: » (variables de mise au point jamais écrites)", async () => {
+      const t = await start((game) => void (game.options.testMode = true));
+      await t.until(() => t.probe().kit.walking === 0, 3000);
+      expect(await pressKey(t, "r")).toContain(" Type: -1 Snoid Script:");
+      expect(await pressKey(t, "R")).toContain(" Type: -1 Snoid Script:");
+    });
+
+    it("sans mode de test, A et R ne font rien", async () => {
+      const t = await start();
+      await t.until(() => t.probe().kit.walking === 0, 3000);
+      const features = t.engine.services.get(FEATURES);
+      const before = features.features.length;
+      expect(await pressKey(t, "a")).toEqual([]);
+      expect(await pressKey(t, "r")).toEqual([]);
+      expect(features.features.length).toBe(before);
+    });
+  });
 
   it("F1 ne fait rien d'audible (pas de voix d'introduction) et le bouton carte demande l'avertissement", async () => {
     const { host, engine, wait, dialog, queued } = await start();

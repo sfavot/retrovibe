@@ -49,16 +49,17 @@
  */
 import type { Shape } from "../../../data/mohawk/shap";
 import { drawShape } from "../../../engine/mohawk/graphics/blit";
-import type { Input } from "../../../engine/mohawk/input";
+import type { Input, KeyEvent } from "../../../engine/mohawk/input";
 import { DIALOG, confirmLeaveToMap } from "../engine/dialog";
 import { FEATURES, FeatureFlag, type Feature } from "../engine/features";
 import { ZOOMBINIS_GAME } from "../engine/game";
+import { screenKeyCode } from "../engine/shortcuts";
 import type { CursorKind, Host } from "../engine/host";
 import type { SceneContext } from "../engine/scene";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../engine/services";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { currentLevel, exitPuzzle, leaveMap, nextScreen } from "../game/route";
-import type { GameDate, Zoombini } from "../game/state";
+import { testMode, type GameDate, type Zoombini } from "../game/state";
 import type { Point, WalkMap } from "../data/zoombini";
 import { createSnoid, type Snoid, type SnoidOptions } from "./snoid";
 
@@ -1244,6 +1245,21 @@ export class PuzzleKit {
     if (this.spec.helpAllowed && !this.spec.helpAllowed()) return false;
     this.replayIntro();
     return true;
+  }
+
+  /**
+   * Touches du mode de test (`[a43f]`) de l'épreuve : sa `Key` d'origine ne lit sa table que si le mode de test est levé (`F1`, code 0x16f, reste à `key`).
+   * `handlers` associe un code de `screenKeyCode` (caractère, ou `F1`… + 0xff) à une action ; `fold` met d'abord a-z en A-Z (`0x60 < code < 0x7b`,
+   * gorges, bac). Renvoie vrai si la touche est consommée (l'action renvoie faux pour ne pas la consommer).
+   */
+  testKey(event: KeyEvent, handlers: Readonly<Partial<Record<number, () => boolean | void>>>, fold = false): boolean {
+    if (!testMode(this.zoombinis.game)) return false;
+    let code = screenKeyCode(event);
+    if (code === null) return false;
+    if (fold && code > 0x60 && code < 0x7b) code -= 0x20;
+    const action = handlers[code];
+    if (!action) return false;
+    return action() !== false;
   }
 
   replayIntro(): void {

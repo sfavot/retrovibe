@@ -22,7 +22,7 @@ Les routines de rappel `1120:0476` et `1120:2900` (événements des Zoombinis) e
 | Enter | `1120:0000` | 955 octets |
 | Exit | `1120:04fd` | 87 octets |
 | Tick | `1120:0554` | 2513 octets ; garde `[1a08]` et `[89ea]` (écran entré) |
-| Key | `1120:10cd` | 74 octets (sans effet de jeu : touches de test) |
+| Key | `1120:10cd` | 74 octets ; hors mode de test seul `F1` (aide vocale) agit ; mode de test : voir 8.5 |
 | Clic (n = 1 carte, 2 Go, 3 tir, 4–8 sélecteur 1, 9–13 sélecteur 2, 14–18 sélecteur 3) | `1120:0f25(n)` | 392 octets |
 | Construction du mur | `1120:1461` | 1620 octets : tables de signes + groupes + objets de dalles |
 | Taille des groupes | `1120:2d8d` | 250 octets |
@@ -214,3 +214,16 @@ Code : règles `src/games/zoombinis/game/puzzles/net.ts` (pures, `MsvcRandom`), 
 - Le verrou de 720 ticks après un groupe libéré (environ 12 secondes après le dernier Zoombini lancé) est repris tel quel ; il paraît long en jeu.
 - Aucune musique (l'épreuve n'en a pas) ; aucun texte écrit par le port ; les cris des Zoombinis viennent des événements des `SCRS`.
 
+### 8.5 Touches du mode de test (`1120:10cd`, `[a43f]`)
+
+Même schéma que l'hôtel : la table est dans le segment de code (`CS:1151` : 4 codes, puis 4 adresses `CS:1159`), lue dans `ZOOMBINI._EX` ; sans `[a43f]`, seule `F1` (0x16f) est lue. **Sûr** pour la table et le code des cibles.
+
+| Touche | Cible | Effet | Confiance | Porté |
+|---|---|---|---|---|
+| `F1` | `110b` | aide vocale (appel lointain), `AX = 1` | sûr | oui (`kit.key`, hors mode de test aussi) |
+| espace | `111f` | `[8b4a] = [8b4e]` (munitions de départ) ; `[8b4c] = 0x11 − [8b4a]` (tas de la bulle) ; si `[8b6c] ≠ 0` : `[8b6c] = 0` et `[8b50]++` (déclenche le rechargement du Tick `8b50 → 8b5a…`) | sûr | oui (`refill`, `bubbleLevel`, `reload`) |
+| `L`, `l` | `1115` | `1120:1f2d` : bandeau en haut à droite (rectangles `DS:1a0a` 500–600 × 1–27, `1a12` moitié gauche, `1a1a` moitié droite) avec les noms (`DS:1a22` : `SC`, `SH`, `MC`) de `[89cc]` à gauche, de `[89ce]` au milieu et de `[89d0]` à droite à partir du niveau 2 (« PR », `DS:1a66`, avant) | sûr (noms, rectangles, indices), probable (fond 0xe, cadre, encre) | oui (`NetState.roles`, `roleNames`) |
+
+`[89cc]`, `[89ce]`, `[89d0]` sont écrits en `1120:1a2c…1a74` : niveaux 0 à 2 selon le même `rand(1)` que `swap` ((2, 1, 0) si non nul, sinon (1, 2, 0)) ; niveau 3 : les trois `rand(2)` distincts (que la version 8.1 jetait). `NetState.roles` les garde (aucun tirage de plus).
+
+Écarts du port : le bandeau est dessiné sur le fond (il reste tant que l'écran dure) avec fond 0xe, cadre noir et encre 0 déduits des appels `11e8:3034`, `60e8`, `7c08` (couleurs non vérifiées) ; le tas de la bulle après l'espace vaut `17 − munitions` comme l'original, soit un cran de plus que le niveau « naturel » du port (`16 − munitions de départ` à l'entrée) : la formule est reprise telle quelle (**probable** que la convention de `[8b4c]` diffère d'une unité, non tranché). Textes : seuls `SC`, `SH`, `MC`, `PR` du programme, en mode de test.

@@ -172,6 +172,8 @@ export interface NetState {
   /** Affectation des sélecteurs : aux niveaux 0 et 1, `swap` (`[89cc] == 2`) échange `P` et `Q` ; aux niveaux 2 et 3, `order` (`[8ba8]`). */
   readonly swap: boolean;
   readonly order: number;
+  /** `DS:89cc`, `89ce`, `89d0` : « rôles » tirés à l'entrée (0 à 2), seulement lus par la touche de test `L` (`1120:1f2d`). Niveaux 0 à 2 : (2, 1, 0) si `swap`, sinon (1, 2, 0). */
+  readonly roles: readonly [number, number, number];
   /** Valeurs des sélecteurs 1 à 3 (`DS:8b7e`, `8b82`, `8b86` ; −1 = aucune) et valeurs précédentes (`8b80`, `8b84`, `8b88`, pour l'image de la boule). */
   selectors: [number, number, number];
   previous: [number, number, number];
@@ -198,15 +200,20 @@ export function newNet(rng: MsvcRandom, level: number, members: number): NetStat
   const groups = placeGroups(rng, level, sizes);
   let swap = false;
   let order = 0;
+  let roles: readonly [number, number, number] = [0, 0, 0];
   if (level < 3) {
     // `rand(1)` : 0 → rôles (1, 2), sinon (2, 1) ; `[89cc] == 2` échange `P` et `Q` aux niveaux 0 et 1 (au niveau 2 l'affectation est `[8ba8]`).
     swap = rng.rand(1) !== 0;
+    roles = swap ? [2, 1, 0] : [1, 2, 0];
   } else {
     for (;;) {
       const a = rng.rand(2);
       const b = rng.rand(2);
       const c = rng.rand(2);
-      if (a !== b && b !== c && c !== a) break;
+      if (a !== b && b !== c && c !== a) {
+        roles = [a, b, c];
+        break;
+      }
     }
     order = rng.rand(5);
   }
@@ -220,6 +227,7 @@ export function newNet(rng: MsvcRandom, level: number, members: number): NetStat
     groups,
     swap,
     order,
+    roles,
     selectors,
     previous: [-1, -1, -1],
     ammo: startAmmo,
@@ -318,6 +326,32 @@ export function endOfShot(state: NetState): boolean {
   state.ammo -= 1;
   if (wasEmpty) state.exhausted = true;
   return wasEmpty;
+}
+
+// --- Mode de test (touches de `1120:10cd`, `[a43f]`) ---
+
+/** Les trois noms de `DS:1a22` (chaînes de 2 lettres, indexées par un rôle de 0 à 2) et le nom de la troisième case aux niveaux 0 et 1 (`DS:1a66`). */
+export const ROLE_NAMES: readonly string[] = ["SC", "SH", "MC"];
+export const THIRD_NAME = "PR";
+
+/** Noms affichés par la touche `L` (`1120:1f2d`) : un par rôle `[89cc]`, `[89ce]`, puis `[89d0]` à partir du niveau 2 (« PR » avant). */
+export function roleNames(state: Pick<NetState, "level" | "roles">): string[] {
+  const [a, b, c] = state.roles;
+  return [ROLE_NAMES[a]!, ROLE_NAMES[b]!, state.level < 2 ? THIRD_NAME : ROLE_NAMES[c]!];
+}
+
+/** Hauteur du tas de boue de la bulle après un rechargement des munitions (`[8b4c] = 0x11 − [8b4a]`, `1120:111f`). */
+export const MUD_TOTAL = 0x11;
+
+/**
+ * Touche espace (`1120:111f`) : les munitions reviennent à leur valeur de départ (`[8b4a] = [8b4e]`) et le tas de la bulle à `0x11 − munitions` ; si le jeu était
+ * arrêté (`[8b6c]`), il repart (`[8b6c] = 0`, `[8b50]++` : le rechargement du Tick). Renvoie vrai dans ce cas.
+ */
+export function refill(state: NetState): boolean {
+  state.ammo = state.startAmmo;
+  const restart = state.exhausted;
+  state.exhausted = false;
+  return restart;
 }
 
 /** Tous les Zoombinis sont libérés (`DS:89b8 ≥ DS:89b2`). */

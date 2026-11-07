@@ -20,7 +20,7 @@ Confiance : **sûr** = lu dans le code ; **probable** = déduit de plusieurs ind
 | Enter | `1190:0107` ; réinitialisation `1190:0000` |
 | Exit | `1190:06a2` (→ `11a8:021c` → `1168:36e1(0, 1)`, comme `10c0:058d`) |
 | Tick | `1190:06ff` |
-| Key | `1190:1199` (débogage et touche d'aide `0x16f`) |
+| Key | `1190:1199` (touche d'aide `0x16f` et touches du mode de test, §4.5) |
 | Clic de région | `1190:0be9(id)` (table `DS:3b6e` ; `1038:0000(0xc000, 1, 0x3b6e)`) |
 | Règle, niveau 0 / 1 / 2 / 3 | `1190:2748` / `2af8` / `2d12` / `381c` ; choix de deux règles : `1190:3a48` |
 | Test d'acceptation | `1190:2588` |
@@ -169,6 +169,30 @@ Protégé contre la ré-entrée (`DS:3bce`). Dans l'ordre :
 | 250…253 | | `1168:4dc9(événement − 0xfa, …)` (variante de pose) |
 
 Places d'arrivée (16 points par tunnel, `seg 1510`, premier et dernier) : entrée 1 = (277,62) … (200,133) ; entrée 4 = (403,60) … (370,127) ; entrée 2 = (288,213) … (259,280) ; entrée 3 = (414,217) … (371,268).
+
+
+### 4.5 Clavier (`1190:1199`)
+
+Hors du mode de test (`DS:a43f = 0`), seule `0x16f` (F1) agit : `11a0:155e` (aide vocale), rend 1. En mode de test, la fonction cherche le code dans la table `CS:148c` (12 mots, cibles aux 12 mots suivants, `CS:14a4`) ; **toutes les touches de la table autres que F1 rendent 0** (non consommées : elles passent ensuite aux raccourcis généraux). Relevé sur les octets de l'exécutable (cibles hors du désassemblage), **sûr**.
+
+| Touche | Cible | Effet | Confiance | Porté |
+|---|---|---|---|---|
+| `F1` (`0x16f`) | `120a` | `11a0:155e` ; rend 1, **même hors mode de test** | sûr | oui (`kit.key`) |
+| `H` | `1217` | `DS:a1a8 += 4` : quatre animations de victoire de plus (quota des danses, §4.3) | sûr | oui (`danceQuota`) |
+| `a` | `121f` | `11a8:04b9` puis message de la ligne d'état d'après `a02a` / `a02c` / `a039` : 1 règle : `a02c ≠ 0` « Left accepts: », sinon « Right accepts: » ; 2 règles : `(a02c, a039)` = `(≠0, ≠0)` « Left / Top accept: », `(≠0, 0)` « Left / Bottom accept: », `(0, ≠0)` « Right / Top accept: », `(0, 0)` « Right / Bottom accept: » (`1198:03cf(-1, texte)`). Puis dessine, pour chaque règle (`a02e + 13 i`), les icônes d'attributs de ses conditions (`1168:5e91`, à partir de x = 250, pas de 30) | sûr (message), probable (icônes) | message seulement |
+| `C` | `1381` | gardien de `a0d6` (groupe 4000) : `n = a1b8 + 1` ; si `n` est hors de `4000…4038`, `n = 4000` ; `11a8:1be6(1, n, objet)`, `11a8:3533`, `a1b8 ← n`, message « SCRB id: n » | sûr | oui |
+| `F` | `1381` | idem avec `a0da` (4200…4226) | sûr | oui |
+| `I` | `1381` | idem avec `a0dc` (4400…4423) | sûr | oui |
+| `O` | `1381` | idem avec `a0d8` (4600…4617) | sûr | oui |
+| `w` | `1432` | `2137(1)` : phrase d'introduction (première visite de l'exécution si `a18e ≠ 1`, sinon une des 8 suivantes) | sûr | oui |
+| `W` | `142c` | `a18e ← 1`, puis `2137(1)` | sûr | oui (le compteur de visites passe à 2 au moins) |
+| `t` | `143b` | `2137(0)` : phrase d'encouragement | sûr | oui |
+| `T` | `1444` | `2137(2)` : phrase d'effondrement (4420 à 4422) | sûr | oui |
+| `e` | `144d` | `2137(3)` : phrase de sortie (tous sauvés, avec perdus, ou après l'effondrement) | sûr | oui |
+
+`2137` empile une entrée de conversation dans la file de 5 (`201d`, refusée si pleine) : les touches `w W t T e` ne l'exécutent pas tout de suite, la file la joue à son tour (§8.3). Le compteur `a1b8` est partagé entre `C F I O` (une touche d'une autre série repart au début de sa série).
+
+**Écarts** : `a` n'affiche pas les icônes d'attributs sous la ligne d'état (message seulement) ; le port n'a pas `a1b8` hors de la scène (remis à 0 à chaque entrée, non vérifié dans l'original) ; `W` règle le compteur de visites du port (`DS:a18e` n'y est qu'un indicateur « première visite » déduit de ce compteur). Les messages utilisent `showDebugMessage` (la ligne d'état du mode de test, en haut à gauche, effacée au prochain redessin de la zone).
 
 ## 5. Animations et sons
 

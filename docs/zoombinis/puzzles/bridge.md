@@ -180,7 +180,15 @@ Types d'éternuement (`7090`) : les `SCRB` 1208–1213 (bas) et 1223–1228 (hau
 
 ### 4.5 Clavier (`10c0:0d20`)
 
-Sans le mode de débogage (`DS:a43f = 0`) la seule touche examinée est le code `0x16f`, qui appelle `11a0:155e` (coupe ou rejoue la voix `DS:a2c4`) ; `a2c4 = 0` dans cette épreuve : **aucun effet**. En mode de débogage : `A` affiche la règle (`Upper/Lower bridge accepts:` + les conditions), `R` affiche `Snoid Script: … Type:`. Pas d'autre raccourci : tout se joue à la souris.
+Sans le mode de débogage (`DS:a43f = 0`) la seule touche examinée est le code `0x16f`, qui appelle `11a0:155e` (coupe ou rejoue la voix `DS:a2c4`) ; `a2c4 = 0` dans cette épreuve : **aucun effet**. Les trois touches (`0x16f` comprise) ne sont prises que si l'écran est actif (`DS:7058 ≠ 0`) et que plus personne ne marche (`DS:9702 ≤ 0`). Après repli a-z → A-Z (`0x60 < c < 0x7b`, `c −= 0x20`), table à comparaisons successives :
+
+| Touche | Effet en mode de débogage | Confiance | Port |
+|---|---|---|---|
+| `A` (`0db5`) | efface la zone `DS:0b16` = (225, 0)–(350, 70) et la ligne d'état (`11d8:1998`), laisse tourner le moteur (`11a8:04b9`), écrit « Upper bridge accepts: » (`DS:7094 ≠ 0`) ou « Lower bridge accepts: » (`1198:03cf(-1, texte, 0, 0, 0)`, sans attente), puis dessine l'icône de chaque condition de la règle (`1168:5e91(DS:7097+i, DS:709c+i, rect)` : attribut, valeur) en (250 + 30 × i, 20), i < `DS:7096` : image `2 × base + 1` de la planche 3000, `base` = `DS:032a` (cheveux, attribut 1), `031e` (yeux, 2), `0312` (nez, 3), `0306` (pieds, 4), ancre `REGS` 100/101 retranchée | **sûr** | porté (`showRule`) ; écart : l'original dessine sur l'écran, le port garde les icônes dans un objet porté devant tout jusqu'au prochain `A` ; la ligne d'état, elle, part à la recomposition suivante (comme `showDebugLine`) |
+| `R` (`0d9b`) | `1198:03cf(DS:70b4, "Snoid Script:", &DS:70b6, " Type:", attente)` ; `70b4` et `70b6` valent −1 à l'initialisation (`10c0:002b`) et à chaque départ de décision (`10c0:081c`) et ne sont écrits nulle part ailleurs : le message est toujours « Type: -1 Snoid Script: » (précédé d'une espace) | **sûr** pour le message, **probable** pour le format du −1 (entier signé) | porté (`showScript`), sans attente (le port n'attend pas) |
+| `0x16f` | `11a0:155e` : sans effet audible ici | **sûr** | `kit.key` (inchangé) |
+
+Pas d'autre raccourci : tout se joue à la souris.
 
 ## 5. Animations et sons
 

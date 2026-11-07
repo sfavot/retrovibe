@@ -8,6 +8,7 @@ import { FEATURES } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
+import { ZOOMBINIS_TEXT } from "../../../src/games/zoombinis/engine/text";
 import { FLEENS_BRANCH_POINTS, FLEENS_QUEUE, FLEENS_TERRACE_POINTS, cousinAttrs, runRobot } from "../../../src/games/zoombinis/game/puzzles/fleens";
 import { nextScreen } from "../../../src/games/zoombinis/game/route";
 import { makeZoombini, type GameState, type Session, type Zoombini } from "../../../src/games/zoombinis/game/state";
@@ -379,6 +380,45 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(one.zoombinis.lastChange).toMatchObject({ screen: S.xfer, target: nextScreen(S.fleens, "success") });
     expect(one.zoombinis.game.group.members.filter((z) => z.present)).toHaveLength(0);
   }, 120_000);
+
+  describe("touches du mode de test (`10e0:0def`)", () => {
+    /** Presse une touche et renvoie les textes dessinés dans la foulée (ligne d'état du mode de test). */
+    async function pressKey(t: Awaited<ReturnType<typeof start>>, key: string, code: string): Promise<string[]> {
+      const text = t.engine.services.get(ZOOMBINIS_TEXT);
+      const drawn: string[] = [];
+      const draw = text.drawText.bind(text);
+      const spy = vi.spyOn(text, "drawText").mockImplementation((surface, font, value, ...rest) => {
+        drawn.push(value);
+        return draw(surface, font, value, ...rest);
+      });
+      t.host.press(code, { key });
+      await t.wait(2);
+      spy.mockRestore();
+      return drawn;
+    }
+
+    it("L et l écrivent « Level » et le niveau + 1 (sans changer le niveau)", async () => {
+      const t = await start((game) => void (game.options.testMode = true));
+      const level = t.probe().level;
+      expect(await pressKey(t, "L", "KeyL")).toContain(`Level ${level + 1}`);
+      expect(await pressKey(t, "l", "KeyL")).toContain(`Level ${level + 1}`);
+      expect(t.probe().level).toBe(level);
+      expect(t.engine.error).toBeNull();
+    });
+
+    it("sans mode de test, L ne fait rien ; les autres touches non plus", async () => {
+      const t = await start();
+      expect(await pressKey(t, "L", "KeyL")).toEqual([]);
+      expect(await pressKey(t, "l", "KeyL")).toEqual([]);
+      expect(await pressKey(t, "a", "KeyA")).toEqual([]);
+    });
+
+    it("en mode de test, une autre touche ne fait rien", async () => {
+      const t = await start((game) => void (game.options.testMode = true));
+      expect(await pressKey(t, "a", "KeyA")).toEqual([]);
+      expect(await pressKey(t, "r", "KeyR")).toEqual([]);
+    });
+  });
 
   it("le bouton carte demande l'avertissement ; F1 rejoue la voix d'introduction", async () => {
     const { host, engine, wait, dialog, queued, probe, zoombinis } = await start();

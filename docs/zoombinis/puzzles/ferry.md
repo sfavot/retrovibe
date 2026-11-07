@@ -185,7 +185,14 @@ Gardé par `DS:10d6 == 0` et `72de ≠ 0`. Ordre :
 
 ### 4.4 Clavier (`10d8:0df6`) et rappel de région
 
-Aucune touche en jeu normal. Seulement quand `DS:a43f ≠ 0` (mode de débogage) ou pour la touche de code `0x16f` : table `CS:0f05` : `A` (`18d6(1)` : affiche le graphe de voisinage), `F` (rejoue le `SCRB` suivant du père mathieu, `DS:731a`, message `Play FrogMan SCRB id:`), `L` (change le niveau d'entraînement via `1198:03cf(72be + 1)`), `0x16f` (`11a0:155e`, rôle non étudié, identique dans `slides.md`). Les raccourcis généraux (`Ctrl+Q`…) sont traités avant (`engine.md` §7.2).
+Aucune touche en jeu normal. Seulement quand `DS:a43f ≠ 0` (mode de débogage) ou pour la touche de code `0x16f`. Après repli a-z → A-Z, table `CS:0f05` (4 codes `41 46 4c 16f`, cibles `0e62 0e89 0e6f 0e57`, lues dans l'exécutable) :
+
+| Touche | Effet | Confiance | Port |
+|---|---|---|---|
+| `A` (`0e62`) | `10d8:18d6(1)` : recalcule le graphe de voisinage (table `DS:7300`) et trace, pour chaque paire de tabourets voisins, un trait du centre d'un rectangle de tabouret (`+0xce`) au centre de l'autre (couleur `11e8:3034(…, 0xb)`, `MoveTo` / `LineTo`), sur l'écran | **sûr** (tracé), **probable** (la couleur 0xb est l'indice de palette) | porté (`showGraph`) ; écart : les traits sont dans un objet porté devant tout jusqu'à la sortie de l'écran (l'original les laisse jusqu'à ce qu'un objet repasse dessus) |
+| `F` (`0e89`) | si le plancher (`DS:72e4`) existe encore (donc pas après le départ) : si `DS:731a` n'est pas dans 1800 à 1832 (`0x708`–`0x728`) il prend le script en cours du père mathieu (`obj + 0x1c`) ; `11a8:1be6(père, 731a, 1)` rejoue ce script, `11a8:3533` précharge ses sons, message « Play FrogMan SCRB id: » + `731a`. **`731a` n'est jamais incrémenté** (ni écrit ailleurs) : `F` rejoue toujours le même `SCRB` (l'ancien texte disait « le suivant ») ; valeur conservée d'une visite à l'autre | **sûr** | porté (`replayFrog`, `DS:731a` dans la mémoire du programme) ; non consommée après le départ, comme l'original |
+| `L` (`0e6f`) | `1198:03cf(72be + 1, 0, 0, 0, 0)` : ligne d'état « Level N+1 » ; **ne change pas le niveau** (l'ancien texte disait « change ») | **sûr** | porté |
+| `0x16f` (`0e57`) | `11a0:155e` (voix d'introduction), identique dans `slides.md` | **sûr** | `kit.key` (inchangé) | Les raccourcis généraux (`Ctrl+Q`…) sont traités avant (`engine.md` §7.2).
 
 ## 5. Animations et sons
 

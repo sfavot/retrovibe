@@ -6,7 +6,8 @@ import { DIALOG } from "../../../src/games/zoombinis/engine/dialog";
 import { createZoombinisEngine } from "../../../src/games/zoombinis/engine/engine";
 import { FEATURES } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
-import { installServices } from "../../../src/games/zoombinis/engine/services";
+import { GRAPHICS, installServices } from "../../../src/games/zoombinis/engine/services";
+import { ZOOMBINIS_TEXT } from "../../../src/games/zoombinis/engine/text";
 import {
   BATH_REMARKS,
   buildRaft,
@@ -301,6 +302,7 @@ describe.skipIf(!original.has)("écran du bac (createFerryScene)", () => {
     size?: number;
     lessAction?: boolean;
     attrs?: (i: number) => Attrs;
+    testMode?: boolean;
   }
 
   async function start(config: Config = {}) {
@@ -322,6 +324,7 @@ describe.skipIf(!original.has)("écran du bac (createFerryScene)", () => {
     zoombinis.game.levels[1] = config.level ?? 0;
     zoombinis.game.options.lessAction = config.lessAction ?? true;
     zoombinis.game.options.magneticMouse = false;
+    zoombinis.game.options.testMode = config.testMode ?? false;
     zoombinis.session.screen = S.ferry;
     engine.start(S.ferry);
     await runFor(engine, host, 100);
@@ -648,6 +651,57 @@ describe.skipIf(!original.has)("écran du bac (createFerryScene)", () => {
       expect(t.engine.error).toBeNull();
     }
   }, 120_000);
+
+  describe("touches du mode de test (`10d8:0df6`)", () => {
+    /** Presse une touche et renvoie les textes dessinés dans la foulée (ligne d'état du mode de test). */
+    async function pressKey(t: Awaited<ReturnType<typeof start>>, key: string): Promise<string[]> {
+      const text = t.engine.services.get(ZOOMBINIS_TEXT);
+      const drawn: string[] = [];
+      const draw = text.drawText.bind(text);
+      const spy = vi.spyOn(text, "drawText").mockImplementation((surface, font, value, ...rest) => {
+        drawn.push(value);
+        return draw(surface, font, value, ...rest);
+      });
+      t.host.press(`Key${key.toUpperCase()}`, { key });
+      await t.ticks(2);
+      spy.mockRestore();
+      return drawn;
+    }
+
+    it("L écrit « Level » et le niveau + 1, sans changer le niveau (l et L)", async () => {
+      const t = await start({ testMode: true, level: 2 });
+      expect(await pressKey(t, "l")).toContain("Level 3");
+      expect(await pressKey(t, "L")).toContain("Level 3");
+      expect(t.probe().raft.seats.length).toBeGreaterThan(0);
+    });
+
+    it("F rejoue le script du père mathieu et l'écrit (« Play FrogMan SCRB id: »)", async () => {
+      const t = await start({ testMode: true });
+      const first = (await pressKey(t, "f")).find((value) => value.startsWith("Play FrogMan SCRB id:"));
+      expect(first).toMatch(/^Play FrogMan SCRB id: 1[68]\d\d$/);
+      expect((await pressKey(t, "F")).some((value) => value.startsWith("Play FrogMan SCRB id:"))).toBe(true);
+    });
+
+    it("A trace le graphe de voisinage des tabourets (couleur 0xb) dans un objet unique", async () => {
+      const t = await start({ testMode: true });
+      const before = t.features.features.length;
+      await pressKey(t, "a");
+      expect(t.features.features.length).toBe(before + 1);
+      const seat = t.probe().raft.seats.findIndex((candidate) => candidate.neighbors.length > 0);
+      const rect = t.probe().seatFeatures[seat]!.rect!;
+      const centre = { x: Math.trunc((rect.left + rect.right) / 2), y: Math.trunc((rect.top + rect.bottom) / 2) };
+      expect(t.engine.services.get(GRAPHICS).screen.get(centre.x, centre.y)).toBe(0xb);
+      await pressKey(t, "A");
+      expect(t.features.features.length).toBe(before + 1);
+    });
+
+    it("sans mode de test, A, F et L ne font rien", async () => {
+      const t = await start({ level: 2 });
+      const before = t.features.features.length;
+      for (const key of ["a", "f", "l"]) expect(await pressKey(t, key)).toEqual([]);
+      expect(t.features.features.length).toBe(before);
+    });
+  });
 
   it("F1 rejoue la voix d'introduction du narrateur (20073 ou 20074)", async () => {
     const t = await start();

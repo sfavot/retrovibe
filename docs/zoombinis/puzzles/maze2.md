@@ -28,7 +28,7 @@ Les 15 noms de `TEXTSTR.MHK` `STRL` 2000 donnent, en 14e position, **« le gouff
 | Enter | `1118:0000` (4 514 octets) | §1.3 et §5 |
 | Exit | `1118:145f` | une seule fois (`[8914]`) : `11a8:021c` (qui appelle `1168:36e1(0, 1)` hors entraînement), fermeture de l'archive et des ressources |
 | Tick | `1118:1503` | machine à files d'événements (§5.1) |
-| Key | `1118:2989` | ne traite que le code `0x16f` (`11a0:155e`, hors épreuve) ; renvoie faux pour toute autre touche si le mode de test `[a43f]` est coupé. Aucun raccourci de jeu. |
+| Key | `1118:2989` | ne traite que le code `0x16f` (`11a0:155e`, hors épreuve) ; renvoie faux pour toute autre touche si le mode de test `[a43f]` est coupé. Aucun raccourci de jeu. **Aucune touche du mode de test** (**sûr**, relu en lot 3) : avec `[a43f] ≠ 0` le handler compare toujours au seul code `0x16f` et renvoie 0 pour le reste. Rien à porter. |
 | Régions cliquables | table `DS:1800`, `1038:0000(0xc000, 1, 0x1800)`, callback `1118:2285` | région 1 = Map, 2 = Go, 3 = zone de jeu (§5.2) |
 
 Appels propres à l'épreuve : `1118:4a3e` (charge la carte du niveau), `1118:4ad2` (construit le niveau), `1118:4c6e` / `1118:4cf0` (crée les objets de la carte), `1118:11b8` (charge un `REGS` et échange ses mots), `1118:127e` (libère), `1118:12c0` (dessin des boutons Map / Go), `1118:13fc` (rafraîchissement des boutons), `1118:1fb4` (arrivée sur une sortie), `1118:29cc` (animation d'une rampe), `1118:3140` à `1118:3e9e` (rappels d'événements), `1100:0000` (initialisation d'un Zoombini), `1100:0b69`, `1100:1301`, `1100:1527`, `1100:1a9d`, `1100:20dc`, `1100:102a` (une case de chaque type, §2.3), `1100:02cf` (collision), `1100:2679` (dessin d'une case).

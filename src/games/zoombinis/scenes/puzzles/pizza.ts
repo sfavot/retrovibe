@@ -32,7 +32,9 @@ import { ZOOMBINIS_GAME } from "../../engine/game";
 import type { Scene, SceneContext } from "../../engine/scene";
 import { ScreenId } from "../../engine/scene";
 import { node, path, scrs } from "../../engine/resources";
+import { GRAPHICS } from "../../engine/services";
 import { ZOOMBINIS_SOUND } from "../../engine/sound";
+import { TextFlags, ZOOMBINIS_TEXT } from "../../engine/text";
 import { dialogMemoryIndex, currentLevel } from "../../game/route";
 import {
   PIZZA_LEVELS,
@@ -90,6 +92,28 @@ const OVEN_EVENT_PIZZA = 32;
 const OVEN_EVENT_TAKE = 60;
 /** Délai entre images du livreur pendant sa première montée au comptoir (`1130:4cb5` : `+0x28 = 2`) ; ensuite 6 (`1130:4571`). */
 const DELIVERER_FIRST_DELAY = 2;
+
+/**
+ * Touches du mode de test (`1130:1a66`, table `CS:1c1c`). `R`, `O`, `D` (majuscules seulement) font monter `DS:8d22` (0 au départ, `1130:0000`) ; les autres touches
+ * à effet en exigent au moins 3. Codes de `WM_CHAR`.
+ */
+const KEY = (letter: string): number => letter.charCodeAt(0);
+/** Valeur de `DS:8d22` à partir de laquelle les touches `N`, `P`, `S`, `W` et Espace agissent. */
+const DEBUG_UNLOCKED = 3;
+/**
+ * Parcours des scripts des trolls par `N` (Arno), `W` (Willa) et `S` (Shyler) : premier `SCRB` (`0x1f40`, `0x2328`, `0x2710`) et nombre de scripts parcourus
+ * (`CS:1b88`, `1b8a`, `1b8c` : remis à 0 à `0x24`, `0x23`, `0x27`).
+ */
+const PROBE_TROLLS = [
+  { base: 8000, count: 36 },
+  { base: 9000, count: 34 },
+  { base: 10000, count: 39 },
+] as const;
+/** Libellés de `1130:3355` (`wsprintf` « %s%d %d … » : huit drapeaux 0 / 1 par ligne). */
+const SET_LABELS = ["Arno    ", "Willa   ", "Shyler  "] as const;
+const MEAL_LABEL = "Meal     ";
+/** Lignes de l'affichage de mise au point : en haut à gauche, 310 × 16 chacune (le rectangle exact de `1130:3355`, lu dans `DS:1b8e`, n'est pas relu). */
+const SETS_LINE = { x: 0, w: 310, h: 16 } as const;
 
 /** Délai entre deux images (`11a8:0ad6` : 6). */
 const DELAY = 6;
@@ -218,6 +242,12 @@ export function createPizzaScene(): Scene {
   /** Le livreur a été appelé au comptoir (`1130:4cb5`, `8d10`). */
   let delivererCalled = false;
   let nextAmbient = 0;
+  /** `DS:8d22` : avancement de la saisie des touches de test (`R`, `O`, `D`, puis `R` en plus), remis à 0 à l'entrée (`1130:0000`). */
+  let debugStage = 0;
+  /** `DS:8d6e` : budget de repas manqués du début de l'écran (copie de `8d5a`, `1130:0000`). */
+  let initialBudget = 0;
+  /** `CS:1b88`, `1b8a`, `1b8c` : prochain script des trolls parcourus par `N`, `W`, `S` (dans le segment de code : conservés d'une entrée à l'autre, ici le temps de la scène). */
+  const probe = [0, 0, 0];
   /** Attentes de silence (narrateur). */
   const silenceWaiters: (() => void)[] = [];
 
@@ -477,12 +507,87 @@ export function createPizzaScene(): Scene {
     ovenBusy = false;
     refreshPreview();
     if (kit) kit.goEnabled = true;
+    playDeparture();
+  }
+
+  /** `1130:3893` : les scènes de départ des trolls présents (la voix de réussite suit celle d'Arno, rappel `3bbf`). */
+  function playDeparture(): void {
     const scripts = departureScripts(state!, ctx.rng);
     for (const { troll: k, script } of scripts) {
       const hook = trollHook(() => state!.liked[k]!);
       play(troll(k), script, k === 0 ? () => kit?.playSuccessVoice() : undefined, hook);
     }
   }
+
+  // ------------------------------------------------------------------------------------------------------------------------
+  // Touches du mode de test (`1130:1a66`)
+
+  /**
+   * `1130:3355` (`A`, `a`) : affiche les ensembles aimés des trolls encore à servir et le repas en préparation, huit drapeaux 0 / 1 par ligne (ingrédients 0 à 7).
+   * **Écart** : une ligne de texte par ligne de l'original en haut à gauche de l'écran, sans le cadre ni la mise en page de l'original ; effacé au prochain
+   * redessin de la zone.
+   */
+  function showSets(): boolean {
+    const screen = ctx.services.get(GRAPHICS).screen;
+    const text = ctx.services.tryGet(ZOOMBINIS_TEXT);
+    const flags = (mask: number): string => Array.from({ length: 8 }, (_, k) => (has(mask, k) ? 1 : 0)).join(" ");
+    const lines: string[] = [];
+    for (let k = 0; k < 3; k++) if (state!.trolls[k] === "present") lines.push(`${SET_LABELS[k]}${flags(state!.liked[k]!)}`);
+    lines.push(`${MEAL_LABEL}${flags(state!.meal)}`);
+    lines.forEach((line, row) => {
+      const rect = { x: SETS_LINE.x, y: row * SETS_LINE.h, w: SETS_LINE.w, h: SETS_LINE.h };
+      screen.fill(0xff, rect);
+      text?.drawText(screen, "small", line, rect, TextFlags.center | TextFlags.vcenter, 0);
+    });
+    ctx.requestPresent();
+    return true;
+  }
+
+  /** `R` : `8d22` repart à 1 (au plus 2), sinon monte d'un. `O` puis `D` le portent de 1 à 3 ; au-delà, `R` ne fait que monter (au-delà de 5 la région 13 serait active : code mort). */
+  function raiseStage(): boolean {
+    debugStage = debugStage <= 2 ? 1 : debugStage + 1;
+    return true;
+  }
+
+  function stageStep(from: number): () => boolean {
+    return () => {
+      if (debugStage === from) debugStage += 1;
+      return true;
+    };
+  }
+
+  /** `N`, `W`, `S` (`8d22 ≥ 3`) : le troll joue le script suivant de sa série (`11a8:1be6(1, base + n, objet)`), la série repart au début après le dernier. */
+  function probeTroll(k: number): () => boolean {
+    return () => {
+      if (debugStage < DEBUG_UNLOCKED) return false;
+      const { base, count } = PROBE_TROLLS[k]!;
+      if (probe[k]! >= count) probe[k] = 0;
+      const script = base + probe[k]!;
+      probe[k] = probe[k]! + 1;
+      // L'objet d'un troll absent n'existe pas dans le port.
+      if (trolls[k]) play(troll(k), script, undefined, trollHook(() => state!.liked[k]!));
+      return true;
+    };
+  }
+
+  const debugKeys: Readonly<Record<number, () => boolean>> = {
+    [KEY("A")]: showSets,
+    [KEY("a")]: showSets,
+    [KEY("R")]: raiseStage,
+    [KEY("O")]: stageStep(1),
+    [KEY("D")]: stageStep(2),
+    [KEY("N")]: probeTroll(0),
+    [KEY("n")]: probeTroll(0),
+    [KEY("W")]: probeTroll(1),
+    [KEY("w")]: probeTroll(1),
+    [KEY("S")]: probeTroll(2),
+    [KEY("s")]: probeTroll(2),
+    // `P` : rejoue la scène de départ (`3893`), sans rien changer d'autre (`8d26` est remis à 0 : plus de chaîne d'états en cours).
+    [KEY("P")]: () => (debugStage < DEBUG_UNLOCKED ? false : (playDeparture(), true)),
+    [KEY("p")]: () => (debugStage < DEBUG_UNLOCKED ? false : (playDeparture(), true)),
+    // Espace : le budget de repas manqués tolérés redevient celui du début de l'écran (`8d5a ← 8d6e`).
+    [0x20]: () => (debugStage < DEBUG_UNLOCKED ? false : ((state!.budget = initialBudget), true)),
+  };
 
   // ------------------------------------------------------------------------------------------------------------------------
   // Entrée : narrateur, présentations des trolls, réplique d'attente
@@ -564,6 +669,8 @@ export function createPizzaScene(): Scene {
       const chosen = currentLevel(zoombinis.game, zoombinis.session, ScreenId.pizza);
       if (chosen < 0 || chosen >= PIZZA_LEVELS) throw new RangeError(`pizza : niveau ${chosen}`);
       state = newPizza(ctx.rng, chosen);
+      debugStage = 0;
+      initialBudget = state.budget;
       ready = false;
       ovenBusy = false;
       delivererCalled = false;
@@ -669,6 +776,7 @@ export function createPizzaScene(): Scene {
       if (!kit || kit.left) return false;
       if (event.ctrl || event.alt) return false;
       if (c.services.tryGet(DIALOG)?.isOpen) return false;
+      if (kit.testKey(event, debugKeys)) return true;
       return kit.key(event);
     },
   };

@@ -36,6 +36,7 @@ import { nextScreen } from "../../../src/games/zoombinis/game/route";
 import { makeZoombini, type Zoombini } from "../../../src/games/zoombinis/game/state";
 import { PIZZA_COUNTER, PIZZA_INGREDIENT_REGIONS, PIZZA_PLACES, PIZZA_SERVE_REGIONS, createPizzaScene, pizzaStateOf } from "../../../src/games/zoombinis/scenes/puzzles/pizza";
 import { BUTTON_GO, BUTTON_MAP, HELP_KEY } from "../../../src/games/zoombinis/scenes/puzzle-kit";
+import { ZOOMBINIS_TEXT } from "../../../src/games/zoombinis/engine/text";
 import { Snoid } from "../../../src/games/zoombinis/scenes/snoid";
 import { originalFiles } from "../../support/original";
 import { runFor, TestHost } from "../engine-test-host";
@@ -390,7 +391,7 @@ const center = (rect: { left: number; top: number; right: number; bottom: number
 
 describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", () => {
   /** L'épreuve au niveau `level` ; les ensembles aimés peuvent être imposés avant la fin de l'introduction. Le son n'est pas déverrouillé : les voix durent 0 ms. */
-  async function start(level: number, options: { size?: number; liked?: number[]; lessAction?: boolean } = {}) {
+  async function start(level: number, options: { size?: number; liked?: number[]; lessAction?: boolean; testMode?: boolean } = {}) {
     const host = new TestHost();
     const engine = createZoombinisEngine(host, { seed: 11 });
     const services = await installServices(engine);
@@ -405,6 +406,7 @@ describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", 
     zoombinis.game.stageUnbroken = true;
     zoombinis.game.levels = [level, 0, 0, 0];
     zoombinis.game.options.lessAction = options.lessAction ?? false;
+    zoombinis.game.options.testMode = options.testMode ?? false;
     zoombinis.session.screen = S.pizza;
     engine.start(S.pizza);
     await runFor(engine, host, 100);
@@ -717,6 +719,109 @@ describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", 
     expect(PIZZA_PLACES).toHaveLength(16);
     expect(PIZZA_PLACES[0]).toEqual({ x: 288, y: 389 });
     expect(PIZZA_PLACES[15]).toEqual({ x: 18, y: 457 });
+  });
+
+  describe("touches du mode de test (1130:1a66)", () => {
+    /** L'épreuve avec les textes dessinés et les scripts joués notés ; `press` frappe une touche (caractère) et laisse passer quelques ticks. */
+    const startKeys = async (level: number, testMode: boolean) => {
+      const env = await start(level, { testMode, liked: level === 0 ? [mask(0, 2)] : undefined });
+      const lines: string[] = [];
+      const text = env.engine.services.get(ZOOMBINIS_TEXT);
+      const draw = text.drawText.bind(text);
+      vi.spyOn(text, "drawText").mockImplementation((surface, font, value, ...rest) => {
+        lines.push(value);
+        return draw(surface, font, value, ...rest);
+      });
+      await env.intro();
+      // Scripts lancés depuis la fin de l'introduction (le hasard des répliques d'attente n'y touche pas : première réplique après 3600 ticks).
+      const started: number[] = [];
+      const set = env.features.setScript.bind(env.features);
+      vi.spyOn(env.features, "setScript").mockImplementation((feature, id, play) => {
+        // Les scripts des trolls seulement (8000 à 10999) : les Zoombinis rejouent aussi les leurs.
+        if ((id ?? 0) >= 8000 && (id ?? 0) < 11000) started.push(id ?? 0);
+        return set(feature, id, play);
+      });
+      const press = async (key: string) => {
+        env.host.press(key === " " ? "Space" : `Key${key.toUpperCase()}`, { key });
+        await env.ticks(3);
+      };
+      const typed = async (keys: string) => {
+        for (const key of keys) await press(key);
+      };
+      /** Scripts de la série d'un troll joués depuis le départ. */
+      const series = (base: number, count: number) => started.filter((id) => id >= base && id < base + count);
+      return { ...env, lines, started, series, press, typed };
+    };
+
+    it("hors du mode de test, aucune touche n'agit (ni A, ni R O D, ni N, W, S, P, Espace)", async () => {
+      const t = await startKeys(2, false);
+      t.state.budget = 3;
+      await t.typed("ARODNWSP aRODNWSp");
+      expect(t.lines.filter((l) => /^(Arno|Willa|Shyler|Meal)/.test(l))).toEqual([]);
+      expect(t.started).toEqual([]);
+      expect(t.state.budget).toBe(3);
+    });
+
+    it("A affiche les ensembles aimés des trolls à servir et le repas, huit drapeaux par ligne (1130:3355)", async () => {
+      const t = await startKeys(0, true);
+      await t.press("A");
+      expect(t.lines).toContain("Arno    1 0 1 0 0 0 0 0");
+      expect(t.lines).toContain("Meal     0 0 0 0 0 0 0 0");
+      expect(t.lines.some((l) => l.startsWith("Willa") || l.startsWith("Shyler"))).toBe(false);
+      t.lines.length = 0;
+      await t.clickIngredients(mask(1, 3));
+      await t.press("a");
+      expect(t.lines).toContain("Meal     0 1 0 1 0 0 0 0");
+    });
+
+    it("N, W, S, P et Espace n'agissent qu'après R, O, D (8d22 ≥ 3) ; O et D dans le désordre, ou en minuscules, n'avancent pas", async () => {
+      const t = await startKeys(2, true);
+      t.state.budget = 3;
+      await t.typed("NWSP ");
+      await t.typed("ODrod");
+      await t.typed("NWSP ");
+      expect(t.started).toEqual([]);
+      expect(t.state.budget).toBe(3);
+      await t.typed("ROD");
+      await t.press("N");
+      expect(t.started).toEqual([8000]);
+      await t.press("W");
+      await t.press("S");
+      expect(t.started).toEqual([8000, 9000, 10000]);
+      await t.press(" ");
+      expect(t.state.budget).toBe(PIZZA_LEVEL_PARAMS[2]!.budget);
+    });
+
+    it("N, W et S parcourent les scripts de chaque troll (8000…8035, 9000…9033, 10000…10038) puis recommencent ; les minuscules font de même", async () => {
+      const t = await startKeys(2, true);
+      await t.typed("ROD");
+      for (const [keys, base, count] of [["Nn", 8000, 36], ["Ww", 9000, 34], ["Ss", 10000, 39]] as const) {
+        for (let i = 0; i < count + 2; i++) await t.press(keys[i % 2]!);
+        const played = t.series(base, count);
+        expect(played).toEqual([...Array.from({ length: count }, (_, i) => base + i), base, base + 1]);
+      }
+    });
+
+    it("P rejoue la scène de départ (8024 ou 8025 : Arno seul, niveau 0)", async () => {
+      const t = await startKeys(0, true);
+      await t.press("P");
+      expect(t.started).toEqual([]);
+      await t.typed("ROD");
+      await t.press("p");
+      expect(t.started).toHaveLength(1);
+      expect([8024, 8025]).toContain(t.started[0]);
+    });
+
+    it("R remet la saisie à 1 tant qu'elle n'a pas atteint 3 (« RORD » n'ouvre rien) ; après R O D, d'autres R laissent les touches actives", async () => {
+      const closed = await startKeys(0, true);
+      await closed.typed("RORD");
+      await closed.press("N");
+      expect(closed.started).toEqual([]);
+      const open = await startKeys(0, true);
+      await open.typed("RODRRR");
+      await open.press("N");
+      expect(open.started).toEqual([8000]);
+    });
   });
 });
 

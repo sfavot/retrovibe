@@ -28,6 +28,7 @@
  *  - aucun texte n'est écrit par le port (voix et sons de l'original).
  */
 import type { Shape } from "../../../../data/mohawk/shap";
+import type { Surface } from "../../../../engine/mohawk/graphics/surface";
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { TAG_SCRB, screenInfo } from "../../data/archives";
 import type { Script } from "../../data/script";
@@ -37,10 +38,12 @@ import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeatureImageHook
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import { scrs } from "../../engine/resources";
 import type { Scene, SceneContext } from "../../engine/scene";
+import { drawDebugBanner } from "../../engine/shortcuts";
 import { ScreenId } from "../../engine/scene";
 import { currentLevel, dialogMemoryIndex } from "../../game/route";
 import {
   NET_LEVELS,
+  MUD_TOTAL,
   NET_SYMBOLS,
   aim,
   endOfShot,
@@ -49,6 +52,8 @@ import {
   isComplete,
   isWon,
   newNet,
+  refill,
+  roleNames,
   setSelector,
   wallColumn,
   wantsRegretVoice,
@@ -287,6 +292,7 @@ export interface NetProbe {
   readonly pendingRelease: number;
 }
 
+
 const PROBES = new WeakMap<Scene, () => NetProbe | null>();
 
 /** Fenêtre sur une scène de muraille (tests) ; null avant l'entrée. */
@@ -320,6 +326,8 @@ export function createNetScene(): Scene {
   const selectorFeatures: (Feature | null)[] = [null, null, null];
   const tileFeatures = new Map<number, Feature>();
   let wallFeature: Feature | null = null;
+  /** Fond de l'écran (recopié à chaque recomposition) : le bandeau de la touche `L` y est dessiné pour rester affiché. */
+  let background: Surface | null = null;
 
   // Variables d'état de l'original (entre parenthèses).
   /** Tir en cours (`[8b8c]`) et dernier tir pas encore réglé (`[8ba6]`) ; clics bloqués (`[89e0]`) ; fin du tir : horodatage (`[8bae]`). */
@@ -510,6 +518,37 @@ export function createNetScene(): Scene {
       flash(SCRB.buttonHint);
     }
     lastMiss = false;
+  }
+
+  // ------------------------------------------------------------------------------------------------------------------------
+  // Touches du mode de test (`1120:10cd`, table `CS:1151`, actives si `[a43f]`)
+
+  /**
+   * Quatre touches (sûr, table lue dans l'exécutable) : espace `111f`, `L` et `l` `1115` (puis `1f2d`), `F1` `110b` (l'aide vocale, traitée par `kit.key`).
+   */
+  function testHandlers(): Readonly<Record<number, () => boolean | void>> {
+    return { 0x20: refillAmmo, 0x4c: showRoles, 0x6c: showRoles };
+  }
+
+  /**
+   * Espace (`1120:111f`) : munitions et tas de la bulle remis à neuf ; si le jeu était arrêté faute de munitions, il repart (`[8b6c] = 0`, `[8b50]++` : le rechargement
+   * du Tick, `reload`).
+   */
+  function refillAmmo(): void {
+    const s = state!;
+    const restart = refill(s);
+    bubbleLevel = Math.max(0, MUD_TOTAL - s.ammo);
+    if (restart && !gone) reload();
+  }
+
+  /** `L` (`1120:1f2d`) : les trois noms des rôles tirés à l'entrée dans un bandeau en haut à droite, dessiné sur le fond (il reste tant que l'écran dure). */
+  function showRoles(): void {
+    const screen = background;
+    if (!screen) return;
+    // Bandeau `DS:1a0a` (gauche `1a12`, droite `1a1a`) : noms des rôles `[89cc]`, `[89ce]`, `[89d0]`.
+    drawDebugBanner(ctx, screen, roleNames(state!));
+    features.invalidate();
+    ctx.requestPresent();
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -868,7 +907,7 @@ export function createNetScene(): Scene {
       statuses = party.map(() => "queue" as Status);
       leverSlots = [0, 1, 2].map(() => ({ member: -1, ready: false }));
 
-      openScreen(ctx, archive, { background: BACKGROUNDS[chosen]! });
+      background = openScreen(ctx, archive, { background: BACKGROUNDS[chosen]! });
       features = ctx.services.get(FEATURES);
       // Groupes de formes et plages de scripts (`1120:0000`).
       features.defineGroup(0, 7000, true);
@@ -992,7 +1031,7 @@ export function createNetScene(): Scene {
       if (!kit || kit.left) return false;
       if (event.ctrl || event.alt) return false;
       if (c.services.tryGet(DIALOG)?.isOpen) return false;
-      return kit.key(event);
+      return kit.key(event) || kit.testKey(event, testHandlers());
     },
   };
   return scene;

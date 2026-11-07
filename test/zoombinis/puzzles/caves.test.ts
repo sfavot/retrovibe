@@ -8,6 +8,7 @@ import { FEATURES } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
+import { ZOOMBINIS_TEXT } from "../../../src/games/zoombinis/engine/text";
 import {
   FLOOR_RECTS,
   HIEROGLYPH_X,
@@ -21,6 +22,7 @@ import {
   SLOT_IDLE_VARIANT,
   SORT_ROWS,
   WAITING_PLACES,
+  clearSlots,
   createCaves,
   drawHints,
   drawRule,
@@ -29,10 +31,13 @@ import {
   layoutSlots,
   lionAtLast,
   lionLimit,
+  lionRestScript,
   lostCount,
   onFloor,
   placeMember,
   regretVoiceDue,
+  relayout,
+  resetCaves,
   robot,
   savedMembers,
   slotFits,
@@ -360,6 +365,100 @@ const setLevel = (level: number) => (game: GameState) => (game.levels = [level, 
 function party(count: number): Zoombini[] {
   return Array.from({ length: count }, (_, i) => makeZoombini([1 + (i % 5), 1 + (Math.floor(i / 5) % 5), 1 + ((i * 2) % 5), 1 + ((i * 3) % 5)], i + 1));
 }
+
+describe("sphinx : mode de test, règles (10c8:27d7, 10c8:299c, 10c8:2b46)", () => {
+  /** Pose tout le groupe à son bon emplacement (le robot), sans rejet. */
+  function placed(level: CavesLevel, seed: number, size = 16) {
+    const rng = new MsvcRandom(seed);
+    const state = createCaves(rng, level, group(size, seed));
+    robot(state).forEach((slot, member) => placeMember(state, rng, member, slot));
+    expect(state.placed).toBe(size);
+    return { state, rng };
+  }
+
+  it("F5 à F8 : l'attribut A est fixé, B passe au suivant s'il est le même ; les posés restent posés sur une dalle valable, la permutation ne change pas", () => {
+    for (const seed of SEEDS) {
+      for (const level of LEVELS) {
+        for (let attr = 0; attr < 4; attr++) {
+          const { state, rng } = placed(level, seed);
+          const orders = [state.rule.orderA, state.rule.orderB].map((o) => [...o]);
+          const attrB = state.rule.attrB;
+          relayout(state, rng, attr);
+          expect(state.rule.attrA).toBe(attr);
+          expect(state.rule.attrB).toBe(attrB === attr ? (attr + 1) % 4 : attrB);
+          expect([state.rule.orderA, state.rule.orderB]).toEqual(orders);
+          expect(state.placed).toBe(16);
+          expect(state.layout).toEqual(layoutSlots(state.rule, level, state.attrs));
+          // Chaque posé occupe une dalle libre qui lui convient (sinon `slotFits` refuserait), une seule fois.
+          const slots = state.slotOf.slice();
+          expect(new Set(slots).size).toBe(16);
+          slots.forEach((slot, member) => {
+            expect(slot).toBeGreaterThanOrEqual(state.layout.first);
+            expect(state.occupant[slot]).toBe(member);
+            const a = state.attrs[member]!;
+            expect(state.layout.needA[slot]).toBe(a[state.rule.attrA]);
+            if (state.rows > 1) expect(state.layout.needB[slot]).toBe(a[state.rule.attrB]);
+          });
+          expect(state.hints).toHaveLength([5, 2, 4, 0][level]!);
+        }
+      }
+    }
+  });
+
+  it("un Zoombini dont la dalle convient encore n'est pas déplacé ; les autres le sont (déplacements renvoyés)", () => {
+    const { state, rng } = placed(1, 7);
+    const before = state.slotOf.slice();
+    const moves = relayout(state, rng);
+    expect(moves).toEqual([]);
+    expect(state.slotOf).toEqual(before);
+    const moved = relayout(state, rng, (state.rule.attrA + 1) % 4);
+    for (const move of moved) {
+      expect(before[move.member]).toBe(move.from);
+      expect(state.slotOf[move.member]).toBe(move.to);
+      expect(move.to).not.toBe(move.from);
+    }
+    expect(moved.length).toBeGreaterThan(0);
+  });
+
+  it("touches 1 à 4 : le niveau change les lignes de tri et les indices, pas les paramètres du lion (qui suivent Espace)", () => {
+    const { state, rng } = placed(0, 42);
+    state.level = 3;
+    relayout(state, rng);
+    expect(state.rows).toBe(2);
+    expect(state.hints).toEqual([]);
+    expect(lionLimit(state)).toBe(LION_STEPS[0]);
+    expect(wakeLion(state)).toBe(LION_BASE_SCRIPT[0] + 1);
+    state.level = 1;
+    relayout(state, rng);
+    expect(state.rows).toBe(1);
+    expect(state.hints).toHaveLength(2);
+    // Espace : compteurs à zéro, une ligne de tri, lion du niveau courant ; les dalles occupées ne bougent pas.
+    const slots = state.slotOf.slice();
+    resetCaves(state);
+    expect(state.placed).toBe(0);
+    expect(state.lion).toBe(0);
+    expect(state.rows).toBe(1);
+    expect(lionLimit(state)).toBe(LION_STEPS[1]);
+    expect(lionRestScript(state)).toBe(LION_BASE_SCRIPT[1] - 1);
+    expect(state.slotOf).toEqual(slots);
+  });
+
+  it("script de repos du lion : base − 1, mais jamais sous 6003", () => {
+    expect(LEVELS.map((level) => lionRestScript({ lionLevel: level } as never))).toEqual([6005, 6004, 6003, 6003]);
+  });
+
+  it("F3 : toutes les dalles redeviennent libres, plus personne n'est posé, compteurs remis à zéro", () => {
+    const { state } = placed(2, 5, 6);
+    state.lion = 2;
+    const posed = clearSlots(state);
+    expect(posed).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(state.occupant.every((m) => m === -1)).toBe(true);
+    expect(state.slotOf.every((s) => s === 0)).toBe(true);
+    expect(state.placed).toBe(0);
+    expect(state.lion).toBe(0);
+    expect(goEnabled(state)).toBe(false);
+  });
+});
 
 describe.skipIf(!original.has)("sphinx : écran sur les vrais fichiers (CAVES.MHK)", () => {
   async function start(setup?: (game: GameState, session: Session) => void, size = 16) {
@@ -836,6 +935,109 @@ describe.skipIf(!original.has)("sphinx : écran sur les vrais fichiers (CAVES.MH
     for (let id = 13000; id <= 13004; id++) expect(parseScrs(archive.get("SCRS", id)).images.length).toBeGreaterThan(5);
     // Les hiéroglyphes : 20 images, `REGS` 200 / 201 pour 20 emplacements.
     expect(archive.ids("REGS")).toContain(201);
+  });
+
+  describe("touches du mode de test (`10c8:1cf5`)", () => {
+    const startTest = async (on: boolean, size = 16) => {
+      const env = await start((game) => void (game.options.testMode = on), size);
+      const lines: string[] = [];
+      const text = env.engine.services.get(ZOOMBINIS_TEXT);
+      const draw = text.drawText.bind(text);
+      vi.spyOn(text, "drawText").mockImplementation((surface, font, value, ...rest) => {
+        lines.push(value);
+        return draw(surface, font, value, ...rest);
+      });
+      const press = async (code: string, key: string) => {
+        env.host.press(code, { key });
+        await env.wait(3);
+      };
+      /** Pose un Zoombini sur sa bonne dalle ; renvoie son indice. */
+      const placeOne = async () => {
+        const index = env.byFront()[0]!;
+        await env.drag(index, env.anchor(env.rightSlot(index)));
+        expect(env.state().slotOf[index]).not.toBe(0);
+        return index;
+      };
+      return { ...env, lines, press, placeOne };
+    };
+
+    it("hors du mode de test, aucune touche n'agit (ni L, ni 1 à 4, ni Espace, ni F2 à F8)", async () => {
+      const t = await startTest(false);
+      const index = await t.placeOne();
+      const before = JSON.stringify([t.state().rule, t.state().level, t.state().lionLevel, t.state().slotOf, t.state().hints, t.state().placed]);
+      for (const [code, key] of [["KeyL", "L"], ["Digit4", "4"], ["Space", " "], ["F2", "F2"], ["F3", "F3"], ["F4", "F4"], ["F5", "F5"], ["F6", "F6"], ["F7", "F7"], ["F8", "F8"]] as const) await t.press(code, key);
+      expect(JSON.stringify([t.state().rule, t.state().level, t.state().lionLevel, t.state().slotOf, t.state().hints, t.state().placed])).toBe(before);
+      expect(t.state().slotOf[index]).not.toBe(0);
+      expect(t.lines.filter((l) => /Level/.test(l))).toEqual([]);
+      expect(t.probe().kit.goEnabled).toBe(true);
+    });
+
+    it("L affiche « Level n » ; F2 et F4 sont consommées sans effet", async () => {
+      const t = await startTest(true);
+      const before = JSON.stringify([t.state().rule, t.state().slotOf, t.state().hints]);
+      await t.press("KeyL", "L");
+      expect(t.lines).toContain("Level 1 ");
+      await t.press("F2", "F2");
+      await t.press("F4", "F4");
+      expect(JSON.stringify([t.state().rule, t.state().slotOf, t.state().hints])).toBe(before);
+    });
+
+    it("F5 à F8 : attribut A, les posés sont reposés sur une dalle valable (position et propriétaire de dalle compris)", async () => {
+      const t = await startTest(true);
+      const index = await t.placeOne();
+      const oldSlot = t.state().slotOf[index]!;
+      const attr = (t.state().rule.attrA + 1) % 4;
+      await t.press(`F${5 + attr}`, `F${5 + attr}`);
+      expect(t.state().rule.attrA).toBe(attr);
+      expect(t.state().rule.attrB).not.toBe(attr);
+      const slot = t.state().slotOf[index]!;
+      expect(slot).not.toBe(0);
+      expect(slotFits(t.state(), slot, index) || t.state().occupant[slot] === index).toBe(true);
+      expect(t.state().placed).toBe(1);
+      const member = t.probe().kit.members[index]!;
+      expect(member.target).toBe(t.probe().slots[slot]);
+      expect(t.probe().slots[slot]!.owner).toBe(member);
+      expect(member.snoid.position).toEqual({ x: SLOT_ANCHORS[slot - 1]!.x, y: SLOT_ANCHORS[slot - 1]!.y });
+      if (slot !== oldSlot) expect(t.probe().slots[oldSlot]!.owner).toBeNull();
+    });
+
+    it("1 à 4 : niveau, lignes de tri et indices changent, le lion garde ses paramètres ; Espace les remet au niveau courant, lion au repos et compteurs à zéro", async () => {
+      const t = await startTest(true);
+      await t.placeOne();
+      await t.press("Digit4", "4");
+      expect(t.state().level).toBe(3);
+      expect(t.state().rows).toBe(2);
+      expect(t.state().hints).toHaveLength(0);
+      expect(t.lines).toContain("Level 4 ");
+      expect(lionLimit(t.state())).toBe(LION_STEPS[0]);
+      expect(t.state().placed).toBe(1);
+      await t.press("Digit2", "2");
+      expect(t.state().rows).toBe(1);
+      expect(t.state().hints).toHaveLength(2);
+      t.state().lion = 2;
+      await t.press("Space", " ");
+      expect(t.state().placed).toBe(0);
+      expect(t.state().lion).toBe(0);
+      expect(lionLimit(t.state())).toBe(LION_STEPS[1]);
+      expect(t.probe().lionScript).toBe(LION_BASE_SCRIPT[1] - 1);
+      expect(t.probe().locked).toBe(false);
+    });
+
+    it("F3 : les dalles sont libres, « go » grisé, les Zoombinis debout reviennent sur les places d'attente dans l'ordre", async () => {
+      const t = await startTest(true);
+      const index = await t.placeOne();
+      const stray = t.byFront()[0]!;
+      const member = t.probe().kit.members[stray]!;
+      member.snoid.moveTo({ x: 100, y: 100 });
+      await t.press("F3", "F3");
+      expect(t.state().slotOf.every((s) => s === 0)).toBe(true);
+      expect(t.state().placed).toBe(0);
+      expect(t.probe().slots.every((slot) => !slot || slot.owner === null)).toBe(true);
+      expect(t.probe().kit.goEnabled).toBe(false);
+      const standing = t.probe().kit.members.filter((m) => m.index !== index);
+      standing.forEach((m, i) => expect(m.snoid.position).toEqual(WAITING_PLACES[i]));
+      expect(t.probe().kit.waitingPlaces[0]!.owner).toBe(standing[0]);
+    });
   });
 
   it("F1 rejoue la voix d'introduction (20065) ; le bouton carte demande l'avertissement", async () => {

@@ -295,8 +295,8 @@ But : remplacer les 12 épreuves provisoires par les vraies, fidèles aux étude
   - ceux qui faussent le résultat d'une partie sont à trancher (voir « Décisions à prendre ») ;
   - tout écart est noté dans l'étude et dans `engine-ts.md`.
 - **Hors périmètre** :
-  - touches de mise au point des épreuves en mode de test (`DS:731a`, `10c8:2d1c`… ; le mode lui-même et ses touches globales et de la carte sont portés, dernier lot),
-    restes de développement (`SCRB` et `REGS` non référencés) ;
+  - restes de développement (`SCRB` et `REGS` non référencés) ; les touches de mise au point des épreuves en mode de test sont portées depuis (dernier lot, sauf
+    l'incrustation `10c8:2d1c` des grottes et la ville `1188:1380`) ;
   - souris aimantée (sans effet, comme en G) ;
   - tactile complet : fait en vague J.
 

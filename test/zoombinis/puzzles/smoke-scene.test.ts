@@ -7,6 +7,7 @@ import { FEATURES } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
+import { ZOOMBINIS_TEXT } from "../../../src/games/zoombinis/engine/text";
 import { isFinished, robotPlan, transform, type SmokeState } from "../../../src/games/zoombinis/game/puzzles/smoke";
 import { nextScreen } from "../../../src/games/zoombinis/game/route";
 import { makeZoombini, type GameState, type Session, type Zoombini } from "../../../src/games/zoombinis/game/state";
@@ -662,6 +663,40 @@ describe.skipIf(!original.has)("cristal : écran sur les vrais fichiers (SMOKE.M
     await dragPoint(probe().crystalAt(4)!, probe().casePoint("left", 0));
     expect(state().left).toEqual([4, 1, 3]);
   }, 60_000);
+
+  it("touches du mode de test (`1158:2504`) : L affiche le niveau, F4 / F5 règlent `[950a]` ; sans effet hors du mode de test", async () => {
+    const testMode = async (on: boolean) => {
+      const env = await start(3, 4, (game) => void (game.options.testMode = on));
+      const lines: string[] = [];
+      const text = env.engine.services.get(ZOOMBINIS_TEXT);
+      const draw = text.drawText.bind(text);
+      vi.spyOn(text, "drawText").mockImplementation((surface, font, value, ...rest) => {
+        lines.push(value);
+        return draw(surface, font, value, ...rest);
+      });
+      return { ...env, lines };
+    };
+    const off = await testMode(false);
+    for (const [code, key] of [["KeyL", "L"], ["F4", "F4"], ["Space", " "]] as const) off.host.press(code, { key });
+    await off.wait(4);
+    expect(off.state().keepShelves).toBe(false);
+    expect(off.lines.filter((l) => /Level|Cheat/.test(l))).toEqual([]);
+
+    const on = await testMode(true);
+    on.host.press("KeyL", { key: "L" });
+    await on.wait(2);
+    expect(on.lines).toContain("Level 3 ");
+    on.host.press("Space", { key: " " });
+    await on.wait(2);
+    expect(on.state().keepShelves).toBe(false);
+    on.host.press("F4", { key: "F4" });
+    await on.wait(2);
+    expect(on.state().keepShelves).toBe(true);
+    expect(on.lines).toContain(" Cheat on ");
+    on.host.press("F5", { key: "F5" });
+    await on.wait(2);
+    expect(on.state().keepShelves).toBe(false);
+  });
 
   it("F1 rejoue la voix d'introduction ; le bouton carte demande l'avertissement", async () => {
     const { host, engine, wait, dialog, queued, probe } = await start(1);

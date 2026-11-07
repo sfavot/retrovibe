@@ -147,6 +147,8 @@ export interface SmokeState {
   target2: Attrs | null;
   /** Étagère (1 à 6) de chaque cristal (`[94dc + 2n]`, permutation tirée par `236b`). */
   shelf: number[];
+  /** Mode de test (touche F4, `[950a]`) : le levier « nouveau tirage » laisse les étagères dans l'ordre (`1158:236b` ne les mélange pas). F5 le remet à faux. */
+  keepShelves: boolean;
   /** Cristaux posés (numéros 1 à 6), de gauche à droite sur la voie. */
   left: number[];
   right: number[];
@@ -535,6 +537,7 @@ function blankState(level: SmokeLevel, members: readonly Attrs[]): SmokeState {
     target: [0, 0, 0, 0],
     target2: null,
     shelf: [0, 1, 2, 3, 4, 5, 6],
+    keepShelves: false,
     left: [],
     right: [],
     second: false,
@@ -778,14 +781,17 @@ export function newRound(s: SmokeState, rng: MsvcRandom, bugMissingB = false): b
     s.silhouette = null;
     s.current = null;
   } else {
-    const pool = newPool();
-    let max = 6;
+    // `1158:236b` : étagères dans l'ordre, puis mélangées sauf en mode de test avec `[950a]` (touche F4), sans tirage.
     const shelf = [0, 1, 2, 3, 4, 5, 6];
-    for (let n = 1; n < 7; n++) {
-      const idx = rng.range(1, max);
-      shelf[n] = pool[idx]!;
-      removeFromPool(pool, idx, max);
-      max--;
+    if (!s.keepShelves) {
+      const pool = newPool();
+      let max = 6;
+      for (let n = 1; n < 7; n++) {
+        const idx = rng.range(1, max);
+        shelf[n] = pool[idx]!;
+        removeFromPool(pool, idx, max);
+        max--;
+      }
     }
     s.shelf = shelf;
     fillCrystals(rng, s, bugMissingB);

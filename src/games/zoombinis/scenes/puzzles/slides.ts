@@ -166,6 +166,8 @@ class SlidesRun implements SlidesProbe {
   private danced = 0;
   private lastDance = 0;
   private lastCycle = 0;
+  /** `DS:9c7e` : avancement de la saisie de la séquence du mode de test (0 à 5, remis à 0 à l'entrée). */
+  private cheat = 0;
   private departures: { at: number; member: KitMember }[] = [];
   private departed = 0;
   private arrivedCount = 0;
@@ -684,6 +686,72 @@ class SlidesRun implements SlidesProbe {
     snoid.walkTo(far, map);
   }
 
+  // ------------------------------------------------------------------------------------------------------------------------
+  // Touches du mode de test (`1170:1740`, table `CS:1810`)
+
+  /**
+   * Touches `s`, `o`, `v`, `l`, `e` dans cet ordre (`DS:9c7e` : chaque lettre n'avance que si la précédente a été saisie, les autres touches ne remettent rien à
+   * zéro). La dernière, au niveau 3 seulement, pose la solution du générateur (`1150:3093`) puis recalcule les liaisons (`1170:3dc0`). Toutes consomment la touche.
+   */
+  readonly testKeys: Readonly<Record<number, () => boolean>> = {
+    [0x73]: () => this.advance(0),
+    [0x6f]: () => this.advance(1),
+    [0x76]: () => this.advance(2),
+    [0x6c]: () => this.advance(3),
+    [0x65]: () => this.advance(4),
+  };
+
+  private advance(from: number): boolean {
+    if (this.cheat !== from) return true;
+    this.cheat = from + 1;
+    if (from === 4 && this.level === 3) this.placeSolution();
+    return true;
+  }
+
+  /**
+   * `1150:3093` : chaque membre de la solution (`DS:92c0`, `board.solution`) est posé d'un coup sur son emplacement, puis les liaisons sont recalculées (`apply`,
+   * `1170:3dc0`). **Écarts** : (1) la solution du générateur du port laisse parfois un membre sans emplacement (la solution de l'original contient tout le groupe) :
+   * il est posé sur l'emplacement resté libre, comme le repli du robot ; (2) l'original ne libère ni l'emplacement ni l'attente que le membre occupait (état
+   * incohérent si le plateau était déjà entamé) : ici ils sont libérés, et un membre hors solution qui occupait un emplacement visé retourne à pied sur une position
+   * d'attente. Sans effet pendant un rejet ou après « go ».
+   */
+  private placeSolution(): void {
+    if (this.went || this.busy) return;
+    const target = [...this.board.solution];
+    const left = this.kit.members.map((_, i) => i).filter((i) => !target.includes(i));
+    target.forEach((m, k) => {
+      if (m < 0 && left.length > 0) target[k] = left.shift()!;
+    });
+    const wanted = new Set(target.filter((m) => m >= 0));
+    const release = (member: KitMember): void => {
+      remove(this.play, member.index);
+      for (const spot of [member.target, member.waiting]) if (spot && spot.owner === member) spot.owner = null;
+      member.target = null;
+      member.waiting = null;
+    };
+    target.forEach((m, k) => {
+      if (m < 0 || this.play.seat[k] === m) return;
+      const member = this.kit.members[m];
+      const spot = this.slots[k];
+      if (!member || !spot || this.flying.has(member)) return;
+      const displaced = this.play.seat[k]!;
+      if (displaced >= 0 && displaced !== m) {
+        const other = this.kit.members[displaced]!;
+        release(other);
+        if (!wanted.has(displaced)) this.sendToWaiting(other);
+      }
+      release(member);
+      this.kit.cancelWalk(member);
+      member.snoid.moveTo({ x: spot.x, y: spot.y });
+      member.snoid.idle();
+      this.features.restack(member.snoid.feature, 1 + spot.y / 1000);
+      spot.owner = member;
+      member.target = spot;
+      place(this.play, m, k);
+    });
+    this.apply();
+  }
+
   /** Écran suivant (`DS:8556 ← 5`) : les reliés sont sauvés (`present`), les autres perdus. */
   private complete(): void {
     if (this.finished) return;
@@ -724,6 +792,7 @@ export function createSlidesScene(): SlidesScene {
       if (!run || run.kit.left) return false;
       if (event.ctrl || event.alt) return false;
       if (ctx.services.tryGet(DIALOG)?.isOpen) return false;
+      if (run.kit.testKey(event, run.testKeys)) return true;
       return run.kit.key(event);
     },
   };

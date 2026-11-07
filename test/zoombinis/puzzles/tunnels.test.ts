@@ -5,6 +5,7 @@ import { createZoombinisEngine } from "../../../src/games/zoombinis/engine/engin
 import { FEATURES, FeatureFlag } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { installServices } from "../../../src/games/zoombinis/engine/services";
+import { ZOOMBINIS_TEXT } from "../../../src/games/zoombinis/engine/text";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
 import { bridgeAvoidCount, nextScreen, setBridgeMemory } from "../../../src/games/zoombinis/game/route";
 import {
@@ -305,7 +306,7 @@ const TICK_MS = 17;
 
 describe.skipIf(!original.has)("écran des grottes de passe-clos (TUNNELS.MHK)", () => {
   /** L'épreuve avec un groupe de `size` Zoombinis différents, au niveau `level` de l'étape 1 ; les autres écrans notent leur entrée. */
-  async function start(level: Level = 0, size = 16, seed = 3, setup?: (session: Session) => void) {
+  async function start(level: Level = 0, size = 16, seed = 3, setup?: (session: Session) => void, testMode = false) {
     resetTunnelsVisits();
     const host = new TestHost();
     host.audio.unlock();
@@ -325,6 +326,7 @@ describe.skipIf(!original.has)("écran des grottes de passe-clos (TUNNELS.MHK)",
     zoombinis.game.levels = [level, 0, 0, 0];
     zoombinis.game.options.lessAction = true;
     zoombinis.game.options.magneticMouse = false;
+    zoombinis.game.options.testMode = testMode;
     zoombinis.session.screen = S.tunnels;
     setup?.(zoombinis.session);
     engine.start(S.tunnels);
@@ -642,5 +644,140 @@ describe.skipIf(!original.has)("écran des grottes de passe-clos (TUNNELS.MHK)",
     // Le Zoombini est arrivé, la file n'est libérée qu'à la fin de la réaction du gardien (première réussite de l'entrée).
     expect(scene.debug.busy || scene.debug.queueLength === 0).toBe(true);
     await until(() => !scene.debug.busy && scene.debug.queueLength === 0);
+  });
+
+  describe("touches du mode de test (1190:1199)", () => {
+    /** L'épreuve en mode de test (ou non), les textes dessinés et les scripts lancés notés, la voix d'introduction finie. */
+    const startKeys = async (testMode: boolean, level: Level = 0, seed = 3) => {
+      const env = await start(level, 16, seed, undefined, testMode);
+      const lines: string[] = [];
+      const text = env.engine.services.get(ZOOMBINIS_TEXT);
+      const draw = text.drawText.bind(text);
+      vi.spyOn(text, "drawText").mockImplementation((surface, font, value, ...rest) => {
+        lines.push(value);
+        return draw(surface, font, value, ...rest);
+      });
+      const quiet = () => env.until(() => !env.scene.debug.busy && env.scene.debug.queueLength === 0);
+      await quiet();
+      const started: number[] = [];
+      const set = env.features.setScript.bind(env.features);
+      vi.spyOn(env.features, "setScript").mockImplementation((feature, id, play) => {
+        // Les scripts des gardiens seulement (4000 à 4699).
+        if ((id ?? 0) >= 4000 && (id ?? 0) < 4700) started.push(id ?? 0);
+        return set(feature, id, play);
+      });
+      const press = async (key: string) => {
+        env.host.press(`Key${key.toUpperCase()}`, { key });
+        await env.ticks(3);
+      };
+      const guard = (script: number) => env.features.features.some((f) => f.depth === 0.3 && f.scriptId === script);
+      return { ...env, lines, started, quiet, press, guard };
+    };
+    const pillarLines = (lines: string[]) => lines.filter((l) => l.startsWith("SCRB id:"));
+
+    it("hors du mode de test, aucune touche n'agit (ni a, C, F, I, O, H, W, w, t, T, e)", async () => {
+      const t = await startKeys(false, 1);
+      for (const key of "aCFIOHWwtTe") await t.press(key);
+      await ticks3(t);
+      expect(t.lines.filter((l) => /accept|SCRB id/.test(l))).toEqual([]);
+      expect(t.started).toEqual([]);
+      expect(t.scene.debug.queueLength).toBe(0);
+    });
+
+    const ticks3 = (t: { ticks: (n: number) => Promise<void> }) => t.ticks(3);
+
+    it.each([
+      [0, 1],
+      [0, 2],
+      [0, 5],
+      [1, 1],
+      [1, 2],
+      [1, 3],
+      [2, 4],
+      [3, 6],
+    ] as const)("a : message d'après le nombre de règles et leurs sens (niveau %i, graine %i)", async (level, seed) => {
+      const t = await startKeys(true, level, seed);
+      const [first, second] = t.rules().rules;
+      const expected =
+        t.rules().rules.length === 1
+          ? first!.w
+            ? "Left accepts:"
+            : "Right accepts:"
+          : first!.w
+            ? second!.w
+              ? "Left / Top accept:"
+              : "Left / Bottom accept:"
+            : second!.w
+              ? "Right / Top accept:"
+              : "Right / Bottom accept:";
+      await t.press("a");
+      expect(t.lines).toContain(expected);
+    });
+
+    it("C, F, I, O font défiler les scripts d'un gardien avec le compteur partagé ; « SCRB id: » le dit ; la série repart au début", async () => {
+      const t = await startKeys(true);
+      await t.press("C");
+      expect(pillarLines(t.lines)).toEqual(["SCRB id: 4000"]);
+      expect(t.guard(4000)).toBe(true);
+      await t.press("C");
+      expect(t.guard(4001)).toBe(true);
+      // Le compteur est partagé : 4002 est hors de la série de F (4200 à 4226), elle commence à son début ; puis I, O de même.
+      await t.press("F");
+      expect(t.guard(4200)).toBe(true);
+      await t.press("I");
+      expect(t.guard(4400)).toBe(true);
+      await t.press("O");
+      expect(t.guard(4600)).toBe(true);
+      await t.press("O");
+      expect(t.guard(4601)).toBe(true);
+      expect(pillarLines(t.lines)).toEqual(["SCRB id: 4000", "SCRB id: 4001", "SCRB id: 4200", "SCRB id: 4400", "SCRB id: 4600", "SCRB id: 4601"]);
+      // Fin de série : 4617 puis retour à 4600.
+      for (let n = 2; n < 19; n++) await t.press("O");
+      expect(pillarLines(t.lines).slice(-2)).toEqual(["SCRB id: 4617", "SCRB id: 4600"]);
+    });
+
+    it("H ajoute quatre animations de victoire : un Zoombini arrivé danse, ce que rien ne fait sans elle", async () => {
+      const danced = async (key: string | null) => {
+        const t = await startKeys(true);
+        await t.dragTo(0, t.right(0));
+        await t.until(() => t.scene.debug.statusOf(0) === "arrived");
+        await t.quiet();
+        if (key) await t.press(key);
+        for (let n = 0; n < 160; n++) {
+          await t.ticks(2);
+          const id = t.kit().members[0]!.snoid.feature.scriptId;
+          if (id >= 8560 && id <= 8564) return true;
+        }
+        return false;
+      };
+      expect(await danced(null)).toBe(false);
+      expect(await danced("H")).toBe(true);
+    });
+
+    it("w, W, t, T, e mettent chacun une phrase des gardiens en file : introduction, encouragement, effondrement, sortie", async () => {
+      const t = await startKeys(true);
+      const phrases = async (key: string) => {
+        t.started.length = 0;
+        await t.press(key);
+        expect(t.scene.debug.queueLength + (t.scene.debug.busy ? 1 : 0), key).toBeGreaterThan(0);
+        await t.quiet();
+        return t.started.slice();
+      };
+      // Introduction de la première visite (4 variantes), puis après W celle des visites suivantes (8 variantes, scripts disjoints).
+      const first = new Set([4221, 4024, 4025, 4614, 4409]);
+      const later = new Set([4611, 4026, 4224, 4412, 4612, 4613, 4223, 4222, 4410, 4411, 4027, 4028]);
+      for (let n = 0; n < 3; n++) for (const id of await phrases("w")) expect(first.has(id), `w : ${id}`).toBe(true);
+      for (let n = 0; n < 3; n++) for (const id of await phrases("W")) expect(later.has(id), `W : ${id}`).toBe(true);
+      // `w` ensuite reste une introduction des visites suivantes (`a18e` reste à 1).
+      for (const id of await phrases("w")) expect(later.has(id), `w après W : ${id}`).toBe(true);
+      for (const id of await phrases("T")) expect([4420, 4421, 4422], `T : ${id}`).toContain(id);
+      // Personne n'est sauvé : phrases de sortie « avec des perdus » (9 variantes).
+      const some = [4225, 4226, 4615, 4616, 4034, 4036, 4037, 4032, 4033];
+      for (const id of await phrases("e")) expect(some, `e : ${id}`).toContain(id);
+      const encouragement = await phrases("t");
+      expect(encouragement.length).toBeGreaterThan(0);
+      // Aucune de ces touches ne change la file de décisions des Zoombinis ni le budget.
+      expect(t.scene.debug.state!.budget).toBe(ERROR_BUDGETS[0]);
+    });
   });
 });

@@ -22,7 +22,7 @@ Pièges de lecture propres à cette étude : la décompilation Ghidra affiche be
 | Dans l'original | « Lion's Lair » (souvenir, **hypothèse**) |
 | Callbacks hors corpus Ghidra | `10c8:1137` (événements des dalles et du Zoombini, créée), `10c8:1245` (événements du lion, non créée : lue avec un script jetable), `10c8:18c7` / `10c8:18d3` (deux petits stubs qui appellent `10c8:18df` avec la rangée de hiéroglyphes), `10c8:1a1f` / `10c8:1ad0` et `10c8:1846` / `10c8:1864` (rappels de redessin) |
 
-Le **Key** `10c8:1cf5` n'agit que si `[a43f]` (mode de débogage) est non nul ou si la touche est `0x16f` : table de 14 touches à `1530:1eff` (relance des tirages `10c8:27d7`, affichage de débogage `10c8:2d1c`…). **Aucune touche n'a d'effet en jeu normal** (sûr ; la table n'a pas été détaillée).
+Le **Key** `10c8:1cf5` n'agit que si `[a43f]` (mode de test) est non nul ou si la touche est `0x16f` (F1) : table de 14 touches à `1530:1eff` (clés) et `+0x1c` (cibles, lues dans le segment). **Aucune touche n'a d'effet en jeu normal** hors F1 (sûr). Détail et port : §2.7.
 
 Ressources utilisées (sûr, d'après `10c8:0000`, `10c8:1afe`) :
 
@@ -115,6 +115,30 @@ Le glisser-déposer est `1168:1742`. `[0c18] = 1168:166e()` donne la dalle dépo
 - **Bouton « go » (`10c8:130f` cas 2)** : actif si `[0bf0] ≠ 0` (au moins un posé). Séquence : si `[7100] == 0` alors `[70fe] = 1` et `[0bf8] = 1` ; flash du bouton (`10c8:1799`) ; `1168:3ead()` (tous les Zoombinis dans une case de dépôt `[02f0 + 2i]` reçoivent `+0x127 = 1`) ; `[8556] = 0x11` (écran suivant : Smoke). Le Tick lance alors l'éveil final du lion (§4.2).
 - **Bouton « carte » (cas 1)** : son 999, flash, `[9704] = 1`, `[8556] = 1`, `11a0:16da()` (même sortie par `1198` que les autres épreuves ; la confirmation « ce groupe sera perdu » est celle de `screens.md` §3.4, hors de cette épreuve).
 
+### 2.7 Touches du mode de test (`10c8:1cf5`, `[a43f]`)
+
+Table lue dans le segment de code (clés `CS:1eff`, cibles `CS:1f1b`), cibles décodées à la main (le désassemblage de corpus ne couvre pas ces blocs). Les touches sont des codes `WM_CHAR` (minuscules non repliées : `L` seulement en majuscule) ou `F1`… = 0x16f… . Toutes renvoient 1 (touche consommée). Confiance **sûr** (octets lus) ; l'interprétation des variables : **sûr** sauf mention.
+
+| Touche | Code | Cible | Effet | Port |
+|---|---:|---|---|---|
+| Espace | `0x20` | `1db5` | `10c8:299c` : `10c8:1f37([7106])` (compteurs `[0c16]` posés, `[0c0c]` cran du lion, `[7102]`, `[0bf8]` verrou, `[70fe]`, `[7100]` à 0 ; `[0bfc] = 1` ; `[0c0a]` / `[0c08]` du niveau `[7106]`), puis la tête du lion `[7232]` reprend le script `[0c08]` (`[0c08] − 1` dès 6004) | `resetCaves` + `lionRestScript` ; les dalles occupées ne sont pas touchées (comme l'original) |
+| `1` à `4` | `0x31`…`0x34` | `1d7b` | `[7106] = n` ; `10c8:27d7(−1)` (nouvelle disposition, ci-dessous) ; `10c8:1a8b(1)` (redessin des hiéroglyphes) ; `10c8:2d1c` seulement si `[0c22] ≠ 0` (jamais vrai : `[0c22]` n'est écrit qu'à 0) ; message « Level n » | `relayout` ; `showDebugLine("Level n ")` |
+| `L` | `0x4c` | `1d9d` | message « Level n » (`"Level x "` dont le `x` devient `"01234"[[7106]]`) | `showDebugLine` |
+| F1 | `0x16f` | `1e31` | aide vocale (`11a0:155e` si `[7106] < 4`) | kit (inchangé) |
+| F2, F4 | `0x170`, `0x172` | `1dc0`, `1dd0` | rien (cible vide, renvoie 1) | consommées, sans effet |
+| F3 | `0x171` | `1dc6` | `10c8:2b46` : les Zoombinis dont les drapeaux valent exactement 1 (donc pas posés) retournent sur les places d'attente `DS:0d62` dans l'ordre ; `[717a + 2s] = 0` et `[02ee + 2s] = 0` pour toutes les dalles ; `10c8:299c` ; `[0bf0] = [0bf2] = [0bf8] = [70fe] = [0c16] = 0` (« go » grisé) | `clearSlots`, scène `sendBack` |
+| F5 à F8 | `0x173`…`0x176` | `1dd5`, `1dec`, `1e03`, `1e1a` | `10c8:27d7(0…3)` : attribut A `[7108] = 0…3` (si `[710a] == [7108]`, `[710a]++`, 0 après 3) ; `10c8:2d1c` ; `10c8:1a8b(1)` | `relayout(attrA)` ; `2d1c` non porté |
+
+`10c8:27d7(n)` : (1) A et B comme ci-dessus si `n ≠ −1` ; (2) copie des occupants `[717a + 2s]` ; `1168:3dd0(0, 1)` (tous « sauvés » pour que `1168:365d` compte tout le groupe) ; `10c8:21c4` (effectifs par valeur ; `[0bfc]` = 1 si `[7106] < 3`, sinon 2) ; `10c8:2508` (valeurs exigées des dalles) ; `1168:3dd0(0, 0)` ; (3) pour chaque dalle occupée par ordre croissant : `10c8:2635(dalle, id)` donne la même dalle si elle convient encore (libre dans la nouvelle table, valeur de A et de B), sinon une dalle libre valable tirée par `04e8(n − 1, 0)` ; le Zoombini est déplacé (`1168:4231(…, 5, …)`), `[717a]` et `[02ee]` mis à jour ; (4) `10c8:2279([7106])` : nouveaux indices (nouveaux tirages) ; redessin. La permutation des valeurs (`[710c…]`, `[7116…]`) ne change pas ; les paramètres du lion (`[0c0a]`, `[0c08]`) ne changent qu'à Espace (`10c8:1f37`).
+
+Écarts du port pour ces touches :
+- l'incrustation `10c8:2d1c` (nom de l'attribut, hiéroglyphes et effectif par valeur, dessinés dans des rectangles locaux) n'est pas dessinée ;
+- le message « Level n » est écrit sur la ligne d'état commune (`showDebugLine`), l'original dessine dans un rectangle local (fond `11e8:3034(…, 0x0b)`) ; texte identique ;
+- les Zoombinis reposés sont posés d'un coup sur la nouvelle dalle (pas de marche `4231` mode 5, ordre de dessin recalculé) ;
+- les marques « sauvé » (`+0x127`) ne sont pas touchées (l'original les remet à 0 par `3dd0(0, 0)` puis les redonne à « go » par `1168:3ead` aux occupants des dalles : même résultat final) ;
+- F3 laisse les Zoombinis posés où ils sont, sans propriétaire de dalle (comme l'original, dont les drapeaux `0x4008001` ≠ 1 les excluent) ;
+- les touches sont ignorées pendant un rejet, une chute ou le départ, et F3 pendant une marche (l'original ne protège rien) ; **robustesse**.
+
 ## 3. Les quatre niveaux (récapitulatif)
 
 Voir §2.1, §2.4 : seuls changent `[0c0a]` (4, 5, 6, 7 rejets tolérés), `[0c08]` (6006, 6005, 6004, 6003 : le script du lion à l'étape `n` est `[0c08] + n`, donc 6007 à 6010 au niveau 1, 6004 à 6010 au niveau 4), le nombre de lignes de tri (1, 1, 2, 2) et les indices (5, 2, 2+2, 0). Le nombre de dalles (`N`) dépend du groupe, pas du niveau. Le dernier script du lion est toujours `SCRB 6010`.
@@ -206,7 +230,7 @@ Rien de propre à l'épreuve. Exit `10c8:0945` : `11b8:00e8(1)`, `11a8:021c` (qu
 4. ~~Une pose correcte déclenche-t-elle un son ?~~ : **tranché en H12**, non, voir §8.2.
 5. Les `SCRB 6000–6012` ne sont pas tous référencés depuis `Enter` (le lion de départ `6003` n'apparaît que par `[0c08]`) ; `SCRS 12000–12003`, `12008–12011`, `tBMP 8000`, `tBMP 8400` et `REGS 202` sont des restes (voir §1).
 6. Comportement si la valeur d'un attribut vaut 0 ou plus de 5 (jamais produit en jeu).
-7. `10c8:2d1c` (affichage de débogage) et la table de touches `DS:1eff` non détaillées.
+7. `10c8:2d1c` (incrustation de débogage) : non détaillée ni portée (voir §2.7). La table de touches est lue (§2.7).
 8. Cohérence du nombre d'exemplaires : au plus 2 Zoombinis identiques dans un groupe (`screens.md` §2.2) ; le tirage n'en dépend pas.
 
 ## 8. Tâche H12 : points tranchés, corrections et écarts du port
@@ -241,6 +265,6 @@ Aucun. La branche « dalle valable » de `10c8:130f` ne contient aucun appel à 
 - **Poussière et rattachement** : la poussière est une feature indépendante ; les objets d'accroche des dalles (script 6000, rappels `10c8:18c7` / `18d3`, `11a8:2a0a`) et `11a8:1f5c` ne sont pas portés.
 - **Pose juste** : le Zoombini est posé d'un coup sur l'ancre (état 4 du kit) puis joue son pas sur place ; la marche de l'original sur la distance de dépôt (au plus 15 pixels) n'est pas portée.
 - **Danse de victoire** : tirage sans remise par `NoRepeatPool` (l'original : `1098:0098` avec le masque `[7238]` et `DS:[2i]`, dont l'indexation est ambiguë) ; **probable**.
-- **Éclat du niveau 1** non porté ; l'attente de la fin du son 996 avant la sortie est portée (`caves.ts`, `leave`). Touches de débogage : non portées.
+- **Éclat du niveau 1** non porté ; l'attente de la fin du son 996 avant la sortie est portée (`caves.ts`, `leave`). Touches du mode de test : portées, sauf l'incrustation `10c8:2d1c` (§2.7).
 - **Aucun texte** : les consignes sont des voix de l'original ; aucune copy à valider.
 

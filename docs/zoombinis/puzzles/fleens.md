@@ -26,7 +26,7 @@ Les routines de rappel de cet écran (`10e0:0578`, `20ec`, `227e`, `2a06`, `2acb
 | Enter | `10e0:00ea` | 993 octets ; ouvre l'archive (chaîne `1530:120a`, handle `[7378]`), crée la scène |
 | Exit | `10e0:0600` | libère ; ne fait rien si `[737c]` = 0 (écran jamais complètement entré) |
 | Tick | `10e0:06a8` | protégé par `[1200]` (réentrance) et `[737c]` |
-| Key | `10e0:0def` | seulement en mode de test (`[a43f]`) : touches `L` / `l` (code 0x4c / 0x6c) → `1198:03cf(niveau+1)` ; code `0x16f` → `11a0:155e` (toujours) |
+| Key | `10e0:0def` | seulement en mode de test (`[a43f]`) : touches `L` / `l` (codes 0x4c et 0x6c, sans repli a-z) → `1198:03cf(DS:7370 + 1, 0, 0, 0, 0)` = ligne d'état « Level N+1 » (texte par défaut « Level », **sûr**) ; **elles ne changent pas le niveau**. Code `0x16f` → `11a0:155e` (toujours, sans condition d'état). Porté : `FleensRun.testKey` (`kit.testKey`). Aucune autre touche (**sûr**, handler de 100 octets). |
 | Clic (région 1 « carte », 2 « Go », 3 « scène ») | `10e0:0ae5(n)` | pointeur en `DS:1198` du bloc de régions `DS:1190` |
 | Initialisation des variables | `10e0:0000` | 234 octets, appelée par Enter |
 | Hook de dessin des parties de nizibooms | `10e0:0e54` | dessin des 6 parties d'un objet « Fleen » (tBMP 4000) |

@@ -30,9 +30,11 @@
  *  - un groupe d'un seul Zoombini n'a pas de `SCRS` 7005 + pieds : la clôture est lancée à la fin de son parcours (7041 + pieds) ; **probable** ;
  *  - le « 20036 / `0x4e44` » des études n'est pas une voix mais l'étiquette de type `SND` de `1028:0d9e(996, SND)` (« le son de « Go » joue-t-il encore ? ») : le kit attend déjà la fin des sons avant l'écran suivant ; départ : tous les sauvés marchent vers (660, 357) (`SCRS` 7021 à 7030 non portés).
  */
+import type { KeyEvent } from "../../../../engine/mohawk/input";
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeaturePart, type Features, type Sheet, createSheet } from "../../engine/features";
 import { ZOOMBINIS_GAME } from "../../engine/game";
+import { showDebugMessage } from "../../engine/shortcuts";
 import type { Scene, SceneContext } from "../../engine/scene";
 import { DIALOG } from "../../engine/dialog";
 import { screenInfo } from "../../data/archives";
@@ -768,6 +770,15 @@ class FleensRun implements FleensProbe {
     return true;
   }
 
+  /**
+   * Touches du mode de test (`10e0:0def`, `DS:a43f`) : `L` et `l` (codes 0x4c et 0x6c, sans repli a-z) écrivent « Level » et le niveau + 1 (`1198:03cf(DS:7370 + 1)`) ;
+   * elles ne changent pas le niveau. Aucune condition d'état (`F1` non plus). Renvoie vrai si la touche est consommée.
+   */
+  testKey(event: KeyEvent): boolean {
+    const showLevel = (): void => showDebugMessage(this.ctx, { n: this.level + 1 });
+    return this.kit.testKey(event, { 0x4c: showLevel, 0x6c: showLevel });
+  }
+
   leaveScene(): void {
     this.kit.leave();
   }
@@ -801,7 +812,7 @@ export function createFleensScene(): FleensScene {
       if (!run || run.kit.left) return false;
       if (event.ctrl || event.alt) return false;
       if (ctx.services.tryGet(DIALOG)?.isOpen) return false;
-      return run.kit.key(event);
+      return run.testKey(event) || run.kit.key(event);
     },
   };
 }

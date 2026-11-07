@@ -373,12 +373,24 @@ Le générateur (§3.5) construit la cible n° 8 à partir des tables `S` (versi
 | `9702`, `9704` | | clic « go » en cours ; sortie immédiate autorisée |
 | `9330 + 2k`, `9358 + 2k`, `9380 + 2k` | | wagonnets garés, Zoombinis passés, file d'attente (ids) |
 | `9442…` | `cases` | table de cases (§2.4) |
-| `950a` | | mis à 1 par la touche `0x172` : empêche le mélange des étagères (mise au point) |
+| `950a` | `gardeÉtagères` | mis à 1 par F4 (`0x172`), à 0 par F5 : empêche le mélange des étagères du levier « nouveau tirage » (mode de test, §5.7) |
 | `94b4`, `947a` | | jamais modifiés dans le code lu (0) |
 
 ### 5.7 Touches (`1158:2504`, table `CS:26af`)
 
-Actives seulement si `[a43f] ≠ 0` (mode de mise au point) ou pour `0x16f` : `0x20` et `0x4c` affichent un message de mise au point (`"01234"` indexé par `[93ac]`, `"Level x "`), `0x16f` appelle d'abord `11a0:155e`, `0x172` / `0x173` mettent `[950a]` à 1 / 0. Aucun rôle en jeu normal ; ni `Echap` ni raccourci d'épreuve. **Sûr** pour le code, **hypothèse** pour la correspondance des codes de touches.
+Actives seulement si `[a43f] ≠ 0` (mode de test) ou pour `0x16f` (F1). Table de 5 clés (`CS:26af`) et 5 cibles (`+0xa`), lue dans le segment ; cibles décodées à la main (blocs absents du désassemblage du corpus). Toutes renvoient 1 (touche consommée). Aucun rôle en jeu normal ; ni `Echap` ni raccourci d'épreuve.
+
+| Touche | Code | Cible | Effet | Confiance | Port |
+|---|---:|---|---|---|---|
+| Espace | `0x20` | `25b3` | rien (renvoie 1) ; l'étude précédente la disait affichant un message : **corrigé** | sûr | consommée, sans effet |
+| `L` (majuscule) | `0x4c` | `2589` | message « Level n » : `"Level x "` dont le `x` devient `"01234"[[93ac]]` (`[93ac]` = niveau 1 à 4) | sûr | `showDebugLine` |
+| F1 | `0x16f` | `25e5` | aide vocale `11a0:155e` | sûr | kit (inchangé) |
+| F4 | `0x172` | `25b8` | `[950a] = 1` et message `DS:22d7` = « ␣Cheat on␣ » (avec une espace de chaque côté) | sûr | `state.keepShelves = true` + `showDebugLine` |
+| F5 | `0x173` | `25d8` | `[950a] = 0`, aucun message | sûr | `state.keepShelves = false` |
+
+`[950a]` (initialisé à 0 par `Enter`, `1158:00c3`) n'est lu qu'en `1158:2398`, dans `1158:236b` (permutation des 6 étagères de gemmes, appelée par le levier « nouveau tirage » `1158:2276`, niveaux 3-4) : à 0 les étagères sont mélangées (6 tirages `04e8`), sinon elles restent dans l'ordre `0…7` et **aucun tirage n'est fait** (le flux aléatoire est donc décalé). **Sûr.** Rôle : « cheat » pour poser les cristaux toujours au même endroit pendant la mise au point.
+
+Écart du port : le texte est écrit sur la ligne d'état commune (`showDebugLine`) ; l'original dessine dans un rectangle local (fond `11e8:3034(…, 0x0b)`). Même texte.
 
 ### 5.8 `Exit` (`1158:0c4c`)
 
@@ -522,7 +534,7 @@ Fichiers : `src/games/zoombinis/scenes/puzzles/smoke.ts` (`createSmokeScene()`, 
 3. « go » est sans effet pendant un tour (l'original le prend toujours) ; au départ seuls les trois premiers wagonnets et les trois premiers sauvés partent, depuis leur place (la plupart du temps ce ne sont pas les mêmes wagonnets que ceux des sauvés : l'original aussi, par `[9330]` / `[9358]`).
 4. Surbrillance des emplacements (11006 / 11007) et dalle verte (11076) : jouées une fois (8 et 5 images) au début du transport au lieu d'être tenues ; arrêtées au lâcher.
 5. La danse au quatrième sauvé interrompt les dernières images de la montée dans le wagonnet (même tick que l'événement 50).
-6. Pas de touches de mise au point (`1158:2504`), pas de rejouer la voix `[a2c4]` hors F1.
+6. Touches du mode de test (`1158:2504`) portées (§5.7) ; pas de rejouer la voix `[a2c4]` hors F1.
 7. Aucun texte visible n'est écrit par le port.
 
 **Points ouverts** : positions exactes des silhouettes en transport (grab), image de départ des Zoombinis des niveaux 1-2 (`4231(0, 7)` du §9 point 6), enchaînement exact de 30 à 38 (point 2 ci-dessus), forme des surbrillances tenues.

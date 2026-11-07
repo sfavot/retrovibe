@@ -17,6 +17,8 @@
  *
  * Écarts et lectures « probables » : voir `docs/zoombinis/engine-ts.md`, « Bac (tâche H4) ».
  */
+import type { KeyEvent } from "../../../../engine/mohawk/input";
+import type { Surface } from "../../../../engine/mohawk/graphics/surface";
 import type { Archive } from "../../../../engine/mohawk/resources";
 import type { Point } from "../../data/zoombini";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature } from "../../engine/features";
@@ -24,6 +26,7 @@ import { ZOOMBINIS_GAME } from "../../engine/game";
 import { DIALOG } from "../../engine/dialog";
 import { ScreenId, type Scene, type SceneContext } from "../../engine/scene";
 import { scrb } from "../../engine/resources";
+import { showDebugMessage } from "../../engine/shortcuts";
 import { ZOOMBINIS_SOUND } from "../../engine/sound";
 import {
   BATH_REMARKS,
@@ -56,6 +59,8 @@ import {
   SEAT_SCRIPT_FIRST,
   seatCount,
   seatedCount,
+  SEAT_HEIGHT,
+  SEAT_WIDTH,
   SPLASH_ENTRY,
   SWIM_START,
   type Chatter,
@@ -130,17 +135,48 @@ const DEPTH_EFFECTS = 5;
 const SEAT_FLAGS = FeatureFlag.relative | FeatureFlag.queueScript | FeatureFlag.noReplay | FeatureFlag.firstImage;
 const DECOR_FLAGS = FeatureFlag.relative | FeatureFlag.stopAtEnd | FeatureFlag.noReplay | FeatureFlag.firstImage;
 
+/** Touche `F` du mode de test : plage des `SCRB` du père mathieu acceptée pour `DS:731a` (0x708 à 0x728). */
+const FROG_FIRST = 1800;
+const FROG_LAST = 1832;
+/** Touche `A` du mode de test : couleur de palette des traits du graphe de voisinage (`11e8:3034(…, 0xb)`). */
+const GRAPH_COLOR = 0xb;
+
+/** Trait de `from` à `to` (Bresenham), pixel par pixel (`11e8:7bd0` / `78ac`, `MoveTo` / `LineTo`). */
+function drawLine(screen: Surface, from: Point, to: Point, color: number): void {
+  let { x, y } = from;
+  const dx = Math.abs(to.x - x);
+  const dy = -Math.abs(to.y - y);
+  const sx = x < to.x ? 1 : -1;
+  const sy = y < to.y ? 1 : -1;
+  let error = dx + dy;
+  for (;;) {
+    screen.fill(color, { x, y, w: 1, h: 1 });
+    if (x === to.x && y === to.y) return;
+    const doubled = 2 * error;
+    if (doubled >= dy) {
+      error += dy;
+      x += sx;
+    }
+    if (doubled <= dx) {
+      error += dx;
+      y += sy;
+    }
+  }
+}
+
 /** Mémoire du programme (variables du segment de données qui ne sont pas remises à zéro à l'entrée : `DS:7304`, historiques des tirages). */
 interface Program {
   visits: number;
   chatter: Chatter;
+  /** `DS:731a` : `SCRB` rejoué par la touche `F` du mode de test (jamais écrit ailleurs ; 0 au départ du programme). */
+  frogDebugScript: number;
 }
 const programs = new WeakMap<Session, Program>();
 
 function programOf(session: Session): Program {
   let program = programs.get(session);
   if (!program) {
-    program = { visits: 0, chatter: createChatter() };
+    program = { visits: 0, chatter: createChatter(), frogDebugScript: 0 };
     programs.set(session, program);
   }
   return program;
@@ -191,7 +227,7 @@ export function createFerryScene(probe?: (probe: FerryProbe) => void): Scene {
       if (event.ctrl || event.alt) return false;
       if (ctx.services.tryGet(DIALOG)?.isOpen) return false;
       running.activity();
-      return kit.key(event);
+      return running.testKey(event) || kit.key(event);
     },
   };
 }
@@ -207,6 +243,8 @@ interface Ejection {
 
 interface Running {
   kit: PuzzleKit;
+  /** Touches du mode de test (`10d8:0df6`) : `A`, `F`, `L`. */
+  testKey(event: KeyEvent): boolean;
   tick(): void;
   activity(): void;
   stop(): void;
@@ -263,6 +301,8 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
   /** `72fe` : départ demandé ; puis départ en cours. */
   let departRequested = false;
   let departing = false;
+  /** `DS:72e4` : le plancher (`SCRB` 1601) existe jusqu'au départ. */
+  let floorAlive = true;
   let shifted = 0;
   let lastVariant: number | null = null;
   /** Instant de la dernière activité et seuil d'inactivité (`11a8:22ad`, `72b8`). */
@@ -602,6 +642,7 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
     kit.suspend();
     // `11a8:20e8` : le plancher et les ambiances disparaissent (le départ redessine le plancher).
     features.destroy(raftBase);
+    floorAlive = false;
     if (ambient) features.destroy(ambient);
     for (const m of kit.members) {
       m.zoombini.present = play.seatOf[m.index] !== null;
@@ -637,6 +678,57 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
     if (!departing) return;
     departing = false;
     kit.finish("success");
+  }
+
+  // --- Touches du mode de test (`10d8:0df6`, table `CS:0f05` : `A` → `0e62`, `F` → `0e89`, `L` → `0e6f`, `F1` → `0e57` ; a-z mises en A-Z) ---
+  let graphOverlay: Feature | null = null;
+
+  /** Valeur de la touche `F` : `SCRB` rejoué par le père mathieu, hors de 1800 à 1832 (`0x708`–`0x728`) il prend celui qui joue (`obj + 0x1c`). */
+  function replayFrog(): boolean {
+    if (!floorAlive) return false;
+    if (program.frogDebugScript < FROG_FIRST || program.frogDebugScript > FROG_LAST) program.frogDebugScript = frog.scriptId;
+    features.setScript(frog, program.frogDebugScript);
+    showDebugMessage(ctx, { text2: "Play FrogMan SCRB id:", n: program.frogDebugScript });
+    return true;
+  }
+
+  /**
+   * Touche `A` (`10d8:18d6(1)`) : trait de centre à centre de chaque paire de tabourets voisins (couleur 0xb de la palette). L'original trace sur l'écran, sans l'effacer
+   * ensuite ; le port garde les traits dans un objet porté devant tout, jusqu'à la sortie de l'écran (écart).
+   */
+  function showGraph(): boolean {
+    const centers = raft.seats.map((seat, i) => {
+      const rect = seatFeatures[i]?.rect;
+      return rect ? { x: Math.trunc((rect.left + rect.right) / 2), y: Math.trunc((rect.top + rect.bottom) / 2) } : { x: seat.x + SEAT_WIDTH / 2, y: seat.y + SEAT_HEIGHT / 2 };
+    });
+    if (!graphOverlay) {
+      graphOverlay = features.create({
+        script: 0,
+        delay: 0,
+        depth: 100,
+        flags: FeatureFlag.overlay,
+        onAfterDraw: (_feature, screen) => {
+          raft.seats.forEach((seat, i) => {
+            for (const j of seat.neighbors) if (j > i) drawLine(screen, centers[i]!, centers[j]!, GRAPH_COLOR);
+          });
+        },
+      });
+    }
+    features.compose();
+    ctx.requestPresent();
+    return true;
+  }
+
+  function testKey(event: KeyEvent): boolean {
+    return kit.testKey(
+      event,
+      {
+        0x41: showGraph,
+        0x46: replayFrog,
+        0x4c: () => showDebugMessage(ctx, { n: level + 1 }),
+      },
+      true,
+    );
   }
 
   /** Clics (`10d8:0984`) : tout appui compte comme activité ; pendant le départ, il court-circuite l'attente. */
@@ -705,6 +797,7 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
 
   return {
     kit,
+    testKey,
     tick,
     activity,
     stop() {

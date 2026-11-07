@@ -38,6 +38,7 @@ import { ZOOMBINIS_GAME } from "./game";
 import { defineService } from "./scene";
 import { GRAPHICS } from "./services";
 import { ZOOMBINIS_SOUND } from "./sound";
+import type { Surface } from "../../../engine/mohawk/graphics/surface";
 import { TextFlags, ZOOMBINIS_TEXT } from "./text";
 
 /** Message de `STRL` 2023 (indice 1-based) et plaque (`1168:2117`, type 1 ou 2) de chaque bascule, d'après la nouvelle valeur de l'option. */
@@ -123,6 +124,70 @@ export function showDebugLine(ctx: ZoombinisContext, text: string): void {
   screen.fill(DEBUG_LINE_FILL, DEBUG_LINE);
   ctx.services.tryGet(ZOOMBINIS_TEXT)?.drawText(screen, "small", text, DEBUG_LINE, TextFlags.center | TextFlags.vcenter, DEBUG_LINE_INK);
   ctx.requestPresent();
+}
+
+/** Arguments de `1198:03cf` (convention Pascal : `n`, `text2`, `&value`, `text`, attente). */
+export interface DebugMessage {
+  /** Premier texte (`[bp+8]`) ; absent : « Level » (`DS:3d16`, valeur de départ du tampon). */
+  text?: string;
+  /** Nombre lu par pointeur (`[bp+0xc]`), écrit après le premier texte, séparé par une espace. */
+  value?: number;
+  /** Second texte (`[bp+0x10]`) : après le reste et une espace si `text` est donné, sinon **à la place** du début du tampon. */
+  text2?: string;
+  /** Nombre final (`[bp+0x14]`) : 0 = rien n'est dessiné ; > 0 = écrit en fin, après une espace ; < 0 = rien n'est ajouté. */
+  n: number;
+}
+
+/**
+ * Texte de `1198:03cf` : le tampon part de « Level », remplacé par `text` s'il est donné, puis ` value`, puis `text2` (à la suite, ou au début du tampon si
+ * `text` est absent, ce qui écrase « Level » et le nombre), puis ` n` si `n > 0`. Renvoie null quand `n` vaut 0 (l'original ne dessine rien).
+ */
+export function debugText(message: DebugMessage): string | null {
+  if (message.n === 0) return null;
+  let text = message.text ?? "Level";
+  if (message.value !== undefined) text += ` ${message.value}`;
+  if (message.text2 !== undefined) text = message.text !== undefined ? `${text} ${message.text2}` : message.text2;
+  if (message.n > 0) text += ` ${message.n}`;
+  return text;
+}
+
+/**
+ * `1198:03cf` : message de mise au point sur la ligne d'état (`showDebugLine`), seulement en mode de test. L'original peut ensuite attendre une touche
+ * (premier argument non nul, boucle `1148:073c(3)`) : le port n'attend pas (les écrans ne se bloquent pas).
+ */
+export function showDebugMessage(ctx: ZoombinisContext, message: DebugMessage): void {
+  const text = debugText(message);
+  if (text !== null) showDebugLine(ctx, text);
+}
+
+/** Bandeau des épreuves en mode de test (hôtel `A`, `10e8:2852`, `DS:1340` / `1348` / `1350` ; filet `L`, `1120:1f2d`, `DS:1a0a` / `1a12` / `1a1a`) : 500 à 600 × 1 à 27. */
+const DEBUG_BANNER = { x: 500, y: 1, w: 100, h: 26 } as const;
+/** Cases des trois libellés : moitié gauche (jusqu'à 549), bandeau entier (donc au milieu), moitié droite (dès 550). */
+const DEBUG_BANNER_SLOTS = [{ x: 500, y: 1, w: 49, h: 26 }, DEBUG_BANNER, { x: 550, y: 1, w: 50, h: 26 }] as const;
+/** Fond (`11e8:3034(…, 0xe)`), cadre (`11e8:60e8`, stylo noir par défaut) et encre (`11e8:7c08(0)`). */
+const DEBUG_BANNER_FILL = 0xe;
+const DEBUG_BANNER_FRAME = 0;
+const DEBUG_BANNER_INK = 0;
+
+/**
+ * Bandeau de mise au point en haut à droite (hôtel, filet) : cadre, fond, puis jusqu'à trois libellés centrés dans la moitié gauche, au milieu et dans la
+ * moitié droite. Dessiné sur `surface` (le fond de l'écran, pour qu'il survive aux recompositions des features) ; à l'écran d'invalider ensuite.
+ */
+export function drawDebugBanner(ctx: ZoombinisContext, surface: Surface, labels: readonly string[]): void {
+  surface.fill(DEBUG_BANNER_FRAME, DEBUG_BANNER);
+  surface.fill(DEBUG_BANNER_FILL, { x: DEBUG_BANNER.x + 1, y: DEBUG_BANNER.y + 1, w: DEBUG_BANNER.w - 2, h: DEBUG_BANNER.h - 2 });
+  const text = ctx.services.tryGet(ZOOMBINIS_TEXT);
+  labels.slice(0, 3).forEach((label, i) => text?.drawText(surface, "small", label, DEBUG_BANNER_SLOTS[i]!, TextFlags.center | TextFlags.vcenter, DEBUG_BANNER_INK));
+}
+
+/**
+ * Code de touche reçu par la `Key` d'un écran (`1198:05b3` → descripteur `+0x10`) : le caractère (`WM_CHAR`, `charCodeOf`), sinon pour `F1` à `F12` la touche
+ * virtuelle + 0xff (`WM_KEYDOWN`, `1148:0ea4` : `F1` = 0x16f). Null pour une autre touche (le port ne transmet pas les autres codes `WM_KEYDOWN`).
+ */
+export function screenKeyCode(event: KeyEvent): number | null {
+  const fn = /^F([1-9]|1[0-2])$/.exec(event.code);
+  if (fn && !event.ctrl && !event.alt) return 0x16f + Number(fn[1]) - 1;
+  return charCodeOf(event);
 }
 
 export class Shortcuts {

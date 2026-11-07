@@ -32,6 +32,7 @@
  *  - les clics pendant les animations de refus et d'acceptation sont ignorés jusqu'à leur fin (l'original ne bloque que le traitement du Tick) ;
  *  - l'attente de 60 ticks de la défaite (`1090:00c1`) est un délai de la scène, pas une attente bloquante.
  */
+import type { Surface } from "../../../../engine/mohawk/graphics/surface";
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { screenInfo } from "../../data/archives";
 import { DIALOG } from "../../engine/dialog";
@@ -40,6 +41,7 @@ import { ZOOMBINIS_GAME } from "../../engine/game";
 import { regs } from "../../engine/resources";
 import type { Scene, SceneContext } from "../../engine/scene";
 import { GRAPHICS } from "../../engine/services";
+import { drawDebugBanner } from "../../engine/shortcuts";
 import { ZOOMBINIS_SOUND } from "../../engine/sound";
 import {
   ROOM_POINTS_125,
@@ -47,12 +49,16 @@ import {
   DEFEAT_VOICE,
   DEFEAT_VOICE_L3,
   DEFEAT_WAIT_TICKS,
+  DIM_COUNT,
+  DIM_FIRST,
   DIM_PERCENT,
   FREE_STEPS,
   HALL_PLACES,
   HELP_VOICE,
   INTRO_SCRIPT,
+  TEST_SCENE_START,
   WARNING_STEP,
+  attributeLetters,
   blockedArt,
   blockedRooms,
   createHotel,
@@ -63,7 +69,9 @@ import {
   drawWarningScript,
   explanationScript,
   introVariant,
+  nextTestScene,
   place,
+  resetClock,
   tablePoint,
   type HotelState,
   type Level,
@@ -98,6 +106,7 @@ const DEPTH = {
   buttons: 5,
   scene: 6,
 } as const;
+
 
 const F = FeatureFlag;
 /** Drapeaux des objets de `12f6` (`0x4188000`, `0xc188000`, `0x508a000`, `0x4008000`, `0x808000`, `0x108000`, `0x8108000`, `0x8188000`). */
@@ -181,6 +190,10 @@ export interface HotelProbe {
   readonly doors: readonly (Feature | undefined)[];
   /** Id de la dernière scénette lancée (introduction, explication, victoire ou défaite). */
   readonly lastScene: number;
+  /** `DS:74c6` (touches de test `H` et `I`, jamais lu hors du code mort `10e8:3e14`). */
+  readonly demo: number;
+  /** Compteurs des touches de test `W` et `E` (`DS:74b4`, `DS:74b6`). */
+  readonly testScenes: { readonly w: number; readonly e: number };
   /** Points de dépôt des chambres. */
   readonly roomTargets: readonly DropTarget[];
   /** Atterrissage de la chambre `room`, rangement final de la `k`-ième place. */
@@ -229,6 +242,12 @@ class HotelRun implements HotelProbe {
   variant = 0;
   dims = 0;
   lastScene = 0;
+  demo = 0;
+  readonly testScenes = { w: TEST_SCENE_START, e: TEST_SCENE_START };
+  /** Entrées 10 à 245 de la palette telle que la relance l'a chargée (`DS:7586`, restaurée par la touche espace). */
+  private paletteBackup: Uint8Array | null = null;
+  /** Fond de l'écran (les features le recopient à chaque recomposition) : le bandeau de la touche `A` y est dessiné pour rester affiché. */
+  private background: Surface | null = null;
   readonly shelves: (Feature | undefined)[] = [];
   readonly doors: (Feature | undefined)[] = [];
   readonly roomTargets: DropTarget[] = [];
@@ -342,7 +361,7 @@ class HotelRun implements HotelProbe {
   /** Entrée (`10e8:0000`, `10e8:1896`) : fond 5000, avant-plans, plan de la palissade (niveau 2), scénette d'introduction. */
   private buildEntry(): void {
     const { archive, features: f } = this;
-    openScreen(this.ctx, archive, { background: BACKGROUND_ENTRY });
+    this.background = openScreen(this.ctx, archive, { background: BACKGROUND_ENTRY });
     this.defineGroups();
     // `74b8` : avant-plan 11500 (niveau 0), 11501 (niveaux 1 et 2), 11502 (niveau 3).
     f.create({ script: SCRB.foreground + (this.level >= 2 ? this.level - 1 : this.level === 0 ? 0 : 1), delay: DELAY.play, flags: FLAG_PLAY, depth: 1 });
@@ -386,8 +405,10 @@ class HotelRun implements HotelProbe {
     const f = this.features;
     this.scene = undefined;
     f.clear();
-    openScreen(ctx, archive, { background: BACKGROUND_HOTEL[level] });
+    this.background = openScreen(ctx, archive, { background: BACKGROUND_HOTEL[level] });
     this.defineGroups();
+    const colors = ctx.services.get(GRAPHICS).palette.colors;
+    this.paletteBackup = colors.slice(DIM_FIRST * 3, (DIM_FIRST + DIM_COUNT) * 3);
     const l3 = level === 3;
     const slots = l3 ? 125 : level === 0 ? 5 : 25;
 
@@ -543,6 +564,80 @@ class HotelRun implements HotelProbe {
       this.skipped = true;
       this.startPlay(false);
     }
+  }
+
+  // ------------------------------------------------------------------------------------------------------------------------
+  // Touches du mode de test (`10e8:2289`, table `CS:2462`, actives si `[a43f]`)
+
+  /**
+   * Treize touches (sûr, table lue dans l'exécutable) : espace `2412`, `A`/`a` `22d4`, `E`/`e` `2395`, `H`/`h` `22df`, `I`/`i` `22f2`, `R` `230b` (la minuscule n'y est pas),
+   * `W`/`w` `2317`, et `F1` `22c9` (l'aide vocale, traitée par `kit.key`). Ne marchent pas pendant la scénette d'entrée (le groupe n'existe pas encore : `kit` nul).
+   */
+  testHandlers(): Readonly<Record<number, () => boolean | void>> {
+    const attributes = () => this.showAttributes();
+    const squirrelW = () => this.testScene("w");
+    const squirrelE = () => this.testScene("e");
+    const demoOn = () => this.demoStart();
+    const demoNext = () => this.demoNext();
+    return {
+      0x20: () => this.resetErrors(),
+      0x41: attributes,
+      0x61: attributes,
+      0x45: squirrelE,
+      0x65: squirrelE,
+      0x48: demoOn,
+      0x68: demoOn,
+      0x49: demoNext,
+      0x69: demoNext,
+      0x52: () => {
+        this.state.acceptAll = true;
+      },
+      0x57: squirrelW,
+      0x77: squirrelW,
+    };
+  }
+
+  /** Espace (`10e8:2412`) : cran de l'horloge à 1, cadran remis sur ce cran (niveaux 0 à 2), lumière d'origine (`DS:7586`, entrées 10 à 245). */
+  private resetErrors(): void {
+    resetClock(this.state);
+    if (this.clock && this.level !== 3) {
+      this.clockBusy = false;
+      this.clockIntro = 0;
+      this.features.setScript(this.clock, SCRB.clock + this.state.step, false);
+    }
+    if (this.paletteBackup) this.ctx.services.get(GRAPHICS).palette.colors.set(this.paletteBackup, DIM_FIRST * 3);
+    this.dims = 0;
+    this.ctx.requestPresent();
+  }
+
+  /** `A` (`10e8:2852`) : lettres des attributs tirés dans un bandeau en haut à droite, dessiné sur le fond (il reste jusqu'au prochain changement de fond). */
+  private showAttributes(): void {
+    const screen = this.background;
+    if (!screen) return;
+    // Bandeau `DS:1340` (gauche `1348`, droite `1350`) : lettres des attributs `[74ce]`, `[74d0]`, `[74d2]`.
+    drawDebugBanner(this.ctx, screen, attributeLetters(this.state));
+    this.features.invalidate();
+    this.ctx.requestPresent();
+  }
+
+  /** `W` (`10e8:2317`, `SCRB 7000 + 0…9`) et `E` (`10e8:2395`, `SCRB 7000 + 10…17`) : la scénette de l'écureuil `DS:74aa` change de script, ou est créée. */
+  private testScene(key: "w" | "e"): void {
+    this.testScenes[key] = key === "w" ? nextTestScene(this.testScenes.w, 0, 9) : nextTestScene(this.testScenes.e, 10, 0x11);
+    const script = INTRO_SCRIPT + this.testScenes[key];
+    this.lastScene = script;
+    if (this.scene) this.features.setScript(this.scene, script, true);
+    else this.sceneObject(script, FLAG_SCENE);
+    this.ctx.requestPresent();
+  }
+
+  /** `H` (`10e8:22df`) : `DS:74c6` passe de 0 à 1. */
+  private demoStart(): void {
+    if (this.demo === 0) this.demo = 1;
+  }
+
+  /** `I` (`10e8:22f2`) : `DS:74c6` augmente de 1 s'il n'est pas nul. Il n'est lu qu'à la fin de la mise en place `10e8:12f6` (qui ne se rejoue pas) : sans effet visible. */
+  private demoNext(): void {
+    if (this.demo !== 0) this.demo += 1;
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -802,7 +897,7 @@ export function createHotelScene(): HotelScene {
       if (!kit || kit.left) return false;
       if (event.ctrl || event.alt) return false;
       if (ctx.services.tryGet(DIALOG)?.isOpen) return false;
-      return kit.key(event);
+      return kit.key(event) || kit.testKey(event, run!.testHandlers());
     },
   };
 }

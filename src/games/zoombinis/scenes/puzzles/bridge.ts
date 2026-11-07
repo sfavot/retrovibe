@@ -28,16 +28,19 @@
  *  - l'ordre de dessin des Zoombinis arrivés est celui de leur ordonnée (l'original les place « devant le précédent » rang par rang, tables non portées) ; **probable** ;
  *  - le type d'éternuement manquant à l'événement 10 (jamais en jeu : le visage l'annonce 18 ticks plus tôt) retombe sur la table `FACE_SNEEZE_TYPES`.
  */
+import { drawShape } from "../../../../engine/mohawk/graphics/blit";
+import type { KeyEvent } from "../../../../engine/mohawk/input";
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { NoRepeatPool } from "../../../../engine/mohawk/rng";
 import { screenInfo } from "../../data/archives";
 import type { Script } from "../../data/script";
-import { scriptAnchorOffset } from "../../data/zoombini";
+import { TABLES_LARGE, scriptAnchorOffset, snoidImageIndex } from "../../data/zoombini";
 import { DIALOG } from "../../engine/dialog";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type Features } from "../../engine/features";
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import { scrs } from "../../engine/resources";
 import type { Scene, SceneContext } from "../../engine/scene";
+import { showDebugMessage } from "../../engine/shortcuts";
 import { currentLevel, dialogMemoryIndex, setBridgeMemory } from "../../game/route";
 import {
   ARRIVAL_PLACES,
@@ -63,15 +66,21 @@ import {
   type Bridge,
   type BridgeLevel,
   type BridgeState,
+  type Condition,
   type Point,
 } from "../../game/puzzles/bridge";
 import type { Zoombini } from "../../game/state";
 import { createPuzzleKit, createTarget, sheetButtonImages, type DropInfo, type DropTarget, type KitMember, type PuzzleKit } from "../puzzle-kit";
 import { closeScreen, openScreen } from "../screen-kit";
-import { screenScripts } from "../snoid";
+import { screenScripts, snoidAssets } from "../snoid";
 import { dialogChoice } from "../xfer";
 
 const SCREEN = 7;
+
+/** Icônes de la règle dessinées par la touche `A` du mode de test (`10c0:0e04`) : ancre de la première, pas, ordonnée. */
+const DEBUG_ICON_X = 250;
+const DEBUG_ICON_STEP = 30;
+const DEBUG_ICON_Y = 20;
 
 /** Fond et palette (`SHPL` / `tBMP` 1000), groupes de formes (`tBMP` 1100 : décor, 1200 : socles, visage, clôture, 1300 : zones de dépôt), planche des boutons. */
 const BACKGROUND = 1000;
@@ -195,6 +204,9 @@ class BridgeRun implements BridgeProbe {
   private firstCount = 0;
   private readonly ranks: Record<Bridge, number> = { 1: 0, 2: 0 };
   private lastIdle = 0;
+  /** Conditions de la règle dessinées par la touche `A` du mode de test (`10c0:0d20`) et l'objet qui les affiche (créé à la première pression). */
+  private debugConditions: readonly Condition[] = [];
+  private debugOverlay: Feature | null = null;
 
   constructor(
     private readonly ctx: SceneContext,
@@ -555,6 +567,55 @@ class BridgeRun implements BridgeProbe {
     }
   }
 
+  /**
+   * Touches du mode de test (`10c0:0d20`, `DS:a43f`) : `A` et `R` (a-z mises en A-Z), seulement si l'épreuve est active (`DS:7058`) et que personne ne marche
+   * (`DS:9702 ≤ 0`, comme pour `F1`). Renvoie vrai si la touche est consommée.
+   */
+  testKey(event: KeyEvent): boolean {
+    if (this.kit.walking > 0) return false;
+    return this.kit.testKey(event, { 0x41: () => this.showRule(), 0x52: () => this.showScript() }, true);
+  }
+
+  /**
+   * `A` : efface la zone (225, 0)–(350, 70) puis écrit « Upper bridge accepts: » (`DS:7094 ≠ 0`) ou « Lower bridge accepts: » et dessine, en (250 + 30 × i, 20), l'icône
+   * de chaque condition de la règle (`1168:5e91(attribut, valeur, rect)`, planche 3000). L'original dessine directement sur l'écran ; le port les garde dans un objet
+   * porté devant tout jusqu'au prochain `A` (écart : ils ne s'effacent pas quand un décor passe dessus).
+   */
+  private showRule(): void {
+    const { rule } = this.state;
+    this.debugConditions = rule.conditions;
+    if (!this.debugOverlay) {
+      const sheet = snoidAssets(this.ctx).sheets[3000];
+      this.debugOverlay = this.features.create({
+        script: 0,
+        delay: 0,
+        depth: 100,
+        flags: FeatureFlag.overlay,
+        onAfterDraw: (_feature, screen) => {
+          this.debugConditions.forEach((condition, i) => {
+            const base = TABLES_LARGE[(["hair", "eyes", "nose", "feet"] as const)[condition.attr - 1]!][condition.value];
+            if (base === undefined) return;
+            // `1168:5e91` : image `2 × base + 1` (1-based), ancre `REGS` retranchée de la position (250 + 30 × i, 20).
+            const index = snoidImageIndex(base + 1);
+            const shape = sheet.images[index - 1];
+            if (shape) drawShape(screen, shape, DEBUG_ICON_X + DEBUG_ICON_STEP * i - (sheet.anchors?.x[index] ?? 0), DEBUG_ICON_Y - (sheet.anchors?.y[index] ?? 0), 8);
+          });
+        },
+      });
+    }
+    // Recomposition immédiate (`11a8:04b9` de l'original), puis le texte par-dessus : la ligne d'état n'est pas un objet et part à la recomposition suivante.
+    this.features.compose();
+    showDebugMessage(this.ctx, { text: rule.upperAccepts ? "Upper bridge accepts:" : "Lower bridge accepts:", n: -1 });
+  }
+
+  /**
+   * `R` : « Snoid Script: » + type (`DS:70b4` / `70b6`). Ces deux variables de mise au point valent -1 à l'initialisation et à chaque départ de décision, et rien ne les écrit
+   * ailleurs : le message est toujours le même.
+   */
+  private showScript(): void {
+    showDebugMessage(this.ctx, { text: " Type:", value: -1, text2: "Snoid Script:", n: -1 });
+  }
+
   leave(): void {
     this.kit.leave();
   }
@@ -588,7 +649,7 @@ export function createBridgeScene(): BridgeScene {
       if (!run || run.kit.left) return false;
       if (event.ctrl || event.alt) return false;
       if (ctx.services.tryGet(DIALOG)?.isOpen) return false;
-      return run.kit.key(event);
+      return run.testKey(event) || run.kit.key(event);
     },
   };
 }

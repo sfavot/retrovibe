@@ -29,9 +29,11 @@
  *  - la danse de victoire tire sans remise (`NoRepeatPool`) au lieu de `1098:0098` avec le masque `[7238]` ; **probable** ;
  *  - le dernier Zoombini posé ne fait pas de pas sur place (fidèle : `[7224]` n'est pas alimenté dans ce cas) ;
  *  - le « 20036 / `0x4e44` » des études n'est pas une voix : c'est l'étiquette de type `SND` passée à `1028:0d9e(id, SND)`, qui demande si le son `id` (996) joue encore ; l'écran suivant l'attend (porté) ;
- *  - les rafales de touches de débogage (`10c8:1cf5`, `[a43f]`) ne sont pas portées.
+ *  - mode de test (`[a43f]`, `10c8:1cf5`) : voir `testKeys`. L'incrustation de débogage `10c8:2d1c` (nom de l'attribut, hiéroglyphes et effectifs par valeur) n'est pas
+ *    dessinée ; les touches sont ignorées pendant une animation de rejet ou de chute et pendant le départ ; le texte « Level n » va sur la ligne d'état commune.
  */
 import { drawShape } from "../../../../engine/mohawk/graphics/blit";
+import type { KeyEvent } from "../../../../engine/mohawk/input";
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { NoRepeatPool } from "../../../../engine/mohawk/rng";
 import { screenInfo } from "../../data/archives";
@@ -40,6 +42,7 @@ import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type Features } from 
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import { node, path, regs } from "../../engine/resources";
 import type { Scene, SceneContext } from "../../engine/scene";
+import { showDebugLine } from "../../engine/shortcuts";
 import { currentLevel, dialogMemoryIndex } from "../../game/route";
 import {
   HIEROGLYPH_X,
@@ -50,16 +53,21 @@ import {
   SLOT_IDLE_VARIANT,
   LION_BASE_SCRIPT,
   WAITING_PLACES,
+  clearSlots,
   createCaves,
   goEnabled,
   lionAtLast,
+  lionRestScript,
   onFloor,
   placeMember,
   regretVoiceDue,
+  relayout,
+  resetCaves,
   wakeLion,
   type CavesLevel,
   type CavesState,
   type Placement,
+  type SlotMove,
 } from "../../game/puzzles/caves";
 import type { Zoombini } from "../../game/state";
 import { createPuzzleKit, createTarget, SOUND_GO, sheetButtonImages, type DropInfo, type DropTarget, type KitMember, type OutsidePlacement, type PuzzleKit, type Rect } from "../puzzle-kit";
@@ -384,6 +392,104 @@ class CavesRun implements CavesProbe {
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
+  // Mode de test (`DS:a43f`, `Key` `10c8:1cf5`, table de 14 touches `CS:1eff`)
+
+  /**
+   * Touches du mode de test (sans effet hors de ce mode, `PuzzleKit.testKey`). Table de l'original (sûr) : Espace `10c8:299c`, 1 à 4 niveau + `10c8:27d7(−1)`,
+   * L « Level n », F1 aide (traitée par le kit), F2 et F4 consommées sans rien faire (cibles vides), F3 `10c8:2b46`, F5 à F8 attribut A + `10c8:27d7(0…3)`.
+   * Ignorées pendant un rejet, une chute ou le départ (l'original ne garde rien : écart de robustesse).
+   */
+  testKeys(event: KeyEvent): boolean {
+    if (this.busy || this.leaving !== null) return false;
+    const level = (code: number) => () => this.setLevel(code - 0x31);
+    const attribute = (code: number) => () => this.setAttribute(code - 0x173);
+    return this.kit.testKey(event, {
+      0x20: () => this.resetRound(),
+      0x31: level(0x31),
+      0x32: level(0x32),
+      0x33: level(0x33),
+      0x34: level(0x34),
+      0x4c: () => this.showLevel(),
+      0x170: () => {},
+      0x171: () => this.sendBack(),
+      0x172: () => {},
+      0x173: attribute(0x173),
+      0x174: attribute(0x174),
+      0x175: attribute(0x175),
+      0x176: attribute(0x176),
+    });
+  }
+
+  /** « Level n » (`"Level x "` dont le `x` devient `"01234"[[7106]]`). */
+  private showLevel(): void {
+    showDebugLine(this.ctx, `Level ${this.state.level + 1} `);
+  }
+
+  /** Touches 1 à 4 : `[7106] = n`, nouvelle disposition (lignes de tri et indices du niveau) ; les paramètres du lion ne changent qu'à Espace. */
+  private setLevel(level: number): void {
+    this.state.level = level as CavesLevel;
+    this.applyLayout(relayout(this.state, this.ctx.rng));
+    this.showLevel();
+  }
+
+  /** Touches F5 à F8 : attribut A = 0 à 3. */
+  private setAttribute(attribute: number): void {
+    this.applyLayout(relayout(this.state, this.ctx.rng, attribute));
+  }
+
+  /** Reporte sur l'écran les Zoombinis reposés par `relayout` (`1168:1687`, `1168:4231(…, 5, …)`, `1168:170f`) : posés d'un coup sur leur nouvelle dalle. */
+  private applyLayout(moves: readonly SlotMove[]): void {
+    for (const move of moves) this.targets[move.from]!.owner = null;
+    for (const move of moves) {
+      const member = this.kit.members[move.member]!;
+      const target = this.targets[move.to]!;
+      target.owner = member;
+      member.target = target;
+      member.snoid.moveTo({ x: target.x, y: target.y });
+      this.features.restack(member.snoid.feature, 1 + target.y / 1000);
+      this.applyPose(member, move.to);
+    }
+    this.features.invalidate();
+    this.ctx.requestPresent();
+  }
+
+  /** Espace (`10c8:299c`) : compteurs et paramètres du lion remis à zéro, lion au repos, saisie rendue. */
+  private resetRound(): void {
+    resetCaves(this.state);
+    this.rest();
+  }
+
+  /** F3 (`10c8:2b46`) : les Zoombinis non posés reviennent sur les places d'attente (dans l'ordre), les dalles sont libres, « go » grisé, puis comme Espace. */
+  private sendBack(): void {
+    if (this.kit.walking >= 1) return;
+    const standing = this.kit.members.filter((m) => this.state.slotOf[m.index] === 0);
+    for (const target of this.targets) if (target) target.owner = null;
+    clearSlots(this.state);
+    standing.forEach((member, i) => {
+      const place = this.kit.waitingPlaces[i]!;
+      for (const p of this.kit.waitingPlaces) if (p.owner === member) p.owner = null;
+      place.owner = member;
+      member.waiting = place;
+      member.target = place;
+      member.snoid.moveTo({ x: place.x, y: place.y });
+      this.features.restack(member.snoid.feature, 1 + place.y / 1000);
+    });
+    // Les posés restent où ils sont (leur drapeau `0x4008001` ne change pas), mais n'occupent plus leur dalle.
+    for (const member of this.kit.members) if (!standing.includes(member)) member.target = null;
+    this.kit.goEnabled = false;
+    this.rest();
+    this.features.invalidate();
+    this.ctx.requestPresent();
+  }
+
+  /** Fin de `10c8:299c` : la tête du lion revient à son script de repos, la saisie est rendue (`[0bf8] = 0`). */
+  private rest(): void {
+    this.locked = false;
+    this.head.onEvent = undefined;
+    this.features.setScript(this.head, lionRestScript(this.state));
+  }
+
+  // ------------------------------------------------------------------------------------------------------------------------
   // Tick (`10c8:09a6`)
 
   tick(): void {
@@ -691,6 +797,7 @@ export function createCavesScene(): CavesScene {
       if (!run || run.kit.left) return false;
       if (event.ctrl || event.alt) return false;
       if (ctx.services.tryGet(DIALOG)?.isOpen) return false;
+      if (run.testKeys(event)) return true;
       return run.kit.key(event);
     },
   };

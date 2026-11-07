@@ -27,7 +27,7 @@
  *  - pas de chargement progressif des 8 `SCRS` d'ambiance (`[7490]`, `10e0:0f51`) ni d'animation de joie des Zoombinis (`[7496]`, `292a(5)`) ni de réactions de groupe de l'événement 135 ;
  *  - le retour d'un Zoombini sorti de la file n'existe pas : il quitte l'écran par la gauche, sauvé ;
  *  - un groupe d'un seul Zoombini n'a pas de `SCRS` 7005 + pieds : la clôture est lancée à la fin de son parcours (7041 + pieds) ; **probable** ;
- *  - la voix 20036 (`0x4e44`) attendue avant de quitter n'est pas portée ; départ : tous les sauvés marchent vers (660, 357) (`SCRS` 7021 à 7030 non portés).
+ *  - le « 20036 / `0x4e44` » des études n'est pas une voix mais l'étiquette de type `SND` de `1028:0d9e(996, SND)` (« le son de « Go » joue-t-il encore ? ») : le kit attend déjà la fin des sons avant l'écran suivant ; départ : tous les sauvés marchent vers (660, 357) (`SCRS` 7021 à 7030 non portés).
  */
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeaturePart, type Features, type Sheet, createSheet } from "../../engine/features";

@@ -167,7 +167,7 @@ Autres écarts : les niveaux 0 à 2 jouent l'introduction du guide (répliques `
 
 ### 4.2 Tick (`10e8:07ca`)
 
-Garde `[132a] == 0` et `[74a4] ≠ 0`. Dans l'ordre : pompe `11a8:04b9` ; sortie demandée (`[8556] ≠ 0`, même schéma que Fleens : attend la voix 20036, `[a2de]`, puis `[8554] = [8556]` et Exit) ; si `[74e0] == 0` : introduction du guide (`[74ae]`, `[74b0]`, `[7508]` : jusqu'à 181 ticks d'attente, voix) ; traitement d'un Zoombini déposé (`[7570]`, 2.2/2.5) ; fin d'animation de refus (`[74e0]`, `[74e4]`, `[74ec]`) ; relance (`[74e2]`, qui recharge le fond, recrée le groupe `1168:0858`, réinstalle les emplacements `11a8:0ed9` et relance `10e8:12f6`). Le niveau 1 joue en plus `10e8:3e14` quand `[74c6] == 2`.
+Garde `[132a] == 0` et `[74a4] ≠ 0`. Dans l'ordre : pompe `11a8:04b9` ; sortie demandée (`[8556] ≠ 0`, même schéma que Fleens : attend la fin du son 996 de « Go » (`1028:0d9e(996, SND)` ; « 20036 » était une fausse lecture de l'étiquette `SND`, voir fleens.md §4.2), `[a2de]`, puis `[8554] = [8556]` et Exit) ; si `[74e0] == 0` : introduction du guide (`[74ae]`, `[74b0]`, `[7508]` : jusqu'à 181 ticks d'attente, voix) ; traitement d'un Zoombini déposé (`[7570]`, 2.2/2.5) ; fin d'animation de refus (`[74e0]`, `[74e4]`, `[74ec]`) ; relance (`[74e2]`, qui recharge le fond, recrée le groupe `1168:0858`, réinstalle les emplacements `11a8:0ed9` et relance `10e8:12f6`). Le niveau 1 joue en plus `10e8:3e14` quand `[74c6] == 2`.
 
 ### 4.3 Zones
 
@@ -179,7 +179,7 @@ Garde `[132a] == 0` et `[74a4] ≠ 0`. Dans l'ordre : pompe `11a8:04b9` ; sortie
 
 - Scripts du guide : `SCRB 6000 + k` (k = 0 à 8 : introductions et répliques selon `[74ee]` ; 9 + : réactions) ; tirage de répliques `SCRB 7007…`, `0x1B5F` (7007) `+ rand(0..2)` à `[74ee] == 9`, `SCRB 0x1D4F + rand(0..2)` (7503–7505, niveau 3, défaite) ; sons 6000–6008 (voix du guide) ; sons des chambres 7000–7023 (ouverture / fermeture de portes), 7500–7535 (grincements / bulles), 9000–9008, 8900–8901.
 - Réactions de Zoombini : `10e8:330e` (refus : le Zoombini repart, `+0x116` cible = position d'origine `[757a]`), `10e8:3620` (acceptation : arrive dans la chambre, pile `1428:[2r]`), `3288` / `32cb` (portes), `3ace` (défaite : joue `1b89(0, 0, …)` sur 2 chambres de pile, rappel `3aa6`), `3bae` (séquence de défaite des Zoombinis). Détail des ids non relevé.
-- Voix : 999 (carte), 996 (Go), 175–198 (tous rangés), 6006 (défaite), 7503–7505 (défaite, niveau 3), 20036 (attente de fin de son avant sortie).
+- Voix : 999 (carte), 996 (Go, dont la fin est attendue avant la sortie), 175–198 (tous rangés), 6006 (défaite), 7503–7505 (défaite, niveau 3).
 
 ## 6. Tampon de partie
 

@@ -177,7 +177,7 @@ Dans tous les cas, si `1168:5c57(S+0x38) == 2` (premier passage ?), la voix d'ai
 
 Chaque tour, si `[1200] == 0` et `[737c] ≠ 0` (garde) :
 1. `11a8:04b9()` (pompe d'animations).
-2. **Sortie demandée** (`[8556] ≠ 0`) : attend la fin du son 20 036 / `0x4e44` (`1028:0d9e`) ; selon `[a2de]` : 0 ou 3 (3 : `3dd0(0, 0)` d'abord) → si `[a406] ≠ 0` ou `[9702] == 0` ou `[9704] ≠ 0`, `[8554] = [8556]`, `[8556] = 0`, `11b8:0011(0, 0)`, `10e0:0600()` : fin ; `[a2de] == 2` : annule la sortie.
+2. **Sortie demandée** (`[8556] ≠ 0`) : attend la fin du son 996 (`1028:0d9e(0x3e4, SND)`). **Correction (sûr)** : « 20 036 / `0x4e44` » n'est pas une voix : `0x534e44` est l'étiquette de type `SND` passée à `1028:0d9e(id, SND)`, dont le mot bas valait `0x4e44` pour le désassembleur ; l'`id` réel est empilé juste avant (`0x3e4` = 996 dans `10e0:06db`, `10c8:09db`, `10b0:0770`, `10b8:07a4`, `10c0:0619`, `10e8:07fd` ; `0x3e5` = 997 dans `10d8:0929`). La fonction répond « ce son joue-t-il encore ? » : l'écran suivant attend la fin du son « Go ». Selon `[a2de]` : 0 ou 3 (3 : `3dd0(0, 0)` d'abord) → si `[a406] ≠ 0` ou `[9702] == 0` ou `[9704] ≠ 0`, `[8554] = [8556]`, `[8556] = 0`, `11b8:0011(0, 0)`, `10e0:0600()` : fin ; `[a2de] == 2` : annule la sortie.
 3. Si `[7338] == 0` (pas d'essai) : si `[7376] == 0` : animation de joie (2.6) ; sinon traitement de la dépose (2.3).
 4. `[7342]`, `[7340]`, `[7344]` (déposés par les rappels `2a06`, `2acb`, `2b90`) : jouent à tour de rôle une animation de réaction sur le dernier objet essayé (types 3, 9, 4).
 5. `[7346]` ≠ 0 : `10e0:2c91()` (sorties de file après Go).
@@ -222,7 +222,7 @@ Soit `a` = attribut 3 de l'objet (octet `+0xEF`, de 1 à 5) et `pos` = `+0x120` 
 
 ### 5.3 Sons connus
 
-Voix du narrateur et commentaires en `ZOOMBINI.MHK` (plage 20000+) : 20036 attendue avant la sortie ; 996 au clic sur « Go » (`0x3e4`) ; 999 au clic sur « carte » ; 20045–20048, 20055–20063, 20079, 20080 (2.5, 3). Sons d'archive : 1000–1002 (musique de forêt, flux), 1800–1814 (répliques aléatoires), 4000–4018 et 4100–4124 (effets de nizibooms), 7000–7008 (poussière). Les sons joués par un script sont ceux du mot qui suit le terminateur ; non catalogués ici.
+Voix du narrateur et commentaires en `ZOOMBINI.MHK` (plage 20000+) : 996 au clic sur « Go » (`0x3e4`) ; 999 au clic sur « carte » ; 20045–20048, 20055–20063, 20079, 20080 (2.5, 3). Sons d'archive : 1000–1002 (musique de forêt, flux), 1800–1814 (répliques aléatoires), 4000–4018 et 4100–4124 (effets de nizibooms), 7000–7008 (poussière). Les sons joués par un script sont ceux du mot qui suit le terminateur ; non catalogués ici.
 
 ### 5.4 Introduction (`10e0:00ea` fin)
 
@@ -266,6 +266,6 @@ Restent ouverts (sans effet sur les règles) :
 
 - Poursuite des nizibooms de la terrasse par le cousin d'un essai manqué (`SCRS` 4004 + position jusqu'à (429, 223), puis 4026 à 4035 : ils courent derrière le Zoombini) : non portée, le cousin ne fait que se tourner (`SCRS` 4003, type 5) ; elle les ferait revenir à leur place par un saut.
 - Le cousin perché que l'essai trouve joue 4020 + 2 (pos − 17) puis 4021 + 2 (pos − 17) (types 7 et 8) et disparaît (**probable**).
-- Pas de chargement progressif des 8 premiers `SCRS` d'ambiance (`[7490]`, `10e0:0f51` : c'est un préchargement, pas une animation), pas d'animation de joie (`[7496]`, `292a(5)`), pas de réactions de groupe de l'événement 135, pas de voix 20036 avant la sortie.
+- Pas de chargement progressif des 8 premiers `SCRS` d'ambiance (`[7490]`, `10e0:0f51` : c'est un préchargement, pas une animation), pas d'animation de joie (`[7496]`, `292a(5)`), pas de réactions de groupe de l'événement 135. L'attente de la fin du son 996 avant la sortie est portée (kit). Les `SCRS` 7021 à 7030 (sorties de la file des essais) ne sont pas portés : mécanisme distinct de l'attente (animations de la file `[734c]`, pas de son).
 - Ambiance : `SCRB` 1200 joue une fois, 1201 à 1206 en boucle (flags de `10e0:00ea`) ; le repère `SCRB` 1100 est créé (image fixe) mais invisible à l'écran : sa première image est vide ou masquée par le décor.
 - Attente des nizibooms (`10e0:0f9f`) : un compteur par objet, tiré dans [0, 80], +1 par tick de la scène ; au-delà de 80, `SCRS` 4000 ou 4001 (`rand(1..100) < 51`) puis retour à 1 ; arrêté pendant un essai et après la clôture.

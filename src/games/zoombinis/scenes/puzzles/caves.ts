@@ -28,7 +28,7 @@
  *  - l'éclat d'introduction des hiéroglyphes du niveau 1 (3 redessins à 30 ticks, `[70fa]`) n'est pas porté : `10c8:1a1f` n'est pas désassemblé ; la rangée est fixe ;
  *  - la danse de victoire tire sans remise (`NoRepeatPool`) au lieu de `1098:0098` avec le masque `[7238]` ; **probable** ;
  *  - le dernier Zoombini posé ne fait pas de pas sur place (fidèle : `[7224]` n'est pas alimenté dans ce cas) ;
- *  - la voix 20036 (`0x4e44`) attendue avant de quitter n'est pas portée ;
+ *  - le « 20036 / `0x4e44` » des études n'est pas une voix : c'est l'étiquette de type `SND` passée à `1028:0d9e(id, SND)`, qui demande si le son `id` (996) joue encore ; l'écran suivant l'attend (porté) ;
  *  - les rafales de touches de débogage (`10c8:1cf5`, `[a43f]`) ne sont pas portées.
  */
 import { drawShape } from "../../../../engine/mohawk/graphics/blit";
@@ -62,7 +62,7 @@ import {
   type Placement,
 } from "../../game/puzzles/caves";
 import type { Zoombini } from "../../game/state";
-import { createPuzzleKit, createTarget, sheetButtonImages, type DropInfo, type DropTarget, type KitMember, type OutsidePlacement, type PuzzleKit, type Rect } from "../puzzle-kit";
+import { createPuzzleKit, createTarget, SOUND_GO, sheetButtonImages, type DropInfo, type DropTarget, type KitMember, type OutsidePlacement, type PuzzleKit, type Rect } from "../puzzle-kit";
 import { closeScreen, openScreen } from "../screen-kit";
 import { screenScripts } from "../snoid";
 import { dialogChoice } from "../xfer";
@@ -610,7 +610,8 @@ class CavesRun implements CavesProbe {
         this.departures.splice(this.departures.indexOf(entry), 1);
         this.depart(entry.member);
       }
-      if (this.departures.length === 0 && this.arrivedCount >= this.departed) this.complete();
+      // `1028:0d9e(996)` (`10c8:09db`) : l'écran ne change pas tant que le son de départ joue encore.
+      if (this.departures.length === 0 && this.arrivedCount >= this.departed && !this.kit.isPlaying(SOUND_GO)) this.complete();
     }
   }
 

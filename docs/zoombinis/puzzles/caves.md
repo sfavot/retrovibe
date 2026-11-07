@@ -131,7 +131,7 @@ Ordre (sûr, relu dans le désassemblage) : niveau `[7106]` ; `10c8:1f37` ; remi
 
 Garde `[0e0e]` (non réentrant) et `[0bf4]` (écran actif). À chaque tour : `11a8:04b9()` (avance les features).
 
-1. **Sortie demandée (`[8556] ≠ 0`)** : attend la fin de la voix `0x4e44` (`1028:0d9e`), puis, si `([a406] ≠ 0 || [9702] == 0 || [9704] > 0)` **et** (`[7100] == 3 || [8556] == 1 || [a406] ≠ 0`) : `[8554] = [8556]`, `[8556] = 0`, `10c8:0945` (Exit), fin. Sinon, si `[7100] == 2` : `[7100] = 3`, son 996 (`0x3e4`), `10c8:16c2(0x1e, 0, 0x178, 0x294)` : les Zoombinis posés (dalles 20 à 1, 3 au plus lancés explicitement, 30 ticks d'écart) partent en file vers la sortie (`+0xda`, `1168:4231(0, 10)`), `[9702] = 1`, `[9704] = 0` (le `[9704]` est remis à 1 par l'arrivée des Zoombinis, côté `1168`).
+1. **Sortie demandée (`[8556] ≠ 0`)** : attend la fin du son 996 (`1028:0d9e(0x3e4, SND)` ; le « `0x4e44` » des anciennes lectures est l'étiquette de type, voir fleens.md §4.2), puis, si `([a406] ≠ 0 || [9702] == 0 || [9704] > 0)` **et** (`[7100] == 3 || [8556] == 1 || [a406] ≠ 0`) : `[8554] = [8556]`, `[8556] = 0`, `10c8:0945` (Exit), fin. Sinon, si `[7100] == 2` : `[7100] = 3`, son 996 (`0x3e4`), `10c8:16c2(0x1e, 0, 0x178, 0x294)` : les Zoombinis posés (dalles 20 à 1, 3 au plus lancés explicitement, 30 ticks d'écart) partent en file vers la sortie (`+0xda`, `1168:4231(0, 10)`), `[9702] = 1`, `[9704] = 0` (le `[9704]` est remis à 1 par l'arrivée des Zoombinis, côté `1168`).
 2. **Éveil du lion (`[70fe] ≠ 0 && [7102] == 0`)** : `[70fe] = 0`, `[7100] = 1`, le lion `[722e]` joue `SCRB 6002` (29 images, événement final 11 → `10c8:1245(10)` : `[7100] = 2`).
 3. **Retournement de dalle (`[7222] ≠ 0`)** : les deux dalles (`[7168]`, `[716a]`) reçoivent leur script allumé (`8999 + [0c18]`, `8999 + [0c1a]`) et le Zoombini ses décalages de pose.
 4. `[7104] ≠ 0` : `[7104] = 0`, `10c8:0e74(0)` (phase 1 du rejet). `[0c0e] ≠ 0` : `[0c0e] = 0`, `10c8:0e74(1)` (phase 2).
@@ -188,7 +188,7 @@ Rappel `10c8:1245` (lion) : arg 10 (octet 11, fin de `6002`) : `[7100] = 2` ; ar
 
 ### 5.3 Sons
 
-`\0SND` de l'archive : 6000 à 6008 (lion), 8200 à 8204 (dalles), 8000 à 8004 et 8400 à 8404 (variantes inutilisées), 12000 (Zoombini). Dans `ZOOMBINI.MHK` : 999 (bouton carte), 996 (`0x3e4`, départ en file), 20036 (`0x4e44`, voix attendue avant de quitter), 20045 à 20048 (consolation), 20055 à 20063 (réussite), 20065 (`0x4e61`, mis dans `[a2c4]`). Musique : voir §1.
+`\0SND` de l'archive : 6000 à 6008 (lion), 8200 à 8204 (dalles), 8000 à 8004 et 8400 à 8404 (variantes inutilisées), 12000 (Zoombini). Dans `ZOOMBINI.MHK` : 999 (bouton carte), 996 (`0x3e4`, départ en file), 20045 à 20048 (consolation), 20055 à 20063 (réussite), 20065 (`0x4e61`, mis dans `[a2c4]`). Musique : voir §1.
 
 ## 6. Écrit dans le tampon de partie à la sortie
 
@@ -241,6 +241,6 @@ Aucun. La branche « dalle valable » de `10c8:130f` ne contient aucun appel à 
 - **Poussière et rattachement** : la poussière est une feature indépendante ; les objets d'accroche des dalles (script 6000, rappels `10c8:18c7` / `18d3`, `11a8:2a0a`) et `11a8:1f5c` ne sont pas portés.
 - **Pose juste** : le Zoombini est posé d'un coup sur l'ancre (état 4 du kit) puis joue son pas sur place ; la marche de l'original sur la distance de dépôt (au plus 15 pixels) n'est pas portée.
 - **Danse de victoire** : tirage sans remise par `NoRepeatPool` (l'original : `1098:0098` avec le masque `[7238]` et `DS:[2i]`, dont l'indexation est ambiguë) ; **probable**.
-- **Éclat du niveau 1** et voix attendue `0x4e44` avant la sortie : non portés. Touches de débogage : non portées.
+- **Éclat du niveau 1** non porté ; l'attente de la fin du son 996 avant la sortie est portée (`caves.ts`, `leave`). Touches de débogage : non portées.
 - **Aucun texte** : les consignes sont des voix de l'original ; aucune copy à valider.
 

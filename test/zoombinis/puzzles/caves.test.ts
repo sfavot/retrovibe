@@ -694,7 +694,14 @@ describe.skipIf(!original.has)("sphinx : écran sur les vrais fichiers (CAVES.MH
     // De la dalle 20 à la dalle 1 : le premier à partir est celui de la dalle la plus loin.
     const order = [...chosen].sort((a, b) => probe().state.slotOf[b]! - probe().state.slotOf[a]!);
     await until(() => probe().kit.members[order[0]!]!.snoid.scriptId !== 0 && !probe().kit.members[order[0]!]!.snoid.resting, 100);
-    await until(() => zoombinis.lastChange?.screen === S.xfer, 3000);
+    // `1028:0d9e(996)` : l'écran ne change qu'une fois le son de départ fini.
+    const kit = probe().kit;
+    let playingAtChange = false;
+    await until(() => {
+      if (zoombinis.lastChange?.screen === S.xfer) playingAtChange = kit.isPlaying(996);
+      return zoombinis.lastChange?.screen === S.xfer;
+    }, 3000);
+    expect(playingAtChange).toBe(false);
     expect(engine.error).toBeNull();
     expect(zoombinis.lastChange).toMatchObject({ screen: S.xfer, target: nextScreen(S.caves, "success") });
     const { game } = zoombinis;

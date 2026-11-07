@@ -231,7 +231,7 @@ Variables de jeu (`DS`, **sûr** sauf mention) :
 
 Le Tick n'a pas de machine à états explicite : les rappels d'événements des animations (§5.4) **empilent** des identifiants dans des files, que le Tick vide à chaque tour dans cet ordre (**sûr**) :
 
-1. Si `[8556] ≠ 0` (sortie demandée) : si `1028:0d9e(20036, 0x53, 996)` renvoie ≠ 0 (**probable** : un son est encore en cours), attend ; puis si `[a2de] ∈ {0, 3}` et (`[a406] ≠ 0` ou `[9702] = 0` ou `[9704] > 0`) : `[8554] = [8556]`, `[8556] = 0`, `11b8:0011(0, 0)`, Exit. `[a2de] = 2` : annule la demande.
+1. Si `[8556] ≠ 0` (sortie demandée) : si `1028:0d9e(996, SND)` renvoie ≠ 0 (**sûr** : le son 996 de « Go » joue encore ; « 20036 » était le mot bas de l'étiquette `SND`, voir fleens.md §4.2), attend ; puis si `[a2de] ∈ {0, 3}` et (`[a406] ≠ 0` ou `[9702] = 0` ou `[9704] > 0`) : `[8554] = [8556]`, `[8556] = 0`, `11b8:0011(0, 0)`, Exit. `[a2de] = 2` : annule la demande.
 2. `[8954]` (rampes) → `1118:29cc(zone)` : la rampe lance son script `S14:028e[zone]` (9000 / 9001 / 9003) avec le rappel `1118:39c5` ; éventuelle plaque supérieure `+1` ; réordonne les calques par rapport au Zoombini (`+0x94`).
 3. `[894e]` (libérations de cases d'attente) → `1100:0b69(Zoombini)` : repart dans sa direction.
 4. `[894c]` (objets d'effet terminés) → repasse l'objet sous le calque `[88d8]`.
@@ -312,7 +312,7 @@ Voir screens.md §3.4 et §6.3. Rien d'autre n'est écrit par l'épreuve (pas de
 1. ~~Générateurs de traits~~ **Tranché (sûr)** : réécrits bit à bit et vérifiés (§4). Le défaut `S14:0700` au lieu de `0754` est **confirmé** (lectures de la liste creuse, résultat 0 possible) et reproduit.
 2. ~~Placement initial de l'équipe~~ **Tranché en H9** : les 20 places de chaque falaise (`S14:042c + 0x50 × falaise + 4 × rang`) sont relues dans l'exécutable (§10.1) ; l'équipe prend les places 0 à 15 de la falaise 0 (`DS:8920 = 0x10`, **sûr** pour les compteurs), valeur initiale de `+0x76` à 0 (**probable**), marche de retour vers la place suivante de la file de la falaise (`1118:1503`, étape 8). Mode `1168:4231` des poses assises : voir §10.
 3. ~~Dessin des cases~~ **Tranché en H9 (sûr, `1100:2679` relue en entier ; vérifié au rendu)** : voir §10.2.
-4. **Sons** : **tranché pour l'essentiel en H9** (§10.4). Restent non identifiés : la voix `20036` (lue comme l'attente du son 996 de « Go », **probable**), `SCRS 14003` et `14005` (aucun appelant ; `1118:2d2a` joue `14003` mais n'est appelée par rien), `\0SND 5100`, `11000`, `12000` (chargés, jamais déclenchés).
+4. **Sons** : **tranché pour l'essentiel en H9** (§10.4). Restent non identifiés : `SCRS 14003` et `14005` (aucun appelant ; `1118:2d2a` joue `14003` mais n'est appelée par rien), `\0SND 5100`, `11000`, `12000` (chargés, jamais déclenchés).
 5. **`REGS 16001`, `16002`, `16499`, `16500`, `17002`, `18002`, carte `16607`** : données non référencées par le code (probablement des variantes de développement).
 6. **Hypothèses de nommage** : « Bubblewonder Abyss », ordre coiffe / yeux / nez / pieds, `+0xbf = +0xef`.
 7. **Durées exactes** : une image = 6 ticks (**probable**, §10.3) ; voix d'introduction `[a2c4] = 20068` rejouée par F1 (kit) ; textes d'aide (`11a0:155e`) toujours non étudiés.

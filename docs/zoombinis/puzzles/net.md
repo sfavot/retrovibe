@@ -150,7 +150,7 @@ Chaque tour (si `[1a08] == 0` et `[89ea] ≠ 0`) : pompe `11a8:04b9` ; sortie de
 
 ## 5. Animations et sons
 
-- Sons du Net : 7000–7021 (catapulte, boue, dalles), 8000–8002, 10000–10004 (boutons, symboles). Voix communes : 20055–20063 (victoire), 20045–20048 (échec partiel), 996 (Go), 999 (carte), 20036 (attente de fin avant sortie).
+- Sons du Net : 7000–7021 (catapulte, boue, dalles), 8000–8002, 10000–10004 (boutons, symboles). Voix communes : 20055–20063 (victoire), 20045–20048 (échec partiel), 996 (Go, dont la fin est attendue avant la sortie : `1028:0d9e(996, SND)`, l'ancien « 20036 » était l'étiquette `SND`), 999 (carte).
 - Événements des Zoombinis (`1120:2900`, table `1120:2D55`) : −1 (fin de script), 0 (basculement de pose), 2 (impact : le Zoombini rejoint le point de la file, `+0x127 = 1`), 4 (envoi à la catapulte, `[89a4]`), 20 (0x14) et 30 (0x1E) : étapes du vol et de la réception (`SCRS 13000+…` : `0x32D8 + 3·(attribut 3 − 1) + (2 − [89d6])` pour le saut, `0x32E7 + 3·… + [89d6]` pour la réception) ; 240–243, 250–253 : poses (comme Fleens).
 - Dalles : un `SCRB` par dalle (9000+), réaction `SCRB 8000 + colonne` au tir, révélation du numéro de groupe.
 - Mur : `SCRB 7000` (4 états, `[8b4c] + 0x1B77`…), tas de boue `7001…7016`.

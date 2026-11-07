@@ -115,9 +115,11 @@ describe.skipIf(!hasOriginalFiles)("ArmaethEngine par défaut et moteur nu", () 
     }
   }, HEAVY_TEST_TIMEOUT);
 
-  it("pas de garde-fou : un trajet bloqué finit comme dans l'original (5, un recalcul, 5, puis G44 « Impossible d'aller plus loin »)", () => {
+  it("pas de garde-fou : un trajet bloqué vers un objet finit comme dans l'original (4 : la commande est rejouée, V008)", () => {
     // salle 8, héros en X pair au pied de la pile de bois : l'alignement sur la colonne 49 le laisse en X 196, où le couloir de la
-    // pile (X 197 à 199 seulement, murs de la rangée 6 et masque de profondeur de P 56) est fermé ; en X impair il passe
+    // pile (X 197 à 199 seulement, murs de la rangée 6 et masque de profondeur de P 56) est fermé ; en X impair il passe.
+    // La marche « trop loin » poursuit le coffret (`Cib`, `Ser`) : au blocage le recalcul ne trouve aucun chemin (pas de repli
+    // sur le nœud le plus proche, `3187:0000`), le suivi rend 4 et `2363:01ea` rejoue la commande, toujours trop loin : `V008` (DOSBox-X)
     const p = new Player();
     p.skipIntro();
     p.engine.sendToRoom(8, true);
@@ -128,8 +130,8 @@ describe.skipIf(!hasOriginalFiles)("ArmaethEngine par défaut et moteur nu", () 
     const results: number[] = [];
     const original = frames.pathEnd.bind(p.engine);
     frames.pathEnd = (obj, result) => (results.push(result), original(obj, result));
-    expect(p.say("ouvrir le coffret")).toContain(text("G", 44));
-    expect(results).toEqual([5, 5]); // le premier blocage recalcule (`+0x43`), le second affiche G44
+    expect(p.say("ouvrir le coffret")).toEqual([text("V", 8)]);
+    expect(results).toEqual([4]);
     expect(hero.path.defined).toBe(false);
     expect([hero.x, hero.p]).toEqual([196, 56]);
   });

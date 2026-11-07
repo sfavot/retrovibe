@@ -331,6 +331,97 @@ describe.skipIf(!hasOriginalFiles)("Hidden : scène (vraies données)", () => {
     expect(api.scene.rewardScr).toBe(6200);
   });
 
+  /** Relève, image par image jusqu'à `until`, si la palette 154–217 est encore celle de départ ; `false` dès qu'elle a changé. */
+  async function paletteTrace(api: Api, act: () => Promise<void> | void, until: () => boolean): Promise<{ old: boolean[]; values: Uint8Array[] }> {
+    const before = api.services.graphics.palette.snapshot(0, 256);
+    await act();
+    const old: boolean[] = [];
+    const values: Uint8Array[] = [];
+    const same = (a: Uint8Array, b: Uint8Array) => a.every((v, i) => v === b[i]);
+    for (let n = 0; n < 400 && !until(); n++) {
+      const now = api.services.graphics.palette.snapshot(0, 256);
+      old.push(same(now, before));
+      values.push(now);
+      await api.run(1000 / 60);
+    }
+    // Jamais de valeur intermédiaire (`10a8:0dc4` n'est pas un fondu) : au plus deux palettes distinctes, et pas de retour en arrière.
+    const switchAt = old.indexOf(false);
+    if (switchAt >= 0) {
+      expect(old.slice(switchAt).some(Boolean)).toBe(false);
+      expect(values.slice(switchAt).every((v) => same(v, values[switchAt]!))).toBe(true);
+    }
+    return { old, values };
+  }
+
+  it("niveau depuis le menu : la palette du nouveau menu est installée avant les 15 ticks de stores, pas à leur fin (`1030:0717`)", async () => {
+    const api = await boot();
+    await api.toMenu();
+    // Les palettes des trois menus sont identiques sur 154–217 (photos en gris) : on relève donc l'image du chargement lui-même.
+    const { palette } = api.services.graphics;
+    const original = palette.loadShpl.bind(palette);
+    let frame = 0;
+    const loads: number[] = [];
+    palette.loadShpl = (shpl) => {
+      loads.push(frame);
+      original(shpl);
+    };
+    await api.click(...BUTTON.level2, 17);
+    frame = 1;
+    while (api.scene.phase !== "menu" && frame < 400) {
+      await api.run(1000 / 60);
+      frame++;
+    }
+    expect(loads).toHaveLength(1);
+    expect(loads[0]).toBeLessThanOrEqual(1);
+    expect(frame).toBeGreaterThanOrEqual(13);
+    expect(frame).toBeLessThanOrEqual(19);
+  });
+
+  it("vignette : 15 ticks de télé vide avec la palette du menu, puis palette de la photo d'un coup et 30 ticks d'écran entier (`1030:0490`)", async () => {
+    const api = await boot();
+    await api.toMenu();
+    const { old } = await paletteTrace(
+      api,
+      () => api.click(...thumbCenter(4), 17),
+      () => api.scene.phase === "playing",
+    );
+    const launching = old.indexOf(false);
+    expect(launching).toBeGreaterThanOrEqual(0);
+    // Le son de clic (5011) est joué en attente, puis 15 ticks de télé vide ; la palette change au début des 30 ticks suivants.
+    expect(old.length - launching).toBeGreaterThanOrEqual(28);
+    expect(old.length - launching).toBeLessThanOrEqual(33);
+    expect(old.slice(0, launching).every(Boolean)).toBe(true);
+    expect(launching).toBeGreaterThanOrEqual(15);
+  });
+
+  it("retour au menu depuis un puzzle : 30 ticks d'écran entier avec l'ancienne palette, palette du menu d'un coup, puis 15 ticks de télé (`1030:0717`)", async () => {
+    const api = await boot();
+    await api.startPuzzle(0);
+    const { old } = await paletteTrace(
+      api,
+      () => api.click(...BUTTON.level1, 17),
+      () => api.scene.phase === "menu",
+    );
+    const switchAt = old.indexOf(false);
+    expect(switchAt).toBeGreaterThanOrEqual(28);
+    expect(switchAt).toBeLessThanOrEqual(33);
+    expect(old.length - switchAt).toBeGreaterThanOrEqual(13);
+    expect(old.length - switchAt).toBeLessThanOrEqual(19);
+  });
+
+  it("Reset : 30 ticks de stores sans aucun changement de palette (`1030:0c67`)", async () => {
+    const api = await boot();
+    await api.startPuzzle(0);
+    await api.click(...BUTTON.reset, 1);
+    await api.until(() => api.scene.phase === "resetting" || api.scene.phase === "transition");
+    const { old } = await paletteTrace(
+      api,
+      () => undefined,
+      () => api.scene.phase === "playing",
+    );
+    expect(old.every(Boolean)).toBe(true);
+  });
+
   it("Reset garde le découpage, remet les pièces dans la pile ; un visage ramène au menu", async () => {
     const api = await boot();
     await api.startPuzzle(0);

@@ -58,6 +58,8 @@ class ConfirmScene implements Scene {
     areas: paletteAreas(PALETTE_YES, 2),
     changeSound: CLICK_SOUND,
     changeSoundIfIdle: true,
+    // Attente de fin de bruitage de l'original : `1823:0347..035b`.
+    waitEffectEnd: true,
   });
 
   constructor(

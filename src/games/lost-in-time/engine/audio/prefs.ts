@@ -1,3 +1,4 @@
+import { SoundPrefs, type Muteable } from "../../../../ui/sound-prefs";
 import type { KeyValueStore } from "../saves";
 
 /** Sortie audio que l'on peut couper sans toucher à l'état du moteur (position, lecture en cours). */
@@ -5,7 +6,12 @@ export interface Mutable {
   muted: boolean;
 }
 
-const KEY = "audio.sound";
+/**
+ * Clé historique de la préférence « Son » : elle s'ajoute au préfixe du stockage (`lost-in-time:`), donc la valeur
+ * enregistrée est `lost-in-time:audio.sound`. Gardée telle quelle pour que les choix déjà faits restent lus (le format
+ * commun serait `retrovibe:lost-in-time:sound`).
+ */
+export const SOUND_KEY = "audio.sound";
 /** Ancienne clé « Musique » (avant le bouton unique), lue une fois puis supprimée. */
 const LEGACY_MUSIC_KEY = "audio.music";
 
@@ -13,32 +19,21 @@ const LEGACY_MUSIC_KEY = "audio.music";
  * Préférence « Son » : persistée, et appliquée en coupant toutes les sorties (effets Web Audio et
  * piste CD, qui porte aussi ambiances et bruitages). Le moteur continue de tourner à l'identique :
  * les scripts interrogent l'état du son et la position du CD.
+ *
+ * La logique (valeur par défaut, `"0"` = coupé, relecture entre onglets) est celle de `src/ui/sound-prefs.ts` ; ici
+ * restent la clé historique et la migration de l'ancienne « Musique ».
  */
 export class AudioPrefs {
-  private on: boolean;
+  private readonly prefs: SoundPrefs;
 
-  constructor(
-    private readonly store: KeyValueStore,
-    private readonly targets: readonly Mutable[],
-  ) {
-    this.on = this.load();
-    this.apply();
-  }
-
-  private load(): boolean {
-    let on = this.store.get(KEY) !== "0";
-    // Migration : une ancienne « Musique » coupée est reprise une fois, puis la clé disparaît
-    // (le store ignore lui-même les erreurs de stockage).
-    if (this.store.get(LEGACY_MUSIC_KEY) === "0") {
-      on = false;
-      this.store.set(KEY, "0");
-    }
-    this.store.remove(LEGACY_MUSIC_KEY);
-    return on;
-  }
-
-  private apply(): void {
-    for (const target of this.targets) target.muted = !this.on;
+  constructor(store: KeyValueStore, targets: readonly Mutable[]) {
+    migrateLegacyMusic(store);
+    const output: Muteable = {
+      setMuted(muted) {
+        for (const target of targets) target.muted = muted;
+      },
+    };
+    this.prefs = new SoundPrefs(store, output, "lost-in-time", { key: SOUND_KEY });
   }
 
   /**
@@ -46,25 +41,27 @@ export class AudioPrefs {
    * Sans cela, un onglet garde son ancienne valeur et la réécrit au prochain clic.
    */
   reload(): boolean {
-    const on = this.store.get(KEY) !== "0";
-    if (on === this.on) return false;
-    this.on = on;
-    this.apply();
-    return true;
+    return this.prefs.reload();
   }
 
   isEnabled(): boolean {
-    return this.on;
+    return this.prefs.isEnabled();
   }
 
   set(on: boolean): void {
-    this.on = on;
-    this.apply();
-    this.store.set(KEY, on ? "1" : "0");
+    this.prefs.set(on);
   }
 
   toggle(): boolean {
-    this.set(!this.on);
-    return this.on;
+    return this.prefs.toggle();
   }
+}
+
+/**
+ * Migration : une ancienne « Musique » coupée est reprise une fois dans « Son », puis la clé disparaît
+ * (le store ignore lui-même les erreurs de stockage).
+ */
+function migrateLegacyMusic(store: KeyValueStore): void {
+  if (store.get(LEGACY_MUSIC_KEY) === "0") store.set(SOUND_KEY, "0");
+  store.remove(LEGACY_MUSIC_KEY);
 }

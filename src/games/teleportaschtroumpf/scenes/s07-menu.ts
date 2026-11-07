@@ -76,6 +76,8 @@ class MenuScene implements Scene {
     axis: "vertical",
     items: HELP_VOICES.map((n) => ({ voice: voiceName("s07v", n) })),
     changeSound: "s07a001b.voc",
+    // Attente de fin de bruitage de l'original : `21ee:11e6..11fa`.
+    waitEffectEnd: true,
     highlight: paletteHighlight(TEXT_PALETTE_FIRST, HOVER_COLOR),
     areas: buttonAreas,
   });

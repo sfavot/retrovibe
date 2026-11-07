@@ -102,6 +102,8 @@ class AbandonScene implements Scene {
       highlight: this.highlight(),
       changeSound: CLICK_SOUND,
       changeSoundIfIdle: true,
+      // Attente de fin de bruitage de l'original : `1823:0c3d..0c51`.
+      waitEffectEnd: true,
       areas: () => [
         // Le portrait, pas le parchemin : celui-ci descend jusqu'aux boutons et déborde sur ses voisins.
         ...this.characters.map((character, i) => spriteArea(this.sprites, PORTRAIT_SPRITES[character], SLOT_X[this.slots[i]], ROW_Y, AREA_MARGIN)),

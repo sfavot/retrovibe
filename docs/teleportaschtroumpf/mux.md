@@ -83,6 +83,8 @@ L'image est conservée d'une image à l'autre (nécessaire pour l'inter).
 Images par seconde = 1 193 182 / diviseur / 12, soit 11,0 pour 9039 (cas général), 5,0 pour S10A, 7,0 pour S52D0, 12,0 pour S52D1. Vérifié : le rapport (fréquence audio × images) / octets audio vaut 1/12 du taux du PIT dans les 4 groupes (0,079 à 0,083 ; un peu moins de 1/12 car la fin du film est parfois muette). Soit environ 1 715 octets audio par image à 18 867 Hz pour 11 images/s. Les chunks audio font environ 6 860 octets (≈ 4 images) ; S10A (5 images/s) : 15 093-15 094 octets.
 `MuxHeader.framesPerSecond` expose cette valeur.
 
+Le « 12 » est une constante d'encodage, pas de lecture : le lecteur original ne l'a nulle part. Il décode une image par numéro de chunk 05 tant que la position audio la dépasse, et la position avance de 4 par chunk audio (`343a:006c`) ; chaque chunk audio contient donc exactement 4 images (222 fichiers sonores sur 222). Voir `engine.md` §8 question 1.
+
 ## API
 
 `new MuxDecoder(bytes)` ; `header` ; `pixels` (image courante, persistante) ; `palette` (768 octets) ; `nextFrame()` → `{ index, paletteChanged, audio[], markers[] }` ou `null` ; `reset()`. Pas d'allocation par pixel ; le tampon de décompression LZ est réutilisé.

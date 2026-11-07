@@ -58,6 +58,8 @@ class PlayersScene implements Scene {
     items: Array.from({ length: MAX_PLAYERS }, () => ({})),
     axis: "horizontal",
     wrap: false,
+    // Attente de fin de bruitage de l'original : `21ee:0e4e..0e62`.
+    waitEffectEnd: true,
     areas: () => SILHOUETTE_X.map((x) => spriteArea(this.sprites, 0, x, COLORED_Y)),
   });
 

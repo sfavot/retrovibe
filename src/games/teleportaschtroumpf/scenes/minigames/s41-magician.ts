@@ -134,6 +134,8 @@ export class MagicianScene implements Scene {
     highlight: paletteHighlight(QUESTION_PALETTE_ENTRY, HOVER_COLOR),
     areas: paletteAreas(QUESTION_PALETTE_ENTRY, 2),
     changeSound: "s07a001b.voc",
+    // Attente de fin de bruitage de l'original : `2143:0659..066d` (question).
+    waitEffectEnd: true,
   });
   private readonly confirmMenu = new Menu({
     axis: "vertical",
@@ -142,6 +144,8 @@ export class MagicianScene implements Scene {
     highlight: paletteHighlight(CONFIRM_PALETTE_ENTRY, HOVER_COLOR),
     areas: paletteAreas(CONFIRM_PALETTE_ENTRY, 2),
     changeSound: "s07a001b.voc",
+    // Attente de fin de bruitage de l'original : `2143:0a5e..0a72` (confirmation).
+    waitEffectEnd: true,
   });
   private branchKind: MagicianBranch = "closed";
   private beep!: Voc;

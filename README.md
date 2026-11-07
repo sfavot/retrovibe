@@ -153,7 +153,7 @@ Avec `npm run dev` : `src/games/mathemagique/ui/dev.html` lance le jeu seul, san
 
 ## Armaeth
 
-*Armaeth* (Grandslam Video, 1994, CD pour DOS adapté par Rob Northen Computing) : jeu d'action et d'aventure en vue de côté, où l'on tape aussi des commandes. Le moteur `AM1.EXE` (Microsoft C, mode réel) et son pilote vidéo résident `VGA.EXE` sont reconstitués par rétro-ingénierie avec Ghidra. Le moteur est réécrit en TypeScript et le jeu est jouable dans le navigateur (en cours de validation) : musique AdLib (OPL2), souris, clavier et écran tactile, sauvegarde dans le navigateur (F2 / F3), et une page d'aide (les indices de `SOS.EXE`, dévoilés un par un) depuis l'écran de présentation.
+*Armaeth* (Grandslam Video, 1994, CD pour DOS adapté par Rob Northen Computing) : jeu d'action et d'aventure en vue de côté, où l'on tape aussi des commandes. Le moteur `AM1.EXE` (Microsoft C, mode réel) et son pilote vidéo résident `VGA.EXE` sont reconstitués par rétro-ingénierie avec Ghidra. Le moteur est réécrit en TypeScript et le jeu est jouable dans le navigateur (en cours de validation) : musique AdLib (OPL2), souris, clavier et écran tactile, sauvegarde dans le navigateur (F2 / F3), et une page d'aide (les indices de `SOS.EXE`, dévoilés un par un) depuis l'écran de présentation. Un robot joue la solution complète sur le moteur sans tête (`test/armaeth/walkthrough.test.ts`) : il va au bout sur 63 graines du hasard sur 64, la graine 56 étant abandonnée (limite du robot).
 
 ### Lancer le jeu
 

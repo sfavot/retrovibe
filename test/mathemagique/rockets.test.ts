@@ -9,6 +9,7 @@ import { Archive } from "../../src/engine/mohawk/resources";
 import { MsvcRandom, NoRepeatPool } from "../../src/engine/mohawk/rng";
 import { SceneId, type Scene } from "../../src/games/mathemagique/engine/scene";
 import { installServices } from "../../src/games/mathemagique/engine/services";
+import { historyOf } from "../../src/games/mathemagique/scenes/hub-logic";
 import { ROCKETS_POLY, polyScriptIds } from "../../src/games/mathemagique/game/poly-config";
 import {
   DEFAULT_RULES,
@@ -716,5 +717,23 @@ describe.skipIf(!hasOriginalFiles)("scène Rockets sur le moteur (NIM.DAT)", () 
     const rig = await boot(0);
     await rig.idle();
     expect(rig.scene.key).toBeUndefined();
+  });
+});
+
+describe("Rockets : séquences secrètes de fin de partie (code mort de l'original, `1070:0958` et `1070:09b7`)", () => {
+  // `1098:036f(0)` : `0 | 0x800` si Maj (`GetKeyState(0x10)`), `| 0x400` si Ctrl (`0x11`) ; les deux sites d'appel (`1070:0972`, `1070:09ce`)
+  // exigent `0x600`, que ces deux bits ne peuvent pas donner : le port ne déclenche donc jamais les effets.
+  const keyMask = (shift: boolean, ctrl: boolean) => 0 | (shift ? 0x800 : 0) | (ctrl ? 0x400 : 0);
+
+  it("la condition `== 0x600` est inatteignable avec Maj et Ctrl", () => {
+    for (const shift of [false, true]) for (const ctrl of [false, true]) expect(keyMask(shift, ctrl)).not.toBe(0x600);
+  });
+
+  it("les quatre dernières frappes `zero` (ami) et `home` (Poly) donnent le `H` comparé par `1018:043a`", () => {
+    expect(historyOf("zero").h).toBe(0x0f59796f);
+    expect(historyOf("home").h).toBe(0x0d1bf6e5);
+    // `X` cumule aussi les frappes antérieures : taper les seuls quatre lettres ne donne pas le `X` d'origine.
+    expect(historyOf("zero").x).not.toBe(0x5beea427);
+    expect(historyOf("home").x).not.toBe(0xa6575855);
   });
 });

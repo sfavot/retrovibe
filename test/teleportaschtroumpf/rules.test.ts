@@ -452,6 +452,26 @@ describe("événements du plateau", () => {
     expect(game.state.current).toBe(1);
   });
 
+  it("Turlusiphon : trou de 1 px de l'original (2bd4:08e8, 0cbc, 0e9c), le bouton n'y répond pas", () => {
+    for (const [screen, row, gaps, inside] of [
+      [3, "bottom", [0xff, 0x113], [0xfe, 0x114]],
+      [6, "bottom", [0xff, 0x113], [0xfe, 0x114]],
+      [5, "top", [0x99, 0xad], [0x98, 0xae]],
+    ] as const) {
+      for (const x of gaps) {
+        const game = duo();
+        place(game, screen, row, x);
+        expect(game.press().some((e) => e.type === "hazard"), `écran ${screen} x=${x.toString(16)}`).toBe(false);
+        expect(game.state.players[0].status).toBe(0);
+      }
+      for (const x of inside) {
+        const game = duo();
+        place(game, screen, row, x);
+        expect(game.press().find((e) => e.type === "hazard"), `écran ${screen} x=${x.toString(16)}`).toMatchObject({ kind: "turlusiphon" });
+      }
+    }
+  });
+
   it("Turlusiphon : relâché au tour suivant (6 → 5), le pion recule de 20 px", () => {
     const game = duo();
     place(game, 3, "bottom", 0x120);
@@ -825,6 +845,20 @@ describe("temps du tour", () => {
     expect(game.state.phase).toBe("turn");
     const events = game.tick(1.5);
     expect(events.find((e) => e.type === "minigame")).toMatchObject({ request: { scene: 23 } });
+  });
+
+  it("multijoueur : action automatique sur une zone sans porte (classe N) = rien, le tour passe au joueur suivant (291e:0401)", () => {
+    // Les zones N (11f4) ont un code `null` ou 15 à 18 : jamais un mini-jeu (28a3:0474), donc « rien et fin de tour ».
+    for (const [screen, row, x] of [[1, "top", 0x30], [4, "bottom", 0x70], [5, "bottom", 0x10], [7, "bottom", 0x80], [8, "top", 0x10]] as const) {
+      expect(doorClassAt(screen, row, x), `écran ${screen} ${row}`).toBe("none");
+      const game = duo();
+      place(game, screen, row, x);
+      game.tick(35);
+      expect(game.state.current).toBe(0);
+      const events = game.tick(1.5);
+      expect(events.filter((e) => e.type === "minigame"), `écran ${screen} ${row}`).toEqual([]);
+      expect(game.state.current).toBe(1);
+    }
   });
 
   it("seul : pas d'action automatique ; indices à 12 s puis 24 s (annulés si le joueur bouge)", () => {

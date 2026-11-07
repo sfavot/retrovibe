@@ -147,8 +147,11 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     const d = mainMenuAs();
     d.choose(10);
     d.flow.videoEnded(false);
+    expect(d.flow.worldReadsInput).toBe(true);
     d.flow.levelEnded("complete", { seconds: 75 });
     expect(d.flow.phaseName).toBe("end");
+    // Derrière l'écran de fin, le monde relit la souris : le pointeur reste verrouillé.
+    expect(d.flow.worldReadsInput).toBe(true);
     expect(d.flow.view).toMatchObject({ kind: "menu", backdrop: "level" });
     d.idle(70); // ~1,1 s : compteur de fin à 99 sur 110
     d.anyKey();
@@ -157,6 +160,7 @@ describe.skipIf(!hasOriginalFiles)("enchaînement des écrans (textes et script 
     d.anyKey();
     expect(host.ended).toBe(1);
     expect(d.flow.view).toMatchObject({ kind: "video", name: "BR_TER1", mission: 1 });
+    expect(d.flow.worldReadsInput).toBe(false);
     // meilleure mission = celle qui est démarrée ; temps de jeu cumulé ; tout est enregistré
     expect(store.get(0)).toMatchObject({ bestMission: 1, playSeconds: 75 });
   });

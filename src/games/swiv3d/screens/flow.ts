@@ -293,6 +293,14 @@ export class Flow {
     return this.phase.kind;
   }
 
+  /**
+   * Le monde est-il simulé avec les commandes du joueur ? En jeu, et derrière l'écran de fin, où `gm_poll_events` relit encore la souris
+   * (type 2 : recentrage du curseur, axes) et la manette à chaque image : le pointeur y reste verrouillé.
+   */
+  get worldReadsInput(): boolean {
+    return this.phase.kind === "level" || this.phase.kind === "end";
+  }
+
   /** Mission de test en cours : F12 ouvre le menu Tricher. */
   get testMode(): boolean {
     return this.test;

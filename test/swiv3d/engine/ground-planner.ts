@@ -37,6 +37,11 @@ function stepCost(slope: number, len: number, water: boolean): number {
   return len * (c + (water ? WATER_COST : 0));
 }
 
+/** Indice de la case (64 unités) d'une position en unités. */
+function cellOf(x: number, z: number): number {
+  return ((Math.floor(z / CELL_UNITS) & MASK) * MAP_SIZE) + (Math.floor(x / CELL_UNITS) & MASK);
+}
+
 export class GroundField {
   /** Coût restant jusqu'à la cible. */
   readonly dist = new Float64Array(MAP_SIZE * MAP_SIZE).fill(Infinity);
@@ -85,6 +90,11 @@ export class GroundField {
         }
       }
     }
+  }
+
+  /** Coût restant depuis la case de (x, z) en unités. */
+  costAt(x: number, z: number): number {
+    return this.dist[cellOf(x, z)]!;
   }
 
   /**

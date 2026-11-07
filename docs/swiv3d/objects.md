@@ -249,7 +249,7 @@ Réserve un nœud aérien (§9, colonne `+0x1c`, `004264d4`). Cible : `00443938(
 - sans cible : `00444ef4` à hauteur 40, nœud suivant à tour de rôle (`00442bc8`) quand `D² < 2 000` ;
 - avec cible : hauteur 70, `gm_enemy_fire` en continu, et à l'arrivée il choisit le voisin libre le plus proche du joueur (`00442a28`) : il **passe devant le joueur en tirant** plutôt qu'il ne le poursuit en vol libre.
 
-Arme 600 (11), 603 (7) ou 601 (2 : sans programme, muet). À la mort : épave `00449c10`, 210 points, nœud rendu.
+Arme 600 (11), 603 (7) ou 601 (2 : visé à 0 et 5, 50 pv, recharge 45, son 2002 au tir de 0 ; `0046d1f8`, branche `< 0x25a`). À la mort : épave `00449c10`, 210 points, nœud rendu.
 
 ### 6.6 Véhicules `5000`, `5002`, `5500` (`0044bca8`, `0044cf1c`) (confirmé)
 
@@ -367,6 +367,7 @@ Un `switch` sur `o.+0x54` (code d'arme). Le minuteur `+0x14` fait office d'horlo
 | 510 | 0 puis 1 | 39 | 2 missiles 800 alternés (g puis d, ±8 unités), `00456f78` | 55 | 2000 |
 | 511 | 0 puis 1 | 41 | 2 missiles 801 alternés, `00455278` | 55 | 2000 |
 | 600 | 0 | 60 | **visé** : vitesse = direction vers la cible × 32 u/image (norme 8 192), 10001 | 50 | 2002 |
+| 601 | 5, 0 | 45 | visé, 10001 (2 coups) | 50 | 2002 |
 | 602 | 0 | 55 | visé, 10005 | 25 | 2002 |
 | 603 | 5, 0 | 40 | visé, 10005 (2 coups) | 35 | 2002 |
 | 610 / 611 / 612 | 0 | 60 | fusée à phases (`00457d4c`, phase de départ 0 / 10 / 20), modèle 801, `vy = 600`, tangage 128, minuteur 40 | 50 | 2000 |
@@ -375,7 +376,7 @@ Un `switch` sur `o.+0x54` (code d'arme). Le minuteur `+0x14` fait office d'horlo
 | 701 | cycle 110 : de 40 à 0 | 110 | faisceau : (32, 24, 16, 8, 0) `cible.pv -= 19` ; son à 40 | 19 × 5 | 2005 |
 | 999, autres | - | - | rien | - | - |
 
-Dans les niveaux : 100, 101, 110, 111, 112, 121, 400, 405, 408 (tourelles et chars) ; 600, 601 (muet), 603 (avions et chasseurs `4002`, `6100-6300`) ; 602 (chasseurs `6300`) ; 700, 701 (canon `3001`). Les autres codes sont câblés mais absents des données lues.
+Dans les niveaux : 100, 101, 110, 111, 112, 121, 400, 405, 408 (tourelles et chars) ; 600, 601, 603 (avions et chasseurs `4002`, `6100-6300`) ; 602 (chasseurs `6300`) ; 700, 701 (canon `3001`). Les autres codes sont câblés mais absents des données lues.
 
 Les tirs « droits » partent dans la **direction du canon** (cap et tangage de l'objet) ; les armes 600-603 et 666 sont **visées** sur la position de la cible au moment du tir (pas de prédiction de son mouvement). Le faisceau 700/701 n'a pas de portée propre : celle de `3001` (640 unités).
 

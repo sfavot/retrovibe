@@ -490,8 +490,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     collector.capturing = flow.phaseName === "capture";
 
     const view = flow.view;
-    // Hors du niveau (menus, pause d'abandon, Tricher, fin), le pointeur est rendu.
-    if (view.kind !== "level" && pointerLocked()) document.exitPointerLock();
+    // Hors du niveau (menus, pause d'abandon, Tricher), le pointeur est rendu ; derrière l'écran de fin, le monde relit encore la souris
+    // (`gm_poll_events` recentre le curseur à chaque image) : il reste verrouillé.
+    if (!flow.worldReadsInput && pointerLocked()) document.exitPointerLock();
     if (view !== lastView) {
       if (lastView?.kind === "video") video?.player?.stop();
       // Titres 3D : en quittant un menu les titres repartent (`gm_title_release`) et le titre du menu suivant arrive ; un écran sans menu

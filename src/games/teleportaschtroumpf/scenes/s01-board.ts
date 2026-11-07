@@ -123,7 +123,7 @@ export function timerBlinkOff(turnSeconds: number, ticks: number): boolean {
   return turnSeconds >= TURN_AUTO_SECONDS - TIMER_BLINK_SECONDS && Math.floor(ticks / (TICKS_PER_SECOND / 2)) % 2 === 1;
 }
 
-/** Bandeau du bas (le même que celui que S48 recopie, `y ≥ 0x98`) : le toucher met en pause. */
+/** Bandeau du bas (le même que celui que S48 recopie, `y ≥ 0x98`) : le toucher ou le clic gauche met en pause (ajout du port). */
 const HUD_TOP = 0x98;
 /** Toucher à moins de `EDGE_TOUCH` pixels d'un bord : le pion marche jusqu'à l'écran voisin. */
 const EDGE_TOUCH = 16;
@@ -274,6 +274,8 @@ export class Board {
 
     const touch = this.readTouch(input.touchGesture);
     if (touch === "pause" || touch === "help") return { kind: touch };
+    // Clic gauche sur le bandeau : la pause, comme au doigt (dans l'original, tout clic vaut le bouton, sans menu à la souris).
+    if (input.validateNotTouch && input.validateAt && input.validateAt.y >= HUD_TOP) return { kind: "pause" };
     if (input.pressed("left") || input.pressed("right") || input.pressed("up")) this.touchTarget = null;
     // Le doigt qui se pose envoie aussi « valider » : c'est son geste qui décide (toucher le pion = le bouton).
     const press = input.validateNotTouch || touch === "press";

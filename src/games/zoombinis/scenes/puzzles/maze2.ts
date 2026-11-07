@@ -20,6 +20,10 @@
  *     compteur qui boucle ; 16 réservées sur la falaise 0). Il peut être relancé s'il y a une rampe active sur sa falaise (relais des falaises 1 et 2 au niveau 3).
  *  5. **Fin** : « go » actif dès qu'un Zoombini a atteint la falaise 3 (`+0x127`) ; il joue 996 puis mène à Zoombiniville. Les Zoombinis hors de la falaise 3 sont perdus.
  *     Quand tous sont sur la falaise 3 : voix de réussite puis danse d'un Zoombini toutes les 30 ticks.
+ *  6. **Danse d'arrivée** : l'événement de `SCRS 14007` (image 5, dernière) met le Zoombini arrivé sur la falaise 3 en file `[8956]` ; le Tick (étape 6) lui joue aussitôt
+ *     `SCRS 15090 + pieds` (12 à 18 images, voix aux événements `212`), qui remplace la fin de `14007`. C'est le rappel de fin de **cette** danse (`+0x2f`) qui le met en file
+ *     `[8950]` : il danse en entier, sur sa case d'arrivée, puis marche vers sa place (la voix de réussite totale est donc dite à ce moment). Sur les falaises 1 et 2 le même
+ *     événement met directement le Zoombini en file `[8950]` : la marche de retour remplace la dernière image de `14007`.
  *
  * ## Écarts avec l'original (voir aussi `docs/zoombinis/puzzles/maze2.md`)
  *
@@ -32,7 +36,6 @@
  *  - la rampe joue son script entier ; le Zoombini passe devant le canon (pas de réordonnancement des calques de la rampe) ;
  *  - les Zoombinis qui reviennent marchent en ligne droite (pas de terrain `tBMP 100` : dans les épreuves l'original ne s'en sert qu'au dépôt) ;
  *  - la case d'attente est animée en boucle (`base + 9…14`) ; le bouton enfoncé joue `base + 15…18` ; **probable** ;
- *  - la danse du Zoombini qui vient d'atterrir sur la falaise 3 (`[8956]`, étape 6 du Tick) est annulée dans l'original par sa marche de retour une image plus tard : non portée ;
  *  - grille `tBMP 12000` et `SCRB 12000` à `12002` : aide de mise au point (jamais créée par le code), non dessinée ; `SCRS 14003` et `14005` : jamais jouées (aucun appelant) ;
  *  - voix `20036` attendue avant de quitter (`1118:1503`) : lue comme l'attente du son 996 du bouton « go » (**probable**), c'est la fin de `pressGo` du kit.
  */
@@ -193,6 +196,8 @@ export interface Maze2Probe {
   /** Place suivante de la file d'une falaise (sans la consommer). */
   nextPlace(cliff: number): Point;
   readonly dancing: boolean;
+  /** Zoombinis qui dansent leur arrivée sur la falaise 3, avant de rejoindre leur place. */
+  readonly landDances: number;
   /** Copie du monde (pour un robot ou un contrôle). */
   snapshot(): Maze2World;
 }
@@ -240,6 +245,8 @@ class Maze2Run implements Maze2Probe {
   private imageCount = 0;
   private switchSounds = 0;
   private dancingNow = false;
+  /** Zoombinis en train de danser leur arrivée sur la falaise 3 (`[8956]`, étape 6 du Tick). */
+  private landDancers = 0;
   private danced = 0;
   private lastDance = 0;
   private readonly dancers: number[] = [];
@@ -351,6 +358,10 @@ class Maze2Run implements Maze2Probe {
 
   get images(): number {
     return this.imageCount;
+  }
+
+  get landDances(): number {
+    return this.landDancers;
   }
 
   get dancing(): boolean {
@@ -799,7 +810,28 @@ class Maze2Run implements Maze2Probe {
   private endView(view: FlightView): void {
     this.dropBubble(view);
     for (const effect of view.effects.splice(0)) this.features.destroy(effect);
-    this.returnHome(view.member, view.at);
+    if (this.world.members[view.member.index]!.cliff === MAZE2_GOAL_CLIFF) this.danceLanding(view);
+    else this.returnHome(view.member, view.at);
+  }
+
+  /**
+   * `1118:1503` étape 6 : un Zoombini arrivé sur la falaise 3 est mis en file `[8956]` par l'événement de `SCRS 14007` (`1118:3263`) ; le Tick lui joue `SCRS 15090 + pieds`
+   * (même rappel, drapeau `+0x2f`) avant que `14007` ait fini : la danse prend la place de sa dernière image. Le rappel de fin de la danse met alors le Zoombini en file
+   * `[8950]` (étape 8) : il ne marche vers sa place qu'une fois la danse finie (voix et retour sont donc retardés d'autant).
+   */
+  private danceLanding(view: FlightView): void {
+    const { member } = view;
+    const { snoid } = member;
+    snoid.setPosition(view.at);
+    snoid.setFacing(0);
+    snoid.onEvent = undefined;
+    this.landDancers += 1;
+    snoid.onEnd = () => {
+      snoid.onEnd = undefined;
+      this.landDancers -= 1;
+      this.returnHome(member, view.at);
+    };
+    snoid.play(SCRS.dance + snoid.traits.feet, FeatureFlag.stopAtEnd, { kind: "normal" });
   }
 
   private returnHome(member: KitMember, from: Point): void {

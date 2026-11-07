@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { MohawkArchive } from "../../../src/data/mohawk/mohawk";
+import { Archive } from "../../../src/engine/mohawk/resources";
+import { scrs } from "../../../src/games/zoombinis/engine/resources";
 import { createZoombinisEngine } from "../../../src/games/zoombinis/engine/engine";
 import { DIALOG } from "../../../src/games/zoombinis/engine/dialog";
 import { FEATURES } from "../../../src/games/zoombinis/engine/features";
@@ -148,8 +151,8 @@ describe.skipIf(!original.has)("gouffre des véhibules : écran (écran 18, MAZE
       expect(done()).toBe(true);
     };
     const scripts = () => features.features.map((f) => f.scriptId);
-    /** Plus rien ne vole (les Zoombinis retenus dans une case d'attente restent), plus de lancer en cours, plus personne en marche. */
-    const settled = () => probe().launches === 0 && probe().world.flights.every((f) => f.state === "wait") && probe().kit.members.every((m) => !m.snoid.walking);
+    /** Plus rien ne vole (les Zoombinis retenus dans une case d'attente restent), plus de lancer en cours, plus de danse d'arrivée, plus personne en marche. */
+    const settled = () => probe().launches === 0 && probe().landDances === 0 && probe().world.flights.every((f) => f.state === "wait") && probe().kit.members.every((m) => !m.snoid.walking);
     /** Point à saisir pour un membre : un point de son rectangle où il est bien le Zoombini le plus en avant. */
     const grab = (index: number) => {
       const member = probe().kit.members[index]!;
@@ -315,6 +318,74 @@ describe.skipIf(!original.has)("gouffre des véhibules : écran (écran 18, MAZE
     expect(maze2Outcome(probe().world).saved).toEqual([index + 1]);
     expect(queued).toContain(30035);
   }, 60_000);
+
+  it("danse d'arrivée : le Zoombini qui atterrit sur la falaise 3 joue SCRS 14007 puis SCRS 15090 + pieds en entier (il ne marche qu'après) ; sur une falaise de relais, pas de danse", async () => {
+    const { probe, until, features, wait, settled, scene } = await start({ level: 0 });
+    // Ticks écoulés de l'écran (l'hôte de test ne garantit pas la durée d'un tick en millisecondes).
+    let ticks = 0;
+    const tick = scene.tick.bind(scene);
+    scene.tick = (...args) => {
+      ticks += 1;
+      tick(...args);
+    };
+    const found = findLaunch(probe(), (w, id) => w.members[id - 1]!.saved);
+    expect(found, "un lancer qui sauve existe").not.toBeNull();
+    const { index, ramp } = found!;
+    const member = probe().kit.members[index]!;
+    const feet = member.snoid.traits.feet;
+    expect(probe().launch(index, ramp)).toBe(true);
+    // Scripts joués par le Zoombini, un échantillon par tick (suites identiques regroupées), et marche en cours.
+    const played: number[] = [];
+    const walkingAt: boolean[] = [];
+    const startedAt: number[] = [];
+    const sample = () => {
+      const id = features.features.find((f) => f === member.snoid.feature)?.scriptId ?? -1;
+      if (played[played.length - 1] !== id) {
+        played.push(id);
+        walkingAt.push(member.snoid.walking);
+        startedAt.push(ticks);
+      }
+    };
+    await until(() => {
+      sample();
+      return probe().world.goalArrivals > 0 && settled();
+    }, 4000);
+    const dance = 15090 + feet;
+    const land = played.indexOf(14007);
+    const danced = played.indexOf(dance);
+    expect(land, "SCRS 14007 joué").toBeGreaterThan(-1);
+    expect(played[land - 1]).toBe(15075 + feet);
+    // La danse suit `14007` sans autre script entre eux, une seule fois (un seul Zoombini sauvé : pas de danse finale), sur sa case d'arrivée.
+    expect(danced).toBe(land + 1);
+    expect(played.filter((id) => id === dance)).toHaveLength(1);
+    expect(walkingAt[danced]).toBe(false);
+    // Elle va au bout de ses images (6 ticks chacune ; échantillons toutes les 3 ticks) avant que la marche ne commence.
+    const images = scrs(new Archive("MAZE2.MHK", MohawkArchive.parse(original.read("MAZE2.MHK"))), dance).imageCount;
+    expect(startedAt[danced + 1]! - startedAt[danced]!).toBeGreaterThanOrEqual((images - 1) * IMAGE_TICKS);
+    // Après la danse seulement : la marche vers la première place de la falaise 3.
+    expect(played.length).toBeGreaterThan(danced + 1);
+    expect(member.snoid.position).toEqual(CLIFF_PLACES[3]![0]);
+    expect(member.zoombini.present).toBe(true);
+    await wait(60);
+    expect(played.filter((id) => id === dance)).toHaveLength(1);
+  }, 60_000);
+
+  it("danse d'arrivée : pas de danse sur une falaise de relais (SCRS 14007 seul, puis la marche)", async () => {
+    const { probe, until, features, settled } = await start({ level: 3 });
+    const found = findLaunch(probe(), (w, id) => w.members[id - 1]!.cliff === 2);
+    expect(found).not.toBeNull();
+    const { index, ramp } = found!;
+    const member = probe().kit.members[index]!;
+    const played = new Set<number>();
+    expect(probe().launch(index, ramp)).toBe(true);
+    await until(() => {
+      played.add(features.features.find((f) => f === member.snoid.feature)?.scriptId ?? -1);
+      return settled() && probe().world.members[index]!.cliff === 2 && probe().world.flights.length === 0;
+    }, 4000);
+    expect(played.has(14007)).toBe(true);
+    for (let feet = 1; feet <= 5; feet++) expect(played.has(15090 + feet)).toBe(false);
+    expect(probe().landDances).toBe(0);
+  }, 90_000);
 
   it("la simulation avance d'une image toutes les 6 ticks, seulement quand quelque chose bouge", async () => {
     const { probe, wait } = await start({ level: 0 });

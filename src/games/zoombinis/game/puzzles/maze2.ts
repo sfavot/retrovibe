@@ -1087,9 +1087,14 @@ const WHIRL_REMOVE = 25;
 const WHIRL_BACK = 26;
 const CLASH_REMOVE = 6 + 5;
 const CLASH_BACK = 6 + 6;
-/** Atterrissage : gerbe `SCRB 10040` (événement `0x79` à l'image 2) puis `SCRS 14007` (6 images, `0x5c` à l'image 5) : le Zoombini quitte la liste en vol au bout de 7 images (`1118:348d`, `1118:3263`). */
+/**
+ * Atterrissage : gerbe `SCRB 10040` (événement `0x79` à l'image 2) puis `SCRS 14007` (6 images, `0x5c` à l'image 5) : à cet événement (`1118:3263`) le Zoombini quitte la
+ * liste en vol (7 images) et, sur une falaise de relais, rejoint tout de suite la file de retour `[8950]` (la marche remplace la dernière image de `14007`). Sur la falaise 3
+ * l'événement le met en file `[8956]` : le Tick lui joue la danse (`SCRS 15090 + pieds`) à la place de la fin de `14007` (image 8) et il ne rejoint `[8950]` qu'à la fin de
+ * la danse, dont la durée dépend de ses pieds (mise en scène : `scenes/puzzles/maze2.ts`).
+ */
 const LAND_REMOVE = 2 + 5;
-const LAND_BACK = 2 + 6;
+const LAND_DANCE = 2 + 6;
 
 function cellIndex(row: number, col: number): number {
   return row * MAZE2_SIZE + col;
@@ -1254,7 +1259,7 @@ function land(w: Maze2World, f: Maze2Flight, cliff: number): void {
   }
   f.state = "land";
   f.removeAt = w.time + LAND_REMOVE;
-  f.backAt = w.time + LAND_BACK;
+  f.backAt = w.time + (cliff === MAZE2_GOAL_CLIFF ? LAND_DANCE : LAND_REMOVE);
 }
 
 /** Événement de la 4e image d'un pas (`1118:3ecd` et variantes) : compteur de la case visée ; deux arrivées → les deux Zoombinis sont rejetés. */

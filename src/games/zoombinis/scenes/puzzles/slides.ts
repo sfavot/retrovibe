@@ -246,7 +246,8 @@ class SlidesRun implements SlidesProbe {
     const F = FeatureFlag;
     for (let k = 0; k < 10; k++) {
       const depth = k < 6 ? DEPTH.stone + (2 * k + 1) * DEPTH.row + DEPTH.row / 2 : k < 8 ? DEPTH.stone + 13 * DEPTH.row : DEPTH.front;
-      this.features.create({ script: SCRB.decor + k, delay: DELAY, flags: F.flag4000000 | F.staticFirst | F.noReplay | F.active | F.firstImage, depth });
+      // `1150:0000` crée les décors avec `0x188000`, sans le bit `0x1000000` : dessinés au repos.
+      this.features.create({ script: SCRB.decor + k, delay: DELAY, flags: F.flag4000000 | F.still | F.noReplay | F.active | F.firstImage, depth });
     }
   }
 

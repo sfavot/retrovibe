@@ -54,7 +54,8 @@ export const FEATURE_END = 0xffff;
 
 /**
  * Drapeaux d'une feature (`+0x20`, `engine.md` §3.5). Interprétés : `firstImage`, `noDraw`, `active`, `resetOnce`, `stopEachImage`,
- * `queueScript`, `noReplay`, `stopAtEnd`, `relative`, `staticFirst`, `random`. Stockés sans effet (« non interprétés ») : `snoid`
+ * `queueScript`, `noReplay`, `stopAtEnd`, `relative`, `staticFirst`, `random`, et `still` (extension du port : image fixe dessinée, pour les décors que
+ * l'original crée sans le bit `0x1000000`). Stockés sans effet (« non interprétés ») : `snoid`
  * et `other` (taille de l'objet et tables `SCRS` de l'original, mais lus par `Features.reorder` pour reconnaître un personnage
  * mobile), `region` (région attachée, `11d8:0958`). Lus seulement par `Features.reorder` (`11a8:231b`) : `overlay`, `active`,
  * `flag4000000`, `limitLeft`, `limitRight`, `limitTop`.
@@ -82,7 +83,12 @@ export const FeatureFlag = {
   stopAtEnd: 0x100000,
   /** Position relative : les parties sont décalées de `position` moins la première case de l'image 0. */
   relative: 0x800000,
-  /** Image fixe : ne joue que la première image, sans son, puis s'arrête. */
+  /**
+   * Image fixe du port (**extension**, bit absent de l'original) : ne joue que la première image, sans son, puis s'arrête, et reste dessinée. Pour les
+   * décors que l'original crée sans `0x1000000` (et que le port veut figer sur leur première image).
+   */
+  still: 0x400000,
+  /** Bit `0x1000000` de l'original : arrêt dès la première image, sans son (`11a0:033a`). */
   staticFirst: 0x1000000,
   /** Lecture aléatoire : l'image suivante est tirée par `10a8:04e8(dernière, 0)`. */
   random: 0x2000000,
@@ -640,7 +646,7 @@ export class Features {
         feature.hasFlag(FeatureFlag.stopEachImage)
       )
         feature.active = false;
-      if (!feature.hasFlag(FeatureFlag.staticFirst)) {
+      if (!feature.hasFlag(FeatureFlag.staticFirst | FeatureFlag.still)) {
         feature.redraw = true;
         silent = false;
       } else {

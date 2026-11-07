@@ -397,6 +397,17 @@ describe("features : lecteur de scripts (scripts synthétiques)", () => {
     expect(f.image).toBe(0);
   });
 
+  it("still (image fixe du port, 0x400000, absente de l'original) : comme le bit 0x1000000 à la lecture, arrêt après la première image", () => {
+    expect(FeatureFlag.still).toBe(0x400000);
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    const f = h.spawn([{ cells: [[1, 7, 7]] }, { cells: [[2, 7, 7]] }], { flags: FeatureFlag.firstImage | FeatureFlag.still });
+    expect(f.parts).toEqual([{ w: 1, x: 7, y: 7 }]);
+    expect(f.active).toBe(false);
+    h.trace(5, () => 0);
+    expect(f.image).toBe(0);
+  });
+
   it("noDraw joue sans dessiner ; noReplay, stopEachImage et resetOnce arrêtent la lecture", () => {
     const h = new Harness();
     h.features.setGroup(0, sheet());

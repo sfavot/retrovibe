@@ -608,7 +608,8 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
       script: SCRIPT_CARD_BASE + style,
       delay: 0,
       depth: CARD_DEPTH,
-      flags: FeatureFlag.staticFirst | FeatureFlag.noReplay | FeatureFlag.firstImage,
+      // `1188:1071` crée la fiche avec `0x5000` (dessin propre `1188:1832`) : sans le bit `0x1000000`, donc dessinée au repos.
+      flags: FeatureFlag.still | FeatureFlag.noReplay | FeatureFlag.firstImage,
       onAfterDraw: (feature, screen) => {
         const drawer = ctx.services.tryGet(ZOOMBINIS_TEXT);
         const rect = feature.rect;

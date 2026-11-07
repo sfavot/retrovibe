@@ -290,7 +290,10 @@ class Maze2Run implements Maze2Probe {
     f.addScripts(GROUP_RAMPS, 8);
     f.addScripts(GROUP_BUBBLES, 44);
     const F = FeatureFlag;
-    const still = F.flag4000000 | F.staticFirst | F.noReplay | F.active | F.firstImage;
+    // `1118:0000` : calques (`0x4008000`, `0x4000000`), marques (`0x4108000`) et rampes (`0x4988000`) sans le bit `0x1000000` ; plaques (`0x508a000`) et caches
+    // des rampes (`0x5988000`, `0x5980000`) avec : ceux-là ne sont dessinés que pendant qu'ils jouent (survol, passage).
+    const still = F.flag4000000 | F.still | F.noReplay | F.active | F.firstImage;
+    const stillBit = F.flag4000000 | F.staticFirst | F.noReplay | F.active | F.firstImage;
     f.create({ script: 0, delay: 0, depth: DEPTH.cells, flags: 0, onAfterDraw: (_feature, screen) => this.drawCells(screen) });
     const active = new Set(this.world.ramps);
     // Machines à bulles des falaises (`SCRB 9005 + falaise`, première image) : la falaise 0 toujours, les falaises 1 et 2 si elles ont une rampe active (`1118:0000`).
@@ -315,9 +318,9 @@ class Maze2Run implements Maze2Probe {
     for (const number of this.world.ramps) {
       const ramp = MAZE2_RAMPS[number - 1]!;
       f.create({ script: SCRB.mark + number - 1, delay: IMAGE_TICKS, depth: DEPTH.marks, flags: still });
-      const plate = f.create({ script: SCRB.plate + number - 1, delay: IMAGE_TICKS, depth: DEPTH.plates, flags: still });
+      const plate = f.create({ script: SCRB.plate + number - 1, delay: IMAGE_TICKS, depth: DEPTH.plates, flags: stillBit });
       const object = f.create({ script: ramp.script, delay: IMAGE_TICKS, depth: DEPTH.ramps, position: ramp.plaque, flags: still | F.relative });
-      const front = ramp.script === 9000 ? null : f.create({ script: ramp.script + 1, delay: IMAGE_TICKS, depth: DEPTH.fronts, position: ramp.plaque, flags: still | F.relative });
+      const front = ramp.script === 9000 ? null : f.create({ script: ramp.script + 1, delay: IMAGE_TICKS, depth: DEPTH.fronts, position: ramp.plaque, flags: stillBit | F.relative });
       const target = createTarget(ramp.drop, number);
       this.rampTargets.push(target);
       this.rampViews.push({ ramp, target, object, front, plate });
@@ -550,7 +553,7 @@ class Maze2Run implements Maze2Probe {
   private playRamp(launch: Launch): void {
     const view = this.rampView(launch.ramp.number);
     const object = view.object;
-    object.flags = (object.flags & ~(FeatureFlag.staticFirst | FeatureFlag.noReplay)) | FeatureFlag.stopAtEnd;
+    object.flags = (object.flags & ~(FeatureFlag.still | FeatureFlag.noReplay)) | FeatureFlag.stopAtEnd;
     this.features.setScript(object, launch.ramp.script);
     if (view.front) {
       view.front.flags = (view.front.flags & ~(FeatureFlag.staticFirst | FeatureFlag.noReplay)) | FeatureFlag.stopAtEnd;

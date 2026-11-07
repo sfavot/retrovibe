@@ -242,7 +242,10 @@ const DROP_RADIUS = 35;
 
 const F = FeatureFlag;
 /** `0x5188000` : feature statique (première image seule, sans son). */
-const STILL = F.flag4000000 | F.staticFirst | F.stopAtEnd | F.noReplay | F.active | F.firstImage;
+/** Décor figé que `1158:0000` crée sans le bit `0x1000000` (piédestal `0x4188000`, poulie `0x4000000`, avant-plans `0x4100000`, levier `0x4180000`, wagonnets `0x4108000`). */
+const STILL = F.flag4000000 | F.still | F.stopAtEnd | F.noReplay | F.active | F.firstImage;
+/** Objets que `1158:0000` crée avec le bit `0x1000000` (`0x5188000`, `0x5180000`, `0xd180000`, zone de dépôt `0x108a000`) : vert, lampes, faisceaux, wagonnet sortant. */
+const STILL_BIT = F.flag4000000 | F.staticFirst | F.stopAtEnd | F.noReplay | F.active | F.firstImage;
 /** Feature qui joue ses scripts une fois (puis s'arrête sur la dernière image). */
 const PLAYS = F.flag4000000 | F.stopAtEnd | F.active;
 
@@ -383,21 +386,21 @@ class SmokeRun implements SmokeProbe {
     f.defineGroup(0, GROUP_SHAPES);
     f.setScripts(SCRB_FIRST, SCRB_COUNT);
     this.pedestal = f.create({ script: low || this.level === 3 ? SCRB.pedestal : SCRB.pedestalLift, delay: DELAY.pedestal, flags: STILL });
-    if (low) this.green = f.create({ script: SCRB.green, delay: DELAY.default, flags: STILL });
-    this.lightLeft = f.create({ script: SCRB.lightLeft, delay: DELAY.default, flags: STILL });
-    this.lightRight = f.create({ script: SCRB.lightRight, delay: DELAY.default, flags: STILL });
+    if (low) this.green = f.create({ script: SCRB.green, delay: DELAY.default, flags: STILL_BIT });
+    this.lightLeft = f.create({ script: SCRB.lightLeft, delay: DELAY.default, flags: STILL_BIT });
+    this.lightRight = f.create({ script: SCRB.lightRight, delay: DELAY.default, flags: STILL_BIT });
     this.crystalBack = f.create({ script: SCRB.intro, delay: DELAY.default, flags: PLAYS });
     this.crystalFront = f.create({ script: SCRB.introFront, delay: DELAY.default, flags: PLAYS });
-    this.beamA = f.create({ script: SCRB.beamA, delay: DELAY.default, flags: STILL });
-    this.beamB = f.create({ script: SCRB.beamB, delay: DELAY.default, flags: STILL });
+    this.beamA = f.create({ script: SCRB.beamA, delay: DELAY.default, flags: STILL_BIT });
+    this.beamB = f.create({ script: SCRB.beamB, delay: DELAY.default, flags: STILL_BIT });
     f.create({ script: SCRB.pulley, delay: DELAY.default, flags: STILL });
-    this.wagonOut = f.create({ script: SCRB.wagonOut, delay: DELAY.default, flags: STILL, depth: DEPTH.out });
+    this.wagonOut = f.create({ script: SCRB.wagonOut, delay: DELAY.default, flags: STILL_BIT, depth: DEPTH.out });
     f.create({ script: SCRB.front, delay: DELAY.none, flags: STILL, depth: DEPTH.front });
     f.create({ script: SCRB.front2, delay: DELAY.none, flags: STILL, depth: DEPTH.front });
     this.lever = f.create({ script: SCRB.leverTest, delay: DELAY.lever, flags: STILL });
     if (low) {
       this.wagonA = f.create({ script: SCRB.emptyWagon, delay: DELAY.default, flags: STILL });
-      f.create({ script: SCRB.dropZone, delay: 7, flags: STILL });
+      f.create({ script: SCRB.dropZone, delay: 7, flags: STILL_BIT });
     } else {
       this.wagonA = f.create({ script: SCRB.arrivalA, delay: DELAY.default, flags: STILL });
       this.wagonB = f.create({ script: SCRB.arrivalB, delay: DELAY.default, flags: STILL });
@@ -501,13 +504,16 @@ class SmokeRun implements SmokeProbe {
     this.features.setScript(feature, id);
   }
 
-  /** Remet la feature en pose statique sur la première image de `id`, sans son (`1158:201c`). */
-  private still(feature: Feature, id: number): void {
+  /**
+   * Remet la feature en pose statique sur la première image de `id`, sans son. `bit` : l'original pose les drapeaux avec le bit `0x1000000` (`0x5188000` :
+   * lampes `1158:2107`, wagonnet sortant `1158:21c3`) ; sinon sans (`0x4188000` : cristal `1158:201c`, levier, piédestal).
+   */
+  private still(feature: Feature, id: number, bit = false): void {
     feature.onEvent = undefined;
     feature.scriptId = id;
     feature.replacing = true;
     feature.active = true;
-    feature.flags |= F.staticFirst | F.noReplay | F.stopAtEnd;
+    feature.flags = (feature.flags & ~(F.staticFirst | F.still)) | (bit ? F.staticFirst : F.still) | F.noReplay | F.stopAtEnd;
     this.features.invalidate();
   }
 
@@ -804,8 +810,8 @@ class SmokeRun implements SmokeProbe {
   }
 
   private stopLights(): void {
-    this.still(this.lightLeft, SCRB.lightLeft);
-    this.still(this.lightRight, SCRB.lightRight);
+    this.still(this.lightLeft, SCRB.lightLeft, true);
+    this.still(this.lightRight, SCRB.lightRight, true);
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -978,7 +984,7 @@ class SmokeRun implements SmokeProbe {
     const member = this.kit.members[pending.member];
     // Le wagonnet est garé à sa place ; celui de sortie revient au repos.
     this.parked[k] = this.features.create({ script: SCRB.parked - k, delay: DELAY.default, flags: STILL, depth: DEPTH.parked });
-    this.still(this.wagonOut, SCRB.wagonOut);
+    this.still(this.wagonOut, SCRB.wagonOut, true);
     const before = s.savedCount;
     const end = endTurn(s, this.ctx.rng);
     if (!end || !member) return;

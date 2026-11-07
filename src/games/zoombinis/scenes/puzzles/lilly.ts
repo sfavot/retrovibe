@@ -384,7 +384,7 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
 
   // --- Avant-plans des berges (`SCRB 14000` à `14004`) ---
   for (const script of FOREGROUNDS) {
-    features.create({ script, delay: FRAME_DELAY, depth: DEPTH_FOREGROUND, flags: FeatureFlag.staticFirst | FeatureFlag.firstImage });
+    features.create({ script, delay: FRAME_DELAY, depth: DEPTH_FOREGROUND, flags: FeatureFlag.still | FeatureFlag.firstImage });
   }
 
   // --- Crapauds (`10f8:484e`) ---

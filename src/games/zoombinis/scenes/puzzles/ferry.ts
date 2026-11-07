@@ -291,10 +291,11 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
 
   // --- Décors fixes ---
   for (const script of POST_SCRIPTS) {
-    features.create({ script, delay: FRAME_DELAY, depth: DEPTH_POSTS, flags: FeatureFlag.staticFirst | FeatureFlag.firstImage });
+    // `10d8:0071` : pieux `0x4000000`, plancher `0xc000` ; ni l'un ni l'autre n'a le bit `0x1000000` : images fixes dessinées.
+    features.create({ script, delay: FRAME_DELAY, depth: DEPTH_POSTS, flags: FeatureFlag.still | FeatureFlag.firstImage });
   }
   // Le plancher du radeau (`SCRB` 1601, objet `72e4`) : sa grande image est aussi dans chaque image du départ, qui le fait glisser avec le reste.
-  const raftBase = features.create({ script: RAFT_BASE_SCRIPT, delay: FRAME_DELAY, depth: DEPTH_RAFT_BASE, flags: FeatureFlag.staticFirst | FeatureFlag.firstImage });
+  const raftBase = features.create({ script: RAFT_BASE_SCRIPT, delay: FRAME_DELAY, depth: DEPTH_RAFT_BASE, flags: FeatureFlag.still | FeatureFlag.firstImage });
   let ambient: Feature | null = null;
   if (!lessAction) {
     // Ambiances (bulles) : 1602 puis 1603, chaînées (`11a8:2083`).

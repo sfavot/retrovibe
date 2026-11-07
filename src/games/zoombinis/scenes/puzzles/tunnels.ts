@@ -424,14 +424,14 @@ export function createTunnelsScene(): TunnelsScene {
         // (`0x8000`) et entrées (`0x0108a000`) au fond, gardiens « déjà triés » (`0x0c180000`), pans de rocher triés une fois (0), plafond devant (`0x0d181000`).
         // Un Zoombini passe donc derrière un gardien ou un pan de rocher dont le bord bas est plus bas que le sien (sortie le long des tunnels du haut).
         features.setDepthSort(true);
-        const still = FeatureFlag.staticFirst | FeatureFlag.stopAtEnd;
-        const { active, flag4000000, overlay } = FeatureFlag;
-        features.create({ script: 9000, delay: DECOR_DELAY, depth: 0.1, flags: still | active });
-        for (let e = 0; e < ENTRANCES; e++) features.create({ script: 5000 + e, delay: DECOR_DELAY, depth: 0.2, flags: still | active });
+        // Bit `0x1000000` (`staticFirst`) : entrées (`0x0108a000`) et plafond (`0x0d181000`) seulement ; cave (`0x8000`), gardiens (`0x0c180000`) et pans (0) n'en ont pas.
+        const { active, flag4000000, overlay, still, staticFirst, stopAtEnd } = FeatureFlag;
+        features.create({ script: 9000, delay: DECOR_DELAY, depth: 0.1, flags: still | stopAtEnd | active });
+        for (let e = 0; e < ENTRANCES; e++) features.create({ script: 5000 + e, delay: DECOR_DELAY, depth: 0.2, flags: staticFirst | stopAtEnd | active });
         pillars = [];
-        for (const c of PILLAR_ORDER) pillars[c] = features.create({ script: 6000 + c, delay: DECOR_DELAY, depth: 0.3, flags: still | flag4000000 });
-        for (let id = 9001; id <= 9006; id++) features.create({ script: id, delay: DECOR_DELAY, depth: 0.4, flags: still });
-        ceiling = features.create({ script: CEILING_SCRIPT, delay: DECOR_DELAY, depth: 3, flags: still | flag4000000 | overlay });
+        for (const c of PILLAR_ORDER) pillars[c] = features.create({ script: 6000 + c, delay: DECOR_DELAY, depth: 0.3, flags: still | stopAtEnd | flag4000000 });
+        for (let id = 9001; id <= 9006; id++) features.create({ script: id, delay: DECOR_DELAY, depth: 0.4, flags: still | stopAtEnd });
+        ceiling = features.create({ script: CEILING_SCRIPT, delay: DECOR_DELAY, depth: 3, flags: staticFirst | stopAtEnd | flag4000000 | overlay });
 
         // Groupe de la scène : copie des présents du tampon (`party` de `exitPuzzle`).
         party = game.group.members.filter((z) => z.present).map((z) => ({ ...z, attrs: [...z.attrs] as Zoombini["attrs"], state: z.state.slice() }));

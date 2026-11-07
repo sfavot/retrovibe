@@ -26,6 +26,16 @@ produits par les vagues ci-dessous.
   du site prête (`index.ts`, `copy.ts` à valider, jaquette) mais absente du registre jusqu'à la fin de H ; saisie de texte commune
   (`src/ui/mohawk/text-input.ts`). Détail par écran : `engine-ts.md`, `screens.md`.
 - Vague H : les 12 épreuves sont portées et enregistrées (kit commun `scenes/puzzle-kit.ts`, règles `game/puzzles/`, écrans `scenes/puzzles/`), et le test de partie complète `test/zoombinis/full-game.test.ts` passe par les deux chemins, avec pertes et rechargement ; copy du site validée (`copy.ts`) et jeu inscrit au registre (`src/games/registry.ts`), donc présent sur l’accueil.
+- Dernier lot (portage des manques et retours de l'utilisatrice, tout commité) :
+  - **portages** : Zoombiniville (habitants sans animation d'attente, mode petit `DS:239a` ; glissement d'un habitant), crédits (Zoombinis du cadre fixes, comme
+    l'original), tri devant / derrière du décor des camps (`11a8:231b`), danse d'arrivée des véhibules, fondu d'entrée et de sortie de XFER, écrans cachés 19 / 20
+    (tir aux Zoombinis, astéroïdes) avec leurs codes secrets et meilleurs scores, mode de test `[a43f]` (global, carte `+` / `-` / `T` puis `a` à `p`, choix) ;
+  - **bit `0x1000000` des features** : vrai sens porté au moteur (`FeatureFlag.playOnly` : dessiné seulement pendant qu'il joue, `11a0:0126`), images fixes du port
+    sur `FeatureFlag.still` ; corrige notamment les étagères de l'hôtel et les mouettes de la falaise ;
+  - **retours de l'utilisatrice** (bugs 1 à 19) : son unique et priorités, falaise de XFER, sorties des tunnels et de la pizza, livraison de la pizza, muraille,
+    gorges, bac au doigt, nizibooms (cousins dans la file), hôtel (taille des Zoombinis, repli de fin), lecture tolérante des parties enregistrées ;
+  - **vague J** (tactile et robot) : dépôt au relâchement au doigt (`Host.pointerIsTouch`), bouton « Menu » tactile, robot de partie partagé et lancé sur plusieurs graines
+    (`full-game-robot.ts`, `full-game-seeds.test.ts`, `touch.test.ts`).
 
 ## Parcours
 
@@ -285,9 +295,10 @@ But : remplacer les 12 épreuves provisoires par les vraies, fidèles aux étude
   - ceux qui faussent le résultat d'une partie sont à trancher (voir « Décisions à prendre ») ;
   - tout écart est noté dans l'étude et dans `engine-ts.md`.
 - **Hors périmètre** :
-  - mode de test caché, touches de débogage (`DS:731a`, `10c8:2d1c`), restes de développement (`SCRB` et `REGS` non référencés) ;
+  - touches de mise au point des épreuves en mode de test (`DS:731a`, `10c8:2d1c`… ; le mode lui-même et ses touches globales et de la carte sont portés, dernier lot),
+    restes de développement (`SCRB` et `REGS` non référencés) ;
   - souris aimantée (sans effet, comme en G) ;
-  - tactile complet (vague J ; le glisser-déposer passe déjà par le pointeur commun).
+  - tactile complet : fait en vague J.
 
 ### Sous-tâches
 
@@ -352,7 +363,12 @@ Un lot ne part que si le précédent est vert. Une tâche « règles » qui lais
 
 ## Décisions à prendre
 
-- **Manuel** : le PDF français (175 Mo, `archives/zoombinis/manuel/`) sera transcrit en page web (vague J), textes à valider.
+- **Manuel** (en attente) : le PDF français (175 Mo, 86 pages scannées sans couche de texte, `archives/zoombinis/manuel/`). Trois pistes : page `MANUEL.html` comme
+  Mathémagique (transcription par lecture des pages, sans OCR, captures du port), PDF allégé (8 à 10 Mo), ou rien.
+- **Fondus des autres écrans** (en attente) : l'original fait le fondu d'entrée et de sortie (`11a8:302b`, `11a8:3065`) sur tous les écrans ; le port ne le fait qu'à XFER
+  et aux écrans cachés. Un mécanisme commun au changement d'écran est possible, mais décale les délais de la plupart des tests.
+- **Bit `0x1000000`, quatre objets** (en attente) : emplacements des camps, détail de l'arche du choix (4110), dalles des grottes, zone de dépôt des grottes fumantes.
+  L'original ne les dessine qu'en surbrillance, mais le fond n'a pas ce qu'ils montrent : ils restent dessinés (`still`, écart provisoire) jusqu'à confirmation.
 - **Accueil du site** : afficher Zoombinis sur l'accueil seulement après H (décidé). La ligne du registre est ajoutée en fin de vague H.
 - **Défaut du bac** (`ferry.md` §7 point 1, décidé) : un Zoombini repris sur un tabouret puis lâché sur le ponton resterait compté comme assis. Il est **corrigé** (il n'est plus compté assis) et l'écart est noté dans `ferry.md` et `engine-ts.md`, après confirmation dans le code par H4.
 - **Défaut du cristal** (`smoke.md` §3.5, décidé) : quand le second Zoombini manque, `1158:5017` écrit dans la mauvaise table et rend le puzzle insoluble (2,5 % des tirages au niveau 3, 3,6 % au niveau 4). Il est **corrigé** (`bugMissingB = false` par défaut) et l'écart est noté dans `smoke.md`.
@@ -370,6 +386,6 @@ Un lot ne part que si le précédent est vert. Une tâche « règles » qui lais
 | F | F | cœur du moteur, graphismes, son et MIDI (mutualisés avec Mathémagique si décidé) | A, R1 |
 | G | G | services (scripts animés, zones, curseurs), écrans du parcours, intégration au site (`index.ts`, registre, jaquette, `dev.html`) | F, R2 |
 | H | H | les 12 épreuves | G, R3-R6 |
-| J | J | manuel, tactile, robot de partie, revue | H |
+| J | J | manuel (en attente), tactile et robot de partie (faits), revue | H |
 
 Chaque vague se termine par `npm run typecheck`, `npm test`, `npm run build` et, dès qu'il y a un rendu, une vérification dans le navigateur.

@@ -256,6 +256,25 @@ describe.skipIf(!original.has)("transition XFER", () => {
     expect(engine.error).toBeNull();
   });
 
+  it("carte (région 1) : le trait du tronçon atteint passe du noir au crème puis se colore en vert depuis le départ, une étape toutes les 4 ticks (11b0:24ed, 26ec)", async () => {
+    const prepare = (game: ReturnType<typeof newGame>) => void (game.successes[0] = 0x11);
+    const { host, engine } = await begin({ from: ScreenId.bridge, to: ScreenId.tunnels, prepare });
+    await runFor(engine, host, TICK_MS * 3);
+    const trailFeature = () => engine.services.get(FEATURES).features.find((f) => f.scriptId === 1200)!;
+    const colored = () => {
+      const part = trailFeature().parts[0]!;
+      const shape = part.sheet!.images[part.w - 1]!;
+      return { before: shape.pixels.filter((p) => p === 0x2e || p === 0x2f).length, after: shape.pixels.filter((p) => p === 0x30 || p === 0x31).length };
+    };
+    const first = colored();
+    expect(first.before).toBeGreaterThan(1000);
+    expect(first.after).toBeLessThan(first.before / 10);
+    await runFor(engine, host, TICK_MS * 230);
+    const later = colored();
+    expect(later.after).toBeGreaterThan(first.after + 100);
+    expect(later.after + later.before).toBe(first.before + first.after);
+  });
+
   it("un clic gauche écourte la transition, une touche ne fait rien", async () => {
     const { host, engine } = await begin({ from: ScreenId.pizza, to: ScreenId.baseCamp });
     await runFor(engine, host, TICK_MS * 30);

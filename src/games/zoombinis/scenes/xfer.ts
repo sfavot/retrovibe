@@ -41,6 +41,7 @@ import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { TextFlags, ZOOMBINIS_TEXT } from "../engine/text";
 import { currentLevel, dialogMemoryIndex } from "../game/route";
 import { createSnoid, screenScripts, type Snoid } from "./snoid";
+import { TrailColoring, TRAIL_DELAY, TRAIL_STARTS, trailStartIndex } from "./xfer-trail";
 import { closeScreen, openScreen } from "./screen-kit";
 
 const ARCHIVE = "XFER.MHK";
@@ -237,6 +238,8 @@ export interface StageState {
   fallback: number;
   /** `DS:ad2c` : étape qu'on vient d'atteindre (0 = aucune). */
   arrived: number;
+  /** `DS:ad2e` : valeur (niveau + 1) de l'étape atteinte, qui choisit les couleurs du trait (`xfer-trail.ts`) ; 0 si aucune. */
+  value: number;
 }
 
 /**
@@ -244,7 +247,7 @@ export interface StageState {
  * le niveau précédent (valeur − 1), ou −1 (« à dessiner au niveau de repli ») s'il n'y en a pas.
  */
 export function stageState(levels: readonly number[], previous: number, target: number, levelPlusOne: number): StageState {
-  const state: StageState = { levels: Int8Array.from(levels), fallback: -1, arrived: 0 };
+  const state: StageState = { levels: Int8Array.from(levels), fallback: -1, arrived: 0, value: 0 };
   let stage = 0;
   let value = 0;
   switch (target) {
@@ -266,6 +269,7 @@ export function stageState(levels: readonly number[], previous: number, target: 
     default: return state;
   }
   state.arrived = stage;
+  state.value = value;
   state.levels[stage] = value - 1;
   if (state.levels[stage]! < 1) {
     if (state.fallback < 0) state.fallback = value - 1;
@@ -349,6 +353,9 @@ export function createXferScene(): Scene {
   let left = false;
   let nextTimer = 0;
   let released = 0;
+  /** Régions 1 à 4 : remplissage du trait du tronçon atteint (`11b0:24ed`) et prochaine échéance (`11b0:26ec`, délai 4). */
+  let trail: TrailColoring | null = null;
+  let trailNext = 0;
   /** Région 0 : Zoombinis déjà passés devant 5100. */
   let cliffPassed = 0;
   let wasIdle = false;
@@ -412,6 +419,8 @@ export function createXferScene(): Scene {
       stackable = undefined;
       finale = undefined;
       released = 0;
+      trail = null;
+      trailNext = 0;
       cliffPassed = 0;
       arrivals = 0;
       finalStarted = false;
@@ -496,11 +505,26 @@ export function createXferScene(): Scene {
             return w === 0 ? [] : [{ ...part, w }];
           }),
         });
+        // `11b0:2406` garde la partie du tronçon atteint ; `11b0:24ed` la colore de proche en proche à chaque dessin (toutes les 4 ticks, `26ec`).
         createFeature(ctx, {
           script: bg + 200,
           delay: 4,
           flags: firstImage,
-          onImage: (_feature, parts) => (parts.length > 0 ? [parts[Math.max(translation.keep, 1) - 1] ?? parts[0]!] : parts),
+          onImage: (_feature, parts) => {
+            const part = parts.length > 0 ? (parts[Math.max(translation.keep, 1) - 1] ?? parts[0]!) : undefined;
+            if (!part || part.w <= 0) return parts;
+            const sheet = features.group(1);
+            const shape = sheet?.images[part.w - 1];
+            if (!sheet || !shape) return [part];
+            // Premier dessin (`24ed`, `ad3a` = 0) : le trait passe aux couleurs « avant » ; la suite avance dans `tick` (`26ec`).
+            if (!trail) {
+              trail = new TrailColoring(shape, TRAIL_STARTS[trailStartIndex(region, translation.keep)]!, state.value);
+              trail.step();
+            }
+            const images = sheet.images.slice();
+            images[part.w - 1] = trail.shape;
+            return [{ ...part, sheet: { images, anchors: sheet.anchors } }];
+          },
         });
         addMembers(present.map(() => ({ ...ROAD_START })));
         present.forEach((_, i) => {
@@ -536,6 +560,12 @@ export function createXferScene(): Scene {
 
       const { rng } = ctx;
       const features = ctx.services.get(FEATURES);
+      // `11b0:26ec` : la feature du trait se redessine toutes les 4 ticks, et chaque dessin colore une étape de plus (`24ed`).
+      if (trail && now >= trailNext) {
+        trailNext = now + TRAIL_DELAY;
+        trail.step();
+        features.invalidate();
+      }
       if (region >= 1 && region <= 4) {
         for (const member of members) {
           if (member.started || now < member.startAt) continue;

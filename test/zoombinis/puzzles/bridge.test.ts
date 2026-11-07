@@ -499,6 +499,28 @@ describe.skipIf(!original.has)("gorges : écran sur les vrais fichiers (BRIDGE.M
     expect(probe().state.errors).toBe(1);
   });
 
+  it("pendant un refus (DS:7078), les dépôts sont mis en file (2 au plus, 10c0:0a99) et aucun ne part ; à la fin du refus ils partent, à 45 ticks d'écart (10c0:0e5a)", async () => {
+    const { probe, drag, accepting, until, byFront, wait } = await start();
+    const order = byFront();
+    const refused = order.find((i) => accepting(i) === 1)!;
+    await drag(refused, BRIDGE_ANCHORS[2]);
+    await until(() => probe().statuses[refused] === "crossing");
+    // Pendant le refus : un dépôt acceptable sur chaque pont (une zone de pont ne tient qu'un Zoombini jusqu'à son départ, `1168:170f`), mis en file.
+    const up = order.find((i) => i !== refused && accepting(i) === 1)!;
+    const down = order.find((i) => i !== refused && accepting(i) === 2)!;
+    const next = [up, down];
+    for (const i of next) await drag(i, BRIDGE_ANCHORS[accepting(i)]);
+    expect(probe().queue).toHaveLength(2);
+    expect(next.map((i) => probe().statuses[i])).toEqual(["queued", "queued"]);
+    // Rien ne part tant que le refus n'est pas fini.
+    while (probe().statuses[refused] !== "wait" && probe().statuses[refused] !== "back") {
+      expect(probe().statuses[next[0]!]).toBe("queued");
+      await wait(10);
+    }
+    await until(() => probe().statuses[next[0]!] === "crossing");
+    await until(() => probe().statuses[next[1]!] === "crossing" || probe().statuses[next[1]!] === "crossed");
+  });
+
   it("le sixième refus ferme les ponts : plus aucun Zoombini ne peut être pris, « go » reste éteint", async () => {
     const { probe, drag, accepting, until, byFront, features, host, engine, wait, queued } = await start();
     const order = byFront();

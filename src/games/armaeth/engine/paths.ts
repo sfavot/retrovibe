@@ -221,6 +221,13 @@ export interface ComputeOptions extends GraphOptions {
   resume?: boolean;
   /** Cible sans nœud accessible (`Cib == 0`, errance) : n'importe quel plan convient pour l'arrivée. */
   anyPlane?: boolean;
+  /**
+   * Cible poursuivie (`Cib != 0` et `Ser != 0`, `22ef:0000` avec `AX != 0`) : si le nœud d'arrivée existe mais n'est pas accessible
+   * (recalcul après un blocage, lien du départ coupé) il n'y a pas de repli sur le nœud le plus proche, le calcul échoue
+   * (`3187:0000`, `31999 < coût` avec `Cib != 0` : saut en `3187:006d`). Sans nœud d'arrivée, le repli reste celui de `Cib == 0` :
+   * l'original y teste `Sol == 83` de la cible (`3187:0000` vers `0938`), non porté.
+   */
+  chased?: boolean;
 }
 
 const contains = (node: { c0: number; c1: number }, col: number): boolean => node.c0 <= col && col <= node.c1;
@@ -323,6 +330,7 @@ export function computePath(terrain: Terrain, body: PathBody, target: PathTarget
 
   let targetCol = destination.x >> 2;
   if (goal < 0 || cost[goal]! >= UNREACHED) {
+    if (options.chased && goal >= 0) return false; // nœud d'arrivée trouvé mais inaccessible (`3187:0000`, `Cib != 0` : pas de repli)
     // repli : le nœud atteint le plus proche de la destination selon la métrique
     const metric = options.metric ?? 0;
     const targetRow = destination.p >> 3;
@@ -440,6 +448,11 @@ export interface FollowContext {
    * (trajet perdu, `Nbc < 0`). Faux rendu = aucun chemin.
    */
   recompute?: (state: PathState, resume: boolean) => boolean;
+  /**
+   * Cible poursuivie (`Ser` en +0x7A) : vrai si l'objet suivi est à portée (`2120:0008`). Testé quand le héros est bloqué, avant le
+   * recalcul : le trajet finit alors par 2 (arrivée) au lieu d'un nouveau calcul (`30d9:0184`, `override_jmp_30d9_0827_case_1`).
+   */
+  touching?: () => boolean;
 }
 
 /**
@@ -528,6 +541,7 @@ function followNodes(state: PathState, body: FollowBody, context: FollowContext)
     /** `0827` : plus rien à faire ; sans destination c'est la fin (5), sinon recalcul `AX = 7`, sauf pour un volant. */
     const stuck = (): "retry" | number => {
       if (!state.target) return FOLLOW_BLOCKED;
+      if (context.touching?.()) return FOLLOW_ARRIVED;
       if (flyer || !context.recompute?.(state, true)) return FOLLOW_RECOMPUTE_FAILED;
       err = 0;
       body.err = 0;

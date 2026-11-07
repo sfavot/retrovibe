@@ -321,7 +321,7 @@ Notations : `E(n)` = entrer dans l'état `n` ; `déf.` = « sol ordinaire » : s
 ### 4.4 Retour de trajet (`2363:01ea`)
 
 Appelée quand le suivi de trajet du **héros joueur** rend un résultat non nul (`r` = 1 / 2 arrivée, 3 cible absente, 4 recalcul impossible, 5 « même décision malgré un blocage », `movement.md` § 6.3) : 
-- `r = 5` **n'est pas « arrivé »** : si `+0x43` est nul, il est posé (7) et le trajet est recalculé une fois (indicateur remis à zéro par le clic et par `2363:0154`) ; sinon `G44` (impossible d'aller plus loin) ;
+- `r = 5` **n'est pas « arrivé »** : si `+0x43` est nul, il est posé (7) et le trajet est recalculé une fois (indicateur remis à zéro par le clic et par `2363:0154`) ; sinon `G44` (impossible d'aller plus loin). Le héros qui marche vers un objet (« trop loin », `2363:0154`) le **poursuit** (`Cib != 0`, `Ser` en +0x7A) : bloqué, `30d9:0184` rend 2 si l'objet est à portée (`2120:0008`), sinon recalcule et, si le nœud d'arrivée devient inaccessible, échoue **sans repli** (`3187:0000`) : `r = 4`, la commande est rejouée (`V008` si l'objet est toujours trop loin) ; `G44` n'apparaît que pour un trajet sans cible poursuivie (clic) ;
 - `r = 1, 2, 4` : si une **commande est en attente** (`DGROUP:5222`, mémorisée par `2363:000c`), elle est rejouée (verbe, prépositions et objets restaurés, `4cc4 = 7`, file de messages remise à zéro, `2210:011e/021e/0008`) ; si rien n'a réussi, la file est affichée ou `S` « message perdu » ;
 - `r = 3` ou `r >= 6` : la commande en attente est abandonnée ;
 - dans tous les cas, ensuite : `2273:0190` + `gm_reset_object_motion` + `Err = 0x11`, retour 7.

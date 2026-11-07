@@ -67,4 +67,16 @@ describe.skipIf(!hasOriginalFiles)("salle 8 : la pile de bois et le coffret", ()
     expect(internals(p).inReach(coffret(p))).toBe(true);
     expect(p.say("regarder le coffret")[0]).toMatch(/solidement fermé à clef/);
   });
+
+  it("ouvrir le coffret depuis un X pair : le couloir de la pile est fermé, la commande rejouée dit « trop loin » (V008, pas G44)", () => {
+    const p = enter();
+    const hero = p.hero;
+    hero.x = 216; // X pair : le héros s'arrête en haut de l'escalier en X 196 (`dosbox.md` § 4.5)
+    p.engine.place(hero, 1);
+    const said = p.say("ouvrir le coffret avec la clef");
+    expect(said).toEqual(["Vous êtes trop loin."]); // `V008` : l'original (DOSBox-X) n'affiche pas `G44` « Impossible d'aller plus loin ! »
+    expect([hero.x, hero.p]).toEqual([196, 56]);
+    expect(hero.path.defined).toBe(false);
+    expect(internals(p).inReach(coffret(p))).toBe(false);
+  });
 });

@@ -14,8 +14,10 @@ Ce document sert de brief commun aux sous-agents. Les références font foi sur 
   lecteurs de toutes les données (`src/games/armaeth/data/`), visionneuse (`ui/asset-viewer.html`), études du moteur.
 - Mise en commun déjà faite entre les jeux : liste des fichiers, chargement, images indexées, visionneuse,
   extraction des CD, outils Ghidra, aides de test (voir la section « Code commun aux jeux » du README).
-- Le moteur sans tête exécute toute la logique du jeu (gestionnaires, personnages, trajets), avec un test de parcours complet et un test d'accessibilité sur toutes les salles ; la page navigateur attend la vague F0.
-- Prochaine étape : vague F0, après le commit de la vague F de Mathémagique.
+- Le moteur sans tête exécute toute la logique du jeu (gestionnaires, personnages, trajets), avec un test de parcours complet et un test d'accessibilité sur toutes les salles.
+- La page navigateur existe et le jeu est dans `src/games/registry.ts` : écran de présentation, hôte du navigateur, page du jeu (`ui/app.ts`), tactile, sauvegardes, page d'aide (`README.md` : « jouable, en cours de validation »).
+- Reste à faire (d'après les sections « écarts » de `walkthrough.md`) : la validation (vague K) ; la dette technique de l'ouverture des portes à serrure (trois chemins, `lockedDoor`, `moveDoor`, `setDoor`) ; les points non portés d'après le désassemblage (par exemple le cas `Sol == 83` de la cible dans `3187:0000`).
+- Graine 56 du robot **abandonnée** (63 graines sur 64 vont au bout ; exclue dans `walkthrough.test.ts`, `walkthrough.md` § « Robot : toutes les graines »).
 
 ## Décisions
 
@@ -34,7 +36,7 @@ Ce document sert de brief commun aux sous-agents. Les références font foi sur 
 
 ## Décisions à prendre
 
-- **Sauvegardes** : sélecteur d'emplacements du navigateur à la place des quatre champs de l'original ; textes à valider.
+- **Sauvegardes** : sélecteur d'emplacements du navigateur à la place des quatre champs de l'original.
 
 ## Vagues
 

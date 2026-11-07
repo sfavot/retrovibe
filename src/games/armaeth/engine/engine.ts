@@ -64,6 +64,7 @@ import {
   FOLLOW_BLOCKED,
   FOLLOW_NO_PATH,
   FOLLOW_RECOMPUTE_FAILED,
+  FOLLOW_TARGET_LOST,
   FOLLOW_WALKING,
   type PathState,
   computePath,
@@ -94,7 +95,7 @@ import {
 import { type ExitResult, type MusicKey, activePlanes, applyRoomLight, completeHeroTransit, enterRoom, exitRoom, loadRoom, onFirstDisplay, planRoomLoad } from "./room";
 import { loadWorldState, serializeWorld } from "./save";
 import { ScriptRunner, type ScriptSet } from "./scripts";
-import { type GameObject, type GameRoom, WorldState, rawU8, setRawU8 } from "./state";
+import { type GameObject, type GameRoom, WorldState, rawU8, rawU16, setRawU16, setRawU8 } from "./state";
 import { EngineTokenHost, type TokenHostEngine } from "./token-host";
 import { type TextRequest, createScriptFlags } from "./tokens";
 import { DGROUP_IMAGE_OFFSET } from "./icons";
@@ -150,6 +151,8 @@ const INPUT_COLORS = { frame: 0xee, inner: 0xdd, background: 0xfa };
 const CARET_BLINK = 35;
 /** Indicateur `+0x43` du héros : le trajet bloqué a déjà été recalculé une fois (`2363:01ea`, remis à 0 par un clic ou `2363:0154`). */
 const HERO_RETRY = 0x43;
+/** `Ser` (+0x7A) de la cible poursuivie : posé par la marche « trop loin » (`2363:0154` -> `22ef:0000`, `AX != 0`). */
+const FOLLOWED = 0x7a;
 /** Garde-fou du chargement de salle (un échec de placement du héros recharge l'ancienne). */
 const MAX_ROOM_LOAD_ATTEMPTS = 8;
 
@@ -712,6 +715,7 @@ export class ArmaethEngine implements TokenHostEngine {
     obj.path.nodes = [];
     obj.speedX = 0;
     obj.speedP = 0;
+    if (obj === this.state?.hero) setRawU16(obj, FOLLOWED, 0); // `30d9:0114` : `Cib`, `Ser` remis à 0
   }
 
   /** `placer(o, mode)` (`1aba:000e`). */
@@ -734,9 +738,18 @@ export class ArmaethEngine implements TokenHostEngine {
     return computePath(this.terrain, obj, { x, y, p, plane }, obj.path, this.pathOptions(obj));
   }
 
-  private pathOptions(obj: GameObject): { acceptsGround?: (type: number) => boolean } {
+  private pathOptions(obj: GameObject): { acceptsGround?: (type: number) => boolean; chased?: boolean } {
     const rule = this.groundRule;
-    return rule ? { acceptsGround: (type) => rule(type, 0, obj, this.services) } : {};
+    const options: { acceptsGround?: (type: number) => boolean; chased?: boolean } = rule ? { acceptsGround: (type) => rule(type, 0, obj, this.services) } : {};
+    if (obj === this.state?.hero && rawU16(obj, FOLLOWED) !== 0) options.chased = true; // les personnages gardent leur repli (`npc-kit.ts`)
+    return options;
+  }
+
+  /** Objet poursuivi par `obj` (`Ser` en +0x7A, `21fb:00c6`), s'il est encore dans sa salle. */
+  private chasedTarget(obj: GameObject): GameObject | undefined {
+    const serial = rawU16(obj, FOLLOWED);
+    const target = serial !== 0 ? this.state?.findBySerial(serial) : undefined;
+    return target && target.room !== null && target.room === obj.room ? target : undefined;
   }
 
   /**
@@ -1462,6 +1475,8 @@ export class ArmaethEngine implements TokenHostEngine {
   /**
    * Fin de trajet du héros (`2363:01ea(héros, r)`) : 1, 2 et 4 rejouent la commande en attente ; 5 (bloqué) recalcule le trajet une
    * fois (`+0x43`, remis à 0 à chaque clic) puis, au deuxième blocage, affiche `G44` ; tous les autres codes abandonnent la commande.
+   * La marche « trop loin » poursuit son objet (`Ser` en +0x7A) : bloqué sans repli possible, le suivi rend 4 (ou 2 si l'objet est à portée)
+   * et la commande est rejouée, d'où `V008` quand l'objet reste trop loin (salle 8, coffret, `dosbox.md` § 4.5), pas `G44`.
    * Sauf recalcul réussi (rend vrai : la marche continue), l'objet s'arrête avec `Err 0x11`. Le hook du jeu (`onPathEnd`) remplace
    * tout cela.
    */
@@ -1518,8 +1533,16 @@ export class ArmaethEngine implements TokenHostEngine {
     const plan = this.pendingReaction;
     const hero = this.state?.hero;
     const target = plan && plan.target !== 0 ? this.state?.findBySerial(plan.target) : undefined;
-    if (!plan || !hero || !target || !this.pathTo(hero, target.x, target.y, target.p, target.plane)) this.pendingReaction = null;
-    else setRawU8(hero, HERO_RETRY, 0);
+    if (!plan || !hero || !target) {
+      this.pendingReaction = null;
+      return;
+    }
+    // `22ef:0000` avec `AX != 0` : la cible est poursuivie (`Ser` en +0x7A, `Cib != 0`) ; les deux essais de `2363:0154` sont identiques
+    setRawU16(hero, FOLLOWED, target.serial);
+    if (!this.pathTo(hero, target.x, target.y, target.p, target.plane)) {
+      setRawU16(hero, FOLLOWED, 0);
+      this.pendingReaction = null;
+    } else setRawU8(hero, HERO_RETRY, 0);
   }
 
   /** `2363:01ea` : rejoue la phrase mémorisée. Vrai si une commande était en attente. */
@@ -1600,9 +1623,12 @@ export class ArmaethEngine implements TokenHostEngine {
     if (path.defined && path.remaining > 0 && path.nodes.length < path.remaining && path.target) {
       if (!computePath(this.terrain, obj, path.target, path, this.pathOptions(obj))) return FOLLOW_NO_PATH;
     }
+    const chased = rawU16(obj, FOLLOWED) !== 0 ? this.chasedTarget(obj) : undefined;
+    if (rawU16(obj, FOLLOWED) !== 0 && !chased) return FOLLOW_TARGET_LOST; // `30d9:0006` : objet suivi absent
     return followPath(path, obj, {
       recompute: (state: PathState, resume: boolean) =>
         state.target ? computePath(this.terrain!, obj, state.target, state, { resume, ...this.pathOptions(obj) }) : false,
+      touching: chased ? () => this.inReach(chased) : undefined,
     });
   }
 

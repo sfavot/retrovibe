@@ -429,3 +429,53 @@ describe.runIf(original.has)("ZoombinisSound sur les fichiers originaux", () => 
     expect(sink.played).toHaveLength(2);
   });
 });
+
+describe.skipIf(!originalFiles("zoombinis", "files.json").has)("ZoombinisSound dans le moteur : ordre du tick (`11a8:04b9`)", () => {
+  it("un son posé sur une image de script part dans le tick où l'image est lue, pas au suivant (voix des trolls de la hutte)", async () => {
+    const { createZoombinisEngine } = await import("../../src/games/zoombinis/engine/engine");
+    const { installServices } = await import("../../src/games/zoombinis/engine/services");
+    const { FEATURES } = await import("../../src/games/zoombinis/engine/features");
+    const { ScreenId } = await import("../../src/games/zoombinis/engine/scene");
+    const { TestHost, runFor } = await import("./engine-test-host");
+    const host = new TestHost();
+    host.audio.unlock();
+    const engine = createZoombinisEngine(host, { seed: 1 });
+    await installServices(engine);
+    let imageReadAt = -1;
+    let troll: { image: number } | undefined;
+    for (const id of Object.values(ScreenId)) {
+      engine.register(id, () => ({
+        async load(ctx) {
+          const archive = await ctx.resources.open("PIZZA.MHK");
+          ctx.services.get(ZOOMBINIS_SOUND).setScreenArchive(archive);
+          const features = ctx.services.get(FEATURES);
+          features.setArchive(archive);
+          features.defineGroup(0, 8000);
+          features.setScripts(8000, 36);
+          // Réplique d'Arno (`SCRB` 8006) : le son 8000 est sur l'image 3.
+          const feature = features.create({ script: 8006, delay: 6, flags: 0 });
+          troll = feature;
+          const onImage = feature.onImage;
+          feature.onImage = (f, parts) => {
+            if (f.image === 3 && imageReadAt < 0) imageReadAt = engine.ctx.clock.ticks;
+            return onImage ? onImage(f, parts) : parts;
+          };
+        },
+        enter() {},
+        leave() {},
+        tick() {},
+      }));
+    }
+    const played: number[] = [];
+    const playWave = host.audio.playWave.bind(host.audio);
+    host.audio.playWave = (sound, loop) => {
+      played.push(engine.ctx.clock.ticks);
+      return playWave(sound, loop);
+    };
+    engine.start(ScreenId.pizza);
+    await runFor(engine, host, 17 * 60);
+    expect(troll).toBeDefined();
+    expect(imageReadAt).toBeGreaterThanOrEqual(0);
+    expect(played[0]).toBe(imageReadAt);
+  });
+});

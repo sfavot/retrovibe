@@ -5,7 +5,8 @@
  *  - ouvre `ZOOMBINI.MHK`, `MIDIMPC.MHK` et `MIDIMAP.DAT` (gardées toute la partie) ;
  *  - crée la surface (`GRAPHICS.screen`) et la palette, et branche `engine.setFrameSource` ;
  *  - enregistre `GRAPHICS` et `ZOOMBINIS_SOUND` dans `engine.services` ;
- *  - ajoute un crochet de tick : palette (fondus, cycles) → préférences musique / effets → son → présentation si l'image a changé.
+ *  - ajoute un crochet de tick : palette (fondus, cycles) → préférences musique / effets → présentation si l'image a changé ; et, en dernier
+ *    (après les features, la partie et la boîte de dialogue), le traitement des files de son.
  * Contrat des scènes : dans `enter`, `sound.setScreenArchive(archive)` ; dans `leave`, `setScreenArchive(null)`.
  */
 import type { Frame } from "../../../engine/mohawk/graphics/frame";
@@ -76,7 +77,6 @@ export async function installServices(engine: ZoombinisEngine): Promise<Zoombini
     // Les préférences (Ctrl+V, Ctrl+Y en vague G) pilotent les drapeaux du son ; assigner seulement au changement (couper arrête la musique).
     if (sound.musicEnabled !== c.prefs.music) sound.musicEnabled = c.prefs.music;
     if (sound.effectsEnabled !== c.prefs.effects) sound.effectsEnabled = c.prefs.effects;
-    sound.tick();
   });
 
   await installText(engine);
@@ -85,6 +85,9 @@ export async function installServices(engine: ZoombinisEngine): Promise<Zoombini
   // Après les features et la partie : le crochet de tick de la boîte passe après les leurs.
   await installDialog(engine);
   installShortcuts(engine);
+  // `11a8:04b9` traite la file des sons (`11a8:2d3f`) après avoir lu les features : un son posé sur une image de script part dans le tick
+  // où cette image s'affiche, pas au suivant (crochet enregistré en dernier, après les features, la partie et la boîte de dialogue).
+  engine.addTickHook(() => sound.tick());
   return { graphics, sound, features, game };
 }
 

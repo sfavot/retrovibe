@@ -1,6 +1,6 @@
 /**
  * Textes de l'interface du site (hors textes du jeu, qui viennent de `TEXTSTR.MHK`).
- * Copy validée, regroupée pour être relue et ajustée en un seul endroit.
+ * Regroupés ici pour être relus et ajustés en un seul endroit.
  */
 export const copy = {
   title: "L'Odyssée des Zoombinis",
@@ -9,6 +9,7 @@ export const copy = {
   coverAlt: "Décor de l'île du choix des Zoombinis, dans L'Odyssée des Zoombinis",
   play: "Jouer",
   sound: "Son",
+  menu: "Menu",
   controlsTitle: "Contrôles",
   controls: [
     "Souris ou écran tactile : tout se fait en cliquant (ou en touchant).",

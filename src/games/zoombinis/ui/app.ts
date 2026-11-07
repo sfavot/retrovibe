@@ -2,10 +2,13 @@ import "./style.css";
 import { fitScale as sharedFitScale, leaveGame, mountGameShell } from "../../../ui/game-shell";
 import { MissingFilesError } from "../../../ui/files";
 import { localStorageStore as createLocalStorageStore } from "../../../ui/local-storage";
+import { withIcons } from "../../../ui/icons";
+import { h } from "../../../ui/dom";
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
 import { fetchGameFiles } from "../data/files";
 import { copy } from "../copy";
 import { COMMON_ARCHIVE } from "../data/archives";
+import { DIALOG } from "../engine/dialog";
 import { createZoombinisEngine, type ZoombinisEngine } from "../engine/engine";
 import { installServices, SCREEN_HEIGHT, SCREEN_WIDTH, type ZoombinisServices } from "../engine/services";
 import { registerScenes } from "../scenes/index";
@@ -93,4 +96,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       shell.setLoading(engine.loading);
     },
   });
+  // Ajout du port pour le tactile (affiché seulement sur écran tactile, `style.css`) : hors de la carte, l'original n'ouvre le menu
+  // (enregistrer, charger) qu'au clavier (`/`, `1198:05b3`). Même effet que la touche : `openMenu` refuse les écrans sans menu.
+  const menuButton = h("button", { type: "button", class: "toggle zb-menu-button" }, ...withIcons(copy.menu, "menu"));
+  menuButton.addEventListener("click", () => {
+    engine.ctx.services.get(DIALOG).openMenu(engine.ctx);
+    shell.focusCanvas();
+  });
+  shell.toggles.prepend(menuButton);
 }

@@ -38,3 +38,14 @@
   margin: 0.4rem 0 0;
   font-size: 1rem;
 }
+
+/* Bouton « Menu » (ajout du port) : seulement sur écran tactile, où le clavier de l'original manque. */
+.zb-menu-button {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .zb-menu-button {
+    display: inline-flex;
+  }
+}

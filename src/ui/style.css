@@ -1374,6 +1374,7 @@ a.button:hover {
 .game-shell.is-touch-landscape .toggle[aria-pressed="false"] .icon-sound-off,
 .game-shell.is-touch-landscape .back-link .icon-close,
 .game-shell.is-touch-landscape .game-shell-footer .icon-help,
+.game-shell.is-touch-landscape .game-shell-footer .icon-menu,
 .game-shell.is-touch-landscape .fullscreen-button[aria-pressed="false"] .icon-expand,
 .game-shell.is-touch-landscape .fullscreen-button[aria-pressed="true"] .icon-shrink {
   display: block;

@@ -254,4 +254,4 @@ Restent ouverts :
 - Pas d'ordre de profondeur fin (`2a0a`) entre le livreur, la pizza et les trolls : profondeurs fixes.
 - Les événements `e33`, `e61`, `e62`, `e100` ne sont pas interprétés (point 8).
 - Aucune musique (`PUZZLE_MUSIC[9]` est nul). Aucun texte à l'écran.
-- La marche de sortie va en ligne droite vers (690, 250) (l'original suit `NODE` / `PATH` 1000).
+- La marche de sortie suit `NODE` / `PATH` 1000 (`1168:2f9f`, `DS:970c` remis à 0 par « go », `1130:18d0`) vers (690, 250), comme l'original (`walkMap` du kit). Reste : les places d'attente du port (rangée en `y = 458`) ne sont pas celles de l'original : le tableau `1478:0a04` se lit dans le segment de données de l'exécutable : (288, 389) (240, 386) (257, 434) (202, 396) (224, 437) (186, 443) (158, 400) (151, 455) (126, 391) (118, 446) (89, 403) (86, 456) (48, 396) (51, 440) (20, 416) (18, 457), et `DS:1b6e` = (270, 334) (point 9 : à porter avec la file de la hutte).

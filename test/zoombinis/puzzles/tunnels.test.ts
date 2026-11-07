@@ -575,6 +575,40 @@ describe.skipIf(!original.has)("écran des grottes de passe-clos (TUNNELS.MHK)",
     expect(game.stageUnbroken).toBe(false);
   });
 
+  it("sortie par « go » : les sauvés suivent NODE / PATH 1000 (1168:2f9f) et passent derrière le gardien du haut (ordre de dessin 11a8:231b)", async () => {
+    const { dragTo, right, until, scene, kit, host, ticks, zoombinis, features } = await start(0);
+    const saved: number[] = [];
+    for (let i = 0; saved.length < 2 && i < 16; i++) {
+      if (right(i) !== 1 && right(i) !== 4) continue;
+      await dragTo(i, right(i));
+      await until(() => scene.debug.statusOf(i) === "arrived");
+      await until(() => !scene.debug.busy && scene.debug.queueLength === 0 && !kit().members[i]!.snoid.walking);
+      saved.push(i);
+    }
+    expect(saved).toHaveLength(2);
+    const walkers = saved.map((i) => kit().members[i]!.snoid);
+    host.click(620, 460);
+    await ticks(2);
+    const seen = new Set<string>();
+    let behindGuardian = false;
+    const guardian = features.features.find((f) => f.scriptId >= 4600 && f.scriptId < 4700 && f.rect && f.rect.top === 76)!;
+    for (let t = 0; t < 1500 && zoombinis.lastChange === null; t += 2) {
+      await ticks(2);
+      for (const snoid of walkers) {
+        seen.add(`${snoid.position.x},${snoid.position.y}`);
+        const r = snoid.feature.rect;
+        const g = guardian.rect!;
+        if (r && r.right > g.left && r.left < g.right && r.bottom > g.top) {
+          const list = features.features;
+          if (list.indexOf(snoid.feature) < list.indexOf(guardian)) behindGuardian = true;
+        }
+      }
+    }
+    // Points de passage du chemin 1 (287, 87) → (430, 83) → (536, 80) → (670, 30) : on passe par (536, 80) au lieu d'aller tout droit.
+    expect(seen.has("536,80")).toBe(true);
+    expect(behindGuardian).toBe(true);
+  });
+
   it("le bouton carte demande l'avertissement, puis mène à la carte sans réussite", async () => {
     const { host, ticks, zoombinis, engine } = await start(0);
     host.click(620, 420);

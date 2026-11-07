@@ -42,7 +42,7 @@ import { scriptAnchorOffset } from "../../data/zoombini";
 import { DIALOG } from "../../engine/dialog";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature } from "../../engine/features";
 import { ZOOMBINIS_GAME } from "../../engine/game";
-import { scrs } from "../../engine/resources";
+import { node, path, scrs } from "../../engine/resources";
 import { ScreenId, type Scene, type SceneContext } from "../../engine/scene";
 import { ZOOMBINIS_SOUND } from "../../engine/sound";
 import { bridgeAvoidCount, dialogMemoryIndex, currentLevel } from "../../game/route";
@@ -123,6 +123,8 @@ const ARRIVAL_PLACES: readonly (readonly Point[])[] = [
 const DROP_RADIUS = 40;
 /** Cible de la marche de sortie (`1190:0cae` : `1168:2982(45, …, 30, 670)`). */
 const EXIT_WALK = { x: 670, y: 30, step: 45 };
+/** `NODE` / `PATH` de l'écran (`1168:2a5c(1000)`), suivis par la marche de sortie. */
+const WALK_MAP = 1000;
 /** Ordonnée de renvoi des Zoombinis restés aux entrées à l'effondrement (`1190:14bc` : `0x1cc`). */
 const COLLAPSE_RETURN_Y = 460;
 /** Places préférées du Zoombini renvoyé (`DS:3bfc` côté gauche : entrées 1 et 2 ; `DS:3c00` côté droit). */
@@ -417,14 +419,19 @@ export function createTunnelsScene(): TunnelsScene {
         // `1190:0000` : `a0ce` est le premier tirage de l'entrée.
         const blocked = drawBlocked(rng);
 
-        // Décor, dans l'ordre de création de l'original : cave, entrées, gardiens, pans de rocher, plafond. Profondeurs : tous derrière les Zoombinis (≥ 1).
+        // Décor, dans l'ordre de création de l'original : cave, entrées, gardiens, pans de rocher, plafond. L'ordre de dessin est celui de `11a8:231b`, actif
+        // dans cet écran (`11a8:021c` l'a laissé allumé ; seul l'effondrement l'éteint, `1190:0b06`) : les drapeaux d'ordre sont ceux de `1190:0107` — cave
+        // (`0x8000`) et entrées (`0x0108a000`) au fond, gardiens « déjà triés » (`0x0c180000`), pans de rocher triés une fois (0), plafond devant (`0x0d181000`).
+        // Un Zoombini passe donc derrière un gardien ou un pan de rocher dont le bord bas est plus bas que le sien (sortie le long des tunnels du haut).
+        features.setDepthSort(true);
         const still = FeatureFlag.staticFirst | FeatureFlag.stopAtEnd;
-        features.create({ script: 9000, delay: DECOR_DELAY, depth: 0.1, flags: still });
-        for (let e = 0; e < ENTRANCES; e++) features.create({ script: 5000 + e, delay: DECOR_DELAY, depth: 0.2, flags: still });
+        const { active, flag4000000, overlay } = FeatureFlag;
+        features.create({ script: 9000, delay: DECOR_DELAY, depth: 0.1, flags: still | active });
+        for (let e = 0; e < ENTRANCES; e++) features.create({ script: 5000 + e, delay: DECOR_DELAY, depth: 0.2, flags: still | active });
         pillars = [];
-        for (const c of PILLAR_ORDER) pillars[c] = features.create({ script: 6000 + c, delay: DECOR_DELAY, depth: 0.3, flags: still });
+        for (const c of PILLAR_ORDER) pillars[c] = features.create({ script: 6000 + c, delay: DECOR_DELAY, depth: 0.3, flags: still | flag4000000 });
         for (let id = 9001; id <= 9006; id++) features.create({ script: id, delay: DECOR_DELAY, depth: 0.4, flags: still });
-        ceiling = features.create({ script: CEILING_SCRIPT, delay: DECOR_DELAY, depth: 3, flags: still });
+        ceiling = features.create({ script: CEILING_SCRIPT, delay: DECOR_DELAY, depth: 3, flags: still | flag4000000 | overlay });
 
         // Groupe de la scène : copie des présents du tampon (`party` de `exitPuzzle`).
         party = game.group.members.filter((z) => z.present).map((z) => ({ ...z, attrs: [...z.attrs] as Zoombini["attrs"], state: z.state.slice() }));
@@ -440,6 +447,8 @@ export function createTunnelsScene(): TunnelsScene {
           // Boutons de la planche 400 (`1190:0574`), dessinés par le kit devant les Zoombinis ; image enfoncée tenue 6 ticks ; « go » ajoute une phrase de sortie.
           buttons: { map: { images: buttons.map, hold: PRESS_TICKS }, go: { images: buttons.go, hold: PRESS_TICKS, onPress: () => pressGo(ctx) }, depth: 2.9 },
           exitWalk: EXIT_WALK,
+          // `1190:0107` charge `NODE` / `PATH` 1000 (`1168:2a5c`) ; `1190:0000` pose `DS:970c = 1` (marches de l'épreuve tout droit), « go » le remet à 0.
+          walkMap: { nodes: node(archive, WALK_MAP), paths: path(archive, WALK_MAP) },
           canPick: (member) => canPick(member),
           decide: (info) => decide(info),
           onPick: (member) => onPick(member),
@@ -959,6 +968,8 @@ export function createTunnelsScene(): TunnelsScene {
       regret(ctx);
     };
     ctx.services.get(FEATURES).setScript(ceiling, CEILING_SCRIPT);
+    // `1190:0b06` : l'ordre de dessin se fige pendant l'effondrement (`11a8:29c4(0)`).
+    ctx.services.get(FEATURES).setDepthSort(false);
   }
 
   /** `1190:15cd` : `rand(0..4) > niveau` ou peu de visites, au moins un sauvé et au moins un perdu. */

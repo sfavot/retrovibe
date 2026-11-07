@@ -36,6 +36,7 @@ import { nextScreen } from "../../../src/games/zoombinis/game/route";
 import { makeZoombini, type Zoombini } from "../../../src/games/zoombinis/game/state";
 import { PIZZA_INGREDIENT_REGIONS, PIZZA_SERVE_REGIONS, createPizzaScene, pizzaStateOf } from "../../../src/games/zoombinis/scenes/puzzles/pizza";
 import { BUTTON_GO, BUTTON_MAP, HELP_KEY } from "../../../src/games/zoombinis/scenes/puzzle-kit";
+import { Snoid } from "../../../src/games/zoombinis/scenes/snoid";
 import { originalFiles } from "../../support/original";
 import { runFor, TestHost } from "../engine-test-host";
 
@@ -572,6 +573,28 @@ describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", 
     expect(game.successes[S.pizza - 7]! & (1 << level)).toBe(1 << level);
     expect(game.monuments[0]).toMatchObject({ stage: 1, level: level + 1 });
     expect(game.levels[0]).toBe(Math.min(level + 1, 3));
+  });
+
+  it("sortie par « go » : les Zoombinis suivent NODE / PATH 1000 de la hutte (1168:2f9f, DS:970c remis à 0) au lieu d'aller tout droit vers (690, 250)", async () => {
+    const { state, clickIngredients, serveClick, ticks, intro, host } = await start(0);
+    await intro();
+    for (const meal of pizzaRobot(state)) {
+      await clickIngredients(meal);
+      await serveClick();
+      await ticks(1700);
+    }
+    await ticks(600);
+    const walkTo = vi.spyOn(Snoid.prototype, "walkTo");
+    host.click(BUTTON_GO.left + 5, BUTTON_GO.top + 5);
+    await ticks(100);
+    const exits = walkTo.mock.calls.filter(([to]) => to.x === 690 && to.y === 250);
+    walkTo.mockRestore();
+    expect(exits.length).toBeGreaterThan(0);
+    // Le chemin unique de PIZZA.MHK : (303, 316) (358, 288) (429, 263) (615, 290) (690, 290).
+    for (const [, map] of exits) {
+      expect(map?.paths).toEqual([[1, 2, 3, 4, 5]]);
+      expect(map?.nodes.at(-2)).toEqual({ x: 615, y: 290 });
+    }
   });
 
   it("par la carte : avertissement, « Ah non ! » garde l'épreuve, « Tant pis… » abandonne le groupe entier", async () => {

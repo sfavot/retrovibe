@@ -14,7 +14,8 @@
  *
  * Écarts assumés avec l'original, voir aussi la fin de ce commentaire :
  * - ordre : l'original insère la feature après celle dont l'id est `param_1` (0 = devant tout) ; ici un entier `depth` (croissant =
- *   plus devant, à égalité l'ordre de création) ;
+ *   plus devant, à égalité l'ordre de création) ; l'ordre de dessin dynamique de l'original (`11a8:231b`, devant / derrière selon
+ *   l'ordonnée) est porté par `Features.reorder` / `setDepthSort` (voir plus bas), que la scène active ; sans lui, `depth` fixe l'ordre ;
  * - rappel de fin d'animation (`0xffff`) : l'original exige que l'appelant ait posé `+0x2f` ; ici `notifyEnd` vaut vrai par défaut ;
  * - les groupes de synchronisation (`+0xde`, tables `DS:06da` / `DS:06fc` / `DS:070d`), la région (`0x8000000`) et le mode
  *   d'écrêtage (`+0xe2`) ne sont pas portés : les drapeaux correspondants sont stockés sans effet.
@@ -54,8 +55,9 @@ export const FEATURE_END = 0xffff;
 /**
  * Drapeaux d'une feature (`+0x20`, `engine.md` §3.5). Interprétés : `firstImage`, `noDraw`, `active`, `resetOnce`, `stopEachImage`,
  * `queueScript`, `noReplay`, `stopAtEnd`, `relative`, `staticFirst`, `random`. Stockés sans effet (« non interprétés ») : `snoid`
- * et `other` (taille de l'objet et tables `SCRS` de l'original), `flag4000000` (jamais lu par les fonctions portées) et `region`
- * (région attachée, `11d8:0958`).
+ * et `other` (taille de l'objet et tables `SCRS` de l'original, mais lus par `Features.reorder` pour reconnaître un personnage
+ * mobile), `region` (région attachée, `11d8:0958`). Lus seulement par `Features.reorder` (`11a8:231b`) : `overlay`, `active`,
+ * `flag4000000`, `limitLeft`, `limitRight`, `limitTop`.
  */
 export const FeatureFlag = {
   snoid: 0x1,
@@ -66,6 +68,8 @@ export const FeatureFlag = {
   noDraw: 0x4000,
   /** Objet « actif » mémorisé (`DS:a646`, `Features.activeId`). */
   active: 0x8000,
+  /** Reste devant tout le reste, par-dessus les Zoombinis (`11a8:231b`) : boutons, premier plan d'un écran. */
+  overlay: 0x1000,
   /** À la prochaine fin d'image : retour à l'image 0, arrêt, et le bit est effacé. */
   resetOnce: 0x10000,
   /** S'arrête après chaque image jouée. */
@@ -82,8 +86,15 @@ export const FeatureFlag = {
   staticFirst: 0x1000000,
   /** Lecture aléatoire : l'image suivante est tirée par `10a8:04e8(dernière, 0)`. */
   random: 0x2000000,
+  /** « Déjà trié » : `11a8:231b` le pose sur un objet fixe à sa première mise en ordre, et ne le déplace plus ensuite. */
   flag4000000: 0x4000000,
   region: 0x8000000,
+  /** Contraintes de `11a8:2737` : cet objet ne cache un passant (ne le met derrière lui) que si le passant n'est pas à gauche de son bord gauche. */
+  limitLeft: 0x40000000,
+  /** … que si le passant ne dépasse pas son bord droit. */
+  limitRight: 0x10000000,
+  /** … que si le passant ne commence pas au-dessus de son bord haut. */
+  limitTop: 0x20000000,
 } as const;
 
 /** Planche multi-image d'un groupe (ou d'un autre jeu de formes que les parties d'un rappel d'image peuvent désigner). */
@@ -190,6 +201,11 @@ export class Feature {
     { length: SCRIPT_MAX_CELLS },
     () => ({ w: 0, x: 0, y: 0 }),
   );
+  /**
+   * Porté devant tout, y compris les `overlay`, tant qu'il est vrai (`Features.reorder`) : extension du port pour un Zoombini transporté par
+   * le pointeur (`1168:1742`, dont l'ordre de dessin n'est pas établi).
+   */
+  raised = false;
   onBeforeDraw: FeatureDrawHook | undefined;
   onAfterDraw: FeatureDrawHook | undefined;
   onEvent: FeatureEventHook | undefined;
@@ -273,6 +289,8 @@ export class Features {
   private dirty = false;
   /** Id de la dernière feature créée avec `FeatureFlag.active` (`DS:a646`). */
   activeId = 0;
+  /** Mise en ordre dynamique à chaque tick (`DS:3fdc`) ; désactivée à la création et par `clear()`. */
+  private depthSort = false;
 
   constructor(private readonly deps: FeaturesDeps) {}
 
@@ -368,6 +386,57 @@ export class Features {
     this.dirty = true;
   }
 
+  /**
+   * `11a8:29c4` : active (ou non) la mise en ordre dynamique `reorder`, faite à chaque tick après la lecture des features. L'original
+   * l'active partout ; le port la laisse aux écrans qui en ont besoin (les autres gardent l'ordre de `depth`). Remise à faux par `clear()`.
+   */
+  setDepthSort(on: boolean): void {
+    this.depthSort = on;
+    this.dirty = true;
+  }
+
+  /**
+   * `11a8:231b` (appelé par `11a8:04b9`, chaque tour du moteur) avec `11a8:25ad` et `11a8:2737` : ordre de dessin, de l'arrière vers l'avant.
+   * Les features se répartissent par drapeaux :
+   * - `active` (`0x8000`) : restent en tête, dans leur ordre ;
+   * - `flag4000000` (déjà triées) : ensuite, dans leur ordre ;
+   * - mobiles (`snoid` ou `other`, c'est-à-dire les Zoombinis) : triées à chaque tick ;
+   * - les autres (décor) : triées une seule fois (le bit `flag4000000` est posé, sauf pour les `overlay`, retriées à chaque tick, qui vont à la fin) ;
+   * puis décor et mobiles sont insérés, tour à tour, dans la liste. Le tri est celui de `25ad` : rectangle de l'image courante, bord bas
+   * croissant puis bord gauche croissant (un objet dont le bord bas est plus bas est dessiné devant) ; `2737` insère chaque objet devant la première feature
+   * qu'il précède, sauf si celle-ci porte `limitLeft` / `limitRight` / `limitTop` et que l'objet est hors de sa colonne ; une feature `overlay`
+   * arrête toujours la recherche (tout passe derrière elle). Sans rectangle (aucune image lue), les bords valent 0 (mémoire à zéro de l'original).
+   *
+   * Écarts : l'original reconnaît un mobile à `drapeaux == 1 ou 2` ; le port teste les bits `snoid` / `other` (un `Snoid` range dans le même mot
+   * ses drapeaux de lecture, `stopEachImage`, et `firstImage`). `raised` (extension) place en dernier les objets portés par le pointeur. L'original
+   * a deux nœuds fixes (tête `0x1008000`, queue `0x1000`) qu'il ne reste qu'à ignorer ici.
+   */
+  reorder(): void {
+    const before = this.list;
+    const head: Feature[] = [];
+    const sorted: Feature[] = [];
+    const moving: Feature[] = [];
+    const decor: Feature[] = [];
+    const carried: Feature[] = [];
+    for (const feature of before) {
+      const flags = feature.flags;
+      if (feature.raised) carried.push(feature);
+      else if (flags & FeatureFlag.active) head.push(feature);
+      else if (flags & FeatureFlag.flag4000000) sorted.push(feature);
+      else if (flags & (FeatureFlag.snoid | FeatureFlag.other)) moving.push(feature);
+      else {
+        if (!(flags & FeatureFlag.overlay)) feature.flags |= FeatureFlag.flag4000000;
+        decor.push(feature);
+      }
+    }
+    const list = [...head, ...sorted];
+    mergeByDepth(list, sortByBottom(decor));
+    mergeByDepth(list, sortByBottom(moving));
+    list.push(...carried);
+    if (list.some((feature, i) => feature !== before[i])) this.dirty = true;
+    this.list = list;
+  }
+
   destroy(feature: Feature): void {
     const index = this.list.indexOf(feature);
     if (index >= 0) this.list.splice(index, 1);
@@ -384,6 +453,7 @@ export class Features {
     this.archive = null;
     this.background = null;
     this.activeId = 0;
+    this.depthSort = false;
     this.dirty = false;
   }
 
@@ -459,6 +529,7 @@ export class Features {
     const now = this.deps.clock.ticks;
     for (const feature of [...this.list])
       if (!feature.destroyed) this.step(feature, now);
+    if (this.depthSort) this.reorder();
     if (this.dirty) this.compose();
   }
 
@@ -668,6 +739,66 @@ export class Features {
         : { left: part.x, top: part.y, right, bottom };
     }
     return rect ?? feature.rect;
+  }
+}
+
+const NO_RECT: FeatureRect = { left: 0, top: 0, right: 0, bottom: 0 };
+const rectOf = (feature: Feature): FeatureRect => feature.rect ?? NO_RECT;
+
+/** `11a8:25ad` : tri par insertion, bord bas puis bord gauche croissants ; un `overlay` va à la fin. */
+function sortByBottom(features: readonly Feature[]): Feature[] {
+  const out: Feature[] = [];
+  for (const feature of features) {
+    const rect = rectOf(feature);
+    let at = out.length;
+    if (!(feature.flags & FeatureFlag.overlay)) {
+      const found = out.findIndex((other) => {
+        const o = rectOf(other);
+        return rect.bottom < o.bottom || (rect.bottom === o.bottom && rect.left < o.left);
+      });
+      if (found >= 0) at = found;
+    }
+    out.splice(at, 0, feature);
+  }
+  return out;
+}
+
+/**
+ * `11a8:2737` : insère `incoming` (déjà trié) dans `list`. Un `overlay` est ajouté à la fin ; sinon l'objet se place devant la première
+ * feature qu'il précède par (bord bas, bord gauche) et que les contraintes de celle-ci n'excluent pas, ou devant la première `overlay`
+ * rencontrée ; la recherche du suivant reprend à cette feature. La recherche part de la fin du bloc de têtes (`active`).
+ */
+function mergeByDepth(list: Feature[], incoming: readonly Feature[]): void {
+  let start = 0;
+  while (start < list.length && list[start]!.flags & FeatureFlag.active) start++;
+  for (const feature of incoming) {
+    if (feature.flags & FeatureFlag.overlay) {
+      list.push(feature);
+      continue;
+    }
+    const rect = rectOf(feature);
+    let at = start;
+    let passed = false;
+    while (at < list.length) {
+      const other = list[at]!;
+      if (other.flags & FeatureFlag.overlay) break;
+      const o = rectOf(other);
+      const earlier = rect.bottom < o.bottom || (rect.bottom === o.bottom && rect.left < o.left);
+      if (
+        earlier &&
+        (rect.bottom < o.top ||
+          ((!(other.flags & FeatureFlag.limitLeft) || o.left <= rect.left) &&
+            (!(other.flags & FeatureFlag.limitRight) || rect.right <= o.right) &&
+            (!(other.flags & FeatureFlag.limitTop) || o.top <= rect.top)))
+      ) {
+        passed = true;
+        break;
+      }
+      at++;
+    }
+    list.splice(at, 0, feature);
+    // La recherche du suivant reprend à la feature devant laquelle l'objet vient de passer (`local_8`), pas après une `overlay`.
+    if (passed) start = at + 1;
   }
 }
 

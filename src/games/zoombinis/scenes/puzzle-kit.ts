@@ -51,7 +51,7 @@ import type { Shape } from "../../../data/mohawk/shap";
 import { drawShape } from "../../../engine/mohawk/graphics/blit";
 import type { Input } from "../../../engine/mohawk/input";
 import { DIALOG, confirmLeaveToMap } from "../engine/dialog";
-import { FEATURES, type Feature } from "../engine/features";
+import { FEATURES, FeatureFlag, type Feature } from "../engine/features";
 import { ZOOMBINIS_GAME } from "../engine/game";
 import type { CursorKind } from "../engine/host";
 import type { SceneContext } from "../engine/scene";
@@ -59,7 +59,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../engine/services";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { currentLevel, exitPuzzle, leaveMap, nextScreen } from "../game/route";
 import type { GameDate, Zoombini } from "../game/state";
-import type { Point } from "../data/zoombini";
+import type { Point, WalkMap } from "../data/zoombini";
 import { createSnoid, type Snoid, type SnoidOptions } from "./snoid";
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -349,6 +349,11 @@ export interface PuzzleKitSpec {
   buttons?: { map?: KitButtonSpec | null; go?: KitButtonSpec | null; depth?: number };
   /** Marche de sortie de `pressGo` (`1168:2982(écart, y, x)`) : point hors écran et écart entre départs (45). */
   exitWalk?: { x: number; y: number; step?: number };
+  /**
+   * `NODE` / `PATH` de l'écran, quand son Enter les charge (`1168:2a5c(1000)` : grottes, hutte à pizza…) : la marche de sortie les suit (`1168:2f9f`,
+   * `DS:970c` remis à 0 par le bouton « go ») au lieu d'aller tout droit. Sans eux, ligne droite (gorges, muraille…).
+   */
+  walkMap?: WalkMap;
   /** Peut-on prendre ce Zoombini ? Défaut : personne en marche (`DS:9702 < 1`) et lui-même immobile. */
   canPick?: (member: KitMember) => boolean;
   /** Appui sur l'écran, après les boutons et avant toute prise : vrai = l'épreuve l'a traité. */
@@ -786,7 +791,8 @@ export class PuzzleKit {
       script: 0,
       delay: 0,
       depth: this.spec.buttons?.depth ?? 0,
-      flags: 0,
+      // Les boutons restent devant tout quand l'écran trie son décor (`0x1000` des boutons de l'original).
+      flags: FeatureFlag.overlay,
       onAfterDraw: (_feature, screen) => {
         for (const [id, spec] of specs) {
           const images = spec?.images;
@@ -895,7 +901,11 @@ export class PuzzleKit {
       radius: spec.radius ?? this.radius,
       bounds: spec.bounds ?? this.bounds,
     };
-    if (spec.feature) this.features.restack(spec.feature, CARRY_DEPTH);
+    if (spec.feature) {
+      this.features.restack(spec.feature, CARRY_DEPTH);
+      // Avec l'ordre de dessin dynamique (`Features.setDepthSort`), l'objet porté reste devant tout (extension du port, comme au camp).
+      spec.feature.raised = true;
+    }
     if (hidden) this.ctx.setCursor(HIDDEN_CURSOR);
   }
 
@@ -952,6 +962,7 @@ export class PuzzleKit {
       return;
     }
     if (carry.hidden) this.ctx.setCursor("system");
+    if (spec.feature) spec.feature.raised = false;
     if (verdict === true) spec.onDrop?.(info);
     else spec.onReturn?.(info);
   }
@@ -1092,7 +1103,7 @@ export class PuzzleKit {
             if (this.walking > 0) this.walking -= 1;
             this.arrived += 1;
           };
-          member.snoid.walkTo({ x, y });
+          member.snoid.walkTo({ x, y }, this.spec.walkMap);
         },
       });
     });
@@ -1248,6 +1259,7 @@ export class PuzzleKit {
     if (carry) {
       this.carry = null;
       if (carry.hidden) this.ctx.setCursor("system");
+      if (carry.spec.feature) carry.spec.feature.raised = false;
       if (carry.member && carry.from) carry.from.owner = carry.member;
     }
     this.scheduled.length = 0;

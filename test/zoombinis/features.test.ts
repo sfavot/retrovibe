@@ -770,3 +770,107 @@ describe.skipIf(!original.has)("features : décor animé de BASECAMP", () => {
     expect(events).toEqual([FEATURE_END]);
   });
 });
+
+describe("features : ordre de dessin dynamique (`11a8:231b`, `25ad`, `2737`)", () => {
+  /** Une feature de 4 × 4 en `(x, y)` (bord bas `y + 4`, bord gauche `x`), de couleur `w`. */
+  const at = (h: Harness, w: number, x: number, y: number, flags = 0): Feature => h.spawn([{ cells: [[w, x, y]] }], { flags, delay: 1000 });
+  const colors = (h: Harness) => h.features.features.map((f) => f.parts[0]?.w);
+
+  it("sans activation, l'ordre reste celui de `depth`", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    at(h, 1, 0, 20);
+    at(h, 2, 0, 0);
+    h.tick();
+    expect(colors(h)).toEqual([1, 2]);
+  });
+
+  it("trie le décor une fois, par bord bas puis bord gauche croissants : le plus bas est devant", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    h.features.setDepthSort(true);
+    const low = at(h, 1, 0, 20);
+    at(h, 2, 10, 5);
+    at(h, 3, 4, 5);
+    h.tick();
+    expect(colors(h)).toEqual([3, 2, 1]);
+    // Trié une fois : le bit « déjà trié » est posé, la feature ne bouge plus quand son image change.
+    expect(low.flags & FeatureFlag.flag4000000).not.toBe(0);
+    low.rect = { left: 0, top: -50, right: 4, bottom: -46 };
+    h.tick();
+    expect(colors(h)).toEqual([3, 2, 1]);
+  });
+
+  it("garde les features `active` au fond et les `overlay` devant, quel que soit leur bord bas", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    h.features.setDepthSort(true);
+    at(h, 1, 0, 0, FeatureFlag.overlay);
+    at(h, 2, 0, 28);
+    at(h, 3, 0, 28, FeatureFlag.active);
+    at(h, 4, 0, 10);
+    h.tick();
+    expect(colors(h)).toEqual([3, 4, 2, 1]);
+  });
+
+  it("retrie les mobiles (`snoid`) à chaque tick : un mobile passe derrière un décor dont le bord bas est plus bas, et devant sinon", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    h.features.setDepthSort(true);
+    const rock = at(h, 1, 10, 20);
+    const walker = at(h, 2, 10, 5, FeatureFlag.snoid);
+    h.tick();
+    expect(h.features.features).toEqual([walker, rock]);
+    walker.rect = { left: 10, top: 20, right: 14, bottom: 30 };
+    h.tick();
+    expect(h.features.features).toEqual([rock, walker]);
+    // Deux mobiles : le plus bas devant.
+    const other = at(h, 3, 0, 0, FeatureFlag.snoid);
+    other.rect = { left: 0, top: 0, right: 4, bottom: 4 };
+    h.tick();
+    expect(h.features.features).toEqual([other, rock, walker]);
+  });
+
+  it("`limitLeft` / `limitRight` : le décor ne cache le mobile que dans sa colonne", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    h.features.setDepthSort(true);
+    const wall = at(h, 1, 10, 6, FeatureFlag.limitLeft | FeatureFlag.limitRight);
+    const walker = at(h, 2, 0, 0, FeatureFlag.snoid);
+    h.tick();
+    wall.rect = { left: 10, top: 0, right: 20, bottom: 20 };
+    const place = (left: number, right: number, bottom: number) => {
+      walker.rect = { left, top: bottom - 10, right, bottom };
+      h.tick();
+      return h.features.features.indexOf(walker) < h.features.features.indexOf(wall) ? "derrière" : "devant";
+    };
+    // Bord bas au-dessus de celui du décor : derrière lui dans sa colonne, devant s'il est hors de la colonne (à gauche, ou débordant à droite).
+    expect(place(12, 18, 15)).toBe("derrière");
+    expect(place(2, 8, 15)).toBe("devant");
+    expect(place(12, 25, 15)).toBe("devant");
+  });
+
+  it("`raised` place le mobile après les `overlay`", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    h.features.setDepthSort(true);
+    const walker = at(h, 1, 0, 0, FeatureFlag.snoid);
+    const top = at(h, 2, 0, 0, FeatureFlag.overlay);
+    h.tick();
+    expect(h.features.features).toEqual([walker, top]);
+    walker.raised = true;
+    h.tick();
+    expect(h.features.features).toEqual([top, walker]);
+  });
+
+  it("`clear` désactive l'ordre dynamique", () => {
+    const h = new Harness();
+    h.features.setDepthSort(true);
+    h.features.clear();
+    h.features.setGroup(0, sheet());
+    at(h, 1, 0, 20);
+    at(h, 2, 0, 0);
+    h.tick();
+    expect(colors(h)).toEqual([1, 2]);
+  });
+});

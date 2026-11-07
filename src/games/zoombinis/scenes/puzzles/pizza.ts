@@ -28,6 +28,7 @@ import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeatureImageHook
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import type { Scene, SceneContext } from "../../engine/scene";
 import { ScreenId } from "../../engine/scene";
+import { node, path } from "../../engine/resources";
 import { ZOOMBINIS_SOUND } from "../../engine/sound";
 import { dialogMemoryIndex, currentLevel } from "../../game/route";
 import {
@@ -109,6 +110,8 @@ const QUEUE_STEP = 34;
 const START_DELAY = 30;
 const STEP_DELAY = 45;
 const EXIT_WALK = { x: 690, y: 250, step: 45 } as const;
+/** `NODE` / `PATH` de l'écran (`1168:2a5c(1000)`), suivis par la marche de sortie. */
+const WALK_MAP = 1000;
 /** Pieds du livreur au comptoir (`DS:1b6e`) : sous le point de départ de la pizza, `12000` finit en (247, 308). **Choix** : valeur non lue dans le corpus. */
 export const PIZZA_COUNTER: Point = { x: 247, y: 338 };
 /** Voix d'introduction rejouée par F1 (`DS:a2c4`) : niveau 0 `20071`, sinon `20072`. */
@@ -568,6 +571,8 @@ export function createPizzaScene(): Scene {
           depth: DEPTH.buttons,
         },
         exitWalk: EXIT_WALK,
+        // `1130:0000` charge `NODE` / `PATH` 1000 (`1168:2a5c`) ; « go » (`1130:1803`) remet `DS:970c` à 0 : la sortie suit les chemins.
+        walkMap: { nodes: node(archive, WALK_MAP), paths: path(archive, WALK_MAP) },
         introVoice: INTRO_VOICES[state.level === 0 ? 0 : 1]!,
         onPointerDown,
       });

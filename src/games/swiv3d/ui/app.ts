@@ -237,6 +237,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     levelSession?.dispose();
     levelSession = null;
     touch.element.style.display = "none";
+    touch.reset();
     controls.clear();
   };
 
@@ -426,7 +427,10 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         return controls.keyDown(event);
       },
       keyUp: (event) => controls.keyUp(event),
-      blur: () => controls.clear(),
+      blur: () => {
+        controls.clear();
+        touch.reset();
+      },
     },
     unlock,
   );

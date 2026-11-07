@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Session } from "./game-helpers";
 import { hasOriginalFiles } from "./helpers";
+import { tap } from "./touch";
+import { readSave } from "../../src/games/teleportaschtroumpf/scenes/save";
 import { FIDGET_AFTER_SECONDS, POSE_FIDGET_RIGHT, POSE_IDLE_RIGHT } from "../../src/games/teleportaschtroumpf/scenes/board/walker";
 import { STUB_POINTS, forceMinigameStubs } from "../../src/games/teleportaschtroumpf/scenes/minigames";
 
@@ -175,8 +177,8 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     const s = await Session.start();
     await s.ready();
     s.place({ screen: 3, row: "bottom", x: 0xa0 });
-    s.setElapsedTurn(15);
-    // Piège d'attente à 16 s de tour : animation de la cage, tour passé (cage affichée), libération, puis le plateau.
+    s.setDwell(15);
+    // Piège d'attente à 16 s dans la plage : animation de la cage, tour passé (cage affichée), libération, puis le plateau.
     await s.settle("BoardEventScene");
     expect(s.board.shown.x).toBe(0xac); // marché jusqu'au point de la cage avant la vidéo
     await s.until(() => s.board.shown.look === "jail");
@@ -188,12 +190,88 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     await s.ready();
     expect(s.game.player.status).toBe(0);
     expect(s.board.shown.look).toBe("normal");
-    // Le pion libéré est encore dans la zone de la cage : le chrono du tour part de la prise de main (`291e:0b6a`), pas
-    // de la libération ; il n'est repris qu'après 16 s sur place.
+    // Le pion libéré est encore dans la zone de la cage : le chrono de la plage repart de la prise de main (`2a78:0272` remet
+    // `DS:7706` à zéro, `2bd4:0a23` relance le chrono à l'image suivante) ; il n'est repris qu'après 16 s sur place.
     expect(s.game.state.turn.elapsed).toBeLessThan(2);
     await s.run(10_000);
     expect(s.game.player.status).toBe(0);
     expect(s.top()).toBe("GameScene");
+  }, 120_000);
+
+  it("doigt : pris par la prison en marchant vers un but, le pion libéré ne repart pas seul vers ce but (ni vers le Turlusiphon)", async () => {
+    const s = await Session.start();
+    await s.ready();
+    s.place({ screen: 3, row: "bottom", x: 0x94 });
+    // Juste après une seconde du chrono : la suivante tombe dans ~1 s, quand le pion est encore dans la zone de la cage.
+    const second = s.game.state.elapsed;
+    await s.until(() => s.game.state.elapsed !== second);
+    s.setDwell(15);
+    await s.run(500);
+    tap(s.host.input, 0x13c, 0x70); // près du bord droit : vers l'écran 4, à travers le Turlusiphon
+    await s.until(() => s.top() === "BoardEventScene");
+    expect(s.game.state.players[0]).toMatchObject({ status: 0, x: 0xac }); // pris par le chrono (S20), déjà libéré au tour suivant
+    expect(s.history.filter((n) => n === "BoardEventScene")).toHaveLength(1);
+    await s.ready();
+    await s.run(3000);
+    expect(s.game.player).toMatchObject({ screen: 3, row: "bottom", x: 0xac, status: 0 });
+    expect(s.board.shown.x).toBe(0xac);
+  }, 120_000);
+
+  it("Turlusiphon : la dernière image de la prise reste à l'écran, annonce puis voix 5, libération, et le pion libre sans fondu", async () => {
+    const s = await Session.start({ audio: true });
+    await s.ready();
+    s.place({ screen: 3, row: "bottom", x: 0xe8 });
+    s.host.input.keyDown("ArrowRight");
+    await s.until(() => s.top() === "BoardEventScene");
+    s.host.input.keyUp("ArrowRight");
+    // Trace à chaque image : scène du dessus, aspect du pion, fondu ; et l'image présentée au dernier pas de la vidéo de prise.
+    const trace: string[] = [];
+    let lastVideoFrame: Uint8Array | null = null;
+    let afterCapture: Uint8Array | null = null;
+    while (!(s.top() === "GameScene" && s.board.playing)) {
+      const top = s.top();
+      await s.run(1000 / 60);
+      const shown = s.host.presentations.at(-1)!.surface;
+      if (afterCapture === null && top === "BoardEventScene") lastVideoFrame = shown;
+      if (afterCapture === null && lastVideoFrame && s.top() === "GameScene") afterCapture = shown;
+      const step = `${s.top()} ${s.board.shown.look}${s.ctx.fade.active || s.ctx.palette.black ? " fondu" : ""}`;
+      if (trace.at(-1) !== step) trace.push(step);
+    }
+    // `2a78:0039` ne redessine pas le plateau : la dernière image de S21A (Schtroumpf endormi) reste jusqu'au tour suivant.
+    expect(afterCapture).toEqual(lastVideoFrame);
+    // Tour passé (siphon), puis tour de la libération : le plateau montre le siphon pendant l'annonce et la voix 5.
+    const plays = s.host.audio.plays.map((p) => p.sound.samples);
+    const voice5 = await Promise.all([4, 5].map((n) => s.ctx.resources.voc(`s21v00${n}t.voc`)));
+    expect(plays.some((x) => voice5.some((v) => v.samples === x))).toBe(true);
+    // La libération (S21B) est la dernière vidéo, juste avant que le joueur ait la main : plus de siphon ni de fondu après.
+    expect(trace.slice(trace.lastIndexOf("BoardEventScene siphon"))).toEqual(["BoardEventScene siphon", "GameScene normal"]);
+    expect(s.host.loaded.some((f) => /S21B\.MUX/i.test(f))).toBe(true);
+    expect(s.board.shown).toMatchObject({ x: 0x109 - 0x14, look: "normal" });
+    expect(s.board.walker.currentFrame(s.board["resources"].sprites)).toBeDefined();
+  }, 120_000);
+
+  it("reprise d'une sauvegarde du tour de libération : même enchaînement (siphon, voix 5, S21B), sans rejouer la libération", async () => {
+    const s = await Session.start();
+    await s.ready();
+    s.place({ screen: 3, row: "bottom", x: 0xe8 });
+    s.host.input.keyDown("ArrowRight");
+    await s.until(() => s.top() === "BoardEventScene");
+    s.host.input.keyUp("ArrowRight");
+    await s.ready();
+    const save = readSave(s.host.storage)!;
+    expect(save.state.turn.released).toBe("turlusiphon");
+    expect(save.state.players[0]).toMatchObject({ status: 0, x: 0x109 - 0x14 });
+    const r = await Session.resume(save);
+    const looks: string[] = [];
+    while (!(r.top() === "GameScene" && r.board?.playing)) {
+      await r.run(1000 / 60);
+      const step = `${r.top()} ${r.board?.shown.look}`;
+      if (looks.at(-1) !== step) looks.push(step);
+    }
+    expect(looks).toContain("GameScene siphon");
+    expect(r.host.loaded.some((f) => /S21B\.MUX/i.test(f))).toBe(true);
+    expect(r.game.player).toMatchObject({ status: 0, x: 0x109 - 0x14 }); // pas de second recul
+    expect(r.board.shown).toMatchObject({ x: 0x109 - 0x14, look: "normal" });
   }, 120_000);
 
   it("S13 interactif : la porte du puits ouvert lance l'animation puis le puits (code 14)", async () => {

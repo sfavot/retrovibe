@@ -221,7 +221,7 @@ describe.skipIf(!hasOriginalFiles)("partie : les événements sont joués sur le
     const s = await Session.start();
     await s.ready();
     s.place(pos(3, "bottom", 0xa0));
-    s.setElapsedTurn(15);
+    s.setDwell(15);
     await s.settle("BoardEventScene");
     expect(s.host.loaded.some((f) => /S20[AB]\.MUX/i.test(f))).toBe(true);
     await s.until(() => s.board.shown.look === "jail");

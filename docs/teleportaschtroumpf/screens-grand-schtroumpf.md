@@ -55,7 +55,7 @@ Tirage d'entrée : `rand × bae / 0x8000 == 0` (une chance sur 2 au tour passé,
 
 **Tour normal** (dans l'ordre, le premier qui parle gagne) :
 
-1. (jamais) 21..25 : dépendent de `DS:2761`, `2783`, `2764`, `275E`, `275F`, jamais écrits dans le code : **mort** (probable) ;
+1. 21..25 : dépendent des compteurs `DS:274F + n` de `26ee:0008` : `DS:2761` (n = 0x12, `2bd4:0c94`), `2783` (0x34, `2bd4:09f6`), `2764` (0x15, `291e:0913` : libération du Turlusiphon), `275E` (0x0F, `2bd4:0c33` et 6 autres), `275F` (0x10, `2bd4:12c1`). Ces compteurs sont bien écrits (relu le 2026-11-07 ; la note « jamais écrits » était fausse), mais ces répliques font partie du tour normal, qui n'est pas atteint (constat ci-dessus) : non portées ;
 2. plusieurs joueurs : `meilleur > temps` et le **dernier** joueur possède au moins un ingrédient (l'original réécrit son drapeau à chaque joueur) → 1 puis 2 ; deux joueurs à plus de 15 et à 5 points d'écart ou moins → 3 ; `temps / 2 ≥ meilleur` → 4 puis 5 ;
 3. avancement du joueur `> temps` : 11, 12, puis la voix de son personnage ; `temps / 2 > avancement` : 13, 14, 15, puis la voix « en retard » du personnage. Voix par personnage (tables `CS:26ee:0f0b` / `0eff`) : en avance `0x8D, 0x9C, 0x95, 0xA0, 0x91, 0x98` + `rand × 2` ; en retard `0x8F, 0x9E, 0x97 (une seule), 0xA2, 0x93, 0x9A` (+ `rand × 2`) ; le drapeau est celui du code de base ;
 4. plusieurs joueurs et `temps ≥ 30` : un ingrédient demandé que personne n'a (boucle d'origine reproduite : sortie par `k = total` qui dépend du nombre d'ingrédients × joueurs), voix 100 + `DS:2792[k]` (`DS:2792` = 0, 5, 3, 6, 2, 7, 8, 1) ;

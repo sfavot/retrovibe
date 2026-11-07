@@ -210,7 +210,10 @@ export const CHARACTER_NAMES: readonly string[] = ["Costaud", "Poète", "Grognon
 
 /** Au-delà de cette durée de tour, une action automatique est déclenchée en multijoueur (`slot 1 ≥ 0x24`). */
 export const TURN_AUTO_SECONDS = 36;
-/** Un piège « d'attente » se déclenche quand le tour dure depuis 16 s (`slot 1 ≥ 0x10`). */
+/**
+ * Un piège « d'attente » se déclenche quand le pion est resté 16 s dans sa plage (`slot 5 > 0xF`, `2bd4:0a45` et ses pareils
+ * des écrans 5, 7, 8, 9) : ce chrono repart à l'entrée dans la plage (`2bd4:0a23`), il ne suit pas le chrono du tour.
+ */
 export const DWELL_SECONDS = 16;
 /** Indices vocaux d'inactivité (fenêtres du chrono du tour, `291e:0401`). */
 export const HINT_WINDOWS: readonly [number, number][] = [
@@ -254,7 +257,7 @@ export interface Hazard {
   walk?: readonly [number, number];
   /** Se déclenche sur un appui du bouton (ou l'action automatique) dans cette plage. */
   press?: readonly [number, number];
-  /** Se déclenche sur appui, ou quand le tour dure depuis `DWELL_SECONDS`, pion dans cette plage. */
+  /** Se déclenche sur appui, ou quand le pion est resté `DWELL_SECONDS` dans cette plage. */
   dwell?: readonly [number, number];
   /** Compté à chaque entrée dans cette plage ; se déclenche à la 5ᵉ (`counter > 4`). */
   counted?: readonly [number, number];

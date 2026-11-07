@@ -3,7 +3,8 @@ import type { Action } from "../../src/games/teleportaschtroumpf/engine/input";
 import { saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
 import type { PlayerSetup } from "../../src/games/teleportaschtroumpf/game/rules";
 import type { Position } from "../../src/games/teleportaschtroumpf/game/tables";
-import { GameScene, createGameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
+import { GameScene, createGameScene, resumeGameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
+import type { GameSave } from "../../src/games/teleportaschtroumpf/scenes/save";
 import { TestHost } from "./engine-test-host";
 
 const FRAME_MS = 1000 / 60;
@@ -65,6 +66,21 @@ export class Session {
     saveOptions(host.storage, parent);
     const holder: { session?: Session } = {};
     const scene = createGameScene({ players: options.players ?? [{ character: 0 }], options: parent }, () => {
+      if (holder.session) holder.session.finished = true;
+    });
+    await engine.start(scene);
+    const session = new Session(host, engine, scene);
+    holder.session = session;
+    return session;
+  }
+
+  /** Reprend une sauvegarde sur un moteur neuf (son coupé, autre graine : seule la sauvegarde compte). */
+  static async resume(save: GameSave, seed = 12345): Promise<Session> {
+    const host = new TestHost();
+    host.audio.enabled = false;
+    const engine = new Engine(host, { seed });
+    const holder: { session?: Session } = {};
+    const scene = resumeGameScene(save, () => {
       if (holder.session) holder.session.finished = true;
     });
     await engine.start(scene);
@@ -148,6 +164,11 @@ export class Session {
   /** Le chrono du tour a déjà couru `seconds` secondes. */
   setElapsedTurn(seconds: number): void {
     this.game.state.turn.elapsed = seconds;
+  }
+
+  /** Le pion est déjà resté `seconds` secondes dans la plage d'attente où il se trouve (chrono de la prison, `slot 5`). */
+  setDwell(seconds: number): void {
+    this.game.state.turn.dwell = seconds;
   }
 
   action(action: Action): boolean {

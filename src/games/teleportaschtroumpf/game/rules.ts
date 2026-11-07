@@ -125,7 +125,7 @@ function newPlayer(setup: PlayerSetup): Player {
 }
 
 function freshTurn(): TurnState {
-  return { elapsed: 0, wellOpen: false, acted: false, hint1Done: false, hint2Done: false, inside: [] };
+  return { elapsed: 0, wellOpen: false, acted: false, hint1Done: false, hint2Done: false, inside: [], dwell: 0, released: null };
 }
 
 const inRange = (x: number, r: readonly [number, number] | undefined): boolean => r !== undefined && x >= r[0] && x <= r[1];
@@ -181,7 +181,11 @@ export class Game {
 
   /** Reprend une partie sérialisée (`JSON.parse(JSON.stringify(game.state))`) avec un générateur fourni. */
   static restore(state: GameState, rng: BorlandRandom): Game {
-    return new Game(structuredClone(state), rng);
+    const copy = structuredClone(state);
+    // Les sauvegardes écrites avant ces champs n'ont ni `turn.dwell` (toujours 0 en début de tour) ni `turn.released`.
+    copy.turn.dwell ??= 0;
+    copy.turn.released ??= null;
+    return new Game(copy, rng);
   }
 
   /** Événements produits depuis le dernier appel (ceux de `create` y compris). */
@@ -283,10 +287,15 @@ export class Game {
       if (s.elapsed >= s.durationSeconds) {
         // Le tour s'arrête au temps écoulé (`291e:0401`), puis `28a3:00ad` termine la partie.
         this.completeTurn();
-      } else if (!s.paused) {
-        this.runHazards("frame");
-        if (this.state.phase === "turn" && s.players.length > 1 && Math.floor(s.turn.elapsed) >= TURN_AUTO_SECONDS) {
-          this.doPress("timeout");
+      } else {
+        // Le chrono de la plage d'attente (`slot 5`) n'est jamais gelé : il court aussi pendant les voix (`1f33:01e6` ne gèle que
+        // le `slot 1`) ; `takeHand` le relance quand le joueur prend la main.
+        this.updateDwell(seconds);
+        if (!s.paused) {
+          this.runHazards("frame");
+          if (this.state.phase === "turn" && s.players.length > 1 && Math.floor(s.turn.elapsed) >= TURN_AUTO_SECONDS) {
+            this.doPress("timeout");
+          }
         }
       }
     }
@@ -296,6 +305,15 @@ export class Game {
   /** Pause (S48) : le chrono du tour est gelé ; le chrono global continue (hypothèse). */
   setPaused(paused: boolean): void {
     this.state.paused = paused;
+  }
+
+  /**
+   * Le joueur prend la main : après l'annonce du tour, ou au retour de la pause S48 (qui relance `291e:0401` en entier,
+   * `cRam38d02`). Le drapeau de la plage d'attente est remis à zéro au début de `291e:0401` (`DS:7706`) et le `slot 5` est
+   * relancé à la première image où le pion s'y trouve (`2bd4:0a23`) : le chrono de la plage repart de zéro.
+   */
+  takeHand(): void {
+    this.state.turn.dwell = 0;
   }
 
   /**
@@ -443,20 +461,38 @@ export class Game {
       frozen = "turlusiphon";
     }
     if (frozen) {
+      // Tour passé (`DS:274E == 2`) : le bloc des avertissements est parcouru, mais la réplique du Grand Schtroumpf
+      // (`26ee:027e`) remplace la vidéo tirée : l'avertissement est perdu, son drapeau reste levé.
+      this.timeWarning();
       this.emit({ type: "skip", player: s.current, reason: frozen });
       this.completeTurn();
       return;
     }
-    // États 3 et 5 : libération dès la première image (animations S20 puis S21).
+    // États 3 et 5 : libération à la première image du tour, après l'annonce (animations S20 puis S21).
     if (p.status === 3) {
       p.status = 0;
+      s.turn.released = "jail";
       this.emit({ type: "release", player: s.current, from: "jail" });
     } else if (p.status === 5) {
       p.status = 0;
       p.x += p.facingRight ? -0x14 : 0x14;
+      s.turn.released = "turlusiphon";
       this.emit({ type: "release", player: s.current, from: "turlusiphon" });
     }
 
+    // Libération du Turlusiphon (`iRam38d04 = 5`, `DS:274E ≠ 2`) : le bloc des avertissements et des répliques est sauté ;
+    // l'avertissement attend le tour suivant.
+    const video = s.turn.released === "turlusiphon" ? 0 : this.timeWarning();
+    if (video) this.emit({ type: "announce", kind: "timeWarning", video });
+    this.emit({ type: "turn", player: s.current, round: s.round, wellOpen: s.turn.wellOpen });
+  }
+
+  /**
+   * Avertissement de temps du début de tour (`291e:0401`) : vidéo `s42a031..035` à jouer (0 = aucune) ; lève le drapeau du
+   * seuil franchi (le second écrase le premier s'ils tombent au même tour).
+   */
+  private timeWarning(): number {
+    const s = this.state;
     const remaining = s.durationSeconds - Math.floor(s.elapsed);
     let video = 0;
     if (!s.warned5 && remaining < WARNING_5_MIN_SECONDS) {
@@ -467,8 +503,7 @@ export class Game {
       s.warned10 = true;
       video = 31 + this.rng.below(3);
     }
-    if (video) this.emit({ type: "announce", kind: "timeWarning", video });
-    this.emit({ type: "turn", player: s.current, round: s.round, wellOpen: s.turn.wellOpen });
+    return video;
   }
 
   /**
@@ -528,6 +563,7 @@ export class Game {
     p.row = pos.row;
     p.x = pos.x;
     this.state.turn.inside = [];
+    this.state.turn.dwell = 0;
     if (from.screen !== pos.screen || from.row !== pos.row) this.emit({ type: "moved", player: this.state.current, from, to: { ...pos }, cause });
   }
 
@@ -549,10 +585,22 @@ export class Game {
     }
     if (next.crossed) this.setPosition(next.position, "edge");
     else p.x = next.position.x;
+    this.updateDwell(0);
     this.runHazards("frame");
   }
 
   // --- Événements du plateau ----------------------------------------------------------------------
+
+  /**
+   * Chrono de la plage d'attente (`slot 5`) : il avance de `seconds` tant que le pion reste dans la plage d'une prison de sa
+   * rangée et repart de zéro dès qu'il en sort (`2bd4:0a1a..0a32`).
+   */
+  private updateDwell(seconds: number): void {
+    const s = this.state;
+    const p = this.player;
+    const inside = HAZARDS.some((h) => h.screen === p.screen && h.row === p.row && inRange(p.x, h.dwell) && this.hazardConditions(h));
+    s.turn.dwell = inside ? s.turn.dwell + seconds : 0;
+  }
 
   private hazardConditions(h: Hazard): boolean {
     return (!h.needsWell || this.state.turn.wellOpen) && (!h.needsFree || this.player.status === 0);
@@ -595,7 +643,7 @@ export class Game {
       if (found) continue;
       if (trigger === "frame") {
         if (inRange(p.x, h.walk)) found = h;
-        else if (inRange(p.x, h.dwell) && Math.floor(s.turn.elapsed) >= DWELL_SECONDS) found = h;
+        else if (inRange(p.x, h.dwell) && Math.floor(s.turn.dwell) >= DWELL_SECONDS) found = h;
       } else {
         // L'appui du Turlusiphon ne répond qu'au bouton ; les autres répondent aussi à l'action automatique.
         const pressRange = h.kind === "turlusiphon" && trigger === "timeout" ? undefined : h.press;

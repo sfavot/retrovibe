@@ -116,7 +116,12 @@ export class Walker {
       (previous === POSE_WALK_LEFT && pose === POSE_RUN_LEFT) ||
       (previous === POSE_IDLE_RIGHT && pose === POSE_FIDGET_RIGHT) ||
       (previous === POSE_IDLE_LEFT && pose === POSE_FIDGET_LEFT);
-    if (force || pose !== previous) this.frame = 0;
+    if (force || pose !== previous) {
+      // L'image montrée jusqu'au prochain `step` est la première de la nouvelle animation : l'index de l'ancienne peut dépasser
+      // sa longueur (une marche de 8 images, une attente d'une seule), le pion disparaîtrait alors jusqu'à l'image suivante.
+      this.frame = 0;
+      this.shownFrame = 0;
+    }
     if (force || (pose !== previous && !keepTimer)) this.startTick = nowTicks;
     this.pose = pose;
   }

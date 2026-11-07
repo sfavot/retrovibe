@@ -23,7 +23,6 @@
  * Écarts avec l'original (aussi dans `net.md` §8) : voir la fin de ce commentaire.
  *  - les animations des Zoombinis (saut, vol, réception) ne sont pas la machine à événements `1120:2900` (absente du corpus) : elles sont enchaînées par fin de script, le Zoombini cesse d'être dessiné
  *    le temps de la montée entre la fin du saut et le début du vol (10 ticks) ; **probable** ;
- *  - la dalle marquée disparaît (la feature est détruite) quand son groupe est passé ; l'original ne la retire jamais (ou ailleurs) ; **probable** ;
  *  - les Zoombinis sont envoyés à la balançoire même après la fin des munitions (l'original ne les lançait plus) ;
  *  - les animations de joie (`SCRS` 13046 + nez) sont jouées par un tirage simple, sans la table sans remise `1098:0098` ;
  *  - aucun texte n'est écrit par le port (voix et sons de l'original).
@@ -614,11 +613,7 @@ export function createNetScene(): Scene {
       pendingRelease = released;
       joysLeft = lessAction() ? JOY_COUNT - 1 : JOY_COUNT;
       nextJoy = ctx.clock.ticks + JOY_GAP;
-      const marked = tileFeatures.get(tile);
-      if (marked) {
-        features.destroy(marked);
-        tileFeatures.delete(tile);
-      }
+      // La dalle marquée (pierre éclaircie et points du groupe) reste : `1120` ne détruit jamais ses dalles (aucun `11a8:20e8`) ; la marque du tir se pose dessus.
     } else {
       pendingRelease = 0;
       shotPending = false;

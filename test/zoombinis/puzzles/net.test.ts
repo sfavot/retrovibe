@@ -642,7 +642,7 @@ describe.skipIf(!original.has)("muraille de signes : écran (écran 15, NET.MHK)
   });
 
   it.each([0, 3])("niveau %i, tir qui libère un groupe : il passe le mur (balançoire, saut, vol, réception, file d'arrivée), « go » devient actif, la dalle est passée", async (level) => {
-    const { probe, ready, choose, fire, ticks, crossed, engine, zoombinis, scripts } = await start(level, { size: 6 });
+    const { probe, ready, choose, fire, ticks, crossed, engine, zoombinis, scripts, features } = await start(level, { size: 6 });
     await ready();
     const state = probe().state;
     const target = state.groups.findIndex((g) => g > 0);
@@ -653,8 +653,12 @@ describe.skipIf(!original.has)("muraille de signes : écran (écran 15, NET.MHK)
     expect(state.hits).toBe(1);
     expect(state.freed).toBe(size);
     expect(state.groups[target]).toBe(-1);
-    // La dalle marquée disparaît.
-    expect(scripts().includes((level < 2 ? 9000 : 9025) + target)).toBe(false);
+    // La dalle marquée reste (pierre éclaircie et points du groupe : `1120` ne détruit jamais ses dalles) et la marque du tir se pose dessus, devant elle (`2a0a` juste avant la colonne 0).
+    expect(scripts().includes((level < 2 ? 9000 : 9025) + target)).toBe(true);
+    const list = features.features;
+    const tileIndex = list.findIndex((f) => f.scriptId === (level < 2 ? 9000 : 9025) + target);
+    const markIndex = list.findIndex((f) => f.scriptId === (level < 2 ? 7023 : 7024));
+    expect(markIndex).toBeGreaterThan(tileIndex);
     expect(probe().kit.goEnabled).toBe(false);
     // Le verrou `[8ba6]` d'un tir qui a libéré un groupe ne tombe que 720 ticks après le dernier mouvement du groupe.
     expect(probe().shotPending).toBe(true);

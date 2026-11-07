@@ -437,6 +437,32 @@ describe.skipIf(!original.has)("écran de l'hôtel (createHotelScene, HOTEL.MHK)
     return { host, engine, services, zoombinis, entered, scene, queued, probe, wait, until, toPlay, drag, grab, settle, palette };
   }
 
+  it("en jeu, les Zoombinis sont de taille normale (`10e8:09a2` : `1168:5a13(1)` avant `0858`) : pris à la main, leurs pieds restent les leurs (transport `145 + pieds`, planche 3000)", async () => {
+    const { probe, toPlay, grab, host, wait, until } = await start({ level: 1 });
+    await until(() => probe().kit !== null, 4000);
+    await toPlay();
+    await until(() => !probe().busy);
+    // Pieds 3 et 5 : la planche petite (3200) n'a que 8 et 7 variantes pour eux, la grande 25 et 35.
+    const index = probe().kit!.members.findIndex((m) => m.snoid.traits.feet === 3 || m.snoid.traits.feet === 5);
+    expect(index).toBeGreaterThanOrEqual(0);
+    const member = probe().kit!.members[index]!;
+    const feet = member.snoid.traits.feet;
+    const point = grab(index)!;
+    host.input.moveMouse(point.x, point.y);
+    host.input.mouseDown("left");
+    await wait(10);
+    host.input.moveMouse(point.x + 20, point.y - 40);
+    await wait(12);
+    expect(member.snoid.scriptId).toBe(145 + feet);
+    // Première partie = pieds (pose 0) : variante dans la plage de ce type de pieds sur la grande planche (`14c0:0306`).
+    const range = feet === 3 ? [335, 359] : [411, 445];
+    const variant = Math.ceil(member.snoid.feature.parts[0]!.w / 2);
+    expect(variant).toBeGreaterThanOrEqual(range[0]!);
+    expect(variant).toBeLessThanOrEqual(range[1]!);
+    host.input.mouseUp("left");
+    await wait(6);
+  });
+
   it("entrée : fond 5000, scénette d'introduction `7000 + variante`, puis la relance (fond de l'hôtel, groupe debout sur les seize places) et le cadran aux niveaux 0 à 2", async () => {
     for (const level of LEVELS) {
       const t = await start({ level, visits: 0 });

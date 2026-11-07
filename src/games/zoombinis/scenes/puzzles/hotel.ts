@@ -394,7 +394,9 @@ class HotelRun implements HotelProbe {
       places: HALL_PLACES,
       targets: (places) => [...roomTargets, ...places],
       radius: RADIUS[level],
-      snoid: { small: true, scripts: screenScripts(archive) },
+      // Planche normale (3000) : l'Enter passe en mode petit pour la scénette (`10e8:0144`, `1168:5a13(0)`), mais la relance revient au mode normal (`10e8:09a2`,
+      // `5a13(1)`) avant de recréer le groupe (`1168:0858`) : en jeu, les Zoombinis de l'hôtel sont de taille normale (et leur transport `145 + pieds` a ses images).
+      snoid: { scripts: screenScripts(archive) },
       depthOf: (p) => 1 + p.y / 1000,
       introVoice: HELP_VOICE,
       buttons: { map: { images: images.map }, go: { images: images.go }, depth: DEPTH.buttons },

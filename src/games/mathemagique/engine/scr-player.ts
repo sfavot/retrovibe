@@ -27,13 +27,14 @@
  * gadgets et pointeur (`blockedThisTick`) comme la boucle d'attente de l'original, et applique le drapeau 8. À la fin (terminée ou
  * interrompue), `onEnd` est appelé depuis le tick, avant `Scene.tick`.
  */
-import { isModifierOnlyKey, type Input } from "./input";
+import { isModifierOnlyKey, type Input } from "../../../engine/mohawk/input";
 import { TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL } from "../../../data/mohawk/mohawk";
 import { resolveScrResources, SCR_CELL_COUNT, SCR_INITIAL_FLAGS, SCR_OFFSCREEN, type ScrClip, type ScrOp, type ScrScript } from "../data/scr";
 import type { ShapeList } from "../../../data/mohawk/shpl";
 import type { Shape } from "../../../data/mohawk/shap";
-import { drawShape } from "./graphics/blit";
-import type { Rect, SavedRect, Surface } from "./graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import type { Rect, SavedRect, Surface } from "../../../engine/mohawk/graphics/surface";
+import { scr } from "./scr";
 import { defineService } from "./scene";
 import type { PlaySoundOptions, PreloadSet, SoundChannel, SoundHandle, WaveArchive } from "./sound";
 
@@ -49,7 +50,8 @@ export const SCR_FLAG = {
 
 /** Ce que le lecteur lit d'une archive (`Archive` de `resources.ts` convient). */
 export interface ScrArchive extends WaveArchive {
-  scr(id: number): ScrScript;
+  /** Décodage mémoïsé d'une ressource (`Archive.memo`) : sert à lire les `\0SCR` (`scr()` de `scr.ts`). */
+  memo<T>(tag: string, id: number, decode: (bytes: Uint8Array) => T, kind?: string): T;
   shpl(id: number): ShapeList;
   shap(id: number): Shape;
   sndl(id: number): number[];
@@ -204,7 +206,7 @@ class ScrAnimation implements AnimationHandle {
     private readonly options: ScrStartOptions,
     seq: number,
   ) {
-    this.script = archive.scr(scrId);
+    this.script = scr(archive, scrId);
     this.ops = this.script.ops;
     this.flags = options.flags ?? 0;
     this.blocking = options.blocking ?? false;

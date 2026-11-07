@@ -2,7 +2,7 @@
  * Registre des scènes de Math Workshop : une fabrique par `SceneId` (table `SCENE_FACTORIES`, complète : le typage l'impose).
  * `options.factories` permet d'en remplacer une de l'extérieur (tests).
  */
-import type { Engine } from "../engine/engine";
+import type { MathEngine } from "../engine/engine";
 import { SceneId, type Scene, type SceneFactory } from "../engine/scene";
 import type { MathServices } from "../engine/services";
 import { createBowlingScene } from "./bowling";
@@ -28,7 +28,7 @@ export interface RegisterScenesOptions extends HubOptions {
 }
 
 /** Fabrique d'une scène à partir des services et des options. */
-type SceneBuilder = (services: MathServices, options: RegisterScenesOptions, engine: Engine) => Scene;
+type SceneBuilder = (services: MathServices, options: RegisterScenesOptions, engine: MathEngine) => Scene;
 
 /** Une ligne par scène. */
 const SCENE_FACTORIES: Record<SceneId, SceneBuilder> = {
@@ -56,7 +56,7 @@ function trophyExit(from: SceneId | undefined): SceneId {
 }
 
 /** Enregistre les 11 scènes dans le moteur (le titre est la première : `engine.start()` la lance). */
-export function registerScenes(engine: Engine, services: MathServices, options: RegisterScenesOptions = {}): void {
+export function registerScenes(engine: MathEngine, services: MathServices, options: RegisterScenesOptions = {}): void {
   for (const id of Object.values(SceneId)) {
     const builder = SCENE_FACTORIES[id];
     const factory: SceneFactory = options.factories?.[id] ?? (() => builder(services, options, engine));

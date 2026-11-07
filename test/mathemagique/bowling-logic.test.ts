@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MohawkArchive } from "../../src/data/mohawk/mohawk";
-import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
+import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import { DEFAULT_BOWLING_TICKS, Roster } from "../../src/games/mathemagique/engine/roster";
 import {
   BowlingProgress,

@@ -1,21 +1,42 @@
 # Moteur TypeScript de Math Workshop (tâche F1)
 
-Cœur du moteur propre au jeu, sur le modèle du Téléportaschtroumpf (`docs/teleportaschtroumpf/engine-ts.md`). Comportement d'origine : `engine.md` (§1 démarrage et scènes, §4.6 temps, §5 entrées, §7 roster) et `screens/*.md`. Ce document décrit le code : où est quoi, comment écrire une scène, ce que les vagues suivantes viennent brancher.
+Cœur du moteur, commun aux jeux Mohawk depuis la vague F2 et étendu ici par le jeu, sur le modèle du Téléportaschtroumpf (`docs/teleportaschtroumpf/engine-ts.md`). Comportement d'origine : `engine.md` (§1 démarrage et scènes, §4.6 temps, §5 entrées, §7 roster) et `screens/*.md`. Ce document décrit le code : où est quoi, comment écrire une scène, ce que les vagues suivantes viennent brancher.
 
 ## Carte du code
 
-Tout est sous `src/games/mathemagique/engine/` (hors `graphics/`, vague F2).
+Le cadre du moteur est **commun** aux jeux Mohawk (Mathémagique, bientôt Zoombinis) : `src/engine/mohawk/` (pur) et `src/ui/mohawk/` (navigateur). Le jeu fixe les identifiants d'écran, les curseurs, la taille de la zone de jeu et ses propres services. Aucun changement de comportement lors du passage au moteur commun (vague F2 de `docs/zoombinis/plan.md`).
+
+### Commun : `src/engine/mohawk/` et `src/ui/mohawk/`
 
 | Fichier | Rôle |
 |---|---|
-| `host.ts` | `Host` : seule frontière avec l'extérieur (fichiers, temps, entrées, audio, stockage, présentation, curseur, sortie), `HostStorage`, `CursorKind`. |
-| `input.ts` | `Input` : position du pointeur (zone de jeu 576×432), files d'événements bouton et clavier, états tenus. Aucune logique de gadget. |
-| `clock.ts` | `Clock` (tick fixe de 17 ms), `Deadline` (échéance en ticks), `Timer` (chrono gelable). |
-| `scene.ts` | `SceneId`, `Scene`, `SceneContext`, `SceneManager` (changement différé), `Services` (point d'extension). |
-| `engine.ts` | `Engine` : assemble le tout, `frame(now)`, ordre d'un tick, présentation, curseur, pause. |
-| `rng.ts` | `MsvcRandom` (congruentiel du jeu) et `NoRepeatPool` (tirage sans remise `10a8:13af`). Pur. |
-| `resources.ts` | `Resources` (cache d'archives Mohawk par nom) et `Archive` (ressources décodées et mémorisées). |
+| `engine/mohawk/host.ts` | `MohawkHost<Cursor>` : seule frontière avec l'extérieur (fichiers, temps, entrées, audio, stockage, présentation, curseur, sortie), `HostStorage`. |
+| `engine/mohawk/input.ts` | `Input` : position du pointeur (zone de jeu de l'hôte), files d'événements bouton et clavier, états tenus. Aucune logique de gadget. |
+| `engine/mohawk/clock.ts` | `Clock` (tick fixe de 17 ms), `Deadline` (échéance en ticks), `Timer` (chrono gelable). |
+| `engine/mohawk/scene.ts` | `Services` / `defineService`, `BaseSceneContext<Id, Cursor>`, `Scene<Ctx, Key>`, `SceneFactory`, `SceneManager<Id, Ctx>` (changement différé). |
+| `engine/mohawk/engine.ts` | `Engine<Id, Ext, Cursor>` : assemble le tout, `frame(now)`, ordre d'un tick, présentation, curseur, pause. Options : `start`, `extend`, `quitOnCtrlQ`, `busyCursor`, `defaultCursor`, `sceneName`, `resources`. |
+| `engine/mohawk/rng.ts` | `MsvcRandom` (congruentiel du jeu, le même dans Zoombinis) et `NoRepeatPool` (tirage sans remise `10a8:13af`). Pur. |
+| `engine/mohawk/resources.ts` | `Resources` (cache d'archives par nom, encodage des `STRL` en option) et `Archive` (`memo(tag, id, décodeur)`, `SHAP`, `tBMP`, `SHPL`, `STRL`, `\0SND`, `SNDL`). |
+| `engine/mohawk/graphics/` | `frame.ts` (`Frame { width, height, pixels, palette }`), `surface.ts` (`Surface(width, height)`, découpe, masque), `palette.ts` (fondus, cycles), `palette-data.ts` (`SHPL`, éclaircissement), `blit.ts` (`SHAP` / `tBMP` dans une surface). |
+| `engine/mohawk/text-input.ts` | `TextInputPort` (interface pure du clavier virtuel : `focus`, `blur`, `onText`) et `NULL_TEXT_INPUT`. Commun à Mathémagique et Zoombinis. |
+| `engine/mohawk/audio/` | WAVE, séquenceur MIDI, lecteur SMF, inventaire des timbres (F1). |
+| `ui/mohawk/canvas-presenter.ts` | `CanvasPresenter` : `Frame` → canvas, paramétré par `{ screenWidth, screenHeight, originX, originY }`. |
+| `ui/mohawk/browser-host.ts` | `BrowserHost<Cursor>` : `fetch`, canvas, clavier et souris, curseurs CSS, soundfont (`soundfontUrl`) ; aides pures `gameOwnsKey`, `toPlayArea`… |
+| `ui/mohawk/text-input.ts` | `createBrowserTextInput` : champ HTML invisible derrière `TextInputPort` (clavier virtuel, caractères composés). |
+| `ui/mohawk/web-sink.ts` | `AudioSink` du navigateur (F1). |
+
+### Propre à Mathémagique : `src/games/mathemagique/engine/`
+
+| Fichier | Rôle |
+|---|---|
+| `host.ts` | `CursorKind` (`arrow`, `busy`, `help`, `hidden`) et `Host = MohawkHost<CursorKind>`. |
+| `scene.ts` | `SceneId` (les 11 scènes), `SCENE_NAMES`, `SceneContext` = `MathContext` = `BaseSceneContext<SceneId, CursorKind> & { roster }`, alias `Scene`, `SceneFactory`, `SceneManager` ; réexporte `Services`, `defineService`. |
+| `engine.ts` | `MathEngine` (= `Engine` commun avec le roster dans le contexte, départ à l'écran titre, curseur `busy`, `STRL` en Windows-1252, Ctrl+Q) et `createMathEngine(host, options)`. |
+| `scr.ts` | `scr(archive, id)` : lecture mémoïsée d'un `\0SCR` (le format est propre au jeu, donc hors de `Archive`). |
+| `graphics/play-area.ts` | Géométrie : zone de jeu 576×432 (`PLAY_WIDTH`, `PLAY_HEIGHT`) dans un écran de 640×480 (`SCREEN_*`, `PLAY_ORIGIN_*`). |
 | `roster.ts` | `Roster` (`MWRoster` : 41 × 5424 octets), règles de noms, masque et rang, `RosterStore` (base64 dans `HostStorage`), `RosterState` (joueur courant). Pur. |
+| `sound.ts`, `scr-player.ts`, `gadgets.ts`, `pointer.ts`, `services.ts`, `graphics/{fon,text,transitions}.ts` | Services et dessin du jeu (voir « Services »). |
+| `ui/browser-host.ts` | `createMathBrowserHost(…)` : `BrowserHost` avec le canvas 640×480 (origine 32,24) et les curseurs CSS du jeu ; `toPlayArea` lié à cette géométrie. |
 
 Tests : `test/mathemagique/engine-core.test.ts`, avec `test/mathemagique/engine-test-host.ts` (hôte de test). Les tests qui lisent les vrais `.DAT` sont ignorés sans `original/mathemagique/` (`hasOriginalFiles`).
 
@@ -26,7 +47,7 @@ Le moteur ne touche ni au DOM, ni à `fetch`, ni à `Date`, ni à `localStorage`
 - `loadFile(path)` : chemin relatif à `original/mathemagique/` (`BOWLING.DAT`, `MPC/PVG.MHK`), résolution insensible à la casse par `GameFiles.resolve` (l'EXE demande `nim.DAT`, `PatFill.DAT`, `milkyway.dat`). Rejette si le fichier manque.
 - `now()` (ms monotones), `unixMillis()` (horloge murale, graine du hasard).
 - `input` (un objet `Input` que l'hôte alimente), `audio` (`AudioSink`, `src/engine/mohawk/audio/sink.ts`), `storage`.
-- `present(frame)` (`Frame` de `graphics/frame.ts`, tampons réutilisés : copier pour garder), `setCursor(kind)` (`arrow`, `busy`, `help`, `hidden`), `exit()`.
+- `present(frame)` (`Frame` de `engine/mohawk/graphics/frame.ts`, tampons réutilisés : copier pour garder), `setCursor(kind)` (`arrow`, `busy`, `help`, `hidden`), `exit()`.
 
 ## Temps : tick de 17 ms
 
@@ -144,7 +165,7 @@ Piste d'optimisation si 300 Ko écrits à chaque niveau réussi gênent : ne sto
 
 ```ts
 const host = new TestHost();
-const engine = new Engine(host, { seed: 0 });
+const engine = new MathEngine(host, { seed: 0 });
 engine.register(SceneId.title, () => new MaScene());
 engine.start();
 await runFor(engine, host, 1000);                          // images à 60 Hz ; attend les chargements
@@ -155,7 +176,7 @@ Pour un chargement qui ne se règle que sur commande, piloter `engine.frame(...)
 
 ## Dette et points ouverts
 
-- Le moteur (`Host`, horloge, scènes, pause sur onglet caché) est dupliqué entre Téléportaschtroumpf, Lost in Time et ce jeu ; une version commune demanderait de refactorer les deux autres (hors périmètre, déjà noté dans `plan.md`).
+- Le moteur est commun à Mathémagique et à Zoombinis (`src/engine/mohawk/`), mais Téléportaschtroumpf et Lost in Time ont encore chacun leur propre copie (`Host`, horloge, scènes, pause sur onglet caché) ; les migrer demanderait de refactorer ces deux jeux (hors périmètre, à proposer ensuite).
 - Ctrl+V (boîte « À propos ») : pas implémenté ici (il faut le rendu de texte) ; à brancher en vague G/H via `addKeyHandler("after", …)`.
 - Durée réelle du timer du Bowling : voir « Temps ».
 

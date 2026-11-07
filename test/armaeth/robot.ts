@@ -11,6 +11,9 @@ export class RobotSetback extends Error {}
 /** Emplacement opposé (le héros qui sort par l'emplacement `i` arrive par `OPPOSITE[i]`). */
 const OPPOSITE = [2, 3, 0, 1, 5, 4] as const;
 
+/** Images de duel consécutives (héros `Ego 6`) au-delà desquelles le duel est tenu pour figé : bien plus que la plus longue animation. */
+const FROZEN_DUEL = 1500;
+
 /** Côtés des sorties à marcher, dans l'ordre des emplacements 0 à 3 de `WorldRoom.exits`. */
 const SIDES = ["up", "right", "down", "left"] as const;
 
@@ -29,10 +32,16 @@ export class Robot extends Player {
   /** Réflexe du joueur, appelé après chaque image (par exemple fouetter l'ours dès qu'il est à portée). */
   watcher: (() => void) | null = null;
   private watching = false;
+  /** Images consécutives où le héros est en duel (`Ego 6`) ; la garde `duelGuard` (active pendant `crossTo`) lève `RobotSetback` au-delà de `FROZEN_DUEL`. */
+  private duelFrames = 0;
+  private duelGuard = false;
 
   override run(ticks: number): void {
     for (let i = 0; i < ticks; i++) {
       this.engine.tick();
+      const hero = this.engine.state?.hero;
+      this.duelFrames = hero && hero.ego === 6 ? this.duelFrames + 1 : 0;
+      if (this.duelGuard && this.duelFrames > FROZEN_DUEL) throw new RobotSetback("duel figé");
       if (this.watcher && !this.watching) {
         this.watching = true;
         try {
@@ -74,8 +83,20 @@ export class Robot extends Player {
     this.run(1);
   }
 
-  /** Sauvegarde (F2, emplacement 1) comme le fait le joueur avant un passage dangereux. */
+  /** Ferme les fenêtres de message ouvertes : elles avalent les touches F2 et F3 (dialogue de Minas Thyl, « le nain se réveille »...). */
+  private closeWindows(): void {
+    for (let k = 0; k < 30; k++) {
+      this.drain();
+      if (!this.engine.windows.active) break;
+    }
+  }
+
+  /**
+   * Sauvegarde (F2, emplacement 1) comme le fait le joueur avant un passage dangereux, après avoir lu les messages : une fenêtre ouverte
+   * avalerait la touche et le F3 suivant ramènerait le héros à une sauvegarde plus ancienne.
+   */
   save(): void {
+    this.closeWindows();
     this.host.key({ type: "function", n: 2 });
     this.run(5);
     this.drain();
@@ -83,11 +104,7 @@ export class Robot extends Player {
 
   /** Restauration (F3) : l'état du monde revient à la dernière sauvegarde, le hasard continue. */
   restore(): void {
-    // une fenêtre de message ouverte (dialogue de Minas Thyl...) avale la touche : on les ferme toutes
-    for (let k = 0; k < 30; k++) {
-      this.drain();
-      if (!this.engine.windows.active) break;
-    }
+    this.closeWindows();
     this.host.key({ type: "function", n: 3 });
     this.run(5);
     this.drain();
@@ -148,6 +165,9 @@ export class Robot extends Player {
   forgetFailures(): void {
     this.failedExits.clear();
   }
+
+  /** Échecs consécutifs de `enterDome` (cases 81 non atteintes). */
+  private domeFailures = 0;
 
   /** Emplacement de la sortie par lequel le héros est entré dans la salle courante (-1 : placement libre). */
   private entry = -1;
@@ -300,7 +320,8 @@ export class Robot extends Player {
         // la sortie par laquelle le héros est venu est fermée derrière lui (herse refermée par les nains) : il n'a plus qu'à recharger
         throw new RobotSetback(`pas de retraite : ${String(error)}`);
       }
-      this.stop(); // le héros garde son élan en entrant : il ne doit pas filer jusqu'au vide pendant l'attente
+      // le héros garde son élan en entrant : il ne doit pas filer jusqu'au vide pendant l'attente
+      this.stop();
       for (let i = 0; i < 40; i++) {
         this.run(10);
         this.drain(2);
@@ -347,13 +368,34 @@ export class Robot extends Player {
     if (!condition || !this.state.hero) throw new RobotSetback(why);
   }
 
+  /**
+   * Un nain mort (la lame magique transperce ceux qui attaquent le héros armé) reste à la profondeur du héros et le bloque (« Impossible
+   * d'aller plus loin ! ») : une flèche vers le bas l'en écarte de quelques pas.
+   */
+  stepAway(): void {
+    const from = this.hero.p;
+    this.arrow("down");
+    this.until(() => !this.state.hero || this.hero.p >= from + 14, 300);
+    this.arrow("down");
+    this.run(5);
+  }
+
   /** De la salle du trône à la corniche d'arrivée du dôme : les cases 81 sous la dalle ouverte descendent vers le fond (bord bas -> 202). */
   enterDome(): void {
-    for (const [x, y] of [[160, 100], [160, 125], [160, 135]]) {
-      if (this.hero.ground === 81) break;
-      this.walkTo(x, y, 4000);
-      this.drain();
+    for (let round = 0; round < 4 && this.hero.ground !== 81; round++) {
+      // un nain mort devant le héros (la lame magique le transperce dans la salle du trône) le bloque à sa profondeur, et le même essai
+      // échoue alors à chaque fois : après six échecs une flèche vers le bas l'en écarte, puis on repart
+      if (round > 0) {
+        this.stepAway();
+      }
+      for (const [x, y] of [[160, 100], [160, 125], [160, 135]]) {
+        if (this.hero.ground === 81) break;
+        this.walkTo(x, y, 4000);
+        this.drain();
+      }
+      if (this.hero.ground !== 81 && round === 0 && ++this.domeFailures <= 6) break;
     }
+    if (this.hero.ground === 81) this.domeFailures = 0;
     this.need(this.hero.ground === 81, "pas sur la dalle ouverte");
     this.arrow("up");
     this.until(() => this.roomId !== 108, 1500);
@@ -477,14 +519,62 @@ export class Robot extends Player {
    * Passe dans la salle voisine `room` : sauvegarde (F2) à l'entrée de la salle précédente, et, si le héros y meurt (un nain, un
    * duel perdu), restauration (F3) puis nouvel essai de cette seule salle. Sauvegarder à chaque salle et ne refaire que la dernière
    * est ce qui rend fiable la traversée des cinq salles de nains (`attempt`).
+   *
+   * L'essai ne réussit que si `hop` est allé jusqu'au bout : `hop` laisse parfois le héros en pleine bagarre avec un soldat éveillé dont
+   * la sortie par laquelle il est venu est coupée (« pas de retraite »), et le héros « arrivé » était alors gardé. Une route qui n'existe
+   * plus (sortie barrée par un nain, herse refermée) est un contretemps comme un autre : on recharge la sauvegarde de la salle précédente.
+   * Un duel figé (héros `Ego 6` pendant `FROZEN_DUEL` images, le trajet de sortie le rejouant indéfiniment) l'est aussi (`run`).
    */
   crossTo(room: number): void {
-    this.attempt(`traversée de la salle ${room}`, 40, () => this.hop(room, 4), () => this.roomId === room);
+    let done = false;
+    let tries = 0;
+    this.duelGuard = false;
+    try {
+      this.attempt(
+        `traversée de la salle ${room}`,
+        40,
+        () => {
+          done = false;
+          tries++;
+          this.duelFrames = 0;
+          this.duelGuard = true;
+          try {
+            // les nains de la salle 202 ou 305 ont pu refermer la herse (`2a44:0a60`) entre la sauvegarde et l'essai ; après dix essais perdus
+            // ainsi, un nain de l'autre salle qui la voit ouverte la referme aussi pendant la marche vers la sortie (le même essai échoue
+            // alors à chaque fois) : le joueur la rouvre et repart aussitôt
+            for (let k = 0; k < 6; k++) {
+              if (this.object(207).ego !== 3 && (this.roomId === 202 || this.roomId === 305)) {
+                // un nain éveillé de la salle referme la herse aussitôt (« Armaëth ! ») : on le laisse venir et on l'assomme (duel) d'abord
+                this.until(() => !this.state.hero || !this.threats().some((o) => o.num <= 204), 600);
+                this.reopenPortcullis();
+              }
+              try {
+                this.hop(room, 4);
+                break;
+              } catch (error) {
+                const closed = this.state.hero && this.object(207).ego !== 3 && (this.roomId === 202 || this.roomId === 305);
+                if (!closed || k === 5 || tries <= 10 || !(error instanceof RobotSetback || (error instanceof Error && /^(aucune route|salle \d+ non atteinte)/.test(error.message)))) throw error;
+                this.forgetFailures();
+              }
+            }
+          } catch (error) {
+            if (error instanceof Error && !(error instanceof RobotSetback) && /^(aucune route|salle \d+ non atteinte)/.test(error.message)) throw new RobotSetback(error.message);
+            throw error;
+          } finally {
+            this.duelGuard = false;
+          }
+          done = true;
+        },
+        () => done && this.roomId === room,
+      );
+    } finally {
+      this.duelGuard = false;
+    }
   }
 
   /**
    * La herse de granite (`Num 207`, entre 202 et 305) : un nain qui la voit ouverte crie « Armaëth ! » et la referme (`2a44:0a60`) ; on la
-   * rouvre par « tinhuel », dit de l'une des deux salles (`3443:0028`), et on attend la fin du coulissement (`Tim = 0x22`).
+   * rouvre par « tinhuel », dit de l'une des deux salles (`3443:0028`), et on attend la fin du coulissement (`Tim = 0x22`) puis 700 images.
    */
   portcullisOpen(): void {
     for (let k = 0; k < 6 && this.object(207).ego !== 3; k++) {
@@ -493,13 +583,51 @@ export class Robot extends Player {
     }
   }
 
-  /** Marche jusqu'à la salle `target`, salle par salle (`crossTo`) ; la herse est rouverte en route si les nains l'ont refermée. */
+  /**
+   * Rouvre la herse et passe aussitôt : `portcullisOpen` laisse 700 images après chaque « tinhuel », largement de quoi laisser un nain de la
+   * salle la refermer. Ici on attend seulement la fin du coulissement.
+   */
+  private reopenPortcullis(): void {
+    for (let k = 0; k < 8 && this.state.hero && this.object(207).ego !== 3; k++) {
+      if (this.object(207).ego === 0) this.say("tinhuel");
+      this.until(() => !this.state.hero || this.object(207).ego === 3, 400);
+    }
+  }
+
+  /**
+   * Attend la fin de la bagarre en cours avant de sauvegarder : un nain assommé (`Ego 2`) à ses pieds ou en duel (`Ego 1`, `6`) se
+   * réveille et attaque dès la restauration, et le héros sauvegardé en plein combat y rejouait sa mort à chaque essai (salle 202 : le
+   * nain bouche le couloir, le trajet choisi passe alors par les échelles et le héros tombe). Le joueur sauvegarde une fois le calme
+   * revenu. Rend faux si le héros est mort ou si le calme ne revient pas.
+   */
+  private settle(): boolean {
+    // le héros qui nage en eau profonde (`Ego 1`) ne se bat pas, et l'attendre sur place le noie (lac 207 au retour de la niche de Ségomir) ;
+    // les gardes de poste (`Ego 5` et `6`) et les soldats endormis (`Ego 7`, `8`) ne se battent pas
+    const fighting = (o: GameObject): boolean => o.ego === 1 || (o.ego === 6 && o.num !== 301) || (o.ego === 2 && Math.abs(o.x - this.hero.x) < 30 && Math.abs(o.p - this.hero.p) < 15);
+    const busy = () => (this.hero.ego !== 0 && this.hero.ego !== 1) || this.state.objects.some((o) => ((o.num >= 201 && o.num <= 204) || o.num === 301) && o.room === this.state.loadedRoom && o.holder === null && fighting(o));
+    for (let k = 0; k < 20 && this.state.hero && busy(); k++) this.wait(25);
+    return !!this.state.hero && !busy();
+  }
+
+  /**
+   * Marche jusqu'à la salle `target`, salle par salle (`crossTo`) ; la herse est rouverte en route si les nains l'ont refermée. Les
+   * messages sont lus avant chaque sauvegarde, puis on attend le calme (`settle`) ; un duel qui ne se termine pas (héros `Ego 6` et soldat
+   * `Ego 1` figés l'un sur l'autre) ou un héros mort ramène à la dernière sauvegarde (celle de la salle précédente).
+   */
   crossAll(target: number): void {
     this.forgetFailures();
-    for (let k = 0; k < 30 && this.roomId !== target; k++) {
+    // le joueur sauvegarde avant de partir : sans cela, un retour en arrière (héros mort, calme qui ne revient pas) rechargerait la sauvegarde
+    // d'un passage plus ancien et défairait le travail de l'étape précédente (points gagnés, objets pris)
+    if (this.state.hero && this.settle()) this.save();
+    for (let k = 0; k < 60 && this.roomId !== target; k++) {
       if (this.object(207).ego !== 3 && (this.roomId === 202 || this.roomId === 305)) this.attempt("herse", 20, () => this.portcullisOpen(), () => this.object(207).ego === 3);
       const route = this.route(target) ?? this.route(202);
       if (!route) throw new Error(`aucune route de la salle ${this.roomId} à ${target}`);
+      if (this.engine.windows.active || this.engine.pendingWindowCount > 0) this.drain();
+      if (!this.state.hero || !this.settle()) {
+        this.restore();
+        continue;
+      }
       this.crossTo(route[0]!);
     }
     if (this.roomId !== target) throw new Error(`salle ${target} non atteinte (en ${this.roomId})`);

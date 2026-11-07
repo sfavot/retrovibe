@@ -10,7 +10,7 @@ import { composeFrame } from "../../src/games/lost-in-time/render/canvas";
 const ORIGINAL = resolve(import.meta.dirname, "../../original/lost-in-time");
 
 /** Jeu complet (sous-systèmes réels, entrées simulées, audio enregistré) pour les tests de bout en bout. */
-export function makeFullGame(hide: string[] = []) {
+export function makeFullGame(hide: string[] = [], store: MemoryStore = new MemoryStore()) {
   const host = new HeadlessHost({
     readFile: (name) => {
       if (hide.includes(name.toUpperCase())) return undefined;
@@ -26,11 +26,11 @@ export function makeFullGame(hide: string[] = []) {
     clearQueue() {},
   };
   const cdBackend: CdBackend = { play() {}, stop() {}, playing: false, currentTime: 0 };
-  const system = createSystem({ host, soundBackend, cdBackend, store: new MemoryStore() });
+  const system = createSystem({ host, soundBackend, cdBackend, store });
   const game = new Game(host, system.sys, { maxSteps: 2_000_000 });
   game.inter.keyFuncLimit = 3000;
   const frame = () => composeFrame(system.gfx, host.input.mouseX, host.input.mouseY);
-  return { host, system, game, samples, frame };
+  return { host, system, game, samples, frame, store };
 }
 
 export { WaitingForInput };

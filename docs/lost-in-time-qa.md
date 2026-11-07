@@ -4,7 +4,8 @@
 - Validé : partie complète jouée, de l'épave à l'écran de fin « La partie est terminée » ; console sans erreur ni avertissement.
 - Validé : bloquant 10 (continuité 2 -> 3) corrigé par `Game.relaunchForPart`, vérifié en jeu réel ; transition 3 -> 4 et chargements croisés OK.
 - Constats restants : 3 mineurs (11, 12, 13), 3 cosmétiques/UX (14, 15, 16), tous conformes au script ou corrigés (voir passe 5).
-- À vérifier : jokers, écoute audio réelle, minuterie exacte du pont, « Rejouer » en fin de partie, tenailles sur le râtelier (taquet), performances sur machine lente, test sur vrai téléphone.
+- Vérifié par le code en passe 6 : jokers (compteur, disponibilité par scène, sauvegarde) et fin de partie / « Rejouer » (voir « Passe 6 »).
+- À vérifier : écoute audio réelle, minuterie exacte du pont, tenailles sur le râtelier (taquet), performances sur machine lente, test sur vrai téléphone.
 
 **Progression atteinte** : navire complet (cale, pont, porte du marin, cinématique), arrivée au manoir (chapitre 2) : portail (batterie, pipette/acide, pomme, cheval, mot, cadenas), jardin, entrée du manoir (bûche, portrait), caveau (portrait posé, plaque 1812-1840 résolue avec 28, monte-charge arrivé, bouton « hors d'usage » comme prévu), façade nord du phare (vinaigre, fléchette sur le tonneau, tonneau en main, soupirail découvert). Arrêt volontaire là à la passe 2 (environ un tiers du jeu, pas de blocage) ; la suite et la fin du jeu sont aux passes 3 à 5 plus bas.
 
@@ -81,7 +82,7 @@ Fin du chapitre 2 (barre de fer, résine, cheminée, dalle, trappe), chapitres 3
 - **Pas de bug moteur nouveau** : console propre (aucun avertissement watchdog `TOT@`), vidéos et voix OK (prisonnier, marin, portail, poignée, électroaimant, tuyau), musique CD en lecture.
 
 ### Non testé (reste)
-Fin du chapitre 2 (monte-charge, porte du phare arrachée, phare, cave), chapitres 3 et 4, jeux chronométrés, fin du jeu, décrément du compteur de jokers, écoute réelle de l'audio.
+Fin du chapitre 2 (monte-charge, porte du phare arrachée, phare, cave), chapitres 3 et 4, jeux chronométrés, fin du jeu, écoute réelle de l'audio. (Décrément du compteur de jokers : vérifié en passe 6.)
 
 ## Partie 3 — chapitres 3 et 4 (2026-10-23)
 
@@ -214,3 +215,19 @@ Ma journalisation de texte perd les caractères accentués (c'est mon relevé, p
 
 **Décompte des constats de la passe 5** : 0 bloquant (le bloquant 10 est corrigé et vérifié), 0 majeur, 3 mineurs (11, 12, 13), 3 cosmétiques/UX (14, 15, 16), 0 erreur console. Non testé : jokers, audio réel, fin si l'on laisse le jeu passer l'écran « La partie est terminée » (« Rejouer »), minuterie exacte du pont, tenailles sur le râtelier (taquet).
 
+## Passe 6 (vérification par le code, sans jeu manuel)
+
+Tests : `test/lost-in-time/jokers.test.ts` (scripts d'origine exécutés sans affichage, jeu réel piloté image par image).
+
+**Jokers**
+- Mécanisme (désassemblage de `MENU.TOT` et `JOKER.TOT`) : le compteur est la variable 32 bits 715, à 3 au départ d'une partie ; `JOKER.TOT` y ajoute 1000 à l'ouverture, retire 1001 à la confirmation et 1000 à l'annulation. L'octet 8327 en est la copie, rangée dans les propriétés globales. `JOKER.DAT` n'est pas une table d'indices : c'est le fichier de langue français de `JOKER.TOT` (13 textes, un par scène).
+- Disponibilité : le sous-programme `MENU.TOT@20799` lit les deux derniers chiffres du nom de scène et n'autorise que 13 scènes (2, 3, 5, 8, 13, 15, 17, 19, 20, 22, 24, 26, 32), certaines sous condition d'état (3, 15, 17, 19, 20, 22, 24, 32) ; un octet (13433 à 3) interdit tout. Ce sont exactement les 13 cas du `switch` de `JOKER.TOT`. Jardin (EMAM1000) et toute autre scène 10xx : refus, quel que soit l'état.
+- Vérifié par test : « JE CONFIRME » 3 -> 2 (indice affiché, `JOKER.TOT` chargé) ; « J'ANNULE » : 3 inchangé, `JOKER.TOT` non chargé ; compteur à 0 : texte 81 « Je n'ai plus de joker », rien accordé ; dernier joker 1 -> 0 puis refus ; jardin : texte 82 « pas droit », compteur intact.
+- Sauvegarde : l'emplacement conserve la variable 715 d'une session à l'autre (`saves.ts`), de bout en bout via le menu Sauver après usage d'un joker (stocké = 2) ; le bloc de propriétés (octets 8288 à 8327) est écrit et relu. Les propriétés restent en mémoire (pas dans `localStorage`) : à l'ouverture du menu Charger le script les réécrit avec les valeurs courantes, donc le compteur est global à la session ; un rechargement de page repart à 3 (le script réécrit aussi ces propriétés au démarrage).
+- Limite : le test impose les variables 714 et 82 (ce que `MENU.TOT` en déduit d'une scène autorisée) au lieu de rejouer le chemin jusqu'à une scène réelle ; les sous-programmes qui les calculent sont testés séparément. Non vérifiable sans jouer : que le script appelle bien le calcul à chaque changement de scène, et le comportement des scènes EMAM1102, 1105 et 1108 de la partie 3 (même suffixe 2, 5 ou 8 que des scènes autorisées de la partie 2) : l'original les traite par le même script, aucun écart du port prouvé.
+- Aucun défaut du port trouvé, aucune modification de `src/`.
+
+**Fin de partie et « Rejouer »**
+- `MENU.TOT` ne termine le jeu que par `loadTot("END")` (@16788 abandon via QUITTER, @25978 fin du jeu après le générique des scènes 24 à 27), avec le même nettoyage avant ; aucune archive ne contient `END.TOT`. Le moteur sort alors de `playTot` (`terminate = 2`), `Game.start()` se résout et `ui/app.ts` affiche « La partie est terminée. » avec « Rejouer » (`location.reload()`), donc les deux chemins mènent au même écran.
+- Test : après QUITTER, `Game.start()` se termine bien (`terminate = 2`). Une nouvelle session sur un stockage contenant déjà une sauvegarde démarre en partie neuve (EMAM1017, compteur à 3) : seul le stockage (emplacements, notes, préférences audio) survit au rechargement, tout l'état du moteur est recréé.
+- Non vérifiable sans jouer : le clic réel sur « Rejouer » après la scène finale du navigateur (la page est identique à celle du QUITTER déjà validé en passe 2).

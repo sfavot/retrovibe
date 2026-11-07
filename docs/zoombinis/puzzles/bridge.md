@@ -87,7 +87,7 @@ Donc si w = 1 le pont du haut accepte exactement les Zoombinis qui vérifient A,
 ### 2.4 Erreurs, perte, fin
 
 - Une **erreur** = un Zoombini refusé (compteur `DS:7068`, 0 à 6, incrémenté à la fin du script de rejet : événement 20 de `0f68`, plafonné à 6). **Au sixième refus, l'épreuve est condamnée** : le compteur vaut 6, la condition d'entrée du clic (`7068 < 6`) échoue, le Tick n'accepte plus de décision (§4.3) et une animation de fin (`SCRB` 1221, événement `0`) est lancée. On tolère donc **5 erreurs, la 6e est fatale** (sûr pour le compteur, **probable** pour le mot « condamnée » : aucune fin automatique de l'écran n'existe).
-- Les Zoombinis refusés restent disponibles (ils retournent sur une place d'attente).
+- Les Zoombinis refusés restent disponibles : ils retournent dans la **falaise de gauche** (place libre d'un rectangle, §8.4), pas sur une place d'attente, et peuvent être repris (§8).
 - Le bouton **Continuer** n'est actif qu'après qu'**au moins un** Zoombini a traversé (`DS:705a` ≠ 0). Il est donc possible de partir avec des Zoombinis restés sur la falaise : ils sont **perdus** (§6).
 - Aucun écran ne s'arrête tout seul : même quand les 16 ont traversé il faut cliquer Continuer (sûr). Quand le dernier traverse, la voix `20055…20063` (`0x4e57…0x4e5f`) est tirée au sort (`0f68` cas 3/6 et `05e4`).
 
@@ -215,10 +215,51 @@ Autres sons (sûr) : `11a0:0ee7(0, 997)` à l'entrée ; 999 (carte), 996 (Contin
 ## 7. Points ouverts
 
 1. Noms des 5 valeurs de chaque attribut et des 3 attributs autres que le pied (screens.md, point 1).
-2. Suite `⌊n/2⌋, +1, −1…` : confirmer en jeu que l'effectif cible ne dépasse jamais `n/2+1` (lecture du code ; aucune exécution).
-3. Effet exact du 6e refus : l'animation 1221 et le drapeau `7074` sont certains, la fin de partie n'a pas d'écran propre ; non testé en jeu.
-4. Rôle exact de `+0x124` (types 0, 6, 7, 8, 9, 0x70 d'objets) et de `9702` / `9704` (arrivées en cours).
-5. Chemins de marche (`1168:5482`, `1168:4231`, rectangles `0ab0/0ab8`) : seule la liste des points est donnée.
-6. `DS:908a` (période d'attente 120 au lieu de 60 ticks) : probablement le réglage « moins d'action », à vérifier.
-7. Code de touche `0x16f` (aide vocale) : identité de la touche non établie.
+2. ~~Suite `⌊n/2⌋, +1, −1…`~~ : **tranché en H1**, voir §8.
+3. ~~Effet exact du 6e refus~~ : **tranché en H1**, voir §8.
+4. Rôle exact de `+0x124` (types 0, 6, 7, 8, 9, 0x70 d'objets) et de `9702` / `9704` (arrivées en cours) : les états 8 (script « normal »), 9 (réaction) et 7 / `0x70` (marche) sont maintenant lus (§8) ; `+0x124 = 6` et `0x70` hors épreuve restent ceux d'`engine.md` §3.6.
+5. Chemins de marche (`1168:5482`, `1168:4231`, rectangles `0ab0/0ab8`) : **tranché en H1** (§8), le retour d'un refusé est une marche en ligne droite vers une place libre du rectangle.
+6. ~~`DS:908a` (période d'attente 120 au lieu de 60 ticks)~~ : **tranché en H1**, voir §8.
+7. Code de touche `0x16f` (aide vocale) : **F1** (`engine.md` §3.6 : `VK_F1 + 0xff`) ; aux gorges elle n'a aucun effet audible (`DS:a2c4 = 0`).
 8. Le niveau 1 de la règle (« deux valeurs du même attribut ») est lu dans le code ; la présentation à l'écran de la règle n'existe pas (le joueur la déduit).
+
+## 8. Points tranchés et écarts du port (tâche H1)
+
+Code : `src/games/zoombinis/game/puzzles/bridge.ts` (règles pures) et `src/games/zoombinis/scenes/puzzles/bridge.ts` (`createBridgeScene`) ; tests `test/zoombinis/puzzles/bridge.test.ts`. Les adresses ci-dessous ont été relues sur le désassemblage (`ZOOMBINI.EXE`, segments `10c0` `1168` `11a8`), y compris les routines que Ghidra n'avait pas créées (`10c0:0e5a`, `0f68`, tables `CS:0f3c` et `CS:12ee`).
+
+### 8.1 Règle (`10c0:131a`)
+
+- **Point 2** (suite de l'effectif cible) : confirmé **sûr** par le code (`local_2c += local_38 ; local_38 = −(local_38+1)`) : on ne teste jamais `n/2 + 2`. Le test (`bridge.test.ts`) le montre sur 200 graines par niveau (effectif toujours de 1 à 9 pour 16 Zoombinis) et sur un groupe construit où l'effectif 12 existe mais où le tirage retombe sur 4. Reproduit tel quel.
+- **Ordre d'énumération des candidates** (celui du « k-ième » du tirage uniforme), **sûr** : niveau 0, octet 0 à 3 puis valeur 1 à 5 ; niveau 1, octet 0 à 3 puis les dix paires de `DS:0b1e` (nibble haut = première valeur) ; niveau 2, les six paires d'octets de `DS:0b46` / `0b5e`, la valeur de l'octet « pas » en boucle extérieure, celle de l'octet « base » en boucle intérieure ; niveau 3, les quatre triplets d'octets (0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3), compteur à trois chiffres dont l'octet le plus bas varie le plus vite (tables de `CS:2021` / `2039`, lues sur le segment). L'octet de poids fort porte l'attribut 1 (cheveux) et l'octet de poids faible l'attribut 4 (pieds) : la fiche est relue octet par octet (`local_64`) puis recomposée en gros-boutiste.
+- **Tirages** : exactement deux, `rng.range(1, k)` (`10a8:04e8(k, 1)`, `k` = nombre de candidates d'effectif `c`) puis `rng.range(0, 1)` (`DS:7094`). Le hasard de l'entrée est donc : un tirage d'attente par Zoombini (`+0xf8`, par le kit), les deux de la règle, puis les tirages de jeu.
+- **Mémoire du niveau 0** (`DS:96ec` / `96f0`, relue par `1190:2748`, grottes) : rendue par `drawRule` (`previous`, `null` si plusieurs candidates sont à égalité) et écrite par la scène des gorges dans la session à chaque tirage (`setBridgeMemory`, `game/route.ts`), puis lue par les grottes (`bridgeAvoidCount`). `96ec` / `96f0` sont des variables de la zone de données lues en `[0x96ec]`, pas des champs du tampon `S` : elles ne sont pas sauvegardées (vérifié sur `10c0:131a`, `1190:0000` et `1190:2748`).
+
+### 8.2 Fin de partie (point 3)
+
+- Le 6e refus **ne ferme pas l'écran** : le visage de la falaise joue, au refus numéro 6, un `SCRB` (1213 en bas, 1228 en haut) dont l'image 39 porte l'événement 0 (`DS:7074 = 1`, `10c0:0e88`). Au Tick suivant (`10c0:05e4`, étape 2) : fin de transport forcée (`DS:96f4 = 1`), socle du haut éteint et effacé, clôture sur le script 1235, socle du bas sur `SCRB` 1221 (hook `0e5a`) ; l'animation 1221 change le décor 1103 par ses événements 100 / 101 (scripts 1236 puis 1103). **Aucun Zoombini ne peut plus être pris** (`DS:7068 < 6` échoue) ; les files de décision déjà posées ne partent plus. Le joueur quitte par « go » (si au moins un Zoombini a traversé) ou par la carte.
+- À la fin de l'animation 1221 (événement −1, notification demandée par `1b89(1, …)`), la voix de regret `20045…20048` part si `rand(0..4) > niveau` **ou** si la mémoire de dialogue de l'écran est ≤ 3 (compteur de visites compté à l'entrée par `1168:5c57`), et seulement s'il reste des Zoombinis sur la falaise. La condition est évaluée à ce moment-là, et pas à chaque éternuement : les événements de fin du visage ne sont pas notifiés (`1b89(0, …)`, `+0x2f = 0`).
+- Cas des Zoombinis restés dans la file : ils ne partent jamais (la condition d'étape 3 `7068 < 6`), ils restent sur leur zone.
+
+### 8.3 Période d'animation (point 6)
+
+`DS:908a` est la copie de l'option « moins d'action » (`S+0x20`, `engine-ts.md`, « Kit des épreuves ») : la période vaut **60 ticks** sans l'option, **120 avec** (`celebrationPeriod`), pour les animations d'attente des Zoombinis arrivés (`SCRS` 2020 à 2024, quota `DS:70b8`). L'option agit aussi sur l'arrivée (tous debout) par le kit.
+
+### 8.4 Détails de mise en scène lus pendant le port
+
+- **Zones de dépôt** : points d'accroche `DS:0b08` (116, 104) et (128, 203), carré de prise de 55 pixels (`DS:9706 = 0x37`) ; le Zoombini est transporté dans le rectangle `DS:0ac0` = (0, 0)–(280, 480). Les `SCRS` de traversée sont écrits en coordonnées d'écran : le script d'un pont commence à son point d'accroche (image 0 : (116, 104) / (128, 203)).
+- **Traversée** : `1168:4741` (états 8 et 9) écrit `+0xa6 / +0xa8` à chaque image dont la première case est une partie : à la fin d'un script le Zoombini est donc à la position de sa dernière image, d'où part sa marche vers la place d'arrivée (événements 3 et 6). Un `SCRS` joué avec un point (réaction d'éternuement) se termine sur ce point (38, 106) / (56, 205).
+- **Retour d'un refusé** (événement −1, `1168:5482(0x24, 1, rect, objet)`) : le Zoombini ne rejoint pas une place d'attente mais une place libre de la falaise de gauche (rectangles `DS:0ab0` : (10, 50)–(57, 105) pour le pont du haut, `DS:0ab8` : (10, 165)–(65, 212) pour le bas) : grille 5 × 4 parcourue colonne par colonne, une secousse de 0 à 5 pixels, première case à plus de 6 pixels de tous les autres. Pendant cette marche `DS:9702` compte un marcheur de plus (l'aide F1 est refusée).
+- **Éternuement** (événement 10) : le script de réaction vaut `1016 / 1012 / 1008 / 1000 / 1004` d'après le type (1 à 5) que le visage a annoncé dans `DS:7090`, +2 au pont du haut, + un tirage 0 / 1. Le type est déterministe par numéro d'erreur : bas 1, 2, 3, 4, 5, 1 ; haut 2, 5, 1, 4, 3, 2 (`faceSneezeType`).
+- **Ordre de départ** (étape 3) : refus bloqués par un refus en cours (`DS:7078`) ; au plus 5 refus simultanés ; 45 ticks entre deux départs (le premier 45 ticks après l'entrée, horodatage `10c0:0000` à la fin d'Enter) ; une décision acceptée démarre avec un délai de 4 ou 5 ticks entre images (`rand(4, 5)`), un refus à 6.
+- **Voix de réussite** : au dernier arrivé (nombre de passés = taille du groupe) quand plus aucune décision n'est en route (`DS:707c = 0`), `rand(20055, 20063)`.
+- **Aide F1** : prise seulement si l'épreuve est active et que plus personne ne marche (`DS:9702 ≤ 0`) ; pas de voix d'introduction, donc sans effet audible.
+
+### 8.5 Écarts du port
+
+- **Corde** : les `SCRB` 1237 à 1248 (ondulation de la corde à la traversée acceptée) ne sont jamais joués dans l'original : le test `10c0:089f` exige `DS:7076 ≠ 0` (un refus) avant la branche « accepté ». Code mort, non porté.
+- **Animations des arrivés** : l'original tire un Zoombini avec `+0x127 ≠ 0` sans regarder son état ; il peut donc interrompre une traversée en cours (qui ne se termine alors jamais). Le port ne choisit que des Zoombinis arrivés et immobiles (**probable** comme intention).
+- **Ordre de dessin des arrivés** : l'original range chaque arrivé « devant le précédent » par rang (tables `CS:12c2`) ; le port les ordonne par ordonnée des pieds (**probable**, effet visuel mineur).
+- **Surbrillance des zones** pendant le transport (`DS:9708`, images 2 des `tBMP` 1300) : non portée.
+- **Sons préchargés** (`11a8:313a`, `3533`) : sans objet (les sons sont lus à la demande).
+- **Mémoire des grottes** : voir §8.1.
+- **Boutons** : image « appuyé » pendant que le bouton de la souris est tenu sur eux (l'original dessine l'image appuyée un court instant, `1090:00c1`).

@@ -6,12 +6,12 @@
  * Dessin : le décor (fond + vignettes ou cadre-indice) est recomposé dans `decor`, `paint()` y pose le cadre de survol ou les pièces puis
  * laisse les boutons (gadgets) se redessiner par-dessus. Aucune copy : tout est image ou voix.
  */
-import { drawMask, drawShape } from "../engine/graphics/blit";
-import type { PaletteCycler } from "../engine/graphics/palette";
-import { Surface, type Rect } from "../engine/graphics/surface";
+import { drawMask, drawShape } from "../../../engine/mohawk/graphics/blit";
+import type { PaletteCycler } from "../../../engine/mohawk/graphics/palette";
+import { Surface, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { rectFromEdges, type GadgetGroup, type GadgetRecord } from "../engine/gadgets";
-import type { KeyEvent } from "../engine/input";
-import type { Archive } from "../engine/resources";
+import type { KeyEvent } from "../../../engine/mohawk/input";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
 import { SCR_FLAG } from "../engine/scr-player";
@@ -56,6 +56,7 @@ import {
   thumbShapeId,
 } from "./patterns-view";
 import { ScreenTransition } from "./screen-transition";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 /** Fondu d'entrée et de sortie (30 ticks, `1088:1b25`). */
 const FADE_TICKS = 30;
@@ -90,9 +91,9 @@ export class PatternsScene implements Scene {
   private archive!: Archive;
   private polyArchive!: Archive;
   /** Fond 103, sans bouton : sert de fond aux gadgets (`captureBackground`). */
-  private readonly base = new Surface();
+  private readonly base = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   /** Fond + vignettes du niveau, ou cadre-indice du puzzle. */
-  private readonly decor = new Surface();
+  private readonly decor = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   private session = new PuzzleSession();
   private board: PatternsBoard | null = null;
   private puzzleShpl: ShapeList | null = null;
@@ -361,7 +362,8 @@ export class PatternsScene implements Scene {
         FRAME_RECT,
         FRAME_BLINDS_TICKS,
         () => {
-          // Hypothèse : la palette change au début de la dernière transition (l'original fait un fondu `10a8:0dc4` autour d'elle).
+          // `1040:0809` : `10a8:0dc4(35, 154)` installe d'un coup (sans fondu) la palette des vignettes juste avant la dernière transition,
+          // après l'effacement qui s'est fait avec l'ancienne palette.
           loadPalette();
           this.rebuildDecor();
           this.paint();
@@ -388,21 +390,35 @@ export class PatternsScene implements Scene {
     if (!this.session.select(k)) return;
     const id = patternsPuzzId(this.session.level, k);
     const puzzle: PatternsPuzz = parsePatternsPuzz(this.archive.raw("PUZZ", id));
-    this.puzzleShpl = this.archive.shpl(id);
-    this.board = new PatternsBoard(puzzle);
-    this.board.deal(this.ctx.rng);
+    const shpl = this.archive.shpl(id);
     this.hoverThumb = -1;
-    // `1040:0543` : le puzzle est composé, puis révélé sur le cadre en 15 ticks ; les pièces hors du cadre apparaissent tout de suite.
+    // `1040:0543` : (1) `1040:1566` retire les vignettes, `1018:09b8` révèle le cadre vide en 15 ticks, encore avec la palette du menu ;
+    // (2) `10a8:0dc4(72, 154)` installe d'un coup les couleurs du tableau (`AnimatePalette`, sans fondu), le puzzle est dessiné, puis
+    // `1040:0d83` mélange les pièces et les révèle sur l'écran entier en 30 ticks (`1018:09b8`, `8bce`).
+    this.board = null;
+    this.puzzleShpl = null;
     this.blinds(
       FRAME_RECT,
       FRAME_BLINDS_TICKS,
       () => {
-        // Seules les entrées 154–225 sont celles du tableau : le fond garde ses couleurs.
-        this.services.graphics.palette.loadShpl(paletteSlice(this.puzzleShpl!, PUZZLE_PALETTE.first, PUZZLE_PALETTE.count));
-        this.rebuildDecor();
+        this.rebuildDecor(true);
         this.paint();
       },
-      () => this.endTransition(),
+      () =>
+        this.blinds(
+          SCREEN_RECT,
+          SCREEN_BLINDS_TICKS,
+          () => {
+            // Seules les entrées 154–225 sont celles du tableau : le fond garde ses couleurs.
+            this.services.graphics.palette.loadShpl(paletteSlice(shpl, PUZZLE_PALETTE.first, PUZZLE_PALETTE.count));
+            this.puzzleShpl = shpl;
+            this.board = new PatternsBoard(puzzle);
+            this.board.deal(this.ctx.rng);
+            this.rebuildDecor();
+            this.paint();
+          },
+          () => this.endTransition(),
+        ),
     );
   }
 

@@ -1,285 +1,41 @@
-import { WebAudioSink } from "../../../ui/mohawk/web-sink";
+import { BrowserHost, toPlayArea as toPlayAreaIn } from "../../../ui/mohawk/browser-host";
+import type { CanvasGeometry } from "../../../ui/mohawk/canvas-presenter";
+import type { WebAudioSink } from "../../../ui/mohawk/web-sink";
 import type { GameFiles } from "../data/files";
-import type { Frame } from "../engine/graphics/frame";
-import type { CursorKind, Host } from "../engine/host";
-import { Input, mouseButtonFromDom } from "../engine/input";
-import {
-  CanvasPresenter,
-  PLAY_ORIGIN_X,
-  PLAY_ORIGIN_Y,
-  SCREEN_HEIGHT,
-  SCREEN_WIDTH,
-} from "../render/canvas-presenter";
-import { MissingFilesError, fetchBytes } from "../../../ui/files";
-import { localStorageStore } from "../../../ui/local-storage";
-import { bindCanvasPointer, bindKeyboard, toLogical } from "../../../ui/pointer";
+import type { CursorKind } from "../engine/host";
+import { PLAY_ORIGIN_X, PLAY_ORIGIN_Y, SCREEN_HEIGHT, SCREEN_WIDTH } from "../engine/graphics/play-area";
+
+// Aides pures de l'hôte navigateur (clavier, focus), communes aux jeux Mohawk.
+export { gameModifiers, gameOwnsKey, isComposedKey, keepsInputOnBlur, type KeyInfo } from "../../../ui/mohawk/browser-host";
+
+/** Canvas de Mathémagique : 640×480 logiques, zone de jeu 576×432 centrée (bordure noire de 32×24). */
+export const MATH_GEOMETRY: CanvasGeometry = {
+  screenWidth: SCREEN_WIDTH,
+  screenHeight: SCREEN_HEIGHT,
+  originX: PLAY_ORIGIN_X,
+  originY: PLAY_ORIGIN_Y,
+};
 
 /** Valeur CSS `cursor` de chaque curseur du moteur. Remplaçable par `setCursorStyle` (bitmaps `CURS` de `MILKYWAY.DAT`). */
-const DEFAULT_CURSORS: Readonly<Record<CursorKind, string>> = {
+const CURSORS: Readonly<Record<CursorKind, string>> = {
   arrow: "default",
   busy: "progress",
   help: "help",
   hidden: "none",
 };
 
-/** Ce qu'il faut savoir d'un `KeyboardEvent` pour décider de son sort (sous-ensemble, pour tester sans DOM). */
-export type KeyInfo = Pick<
-  KeyboardEvent,
-  "key" | "code" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey"
-> & { isComposing?: boolean; altGraph?: boolean };
+export type MathBrowserHost = BrowserHost<CursorKind>;
 
 /**
- * Modificateurs vus par le jeu. AltGr (Ctrl+Alt sous Windows, `getModifierState("AltGraph")`) sert à taper des caractères (@, €, #…) :
- * ce n'est ni Ctrl ni Alt, sinon le jeu prendrait « @ » pour un raccourci.
+ * Hôte navigateur de Mathémagique.
+ * `base` : URL du dossier des fichiers du jeu, sans barre finale (ex. `./mathemagique`).
+ * `onExit` : ce que fait `exit()` une fois le son coupé (retour à l'accueil, redémarrage…).
  */
-export function gameModifiers(event: KeyInfo): {
-  ctrl: boolean;
-  alt: boolean;
-  shift: boolean;
-} {
-  return {
-    ctrl: event.ctrlKey && !event.altGraph,
-    alt: event.altKey && !event.altGraph,
-    shift: event.shiftKey,
-  };
+export function createMathBrowserHost(base: string, files: GameFiles, canvas: HTMLCanvasElement, onExit: () => void, audio?: WebAudioSink): MathBrowserHost {
+  return new BrowserHost<CursorKind>({ base, files, canvas, onExit, geometry: MATH_GEOMETRY, cursors: CURSORS, defaultCursor: "arrow", audio });
 }
 
-/**
- * Touches que le jeu ne lit pas au clavier : le texte composé (accents morts « ^ » puis « e », IME, clavier virtuel) arrive par le champ
- * invisible (`text-input.ts`, événements `compositionend` / `beforeinput`), qui est l'unique source ; lire aussi la touche physique
- * l'insérerait deux fois.
- */
-export function isComposedKey(event: Pick<KeyInfo, "key" | "isComposing">): boolean {
-  return (
-    event.isComposing === true ||
-    event.key === "Dead" ||
-    event.key === "Process" ||
-    event.key === "Unidentified"
-  );
-}
-
-/**
- * Touches dont le navigateur ne doit pas faire son action quand le canvas a le focus (défilement par Espace et flèches, retour
- * arrière, recherche rapide des caractères imprimables, Tab…). Le jeu possède Tab et Maj+Tab (focus des boutons, outils de l'Atelier
- * du rythme) : le navigateur ne doit pas déplacer le focus DOM vers le bouton Son ou le lien de retour. La sortie au clavier est
- * Échap, qui rend le focus au navigateur (`BrowserHost.bindKeyboard`). F5, F12 et les autres touches de fonction restent au navigateur.
- */
-export function gameOwnsKey(
-  event: Pick<KeyInfo, "key" | "code" | "ctrlKey" | "metaKey" | "altKey" | "altGraph">,
-): boolean {
-  if (event.metaKey) return false;
-  const altGraph = event.altGraph === true;
-  // Seuls Ctrl+Q (sortie) et Ctrl+V (« À propos ») sont au jeu ; Ctrl+R, Ctrl+W, Ctrl+C… restent au navigateur.
-  if (event.ctrlKey && !altGraph) return event.code === "KeyQ" || event.code === "KeyV";
-  if (event.altKey && !altGraph) return false;
-  if (event.key.length === 1) return true;
-  return (
-    event.code === "Space" ||
-    event.code === "Tab" ||
-    event.code === "Enter" ||
-    event.code === "NumpadEnter" ||
-    event.code === "Escape" ||
-    event.code === "Backspace" ||
-    event.code === "F1" ||
-    event.code.startsWith("Arrow")
-  );
-}
-
-/**
- * Le canvas perd le focus au profit de `related` : si c'est un autre récepteur clavier du jeu (le champ invisible, qui prend le focus au
- * `pointerup`), rien n'est relâché ; sinon un `reset` jetterait le relâchement du clic en file et les boutons resteraient « enfoncés ».
- */
-export function keepsInputOnBlur(
-  related: EventTarget | null,
-  keyTargets: ReadonlySet<EventTarget>,
-): boolean {
-  return related !== null && keyTargets.has(related);
-}
-
-/**
- * Coordonnées d'un point de l'écran dans la zone de jeu (576×432) : le canvas fait 640×480 logiques (zone de jeu centrée dans une
- * bordure noire) et s'affiche à la taille CSS `width × height`. Peut sortir de la zone (négatif ou au-delà).
- */
-export function toPlayArea(
-  clientX: number,
-  clientY: number,
-  rect: { left: number; top: number; width: number; height: number },
-): { x: number; y: number } {
-  const { x, y } = toLogical(clientX, clientY, rect, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
-  return { x: x - PLAY_ORIGIN_X, y: y - PLAY_ORIGIN_Y };
-}
-
-/**
- * Hôte du navigateur : fichiers par `fetch` (le cache HTTP du navigateur fait le reste ; les archives décodées sont gardées par
- * `Resources`), canvas 640×480 (`CanvasPresenter`), Web Audio + soundfont, clavier et souris du canvas.
- */
-export class BrowserHost implements Host {
-  readonly input = new Input();
-  readonly audio: WebAudioSink;
-  readonly storage = localStorageStore();
-  private readonly presenter: CanvasPresenter;
-  private readonly cursors: Record<CursorKind, string> = { ...DEFAULT_CURSORS };
-  private cursor: CursorKind = "arrow";
-  private presented = false;
-  /** Éléments qui reçoivent le clavier du jeu (le canvas et le champ invisible). */
-  private readonly keyTargets = new Set<EventTarget>();
-  /** Appui long d'un doigt (position dans la zone de jeu) : l'équivalent tactile de Ctrl + clic. */
-  onLongPress: ((x: number, y: number) => void) | null = null;
-
-  /**
-   * `base` : URL du dossier des fichiers du jeu, sans barre finale (ex. `./mathemagique`).
-   * `onExit` : ce que fait `exit()` une fois le son coupé (retour à l'accueil, redémarrage…).
-   */
-  constructor(
-    private readonly base: string,
-    private readonly files: GameFiles,
-    private readonly canvas: HTMLCanvasElement,
-    private readonly onExit: () => void,
-    audio: WebAudioSink = new WebAudioSink(),
-  ) {
-    this.audio = audio;
-    this.presenter = new CanvasPresenter(canvas);
-    this.setCursor("arrow");
-    this.bindInput();
-  }
-
-  async loadFile(name: string): Promise<Uint8Array> {
-    const path = this.files.resolve(name);
-    if (!path) throw new MissingFilesError(`fichier introuvable : ${name}`);
-    return fetchBytes(this.base, path);
-  }
-
-  now(): number {
-    return performance.now();
-  }
-
-  unixMillis(): number {
-    return Date.now();
-  }
-
-  present(frame: Frame): void {
-    this.presenter.present(frame);
-    // Première image affichée : le jeu est lancé, on peut charger la soundfont (18 Mo) sans retarder le premier écran.
-    if (!this.presented) {
-      this.presented = true;
-      this.audio.startMidiLoading();
-    }
-  }
-
-  setCursor(cursor: CursorKind): void {
-    this.cursor = cursor;
-    this.canvas.style.cursor = this.cursors[cursor];
-  }
-
-  /**
-   * Remplace l'apparence d'un curseur par une valeur CSS `cursor` (ex. `url(blob:…) 0 0, progress`) : crochet pour les bitmaps `CURS`
-   * de `MILKYWAY.DAT` (`loadCursorImages` + `cssCursor`). Prend effet tout de suite si c'est le curseur affiché.
-   */
-  setCursorStyle(cursor: CursorKind, css: string): void {
-    this.cursors[cursor] = css;
-    if (cursor === this.cursor) this.canvas.style.cursor = css;
-  }
-
-  /** Coupe le son (musique et bruitages) : à appeler quand la page du jeu est quittée. */
-  silence(): void {
-    this.audio.midi.reset();
-    this.audio.suspend();
-  }
-
-  /** Libère la sortie audio (contexte fermé) : à appeler une fois, quand la page du jeu est quittée. */
-  close(): void {
-    this.audio.close();
-  }
-
-  exit(): void {
-    this.silence();
-    this.onExit();
-  }
-
-  /** Branche souris et doigt du canvas sur `input` (coordonnées dans la zone de jeu, 576×432) ; le son se débloque au premier geste. */
-  private bindInput(): void {
-    const { canvas, input, audio } = this;
-    const mods = (event: PointerEvent) => ({ ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey });
-    const inPlayArea = (x: number, y: number): { x: number; y: number } => ({ x: x - PLAY_ORIGIN_X, y: y - PLAY_ORIGIN_Y });
-    bindCanvasPointer(
-      canvas,
-      { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
-      {
-        move: (x, y) => {
-          const at = inPlayArea(x, y);
-          input.moveMouse(at.x, at.y);
-        },
-        down: (domButton, x, y, event) => {
-          const button = mouseButtonFromDom(domButton);
-          if (!button) return;
-          const at = inPlayArea(x, y);
-          input.moveMouse(at.x, at.y);
-          input.mouseDown(button, mods(event));
-        },
-        up: (domButton, x, y, event) => {
-          const button = mouseButtonFromDom(domButton);
-          if (!button) return;
-          const at = inPlayArea(x, y);
-          input.moveMouse(at.x, at.y);
-          input.mouseUp(button, mods(event));
-        },
-        longPress: (x, y) => {
-          const at = inPlayArea(x, y);
-          this.onLongPress?.(at.x, at.y);
-        },
-      },
-      { onGesture: () => audio.unlock() },
-    );
-    this.bindKeyboard(canvas);
-  }
-
-  /**
-   * Branche le clavier de `target` sur `input`. Le canvas l'est de base ; le champ invisible du clavier virtuel (`text-input.ts`) l'est
-   * aussi, parce que le focus y va pendant la saisie du nom : les touches d'un clavier physique doivent y arriver au jeu quand même.
-   */
-  bindKeyboard(target: HTMLElement): void {
-    const { input, audio } = this;
-    this.keyTargets.add(target);
-    const info = (event: KeyboardEvent): KeyInfo => ({
-      key: event.key,
-      code: event.code,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      altKey: event.altKey,
-      shiftKey: event.shiftKey,
-      isComposing: event.isComposing,
-      altGraph: event.getModifierState("AltGraph"),
-    });
-    bindKeyboard(
-      target,
-      {
-        keyDown: (event) => {
-          // Raccourcis du système (Cmd sur Mac) : jamais au jeu.
-          if (event.metaKey) return false;
-          const key = info(event);
-          // Texte composé : il arrive par le champ invisible, pas par la touche physique.
-          if (isComposedKey(key)) return false;
-          // Maj+Échap est la sortie au clavier (le jeu possède Tab) : le canvas rend le focus au navigateur. Échap seul reste au jeu
-          // (code 27 du moniteur et du hub).
-          if (event.key === "Escape" && event.shiftKey && target === this.canvas) {
-            this.canvas.blur();
-            return true;
-          }
-          input.keyDown({ key: event.key, code: event.code, repeat: event.repeat, ...gameModifiers(key) });
-          return gameOwnsKey(key);
-        },
-        keyUp: (event) => {
-          const key = info(event);
-          input.keyUp(event.code, gameModifiers(key));
-          return gameOwnsKey(key);
-        },
-        // Le focus passe à un autre récepteur du jeu (canvas ↔ champ invisible) : on ne relâche rien. Perdre le focus
-        // relâche tout, sinon une touche tenue au moment du clic ailleurs resterait enfoncée.
-        blur: (event) => {
-          if (!keepsInputOnBlur(event.relatedTarget, this.keyTargets)) input.reset();
-        },
-      },
-      () => audio.unlock(),
-    );
-  }
+/** Point de l'écran dans la zone de jeu de 576×432 (voir `toPlayArea` de l'hôte commun). */
+export function toPlayArea(clientX: number, clientY: number, rect: { left: number; top: number; width: number; height: number }): { x: number; y: number } {
+  return toPlayAreaIn(clientX, clientY, rect, MATH_GEOMETRY);
 }

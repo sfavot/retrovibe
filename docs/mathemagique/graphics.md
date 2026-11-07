@@ -1,12 +1,12 @@
 # Graphismes (Math Workshop)
 
-Code : `src/games/mathemagique/engine/graphics/` (pur, testable sous node) et `src/games/mathemagique/render/canvas-presenter.ts` (navigateur). Tests : `test/mathemagique/graphics.test.ts`. Références : [shap.md](shap.md), [engine.md](engine.md) §4. « Hypothèse » marque ce que le code de `MATH` ne prouve pas.
+Code : `src/engine/mohawk/graphics/` (pur, testable sous node, commun aux jeux Mohawk), `src/games/mathemagique/engine/graphics/` (texte, transitions, `.fon`, géométrie de l'écran) et `src/ui/mohawk/canvas-presenter.ts` (navigateur). Tests : `test/mathemagique/graphics.test.ts`. Références : [shap.md](shap.md), [engine.md](engine.md) §4. « Hypothèse » marque ce que le code de `MATH` ne prouve pas.
 
 ## Graphismes
 
 ### Surface (`surface.ts`)
 
-- `Surface(width = 576, height = 432)` : indices 8 bits (`pixels`). Rectangles `{ x, y, w, h }`.
+- `Surface(width, height)` (Mathémagique passe `PLAY_WIDTH × PLAY_HEIGHT` = 576×432, `engine/graphics/play-area.ts`) : indices 8 bits (`pixels`). Rectangles `{ x, y, w, h }`.
 - `fill(color, rect?)`, `copyFrom(src, srcRect?, dx, dy, transparent?)` (`transparent` = ignorer l'index 0), `get(x, y)`.
 - `saveRect(rect)` / `restoreRect(saved)` : équivalents de `e2SaveRect` (`10a8:1023`) ; la restauration est exacte (sans découpe).
 - Découpe : pile `pushClip(rect)` / `popClip()` (intersection, équivalent de `e2ClipRect`, `10a8:119f`) et, en plus, `mask` : `ClipMask(width, height, rects)` = union de rectangles (cellules de Hidden). Tout le dessin passe par `clip`, `clipSpan` et `visible`.
@@ -39,9 +39,9 @@ Machines pures : `step()` (un tick) renvoie les rectangles **nouvellement révé
 - **Balayage** `Wipe(rect, direction 0..3, ticks)` (`1018:0162`, `01fd`, `0275`) : 0 haut → bas, 1 bas → haut, 2 gauche → droite, 3 droite → gauche. Crédits : 30 ticks, direction `(+1) & 3` à chaque appel (`1078:04ef`).
 - **Stores vénitiens** `Blinds(rect, ticks, bande = 10)` (`1018:0722`, `0785`, `0811`, `0889`, appelant `09b8`) : bandes de 10 lignes, dans chacune les lignes apparaissent de haut en bas ; appels du jeu : 15 ticks (menus, choix de puzzle) ou 30 ticks (niveau, mélange). Le rectangle d'écrêtage et le port source (`DAT_8bd6`, port de travail) sont ceux de l'appelant ; si le port source est nul, l'original rafraîchit la zone sans copie (`10d8:66d1`), non modélisé.
 
-### Présentation (`render/canvas-presenter.ts`)
+### Présentation (`src/ui/mohawk/canvas-presenter.ts`)
 
-`new CanvasPresenter(canvas)` fixe le canvas à 640×480 logiques, fond noir ; `present(frame)` convertit `Frame.pixels` par la palette de la frame (table de 256 couleurs réutilisée, un `ImageData` 576×432 réutilisé) et le pose en (32, 24). Échelle entière et `image-rendering: pixelated` : CSS de l'appelant.
+`new CanvasPresenter(canvas, { screenWidth: 640, screenHeight: 480, originX: 32, originY: 24 })` fixe le canvas à 640×480 logiques, fond noir ; `present(frame)` convertit `Frame.pixels` par la palette de la frame (table de 256 couleurs réutilisée, un `ImageData` de la taille de la `Frame`, 576×432, réutilisé) et le pose en (32, 24). Échelle entière et `image-rendering: pixelated` : CSS de l'appelant.
 
 ### Points ouverts
 

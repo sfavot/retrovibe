@@ -14,13 +14,13 @@
  * `PolyHelper` ne connaît ni archive, ni surface, ni curseur : tout passe par `PolyPorts`. `createScrPolyPorts` est l'implémentation réelle
  * (`ScrPlayer` en mode bloquant, voix, fond sauvegardé, curseur « ? »). Les tests utilisent des ports factices.
  */
-import type { Archive, Resources } from "../engine/resources";
+import type { Archive, Resources } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type ScrArchive, type ScrPlayer } from "../engine/scr-player";
-import { Surface, type Rect, type SavedRect } from "../engine/graphics/surface";
-import type { Palette } from "../engine/graphics/palette";
+import { Surface, type Rect, type SavedRect } from "../../../engine/mohawk/graphics/surface";
+import type { Palette } from "../../../engine/mohawk/graphics/palette";
 import type { CursorController } from "../engine/pointer";
 import type { RosterState, RosterFieldName } from "../engine/roster";
-import { NoRepeatPool, type MsvcRandom } from "../engine/rng";
+import { NoRepeatPool, type MsvcRandom } from "../../../engine/mohawk/rng";
 import { POLY_ZONE, type PolyConfig, type PolyContext, type PolyTopic } from "./poly-config";
 
 // --- Ports ---

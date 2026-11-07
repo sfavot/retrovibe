@@ -1,5 +1,5 @@
 /** Rockets, Bowling, Rhythm Shop, Pattern Windows et le Hall of Fame : parcours du robot. */
-import { hitTestShape } from "../../../src/games/mathemagique/engine/graphics/blit";
+import { hitTestShape } from "../../../src/engine/mohawk/graphics/blit";
 import { SceneId } from "../../../src/games/mathemagique/engine/scene";
 import type { BowlingScene } from "../../../src/games/mathemagique/scenes/bowling";
 import { LEVEL_SHAPES, OPERATION_EDGES } from "../../../src/games/mathemagique/scenes/bowling-view";

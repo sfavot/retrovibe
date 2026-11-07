@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import { Roster, RosterStore, achievementBit, gradeOfMask, type PlayerInfo } from "../../src/games/mathemagique/engine/roster";
 import { SceneId } from "../../src/games/mathemagique/engine/scene";
 import { installServices } from "../../src/games/mathemagique/engine/services";
@@ -546,7 +546,7 @@ describe.skipIf(!hasOriginalFiles)("Hall of Fame : scène (TROPHY.DAT)", () => {
       roster.setMask(added.id, mask);
     }
     new RosterStore(host.storage).save(roster);
-    const engine = new Engine(host, { seed: 1 });
+    const engine = new MathEngine(host, { seed: 1 });
     const services = installServices(engine);
     engine.register(SceneId.trophy, () => createTrophyScene(services, options));
     engine.register(SceneId.hub, () => ({ enter() {}, leave: () => services.endScene(), tick() {} }));

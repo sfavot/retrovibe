@@ -250,15 +250,24 @@ export function sequenceFinished(obj: GameObject, active: boolean): boolean {
 /**
  * Un tic d'animation scénarisée (`16f5:02a2`, certain) : quand la séquence d'images est terminée, `Tim` baisse ; à 0 le pas
  * suivant est chargé (`Nbr - 1`) ; quand `Nbr` tombe à 0 : `Anm = 0`, `Err = 0`, ressource d'origine rechargée, arrêt du son,
- * et l'id terminé est rendu. `active` : l'objet est dans une salle active (chargée).
+ * et l'id terminé est rendu. Tant qu'elle dure, chaque tic finit par `Err = 0` et, pour un objet `Mob 1`, `Ver = 0xFF`
+ * (`16f5:0371..037d`) : un arrêt en cours d'animation (`2273:0190`, vitesses à 0, par un face-à-face) ne fige donc la séquence
+ * qu'un tic (`animStep` n'avance pas un objet sans vitesse). Le port ne réarmait pas `Ver` : un duel touché par un tiers restait
+ * figé pour toujours. `active` : l'objet est dans une salle active (chargée).
  */
 export function tickScriptedAnimation(obj: GameObject, sprites: SpriteSource, ani: AniTable, active: boolean): ScriptedTick {
   const none: ScriptedTick = { finished: 0, events: [] };
   const id = obj.animId;
-  if (id === 0 || !sequenceFinished(obj, active)) return none;
+  if (id === 0) return none;
+  const running = (): ScriptedTick => {
+    setRawU8(obj, RAW_OFFSET.err, 0);
+    if (obj.mob === 1) obj.speedY = -1;
+    return none;
+  };
+  if (!sequenceFinished(obj, active)) return running();
   const loops = Math.max(0, rawU16(obj, RAW_OFFSET.tim) - 1);
   setRawU16(obj, RAW_OFFSET.tim, loops);
-  if (loops !== 0) return none;
+  if (loops !== 0) return running();
   const remaining = Math.max(0, rawU16(obj, RAW_OFFSET.nbr) - 1);
   setRawU16(obj, RAW_OFFSET.nbr, remaining);
   if (remaining === 0) {
@@ -268,5 +277,5 @@ export function tickScriptedAnimation(obj: GameObject, sprites: SpriteSource, an
     return { finished: id, events: [{ type: "soundStop" }] };
   }
   loadAniStep(obj, sprites, ani, id, aniRecord(ani, id).steps - remaining);
-  return none;
+  return running();
 }

@@ -74,17 +74,19 @@ import {
   type PolyConfig,
 } from "../../src/games/mathemagique/game/poly-config";
 import { PolyHelper, createScrPolyPorts, rosterIntroFlag, type PolyAnimation, type PolyPorts } from "../../src/games/mathemagique/game/poly";
-import { Surface } from "../../src/games/mathemagique/engine/graphics/surface";
-import { Palette } from "../../src/games/mathemagique/engine/graphics/palette";
-import { Input } from "../../src/games/mathemagique/engine/input";
+import { Surface } from "../../src/engine/mohawk/graphics/surface";
+import { Palette } from "../../src/engine/mohawk/graphics/palette";
+import { Input } from "../../src/engine/mohawk/input";
 import { PointerService } from "../../src/games/mathemagique/engine/pointer";
-import { Archive } from "../../src/games/mathemagique/engine/resources";
-import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
+import { Archive } from "../../src/engine/mohawk/resources";
+import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import { RosterState, RosterStore } from "../../src/games/mathemagique/engine/roster";
 import { ScrPlayer } from "../../src/games/mathemagique/engine/scr-player";
 import { SoundService } from "../../src/games/mathemagique/engine/sound";
 import { MemoryStorage, TestHost } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../../src/games/mathemagique/engine/graphics/play-area";
+import { scr as readScr } from "../../src/games/mathemagique/engine/scr";
 
 const real = describe.skipIf(!hasOriginalFiles);
 
@@ -951,8 +953,8 @@ real("Poly : les identifiants des configurations existent dans l'archive d'aide"
     expect(range(12).every((r) => polly.has("\0SCR", 27000 + 50 * r))).toBe(true);
     expect(polly.has("\0SCR", 27600)).toBe(false);
     expect(range(13).every((r) => polly.has("\0SCR", 32000 + 50 * r) && polly.has("\0SCR", 37000 + 50 * r))).toBe(true);
-    for (const config of [HIDDEN_POLY, PATTERNS_POLY, STICKLERS_POLY]) expect(polly.scr(config.introLong).clip.bottom).toBe(432);
-    expect(archives["NIM.DAT"].scr(1100).clip.bottom + ROCKETS_POLY.offsetY).toBe(431);
+    for (const config of [HIDDEN_POLY, PATTERNS_POLY, STICKLERS_POLY]) expect(readScr(polly, config.introLong).clip.bottom).toBe(432);
+    expect(readScr(archives["NIM.DAT"], 1100).clip.bottom + ROCKETS_POLY.offsetY).toBe(431);
     expect(HIDDEN_POLY.offsetY).toBe(0);
   });
 
@@ -1386,7 +1388,7 @@ real("Poly : ports réels (ScrPlayer, POLLY.DAT)", () => {
     const host = new TestHost();
     host.audio.unlock();
     const sound = new SoundService(host.audio);
-    const surface = new Surface();
+    const surface = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
     surface.fill(7);
     const dirty = { count: 0 };
     const scr = new ScrPlayer({ surface, sound, onDirty: () => dirty.count++ });
@@ -1419,7 +1421,7 @@ real("Poly : ports réels (ScrPlayer, POLLY.DAT)", () => {
     for (let i = 0; i < 200 && poly.phase === "arriving"; i++) tick();
     expect(poly.phase).toBe("intro");
     expect(poly.currentScr).toBe(25100);
-    expect(archive.scr(25000).duration).toBeLessThan(200);
+    expect(readScr(archive, 25000).duration).toBeLessThan(200);
     for (let i = 0; i < 100; i++) tick();
     expect(poly.phase).toBe("intro");
     click();

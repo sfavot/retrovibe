@@ -19,16 +19,16 @@
  * courant est `ctx.roster.currentPlayerId`, mis à jour au fil des clics. Les préférences s'appliquent tout de suite : le son (`ambient`)
  * et le pointeur (`clickAndStick`) relisent le roster à chaque demande ; le timer est pris à la fermeture s'il vaut 1 à 999 s.
  */
-import type { Archive } from "../../engine/resources";
+import type { Archive } from "../../../../engine/mohawk/resources";
 import { GadgetGroup, rectFromEdges, type GadgetRecord, type GadgetSpec } from "../../engine/gadgets";
-import { drawShape } from "../../engine/graphics/blit";
+import { drawShape } from "../../../../engine/mohawk/graphics/blit";
 import type { FonFont } from "../../engine/graphics/fon";
 import { parseFon } from "../../engine/graphics/fon";
-import type { Rect, SavedRect } from "../../engine/graphics/surface";
+import type { Rect, SavedRect } from "../../../../engine/mohawk/graphics/surface";
 import { drawText, measureText } from "../../engine/graphics/text";
 import type { Host } from "../../engine/host";
-import type { KeyEvent } from "../../engine/input";
-import { NoRepeatPool } from "../../engine/rng";
+import type { KeyEvent } from "../../../../engine/mohawk/input";
+import { NoRepeatPool } from "../../../../engine/mohawk/rng";
 import { MAX_PLAYERS, canAppendNameChar, formatPlayerName, type PlayerInfo } from "../../engine/roster";
 import type { AnimationHandle } from "../../engine/scr-player";
 import { SCR_FLAG } from "../../engine/scr-player";
@@ -37,7 +37,7 @@ import type { MathServices } from "../../engine/services";
 import type { SoundHandle } from "../../engine/sound";
 import { TAG_SCR, TAG_SND } from "../../../../data/mohawk/mohawk";
 import { MONITOR_NAME_RULES } from "./name-text";
-import { NULL_TEXT_INPUT, type TextInputPort } from "./text-input";
+import { NULL_TEXT_INPUT, type TextInputPort } from "../../../../engine/mohawk/text-input";
 
 export type MonitorMode = "signin" | "roster" | "preferences" | "trivia";
 

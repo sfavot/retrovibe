@@ -2,7 +2,7 @@
  * Un problème du Bowling en entier (`1010:108d` + `1010:2150`, screens/bowling.md §1.6 à §1.8) : énoncé, bonne réponse, 3 distracteurs,
  * place de la bonne réponse. Pas de rendu : l'énoncé et les cases sont des descriptions que la scène dessine.
  */
-import { MsvcRandom } from "../../engine/rng";
+import { MsvcRandom } from "../../../../engine/mohawk/rng";
 import { contiguousMask, popcount, rotateMask12, scatteredMask, simplifyFraction } from "./equivalence";
 import { type EstimationPrompt, type EstimationTables, formatEstimationPrompt } from "./estimation";
 import { buildOperands, equivalenceCells, type OperandWords, type Operands } from "./operands";

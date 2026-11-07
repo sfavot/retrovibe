@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { MohawkArchive } from "../../src/data/mohawk/mohawk";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import type { GadgetGroup } from "../../src/games/mathemagique/engine/gadgets";
 import { parseFon, type FonFont } from "../../src/games/mathemagique/engine/graphics/fon";
 import { encodeText, measureText } from "../../src/games/mathemagique/engine/graphics/text";
-import type { KeyEvent } from "../../src/games/mathemagique/engine/input";
-import { Archive } from "../../src/games/mathemagique/engine/resources";
+import type { KeyEvent } from "../../src/engine/mohawk/input";
+import { Archive } from "../../src/engine/mohawk/resources";
 import {
   ASCII_NAME_RULES,
   LATIN1_NAME_RULES,
@@ -25,8 +25,8 @@ import {
   type MonitorMode,
   type MonitorOpenOptions,
   type MonitorResult,
-  type TextInputPort,
 } from "../../src/games/mathemagique/scenes/monitor";
+import type { TextInputPort } from "../../src/engine/mohawk/text-input";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 
@@ -172,7 +172,7 @@ describe.runIf(hasOriginalFiles)("MonitorOverlay (MAINSCRN.DAT réel)", () => {
     for (const name of options.players ?? []) seeded.addPlayer(name, LATIN1_NAME_RULES);
     options.roster?.(seeded);
     new RosterStore(host.storage).save(seeded);
-    const engine = new Engine(host, { seed: 3 });
+    const engine = new MathEngine(host, { seed: 3 });
     const services = installServices(engine);
     const textInput = new FakeTextInput();
     const scene = new HostScene(services, archive, font, textInput, options.hub ?? false);

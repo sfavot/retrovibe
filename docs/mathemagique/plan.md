@@ -14,7 +14,7 @@ Ce document sert de brief commun aux sous-agents. Les références font foi sur 
   visionneuse (`ui/asset-viewer.html`), rétro-ingénierie Ghidra, études du moteur et des 8 écrans.
 - Vague H terminée (câblage) : les écrans Hidden, Patterns, Sticklers, Rockets et Hall of Fame sont enregistrés ; le hub pose son
   moniteur (`MonitorOverlay`, touches, ticks, `monitorClosed`) ; polices en Mac Roman (`encodeText`) ; tri des joueurs sans accents ;
-  hôte navigateur : champ invisible du clavier mobile (`ui/text-input.ts`), téléchargement du certificat (`ui/certificate-download.ts`),
+  hôte navigateur : champ invisible du clavier mobile (`src/ui/mohawk/text-input.ts`), téléchargement du certificat (`ui/certificate-download.ts`),
   appui long de 500 ms = Ctrl + clic, joueurs enregistrés en quittant et à `pagehide`.
 - Vague I terminée (commits `9bc5e28`, `4005534`) : Bowling for Numbers, Rhythm Shop et Pattern Windows portés.
 
@@ -60,6 +60,6 @@ Chaque vague se termine par `npm run typecheck`, `npm test`, `npm run build` et,
 - **Joueurs** : `localStorage`, 40 au maximum, sauvegarde aussi en quittant (correction d'un défaut de l'original).
 - **Quitter** (hub, après la confirmation par sifflet) : retour à l'accueil du site.
 - **Ctrl + clic** sur tactile : appui long de 500 ms (comme Lost in Time).
-- **Séquences secrètes** : les 12 décodées, au clavier ; les 7 partielles restent à retrouver.
+- **Séquences secrètes** : les 19 au clavier : 12 décodées, 7 reconnues par leur couple `(X, H)` relu dans `MATH` (préfixe d'origine non identifiable mais sans effet, voir `screens/common.md` §4.3).
 - **Rockets** : le compteur de victoires de Poly jamais remis à zéro est reproduit (défaut documenté).
 - **Textes du site validés** : `src/games/mathemagique/copy.ts`.

@@ -4,7 +4,7 @@ import {
   PLAY_ORIGIN_Y,
   SCREEN_HEIGHT,
   SCREEN_WIDTH,
-} from "../../src/games/mathemagique/render/canvas-presenter";
+} from "../../src/games/mathemagique/engine/graphics/play-area";
 import { fitScale } from "../../src/games/mathemagique/ui/app";
 import {
   gameOwnsKey,

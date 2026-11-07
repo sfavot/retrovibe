@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import { ROSTER_BACKUP_KEY, ROSTER_STORAGE_KEY, RosterState, RosterStore, Roster } from "../../src/games/mathemagique/engine/roster";
 import { SceneId, type Scene, type SceneContext } from "../../src/games/mathemagique/engine/scene";
 import { installServices } from "../../src/games/mathemagique/engine/services";
@@ -24,12 +24,12 @@ function stub(log: string[], name: string, load?: () => Promise<void>, onTick?: 
 }
 
 /** Images à la main (un `runFor` attendrait un chargement volontairement bloqué). */
-function frames(engine: Engine, host: TestHost, n: number): void {
+function frames(engine: MathEngine, host: TestHost, n: number): void {
   for (let i = 0; i < n; i++) engine.frame((host.time += 17));
 }
 
 /** Journalise l'identifiant de chaque scène entrée. */
-function trackEntries(engine: Engine): SceneId[] {
+function trackEntries(engine: MathEngine): SceneId[] {
   const entered: SceneId[] = [];
   const previous = engine.scenes.onEntered;
   engine.scenes.onEntered = () => {
@@ -42,7 +42,7 @@ function trackEntries(engine: Engine): SceneId[] {
 describe("échec de chargement d'une scène suivante", () => {
   it("expose l'erreur du moteur pendant que l'ancienne scène reste là (l'hôte doit alors s'arrêter)", async () => {
     const host = new TestHost();
-    const engine = new Engine(host, { seed: 0 });
+    const engine = new MathEngine(host, { seed: 0 });
     const log: string[] = [];
     engine.register(SceneId.hub, () => stub(log, "hub", undefined, (ctx) => ctx.clock.ticks === 3 && ctx.scenes.request(SceneId.rhythm)));
     engine.register(SceneId.rhythm, () => stub(log, "rhythm", () => Promise.reject(new Error("fichier absent"))));
@@ -58,7 +58,7 @@ describe("échec de chargement d'une scène suivante", () => {
 describe("SceneManager.request idempotent", () => {
   it("une demande égale à la scène en chargement ou déjà demandée est ignorée", async () => {
     const host = new TestHost();
-    const engine = new Engine(host, { seed: 0 });
+    const engine = new MathEngine(host, { seed: 0 });
     const log: string[] = [];
     let loads = 0;
     let release!: () => void;
@@ -85,7 +85,7 @@ describe("SceneManager.request idempotent", () => {
 
   it("une demande différente pendant un chargement est toujours gardée", async () => {
     const host = new TestHost();
-    const engine = new Engine(host, { seed: 0 });
+    const engine = new MathEngine(host, { seed: 0 });
     const log: string[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -108,7 +108,7 @@ describe("Resources.abortSceneLoad", () => {
   it("libère les archives ouvertes par le chargement raté, garde celles de l'ancienne scène et les persistantes", async () => {
     const host = new TestHost();
     for (const name of ["a.dat", "b.dat", "c.dat", "d.dat"]) host.virtualFiles.set(name, new Uint8Array(0));
-    const engine = new Engine(host, { seed: 0 });
+    const engine = new MathEngine(host, { seed: 0 });
     const { resources } = engine.ctx;
     // Les octets vides ne sont pas une archive Mohawk : on court-circuite le décodage via un faux `open`.
     const fake = (name: string) => ({ name }) as never;
@@ -129,7 +129,7 @@ describe("Resources.abortSceneLoad", () => {
 
   it("via le gestionnaire : un load qui échoue après avoir ouvert une archive ne la laisse pas ouverte", async () => {
     const host = new TestHost();
-    const engine = new Engine(host, { seed: 0 });
+    const engine = new MathEngine(host, { seed: 0 });
     const log: string[] = [];
     engine.register(SceneId.hub, () => stub(log, "hub", undefined, (ctx) => ctx.clock.ticks === 3 && ctx.scenes.request(SceneId.rhythm)));
     engine.register(
@@ -214,7 +214,7 @@ describe("roster : sécurité des données", () => {
 describe("services.endScene", () => {
   it("restaure les couleurs tournées par un cycle de palette en fin de scène", () => {
     const host = new TestHost();
-    const engine = new Engine(host, { seed: 0 });
+    const engine = new MathEngine(host, { seed: 0 });
     const services = installServices(engine);
     const { palette } = services.graphics;
     palette.setColor(10, 1, 2, 3);
@@ -232,7 +232,7 @@ describe.skipIf(!hasOriginalFiles)("scènes réelles", () => {
   it("Bowling → Trophée : un double clic ne charge le Hall of Fame qu'une fois ; double Exit : un seul retour au Bowling", async () => {
     const host = new TestHost();
     host.audio.unlock();
-    const engine = new Engine(host, { seed: 7 });
+    const engine = new MathEngine(host, { seed: 7 });
     const services = installServices(engine);
     const added = engine.ctx.roster.roster.addPlayer("Test");
     if (!added.ok) throw new Error("joueur");
@@ -257,7 +257,7 @@ describe.skipIf(!hasOriginalFiles)("scènes réelles", () => {
   it("hub : un appui long pendant le clip bloquant de Poly est ignoré (pas de connexion à la place des préférences)", async () => {
     const host = new TestHost();
     host.audio.unlock();
-    const engine = new Engine(host, { seed: 3 });
+    const engine = new MathEngine(host, { seed: 3 });
     const services = installServices(engine);
     const monitor: string[] = [];
     registerScenes(engine, services, { openMonitor: (mode) => monitor.push(mode) });
@@ -285,7 +285,7 @@ describe.skipIf(!hasOriginalFiles)("scènes réelles", () => {
   it("Bowling : « Ambient Sounds » rallumé en pleine partie relance la musique", async () => {
     const host = new TestHost();
     host.audio.unlock();
-    const engine = new Engine(host, { seed: 7 });
+    const engine = new MathEngine(host, { seed: 7 });
     const services = installServices(engine);
     const added = engine.ctx.roster.roster.addPlayer("Test");
     if (!added.ok) throw new Error("joueur");

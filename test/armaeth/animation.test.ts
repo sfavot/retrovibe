@@ -198,6 +198,23 @@ describe("animations scénarisées", () => {
     expect(obj.fig).toBe(2);
     expect(tickScriptedAnimation(obj, sprites, fakeAni(), false).finished).toBe(5);
   });
+
+  it("un arrêt en cours d'animation ne fige pas la séquence : chaque tic remet `Err` à 0 et `Ver` à 0xFF pour un `Mob 1`", () => {
+    const { obj } = newObject();
+    startScriptedAnimation(obj, sprites, fakeAni(), { id: 5, gst: 7, mob: 1, ego: 6, hor: 0, ver: 1, prf: 0, audible: false });
+    // face-à-face (`2273:0190`) : vitesses à 0, contact en cours
+    obj.speedX = obj.speedY = obj.speedP = 0;
+    obj.err = 8;
+    expect(tickScriptedAnimation(obj, sprites, fakeAni(), true).finished).toBe(0);
+    expect(obj.speedY).toBe(-1);
+    expect(obj.err).toBe(0);
+    let finished = 0;
+    for (let t = 0; t < 10 && !finished; t++) {
+      animStep(obj, sprites, 0);
+      finished = tickScriptedAnimation(obj, sprites, fakeAni(), true).finished;
+    }
+    expect(finished).toBe(5);
+  });
 });
 
 describe.skipIf(!hasOriginalFiles)("animation sur les ressources du jeu", () => {

@@ -7,13 +7,14 @@
  * la zone prend le nouvel état tout de suite. Comme l'original (`1018:0889`), un clic pendant la transition la termine d'un coup.
  */
 import { Blinds, revealRects } from "../engine/graphics/transitions";
-import { Surface, type Rect, type SavedRect } from "../engine/graphics/surface";
+import { Surface, type Rect, type SavedRect } from "../../../engine/mohawk/graphics/surface";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 /** Hauteur des bandes (paramètre 10 de tous les appels de l'original). */
 const STRIP_HEIGHT = 10;
 
 export class ScreenTransition {
-  private readonly work = new Surface();
+  private readonly work = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   private blinds: Blinds | null = null;
   private done: (() => void) | null = null;
   private age = 0;

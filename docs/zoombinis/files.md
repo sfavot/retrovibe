@@ -4,8 +4,8 @@ Généré par `scripts/zoombinis-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/zoombinis/`) : **63.0 Mo** (66074828 octets), 23 fichiers
-- Version française du CD (`FRENCH/`), à plat.
+- Total versionné (`original/zoombinis/`) : **71.2 Mo** (74611857 octets), 27 fichiers
+- Version française du CD (`FRENCH/`), à plat ; `LOGO025.mp4` est le film `FRENCH/LOGO025.MOV` converti (H.264 + AAC).
 
 ## Archives Mohawk
 
@@ -41,12 +41,16 @@ Types de ressources (tag de 4 octets : nombre de ressources). Les octets non imp
 | Fichier | Taille |
 |---|---:|
 | `CORNER.TTF` | 33.4 Ko |
+| `COVER.png` | 231.3 Ko |
+| `LOGO025.mp4` | 4.6 Mo |
+| `zoombinis-gm-LICENSE.txt` | 2.3 Ko |
+| `zoombinis-gm.sf2` | 3.3 Mo |
 
 ## Gardé uniquement dans `archives/zoombinis/`
 
 - `ENGLISH/`, `GERMAN/` : versions anglaise et allemande (seule `FRENCH/` est servie).
 - `FRENCH/MIDIMAC.MHK` : jeu MIDI pour Mac (`MIDIMPC.MHK`, version PC, est gardé).
-- `FRENCH/LOGO*.MOV`, `FRENCH/LOGO*.PRF` : vidéos QuickTime des logos et leurs fichiers de préchargement : à étudier (lues par le jeu au démarrage ?).
+- `FRENCH/LOGO*.MOV`, `FRENCH/LOGO*.PRF` : vidéos QuickTime des logos (codec `cdtoons`, illisible par un navigateur) et leurs statistiques de lecture ; seul `LOGO025.MOV`, le film nommé par le jeu, est converti en `LOGO025.mp4` (`scripts/zoombinis-extract.sh`).
 - `ZOOMBINI._EX` : exécutable NE 16 bits du jeu (Borland C++), cible de la rétro-ingénierie.
 - `BROEMIDI`, `BROEMIDI.TMI`, `DIB.DRV`, `MOHAWK.WIN`, `QB.DEC` : lanceur MIDI, pilote DIB, configuration du moteur et décodeur QuickTime : utiles à la rétro-ingénierie, pas servis au navigateur.
 - `SETUP.*/`, `INSTALL.EXE`, `AUTORUN.*`, `SYSTEM/` : installeurs (Microsoft Setup, QuickTime, WinG) et lanceur du CD.
@@ -60,4 +64,4 @@ Le CD complet est extrait dans `archives/zoombinis/cd/`, l'installation DOSBox d
 bash scripts/zoombinis-extract.sh [jeu.7z [installeur.exe [manuel.7z]]]
 ```
 
-Archives par défaut dans `archives/zoombinis/` (non versionnées) : `jeu-02069-odyssee_des_zoombinis-pcwin.7z`, `setup-02069-Zoombinis_Logique-Dosbox.exe`, `man-02069-l_odyssee_des_zoombinis.7z`. Outils requis : `7zz`, `innoextract`, `python3`.
+Archives par défaut dans `archives/zoombinis/` (non versionnées) : `jeu-02069-odyssee_des_zoombinis-pcwin.7z`, `setup-02069-Zoombinis_Logique-Dosbox.exe`, `man-02069-l_odyssee_des_zoombinis.7z`. Outils requis : `7zz`, `innoextract`, `python3`, `ffmpeg`.

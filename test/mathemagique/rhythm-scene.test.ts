@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import { SceneId, type Scene } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import { ERROR_LINES } from "../../src/games/mathemagique/game/rhythm/errors";
@@ -7,7 +7,7 @@ import { type BinId, BIN_EDGES, pieceSpan } from "../../src/games/mathemagique/g
 import { createRhythmScene, type RhythmScene } from "../../src/games/mathemagique/scenes/rhythm";
 import { ALGEBIRD_CLEAN, BUTTONS, edgesRect, toolRect } from "../../src/games/mathemagique/scenes/rhythm-view";
 import { dancePoses, planDance } from "../../src/games/mathemagique/scenes/rhythm-dance";
-import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
+import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles } from "./helpers";
 
@@ -23,7 +23,7 @@ class HubStub implements Scene {
 async function boot(options: { drag?: boolean } = {}) {
   const host = new TestHost();
   host.audio.unlock();
-  const engine = new Engine(host, { seed: 5 });
+  const engine = new MathEngine(host, { seed: 5 });
   const services = installServices(engine);
   let scene!: RhythmScene;
   engine.register(SceneId.hub, () => new HubStub(() => services));
@@ -253,4 +253,41 @@ describe.skipIf(!hasOriginalFiles)("Rhythm Shop : scène (vraies données)", () 
     expect(api.scene.inspect().activeTool).toBe(0);
     void toolRect;
   });
+
+  it("fusion : Fractionator vidé au tick 7 et résultat au tick 126 de la `SCR` 20000 (hook `1028:354a`), pas à la fin (175)", async () => {
+    const api = await boot();
+    await api.idle();
+    await api.move(false, "parts", 0, "fractionator");
+    await api.button("doIt");
+    await api.idle();
+    expect(api.scene.inspect().fractionator).toEqual([72, 72]);
+    api.host.press("Digit7"); // Melder 2 (réplique de type 1 car deux pièces)
+    await api.run(50);
+    await api.idle();
+    expect(api.scene.inspect().activeTool).toBe(6);
+    await api.button("doIt");
+    expect(api.scene.inspect().tool).toBe("meld");
+    expect(api.scene.inspect().fractionator).toEqual([144]);
+    // L'animation est pilotée tick par tick : relevé du tick de chaque changement du Fractionator dessiné.
+    const seen: { tick: number; words: readonly number[] }[] = [];
+    let last: readonly number[] | null = null;
+    let end = 0;
+    for (let guard = 0; guard < 400 && api.scene.inspect().state === "animating"; guard++) {
+      const s = api.scene.inspect();
+      if (s.meldTick !== null) {
+        end = s.meldTick;
+        if (!last || last.join() !== s.shownFractionator.join()) {
+          seen.push({ tick: s.meldTick, words: s.shownFractionator });
+          last = s.shownFractionator;
+        }
+      }
+      await api.run(17);
+    }
+    expect(seen.map((x) => x.words)).toEqual([[72, 72], [], [144]]);
+    // Tolérance d'un tick : la boucle d'observation avance d'environ un tick à la fois.
+    expect(Math.abs(seen[1]!.tick - 7)).toBeLessThanOrEqual(2);
+    expect(Math.abs(seen[2]!.tick - 126)).toBeLessThanOrEqual(2);
+    expect(end).toBeLessThan(176);
+    expect(api.scene.inspect().shownFractionator).toEqual([144]);
+  }, 60_000);
 });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { MessageTable, messageId } from "../../src/games/armaeth/data/text";
 import { hasOriginalFiles, readOriginal } from "./helpers";
-import { LAVA_PATH, Robot, RobotSetback } from "./robot";
-import { castle, chapiterAndCrown, craterTrap, guardRoom, penSarhuls, riverAndLair, talisman, toSarhulPit, warriorDuel, witchLair } from "./solution";
+import { Robot, RobotSetback } from "./robot";
+import { castle, chapiterAndCrown, clearToads, craterTrap, guardRoom, penSarhuls, plank, relightTorch, riverAndLair, talisman, toSarhulPit, warriorDuel, witchLair } from "./solution";
 
 /**
  * Solution complète d'*Armaeth* jouée par un robot sur le moteur sans tête, du titre jusqu'au couronnement (`docs/armaeth/walkthrough.md`).
@@ -351,37 +351,7 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
   }, 120_000);
 
   it("chapitre 3 (c) : la planche de la salle de Minas Thyl (304) (score 315)", () => {
-    p.attempt(
-      "planche",
-      40,
-      () => {
-        p.goTo(106);
-        // la voûte du fond (sortie haute vers 103) est à gauche : les clics de bord mènent à la sortie de droite (107) ; on se place sous la
-        // voûte (P 15) puis flèche haut
-        p.walkTo(36, 44, 1500);
-        p.arrow("up");
-        p.until(() => p.roomId !== 106, 600);
-        p.stop();
-        p.run(30);
-        p.goTo(108);
-        p.downToRamp();
-        p.walkTo(230, 62, 4000);
-        p.drain();
-        for (const room of p.route(302)!) p.hop(room);
-        // les vapeurs de la salle 304 éteignent les torches (`147f:0352`, `G373`) : on les laisse ici, allumées
-        p.dropTorches();
-        p.enterLava();
-        // Minas Thyl vient à la rencontre du héros (sans baguette elle ne propose que son pacte : `G325`, puis attend : `Ego 5`)
-        for (let k = 0; k < 8 && p.state.hero && !has(308); k++) p.say("prendre la planche");
-        if (!has(308)) throw new RobotSetback("pas de planche");
-        // retour par le même chemin (les geysers de la salle tuent parfois : l'essai recommence depuis la sauvegarde)
-        p.lavaWalk([...LAVA_PATH].reverse().slice(1));
-        p.goTo(302, new Set(), true);
-        p.takeTorches();
-      },
-      // Minas Thyl, restée où le héros l'a laissée, ne doit pas être dans son antre (301) : elle y capturerait le héros
-      () => has(308) && p.roomId === 302,
-    );
+    plank(p);
     expect(has(308)).toBe(true);
     expect(p.roomId).toBe(302);
     // un nain guerrier tué en duel sur la route de la mine (`2a44:06c6`, +10) selon le hasard : sinon, à l'étape (e) (`warriorDuel`)
@@ -448,7 +418,8 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
     // les autres soldats de la salle de garde : endormis, tués dans leur sommeil ; éveillés, vaincus en duel ; le dernier rapporte +30
     guardRoom(p);
     expect(awarded(309)).toBe(true);
-    expect(p.state.score).toBe(365);
+    // la salle 208 (+10, `147f:0130`) est parfois atteinte plus tôt, sur la route d'un nain guerrier à la nage (`warriorDuel`) : les points de l'étape (g) sont alors déjà là
+    expect(p.state.score).toBe(awarded(205) ? 375 : 365);
   }, 120_000);
 
   it("chapitre 3 (f) : le puits vidé, le coffre de fer du fond, la baguette de Minas Thyl et « tehrehanan » (score 395)", () => {
@@ -495,7 +466,7 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
     // la baguette et la bouteille d'hydromel : « tehrehanan » en fait la potion qui protège des laves (+30)
     expect(p.say("tehrehanan").join(" ")).toContain(text("V", 380));
     expect(awarded(312)).toBe(true);
-    expect(p.state.score).toBe(395);
+    expect(p.state.score).toBe(awarded(205) ? 405 : 395);
   }, 120_000);
 
   it("chapitre 3 (g) : la rivière souterraine et le repaire de Ségomir (salles 208 et 210) (score 425)", () => {
@@ -544,6 +515,8 @@ describe.skipIf(!hasOriginalFiles)("solution complète : du titre au couronnemen
   }, 120_000);
 
   it("chapitre 3 (j) : la fosse des Sarhûls, l'enclos, la herse de pierre, le chapiteau d'Erin Hûviel, la boule de cristal et la couronne (score 645)", () => {
+    relightTorch(p);
+    clearToads(p);
     p.crossAll(305);
     // la porte de fer, l'élixir d'invisibilité ; derrière la grille ouvragée fermée, on attend que les Sarhûls soient tous dans l'enclos
     // et on l'ouvre (+40) ; la fosse, la herse de pierre (clef d'or), la salle 314 ; sur le chapiteau avec le talisman (+20), la boule

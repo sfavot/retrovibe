@@ -4,7 +4,7 @@
  */
 import { HotspotTable } from "../engine/gadgets";
 import { SceneId } from "../engine/scene";
-import type { KeyEvent } from "../engine/input";
+import type { KeyEvent } from "../../../engine/mohawk/input";
 
 /** Rectangle `[gauche, haut, droite, bas]` des tables de l'original. */
 export type Edges = readonly [number, number, number, number];
@@ -334,22 +334,44 @@ export function historyOf(keys: string): { x: number; h: number } {
 export interface SecretCode {
   /** `SHPL` de la photo affichée dans l'écran du moniteur. */
   shpl: number;
-  /** Frappes (minuscules) ; hypothèse : initiales des membres de l'équipe. */
+  /**
+   * Frappes (minuscules) tapées après Ctrl+A. Pour les codes décodés (`complete`), initiales de l'équipe (hypothèse) ; sinon, **une**
+   * frappe parmi d'autres qui donne le même couple `(x, h)` (le préfixe d'origine n'est pas identifiable, voir `partial`), utile aux tests.
+   */
   keys: string;
   x: number;
   h: number;
+  /** Vrai si `keys` est la frappe complète décodée ; faux si seul le couple `(x, h)` relu dans `MATH` fait foi. */
+  complete: boolean;
 }
 
 function secret(shpl: number, keys: string): SecretCode {
-  return { shpl, keys, ...historyOf(keys) };
+  return { shpl, keys, ...historyOf(keys), complete: true };
 }
 
 /**
- * Les 12 codes de deux lettres décodés (`common.md` §4.3, vérifiés par simulation). Les 7 autres (`SHPL` 301, 302, 304 à 308) ont un
- * préfixe de touches inconnu : non implémentés.
+ * Code dont on ne connaît que le couple `(X, H)` comparé par `1018:043a` (constantes poussées en `1080:0277`–`0474`), pas le préfixe de
+ * touches : `H` donne les 4 dernières touches (le prénom) et le quartet bas de la 5e, mais `X` cumule les `H` successifs, donc toutes les
+ * touches antérieures aux 4 dernières y entrent par un même terme linéaire (GF(2)) : seul leur XOR pondéré est connu. Comme l'original
+ * ne compare que `(X, H)`, comparer ce couple reconnaît la frappe d'origine quelle qu'elle soit. `keys` est une préimage de test.
+ */
+function partial(shpl: number, x: number, h: number, keys: string): SecretCode {
+  return { shpl, keys, x, h, complete: false };
+}
+
+/**
+ * Les 19 codes (`common.md` §4.3), dans l'ordre de test de `1080:0277` (`SHPL` 301 à 313, 315 à 320). 12 sont décodés (frappe de deux lettres,
+ * vérifiée par simulation) ; les 7 autres (301, 302, 304 à 308) sont reconnus par leur couple `(X, H)` relu dans `MATH` (voir `partial`).
  */
 export const SECRETS: readonly SecretCode[] = [
+  partial(301, 0x6d60b48c, 0x0dba75e5, "60mike"),
+  partial(302, 0xbd41350b, 0x0c3bb761, ";0anna"),
   secret(303, "mr"),
+  partial(304, 0xd5f0d14a, 0x0c5b30e8, "m blah"),
+  partial(305, 0xbf033683, 0x0e7d30ee, ";0stan"),
+  partial(306, 0xb17e0cf4, 0x541cf0ed, "dz5 sam"),
+  partial(307, 0xb17fc87d, 0x541d37ed, "dz5 tom"),
+  partial(308, 0xb17a8c6c, 0x54187974, "dz5 art"),
   secret(309, "hn"),
   secret(310, "pb"),
   secret(311, "ah"),

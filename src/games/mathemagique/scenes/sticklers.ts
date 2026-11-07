@@ -8,15 +8,15 @@
  * Les règles (collage, éparpillement, rotation) sont dans `SticklersBoard` (`game/puzzle-kit.ts`) ; la scène fait le rendu, les sons, les groupes
  * de gadgets et l'aide de Poly. Aucune copy visible : tout est dessin ou audio.
  */
-import { drawShape } from "../engine/graphics/blit";
-import { Surface, intersectRect, type Rect } from "../engine/graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import { Surface, intersectRect, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
-import type { Archive } from "../engine/resources";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type AnimationHandle } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices } from "../engine/services";
 import { ScreenTransition } from "./screen-transition";
-import type { KeyEvent } from "../engine/input";
+import type { KeyEvent } from "../../../engine/mohawk/input";
 import { PUZZLES_PER_LEVEL, parseSticklersPuzz, puzzId, rewardId, sticklersMenuShplId } from "../game/puzz";
 import { PolyHelper, createScrPolyPorts, openPolyArchive, rosterIntroFlag } from "../game/poly";
 import { POLY_ZONE, STICKLERS_POLY } from "../game/poly-config";
@@ -57,6 +57,7 @@ import {
   unionRect,
   type ButtonRole,
 } from "./sticklers-view";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 /** Photographie de l'état pour les tests et le débogage (ne sert pas à la scène). */
 export interface SticklersSnapshot {
@@ -104,8 +105,8 @@ export function createSticklersScene(services: MathServices): SticklersScene {
   let thumbsGroup!: GadgetGroup;
   let replayGroup!: GadgetGroup;
   /** Arrière-plan fixe (SHPL 104) et composition statique : fond + boutons + gabarit ou vignettes. L'écran = base + fragments / cadre de survol. */
-  const background = new Surface();
-  const base = new Surface();
+  const background = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
+  const base = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   const hysteresis = new HitHysteresis();
   let hoverThumb = -1;
   let hoverPiece: StickPiece | null = null;
@@ -262,7 +263,8 @@ export function createSticklersScene(services: MathServices): SticklersScene {
         EASEL,
         EASEL_BLINDS_TICKS,
         () => {
-          // Hypothèse : la palette change au début de la dernière transition (l'original fait un fondu `10a8:0dc4` autour d'elle).
+          // `1048:0816` : `10a8:0dc4(32, 154)` installe d'un coup (sans fondu) la palette des vignettes juste avant la dernière transition,
+          // après l'effacement qui s'est fait avec l'ancienne palette.
           restoreScenePalette();
           paintMenuBase();
           composeAll(old);
@@ -291,42 +293,55 @@ export function createSticklersScene(services: MathServices): SticklersScene {
     const id = puzzId(session.level, k);
     const puzz = parseSticklersPuzz(archive.raw("PUZZ", id));
     shplFirst = archive.shpl(id).firstShapeId;
-    hysteresis.reset();
-    board = new SticklersBoard(session.level, puzz, sizeOf, (piece, x, y) => hysteresis.test(piece, shapeOf(piece), x, y));
-    board.scatter(ctx.rng);
     hoverThumb = -1;
     hoverPiece = null;
     heldRect = null;
-    attachBoard<StickPiece>(pointer, gate(board), {
-      picked(piece) {
-        if (!regrabbing) play(SND.grab);
-        hoverPiece = null;
-        const now = pieceRect(piece);
-        compose(heldRect ? unionRect(heldRect, now) : now);
-        heldRect = now;
-      },
-      moved(piece) {
-        const now = pieceRect(piece);
-        compose(heldRect ? unionRect(heldRect, now) : now);
-        heldRect = now;
-      },
-      dropped(piece, outcome) {
-        if (pointer.mode === "clickAndStick") play(SND.drop);
-        const now = pieceRect(piece);
-        compose(heldRect ? unionRect(heldRect, now) : now);
-        heldRect = null;
-        if (outcome.complete) win();
-      },
-    });
-    // `1048:0556` : le puzzle est composé puis révélé sur le chevalet en 15 ticks ; la zone de dispersion apparaît tout de suite.
+    // `1048:0556` : (1) `1048:17f9` retire les vignettes, `1018:09b8` révèle le chevalet vide en 15 ticks, encore avec la palette du menu ;
+    // (2) `10a8:0dc4(32, 154)` installe d'un coup les couleurs du puzzle (sans fondu), le gabarit est dessiné, puis `1048:0cf8` disperse les
+    // fragments et les révèle sur l'écran entier en 30 ticks (`1018:09b8`, `8bce`).
+    board = null;
     blinds(
       EASEL,
       EASEL_BLINDS_TICKS,
       () => {
-        paintPuzzleBase(id, puzz);
+        resetBase(EASEL);
+        resetBase(SCATTER);
         composeAll();
       },
-      endTransition,
+      () =>
+        blinds(
+          FULL,
+          SCREEN_BLINDS_TICKS,
+          () => {
+            hysteresis.reset();
+            board = new SticklersBoard(session.level, puzz, sizeOf, (piece, x, y) => hysteresis.test(piece, shapeOf(piece), x, y));
+            board.scatter(ctx.rng);
+            paintPuzzleBase(id, puzz);
+            attachBoard<StickPiece>(pointer, gate(board), {
+              picked(piece) {
+                if (!regrabbing) play(SND.grab);
+                hoverPiece = null;
+                const now = pieceRect(piece);
+                compose(heldRect ? unionRect(heldRect, now) : now);
+                heldRect = now;
+              },
+              moved(piece) {
+                const now = pieceRect(piece);
+                compose(heldRect ? unionRect(heldRect, now) : now);
+                heldRect = now;
+              },
+              dropped(piece, outcome) {
+                if (pointer.mode === "clickAndStick") play(SND.drop);
+                const now = pieceRect(piece);
+                compose(heldRect ? unionRect(heldRect, now) : now);
+                heldRect = null;
+                if (outcome.complete) win();
+              },
+            });
+            composeAll();
+          },
+          endTransition,
+        ),
     );
   }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MohawkArchive } from "../../src/data/mohawk/mohawk";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
-import { Archive } from "../../src/games/mathemagique/engine/resources";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
+import { Archive } from "../../src/engine/mohawk/resources";
 import { SceneId, type Scene } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import { HIDDEN_POLY } from "../../src/games/mathemagique/game/poly-config";
@@ -93,7 +93,7 @@ class HubStub implements Scene {
 async function boot(options: { seed?: number; dragMode?: boolean; player?: boolean } = {}) {
   const host = new TestHost();
   host.audio.unlock();
-  const engine = new Engine(host, { seed: options.seed ?? 3 });
+  const engine = new MathEngine(host, { seed: options.seed ?? 3 });
   const services = installServices(engine);
   const hub = new HubStub(() => services);
   let scene!: HiddenScene;

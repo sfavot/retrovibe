@@ -1,5 +1,5 @@
 import type { PcmSound, WaveHandle } from "../../../src/engine/mohawk/audio/sink";
-import type { Frame } from "../../../src/games/mathemagique/engine/graphics/frame";
+import type { Frame } from "../../../src/engine/mohawk/graphics/frame";
 import type { CursorKind } from "../../../src/games/mathemagique/engine/host";
 import { FakeAudio, FakeMidi, TestHost } from "../engine-test-host";
 

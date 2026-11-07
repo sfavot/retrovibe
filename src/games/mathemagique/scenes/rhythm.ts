@@ -15,11 +15,11 @@
  * Aucune copy nouvelle : le Teletune affiche les noms de `STRL` 30001 et le format d'origine `(%d) %d/%d bar(s)` ; le reste est dessin et voix.
  */
 import { parseFon, type FonFont } from "../engine/graphics/fon";
-import { drawShape } from "../engine/graphics/blit";
-import { Surface, intersectRect, type Rect } from "../engine/graphics/surface";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
+import { Surface, intersectRect, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { type GadgetGroup, type GadgetSpec } from "../engine/gadgets";
-import type { KeyEvent } from "../engine/input";
-import type { Archive } from "../engine/resources";
+import type { KeyEvent } from "../../../engine/mohawk/input";
+import type { Archive } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type AnimationHandle, type ScrStartOptions } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices, SceneArchive } from "../engine/services";
@@ -85,6 +85,7 @@ import {
   type ButtonRole,
   type Sprite,
 } from "./rhythm-view";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../engine/graphics/play-area";
 
 export type RhythmState = "entering" | "idle" | "animating" | "reacting" | "playing" | "finale" | "help" | "exiting";
 
@@ -103,6 +104,10 @@ export interface RhythmSnapshot {
   parts: readonly number[];
   pattern: readonly number[];
   fractionator: readonly number[];
+  /** Pièces dessinées dans le Fractionator (en retard sur `fractionator` pendant l'animation d'un outil). */
+  shownFractionator: readonly number[];
+  /** Ticks écoulés de l'animation de la fusion (`SCR` 20000), `null` hors fusion. */
+  meldTick: number | null;
   activeTool: number;
   /** `SCR` de réaction d'Algebird en cours (ou le dernier lancé), `null` hors réaction. */
   reaction: number | null;
@@ -202,8 +207,8 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   let state: RhythmState = "entering";
   let leaving = false;
   let exitFading = false;
-  const background = new Surface();
-  const base = new Surface();
+  const background = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
+  const base = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   let teletune: ReturnType<typeof teletuneLines> = [];
   let helpHand = false;
   let heldRect: Rect | null = null;
@@ -212,6 +217,8 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   let reactionThen: (() => void) | null = null;
   const reactions: number[] = [];
   let toolAnim: ToolAnimation | null = null;
+  /** Pièces dessinées dans le Fractionator de la composition (le plateau est déjà à jour pendant une animation d'outil). */
+  let shownFractionator: readonly number[] = [];
   let run: PlayRun | null = null;
   let finalAnimation = 0;
   let pulses = 0;
@@ -282,6 +289,7 @@ export function createRhythmScene(services: MathServices): RhythmScene {
   }
 
   function paintBin(bin: BinId, words: readonly number[] = board.words(bin)): void {
+    if (bin === "fractionator") shownFractionator = [...words];
     const rect = binRect(bin);
     base.copyFrom(background, rect, rect.x, rect.y);
     drawBin(base, shapeOf, bin, words, lit?.bin === bin ? lit.index : -1);
@@ -507,10 +515,25 @@ export function createRhythmScene(services: MathServices): RhythmScene {
     };
     setState("animating");
     if (tool.kind === "meld") {
-      // Hook 0 de la `SCR` 20000 (`1028:354a`, argument 0, tick 7) : le Fractionator est vidé pendant la fusion. Le hook 1 (résultat, tick 126 sur
-      // 175) n'est pas rejoué : le fond sauvegardé du lecteur ne peut pas être repeint en cours de route (le résultat paraît à la fin).
-      refreshBin("fractionator", []);
-      toolAnim.handle = scr.playBlocking(archive, MELD_SCR, { flags: MELD_FLAGS }, () => finishToolAnimation());
+      // Le hook 0 de la `SCR` 20000 (`1028:354a`) redessine le Fractionator : argument 0 au tick 7 (vide, `DS:75f6` mis à 0 le temps de l'appel
+      // `1058:0592`), argument 1 au tick 126 sur 175 (pièces du résultat). Jusque-là le Fractionator montre les pièces d'avant. Les fonds de
+      // l'animation viennent de `base` (qui reçoit ces deux dessins) et non de l'écran sauvegardé au départ, sinon chaque image rétablirait
+      // l'ancien contenu (écart assumé avec le drapeau 1 d'origine, qui sauvegarde le fond avant le hook).
+      refreshBin("fractionator", before);
+      toolAnim.handle = scr.playBlocking(
+        archive,
+        MELD_SCR,
+        {
+          flags: MELD_FLAGS,
+          background: base,
+          onHook: (hook, arg) => {
+            if (hook !== 0) return;
+            if (arg === 0) paintBin("fractionator", []);
+            else if (arg === 1) paintBin("fractionator");
+          },
+        },
+        () => finishToolAnimation(),
+      );
       ctx.requestPresent();
       return;
     }
@@ -1054,6 +1077,8 @@ export function createRhythmScene(services: MathServices): RhythmScene {
         parts: board.parts,
         pattern: board.pattern,
         fractionator: board.fractionator,
+        shownFractionator,
+        meldTick: toolAnim?.kind === "meld" && toolAnim.handle ? toolAnim.handle.time : null,
         activeTool: board.activeToolIndex,
         reaction: reaction ? reaction.scrId : null,
         reactions: [...reactions],

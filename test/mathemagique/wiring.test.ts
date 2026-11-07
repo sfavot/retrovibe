@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import { SceneId } from "../../src/games/mathemagique/engine/scene";
 import { ROSTER_STORAGE_KEY } from "../../src/games/mathemagique/engine/roster";
 import { installServices } from "../../src/games/mathemagique/engine/services";
@@ -15,7 +15,7 @@ function boot(setup?: (host: TestHost) => void) {
   const host = new TestHost();
   host.audio.unlock();
   setup?.(host);
-  const engine = new Engine(host, { seed: 3 });
+  const engine = new MathEngine(host, { seed: 3 });
   const services = installServices(engine);
   registerScenes(engine, services);
   engine.start();

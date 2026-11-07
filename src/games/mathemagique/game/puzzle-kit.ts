@@ -10,9 +10,9 @@
  *
  * Module `game/` : n'écrit rien d'autre que l'état des plateaux ; les scènes (vague H) dessinent et jouent les sons.
  */
-import type { Rect } from "../engine/graphics/surface";
+import type { Rect } from "../../../engine/mohawk/graphics/surface";
 import type { PickResult, PointerService } from "../engine/pointer";
-import { NoRepeatPool, type MsvcRandom } from "../engine/rng";
+import { NoRepeatPool, type MsvcRandom } from "../../../engine/mohawk/rng";
 import type { Cell, HiddenPuzz, PatternsPuzz, SticklersPuzz } from "./puzz";
 import { LEVELS, PATTERNS_PIECES, PUZZLES_PER_LEVEL, hiddenPuzzId, shapeBases } from "./puzz";
 

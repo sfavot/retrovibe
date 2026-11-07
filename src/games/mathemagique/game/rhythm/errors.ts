@@ -5,7 +5,7 @@
  * Tirage : `FUN_10a8_13af`, que la fiche appelle « tirage entier » mais que le reste du moteur identifie au tirage sans remise (`NoRepeatPool`).
  * On garde un historique par type (une réplique ne revient pas avant que les autres soient passées). `noRepeat: false` donne un `rand1(n)` simple.
  */
-import { MsvcRandom, NoRepeatPool } from "../../engine/rng";
+import { MsvcRandom, NoRepeatPool } from "../../../../engine/mohawk/rng";
 
 /** Type d'erreur / de réaction (premier argument de `1058:087c`). */
 export type ErrorType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;

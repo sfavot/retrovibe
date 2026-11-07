@@ -5,7 +5,7 @@ import { keepFirstMeasure } from "../../src/games/mathemagique/audio/rhythm-rewr
 import { MidiPlayer, parsePrograms, parseSysx } from "../../src/engine/mohawk/audio/sequencer";
 import type { MidiSink } from "../../src/engine/mohawk/audio/sink";
 import { type MarkerEvent, type Song, parseSong } from "../../src/engine/mohawk/audio/smf";
-import { MsvcRandom } from "../../src/games/mathemagique/engine/rng";
+import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import {
   LEVEL_COUNT,
   PLST_SIZE,

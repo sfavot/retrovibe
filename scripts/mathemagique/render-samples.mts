@@ -17,7 +17,7 @@ import {
   applyShpl,
   createPalette,
   type Palette,
-} from "../../src/games/mathemagique/data/palette";
+} from "../../src/engine/mohawk/graphics/palette-data";
 import { decodeShap, type Shape } from "../../src/data/mohawk/shap";
 import { decodeTbmp } from "../../src/data/mohawk/tbmp";
 import { parseTpal } from "../../src/data/mohawk/tpal";

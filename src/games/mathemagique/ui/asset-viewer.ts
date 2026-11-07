@@ -10,7 +10,7 @@ import { parseMidi as parseMidiNotes } from "../../indy/audio/midi";
 import { baseName, fetchGameFiles, type GameFiles } from "../data/files";
 import { extractMidi, isMidi } from "../../../data/mohawk/midi";
 import { MohawkArchive, TAG_SCR, TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL, TAG_STRL } from "../../../data/mohawk/mohawk";
-import { applyShpl, createPalette, type Palette } from "../data/palette";
+import { applyShpl, createPalette, type Palette } from "../../../engine/mohawk/graphics/palette-data";
 import { parseScr, resolveScrResources, type ScrEvent, type ScrScript } from "../data/scr";
 import { decodeShap, type Shape } from "../../../data/mohawk/shap";
 import { parseShpl, type ShapeList } from "../../../data/mohawk/shpl";

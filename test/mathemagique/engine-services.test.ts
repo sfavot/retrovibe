@@ -4,7 +4,7 @@ import { parseSong } from "../../src/engine/mohawk/audio/smf";
 import { parseMidi } from "../../src/data/mohawk/midi";
 import { MohawkArchive, TAG_SND } from "../../src/data/mohawk/mohawk";
 import type { Shape } from "../../src/data/mohawk/shap";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import {
   GadgetManager,
   HotspotTable,
@@ -14,8 +14,8 @@ import {
   rectFromEdges,
   type GadgetSpec,
 } from "../../src/games/mathemagique/engine/gadgets";
-import { Surface } from "../../src/games/mathemagique/engine/graphics/surface";
-import { Input, type ButtonEvent, type KeyEvent, type MouseButton } from "../../src/games/mathemagique/engine/input";
+import { Surface } from "../../src/engine/mohawk/graphics/surface";
+import { Input, type ButtonEvent, type KeyEvent, type MouseButton } from "../../src/engine/mohawk/input";
 import {
   CURS_BYTES,
   CursorController,
@@ -31,13 +31,15 @@ import {
   type PickResult,
   type PointerMode,
 } from "../../src/games/mathemagique/engine/pointer";
-import { Archive } from "../../src/games/mathemagique/engine/resources";
+import { Archive } from "../../src/engine/mohawk/resources";
 import { SCR_FLAG, ScrPlayer, type ScrSoundPort } from "../../src/games/mathemagique/engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../../src/games/mathemagique/engine/scene";
 import { GRAPHICS, installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import { SoundService, type PlaySoundOptions, type SoundHandle } from "../../src/games/mathemagique/engine/sound";
 import { TestHost, runFor } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
+import { PLAY_HEIGHT, PLAY_WIDTH } from "../../src/games/mathemagique/engine/graphics/play-area";
+import { scr } from "../../src/games/mathemagique/engine/scr";
 
 // --- Archive synthétique -------------------------------------------------------------------------------------------------------
 
@@ -194,7 +196,7 @@ class RecordingSound implements ScrSoundPort {
 }
 
 function setup(options: { sound?: ScrSoundPort } = {}) {
-  const surface = new Surface();
+  const surface = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
   surface.fill(1);
   const dirty = { count: 0 };
   const player = new ScrPlayer({ surface, sound: options.sound, onDirty: () => dirty.count++ });
@@ -259,7 +261,7 @@ describe("ScrPlayer (scripts synthétiques)", () => {
 
   it("avec un fond propre (descripteur `+8`, Bowling) : aucune traînée sans le drapeau 1, le fond vient de la scène", () => {
     const { surface, player, archive } = setup();
-    const clean = new Surface();
+    const clean = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
     clean.fill(3);
     player.start(archive, 100, { background: clean });
     expect(surface.get(60, 120)).toBe(5);
@@ -536,10 +538,10 @@ describe("ScrPlayer (scripts synthétiques)", () => {
 describe("ScrPlayer (données du jeu)", () => {
   it.skipIf(!hasOriginalFiles)("MAINSCRN 1000 : 13 images, terminée au tick 98, dessin dans la zone", () => {
     const archive = new Archive("MAINSCRN.DAT", MohawkArchive.parse(readOriginal("MAINSCRN.DAT")));
-    const surface = new Surface();
+    const surface = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
     surface.fill(2);
     const player = new ScrPlayer({ surface });
-    const script = archive.scr(1000);
+    const script = scr(archive, 1000);
     expect(script.frames).toHaveLength(13);
     expect(script.duration).toBe(98);
     const anim = player.start(archive, 1000, { flags: SCR_FLAG.saveBackground | SCR_FLAG.keepMidi | SCR_FLAG.restoreBackground });
@@ -562,11 +564,11 @@ describe("ScrPlayer (données du jeu)", () => {
     const host = new TestHost();
     host.audio.unlock();
     const sound = new SoundService(host.audio);
-    const surface = new Surface();
+    const surface = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
     const player = new ScrPlayer({ surface, sound });
     const anim = player.start(archive, 1200);
     let startedAt = -1;
-    for (let t = 1; t <= archive.scr(1200).duration + 1; t++) {
+    for (let t = 1; t <= scr(archive, 1200).duration + 1; t++) {
       host.time = t * 17;
       player.tick();
       if (startedAt < 0 && host.audio.waves.length > 0) startedAt = t;
@@ -581,7 +583,7 @@ describe("ScrPlayer (données du jeu)", () => {
     const archive = new Archive("BOWLING.DAT", MohawkArchive.parse(readOriginal("BOWLING.DAT")));
     const host = new TestHost();
     const sound = new SoundService(host.audio);
-    const player = new ScrPlayer({ surface: new Surface(), sound });
+    const player = new ScrPlayer({ surface: new Surface(PLAY_WIDTH, PLAY_HEIGHT), sound });
     player.start(archive, 1203);
     expect(sound.preloadedSets).toBe(1);
   });
@@ -1047,7 +1049,7 @@ describe("GadgetManager", () => {
     ]);
     const manager = new GadgetManager({ shape: (id) => shapes.get(id) });
     const group = manager.addGroup({ records: [{ rect: { x: 20, y: 20, w: 8, h: 8 }, shapes: { hover: 1, pressed: 2 } }] });
-    const surface = new Surface();
+    const surface = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
     surface.fill(3);
     manager.captureBackground(surface);
     expect(manager.draw(surface)).toBe(false); // normal, rien à poser, rien n'a changé
@@ -1079,7 +1081,7 @@ describe("GadgetManager", () => {
     ]);
     const manager = new GadgetManager({ shape: (id) => shapes.get(id) });
     manager.addGroup({ records: [{ rect: { x: 20, y: 20, w: 8, h: 8 }, shapes: { normal: 1, pressed: 2 }, pressedRect: { x: 22, y: 22, w: 6, h: 6 } }] });
-    const surface = new Surface();
+    const surface = new Surface(PLAY_WIDTH, PLAY_HEIGHT);
     surface.fill(3);
     manager.captureBackground(surface);
     expect(manager.draw(surface)).toBe(true); // la forme normale est posée par les gadgets
@@ -1381,7 +1383,7 @@ describe("installServices (moteur complet)", () => {
 
   async function boot(onEnter: (scene: ProbeScene, services: MathServices) => void) {
     const host = new TestHost();
-    const engine = new Engine(host, { seed: 1 });
+    const engine = new MathEngine(host, { seed: 1 });
     const services = installServices(engine);
     const archive = syntheticArchive();
     const scene = new ProbeScene(() => services, archive, onEnter);

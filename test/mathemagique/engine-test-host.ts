@@ -2,11 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { AudioSink, MidiSink, PcmSound, WaveHandle } from "../../src/engine/mohawk/audio/sink";
 import { GameFiles, type GameFileEntry } from "../../src/games/mathemagique/data/files";
-import type { Engine } from "../../src/games/mathemagique/engine/engine";
-import type { Frame } from "../../src/games/mathemagique/engine/graphics/frame";
+import type { MathEngine } from "../../src/games/mathemagique/engine/engine";
+import type { Frame } from "../../src/engine/mohawk/graphics/frame";
 import type { CursorKind, Host } from "../../src/games/mathemagique/engine/host";
 import { FakeStorage } from "../support/fake-host";
-import { Input, type MouseButton } from "../../src/games/mathemagique/engine/input";
+import { Input, type MouseButton } from "../../src/engine/mohawk/input";
 
 const ORIGINAL = resolve(import.meta.dirname, "../../original/mathemagique");
 
@@ -188,7 +188,7 @@ export const FRAME_MS = 1000 / 60;
  * Simule `ms` millisecondes d'images à 60 Hz. Après chaque image attend un éventuel chargement de scène (lectures de fichiers
  * réelles), comme le ferait le navigateur entre deux images.
  */
-export async function runFor(engine: Engine, host: TestHost, ms: number, onFrame?: (elapsedMs: number) => void): Promise<void> {
+export async function runFor(engine: MathEngine, host: TestHost, ms: number, onFrame?: (elapsedMs: number) => void): Promise<void> {
   const start = host.time;
   const end = start + ms;
   while (host.time < end - 1e-9) {
@@ -201,7 +201,7 @@ export async function runFor(engine: Engine, host: TestHost, ms: number, onFrame
 }
 
 /** Simule des images jusqu'à ce que `done()` soit vrai (échoue après `limitMs`). */
-export async function runUntil(engine: Engine, host: TestHost, done: () => boolean, limitMs = 120_000): Promise<void> {
+export async function runUntil(engine: MathEngine, host: TestHost, done: () => boolean, limitMs = 120_000): Promise<void> {
   const end = host.time + limitMs;
   while (!done()) {
     if (host.time >= end) throw new Error(`condition non atteinte après ${limitMs} ms simulées`);

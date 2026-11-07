@@ -3,9 +3,9 @@
  * Rien ici ne touche au moteur : géométrie, ids de ressources, dessin des bacs et des animations d'outils, étiquettes des boutons d'outils.
  */
 import type { Shape } from "../../../data/mohawk/shap";
-import { drawShape } from "../engine/graphics/blit";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
 import type { FonFont } from "../engine/graphics/fon";
-import { Surface, type Rect } from "../engine/graphics/surface";
+import { Surface, type Rect } from "../../../engine/mohawk/graphics/surface";
 import { drawText, measureText } from "../engine/graphics/text";
 import { rectFromEdges } from "../engine/gadgets";
 import { BIN_EDGES, MEASURE, PIECE_HEIGHT, type BinId, type Tool, ghostShapeId, pieceShapeId, pieceSpan, reduceFraction } from "../game/rhythm/pieces";

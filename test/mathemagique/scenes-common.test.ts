@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import { SceneId, type Scene } from "../../src/games/mathemagique/engine/scene";
 import { installServices, type MathServices } from "../../src/games/mathemagique/engine/services";
 import { clockFrame } from "../../src/games/mathemagique/scenes/title";
@@ -44,9 +44,26 @@ describe("séquences secrètes (hub-logic)", () => {
     for (const c of keys) history.pushKey({ key: c, ctrl: false });
   }
 
-  it("connaît exactement les 12 codes décodés, avec les couples X / H de la doc", () => {
-    expect(SECRETS).toHaveLength(12);
-    for (const secret of SECRETS) {
+  // Les 7 codes dont seul le couple (X, H) est connu (`1080:0277`–`0474`) : constantes relues dans le désassemblage de `MATH`.
+  const PARTIAL: Record<number, [number, number]> = {
+    301: [0x6d60b48c, 0x0dba75e5],
+    302: [0xbd41350b, 0x0c3bb761],
+    304: [0xd5f0d14a, 0x0c5b30e8],
+    305: [0xbf033683, 0x0e7d30ee],
+    306: [0xb17e0cf4, 0x541cf0ed],
+    307: [0xb17fc87d, 0x541d37ed],
+    308: [0xb17a8c6c, 0x54187974],
+  };
+
+  it("connaît les 19 codes : 12 décodés (X / H de la doc) et 7 reconnus par leur seul couple (X, H)", () => {
+    expect(SECRETS).toHaveLength(19);
+    expect(SECRETS.map((s) => s.shpl)).toEqual([301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 315, 316, 317, 318, 319, 320]);
+    for (const secret of SECRETS.filter((s) => !s.complete)) {
+      const [x, h] = PARTIAL[secret.shpl]!;
+      expect([secret.x, secret.h]).toEqual([x, h]);
+    }
+    expect(SECRETS.filter((s) => !s.complete).map((s) => s.shpl)).toEqual(Object.keys(PARTIAL).map(Number));
+    for (const secret of SECRETS.filter((s) => s.complete)) {
       const [keys, x, h] = DOCUMENTED[secret.shpl]!;
       expect(secret.keys).toBe(keys);
       expect(secret.x).toBe(x);
@@ -65,6 +82,20 @@ describe("séquences secrètes (hub-logic)", () => {
       noisy.pushKey({ key: "a", ctrl: true });
       type(noisy, secret.keys);
       expect(noisy.match()).toBe(secret.shpl);
+    }
+  });
+
+  it("codes partiels : toute préimage de (X, H) les déclenche (préfixe d'origine non identifiable), pas une frappe voisine", () => {
+    const alternatives: Record<number, string> = { 301: "& mike", 302: "+ anna", 304: "-`blah", 305: "+ stan", 306: "nE sam", 307: "^u tom", 308: "~U art" };
+    for (const [shpl, keys] of Object.entries(alternatives)) {
+      const history = new KeyHistory();
+      type(history, keys);
+      expect(history.match()).toBe(Number(shpl));
+    }
+    for (const keys of ["mike", "anna", "blah", "stan", "e sam", "e tom", "e art"]) {
+      const history = new KeyHistory();
+      type(history, keys);
+      expect(history.match()).toBeUndefined();
     }
   });
 
@@ -193,7 +224,7 @@ describe("horloge du titre (1068:0785)", () => {
 
 interface Game {
   host: TestHost;
-  engine: Engine;
+  engine: MathEngine;
   services: MathServices;
   monitor: { mode: MonitorMode; detail: MonitorDetail | undefined }[];
 }
@@ -203,7 +234,7 @@ function boot(options: RegisterScenesOptions = {}, setup?: (host: TestHost) => v
   const host = new TestHost();
   host.audio.unlock();
   setup?.(host);
-  const engine = new Engine(host, { seed: 3 });
+  const engine = new MathEngine(host, { seed: 3 });
   const services = installServices(engine);
   const monitor: Game["monitor"] = [];
   registerScenes(engine, services, { openMonitor: (mode, detail) => monitor.push({ mode, detail }), ...options });

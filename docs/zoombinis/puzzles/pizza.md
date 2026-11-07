@@ -7,8 +7,8 @@ Confiance : **sûr** = lu dans le code ; **probable** = déduit de plusieurs ind
 ## 0. Résumé
 
 - Le joueur compose un **repas** en basculant des ingrédients (5 « pizzas » et 0 à 3 « sundaes » selon le niveau), puis le **sert**. **Chaque troll encore présent** juge le repas : *parfait* si l'ensemble d'ingrédients est **exactement** celui qu'il aime ; sinon il réagit selon qu'il y a **un seul** ingrédient de trop, **plusieurs**, ou que tout ce qui est servi est aimé mais **incomplet** (sûr).
-- Un troll parfait part. Quand tous les trolls sont partis, le bouton Continuer s'active et **tous les Zoombinis passent** d'un coup (`1168:3dd0(0,1)`). Il n'y a pas de passage partiel : si le joueur quitte autrement, **tout le groupe est perdu** (sûr pour les appels, voir §6).
-- Chaque repas **non parfait** (pour au moins un troll) entame un budget : **6 tolérés au niveau 0, 7 au niveau 1 à 3** ; le repas qui l'épuise (le 6e, resp. le 7e) met fin à l'épreuve (trolls furieux). Servir deux fois le **même** repas ne coûte rien (sûr pour le compteur, **probable** pour l'interprétation de fin).
+- Un troll parfait part (il emporte sa pizza). Quand tous les trolls sont partis, le bouton Continuer s'active et **tous les Zoombinis passent** d'un coup (`1168:3dd0(0,1)`). Il n'y a pas de passage partiel : si le joueur quitte autrement (carte), **tout le groupe est perdu** (sûr pour les appels, voir §6).
+- Les trolls présents jugent dans l'ordre (Arno, Willa, Shyler) ; **le premier troll content part et arrête la chaîne** : les suivants ne jugent pas ce repas (relu en H3, `0d85`, `8d96`). Un repas qui ne contente personne entame un budget : **6 tolérés au niveau 0, 7 aux niveaux 1 à 3**. Le repas qui épuise le budget (le 6e, resp. le 7e) fait jouer une réaction de fureur (§2.5) ; **l'épreuve n'est pas perdue pour autant** (H3, §8). Servir deux fois le **même** repas est un doublon : une seule réplique, et il coûte un repas comme un manqué (relu en H3 et après : `5091` → `4620`, voir §8).
 
 ## 1. Identification
 
@@ -68,7 +68,7 @@ si aucun ajout n'a eu lieu : (cas impossible) ajouter rand(0..3)
 - **Niveau 0** : `S_A = base`.
 - **Niveau 1** : chaque ingrédient de la base va à `S_A` ou à `S_W` selon `rand(0..1)` (pile ou face indépendant). Si les deux sont vides (base vide, impossible) un ingrédient est tiré. **Aucune garantie que les deux ensembles soient non vides** : avec `s` éléments dans la base, un troll a un ensemble vide avec la probabilité `2 × 2⁻ˢ` (25 % pour 3, 12,5 % pour 4…). Un troll à ensemble vide n'est parfait que pour un repas **vide** (point ouvert §7).
 - **Niveaux 2 et 3** : chaque ingrédient de la base va à `S_A`, `S_W` ou `S_S` selon `rand(0..2)`, puis une boucle de **réparation** déplace des ingrédients (tirés au hasard dans le plus gros ensemble qui en a au moins deux) jusqu'à ce que les **trois ensembles soient non vides** et disjoints. Résultat : une partition de la base en trois parties non vides.
-- **Niveau 3 seulement** : on repère le plus gros ensemble (comparaison stricte `A < W`, puis `W < S`, sinon `A < S` : en cas d'égalité le plus petit indice gagne), on tire **deux** ingrédients distincts `p₁, p₂` dans cet ensemble (`2a29`) et un ingrédient dans chacun des deux autres `p₃, p₄` ; `595f(p₁, p₂, p₃, p₄)` crée **quatre assiettes de départ** dans l'historique (§4.5), de repas `{p₃, p₄}`, `{p₂, p₃}`, `{p₁, p₂}`, `{p₁, p₄}` (**probable** pour l'ordre des paramètres : décompilé sans arguments).
+- **Niveau 3 seulement** : on repère le plus gros ensemble (comparaison stricte `A < W`, puis `W < S`, sinon `A < S` : en cas d'égalité le plus petit indice gagne), on tire **deux** ingrédients distincts A puis B dans cet ensemble (`2a29`), puis un ingrédient C dans le premier des deux autres ensembles (par rang) et D dans le second. `595f` est appelée `PUSH A ; PUSH C ; PUSH B ; PUSH D` (`1130:2a07`, **sûr** : lu dans le désassemblage, pas dans la décompilation qui inverse l'ordre pascal) et crée **quatre assiettes de départ** dans l'historique (§4.5), de repas `{A, C}`, `{C, B}`, `{B, D}`, `{A, D}` : un cycle où chaque ingrédient est dans deux assiettes consécutives (point ouvert 5 tranché, **sûr**).
 
 ### 2.4 Verdict d'un troll (`1130:2a9d(k)`)
 
@@ -86,14 +86,15 @@ si aucun ajout n'a eu lieu : (cas impossible) ajouter rand(0..3)
 ### 2.5 Service, doublon et fin (`1130:1803`, `0d85`, `4620`)
 
 1. **Service** : régions 3 ou 12 (§4.2), seulement si tout est au repos (`8e58 = 0` et `8d9a = 8d9c = 8d94 = 8d3a = 8d3c = 8d3e = 8d46 = 0`, `DS:seg165:02f0 ≠ 0`). `8e58 = 1`, `8e14 ← 8e04`, le premier livreur monte au comptoir si besoin (`4cb5`), puis `1e08(3)` lance l'animation du four (`SCRB` 7057/7058 selon le niveau) et remet les bascules à zéro (`55d9`).
-2. **Doublon** (`1130:3b38`) : on compare le masque du repas aux masques de l'**historique** (`8e26[0…8e42]`, 1 octet par repas servi). S'il existe déjà : `8dae = 1`, **pas de nouveau verdict** : chaque troll dont le dernier verdict calculé est 1 réagit par `5091(1, k)` (grognement), les autres sont ignorés ; le repas **ne compte pas** dans le budget.
-3. **Nouveau repas** : chaque troll présent (état 1) réagit à tour de rôle (Arno, Willa, Shyler : le Tick enchaîne `2c0b(0,0)`, `(1,1)`, `(2,2)` quand l'animation du précédent est finie) avec la réaction du §5. Verdict 2 : le troll passe à l'état 2 (« content ») puis 3 (« parti ») ; verdicts 0, 1, 4 : `8d38 = k + 1`.
-4. Si `8d38 ≠ 0` à la fin de la chaîne (au moins un troll insatisfait), `4620` : `8d5a −= 1` ; si le résultat vaut 0 : `8d82 = 1`. Tant que `8d82 = 0` le jeu continue (le repas est ajouté à l'historique par `3aa6`, le livreur revient) ; quand le compteur est épuisé, le troll suivant joue la réaction de fureur (`SCRB` 8022 + `8d80`, 9029, 10029, état `8df6`) et l'épreuve est **perdue** : plus de nouveau repas utile, `8d20` reste 0 (Continuer grisé).
-5. Quand tous les trolls présents sont à l'état ≥ 2 (`8d9c = 1`, posé par `2c0b`) : `3893` joue la scène de départ (`SCRB` 8024…8031, 9030…9033, 10035…10037 selon la composition ; ids du §5), `8d20 = 1` : **Continuer actif**.
+2. **Doublon** (`1130:3b38`) : on compare le masque du repas aux masques de l'**historique** (`8e26[0…8e42]`, 1 octet par repas servi). S'il existe déjà : `8dae = 1`, **pas de nouveau verdict** : chaque troll dont le dernier verdict calculé est 1 réagit par `5091(1, k)` (grognement), les autres sont ignorés ; **dans le port** le repas ne compte pas dans le budget (le code lu le fait passer par `4620`, §8.2).
+3. **Nouveau repas** : chaque troll présent (état 1) réagit à tour de rôle (Arno, Willa, Shyler : le Tick enchaîne `2c0b(0,0)`, `(1,1)`, `(2,2)` quand l'animation du précédent est finie) avec la réaction du §5. Verdict 2 : le troll passe à l'état 2 (« content ») puis 3 (« parti ») et **la chaîne s'arrête** (les trolls suivants ne jugent pas ce repas, §8.2) ; verdicts 0, 1, 4 : `8d38 = k + 1`.
+4. Si `8d38 ≠ 0` à la fin de la chaîne (au moins un troll a réagi sans être content et aucun troll n'est devenu content : un troll content remet `8d38` à 0), `4620` : `8d5a −= 1`, `8d80` = « il restait du budget avant ce repas », `8d82` = 1 si le résultat vaut 0. Tant que `8d82 = 0` et `8d80 ≠ 0` (budget restant après ce repas ≥ 1) : le livreur revient à la file (`4571`) ; sinon (épuisement, ou déjà épuisé) **le premier troll présent** joue `SCRB` 8022 + `8d80` (Arno ; 9028 + `8d80` Willa ; 10032 + `8d80` Shyler), le livreur ne revient pas, et `8d82` retombe à 0. **Rien d'autre ne lit `8d5a` ni `8d82` dans le code** : après l'épuisement le jeu continue (le service n'est pas bloqué, `1130:1803` case 3 ne le teste pas), chaque repas manqué joue 8022 (`8d80 = 0`).
+5. Quand tous les trolls présents sont à l'état ≥ 2 (`8d9c = 1`, posé par `2c0b`) : le dernier content joue d'abord son départ (`SCRB` 8021 / 9027 / 10031, `0d85`), puis `3893` joue la scène de départ (`SCRB` 8024…8031, 9030…9033, 10034…10037 selon la composition ; ids du §5), `8d20 = 1` : **Continuer actif**.
+6. Un repas non parfait (ou un doublon) lance l'assiette : `415d` joue `SCRB` 8020 / 9026 / 10030 sur le dernier troll qui a réagi (celui du premier verdict « incomplet », `8daa`, s'il y en a un), `3aa6` range le repas dans l'historique et `478e` pose l'assiette (§4.5). **Les repas parfaits n'entrent pas dans l'historique.**
 
-Donc **budget d'erreurs** : le 6e repas non parfait (niveau 0) ou le 7e (niveaux 1 à 3) termine l'épreuve ; 5 (resp. 6) erreurs sont tolérées. (Sûr pour le calcul ; que le dernier repas manqué soit *fatal* est **probable** : après lui, la seule issue observée dans le code est la carte.)
+Donc **budget** : seul un repas qui ne contente aucun troll coûte ; le 6e (niveau 0) ou le 7e (niveaux 1 à 3) le fait tomber à 0 et joue la fureur ; 5 (resp. 6) repas manqués sont donc « tolérés » sans fureur.
 
-Livreur (`4cb5`, `DS:8d10` = rang, `1b6c` = objet) : le premier Zoombini de la file (`DS:0000…`, liste d'ids du groupe) monte au comptoir (`+0x28 = 2`, position `DS:1b6e`) ; l'avancement au suivant n'est déclenché que si `DS:8d14 ≠ 0`, drapeau qui n'est **jamais posé** dans le code lu : **probable** que le même Zoombini porte tous les plateaux (point ouvert).
+Livreur (`4cb5`, `DS:8d10` = rang, `1b6c` = objet) : le premier Zoombini de la file (`DS:0000…`, liste d'ids du groupe) monte au comptoir (`+0x28 = 2`, position `DS:1b6e`) ; l'avancement au suivant n'est déclenché que si `DS:8d14 ≠ 0`, drapeau qui n'est **jamais posé** (cinq occurrences de `[0x8d14]` dans tout `disasm.txt`, toutes des lectures ou la remise à 0) : **sûr** que le même Zoombini (le premier du groupe) porte tous les plateaux (point ouvert 3 tranché). Il monte au comptoir (`DS:1b6e`, `+0x116 / +0x118` = (x, y)) au premier repas et revient à la file après chaque repas tant que le budget n'est pas épuisé (`4571`) ; son départ est jamais « perdu » (aucun Zoombini n'est perdu dans cette épreuve).
 
 ## 3. Les quatre niveaux
 
@@ -202,10 +203,55 @@ Détail de la logique : [../screens.md](../screens.md) §1.2, §3.4.
 
 ## 7. Points ouverts
 
-1. Ensemble aimé **vide** au niveau 1 (probabilité 8 à 25 % selon la taille de la base) : le comportement d'origine (servir un plateau vide ?) n'a pas été observé ; l'algorithme est lu tel quel.
-2. Les ingrédients : noms (pepperoni, champignons… ; sundaes), appariement indice → image et rôle de `8d5c`, `8d64` (aucune lecture utile).
-3. Livreur : un seul Zoombini porte-t-il tous les plateaux (`8d14` jamais posé) ou le suivant du groupe prend-il le relais ? Nombre exact de repas par Zoombini non établi.
-4. Effet exact du repas qui épuise le budget (`8d82`) : la chaîne `8df6`, `8d9a`, `4de0`, `4ff7` n'a été lue que partiellement ; la fin de l'épreuve (trolls furieux, plus de Continuer) est **probable**.
-5. Ordre exact des paramètres de `595f` au niveau 3 ; association des plages sonores 7000–7009, 11000–11007, 12000–12004, 13000–13008, 14000, 15000–15006.
-6. Clic id 13 (glisser un Zoombini) : code mort ou activé par un autre chemin (`8d22`) ; `1130:5ea9` (« bctwo.mhk ») : préchargement du camp suivant, non vérifié.
-7. Associations Arno = troll 0, Willa = 1, Shyler = 2 à confirmer sur les `SCRB` (8032, 9034, 10038).
+Tranchés en H3 (détail et écarts en §8) :
+
+1. Ensemble aimé **vide** au niveau 1 : repris tel quel (un troll sans ingrédient aimé n'est content que d'un repas vide) ; le robot sert alors le repas vide.
+2. Les ingrédients : noms (pepperoni, champignons… ; sundaes), appariement indice → image : voir §8 (couches de la pizza) ; rôle de `8d5c`, `8d64` : résidus, aucune lecture utile.
+3. Livreur : le premier Zoombini du groupe porte tous les plateaux (`8d14` jamais posé).
+4. Budget épuisé : fureur puis réaction grognon, le jeu continue (pas de défaite codée).
+5. `595f` : A, C, B, D (§2.3). Plages sonores 7000–7009 (clic des boutons, four), 12000–12004 (assiettes), 15000–15006 (voix du narrateur à l'entrée, `1130:5358`) : attribuées ; 11000–11007, 13000–13008, 14000 : non utilisées par ce code.
+7. Trolls : le rang `k` relie `8dc0 + 16 k` / `8d52 + 2 k` / `SCRB` 8032, 9034, 10038 / banques 8000, 9000, 10000 (**sûr**) ; les noms Arno, Willa, Shyler viennent de la table de débogage `1130:3355` (**probable** pour le nom).
+
+Restent ouverts :
+
+6. Clic id 13 (glisser un Zoombini) : code mort (`8d22` jamais incrémenté) ; `1130:5ea9` (« bctwo.mhk ») : préchargement du camp suivant, non vérifié.
+8. Événements `e33`, `e61`, `e62`, `e100` des `SCRB` (table de `1130:367c` / `42dd` à `DS:3883` / `4545`, absente du corpus) : leur effet (probablement des points de synchronisation entre le four, la pizza et le livreur) n'est pas porté.
+9. Places d'attente des Zoombinis (`1478:0a04`, 16 points) et position du comptoir (`DS:1b6e`) : tableaux du segment de données, absents du corpus.
+
+## 8. Tâche H3 : décisions et écarts
+
+Écran : `scenes/puzzles/pizza.ts` (`createPizzaScene`), règles : `game/puzzles/pizza.ts`, tests : `test/zoombinis/puzzles/pizza.test.ts`.
+
+### 8.1 Décisions des points ouverts
+
+- **1 (ensemble vide)** : l'original ne corrige rien (`2669`, niveau 1). Environ une graine sur dix. Un ensemble vide n'est parfait que pour un repas vide (`2a9d` : aucun ingrédient de trop, `bon = n = 0`) ; servir un seul ingrédient donne « un de trop ». Le robot le sait.
+- **3 (livreur)** : voir §2.5.
+- **4 (budget)** : voir §2.5 ; l'étude y voyait une défaite (Continuer grisé) : le code n'en pose aucune.
+- **5 (`595f`)** : voir §2.3.
+- **7 (trolls)** : voir §7.
+
+### 8.2 Corrections de l'étude
+
+- **Chaîne de jugement** : le premier troll content part **et les suivants ne jugent pas** ce repas ; le repas ne coûte rien dès qu'un troll est content (`8d38` remis à 0 par les branches « content » de `0d85`). L'étude écrivait « non parfait pour au moins un troll ». Comme les ensembles sont disjoints, au plus un troll est content par repas, donc seule change la liste des réactions jouées.
+- **Historique** : seuls les repas **manqués** (et les 4 assiettes de départ) y entrent (`3aa6` est appelée par `415d` et `595f`, jamais pour un repas parfait). Un repas parfait ne peut donc pas être un doublon.
+- **Doublon** : le code (`5091` pose `8d38`, puis `4620`) le fait coûter comme un repas manqué. L'étude le disait gratuit ; le port suit le code (`PizzaOptions.duplicateCostsBudget` vrai par défaut, faux = ancienne lecture).
+- **Ordre des répliques** : `5091` (doublon) joue l'incomplet du premier troll au verdict 1 (`8000 + 8df0`, sans avancer le compteur) ; sinon un troll tiré (`rand(1)`, `rand(2)` ou `rand(1) × 2` selon les présents) joue `8015 + rand(1)`, `9017 + rand(1)` ou `10027 + rand(2)`.
+- **`8d9a`** n'est pas « fureur » mais l'état « réplique d'attente en cours » (`4de0`) ; la fureur est `8df6`.
+- **Historique limité à 28** : le 29e repas écrirait au-delà de `8e26` dans l'original ; le port n'a pas de limite.
+
+### 8.3 Ce que l'écran montre (scripts relus)
+
+- **Entrée** : narrateur (`5358`, code 0 à 4 selon `1168:5c57` (mémoire de dialogue, `dialogChoice`) et un tirage `rand(100)` : 0 → voix 15005 puis 15006 ; 1 → 15000, 15001 ; 2 → 15002 ; 3 → 15003, 15004 ; 4 → 15003 à 15006 ; **probable** pour l'enchaînement), présentations des trolls (`SCRB` 8032, 9034, 10038, chacun joué à son tour : `4ec8`), puis une réplique d'attente (`4de0` : 8014 ; 9019 + `rand(1)` ; 10001 + `rand(7)`).
+- **Boutons d'ingrédients** : `SCRB` `base + 2 × rang + état` (bases 7005, 7015, 7027, 7041 ; au niveau 1 le rang des sundaes est décalé de 1 : le bouton 4 n'existe pas), image et clic sonore dans le script. La pizza dans le four (`SCRB` 7001 + niveau, `1130:1c58`) n'affiche que les parties des ingrédients basculés : parties 57 à 61 = ingrédients 0 à 4, 67 à 69 = ingrédients 5 à 7 (`1130:1ce0`).
+- **Couches de pizza** (`1130:3bbf`, parties d'une planche de troll 152 à 191, de l'assiette 1 à 40, quatre variantes par couche) : couche 0 = base, 1 à 5 = ingrédients 4 à 0, 6 = base des sundaes (hors niveau 0), 7 à 9 = ingrédients 7 à 5. Le départ d'un troll montre la pizza de **ses** ingrédients aimés ; la pizza servie sur la table et le lancer d'assiette montrent le **repas servi** (**probable** : les filtres `245f`, `2296`, `3d89` sont hors du désassemblage exporté, déduits de `3bbf`).
+- **Service** : porte du four 7057 / 7058, four 7066, la pizza part du four (`SCRB` 12000) puis traverse jusqu'à la table (12001), tous deux avec les couches du repas ; le livreur monte au comptoir en même temps que le four. **Choix** : le port les enchaîne (four, puis 12000, puis 12001) ; l'original les synchronise sur les événements des scripts.
+- **Content** : réplique parfaite, puis le troll part avec sa pizza (8021, 9027, 10031) ; le livreur revient tout de suite. **Manqué** : réactions de chaque troll (§5), puis le lanceur joue 8020 / 9026 / 10030 et l'assiette tombe (12025 à 12040 pour les communes, 12016 à 12024 pour les trolls) ; au-delà de 15 assiettes communes les emplacements sont réutilisés (`478e`).
+- **Fin** : scène de départ (`3893`) ; « go » est actif dès qu'elle démarre ; la voix de réussite (20055 à 20063) suit la scène d'Arno. Boutons carte et « go » : planche `tBMP` 6000 (images 5 / 6 et 1 / 2 / 3), dessinés dans le fond aux rectangles des régions 1 et 2. « Go » : `markAll(true)` puis `pressGo` (marche de sortie vers (690, 250)).
+
+### 8.4 Écarts de l'écran
+
+- Places d'attente : une rangée de 34 pixels en bas (`y = 458`), le livreur à gauche ; comptoir en (247, 338) : le tableau `1478:0a04` et `DS:1b6e` ne sont pas dans le corpus (point 9). Le glisser-déposer est coupé (région 13 inerte).
+- Pas d'ordre de profondeur fin (`2a0a`) entre le livreur, la pizza et les trolls : profondeurs fixes.
+- Les événements `e33`, `e61`, `e62`, `e100` ne sont pas interprétés (point 8).
+- Aucune musique (`PUZZLE_MUSIC[9]` est nul). Aucun texte à l'écran.
+- La marche de sortie va en ligne droite vers (690, 250) (l'original suit `NODE` / `PATH` 1000).

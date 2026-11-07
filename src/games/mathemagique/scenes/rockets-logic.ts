@@ -8,7 +8,7 @@
  * (`1070:0932` écrit `serieEnfant` au lieu de `seriePoly`, §1.5). Décision de la vague H : reproduit. L'interrupteur est
  * `RocketsRules.polyStreakResets` (défaut `false` = fidèle ; `true` = corrigé, symétrique de l'enfant).
  */
-import { NoRepeatPool, type MsvcRandom } from "../engine/rng";
+import { NoRepeatPool, type MsvcRandom } from "../../../engine/mohawk/rng";
 import type { ScrClip } from "../data/scr";
 
 /** Ce que la logique demande au hasard : `range(lo, hi)` = `1018:04e1`, bornes incluses (`MsvcRandom` convient). */

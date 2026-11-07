@@ -63,7 +63,12 @@ Réimplémentation du moteur d'*Indiana Jones and his Desktop Adventures* (Lucas
   référencé dans `registry.ts`. Les routes sont `#/` (accueil) et `#/<id>` (jeu). Indy est dans `src/games/indy/`.
 - `src/games/indy/ui/` — interface d'Indy (écran titre, vue de jeu, bulles, inventaire, carte). Ses textes sont dans `copy.ts`.
 - `src/ui/` — éléments communs : page d'accueil, helper DOM, styles, textes de l'accueil.
-- `src/engine/mohawk/` et `src/ui/mohawk/` — audio partagé des jeux Mohawk (Mathémagique, Zoombinis) : séquenceur MIDI, lecteur SMF, `AudioSink` et inventaire des timbres (`engine/mohawk/audio/`), `AudioSink` du navigateur (`ui/mohawk/web-sink.ts`).
+- `src/engine/mohawk/` et `src/ui/mohawk/` — le moteur commun des jeux Mohawk (Mathémagique, bientôt Zoombinis) : cœur pur (`Engine`, scènes, horloge de 17 ms, entrées, hasard, cache d'archives, `Host`), graphismes indexés (`graphics/` : surface, palette, blit, `Frame`), audio (`audio/` : séquenceur MIDI, lecteur SMF, `AudioSink`, inventaire des timbres) et, côté navigateur, l'hôte (`browser-host.ts`), le présentateur du canvas et la sortie audio Web Audio ; chaque jeu fournit ses écrans, ses curseurs et la taille de sa zone de jeu.
+
+### Choix
+
+- **Sauvegardes** : seule la sauvegarde automatique du navigateur existe. Les sauvegardes `.WLD` de l'original (signature `INDYSAV44`) ne sont ni lues ni écrites, et ne le seront pas (décision du 2026-10-27).
+- **Musique** : `THEMW3.MID` n'est jamais joué ; l'original ne l'utilise que sous Windows 3.x, à la place de `THEME.MID` (voir `engine/assets.ts`).
 
 ## Lost in Time
 

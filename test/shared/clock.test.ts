@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FixedStepClock } from "../../src/engine/clock";
-import { Clock as MathClock, MAX_CATCH_UP_TICKS, TICK_MS, msToTicks } from "../../src/games/mathemagique/engine/clock";
+import { Clock as MathClock, MAX_CATCH_UP_TICKS, TICK_MS, msToTicks } from "../../src/engine/mohawk/clock";
 import { Clock as SmurfClock } from "../../src/games/teleportaschtroumpf/engine/clock";
 
 function drain(clock: FixedStepClock): number {

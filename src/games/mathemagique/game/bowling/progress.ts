@@ -6,7 +6,7 @@
  * roster que dans `load` et `save`.
  */
 import { DEFAULT_BOWLING_TICKS, type Roster, achievementBit, gradeOfMask, maskHas } from "../../engine/roster";
-import type { MsvcRandom } from "../../engine/rng";
+import type { MsvcRandom } from "../../../../engine/mohawk/rng";
 import { BONUS, CORRECT_PER_STRIKE, LEVEL_COUNT, STRIKES_PER_LEVEL, STRIKE_THRESHOLDS, SUBTYPE_COUNTS } from "./tables";
 
 const OPERATIONS = SUBTYPE_COUNTS.length;

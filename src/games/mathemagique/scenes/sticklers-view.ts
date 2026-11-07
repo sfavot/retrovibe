@@ -4,8 +4,8 @@
  */
 import type { Shape } from "../../../data/mohawk/shap";
 import type { ShapeList } from "../../../data/mohawk/shpl";
-import { hitTestShape } from "../engine/graphics/blit";
-import type { Rect } from "../engine/graphics/surface";
+import { hitTestShape } from "../../../engine/mohawk/graphics/blit";
+import type { Rect } from "../../../engine/mohawk/graphics/surface";
 import { rectFromEdges } from "../engine/gadgets";
 import { edgesToRect, stickBounds, type StickPiece } from "../game/puzzle-kit";
 

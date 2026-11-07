@@ -4,9 +4,9 @@
  */
 import { describe, expect, it } from "vitest";
 import { TAG_SCR, TAG_SHAP, TAG_SND, MohawkArchive } from "../../src/data/mohawk/mohawk";
-import { Engine } from "../../src/games/mathemagique/engine/engine";
-import { Archive } from "../../src/games/mathemagique/engine/resources";
-import { MsvcRandom, NoRepeatPool } from "../../src/games/mathemagique/engine/rng";
+import { MathEngine } from "../../src/games/mathemagique/engine/engine";
+import { Archive } from "../../src/engine/mohawk/resources";
+import { MsvcRandom, NoRepeatPool } from "../../src/engine/mohawk/rng";
 import { SceneId, type Scene } from "../../src/games/mathemagique/engine/scene";
 import { installServices } from "../../src/games/mathemagique/engine/services";
 import { ROCKETS_POLY, polyScriptIds } from "../../src/games/mathemagique/game/poly-config";
@@ -51,6 +51,7 @@ import {
 import { createRocketsScene, type RocketsScene } from "../../src/games/mathemagique/scenes/rockets";
 import { TestHost, runFor, runUntil } from "./engine-test-host";
 import { hasOriginalFiles, readOriginal } from "./helpers";
+import { scr } from "../../src/games/mathemagique/engine/scr";
 
 const seq = (n: number, count: number, seed = 0): number[] => {
   const rng = new MsvcRandom(seed);
@@ -336,13 +337,13 @@ describe.skipIf(!hasOriginalFiles)("données réelles de NIM.DAT", () => {
       21: { 7: 3, 19: 3, 17: 6, 15: 6, 16: 3 },
     };
     for (let total = 11; total <= 21; total++) {
-      const layout = parseLayout(a.scr(layoutScrId(total)), total);
+      const layout = parseLayout(scr(a, layoutScrId(total)), total);
       expect(layout).toHaveLength(total);
       const counts: Record<number, number> = {};
       for (const cell of layout) counts[cell.type] = (counts[cell.type] ?? 0) + 1;
       expect(counts).toEqual(composition[total]);
     }
-    const first = parseLayout(a.scr(30021), 11);
+    const first = parseLayout(scr(a, 30021), 11);
     expect(first.slice(0, 3).map((c) => [c.x, c.y])).toEqual([
       [122, 163],
       [97, 188],
@@ -368,7 +369,7 @@ describe.skipIf(!hasOriginalFiles)("données réelles de NIM.DAT", () => {
     const a = archive();
     const clip = flightClip({ x: 122, y: 163 }, 7);
     expect(clip).toEqual({ left: 122 - ROCKET_OFFSET_X[7]!, right: 122 - ROCKET_OFFSET_X[7]! + 72, bottom: 163 + ROCKET_OFFSET_Y[7]!, top: 163 + ROCKET_OFFSET_Y[7]! - 354 });
-    const script = a.scr(flightScrId(7));
+    const script = scr(a, flightScrId(7));
     expect(script.frames).toHaveLength(21);
     expect(script.duration).toBe(105);
   });
@@ -382,7 +383,7 @@ describe.skipIf(!hasOriginalFiles)("données réelles de NIM.DAT", () => {
 
   it("test de clic : un pixel opaque touche, un pixel hors masque traverse ; l'indice le plus élevé est devant", () => {
     const a = archive();
-    const layout = parseLayout(a.scr(layoutScrId(11)), 11);
+    const layout = parseLayout(scr(a, layoutScrId(11)), 11);
     const slots = slotsFromLayout(layout);
     const mask = (type: number) => a.shap(rocketMaskId(type));
     for (let i = 0; i < slots.length; i++) {
@@ -416,7 +417,7 @@ describe.skipIf(!hasOriginalFiles)("données réelles de NIM.DAT", () => {
 
 interface Rig {
   host: TestHost;
-  engine: Engine;
+  engine: MathEngine;
   scene: RocketsScene;
   archive: Archive;
   hubEntered: () => boolean;
@@ -427,7 +428,7 @@ interface Rig {
 
 async function boot(seed = 0): Promise<Rig> {
   const host = new TestHost();
-  const engine = new Engine(host, { seed });
+  const engine = new MathEngine(host, { seed });
   const services = installServices(engine);
   const scene = createRocketsScene(services);
   let hub = false;

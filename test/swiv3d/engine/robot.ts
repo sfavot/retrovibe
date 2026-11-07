@@ -3,6 +3,11 @@
  * d'objectifs dans l'ordre (9 -> 0) avec ses armes réelles. Aucune triche : pas de téléportation, pas de modification de l'état.
  *
  * Direction : le cap `yaw` (512 pas par tour) pointe vers `(sin yaw, cos yaw)` en (x, z) ; tourner à droite augmente le cap.
+ *
+ * Priorités : véhicule au sol, objectif que son trajet atteint sans mur, puis Super Ressort à ramasser, puis plate-forme ; bonus
+ * d'énergie quand l'énergie baisse ; ennemi qui vise le joueur et tire ; objectif du groupe de tête. Esquive (hélicoptère) : au combat,
+ * consigne de vitesse qui tourne autour de la cible (les tirs ennemis visent la position du moment, sans anticipation), et écart
+ * latéral devant tout projectile ennemi qui passerait près. Le véhicule au sol qui cale sur une pente saute au Super Ressort.
  */
 import type { PlayerInput } from "../../../src/games/swiv3d/engine/input";
 import { emptyInput } from "../../../src/games/swiv3d/engine/input";
@@ -12,14 +17,14 @@ import type { World } from "../../../src/games/swiv3d/engine/world";
 import { GroundField } from "./ground-planner";
 
 /** Distance (unités) à laquelle le pilote cesse d'avancer et se contente de tirer. */
-const STANDOFF = 260;
+const STANDOFF = 400;
 /** Portée de tir : une balle vole 28 à 30 ticks à 31 unités par tick. */
 const FIRE_RANGE = 640;
 /** Véhicule au sol : il tire depuis le bord (sous la portée de 640) au lieu de descendre dans une cuvette dont il ne sortirait plus. */
 const GROUND_STANDOFF = 480;
-/** Fenêtre de contrôle de blocage (ticks) et déplacement minimal attendu (unités). */
 /** Écart minimal (ticks) entre deux tirs spéciaux. */
 const SPECIAL_GAP = 40;
+/** Fenêtre de contrôle de blocage (ticks) et déplacement minimal attendu (unités). */
 const STUCK_WINDOW = 120;
 const STUCK_MIN_MOVE = 40;
 /** Durée (ticks) d'une manœuvre de dégagement. */
@@ -55,10 +60,40 @@ export interface TargetInfo {
   pickup: boolean;
 }
 
+/** Portée (unités) à laquelle un ennemi qui vise le joueur devient la cible ; au-delà de THREAT_GIVE_UP ticks sans l'abattre, il est
+ * ignoré pendant THREAT_IGNORE ticks (un char d'une fabrique en remplace un autre sans fin). */
+const THREAT_RANGE = 700;
+const THREAT_GIVE_UP = 400;
+const THREAT_IGNORE = 1500;
+/** Tireur : un programme d'arme (100 à 999), ou l'hélicoptère kamikaze `4001` qui percute. */
+const isShooter = (o: GameObject): boolean => o.type === 4001 || (o.subtype >= 100 && o.subtype < 1000);
+
+/** Combat de l'hélicoptère : distance (unités) sous laquelle il suit la consigne de vitesse, vitesse d'approche maximale et vitesse
+ * latérale de l'orbite (unités/tick), période (ticks) du changement de sens, tolérance (unités/tick) du suivi en tout ou rien. */
+const COMBAT_RANGE = 1200;
+const APPROACH = 8;
+const ORBIT = 7;
+const ORBIT_FLIP = 400;
+const DEADBAND = 1.5;
+/** Esquive : distance de passage (unités) d'un projectile ennemi qui déclenche l'écart, horizon de prévision (ticks). */
+const DODGE = 60;
+const DODGE_HORIZON = 25;
+
+/** Véhicule au sol : coût de trajet (`GroundField`) sous lequel il attaque l'objectif au lieu de rejoindre une plate-forme (un mur
+ * ou une traversée d'eau coûtent bien plus). */
+const REACHABLE = 600;
+/** Véhicule au sol : fenêtre (ticks) sans baisse du coût restant du trajet, et baisse minimale qui compte comme un progrès. */
+const PROGRESS_WINDOW = 250;
+const PROGRESS_MIN = 5;
+/** Super Ressort (arme spéciale 9, bonus 1009) : durée maximale de la manœuvre (ticks), cases du trajet visées par le saut. */
+const JUMP_SLOT = 9;
+const JUMP_TICKS = 200;
+const JUMP_LOOKAHEAD = 30;
+
 /** Sous ce niveau d'énergie, le pilote fait un détour par le bonus d'énergie (codes 100 à 102) le plus proche. */
-const LOW_ENERGY = 400;
+const LOW_ENERGY = 450;
 /** Distance maximale (unités) d'un détour. */
-const PICKUP_RANGE = 5000;
+const PICKUP_RANGE = 12000;
 
 export class Robot {
   /** Blocages détectés (position quasi inchangée alors que la cible est loin). */
@@ -73,9 +108,19 @@ export class Robot {
   pickups = 0;
   private history: { x: number; z: number }[] = [];
   private unstuckLeft = 0;
+  private jumpLeft = 0;
+  /** Sauts au Super Ressort. */
+  jumps = 0;
   private unstuckDir = 1;
   private tick = 0;
   private field: { goal: GameObject; field: GroundField } | null = null;
+  private threatObj: GameObject | null = null;
+  /** Objectifs que le véhicule au sol peut rejoindre par son trajet (calculé une fois par cible). */
+  private readonly reachable = new Map<GameObject, boolean>();
+  /** Meilleur coût restant atteint sur le trajet courant (véhicule au sol), et depuis quand. */
+  private progress: { goal: GameObject; best: number; since: number } | null = null;
+  private threatSince = 0;
+  private readonly ignored = new Map<GameObject, number>();
 
   constructor(private readonly world: World) {}
 
@@ -150,13 +195,117 @@ export class Robot {
     return info;
   }
 
+  /** Véhicule au sol sans Super Ressort : le bonus 1009 le plus proche (révélé par le groupe 9, `7002`), pour sauter un mur. */
+  private jumpGoal(): TargetInfo | null {
+    const w = this.world;
+    if (w.player.form === 0 || w.player.form === 3 || (w.game.ammo[JUMP_SLOT] ?? 0) > 0) return null;
+    const p = w.player.obj;
+    let best: TargetInfo | null = null;
+    for (const o of w.liveObjects()) {
+      if (o.subtype !== 1000 + JUMP_SLOT || o.update === "static" || o.state !== 0 || o.type !== 0) continue;
+      const info = this.info(o, -1, p);
+      info.pickup = true;
+      if (!best || info.distance < best.distance) best = info;
+    }
+    return best;
+  }
+
+  /**
+   * Menace : l'ennemi vivant le plus proche qui vise le joueur (`+0x58`) et tire, à portée. Le robot l'abat avant de reprendre les
+   * objectifs (les tourelles et les avions `4002` tirent en continu sur leur cible) ; projectiles, éclats et objets dépeuplables
+   * (`classe & 0x68`, dont les chars des fabriques) exclus.
+   */
+  private threat(): TargetInfo | null {
+    const w = this.world;
+    const p = w.player.obj;
+    if (this.threatObj && (this.threatObj.classe === 0 || this.threatObj.target !== p)) this.threatObj = null;
+    if (this.threatObj && this.tick - this.threatSince > THREAT_GIVE_UP) {
+      this.ignored.set(this.threatObj, this.tick + THREAT_IGNORE);
+      this.threatObj = null;
+    }
+    let best: TargetInfo | null = null;
+    for (const o of w.liveObjects()) {
+      if (o.target !== p || o === p || o.hp <= 0 || o.classe & 0x68 || !(o.classe & 0x1000)) continue;
+      if (!isShooter(o)) continue;
+      if ((this.ignored.get(o) ?? 0) > this.tick) continue;
+      const info = this.info(o, -3, p);
+      if (o === this.threatObj && info.distance < THREAT_RANGE * 1.3) return info;
+      if (info.distance < THREAT_RANGE && (!best || info.distance < best.distance)) best = info;
+    }
+    if (best && best.obj !== this.threatObj) {
+      this.threatObj = best.obj;
+      this.threatSince = this.tick;
+    }
+    return best;
+  }
+
+  /**
+   * Esquive de l'hélicoptère : parmi les projectiles ennemis (classe `0x3b`), celui qui passera le plus tôt à moins de DODGE unités
+   * du joueur (trajectoires rectilignes relatives) ; le robot glisse alors du côté opposé à sa ligne de vol, en remplaçant la consigne
+   * latérale.
+   */
+  private dodge(inp: PlayerInput): void {
+    const w = this.world;
+    const p = w.player.obj;
+    let soonest = Infinity;
+    let side = 0;
+    for (const o of w.liveObjects()) {
+      if (o.classe !== 0x3b) continue;
+      const rx = torusDelta(o.x, p.x) / 256;
+      const ry = (o.y - p.y) / 256;
+      const rz = torusDelta(o.z, p.z) / 256;
+      if (Math.abs(rx) > 900 || Math.abs(rz) > 900) continue;
+      const vx = (o.vx - p.vx) / 256;
+      const vy = (o.vy - p.vy) / 256;
+      const vz = (o.vz - p.vz) / 256;
+      const v2 = vx * vx + vy * vy + vz * vz;
+      if (v2 < 1) continue;
+      const tc = -(rx * vx + ry * vy + rz * vz) / v2;
+      if (tc < 0 || tc > DODGE_HORIZON || tc >= soonest) continue;
+      const mx = rx + vx * tc;
+      const my = ry + vy * tc;
+      const mz = rz + vz * tc;
+      if (mx * mx + my * my + mz * mz > DODGE * DODGE) continue;
+      soonest = tc;
+      // côté du joueur par rapport à la ligne du projectile, dans le plan : signe de (v × r) en y ; aller de ce côté
+      const cross = vx * -rz - vz * -rx;
+      // droite de l'appareil : (cos cap, -sin cap) ; la direction d'écart est la perpendiculaire à v du côté du joueur
+      const a = (p.yaw * 2 * Math.PI) / 512;
+      const ex = cross > 0 ? -vz : vz;
+      const ez = cross > 0 ? vx : -vx;
+      side = ex * Math.cos(a) - ez * Math.sin(a) > 0 ? 1 : -1;
+    }
+    if (side === 0) return;
+    inp.strafeRight = side > 0;
+    inp.strafeLeft = side < 0;
+  }
+
+  /**
+   * Véhicule au sol : la cible d'objectif si le trajet du véhicule y mène sans franchir de mur (coût du champ sous REACHABLE) ;
+   * sinon `null` et le robot rejoint une plate-forme pour passer en hélicoptère.
+   */
+  private groundObjective(): TargetInfo | null {
+    const form = this.world.player.form;
+    if (form === 0 || form === 3) return null;
+    const t = this.target();
+    if (!t) return null;
+    let reach = this.reachable.get(t.obj);
+    if (reach === undefined) {
+      const p = this.world.player.obj;
+      const field = new GroundField(this.world.level, t.obj.x >> 8, t.obj.z >> 8);
+      reach = field.costAt(p.x / 256, p.z / 256) < REACHABLE;
+      this.reachable.set(t.obj, reach);
+    }
+    return reach ? t : null;
+  }
+
   /** Entrées du prochain tick. */
   decide(): PlayerInput {
     const inp = emptyInput();
     const w = this.world;
     const p = w.player.obj;
     this.tick++;
-    const t = this.padGoal() ?? this.pickupGoal() ?? this.target();
+    const t = this.groundObjective() ?? this.jumpGoal() ?? this.padGoal() ?? this.pickupGoal() ?? this.threat() ?? this.target();
     if (!t || w.game.endCounter >= 0) return inp;
 
     const heli = w.player.form === 0 || w.player.form === 3;
@@ -190,6 +339,35 @@ export class Robot {
         }
       }
     }
+    // véhicule au sol sur un trajet : si le coût restant n'a pas baissé depuis PROGRESS_WINDOW ticks (il monte et redescend la même
+    // pente) et qu'il a un Super Ressort, il saute vers le trajet
+    if (!heli && this.field && this.field.goal === t.obj && this.unstuckLeft === 0 && this.jumpLeft === 0) {
+      const cost = this.field.field.costAt(p.x / 256, p.z / 256);
+      if (this.progress?.goal !== t.obj || cost < this.progress.best - PROGRESS_MIN) {
+        this.progress = { goal: t.obj, best: cost, since: this.tick };
+      } else if (this.tick - this.progress.since > PROGRESS_WINDOW && (w.game.ammo[JUMP_SLOT] ?? 0) > 0) {
+        this.jumpLeft = JUMP_TICKS;
+        this.progress.since = this.tick + JUMP_TICKS;
+      }
+    }
+    if (this.jumpLeft > 0) {
+      // sélection du Super Ressort, alignement sur le trajet plus loin (le saut porte à plus de 1 000 unités), puis tir de l'arme
+      this.jumpLeft--;
+      const st = w.status;
+      const jumpErr = this.jumpError();
+      if (st.special !== JUMP_SLOT) {
+        if (this.tick % 5 === 0) inp.weaponDirect = JUMP_SLOT + 1;
+      } else if (Math.abs(jumpErr) > 4) {
+        if (jumpErr > 0) inp.turnRight = true;
+        else inp.turnLeft = true;
+        if (speed < 2) inp.forward = true;
+      } else if (st.specialArmed) {
+        inp.fireSpecial = true;
+        this.jumps++;
+        this.jumpLeft = 0;
+      } else inp.forward = speed < 2;
+      return inp;
+    }
     if (this.unstuckLeft > 0) {
       // dégagement : reculer en tournant, puis repartir
       this.unstuckLeft--;
@@ -214,6 +392,27 @@ export class Robot {
     // tir : cible dans la portée et dans le cône (une cible de 30 unités de rayon)
     const tol = Math.max(3, Math.round((Math.atan2(40, Math.max(t.distance, 1)) * 512) / (2 * Math.PI)));
     if (!t.pickup && t.distance < FIRE_RANGE && Math.abs(err) <= tol) inp.firePrimary = true;
+    // combat de l'hélicoptère : consigne de vitesse (rapprochement vers la distance de tir + orbite latérale), suivie en tout ou
+    // rien dans le repère de l'appareil ; les tirs ennemis partent vers sa position du moment, sans anticipation
+    if (heli && !t.pickup && t.distance < COMBAT_RANGE) {
+      const dir = Math.floor(this.tick / ORBIT_FLIP) % 2 === 0 ? 1 : -1;
+      const ux = t.dx / Math.max(1, t.distance);
+      const uz = t.dz / Math.max(1, t.distance);
+      const radial = Math.max(-6, Math.min(APPROACH, (t.distance - STANDOFF) / 20));
+      // tangente (à droite de la direction de la cible) : (uz, -ux)
+      const wantX = ux * radial + uz * ORBIT * dir;
+      const wantZ = uz * radial - ux * ORBIT * dir;
+      const ex = wantX - p.vx / 256;
+      const ez = wantZ - p.vz / 256;
+      const a = (p.yaw * 2 * Math.PI) / 512;
+      const fwd = ex * Math.sin(a) + ez * Math.cos(a);
+      const right = ex * Math.cos(a) - ez * Math.sin(a);
+      inp.forward = fwd > DEADBAND;
+      inp.back = fwd < -DEADBAND;
+      inp.strafeRight = right > DEADBAND;
+      inp.strafeLeft = right < -DEADBAND;
+    }
+    if (heli) this.dodge(inp);
     if (!t.pickup) this.special(inp, t, err);
     return inp;
   }
@@ -237,11 +436,20 @@ export class Robot {
     return (((yaw - p.yaw + 256) % 512) + 512) % 512 - 256;
   }
 
+  /** Écart de cap (pas) vers le point du trajet situé JUMP_LOOKAHEAD cases plus loin : la direction du saut. */
+  private jumpError(): number {
+    const p = this.world.player.obj;
+    if (!this.field) return 0;
+    const wp = this.field.field.waypoint(p.x / 256, p.z / 256, JUMP_LOOKAHEAD);
+    const yaw = Math.round((Math.atan2(torusDelta(wp.x * 256, p.x) / 256, torusDelta(wp.z * 256, p.z) / 256) * 512) / (2 * Math.PI));
+    return (((yaw - p.yaw + 256) % 512) + 512) % 512 - 256;
+  }
+
   /** Arme spéciale : sélectionne la première arme de 1 à 10 qui a des munitions, tire (appui bref) armée, alignée et à portée. */
   private special(inp: PlayerInput, t: TargetInfo, err: number): void {
     const st = this.world.status;
     const ammo = st.specialAmmo;
-    if (st.special < 0 || st.special > 9 || (ammo[st.special] ?? 0) <= 0) {
+    if (st.special < 0 || st.special > 9 || st.special === JUMP_SLOT || (ammo[st.special] ?? 0) <= 0) {
       const k = [0, 1, 4, 2, 3, 5, 6, 8, 10].find((i) => i <= 9 && (ammo[i] ?? 0) > 0);
       if (k !== undefined && this.tick % 20 === 0) inp.weaponDirect = k + 1;
       return;

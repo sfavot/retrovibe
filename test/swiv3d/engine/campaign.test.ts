@@ -303,13 +303,17 @@ function publish(title: string, reports: readonly LevelReport[]): void {
 describe.skipIf(!hasOriginalFiles || !process.env.CAMPAIGN)("robot de campagne : les 4 missions se terminent", () => {
   const only = ONLY ?? LEVELS;
 
-  // Rapport seulement : le robot n'esquive pas les tirs ennemis, donc le mode pur peut mourir (TERRAN01, TERRAN03) sans que le
-  // niveau soit en cause. La complétion n'est donc pas assertée ici.
-  it("mode pur (rapport) : le joueur peut mourir", { timeout: 1_800_000 }, () => {
+  // Le robot esquive (orbite de combat et écart devant les projectiles de l'hélicoptère) et termine TERRAN00 et TERRAN01 ; il meurt
+  // encore dans TERRAN02 (traversée d'eau obligatoire au départ en buggy : 345 pv, puis combat avec ce qui reste) et TERRAN03 (buggy
+  // dans une cuvette fermée par des pentes de 0,68, sous les tirs) : difficulté des niveaux, pas un défaut relevé du moteur
+  // (collisions, programmes d'armes, physique des véhicules et sol relus dans la décompilation). Seule TERRAN00 est assertée.
+  it("mode pur : le joueur peut mourir ; TERRAN00 se termine", { timeout: 1_800_000 }, () => {
     const pure = runCampaign("pur", only);
     publish("pur (le joueur peut mourir)", pure.reports);
     expect(pure.reports.map((r) => r.name)).toEqual([...only]);
     for (const r of pure.reports) expect(r.exception, `${r.name} : exception`).toBeNull();
+    const first = pure.reports.find((r) => r.name === "TERRAN00");
+    if (first) expect(first.completed, `TERRAN00 : ${first.outcome} après ${first.ticks} ticks`).toBe(true);
   });
 
   it("mode invulnérable : chaque mission est atteignable, groupes 9 -> 0, levelComplete", { timeout: 1_800_000 }, () => {

@@ -94,7 +94,7 @@ function missile(
 
 /**
  * Programme d'arme de `o` (`o.subtype`, `o.target`, `o.timer`). Les codes absents des niveaux livrés (109, 120, 500, 510…) sont
- * portés d'après la décompilation ; `501` est un doublon de `500` en balles 10001 (la décompilation ne donne pas de cas propre).
+ * portés d'après la décompilation ; `501` (branche `< 0x1f6`) reprend `500` en balles 10001 de 45 pv, recharge 47.
  */
 export function enemyFire(world: World, o: GameObject): void {
   const t = o.timer;

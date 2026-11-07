@@ -186,4 +186,35 @@ describe.skipIf(!available)("session de niveau : HUD, état de départ, bilan", 
     expect(controls.samples.length).toBeGreaterThan(0);
     for (const input of controls.samples) expect(input).toMatchObject({ forward: false, firePrimary: true });
   });
+
+  it("derrière l'écran de fin, la souris (type 2) est relue : ses axes arrivent au pilote, ses boutons non", async () => {
+    class RecordingControls extends Controls {
+      samples: PlayerInput[] = [];
+      override sample(): PlayerInput {
+        const input = super.sample();
+        this.samples.push(input);
+        return input;
+      }
+    }
+    const s = services();
+    const controls = new RecordingControls();
+    controls.configure({ type: 2, keys: [0xcb, 0xcd, 0xc8, 0xd0, 0xcb, 0xcd, 0x90, 0x91, 0xc9, 0xd1, 0x1d], axes: [1, 0, 0], clip: 1 });
+    s.controls = controls;
+    const session = await startLevel(s, { name: "TERRAN00", mission: 0 });
+    let now = 1000;
+    const frame = (n = 1): void => {
+      for (let k = 0; k < n; k++) session.onFrame((now += 25));
+    };
+    frame(2);
+    session.complete();
+    controls.mouseButton(0, true);
+    controls.samples.length = 0;
+    for (let k = 0; k < 4; k++) {
+      controls.mouseMove(10, 0);
+      frame();
+    }
+    expect(controls.samples.length).toBeGreaterThan(0);
+    expect(controls.samples.some((input) => (input.axes?.turn ?? 0) > 0)).toBe(true);
+    for (const input of controls.samples) expect(input.firePrimary).toBe(false);
+  });
 });

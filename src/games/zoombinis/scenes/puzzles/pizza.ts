@@ -9,11 +9,13 @@
  * Déroulé (`1130:0000`, `0d85`) :
  *  1. entrée : narrateur (`5358`, voix `15000…15006`), puis chaque troll joue son introduction (`SCRB` 8032, 9034, 10038), puis une réplique d'attente (`4de0`) ; ensuite le
  *     service est permis. Les boutons peuvent être basculés dès l'entrée (la bascule n'attend que la fin de l'animation du four) ;
- *  2. service (régions 3 et 12) : les boutons repartent à zéro, le four joue (`SCRB` 7066 et 7057 / 7058), le livreur (premier Zoombini du groupe) monte au comptoir, la
- *     pizza part du four vers la table des trolls (`SCRB` 12000 puis 12001, les parties filtrées par le repas) ;
+ *  2. service (régions 3 et 12) : les boutons repartent à zéro, le four joue (`SCRB` 7066 et 7057 / 7058) ; à son évènement 33 la pizza sort
+ *     (`SCRB` 12000), à son évènement 61 le livreur la prend (`SCRS` 13000 + pieds − 1), à sa fin il la porte jusqu'au premier troll à servir (13005 / 13010 / 13015) pendant
+ *     que la pizza suit (12001 / 12006 / 12011, au rythme du livreur : groupe `1f5c`) ; le livreur (premier Zoombini du groupe) attend au comptoir (`DS:1b6e`), où il
+ *     monte dès l'arrivée du groupe (`4cb5`) et revient après chaque repas (`4571`) ;
  *  3. verdicts (`serveMeal`) : les trolls réagissent à tour de rôle ; un troll content part avec sa pizza (`SCRB` 8021 / 9027 / 10031, parties filtrées par ses ingrédients
  *     aimés) et arrête la chaîne ; si aucun n'est content le dernier qui a réagi (celui du premier verdict « incomplet » sinon) lance l'assiette (`SCRB` 8020 / 9026 / 10030),
- *     qui tombe dans l'historique (`SCRB` 12016–12040), le livreur revient à la file sauf après l'épuisement du budget (le premier troll présent joue alors la fureur) ;
+ *     qui tombe dans l'historique (`SCRB` 12016–12040), le livreur revient au comptoir sauf après l'épuisement du budget (le premier troll présent joue alors la fureur) ;
  *  4. tous partis : scène de départ (`3893`), « go » actif ; la voix de réussite suit la scène d'Arno. « Go » sauve le groupe entier, la carte le perd entièrement.
  *
  * Boutons carte et « go » : rectangles `(600, 403)–(639, 440)` et `(600, 441)–(639, 478)`, gérés par le kit (images de la planche 6000 fournies ici, image appuyée tenue 6 ticks) ;
@@ -21,14 +23,15 @@
  */
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { TAG_SCRB } from "../../data/archives";
-import type { Point } from "../../data/zoombini";
+import type { Script } from "../../data/script";
+import { scriptAnchorOffset, type Point } from "../../data/zoombini";
 import { screenInfo } from "../../data/archives";
 import { DIALOG } from "../../engine/dialog";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeatureImageHook, type FeaturePart, type Features } from "../../engine/features";
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import type { Scene, SceneContext } from "../../engine/scene";
 import { ScreenId } from "../../engine/scene";
-import { node, path } from "../../engine/resources";
+import { node, path, scrs } from "../../engine/resources";
 import { ZOOMBINIS_SOUND } from "../../engine/sound";
 import { dialogMemoryIndex, currentLevel } from "../../game/route";
 import {
@@ -53,6 +56,7 @@ import type { Zoombini } from "../../game/state";
 import { createPuzzleKit, sheetButtonImages, type KitMember, type PuzzleKit, type Rect } from "../puzzle-kit";
 import { closeScreen, openScreen } from "../screen-kit";
 import { dialogChoice } from "../xfer";
+import { screenScripts } from "../snoid";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Constantes de l'écran (`1130:0000`, `1130:1803`)
@@ -72,9 +76,20 @@ const OVEN_SERVE = 7066;
 const DOOR_SERVE = [7057, 7058] as const;
 /** Table des trolls (`8033`, `DS:8d50`), planche 8000 image 1 en (419, 295). */
 const TABLE_SCRIPT = 8033;
-/** Pizza qui part du four (`12000`) puis traverse jusqu'à la table (`12001`). */
+/** Pizza qui sort du four (`12000`, créée à l'évènement 33 du four), puis portée par le livreur jusqu'au troll servi : `12001`, `12006` ou `12011` (`1130:37b2`). */
 const FLIGHT_FIRST = 12000;
-const FLIGHT_SECOND = 12001;
+const FLIGHT_CARRIED = [12001, 12006, 12011] as const;
+/**
+ * Gestes du livreur (`SCRS` NORMAL de `PIZZA.MHK`, + pieds − 1) : il prend la pizza (`13000`, évènement 61 du four, `1130:374b`), puis la porte jusqu'au
+ * premier troll encore à servir (`13005`, `13010` ou `13015`, à la fin du four, `1130:37b2`), en même temps que la pizza.
+ */
+const DELIVERER_TAKE = 13000;
+const DELIVERER_CARRY = [13005, 13010, 13015] as const;
+/** Évènements du four (`SCRB` 7066, rappel `1130:367c`, table `CS:3883`, octet bas − 1) : la pizza sort (`e33`), le livreur la prend (`e61`). */
+const OVEN_EVENT_PIZZA = 32;
+const OVEN_EVENT_TAKE = 60;
+/** Délai entre images du livreur pendant sa première montée au comptoir (`1130:4cb5` : `+0x28 = 2`) ; ensuite 6 (`1130:4571`). */
+const DELIVERER_FIRST_DELAY = 2;
 
 /** Délai entre deux images (`11a8:0ad6` : 6). */
 const DELAY = 6;
@@ -102,18 +117,19 @@ function inside(rect: Readonly<Rect>, x: number, y: number): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
-/** Places d'attente du groupe (le livreur, rang 0, est à gauche) : une rangée en bas de l'écran. **Choix** : le tableau `1478:0a04` de l'original n'est pas dans le corpus. */
-const QUEUE_Y = 458;
-const QUEUE_X = 30;
-const QUEUE_STEP = 34;
+/** Places d'attente du groupe (`1130:0000` : `11a8:0ed9(1, 1478:0a04, 16)`), lues dans le segment de données de l'exécutable. Le livreur part de la première. */
+export const PIZZA_PLACES: readonly Point[] = [
+  { x: 288, y: 389 }, { x: 240, y: 386 }, { x: 257, y: 434 }, { x: 202, y: 396 }, { x: 224, y: 437 }, { x: 186, y: 443 }, { x: 158, y: 400 }, { x: 151, y: 455 },
+  { x: 126, y: 391 }, { x: 118, y: 446 }, { x: 89, y: 403 }, { x: 86, y: 456 }, { x: 48, y: 396 }, { x: 51, y: 440 }, { x: 20, y: 416 }, { x: 18, y: 457 },
+];
 /** Arrivée échelonnée (`1168:274e(30, 45)`) et marche de sortie (`1168:2982(45, 0, 250, 690)` : x = 690, y = 250). */
 const START_DELAY = 30;
 const STEP_DELAY = 45;
 const EXIT_WALK = { x: 690, y: 250, step: 45 } as const;
 /** `NODE` / `PATH` de l'écran (`1168:2a5c(1000)`), suivis par la marche de sortie. */
 const WALK_MAP = 1000;
-/** Pieds du livreur au comptoir (`DS:1b6e`) : sous le point de départ de la pizza, `12000` finit en (247, 308). **Choix** : valeur non lue dans le corpus. */
-export const PIZZA_COUNTER: Point = { x: 247, y: 338 };
+/** Pieds du livreur au comptoir (`DS:1b6e`, lu dans le segment de données de l'exécutable). */
+export const PIZZA_COUNTER: Point = { x: 270, y: 334 };
 /** Voix d'introduction rejouée par F1 (`DS:a2c4`) : niveau 0 `20071`, sinon `20072`. */
 const INTRO_VOICES = [20071, 20072] as const;
 /** Ambiance : une animation de troll toutes les 3600 ticks quand rien ne joue (`1130:0d85`, `0xe10`). */
@@ -121,6 +137,17 @@ const AMBIENT_TICKS = 3600;
 
 /** Voix du narrateur à l'entrée (`1130:5358`, ids `15000…15006`) selon le code. **Probable** pour l'enchaînement : l'original coupe la suite si une voix est interrompue. */
 const NARRATION: readonly (readonly number[])[] = [[15005, 15006], [15000, 15001], [15002], [15003, 15004], [15003, 15004, 15005, 15006]];
+
+/** Position des pieds à la dernière image d'un `SCRS` posé en `start` (`1168:4741` suit la première case de chaque image). */
+function scriptEnd(script: Script, start: Point): Point {
+  const origin = scriptAnchorOffset(script.images, start, false);
+  let last = script.images[0]?.cells[0];
+  for (const image of script.images) {
+    const first = image.cells[0];
+    if (first && first.w > 0) last = first;
+  }
+  return last ? { x: origin.x + last.x, y: origin.y + last.y } : start;
+}
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Parties des pizzas (filtres d'image)
@@ -188,6 +215,8 @@ export function createPizzaScene(): Scene {
   /** Le service est permis (intro finie, rien ne joue) ; `busy` : un repas est en cours. */
   let ready = false;
   let ovenBusy = false;
+  /** Le livreur a été appelé au comptoir (`1130:4cb5`, `8d10`). */
+  let delivererCalled = false;
   let nextAmbient = 0;
   /** Attentes de silence (narrateur). */
   const silenceWaiters: (() => void)[] = [];
@@ -259,37 +288,45 @@ export function createPizzaScene(): Scene {
     return kit?.members[state!.deliverer] ?? null;
   }
 
-  function walkDeliverer(to: Point, done: () => void): void {
+  /** `1130:4cb5` : le premier du groupe monte au comptoir dès qu'il est posé sur sa place, à pas rapides (délai 2). Une seule fois (`8d14` n'est jamais posé). */
+  function callDeliverer(): void {
+    if (delivererCalled) return;
     const member = deliverer();
-    if (!member || member.walking || member.snoid.destroyed) {
-      done();
-      return;
-    }
-    const at = member.snoid.position;
-    if (at.x === to.x && at.y === to.y) {
-      done();
-      return;
-    }
+    if (!member || member.snoid.destroyed || member.walking || !member.snoid.resting) return;
+    delivererCalled = true;
+    member.snoid.delay = DELIVERER_FIRST_DELAY;
     // Marche du kit, non comptée dans `walking` : le livreur ne bloque pas les autres.
-    kit!.walk(
-      member,
-      to,
-      () => {
-        if (!gone) done();
-      },
-      { counted: false },
-    );
+    kit!.walk(member, PIZZA_COUNTER, undefined, { counted: false });
   }
 
-  function delivererHome(): Point | null {
+  /**
+   * Le livreur joue un de ses gestes (`1168:3f76` : depuis l'endroit où il est, la marche en cours s'arrête). À la fin il reste sur la dernière image ; sa position
+   * est celle de la dernière case (`1168:4741`).
+   */
+  function delivererGesture(id: number, done?: () => void): void {
     const member = deliverer();
-    const place = member ? kit!.waitingPlaces[member.index] : null;
-    return place ? { x: place.x, y: place.y } : null;
+    if (!member || member.snoid.destroyed) {
+      done?.();
+      return;
+    }
+    const snoid = member.snoid;
+    kit!.cancelWalk(member);
+    const script = scrs(archive, id + snoid.traits.feet - 1);
+    const start = { ...snoid.position };
+    snoid.onEnd = () => {
+      snoid.onEnd = undefined;
+      snoid.setPosition(scriptEnd(script, start));
+      if (!gone) done?.();
+    };
+    snoid.play(id + snoid.traits.feet - 1, FeatureFlag.stopAtEnd, { kind: "normal" });
   }
 
+  /** `1130:4571` puis `0d85` : le livreur reprend la pose d'attente, au pas normal (délai 6), et retourne au comptoir (`DS:1b6e`), tout droit (`DS:970c = 1`). */
   function returnDeliverer(): void {
-    const home = delivererHome();
-    if (home) walkDeliverer(home, () => {});
+    const member = deliverer();
+    if (!member || member.snoid.destroyed) return;
+    member.snoid.delay = DELAY;
+    kit!.walk(member, PIZZA_COUNTER, undefined, { counted: false });
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -341,14 +378,11 @@ export function createPizzaScene(): Scene {
   // ------------------------------------------------------------------------------------------------------------------------
   // Service
 
-  function drawFlight(mask: number, done: () => void): void {
+  /** `1130:367c` (évènement 33 du four) : la pizza sort du four (`SCRB` 12000), avec les couches du repas. */
+  function drawFlight(mask: number): void {
     if (flight && !flight.destroyed) features.destroy(flight);
     const hook: FeatureImageHook = (_f, parts) => plateLayers(parts, mask, level());
     flight = features.create({ script: FLIGHT_FIRST, delay: DELAY, flags: PLAYING, depth: DEPTH.flight, onImage: hook });
-    flight.onEvent = (_image, n) => {
-      if (n !== FEATURE_END || gone) return;
-      play(flight!, FLIGHT_SECOND, done, hook);
-    };
   }
 
   function removeFlight(): void {
@@ -356,23 +390,44 @@ export function createPizzaScene(): Scene {
     flight = null;
   }
 
+  /** Premier troll encore à servir (`8d52`, `8d54`, `8d56` = 1, dans cet ordre ; le troisième par défaut) : il choisit le trajet du livreur et de la pizza. */
+  function servedTroll(): number {
+    const trolls = state!.trolls;
+    if (trolls[0] === "present") return 0;
+    if (trolls[1] === "present") return 1;
+    return 2;
+  }
+
   function serve(): void {
     const s = state!;
     const previous = s.meal;
+    const towards = servedTroll();
     const result = serveMeal(s, ctx.rng);
     if (!result) return;
     ready = false;
     ovenBusy = true;
     // `55d9` : les boutons allumés repartent à zéro.
     for (const k of availableIngredients(s.level)) if (has(previous, k)) play(ingredientButtons.get(k)!, buttonScript(k, false));
-    // Le four joue (`1e08`, case 3) pendant que le livreur monte au comptoir ; ensuite la pizza part vers les trolls.
-    const afterOven = join(2, () => {
-      ovenBusy = false;
-      drawFlight(result.meal, () => verdicts(result));
-    });
+    // `1e08` (case 3) : porte du four et four (7066) ; ses évènements font sortir la pizza (33) et la font prendre au livreur (61) ; à sa fin (`37b2`), le livreur
+    // la porte jusqu'au troll pendant que la pizza suit (12001 / 12006 / 12011) ; les réactions attendent les deux (`8d30`).
     play(preview, DOOR_SERVE[s.level === 0 ? 0 : 1], undefined, (_f, parts) => previewLayers(parts, 0));
-    play(oven, OVEN_SERVE, afterOven);
-    walkDeliverer(PIZZA_COUNTER, afterOven);
+    play(oven, OVEN_SERVE, () => {
+      ovenBusy = false;
+      if (!flight || flight.destroyed) drawFlight(result.meal);
+      const both = join(2, () => verdicts(result));
+      const hook: FeatureImageHook = (_f, parts) => plateLayers(parts, result.meal, level());
+      // `1f5c(pizza, livreur)` (`1130:386a`) : un groupe avance au rythme de son meneur (`11a0:033a`, `1520:06da`), ici le livreur, placé avant la pizza
+      // dans la liste (`2a0a`) : la pizza prend son délai (2 à la première livraison, `1130:4cb5` ; 6 ensuite, `1130:4571`). Les deux partent dans le même tick.
+      flight!.delay = deliverer()?.snoid.delay ?? DELAY;
+      play(flight!, FLIGHT_CARRIED[towards]!, both, hook);
+      delivererGesture(DELIVERER_CARRY[towards]!, both);
+    });
+    const ovenEvents = oven.onEvent;
+    oven.onEvent = (image, n, feature) => {
+      if (n === OVEN_EVENT_PIZZA && !gone) drawFlight(result.meal);
+      else if (n === OVEN_EVENT_TAKE && !gone) delivererGesture(DELIVERER_TAKE);
+      ovenEvents?.(image, n, feature);
+    };
   }
 
   /** Réactions des trolls puis la suite du repas. */
@@ -509,6 +564,7 @@ export function createPizzaScene(): Scene {
       state = newPizza(ctx.rng, chosen);
       ready = false;
       ovenBusy = false;
+      delivererCalled = false;
       flight = null;
       plateSlots.clear();
       plateMasks.clear();
@@ -549,11 +605,13 @@ export function createPizzaScene(): Scene {
 
       // Le groupe de la scène : copie des présents du tampon (`party` de `exitPuzzle`).
       party = zoombinis.game.group.members.filter((z) => z.present).map((z) => ({ ...z, attrs: [...z.attrs] as Zoombini["attrs"], state: z.state.slice() }));
-      const places = party.map((_, i) => ({ x: QUEUE_X + i * QUEUE_STEP, y: QUEUE_Y }));
+      const places = party.map((_, i) => ({ ...PIZZA_PLACES[i % PIZZA_PLACES.length]! }));
       kit = createPuzzleKit(ctx, {
         screen: ScreenId.pizza,
         party,
-        places: places.length > 0 ? places : [{ x: QUEUE_X, y: QUEUE_Y }],
+        places: places.length > 0 ? places : [{ ...PIZZA_PLACES[0]! }],
+        // Gestes du livreur (`SCRS` 13000 à 13039 de l'écran).
+        snoid: { scripts: screenScripts(archive) },
         // Aucun glisser-déposer (région 13 inerte).
         canPick: () => false,
         // Boutons carte et « go » (planche 6000, `1130:0be6`), dessinés par le kit sous les objets de l'écran ; image enfoncée tenue 6 ticks.
@@ -596,6 +654,7 @@ export function createPizzaScene(): Scene {
     tick() {
       if (!kit || gone) return;
       kit.tick();
+      callDeliverer();
       const now = ctx.clock.ticks;
       if (silenceWaiters.length > 0 && soundIdle()) silenceWaiters.shift()!();
       if (ready && !ovenBusy && now >= nextAmbient && !(ctx.services.tryGet(DIALOG)?.isOpen ?? false)) {

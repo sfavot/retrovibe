@@ -34,7 +34,7 @@ import {
 } from "../../../src/games/zoombinis/game/puzzles/pizza";
 import { nextScreen } from "../../../src/games/zoombinis/game/route";
 import { makeZoombini, type Zoombini } from "../../../src/games/zoombinis/game/state";
-import { PIZZA_INGREDIENT_REGIONS, PIZZA_SERVE_REGIONS, createPizzaScene, pizzaStateOf } from "../../../src/games/zoombinis/scenes/puzzles/pizza";
+import { PIZZA_COUNTER, PIZZA_INGREDIENT_REGIONS, PIZZA_PLACES, PIZZA_SERVE_REGIONS, createPizzaScene, pizzaStateOf } from "../../../src/games/zoombinis/scenes/puzzles/pizza";
 import { BUTTON_GO, BUTTON_MAP, HELP_KEY } from "../../../src/games/zoombinis/scenes/puzzle-kit";
 import { Snoid } from "../../../src/games/zoombinis/scenes/snoid";
 import { originalFiles } from "../../support/original";
@@ -625,23 +625,51 @@ describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", 
     expect(zoombinis.game.group.members).toHaveLength(16);
   });
 
-  it("le livreur est le premier Zoombini du groupe : il monte au comptoir au service puis revient à sa place", async () => {
+  it("le livreur (premier du groupe) monte au comptoir (DS:1b6e) dès l'arrivée, prend la pizza (SCRS 13000) puis la porte au troll (13005) pendant que la pizza suit (12001), et revient au comptoir", async () => {
+    let delivererSnoid: Snoid | undefined;
+    const walkTo = vi.spyOn(Snoid.prototype, "walkTo");
+    const playSpy = vi.spyOn(Snoid.prototype, "play");
+    const placed = vi.spyOn(Snoid.prototype, "setPosition");
     const { state, clickIngredients, serveClick, ticks, intro, features } = await start(0, { liked: [mask(0, 1)], lessAction: true });
     await intro();
-    const snoids = features.features.filter((f) => f.hasFlag(1));
-    const first = snoids[0]!;
-    const home = { left: first.rect!.left, top: first.rect!.top };
     expect(state.deliverer).toBe(0);
+    // Première montée au comptoir, dès que le groupe est posé.
+    const firstWalk = walkTo.mock.calls.findIndex(([to]) => to.x === PIZZA_COUNTER.x && to.y === PIZZA_COUNTER.y);
+    expect(firstWalk).toBeGreaterThanOrEqual(0);
+    delivererSnoid = walkTo.mock.contexts[firstWalk] as Snoid;
+    expect(PIZZA_COUNTER).toEqual({ x: 270, y: 334 });
+    expect(delivererSnoid.position).toEqual(PIZZA_COUNTER);
+    const deliverer = delivererSnoid;
+    const feet = deliverer.traits.feet;
+    const scriptsOf = () => playSpy.mock.calls.filter((_, i) => playSpy.mock.contexts[i] === deliverer).map(([id]) => id).filter((id) => id >= 13000);
+    walkTo.mockClear();
     await clickIngredients(mask(2));
     await serveClick();
-    await ticks(200);
-    // Parti de sa place vers le comptoir (à droite et plus haut).
-    expect(first.rect!.top).toBeLessThan(home.top);
-    expect(first.rect!.left).toBeGreaterThan(home.left);
+    // Le four joue : la pizza sort, le livreur la prend, puis la porte (Arno, le seul troll du niveau 0, est servi : 13005 et 12001).
+    for (let i = 0; i < 400 && !scriptsOf().includes(13004 + feet); i++) await ticks(5);
+    expect(scriptsOf()).toEqual([12999 + feet, 13004 + feet]);
+    expect(features.features.some((f) => f.scriptId === 12001)).toBe(true);
     await ticks(1800);
-    // Le budget n'est pas épuisé : il est revenu.
-    expect(Math.abs(first.rect!.left - home.left)).toBeLessThanOrEqual(3);
-    expect(Math.abs(first.rect!.top - home.top)).toBeLessThanOrEqual(3);
+    // Repas manqué, budget non épuisé : il est revenu au comptoir (pas à sa place d'attente).
+    expect(walkTo.mock.calls.some(([to], i) => walkTo.mock.contexts[i] === deliverer && to.x === PIZZA_COUNTER.x && to.y === PIZZA_COUNTER.y)).toBe(true);
+    expect(deliverer.position).toEqual(PIZZA_COUNTER);
+    // À la fin du geste, il est devant la table d'Arno (dernière case de 13005 + pieds), loin du comptoir.
+    const ends = placed.mock.calls.filter((_, i) => placed.mock.contexts[i] === deliverer).map(([at]) => at);
+    expect(ends.some((at) => at.x > 350 && at.y < 320)).toBe(true);
+    walkTo.mockRestore();
+    playSpy.mockRestore();
+    placed.mockRestore();
+  });
+
+  it("places d'attente lues dans l'exécutable (1478:0a04) : chaque Zoombini du groupe sauf le livreur reste sur la sienne", async () => {
+    const { ticks, intro, features } = await start(0, { liked: [mask(0, 1)], lessAction: true });
+    await intro();
+    await ticks(100);
+    const snoids = features.features.filter((f) => f.hasFlag(1));
+    expect(snoids.length).toBe(16);
+    expect(PIZZA_PLACES).toHaveLength(16);
+    expect(PIZZA_PLACES[0]).toEqual({ x: 288, y: 389 });
+    expect(PIZZA_PLACES[15]).toEqual({ x: 18, y: 457 });
   });
 });
 

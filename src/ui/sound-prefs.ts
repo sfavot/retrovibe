@@ -14,10 +14,17 @@ export function soundPrefKey(game: string): string {
   return `retrovibe:${game}:sound`;
 }
 
+/** Réglages facultatifs de `SoundPrefs`. */
+export interface SoundPrefsOptions {
+  /** Clé de stockage à la place de `soundPrefKey(game)` (clé historique d'un jeu dont les préférences existent déjà). */
+  key?: string;
+}
+
 /**
  * Préférence « Son » d'un jeu : activée par défaut, persistée (`"0"` = coupé) et appliquée à la sortie audio, sans
- * lien avec les réglages de volume propres au jeu. Une clé par jeu ; la lecture et l'écriture sont les mêmes que
- * celles de `SoundPrefs` du Téléportaschtroumpf et d'`AudioPrefs` de Lost in Time (qui pourront migrer ici).
+ * lien avec les réglages de volume propres au jeu. Une clé par jeu (`retrovibe:<jeu>:sound`), ou la clé historique du jeu
+ * (`options.key`) quand des préférences déjà enregistrées par les joueurs doivent rester lues : Lost in Time, dont le
+ * stockage est préfixé, garde `audio.sound`.
  */
 export class SoundPrefs {
   private on: boolean;
@@ -27,8 +34,9 @@ export class SoundPrefs {
     private readonly storage: SoundPrefsStorage,
     private readonly target: Muteable,
     game: string,
+    options: SoundPrefsOptions = {},
   ) {
-    this.key = soundPrefKey(game);
+    this.key = options.key ?? soundPrefKey(game);
     this.on = this.read();
     this.apply();
   }

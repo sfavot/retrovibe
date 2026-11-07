@@ -256,6 +256,39 @@ describe.skipIf(!original.has)("transition XFER", () => {
     expect(engine.error).toBeNull();
   });
 
+  it("falaise (bug 16) : les mouettes 5104 à 5107 (et 5102, 5103, 5108) ne sont dessinées que pendant leur vol (bit 0x1000000, 11a0:0126) ; au repos elles ne restent pas figées", async () => {
+    const { host, engine } = await begin({ from: ScreenId.picker, to: ScreenId.bridge, seed: 3 });
+    const features = engine.services.get(FEATURES);
+    await runFor(engine, host, TICK_MS * 3);
+    const playOnly = () => features.features.filter((f) => f.scriptId >= 5102 && f.scriptId <= 5108 && f.hasFlag(FeatureFlag.staticFirst));
+    expect(playOnly()).toHaveLength(7);
+    // Au départ, aucune n'est dessinée : leurs pixels sont ceux du fond.
+    const { screen } = engine.services.get(GRAPHICS);
+    const background = (features as unknown as { background: { pixels: Uint8Array } }).background.pixels;
+    const gull = playOnly().find((f) => f.scriptId === 5104)!;
+    let differs = 0;
+    for (let y = gull.rect!.top; y < gull.rect!.bottom; y++) for (let x = gull.rect!.left; x < gull.rect!.right; x++) if (screen.pixels[y * 640 + x] !== background[y * 640 + x]) differs++;
+    expect(differs).toBe(0);
+    const flown = new Set<number>();
+    const images = new Map<number, Set<number>>();
+    for (let t = 0; t < 1400 && engine.scenes.currentId === ScreenId.xfer; t += 2) {
+      await runFor(engine, host, TICK_MS * 2);
+      for (const f of playOnly()) {
+        // Dessinée si et seulement si elle joue.
+        expect(f.hasFlag(FeatureFlag.noDraw), `${f.scriptId} t=${t}`).toBe(!f.active);
+        if (f.active && f.scriptId >= 5104 && f.scriptId <= 5107) {
+          flown.add(f.scriptId);
+          if (!images.has(f.scriptId)) images.set(f.scriptId, new Set());
+          images.get(f.scriptId)!.add(f.image);
+        }
+      }
+    }
+    // Au moins une mouette a volé, en changeant d'image.
+    expect(flown.size).toBeGreaterThan(0);
+    for (const seen of images.values()) expect(seen.size).toBeGreaterThan(1);
+    expect(engine.error).toBeNull();
+  }, 60_000);
+
   it("carte (région 1) : le trait du tronçon atteint passe du noir au crème puis se colore en vert depuis le départ, une étape toutes les 4 ticks (11b0:24ed, 26ec)", async () => {
     const prepare = (game: ReturnType<typeof newGame>) => void (game.successes[0] = 0x11);
     const { host, engine } = await begin({ from: ScreenId.bridge, to: ScreenId.tunnels, prepare });

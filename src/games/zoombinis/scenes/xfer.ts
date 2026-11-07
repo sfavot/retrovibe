@@ -34,7 +34,7 @@
  */
 import type { Rect, Surface } from "../../../engine/mohawk/graphics/surface";
 import type { Archive } from "../../../engine/mohawk/resources";
-import { FEATURES, FeatureFlag, type Feature, type FeatureOptions, type FeaturePart } from "../engine/features";
+import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeatureOptions, type FeaturePart } from "../engine/features";
 import { ZOOMBINIS_GAME } from "../engine/game";
 import { ScreenId, type Scene, type SceneContext } from "../engine/scene";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
@@ -381,6 +381,28 @@ export function createXferScene(): Scene {
     return ctx.services.get(FEATURES).create(options);
   }
 
+  /**
+   * Objet `0x1188000` (`11b0:0c01`, `0c37`, `0c68`, `0d88` : 5102 à 5108, 6108). Le bit `0x1000000` fait que `11a0:033a` l'arrête dès sa première image et
+   * que le rappel de dessin `11a0:0126` ne le dessine que pendant qu'il joue (`+0xe0 ≠ 0`) : invisible au repos, il n'apparaît que le temps de son
+   * animation (mouettes 5104 à 5107, bug 16). Le moteur du port dessine `staticFirst` au repos : `noDraw` le remplace ici, levé par `launch`.
+   */
+  function createPlayOnly(ctx: SceneContext, script: number): Feature {
+    const feature = createFeature(ctx, { script, delay: 6, flags: FeatureFlag.staticFirst | FeatureFlag.stopAtEnd | FeatureFlag.noReplay | FeatureFlag.active });
+    feature.flags |= FeatureFlag.noDraw;
+    return feature;
+  }
+
+  /** Relance un objet de `createPlayOnly` (`11a8:1b89`) : dessiné jusqu'à sa fin, puis de nouveau invisible tant que le bit `0x1000000` est posé. */
+  function launch(ctx: SceneContext, feature: Feature, onEvent?: (n: number) => void): void {
+    feature.flags &= ~FeatureFlag.noDraw;
+    feature.notifyEnd = true;
+    feature.onEvent = (_image, n) => {
+      if (n === FEATURE_END && feature.hasFlag(FeatureFlag.staticFirst)) feature.flags |= FeatureFlag.noDraw;
+      onEvent?.(n);
+    };
+    ctx.services.get(FEATURES).setScript(feature, 0, true);
+  }
+
   function restack(ctx: SceneContext, depth: number): void {
     if (!stackable) return;
     ctx.services.get(FEATURES).restack(stackable, depth);
@@ -453,8 +475,7 @@ export function createXferScene(): Scene {
       }
       const scripts = screenScripts(archive);
       const present = game.group.flagA ? [] : game.group.members.filter((member) => member.present);
-      const { staticFirst, stopAtEnd, noReplay, active, firstImage } = FeatureFlag;
-      const hold = staticFirst | stopAtEnd | noReplay | active;
+      const { stopAtEnd, noReplay, active, firstImage } = FeatureFlag;
 
       const addMembers = (positions: { x: number; y: number }[]): void => {
         present.forEach((zoombini, i) => {
@@ -467,16 +488,16 @@ export function createXferScene(): Scene {
       };
 
       if (region === 0) {
-        for (const id of [5102, 5103]) once.push(createFeature(ctx, { script: id, delay: 6, flags: hold }));
-        for (const id of [5104, 5105, 5106, 5107]) ambient.push(createFeature(ctx, { script: id, delay: 6, flags: hold }));
-        createFeature(ctx, { script: 5108, delay: 6, flags: hold });
+        for (const id of [5102, 5103]) once.push(createPlayOnly(ctx, id));
+        for (const id of [5104, 5105, 5106, 5107]) ambient.push(createPlayOnly(ctx, id));
+        createPlayOnly(ctx, 5108);
         addMembers(present.map(() => ({ ...CLIFF_START })));
         // Créés après les Zoombinis, donc devant eux (`11a8:0ad6` ajoute en fin de liste) : 5100 cache ceux qui attendent à (200, 235), 5101 vient encore devant.
         const options: FeatureOptions = { script: 5100, delay: 0, flags: 0, depth: CLIFF_DEPTH };
         stackable = createFeature(ctx, options);
         createFeature(ctx, { script: 5101, delay: 0, flags: 0, depth: FRONT });
       } else if (region === 5) {
-        finale = createFeature(ctx, { script: 6108, delay: 6, flags: hold });
+        finale = createPlayOnly(ctx, 6108);
         const sign = createFeature(ctx, { script: 6105, delay: 0, flags: 0 });
         sign.onAfterDraw = (feature, screen) => {
           const text = ctx.services.tryGet(ZOOMBINIS_TEXT);
@@ -577,12 +598,7 @@ export function createXferScene(): Scene {
       if (now <= nextTimer) return;
       if (region === 5 && arrivals > 4 && !finalStarted) {
         finalStarted = true;
-        if (finale) {
-          finale.onEvent = (_image, n) => {
-            if (n === 30) finish(ctx);
-          };
-          features.setScript(finale, 0, true);
-        }
+        if (finale) launch(ctx, finale, (n) => n === 30 && finish(ctx));
       }
       if (region === 0) {
         nextTimer = now + rng.range(3, 6) * 30;
@@ -592,7 +608,7 @@ export function createXferScene(): Scene {
         } else {
           const k = rng.range(0, 4);
           const feature = ambient[k];
-          if (feature && !feature.active) features.setScript(feature, 0, true);
+          if (feature && !feature.active) launch(ctx, feature);
         }
       } else if (region === 5) {
         nextTimer = now + rng.range(3, 6) * 40;
@@ -634,8 +650,9 @@ export function createXferScene(): Scene {
         const feature = once[slot];
         if (onceFlags[slot] && feature) {
           onceFlags[slot] = false;
+          // `11b0:1deb` : drapeaux `0x188000`, le bit `0x1000000` en moins : l'objet reste dessiné après son animation.
           feature.flags = FeatureFlag.stopAtEnd | FeatureFlag.noReplay | FeatureFlag.active;
-          features.setScript(feature, 0, true);
+          launch(ctx, feature);
         }
         break;
       }

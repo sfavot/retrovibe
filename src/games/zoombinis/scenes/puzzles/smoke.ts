@@ -326,6 +326,8 @@ class SmokeRun implements SmokeProbe {
   private readonly anchorX: Int16Array;
   private readonly anchorY: Int16Array;
   private readonly wagonTarget: DropTarget;
+  /** Zone de dépôt (`SCRB` 11001, niveaux 1 et 2) : surbrillance du wagonnet survolé. */
+  private dropZone: Feature | undefined;
   private readonly pool: NoRepeatPool;
 
   // Features de la machine (noms d'après §2.2).
@@ -400,9 +402,9 @@ class SmokeRun implements SmokeProbe {
     this.lever = f.create({ script: SCRB.leverTest, delay: DELAY.lever, flags: STILL });
     if (low) {
       this.wagonA = f.create({ script: SCRB.emptyWagon, delay: DELAY.default, flags: STILL });
-      // Zone de dépôt (le wagonnet de gauche) : `0x108a000` dans l'original (`1158:07c7`), avec le bit. **Écart provisoire** : dessinée (`STILL`) en attendant que
-      // l'utilisatrice confirme l'aspect de l'original (le fond n'a pas ce wagonnet).
-      f.create({ script: SCRB.dropZone, delay: 7, flags: STILL });
+      // Zone de dépôt (le wagonnet de gauche) : `0x108a000` (`1158:07c7`), avec le bit `0x1000000` : dessinée seulement pendant sa surbrillance, quand un
+      // Zoombini porté la survole (`1168:1742`, `DropTarget.highlight`).
+      this.dropZone = f.create({ script: SCRB.dropZone, delay: 7, flags: STILL_BIT });
     } else {
       this.wagonA = f.create({ script: SCRB.arrivalA, delay: DELAY.default, flags: STILL });
       this.wagonB = f.create({ script: SCRB.arrivalB, delay: DELAY.default, flags: STILL });
@@ -412,7 +414,10 @@ class SmokeRun implements SmokeProbe {
     };
 
     this.buildPieces();
-    this.wagonTarget = createTarget(SMOKE_WAGON, "wagon");
+    // Au doigt (extension tactile, bug 18), le wagonnet est pris aussi quand le doigt est sur l'image de la zone de dépôt.
+    const dropZone = this.dropZone;
+    this.wagonTarget = createTarget(SMOKE_WAGON, "wagon", dropZone ? () => dropZone.rect : undefined);
+    if (dropZone) this.wagonTarget.highlight = dropZone;
     const buttons = sheetButtonImages(archive.tbmpImages(BUTTONS_SHEET));
     this.kit = createPuzzleKit(ctx, {
       screen: SCREEN,

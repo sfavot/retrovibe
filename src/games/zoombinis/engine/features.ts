@@ -476,6 +476,22 @@ export class Features {
    * `11a8:1be6` : change le script de la feature (`id` 0 = le courant) : image 0 lue à la prochaine échéance, `play` = en lecture.
    * Avec `queueScript`, le script remplacé est mis en file pour être repris à la fin du nouveau (un script déjà en file : appel ignoré).
    */
+  /**
+   * Surbrillance d'une zone de dépôt survolée par un objet porté (`1168:1742`) : l'objet de la zone rejoue son script depuis le début (`+0xe0 = 1`, `+0xc8 = 0`,
+   * `+0xca = 1`) et le reboucle tant qu'il est survolé. Pour une zone `playOnly`, c'est le seul moment où elle est dessinée.
+   */
+  playZone(feature: Feature): void {
+    feature.flags &= ~FeatureFlag.resetOnce;
+    this.setScript(feature, feature.scriptId, true);
+  }
+
+  /** Fin du survol (`1168:1742`) : `0x10000` (`resetOnce`) et échéance immédiate (`+0x24 = 0`) : l'objet revient à son image 0 et s'arrête. */
+  resetZone(feature: Feature): void {
+    if (!feature.active) return;
+    feature.flags |= FeatureFlag.resetOnce;
+    feature.next = 0;
+  }
+
   setScript(feature: Feature, id = 0, play = true): void {
     if (id === 0) id = feature.scriptId;
     if (

@@ -108,7 +108,7 @@ export const BUTTON_GO: Readonly<Rect> = { left: 600, top: 441, right: 639, bott
 export const SCREEN_BOUNDS: Readonly<Rect> = { left: 0, top: 0, right: SCREEN_WIDTH - 1, bottom: SCREEN_HEIGHT - 1 };
 
 /** Écart (pixels de l'écran) en deçà duquel un doigt relâché n'a pas glissé : c'est un toucher (prise en main, `updateCarry`). */
-const TAP_SLOP = 4;
+export const TAP_SLOP = 4;
 
 /** Curseur masqué pendant le transport (`11e8:77bc`) : `hidden` de `CursorKind`, associé à `none` par l'hôte du navigateur. */
 export const HIDDEN_CURSOR: CursorKind = "hidden";
@@ -166,6 +166,8 @@ export interface DropTarget {
    * Zoombini porté, une cible libre est aussi prise quand le doigt est sur son image (voir `findIn`).
    */
   readonly area?: () => Rect | null;
+  /** Objet de la zone (`1520:0x0002 + 2k`) : il rejoue son script quand un objet porté survole la cible (`1168:1742`, `Features.playZone`). */
+  highlight?: Feature;
 }
 
 export function createTarget(point: Point, tag?: unknown, area?: () => Rect | null): DropTarget {
@@ -932,6 +934,8 @@ export class PuzzleKit {
     const finger = this.touchPoint(input);
     const hover = findIn(carry.targets, carry.radius, { x, y }, carry.member, finger);
     if (hover !== carry.hover) {
+      if (carry.hover?.highlight) this.features.resetZone(carry.hover.highlight);
+      if (hover?.highlight) this.features.playZone(hover.highlight);
       carry.hover = hover;
       carry.spec.onHover?.(hover);
     }
@@ -968,6 +972,9 @@ export class PuzzleKit {
     const { spec } = carry;
     const target = findIn(carry.targets, carry.radius, position, carry.member, finger);
     const info: ObjectDrop = { target, from: carry.from, position, origin: carry.origin };
+    // `1168:1742` : au lâcher, la zone survolée revient au repos.
+    if (carry.hover?.highlight) this.features.resetZone(carry.hover.highlight);
+    carry.hover = null;
     // La décision se prend le transport déjà fini (`kit.carrying` est nul pour l'épreuve), sauf si elle garde l'objet en main.
     this.carry = null;
     const verdict = spec.decide ? spec.decide(info) : target !== null && target !== carry.from;
@@ -1274,6 +1281,7 @@ export class PuzzleKit {
     const carry = this.carry;
     if (carry) {
       this.carry = null;
+      if (carry.hover?.highlight) this.features.resetZone(carry.hover.highlight);
       if (carry.hidden) this.ctx.setCursor("system");
       if (carry.spec.feature) carry.spec.feature.raised = false;
       if (carry.member && carry.from) carry.from.owner = carry.member;

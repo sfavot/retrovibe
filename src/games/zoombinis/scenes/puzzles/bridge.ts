@@ -26,7 +26,6 @@
  *    (il peut donc interrompre une traversée, ce qui la laisse sans fin) ;
  *  - l'ondulation de la corde à la traversée acceptée (`SCRB` 1237 à 1248) est du **code mort** de l'original (`10c0:089f` exige un refus avant de tester l'acceptation) : elle n'est pas jouée ;
  *  - l'ordre de dessin des Zoombinis arrivés est celui de leur ordonnée (l'original les place « devant le précédent » rang par rang, tables non portées) ; **probable** ;
- *  - la surbrillance des zones de dépôt pendant le transport (`DS:9708`) n'est pas portée (voir `engine-ts.md`) ;
  *  - le type d'éternuement manquant à l'événement 10 (jamais en jeu : le visage l'annonce 18 ticks plus tôt) retombe sur la table `FACE_SNEEZE_TYPES`.
  */
 import type { Archive } from "../../../../engine/mohawk/resources";
@@ -223,7 +222,8 @@ class BridgeRun implements BridgeProbe {
     f.addScripts(GROUP_ZONES, 2);
     const F = FeatureFlag;
     for (const bridge of [1, 2] as const) {
-      f.create({ script: GROUP_ZONES + bridge - 1, delay: ZONE_DELAY, flags: F.playOnly | F.noReplay | F.active | F.firstImage });
+      // Zones de dépôt (`0x2000`) : allumées au survol d'un Zoombini porté (`1168:1742`, `DropTarget.highlight`).
+      this.zones[bridge].highlight = f.create({ script: GROUP_ZONES + bridge - 1, delay: ZONE_DELAY, flags: F.playOnly | F.noReplay | F.active | F.firstImage });
     }
     this.face = f.create({ script: SCRB.face, delay: PIECE_DELAY, flags: F.playOnly | F.stopAtEnd | F.noReplay | F.queueScript | F.active });
     this.fence = f.create({ script: SCRB.fence, delay: PIECE_DELAY, flags: F.stopAtEnd | F.active });

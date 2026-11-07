@@ -17,6 +17,8 @@ const original = originalFiles("zoombinis", "files.json");
 /** Centres des boutons (`1470:0000` et suivants) : attribut `row` (0 à 3) de valeur `value` (1 à 5), et les actions. */
 const attribute = (row: number, value: number): [number, number] => [3 + 39 * (value - 1) + 19, 304 + 44 * row + 20];
 const ADD: [number, number] = [232, 323];
+/** Entrée de la grotte : la zone de retrait (`DS:1ab6`, (172, 226), tolérance 60). */
+const CAVE = [175, 225] as const;
 const GUIDE: [number, number] = [239, 383];
 const NAME: [number, number] = [244, 428];
 const RANDOM: [number, number] = [232, 459];
@@ -67,6 +69,16 @@ describe.skipIf(!original.has)("choix des Zoombinis (écran 3)", () => {
       host.click(at[0], at[1]);
       await runFor(engine, host, ms);
     };
+    /** Glisse (bouton tenu) du point `from` au point `to`, puis relâche (`1168:1742`). */
+    const drag = async (from: readonly [number, number], to: readonly [number, number]) => {
+      host.input.moveMouse(from[0], from[1]);
+      host.input.mouseDown("left");
+      await runFor(engine, host, 60);
+      host.input.moveMouse(to[0], to[1]);
+      await runFor(engine, host, 120);
+      host.input.mouseUp("left");
+      await runFor(engine, host, 60);
+    };
     /** Compose et ajoute un Zoombini de type `attrs`. */
     const chosen = [0, 0, 0, 0];
     const create = async (attrs: readonly number[]) => {
@@ -77,7 +89,7 @@ describe.skipIf(!original.has)("choix des Zoombinis (écran 3)", () => {
       }
       await click(ADD, 20);
     };
-    return { host, engine, services, entered, queue, features, zoombinis, snoids, click, create };
+    return { host, engine, services, entered, queue, features, zoombinis, snoids, click, drag, create };
   }
 
   /** 16 types distincts. */
@@ -203,8 +215,8 @@ describe.skipIf(!original.has)("choix des Zoombinis (écran 3)", () => {
     expect(snoids()).toHaveLength(16);
   });
 
-  it("retire un Zoombini au clic : ses valeurs et son nom reviennent dans les boutons, son exemplaire est libéré", async () => {
-    const { zoombinis, snoids, create, click, engine, host, queue } = await start();
+  it("retire un Zoombini glissé sur l'entrée de la grotte (zone 4110, 1168:1742) : ses valeurs et son nom reviennent dans les boutons, son exemplaire est libéré", async () => {
+    const { zoombinis, snoids, create, click, drag, engine, host, queue } = await start();
     await create([1, 2, 3, 4]);
     await create([5, 4, 3, 2]);
     await runFor(engine, host, 20000);
@@ -212,7 +224,7 @@ describe.skipIf(!original.has)("choix des Zoombinis (écran 3)", () => {
     const name = nameOf(target.state);
     const rect = snoids()[0]!.rect!;
     queue.mockClear();
-    await click([Math.round((rect.left + rect.right) / 2), Math.round((rect.top + rect.bottom) / 2)]);
+    await drag([Math.round((rect.left + rect.right) / 2), Math.round((rect.top + rect.bottom) / 2)], CAVE);
     const { game } = zoombinis;
     expect(game.group.members.map((z) => z.attrs)).toEqual([[5, 4, 3, 2]]);
     expect(game.counters.created).toBe(1);
@@ -225,13 +237,68 @@ describe.skipIf(!original.has)("choix des Zoombinis (écran 3)", () => {
     expect(nameOf(game.group.members[1]!.state)).toBe(name);
   });
 
+  it("un clic sur un Zoombini ne le retire plus ; glissé ailleurs il revient à sa place ; l'entrée de la grotte (4110, bit 0x1000000) n'est dessinée que survolée", async () => {
+    const { zoombinis, snoids, create, click, engine, host, features } = await start();
+    await create([1, 2, 3, 4]);
+    await runFor(engine, host, 20000);
+    const zone = features.features.find((f) => f.scriptId === 4110)!;
+    expect(zone.active).toBe(false);
+    const snoid = snoids()[0]!;
+    const rect = snoid.rect!;
+    const at: [number, number] = [Math.round((rect.left + rect.right) / 2), Math.round((rect.top + rect.bottom) / 2)];
+    await click(at);
+    expect(zoombinis.game.group.members).toHaveLength(1);
+    // Porté au-dessus de l'entrée : la zone joue (dessinée) ; ramené ailleurs puis lâché : il revient, la zone s'arrête.
+    host.input.moveMouse(at[0], at[1]);
+    host.input.mouseDown("left");
+    await runFor(engine, host, 60);
+    host.input.moveMouse(CAVE[0], CAVE[1]);
+    await runFor(engine, host, 120);
+    expect(zone.active).toBe(true);
+    host.input.moveMouse(500, 400);
+    await runFor(engine, host, 120);
+    expect(zone.active).toBe(false);
+    host.input.mouseUp("left");
+    await runFor(engine, host, 60);
+    expect(zoombinis.game.group.members).toHaveLength(1);
+    expect(snoid.rect).toEqual(rect);
+  });
+
+  it("au doigt (extension tactile, bug 18) : glisser le Zoombini sur l'image de l'entrée, ou le toucher puis toucher l'entrée, le retire ; toucher puis toucher ailleurs le ramène", async () => {
+    for (const mode of ["glisser", "toucher-toucher", "toucher-ailleurs"] as const) {
+      const { zoombinis, snoids, create, drag, engine, host } = await start();
+      (host as unknown as { pointerIsTouch: boolean }).pointerIsTouch = true;
+      await create([1, 2, 3, 4]);
+      await runFor(engine, host, 20000);
+      const snoid = snoids()[0]!;
+      const rect = snoid.rect!;
+      const at: [number, number] = [Math.round((rect.left + rect.right) / 2), Math.round((rect.top + rect.bottom) / 2)];
+      // Un point du bas de l'image de l'entrée (4110) ; toute l'image tient dans la tolérance de 60 points autour de (172, 226).
+      const finger: [number, number] = [160, 255];
+      if (mode === "glisser") await drag(at, finger);
+      else {
+        host.click(at[0], at[1]);
+        await runFor(engine, host, 60);
+        expect(zoombinis.game.group.members, mode).toHaveLength(1);
+        const to = mode === "toucher-toucher" ? finger : ([500, 400] as const);
+        host.click(to[0], to[1]);
+        await runFor(engine, host, 200);
+      }
+      expect(zoombinis.game.group.members, mode).toHaveLength(mode === "toucher-ailleurs" ? 1 : 0);
+      if (mode === "toucher-ailleurs") {
+        await runFor(engine, host, 500);
+        expect(snoid.rect).toEqual(rect);
+      }
+    }
+  });
+
   it("garde les Zoombinis dans leur rangée après un retrait : le suivant prend la place libre", async () => {
-    const { zoombinis, snoids, create, click, engine, host } = await start();
+    const { zoombinis, snoids, create, drag, engine, host } = await start();
     for (const attrs of TYPES.slice(0, 3)) await create(attrs);
     await runFor(engine, host, 20000);
     const first = snoids()[0]!;
     const rect = first.rect!;
-    await click([Math.round((rect.left + rect.right) / 2), Math.round((rect.top + rect.bottom) / 2)]);
+    await drag([Math.round((rect.left + rect.right) / 2), Math.round((rect.top + rect.bottom) / 2)], CAVE);
     expect(zoombinis.game.group.members).toHaveLength(2);
     // Les deux restants rejoignent les places 0 et 1 : le premier marche d'une place vers la droite.
     await runFor(engine, host, 5000);

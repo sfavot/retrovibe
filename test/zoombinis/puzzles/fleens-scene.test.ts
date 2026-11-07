@@ -184,6 +184,29 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(probe().trial?.index).toBe(index);
   }, 60_000);
 
+  it("survol du repère libre (1168:1742) : le repère (bit 0x1000000) joue et se dessine ; hors de lui et au lâcher, il s'arrête", async () => {
+    const { probe, grab, wait, until, host, specials, mark } = await start();
+    await until(() => probe().dropTarget.owner === null && !probe().introPlaying, 900);
+    const zone = probe().dropTarget.highlight!;
+    expect(zone.active).toBe(false);
+    const index = specials()[0]!;
+    const point = grab(index)!;
+    const member = probe().kit.members[index]!;
+    const at = { x: point.x - member.snoid.position.x, y: point.y - member.snoid.position.y };
+    host.input.moveMouse(point.x, point.y);
+    host.input.mouseDown("left");
+    await wait(4);
+    host.input.moveMouse(mark().x + at.x, mark().y + at.y);
+    await wait(8);
+    expect(zone.active).toBe(true);
+    host.input.moveMouse(320, 40);
+    await wait(8);
+    expect(zone.active).toBe(false);
+    host.input.mouseUp("left");
+    await wait(10);
+    expect(zone.active).toBe(false);
+  });
+
   it("un essai juste remplit un cocon : parcours 7000 + pieds, cocon (SCRB 1001), cousin perché descendu dans la file des cousins, repère libéré à l'événement 7", async () => {
     const { probe, tryOnce, until, specials, state, features, settle, mark } = await start();
     const index = specials()[0]!;

@@ -26,8 +26,10 @@
  *    (544, 264, `NODE` 8) ; le groupe part quand il est arrivé et que le son 996 est fini (`1128:0566`) ; un clic pendant l'attente fait partir tout de suite ;
  *  - un Zoombini créé sort de la grotte (nœud 1 de `NODE` 1000, 148 × 215) et marche jusqu'à sa place par `PATH` 1000.
  *
- * Écarts : le retrait d'un Zoombini se fait au clic (l'original lance `1168:1742`, un glissement de la souris qui le ramène à sa place, et la condition
- * de retrait `1168:166e` demande une zone de dépôt que l'écran ne déclare pas : la cible exacte n'est pas établie) ; les Zoombinis retirés disparaissent
+ * Retrait (`1168:1742`, `1168:166e`) : un Zoombini immobile est pris et suit la souris tant que le bouton est tenu ; lâché sur l'entrée de la grotte (zone 4110, point
+ * (172, 226), tolérance 60, qui s'allume au survol) il est retiré, sinon il revient à sa place.
+ *
+ * Écarts : le Zoombini porté passe devant tout et revient d'un coup à sa place ; les Zoombinis retirés disparaissent
  * sans marcher ; pas d'animation d'attente des Zoombinis (clignements) ; l'enfoncement d'un bouton d'action dure 2 ticks comme `1090:00c1(1, 0, 2, …)` ;
  * le Zoombini qui embarque ne grimpe pas à l'échelle (il s'arrête au bout du chemin) ; le curseur n'est pas changé
  * (aucun appel dans `1128:*`, les zones de `1038:*` n'ont pas été décodées) ; phrase d'accueil de la première arrivée (`[384c]`, posé par le logo)
@@ -48,6 +50,8 @@ import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { TextFlags, ZOOMBINIS_TEXT } from "../engine/text";
 import { addZoombini, groupComplete, isAvailable, pickerEnter, pickerLeave, pickRandomType, remainingToCreate, removeZoombini } from "../game/team";
 import { STATE_BYTES, testMode, ZOOMBINI_TYPES, type Zoombini } from "../game/state";
+import type { Host } from "../engine/host";
+import { CARRY_DELAY, CARRY_DEPTH, CARRY_SCRIPT_BASE, TAP_SLOP } from "./puzzle-kit";
 import { closeScreen, openScreen } from "./screen-kit";
 import { createSnoid, type Snoid } from "./snoid";
 
@@ -71,12 +75,14 @@ const ROCKS = [4106, 4107, 4108, 4109] as const;
 /** Drapeaux inconnus du lecteur de features (`FeatureFlag.flag4000000` et deux bits jamais lus) : l'arche (`1128:006d`, `0x64000000`) et la couche des boutons (`0x4001000`). */
 const ARCH_FLAGS = 0x64000000;
 const BUTTON_LAYER_FLAGS = 0x4001000;
-/** `0x108a000` : image fixe jouée une fois, dès la création. */
 /**
- * Détail de l'arche (4110) : `0x108a000` dans l'original (`1128:006d`), donc avec le bit `0x1000000`. **Écart provisoire** : il reste dessiné (`still`) en attendant que
- * l'utilisatrice confirme l'aspect de l'original (l'ouverture sombre de la roche n'est pas dans le fond).
+ * Entrée de la grotte (4110) : `0x108a000` (`1128:006d`), avec le bit `0x1000000` (`playOnly`) et `0x2000` : c'est **la zone de dépôt du retrait**, de point `DS:1ab6`
+ * (172, 226). Dessinée seulement pendant sa surbrillance, quand un Zoombini porté la survole (`1168:1742`).
  */
-const DETAIL_FLAGS = FeatureFlag.still | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
+const DETAIL_FLAGS = FeatureFlag.playOnly | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
+/** Point de la zone de retrait (`DS:1ab6`) et tolérance de l'écran (`DS:9706` = 60, `1128:0000`) : carré `[x − 60, x + 60[ × [y − 60, y + 60[` autour du porté. */
+const REMOVE_ZONE = { x: 172, y: 226 } as const;
+const REMOVE_TOLERANCE = 60;
 
 /** Profondeurs : décor 0, décors animés créés par `Ctrl+W` 0,01 (ils sont créés avant les boutons à l'entrée), boutons 0,5, Zoombinis de 1 à 2. */
 const BUTTON_LAYER_DEPTH = 0.5;
@@ -263,6 +269,22 @@ interface Occupant {
   walking: boolean;
 }
 
+/** Zoombini porté pour être retiré (`1168:1742`) : écart pointeur / position à la prise, position d'origine, survol de la zone de retrait. */
+interface Carry {
+  occupant: Occupant;
+  snoid: Snoid;
+  grab: Point;
+  origin: Point;
+  lastX: number;
+  hover: boolean;
+  /** Profondeur rendue au lâcher. */
+  depth: number;
+  /** Point de l'appui qui a pris le Zoombini. */
+  pressAt: Point;
+  /** Au doigt, un toucher sans glissement le garde en main : le toucher suivant le dépose (extension tactile du port, comme le kit). */
+  sticky: boolean;
+}
+
 /** Le départ en cours : le Zoombini qui embarque (s'il y en a un) et son arrivée. */
 interface Departure {
   arrived: boolean;
@@ -348,7 +370,8 @@ function start(ctx: SceneContext, archive: Archive, map: PickerMap) {
   WAVES.forEach((script, i) => features.create({ script, delay: 10 + i, flags: FeatureFlag.active }));
   if (!initial.options.lessAction) createMascots();
   features.create({ script: ARCH, delay: 0, flags: ARCH_FLAGS });
-  features.create({ script: ARCH_DETAIL, delay: 6, flags: DETAIL_FLAGS });
+  const removeZone = features.create({ script: ARCH_DETAIL, delay: 6, flags: DETAIL_FLAGS });
+  let carry: Carry | null = null;
   for (const script of ROCKS) features.create({ script, delay: 0, flags: 0 });
   features.create({ script: 0, delay: 0, depth: BUTTON_LAYER_DEPTH, flags: BUTTON_LAYER_FLAGS, onAfterDraw: (_feature, screen) => paint(screen) });
 
@@ -716,13 +739,71 @@ function start(ctx: SceneContext, archive: Archive, map: PickerMap) {
       }
       return;
     }
-    if (creating === 0) {
+    // Cas 7 (`[8cf4] == 0` : personne ne marche) : le Zoombini est pris et suit la souris (`1168:1742`) ; lâché sur l'entrée de la grotte il est retiré.
+    if (creating === 0 && !slots.some((occupant) => occupant?.walking)) {
       const occupant = zoombiniAt(x, y);
-      if (occupant) {
+      if (occupant?.snoid) {
         stopSpeaking();
-        clickZoombini(occupant);
+        const at = occupant.snoid.position;
+        carry = { occupant, snoid: occupant.snoid, grab: { x: x - at.x, y: y - at.y }, origin: { x: at.x, y: at.y }, lastX: x, hover: false, depth: occupant.snoid.feature.depth, pressAt: { x, y }, sticky: false };
+        // Porté devant tout (extension, comme dans les épreuves : l'ordre de `1168:1742` n'est pas établi), délai 3, animation de transport `145 + pieds` (état 5).
+        features.restack(occupant.snoid.feature, CARRY_DEPTH);
+        occupant.snoid.delay = CARRY_DELAY;
+        occupant.snoid.play(CARRY_SCRIPT_BASE + occupant.snoid.traits.feet);
       }
     }
+  }
+
+  /** Un tour de `1168:1742` : le Zoombini suit la souris tant que le bouton est tenu ; l'entrée de la grotte s'allume quand il est assez près. */
+  /** Le dernier appui vient d'un doigt (`Host.pointerIsTouch`). */
+  const touch = (): boolean => (ctx.host as Host).pointerIsTouch === true;
+
+  /**
+   * Survol de la zone de retrait : son point dans le carré de tolérance autour du Zoombini porté (`1168:1742`) ; au doigt (extension tactile, comme le kit au bac,
+   * bug 18), à défaut, le doigt sur l'image de la zone (4110, l'entrée de la grotte).
+   */
+  function overRemoveZone(x: number, y: number, finger: Point): boolean {
+    if (REMOVE_ZONE.x >= x - REMOVE_TOLERANCE && REMOVE_ZONE.x < x + REMOVE_TOLERANCE && REMOVE_ZONE.y >= y - REMOVE_TOLERANCE && REMOVE_ZONE.y < y + REMOVE_TOLERANCE) return true;
+    const rect = removeZone.rect;
+    return touch() && rect !== null && finger.x >= rect.left && finger.x < rect.right && finger.y >= rect.top && finger.y < rect.bottom;
+  }
+
+  /** Un tour de transport ; `tap` : le toucher qui dépose le Zoombini tenu en main (son point). */
+  function updateCarry(tap: Point | null = null): void {
+    const current = carry!;
+    const { input } = ctx;
+    const drop = tap !== null;
+    const px = tap?.x ?? input.mouseX;
+    const py = tap?.y ?? input.mouseY;
+    const x = Math.max(0, Math.min(639, px - current.grab.x));
+    const y = Math.max(0, Math.min(479, py - current.grab.y));
+    if (px < current.lastX) current.snoid.setFacing(1);
+    else if (px > current.lastX) current.snoid.setFacing(0);
+    current.lastX = px;
+    current.snoid.setPosition({ x, y });
+    const hover = overRemoveZone(x, y, { x: px, y: py });
+    if (hover !== current.hover) {
+      if (hover) features.playZone(removeZone);
+      else features.resetZone(removeZone);
+      current.hover = hover;
+    }
+    if (!drop && (current.sticky || input.isButtonDown("left"))) return;
+    // Au doigt, relâché sans avoir glissé : il reste en main jusqu'au toucher suivant.
+    if (!drop && touch() && Math.abs(px - current.pressAt.x) <= TAP_SLOP && Math.abs(py - current.pressAt.y) <= TAP_SLOP) {
+      current.sticky = true;
+      return;
+    }
+    // Lâché : retiré sur la zone (`1168:166e`), sinon rendu à sa place.
+    carry = null;
+    if (current.hover) features.resetZone(removeZone);
+    features.restack(current.snoid.feature, current.depth);
+    current.snoid.delay = 6;
+    if (current.hover) {
+      clickZoombini(current.occupant);
+      return;
+    }
+    current.snoid.setPosition(current.origin);
+    current.snoid.idle();
   }
 
   function finishDeparture(): void {
@@ -757,8 +838,14 @@ function start(ctx: SceneContext, archive: Archive, map: PickerMap) {
       if (left) return;
       for (const event of ctx.input.buttonEvents) {
         if (left) return;
+        if (carry?.sticky && event.down && event.button === "left") {
+          updateCarry({ x: event.x, y: event.y });
+          continue;
+        }
+        if (carry) break;
         if (event.down && event.button === "left") click(event.x, event.y, event.shift);
       }
+      if (carry) updateCarry();
       // Départ : une fois le son de départ fini et le Zoombini arrivé sur le bateau.
       if (departure && !left && departure.arrived && sound.pending.effects === 0 && sound.effectsPlaying === 0) finishDeparture();
     },

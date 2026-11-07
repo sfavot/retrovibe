@@ -228,9 +228,9 @@ class CavesRun implements CavesProbe {
     const fillers = Math.min(4, SLOT_COUNT - this.party.length);
     if (fillers > 0) f.create({ script: SCRB.filler + fillers, delay: DELAY.default, flags: F.flag4000000 | F.stopAtEnd | F.active, depth: DEPTH.filler });
     for (let s = 1; s <= SLOT_COUNT; s++) {
-      // Dalles : `0x508a000` dans l'original (`10c8:0000`), donc avec le bit `0x1000000`. **Écart provisoire** : elles restent dessinées (`still`) en attendant que
-      // l'utilisatrice confirme l'aspect de l'original (sans elles, le fond montre des dalles dorées en pointe de diamant).
-      this.tiles[s] = f.create({ script: SCRB.tile + s, delay: DELAY.tile, flags: F.flag4000000 | F.still | F.noReplay | F.active | F.firstImage });
+      // Dalles : `0x508a000` (`10c8:0000`), avec le bit `0x1000000` (`playOnly`) : zones de dépôt dessinées seulement pendant leur surbrillance, quand un
+      // Zoombini porté les survole (`1168:1742`, `DropTarget.highlight`) ; au repos, le fond montre les dalles.
+      this.tiles[s] = f.create({ script: SCRB.tile + s, delay: DELAY.tile, flags: F.flag4000000 | F.playOnly | F.noReplay | F.active | F.firstImage });
     }
     f.create({ script: SCRB.decor, delay: 0, flags: F.flag4000000 });
 
@@ -254,7 +254,13 @@ class CavesRun implements CavesProbe {
     });
 
     // Cibles de dépôt : les dalles du groupe (les dalles de remplissage appartiennent à leur objet : `[02f0 + 2i]`, jamais libres).
-    for (let s = SLOT_COUNT + 1 - this.party.length; s <= SLOT_COUNT; s++) this.targets[s] = createTarget(SLOT_ANCHORS[s - 1]!, s);
+    for (let s = SLOT_COUNT + 1 - this.party.length; s <= SLOT_COUNT; s++) {
+      // Au doigt (extension tactile, bug 18), la dalle dont l'image est sous le doigt est prise aussi.
+      const tile = this.tiles[s]!;
+      const target = createTarget(SLOT_ANCHORS[s - 1]!, s, () => tile.rect);
+      target.highlight = tile;
+      this.targets[s] = target;
+    }
     const buttons = sheetButtonImages(archive.tbmpImages(BUTTONS_SHEET));
     this.kit = createPuzzleKit(ctx, {
       screen: SCREEN,

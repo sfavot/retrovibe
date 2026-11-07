@@ -505,6 +505,59 @@ describe.skipIf(!original.has)("sphinx : écran sur les vrais fichiers (CAVES.MH
     expect(robot(copy)).toHaveLength(16);
   });
 
+  it("survol d'une dalle libre (1168:1742) : la dalle (SCRB 6999 + s, bit 0x1000000) joue et se dessine ; hors d'elle et au lâcher, elle s'arrête", async () => {
+    const { probe, grab, byFront, anchor, wait, host, features, state } = await start();
+    const index = byFront()[0]!;
+    const member = probe().kit.members[index]!;
+    const slot = state().layout.first;
+    const tile = () => features.features.find((f) => f.scriptId === 6999 + slot)!;
+    expect(tile().active).toBe(false);
+    const point = grab(index)!;
+    const at = { x: point.x - member.snoid.position.x, y: point.y - member.snoid.position.y };
+    host.input.moveMouse(point.x, point.y);
+    host.input.mouseDown("left");
+    await wait(4);
+    host.input.moveMouse(anchor(slot).x + at.x, anchor(slot).y + at.y);
+    await wait(8);
+    expect(tile().active).toBe(true);
+    host.input.moveMouse(600, 60);
+    await wait(8);
+    expect(tile().active).toBe(false);
+    host.input.mouseUp("left");
+    await wait(10);
+    expect(tile().active).toBe(false);
+  });
+
+  it("au doigt (extension tactile, bug 18) : le doigt sur l'image de la dalle, loin de son ancre, y pose le Zoombini", async () => {
+    const { probe, grab, byFront, anchor, wait, host, features, state, rightSlot } = await start();
+    const index = byFront()[0]!;
+    const slot = rightSlot(index);
+    const tile = features.features.find((f) => f.scriptId === 6999 + slot)!;
+    (host as unknown as { pointerIsTouch: boolean }).pointerIsTouch = true;
+    const member = probe().kit.members[index]!;
+    const point = grab(index)!;
+    const at = { x: point.x - member.snoid.position.x, y: point.y - member.snoid.position.y };
+    // Un point de l'image de la cible où les pieds du Zoombini porté sont loin de l'ancre (hors du carré de 15, `DS:9706`).
+    const rect = tile.rect!;
+    let finger: { x: number; y: number } | null = null;
+    for (let y = rect.top; y < rect.bottom && !finger; y++) {
+      for (let x = rect.left; x < rect.right && !finger; x++) {
+        if (Math.max(Math.abs(x - at.x - anchor(slot).x), Math.abs(y - at.y - anchor(slot).y)) > 30) finger = { x, y };
+      }
+    }
+    expect(finger).not.toBeNull();
+    host.input.moveMouse(point.x, point.y);
+    host.input.mouseDown("left");
+    await wait(4);
+    host.input.moveMouse(finger!.x, finger!.y);
+    await wait(8);
+    expect(tile.active).toBe(true);
+    host.input.mouseUp("left");
+    await wait(10);
+    expect(state().slotOf[index]).toBe(slot);
+    expect(member.snoid.position).toEqual(anchor(slot));
+  });
+
   it("une pose juste reste sur la dalle : posé, « go » actif, dalle libérée aux autres, pas de cran, pas à pas sur place", async () => {
     const { probe, drag, rightSlot, byFront, anchor, until, state, queued } = await start();
     const index = byFront()[0]!;

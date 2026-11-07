@@ -235,7 +235,7 @@ Voir l'en-tête de `scenes/puzzles/hotel.ts` : entrée (5000 + scénette), relan
 - le rectangle de découpe d'un Zoombini rangé (`+0xe4`, événement 15) n'est pas porté : l'avant-plan percé suffit ;
 - un Zoombini déjà rangé n'est pas reprenable (l'original le laisse déplacer, sans effet sur la chambre) ;
 - un dépôt sur une chambre bloquée renvoie le Zoombini sur sa place (l'original l'annule sans le déplacer) ;
-- le survol des socles (images 1 et 2 de `10000 + r`, `DS:9708`) n'est pas porté ;
+- le survol des socles (`1168:1742`, `DS:9708`) est porté : le socle de la chambre survolée rejoue son script (`DropTarget.highlight`), seul moment où il est dessiné ;
 - les clics pendant l'animation de refus ou d'acceptation sont ignorés jusqu'à sa fin (l'original ne retarde que le traitement) ;
 - l'attente de défaite (`1090:00c1`, 60 ticks) est un délai de la scène ;
 - le tirage inutile du niveau 3 (`rand(0..3)` avant le son 7500) est conservé ;

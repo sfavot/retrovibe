@@ -365,7 +365,7 @@ class FleensRun implements FleensProbe {
     f.addScripts(SCRB.dust, 7);
     const F = FeatureFlag;
     this.branch = f.create({ script: SCRB.branch, delay: DELAY, flags: F.stopAtEnd | F.active | F.firstImage });
-    f.create({ script: SCRB.mark, delay: DELAY, flags: F.playOnly | F.noReplay | F.active | F.firstImage });
+    const mark = f.create({ script: SCRB.mark, delay: DELAY, flags: F.playOnly | F.noReplay | F.active | F.firstImage });
 
     // `10e0:1b29` : règle cachée (octets 0x0C à 0x13 de la partie, conservés d'une entrée à l'autre aux niveaux 0 et 2), spéciaux, nizibooms.
     const rule = Uint8Array.from(game.fleensRule);
@@ -385,6 +385,8 @@ class FleensRun implements FleensProbe {
     }
 
     this.dropTarget = createTarget(DROP_POINT);
+    // Repère (`0x2000`, zone de dépôt) : allumé au survol d'un Zoombini porté (`1168:1742`, `DropTarget.highlight`).
+    this.dropTarget.highlight = mark;
     const buttons = sheetButtonImages(archive.tbmpImages(BUTTONS_SHEET));
     this.kit = createPuzzleKit(ctx, {
       screen: SCREEN,

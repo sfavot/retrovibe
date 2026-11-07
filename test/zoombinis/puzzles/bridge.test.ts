@@ -410,6 +410,30 @@ describe.skipIf(!original.has)("gorges : écran sur les vrais fichiers (BRIDGE.M
     expect(bridgeAvoidCount(zoombinis.session)).not.toBe(99);
   });
 
+  it("survol d'une zone libre (1168:1742) : la zone du pont (SCRB 1300 + pont, bit 0x1000000) joue et se dessine ; hors d'elle et au lâcher, elle s'arrête", async () => {
+    const { probe, grab, byFront, wait, host, features } = await start();
+    for (const bridge of [1, 2] as const) {
+      const zone = features.features.find((f) => f.scriptId === 1300 + bridge - 1)!;
+      expect(zone.active).toBe(false);
+      const index = byFront()[0]!;
+      const point = grab(index)!;
+      const member = probe().kit.members[index]!;
+      const at = { x: point.x - member.snoid.position.x, y: point.y - member.snoid.position.y };
+      host.input.moveMouse(point.x, point.y);
+      host.input.mouseDown("left");
+      await wait(4);
+      host.input.moveMouse(BRIDGE_ANCHORS[bridge].x + at.x, BRIDGE_ANCHORS[bridge].y + at.y);
+      await wait(8);
+      expect(zone.active).toBe(true);
+      host.input.moveMouse(320, 40);
+      await wait(8);
+      expect(zone.active).toBe(false);
+      host.input.mouseUp("left");
+      await wait(10);
+      expect(zone.active).toBe(false);
+    }
+  });
+
   it("une pose acceptée traverse : le Zoombini est sauvé, rejoint la falaise de droite et active « go »", async () => {
     const { probe, drag, accepting, wait, until, byFront, queued } = await start();
     const index = byFront().find((i) => accepting(i) === 1)!;

@@ -277,5 +277,5 @@ Port : classe `Niziboom` (`play(id, { at })` : sans `at` le script part de la po
 ### 8.3 Écarts du port (non portés ou changés)
 
 - Pas de chargement progressif des 8 premiers `SCRS` d'ambiance (`[7490]`, `10e0:0f51` : c'est un préchargement, pas une animation), pas d'animation de joie (`[7496]`, `292a(5)`), pas de réactions de groupe de l'événement 135. L'attente de la fin du son 996 avant la sortie est portée (kit). Les `SCRS` 7021 à 7030 (sorties de la file des essais) ne sont pas portés : mécanisme distinct de l'attente (animations de la file `[734c]`, pas de son).
-- Ambiance : `SCRB` 1200 joue une fois, 1201 à 1206 en boucle (flags de `10e0:00ea`) ; le repère `SCRB` 1100 est créé (image fixe) mais invisible à l'écran : sa première image est vide ou masquée par le décor.
+- Ambiance : `SCRB` 1200 joue une fois, 1201 à 1206 en boucle (flags de `10e0:00ea`) ; le repère `SCRB` 1100 (`0x108a000`, zone de dépôt) n'est dessiné que pendant son survol par un Zoombini porté (bit `0x1000000`, `1168:1742`, `DropTarget.highlight`).
 - Attente des nizibooms (`10e0:0f9f`) : un compteur par objet, tiré dans [0, 80], +1 par tick de la scène ; au-delà de 80, `SCRS` 4000 ou 4001 (`rand(1..100) < 51`) puis retour à 1 ; arrêté pendant un essai et après la clôture.

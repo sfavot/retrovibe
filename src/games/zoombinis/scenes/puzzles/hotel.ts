@@ -27,7 +27,7 @@
  *  - le rectangle de découpe d'un Zoombini rangé (`+0xe4`) n'est pas porté : l'avant-plan percé suffit à ne le montrer que dans l'ouverture de sa porte ;
  *  - un Zoombini déjà rangé n'est pas reprenable (l'original le laisse déplacer pour trier à l'œil, sans changer de chambre) ;
  *  - un dépôt sur une chambre bloquée renvoie le Zoombini sur sa place d'origine (l'original l'annule sans le déplacer) ;
- *  - le survol (images 1 et 2 des socles `10000 + r`) n'est pas porté : les socles, que l'original ne dessine que pendant ce survol (bit `0x1000000`, `11a0:0126`), ne sont jamais
+ *  - (porté) le survol d'une chambre allume son socle `10000 + r` (bit `0x1000000` : dessiné seulement pendant ce survol, `11a0:0126`, `1168:1742`) ; hors survol il n'est pas
  *    dessinés (`FLAG_BASE`) ;
  *  - les clics pendant les animations de refus et d'acceptation sont ignorés jusqu'à leur fin (l'original ne bloque que le traitement du Tick) ;
  *  - l'attente de 60 ticks de la défaite (`1090:00c1`) est un délai de la scène, pas une attente bloquante.
@@ -105,7 +105,7 @@ const FLAG_DOOR = F.flag4000000 | F.stopAtEnd | F.noReplay | F.active;
 const FLAG_SHELF = F.region | FLAG_DOOR;
 /**
  * Socles de dépôt (`0x508a000`, niveau 3 : `0x108a000`) : le bit `0x1000000` fait que le rappel de dessin `11a0:0126` ne dessine l'objet que
- * pendant qu'il joue (`+0xe0 ≠ 0`) ; il s'arrête dès sa première image (`11a0:033a`), donc il n'est jamais dessiné hors du survol (non porté).
+ * pendant qu'il joue (`+0xe0 ≠ 0`) ; il s'arrête dès sa première image (`11a0:033a`), donc il n'est dessiné que pendant le survol (`1168:1742`, `DropTarget.highlight`).
  * Ce sont des surbrillances (planche pointillée posée sur l'étagère), pas des étagères : dessinés en permanence, ils cachaient l'étagère qui
  * bascule au refus et celles qui se replient à la fin (`3ace`). Le moteur applique ce bit (`FeatureFlag.playOnly`).
  */
@@ -232,6 +232,8 @@ class HotelRun implements HotelProbe {
   readonly shelves: (Feature | undefined)[] = [];
   readonly doors: (Feature | undefined)[] = [];
   readonly roomTargets: DropTarget[] = [];
+  /** Socles de dépôt (`SCRB` 10000 + r ou 10025 + r), dans l'ordre des cibles des chambres. */
+  readonly bases: Feature[] = [];
 
   readonly level: Level;
   private readonly features: Features;
@@ -417,6 +419,8 @@ class HotelRun implements HotelProbe {
     // `1168:3dd0(0, 0)` : personne n'est encore rangé.
     this.kit.markAll(false);
     this.buildRooms();
+    // Socles : zones de dépôt des chambres (`0x2000`), allumés au survol d'un Zoombini porté (`1168:1742`, `DropTarget.highlight`).
+    roomTargets.forEach((target, i) => (target.highlight = this.bases[i]));
     this.later.length = 0;
     // `10e8:0b09` : scénette d'explication, sinon le cadran démarre.
     const explain = explanationScript(level, this.variant);
@@ -476,7 +480,7 @@ class HotelRun implements HotelProbe {
         });
       }
       for (let room = 0; room < rooms; room++) {
-        f.create({ script: SCRB.baseL3 + room, delay: DELAY.play, flags: FLAG_BASE_L3, depth: DEPTH.base });
+        this.bases[room] = f.create({ script: SCRB.baseL3 + room, delay: DELAY.play, flags: FLAG_BASE_L3, depth: DEPTH.base });
       }
       return;
     }
@@ -497,7 +501,7 @@ class HotelRun implements HotelProbe {
       this.shelves[slot] = f.create({ script: SCRB.shelf + roomAt(slot), delay: DELAY.shelf, flags: FLAG_SHELF, depth: DEPTH.shelf });
     }
     for (let slot = 0; slot < rooms; slot++) {
-      f.create({ script: SCRB.base + roomAt(slot), delay: DELAY.base, flags: FLAG_BASE, depth: DEPTH.base });
+      this.bases[slot] = f.create({ script: SCRB.base + roomAt(slot), delay: DELAY.base, flags: FLAG_BASE, depth: DEPTH.base });
     }
   }
 

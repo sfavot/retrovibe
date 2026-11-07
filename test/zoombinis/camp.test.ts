@@ -508,6 +508,69 @@ describe.skipIf(!original.has).each([1, 2] as const)("camp de base %i", (camp) =
     }
   });
 
+  it("survol d'une place libre (1168:1742, 15 points) : son emplacement (bit 0x1000000) joue et se dessine ; hors de toute place, il s'arrête et disparaît", async () => {
+    const { features, engine, host } = await start((game) => {
+      game.group.members = members(15);
+      game.counters.created = 15;
+    });
+    await runFor(engine, host, 30000);
+    const placeScript = camp === 1 ? 1200 : 7000;
+    const place = (i: number) => features.features.find((f) => f.scriptId === placeScript + i)!;
+    for (let i = 0; i < 16; i++) expect(place(i).active, `place ${i}`).toBe(false);
+    const [x0, y0] = PLACES[camp][0]!;
+    const [x15, y15] = PLACES[camp][15]!;
+    host.input.moveMouse(x0, y0);
+    host.input.mouseDown("left");
+    await runFor(engine, host, 60);
+    host.input.moveMouse(x15 + 5, y15 - 5);
+    await runFor(engine, host, 60);
+    expect(place(15).active).toBe(true);
+    // La place qu'il vient de quitter est libre aussi, mais trop loin ; les places occupées ne s'allument pas.
+    expect(place(0).active).toBe(false);
+    host.input.moveMouse(320, 60);
+    await runFor(engine, host, 60);
+    expect(place(15).active).toBe(false);
+    host.input.mouseUp("left");
+    await runFor(engine, host, 600);
+    expect(features.features.filter((f) => f.scriptId >= placeScript && f.scriptId < placeScript + 16).every((f) => !f.active)).toBe(true);
+  });
+
+  it("au doigt (extension tactile, bug 18) : glisser le doigt sur l'image d'un emplacement libre, ou toucher le Zoombini puis l'emplacement, l'y pose ; à la souris, la tolérance d'origine (15 points) reste seule", async () => {
+    for (const mode of ["glisser", "toucher-toucher", "souris"] as const) {
+      const { features, engine, host, group } = await start((game) => {
+        game.group.members = members(15);
+        game.counters.created = 15;
+      });
+      (host as unknown as { pointerIsTouch: boolean }).pointerIsTouch = mode !== "souris";
+      await runFor(engine, host, 30000);
+      const placeScript = camp === 1 ? 1200 : 7000;
+      const rect = features.features.find((f) => f.scriptId === placeScript + 15)!.rect!;
+      const [ax, ay] = PLACES[camp][15]!;
+      // Un point de l'image de l'emplacement, à plus de 15 points de son ancre.
+      const finger: Pt = [rect.left + 2, rect.bottom - 2];
+      expect(Math.max(Math.abs(finger[0] - ax), Math.abs(finger[1] - ay))).toBeGreaterThan(15);
+      const [x0, y0] = PLACES[camp][0]!;
+      host.input.moveMouse(x0, y0);
+      host.input.mouseDown("left");
+      await runFor(engine, host, 60);
+      if (mode === "toucher-toucher") {
+        host.input.mouseUp("left");
+        await runFor(engine, host, 60);
+        host.input.moveMouse(finger[0], finger[1]);
+        host.input.mouseDown("left");
+        await runFor(engine, host, 30);
+        host.input.mouseUp("left");
+      } else {
+        host.input.moveMouse(finger[0], finger[1]);
+        await runFor(engine, host, 60);
+        host.input.mouseUp("left");
+      }
+      await runFor(engine, host, 3000);
+      const at15 = group().some((f) => f.rect && Math.abs((f.rect.left + f.rect.right) / 2 - ax) < 12 && Math.abs((f.rect.top + f.rect.bottom) / 2 - ay) < 14);
+      expect(at15, mode).toBe(mode !== "souris");
+    }
+  });
+
   it.skipIf(camp !== 1)("un Zoombini qui marche derrière le rocher 1110 (`limitLeft` / `limitRight`) est caché par lui, puis repasse devant", async () => {
     const { features, group, engine, host } = await start((game) => {
       game.group.members = members(16);

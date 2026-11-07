@@ -170,6 +170,7 @@ describe.skipIf(!original.has)("cristal : écran sur les vrais fichiers (SMOKE.M
       state,
       wait,
       until,
+      grab,
       dragMember,
       dragPoint,
       pullLever,
@@ -223,6 +224,53 @@ describe.skipIf(!original.has)("cristal : écran sur les vrais fichiers (SMOKE.M
       expect(probe().crystalAt(1)).not.toBeNull();
       expect(probe().secondTarget).toEqual(level === 4 ? { x: 616, y: 253 } : null);
     }
+  });
+
+  it("niveau 1 : le wagonnet de dépôt (SCRB 11001, bit 0x1000000) n'est dessiné que survolé par un Zoombini porté (1168:1742)", async () => {
+    const { probe, grab, wait, host, features } = await start(1);
+    const zone = () => features.features.find((f) => f.scriptId === 11001)!;
+    expect(zone().active).toBe(false);
+    const member = probe().kit.members[0]!;
+    const point = grab(0)!;
+    const at = { x: point.x - member.snoid.position.x, y: point.y - member.snoid.position.y };
+    host.input.moveMouse(point.x, point.y);
+    host.input.mouseDown("left");
+    await wait(4);
+    host.input.moveMouse(SMOKE_WAGON.x + at.x, SMOKE_WAGON.y + at.y);
+    await wait(8);
+    expect(zone().active).toBe(true);
+    host.input.moveMouse(point.x, point.y);
+    await wait(8);
+    expect(zone().active).toBe(false);
+    host.input.mouseUp("left");
+    await wait(6);
+  });
+
+  it("niveau 1, au doigt (extension tactile, bug 18) : le doigt sur l'image du wagonnet, jusqu'à son bord le plus éloigné de l'ancre, y pose le Zoombini", async () => {
+    const { probe, grab, wait, host, features, state } = await start(1);
+    const zone = features.features.find((f) => f.scriptId === 11001)!;
+    (host as unknown as { pointerIsTouch: boolean }).pointerIsTouch = true;
+    const member = probe().kit.members[0]!;
+    const point = grab(0)!;
+    const at = { x: point.x - member.snoid.position.x, y: point.y - member.snoid.position.y };
+    // Le point de l'image du wagonnet où les pieds du Zoombini porté sont le plus loin de l'ancre : l'image tient presque dans le carré de 35 (`DS:9706`),
+    // l'extension tactile ne sert qu'à ses bords.
+    const rect = zone.rect!;
+    const distance = (x: number, y: number) => Math.max(Math.abs(x - at.x - SMOKE_WAGON.x), Math.abs(y - at.y - SMOKE_WAGON.y));
+    let finger = { x: rect.left, y: rect.top };
+    for (let y = rect.top; y < rect.bottom; y++) {
+      for (let x = rect.left; x < rect.right; x++) if (distance(x, y) > distance(finger.x, finger.y)) finger = { x, y };
+    }
+    host.input.moveMouse(point.x, point.y);
+    host.input.mouseDown("left");
+    await wait(4);
+    host.input.moveMouse(finger.x, finger.y);
+    await wait(8);
+    expect(zone.active).toBe(true);
+    host.input.mouseUp("left");
+    await wait(10);
+    expect(state().current).toBe(0);
+    expect(member.snoid.position).toEqual(SMOKE_WAGON);
   });
 
   it.each([1, 2] as const)("niveau %i : un Zoombini sur le wagonnet, une silhouette sur le cristal, levier : test réussi, sauvé, garé, « go » actif", async (level) => {

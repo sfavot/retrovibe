@@ -34,9 +34,10 @@
  * Zoombini passe donc derrière le rocher 1110 (bord bas 346, colonne x de 321 à 394, drapeaux `0x50000000`) et devant le décor plus haut (insecte, champignons),
  * et les Zoombinis des places sont derrière le premier plan 1100 à 1103 ; au camp 2 tout le décor est au fond ou plus haut : rien ne change à l'écran.
  *
- * Écarts : le glisser-déposer d'un Zoombini du groupe le rend à sa place s'il n'est lâché ni sur le présentoir ni près d'une place libre (l'original lance
- * `1168:1742`, dont les zones de dépôt `1520:00fc` ne sont pas déclarées par ces écrans : le rayon de 36 points est choisi) ; pas de surbrillance des places
- * pendant le glissement ; pas d'animation d'attente ; le curseur n'est pas changé ; l'arrêt du son 2000 coupe tous les effets (pas d'arrêt par identifiant) ;
+ * Glisser-déposer (`1168:1742`) : les 16 emplacements sont les zones de dépôt (créés avec `0x2000`, point = la place) ; une place libre survolée à 15 points près
+ * s'allume (son emplacement joue, invisible sinon : bit `0x1000000`) et prend le Zoombini au lâcher ; sinon il retourne à sa place.
+ *
+ * Écarts : pas d'animation d'attente ; le curseur n'est pas changé ; l'arrêt du son 2000 coupe tous les effets (pas d'arrêt par identifiant) ;
  * le Zoombini porté par le pointeur est devant tout (extension : l'ordre de `1168:1742` n'est pas établi) ; la lecture de `drapeaux == 1` d'un Zoombini devient « bit snoid » (voir `Features.reorder`) ; les lattes du présentoir sont une feature `0x1000` (l'original en a une `0x9000`) ; les champignons ne sont pas créés par `10b0:0027`
  * (**hypothèse** : ils le sont ailleurs, leur image mémorisée est restituée à l'entrée) ; aucune musique n'est lancée par ces écrans (aucun appel dans `10b0:0027`).
  */
@@ -68,6 +69,8 @@ import {
   type Camp,
   type Rect,
 } from "../game/team";
+import type { Host } from "../engine/host";
+import { TAP_SLOP } from "./puzzle-kit";
 import { closeScreen, openScreen } from "./screen-kit";
 import { createSnoid, type Snoid } from "./snoid";
 import { dialogChoice } from "./xfer";
@@ -104,8 +107,11 @@ const COLUMNS = 5;
 const ROWS = 5;
 /** Les Zoombinis du présentoir sont dessinés autour de la position de la case : écart du point d'ancrage du personnage au centre de la case (mesuré sur le rendu : l'ancre est un peu sous le milieu du corps). */
 const SHELF_FEET = 3;
-/** Rayon (points) de recherche d'une place libre quand un Zoombini est lâché (voir l'écart décrit en tête). */
-const DROP_RADIUS = 36;
+/**
+ * Tolérance des zones de dépôt (`DS:9706`, 15 par défaut, `1168:0034` ; les camps ne la changent pas) : une place est survolée, et prise au lâcher, si son point est dans le
+ * carré `[x − 15, x + 15[ × [y − 15, y + 15[` autour du Zoombini porté (`1168:1742`, test `11d8:0000`). La première place libre dans l'ordre l'emporte.
+ */
+const ZONE_TOLERANCE = 15;
 /** Arrivée à pied : départ hors écran (`+0xd6 = 0xffce`), délais `1168:274e(30, 45)`. */
 const ENTRY_X = -50;
 const ARRIVAL_FIRST = 30;
@@ -114,12 +120,11 @@ const ARRIVAL_GAP = 45;
 const EXIT_X = 0x2a8;
 const EXIT_GAP = 45;
 
-/** Les 16 features d'emplacement : images fixes jouées une fois dès la création (`0x108a000`). */
 /**
- * Les 16 emplacements : `0x108a000` dans l'original (`10b0:01ee`, `10b8:01e9`), donc avec le bit `0x1000000` : ils ne seraient dessinés que pendant leur surbrillance
- * (non portée). **Écart provisoire** : ils restent dessinés (`still`) en attendant que l'utilisatrice confirme l'aspect de l'original, le fond n'ayant pas ces pierres.
+ * Les 16 emplacements : `0x108a000` (`10b0:01ee`, `10b8:01e9`), avec le bit `0x1000000` (`playOnly`) et `0x2000` (zone de dépôt `1520:00fc`, point = la place) : ils ne
+ * sont dessinés que pendant leur surbrillance, quand un Zoombini porté survole une place libre (`1168:1742`, `Features.playZone`).
  */
-const PLACE_FLAGS = FeatureFlag.still | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
+const PLACE_FLAGS = FeatureFlag.playOnly | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
 const { playOnly, stopAtEnd, noReplay, active, random, queueScript, stopEachImage } = FeatureFlag;
 /** Drapeaux de tri de `11a8:231b` : `0x1000` (feature 1107 de `BASECAMP`), `0x50000000` (1110) et `0x4000000` (6002, 6004, 6006 à 6008 de `BCTWO`). */
 const { overlay, limitLeft, limitRight, flag4000000 } = FeatureFlag;
@@ -417,6 +422,12 @@ interface Drag {
   /** Entrée vidée du présentoir (`slot` nul) : où il retourne s'il n'est pas accepté. */
   shelfIndex: number;
   lastX: number;
+  /** Place libre survolée (`1168:1742`), dont l'emplacement est en surbrillance ; null sinon. */
+  hover: number | null;
+  /** Point de l'appui qui a pris le Zoombini. */
+  pressAt: Point;
+  /** Au doigt, un toucher sans glissement le garde en main : le toucher suivant le dépose (extension tactile du port, comme le kit). */
+  sticky: boolean;
 }
 
 function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
@@ -468,7 +479,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
   // Dessin sans script : le présentoir (`0xc000` dans l'original) reste au fond, lattes et boutons (`0x1000`) devant les Zoombinis.
   features.setDepthSort(true);
   features.create({ script: 0, delay: 0, flags: active, onAfterDraw: (_feature, screen) => paintShelfBase(screen) });
-  spec.places.forEach((_place, i) => features.create({ script: spec.placeScript + i, delay: 7, flags: PLACE_FLAGS }));
+  const placeFeatures = spec.places.map((_place, i) => features.create({ script: spec.placeScript + i, delay: 7, flags: PLACE_FLAGS }));
   decor = spec.decor.features.map((params) => features.create(params));
   const mush = spec.decor.mushrooms;
   if (mush) {
@@ -840,7 +851,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
   }
 
   function beginDrag(occupant: Occupant, slot: number | null, shelfIndex: number, x: number, y: number): void {
-    drag = { occupant, slot, shelfIndex, lastX: x };
+    drag = { occupant, slot, shelfIndex, lastX: x, hover: null, pressAt: { x, y }, sticky: false };
     occupant.snoid.feature.raised = true;
     occupant.snoid.moveTo({ x, y });
   }
@@ -859,24 +870,43 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
     return true;
   }
 
-  function nearestFreePlace(point: Point, own: number | null): number {
-    let best = -1;
-    let bestDistance = DROP_RADIUS * DROP_RADIUS;
-    spec.places.forEach((place, i) => {
-      if (slots[i] !== null && i !== own) return;
-      const d = (place.x - point.x) ** 2 + (place.y - point.y) ** 2;
-      if (d <= bestDistance) {
-        bestDistance = d;
-        best = i;
-      }
+  /** Le dernier appui vient d'un doigt (`Host.pointerIsTouch`). */
+  const touch = (): boolean => (ctx.host as Host).pointerIsTouch === true;
+
+  /**
+   * `1168:1742` : la première place libre (ou celle qu'il vient de quitter) dont le point est dans le carré de tolérance autour du Zoombini porté ; −1 sinon.
+   * Au doigt (extension tactile, comme le kit au bac, bug 18), à défaut : la première place libre dont l'image d'emplacement est sous le doigt.
+   */
+  function placeUnder(point: Point, own: number | null): number {
+    const free = (i: number): boolean => slots[i] === null || i === own;
+    const near = spec.places.findIndex(
+      (place, i) =>
+        free(i) &&
+        place.x >= point.x - ZONE_TOLERANCE &&
+        place.x < point.x + ZONE_TOLERANCE &&
+        place.y >= point.y - ZONE_TOLERANCE &&
+        place.y < point.y + ZONE_TOLERANCE,
+    );
+    if (near >= 0 || !touch()) return near;
+    return spec.places.findIndex((_place, i) => {
+      const rect = placeFeatures[i]!.rect;
+      return free(i) && rect !== null && point.x >= rect.left && point.x < rect.right && point.y >= rect.top && point.y < rect.bottom;
     });
-    return best;
+  }
+
+  /** Surbrillance de la place survolée (`Features.playZone` / `resetZone`). */
+  function hoverPlace(place: number | null): void {
+    if (!drag || drag.hover === place) return;
+    if (drag.hover !== null) features.resetZone(placeFeatures[drag.hover]!);
+    if (place !== null) features.playZone(placeFeatures[place]!);
+    drag.hover = place;
   }
 
   /** Lâcher (`10b0:0a2a`, `1168:1742`) : présentoir (case libre la plus proche), place libre du groupe, sinon retour à l'origine. */
   function drop(x: number, y: number): void {
     const dragged = drag;
     if (!dragged) return;
+    hoverPlace(null);
     drag = null;
     const { occupant } = dragged;
     occupant.snoid.moveTo({ x, y });
@@ -892,7 +922,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
         return;
       }
     }
-    const place = nearestFreePlace({ x, y }, dragged.slot);
+    const place = placeUnder({ x, y }, dragged.slot);
     if (place >= 0) {
       if (dragged.slot !== null && dragged.slot !== place) slots[dragged.slot] = null;
       slots[place] = occupant;
@@ -929,6 +959,8 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
     else if (sx > drag.lastX) drag.occupant.snoid.setFacing(0);
     drag.lastX = sx;
     drag.occupant.snoid.moveTo({ x: sx, y: sy });
+    const place = placeUnder({ x: sx, y: sy }, drag.slot);
+    hoverPlace(place >= 0 ? place : null);
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -1066,16 +1098,22 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
       for (const event of ctx.input.buttonEvents) {
         if (left) return;
         if (event.button !== "left") continue;
-        if (event.down) click(event.x, event.y);
+        if (event.down && drag?.sticky) {
+          // Toucher qui dépose le Zoombini tenu en main.
+          dragTo(event.x, event.y);
+          drop(event.x, event.y);
+        } else if (event.down) click(event.x, event.y);
         else {
-          if (drag) drop(event.x, event.y);
+          // Au doigt, relâché sans avoir glissé : il reste en main jusqu'au toucher suivant.
+          if (drag && !drag.sticky && touch() && Math.abs(event.x - drag.pressAt.x) <= TAP_SLOP && Math.abs(event.y - drag.pressAt.y) <= TAP_SLOP) drag.sticky = true;
+          else if (drag && !drag.sticky) drop(event.x, event.y);
           if (held !== 0) {
             held = 0;
             soundScroll(true);
           }
         }
       }
-      if (drag) {
+      if (drag && !drag.sticky) {
         if (ctx.input.isButtonDown("left")) dragTo(ctx.input.mouseX, ctx.input.mouseY);
         else drop(ctx.input.mouseX, ctx.input.mouseY);
       }

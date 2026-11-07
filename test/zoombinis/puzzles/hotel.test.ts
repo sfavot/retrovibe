@@ -551,6 +551,31 @@ describe.skipIf(!original.has)("écran de l'hôtel (createHotelScene, HOTEL.MHK)
     expect(probe.clockScript).toBe(6000 + FREE_STEPS[2]!);
   }, 30_000);
 
+  it("survol d'une chambre libre (1168:1742) : son socle (SCRB 10000 + r, bit 0x1000000) joue et se dessine ; hors d'elle et au lâcher, il s'arrête", async () => {
+    for (const level of LEVELS) {
+      const { probe, grab, wait, host, toPlay } = await start({ level, visits: 5 });
+      await toPlay();
+      const room = level === 0 ? 2 : level === 3 ? 30 : 7;
+      const zone = probe().roomTargets[room]!.highlight!;
+      expect(zone.active).toBe(false);
+      const point = grab(0)!;
+      const member = probe().kit!.members[0]!;
+      const at = { x: point.x - member.snoid.position.x, y: point.y - member.snoid.position.y };
+      host.input.moveMouse(point.x, point.y);
+      host.input.mouseDown("left");
+      await wait(4);
+      host.input.moveMouse(probe().point(room).x + at.x, probe().point(room).y + at.y);
+      await wait(8);
+      expect(zone.active).toBe(true);
+      host.input.moveMouse(320, 470);
+      await wait(8);
+      expect(zone.active).toBe(false);
+      host.input.mouseUp("left");
+      await wait(10);
+      expect(zone.active).toBe(false);
+    }
+  });
+
   it("pose acceptée : le Zoombini monte (SCRS de montée), prend sa place de pile, la porte s'ouvre, « go » devient actif, il est sauvé", async () => {
     for (const level of LEVELS) {
       const t = await start({ level, visits: 5 });

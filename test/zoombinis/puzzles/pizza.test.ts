@@ -661,6 +661,28 @@ describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", 
     placed.mockRestore();
   });
 
+  it("repas manqué : le troll mange puis lance la pizza (SCRB 8020, couches du repas aux images 17 à 20), et l'assiette ne tombe qu'à la fin du lancer, comme 1130:415d → 0d85 → 478e", async () => {
+    const { clickIngredients, serveClick, ticks, intro, engine, features } = await start(0, { liked: [mask(0, 1)], lessAction: true });
+    await intro();
+    await clickIngredients(mask(2));
+    await serveClick();
+    let lastImageAt = -1;
+    let plateAt = -1;
+    let pizzaThrown = false;
+    for (let t = 0; t < 4000 && plateAt < 0; t++) {
+      await ticks(1);
+      const thrower = features.features.find((f) => f.scriptId === 8020);
+      if (thrower && thrower.image >= 17 && thrower.image <= 19 && thrower.parts.some((p) => p.w >= 152 && p.w <= 191)) pizzaThrown = true;
+      if (thrower && thrower.image === 23 && lastImageAt < 0) lastImageAt = engine.ctx.clock.ticks;
+      if (features.features.some((f) => f.scriptId >= 12016 && f.scriptId <= 12040)) plateAt = engine.ctx.clock.ticks;
+    }
+    expect(pizzaThrown).toBe(true);
+    expect(lastImageAt).toBeGreaterThan(0);
+    // Fin du script (délai 6 après sa dernière image), puis l'assiette est créée et lit sa première image (hors écran en haut) dans le même tick.
+    expect(plateAt - lastImageAt).toBeGreaterThanOrEqual(6);
+    expect(plateAt - lastImageAt).toBeLessThanOrEqual(8);
+  });
+
   it("places d'attente lues dans l'exécutable (1478:0a04) : chaque Zoombini du groupe sauf le livreur reste sur la sienne", async () => {
     const { ticks, intro, features } = await start(0, { liked: [mask(0, 1)], lessAction: true });
     await intro();

@@ -58,7 +58,7 @@ describe("game/ : compléments pour le plateau", () => {
   it("prison, siphon et puits : l'arrivée est la position du pion après l'effet", () => {
     const jail = oneGame();
     Object.assign(jail.player, { screen: 3, row: "bottom", x: 0xa0 });
-    jail.state.turn.elapsed = 16;
+    jail.state.turn.dwell = 16;
     const jailed = jail.tick(1).find((e) => e.type === "hazard");
     expect(jailed).toMatchObject({ kind: "jail", from: { screen: 3, row: "bottom", x: 0xa0 }, to: { screen: 3, row: "bottom", x: 0xac } });
 

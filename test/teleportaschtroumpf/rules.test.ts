@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
 import { DEFAULT_OPTIONS } from "../../src/games/teleportaschtroumpf/engine/options";
 import { arrival, doorAt, doorClassAt, resolveEdges, settleX } from "../../src/games/teleportaschtroumpf/game/board";
-import { Game, newGame, type GameSetup } from "../../src/games/teleportaschtroumpf/game/rules";
+import { Game, newGame, type GameEvent, type GameSetup } from "../../src/games/teleportaschtroumpf/game/rules";
 import { popcount } from "../../src/games/teleportaschtroumpf/game/state";
 import {
   BESPECTACLED_DESTINATIONS,
@@ -376,6 +376,71 @@ describe("événements du plateau", () => {
     const events = game.tick(1.5);
     expect(events.map((e) => e.type)).toEqual(["hazard", "skip", "release", "turn"]);
     expect(game.player.status).toBe(0);
+  });
+
+  it("prison par attente : le chrono part de l'entrée dans la zone, pas du début du tour ; sortir le remet à zéro", () => {
+    const game = solo();
+    place(game, 3, "bottom", 0x80);
+    game.tick(20); // 20 s de tour hors de la zone
+    game.walk(1);
+    game.walk(1);
+    game.walk(1);
+    game.walk(1);
+    game.walk(1); // 0x94 : dans la zone, attente 0
+    expect(game.player).toMatchObject({ x: 0x94, status: 0 });
+    expect(game.tick(15).some((e) => e.type === "hazard")).toBe(false);
+    game.walk(-1); // ressort (0x90) : le chrono repart de zéro
+    game.walk(1);
+    expect(game.tick(15).some((e) => e.type === "hazard")).toBe(false);
+    expect(game.tick(1).find((e) => e.type === "hazard")).toMatchObject({ kind: "jail" });
+  });
+
+  it("prison par attente : le chrono de la plage court pendant les voix (chrono du tour gelé) et repart quand le joueur reprend la main", () => {
+    const voices = solo();
+    place(voices, 3, "bottom", 0xa0);
+    voices.setPaused(true); // voix d'un indice, de l'aide : seul le chrono du tour est gelé (`1f33:01e6(1)`)
+    expect(voices.tick(10).some((e) => e.type === "hazard")).toBe(false);
+    voices.setPaused(false);
+    expect(voices.tick(6).find((e) => e.type === "hazard")).toMatchObject({ kind: "jail" });
+
+    const paused = solo();
+    place(paused, 3, "bottom", 0xa0);
+    paused.setPaused(true); // annonce du tour ou pause S48
+    paused.tick(20);
+    paused.takeHand(); // fin de l'annonce, retour de la pause : `291e:0401` relance le chrono de la plage
+    paused.setPaused(false);
+    expect(paused.tick(15).some((e) => e.type === "hazard")).toBe(false);
+    expect(paused.tick(1).find((e) => e.type === "hazard")).toMatchObject({ kind: "jail" });
+  });
+
+  it("avertissement de temps : perdu à un tour passé, reporté au tour suivant après la libération du siphon", () => {
+    const announced = (events: GameEvent[]) => events.some((e) => e.type === "announce");
+    const door = (game: Game) => {
+      place(game, 1, "bottom", 0x0b);
+      game.press();
+      return game.resolveMinigame({ kind: "points", points: 0 });
+    };
+    // Tour passé en prison (`DS:274E == 2`) : le drapeau est levé, la réplique de `26ee:027e` remplace la vidéo.
+    const jail = duo();
+    place(jail, 3, "bottom", 0xa0);
+    jail.press(); // joueur 0 pris
+    jail.state.elapsed = jail.state.durationSeconds - 550;
+    const skipped = door(jail); // joueur 1 joue, le tour du joueur 0 est passé, puis joueur 1
+    expect(skipped.some((e) => e.type === "skip")).toBe(true);
+    expect(announced(skipped)).toBe(false);
+    expect(jail.state.warned10).toBe(true);
+
+    // Libération du Turlusiphon (`iRam38d04 = 5`) : le bloc est sauté, l'avertissement vient au tour suivant.
+    const siphon = duo();
+    place(siphon, 3, "bottom", 0x120);
+    siphon.press(); // joueur 0 avalé
+    door(siphon); // joueur 1, puis tour passé du joueur 0 (4 → 6)
+    siphon.state.elapsed = siphon.state.durationSeconds - 550;
+    const released = door(siphon); // joueur 1, puis libération du joueur 0 (6 → 5 → 0)
+    expect(released.find((e) => e.type === "release")).toMatchObject({ from: "turlusiphon" });
+    expect(announced(released)).toBe(false);
+    expect(siphon.state).toMatchObject({ warned10: false, turn: { released: "turlusiphon" } });
+    expect(announced(door(siphon))).toBe(true); // tour suivant (joueur 1)
   });
 
   it("Turlusiphon : bouton dans la zone droite, état 4, un tour passé", () => {

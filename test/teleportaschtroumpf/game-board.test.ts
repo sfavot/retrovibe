@@ -168,6 +168,17 @@ describe("Walker : marche, course, saut, attente (2bd4:02bd, 2bd4:0093)", () => 
     expect(walker.pose).toBe(POSE_IDLE_RIGHT);
   });
 
+  it("une nouvelle pose montre sa première image tout de suite (le pion ne disparaît pas après une marche)", () => {
+    const { walker, frames, now } = rig();
+    const hy8 = fakeSprites();
+    frames(5, { right: true }); // 5e image de la marche : au-delà de l'unique image de l'attente
+    walker.reset(true, now());
+    expect(walker.currentFrame(hy8)).toBe(hy8.animations[0].frames[0]);
+    frames(3, { left: true });
+    walker.startArrival(now());
+    expect(walker.currentFrame(hy8)).toBe(hy8.animations[0xc].frames[0]);
+  });
+
   it("arrivée après une téléportation : animation de 8 images, bip, puis attente tournée à droite", () => {
     const { walker, frames, now } = rig();
     walker.startArrival(now());

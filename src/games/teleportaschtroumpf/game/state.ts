@@ -76,6 +76,16 @@ export interface TurnState {
   hint2Done: boolean;
   /** Plages « comptées » (lac, pont) où le pion se trouve actuellement. */
   inside: string[];
+  /**
+   * Secondes passées dans la plage d'un piège d'attente (prison) depuis que le pion y est entré (`slot 5`, relancé à l'entrée :
+   * `2bd4:0a23`) ; 0 hors de la plage.
+   */
+  dwell: number;
+  /**
+   * Le tour a commencé par une libération (`291e:0401`, états 3 et 5) : la scène la montre après l'annonce, y compris à la
+   * reprise d'une sauvegarde de ce tour (l'état est déjà celui d'après la libération).
+   */
+  released: "jail" | "turlusiphon" | null;
 }
 
 export interface GameState {

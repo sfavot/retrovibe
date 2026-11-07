@@ -170,7 +170,7 @@ export class Commentary {
     return this.missingIngredient(game);
   }
 
-  /** Partie normale, dans l'ordre de `26ee:027e` (les cinq premières répliques 0x15..0x19 dépendent de drapeaux jamais levés). */
+  /** Partie normale, dans l'ordre de `26ee:027e` (les cinq premières répliques 0x15..0x19, liées aux compteurs `DS:274F + n` de `26ee:0008`, ne sont pas portées : voir `screens-grand-schtroumpf.md`). */
   private normalComment(game: Game, rng: BorlandRandom, percent: number): number {
     const { players, current } = game.state;
     const m = measure(game);

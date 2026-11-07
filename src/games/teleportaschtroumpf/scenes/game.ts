@@ -68,6 +68,8 @@ const VOICE_ANNOUNCE = 12;
 const VOICE_JAIL = 0;
 const VOICE_SIPHON = 16;
 const VOICE_NOTHING = 6;
+/** Voix 5 (`s21v` 4 ou 5) : début du tour de la libération du Turlusiphon. */
+const VOICE_SIPHON_RELEASE = 5;
 
 export class GameScene implements Scene {
   readonly step = 4;
@@ -82,6 +84,8 @@ export class GameScene implements Scene {
   private script: Script | null = null;
   private waitingResume = false;
   private resumed = false;
+  /** Mise à jour du plateau à faire au retour de la scène empilée, avant qu'il ne soit redessiné (voir `overlay`). */
+  private onResume: ((ctx: SceneContext) => void) | null = null;
   private finished = false;
   /** S19 (ingrédients) n'est dit qu'au premier tour. */
   private introShown = false;
@@ -150,6 +154,9 @@ export class GameScene implements Scene {
 
   resume(ctx: SceneContext): void {
     this.resumed = true;
+    const after = this.onResume;
+    this.onResume = null;
+    after?.(ctx);
     // Les scènes empilées (mini-jeux, vidéos) ont pris l'écran : le plateau le reprend.
     this.board.redraw(ctx);
   }
@@ -205,7 +212,9 @@ export class GameScene implements Scene {
         yield* this.skipTurn(ctx, event.player, event.reason);
         break;
       case "release":
-        yield* this.release(ctx, event.player, event);
+        // `game/` libère le pion avant d'annoncer le tour ; l'original annonce d'abord le joueur, pion encore caché ou sous le
+        // Turlusiphon, puis joue la libération dans la boucle du tour (`2a78:0272` à la première image) : c'est `beginTurn` qui
+        // la montre, d'après `turn.released` (aussi présent dans une sauvegarde de ce tour).
         break;
       case "hazard":
         yield* this.hazard(ctx, event);
@@ -260,25 +269,37 @@ export class GameScene implements Scene {
     }
     // Avant S19, le bandeau n'a que le portrait : S19 y ajoute l'objectif.
     if (!this.introShown) this.board.setGoalHidden(true);
-    yield* this.showPlayer(ctx, player, "normal", wellOpen);
+    const released = this.game.state.turn.released;
+    // Tour de la libération : la cage n'est pas dessinée (état 3, `291e:125c`) et le pion est caché (pose 12) ; le Schtroumpf
+    // endormi reste sur le Turlusiphon (état 5, `2bd4:08e8`).
+    yield* this.showPlayer(ctx, player, released === "jail" ? "hidden" : released === "turlusiphon" ? "siphon" : "normal", wellOpen);
     if (!this.introShown) {
       this.introShown = true;
       yield* this.grandSchtroumpf(ctx, { kind: "ingredients", game: this.game }, false);
     }
-    yield* this.speak(ctx, hintVoice(VOICE_ANNOUNCE, this.game.state.players[player].character, ctx.rng));
+    const character = this.game.state.players[player].character;
+    yield* this.speak(ctx, hintVoice(VOICE_ANNOUNCE, character, ctx.rng));
     yield* this.wait(ctx, ANNOUNCE_PAUSE_TICKS);
-    const warned = this.warning !== null;
-    if (this.warning !== null) {
-      const video = this.warning;
-      this.warning = null;
-      // Vidéo par-dessus le plateau, sans fondu (`154c:097b`) ; `resume` le redessine à la fin.
-      yield* this.grandSchtroumpf(ctx, { kind: "timeWarning", video }, false);
+    if (released === "turlusiphon") {
+      // `291e:0401`, état 6 → 5 : `iRam38d04 = 5`, la voix 5 suit l'annonce ; le bloc des avertissements et des répliques
+      // (`iRam38d04 == 99 || DS:274E == 2`) est sauté, `DS:28B0` n'est pas mis à jour (`game/` ne tire pas d'avertissement).
+      yield* this.speak(ctx, hintVoice(VOICE_SIPHON_RELEASE, character, ctx.rng));
+    } else {
+      const warned = this.warning !== null;
+      if (this.warning !== null) {
+        const video = this.warning;
+        this.warning = null;
+        // Vidéo par-dessus le plateau, sans fondu (`154c:097b`) ; `resume` le redessine à la fin.
+        yield* this.grandSchtroumpf(ctx, { kind: "timeWarning", video }, false);
+      }
+      yield* this.comment(ctx, this.commentary.afterAnnouncement(this.game, ctx.rng, { warned, skipped: false }));
     }
-    yield* this.comment(ctx, this.commentary.afterAnnouncement(this.game, ctx.rng, { warned, skipped: false }));
+    if (released) yield* this.release(ctx, player, released);
     ctx.voice.holdMusic(false);
     // `291e:0b72` : le chrono de pose repart avec celui du tour, l'annonce ne compte pas dans l'attente avant l'impatience.
     this.board.walker.restartPoseTimer(ctx.clock.ticks);
     this.unfreeze(ctx);
+    this.game.takeHand();
   }
 
   /** Tour passé : le joueur est dans sa cage ou sous le siphon (`291e:0401`, états 2 et 4). */
@@ -286,7 +307,7 @@ export class GameScene implements Scene {
     const character = this.game.state.players[player].character;
     // Pas de musique pendant l'annonce, comme au début d'un tour jouable (`beginTurn`).
     ctx.voice.holdMusic(true);
-    yield* this.showPlayer(ctx, player, reason === "jail" ? "jail" : "siphon", false);
+    yield* this.showPlayer(ctx, player, captiveLook(reason), false);
     yield* this.speak(ctx, hintVoice(VOICE_ANNOUNCE, character, ctx.rng));
     yield* this.wait(ctx, ANNOUNCE_PAUSE_TICKS);
     yield* this.speak(ctx, hintVoice(reason === "jail" ? VOICE_JAIL : VOICE_SIPHON, character, ctx.rng));
@@ -295,12 +316,17 @@ export class GameScene implements Scene {
     ctx.voice.holdMusic(false);
   }
 
-  /** Libération au début du tour (animations de S20 et S21). */
-  private *release(ctx: SceneContext, player: number, event: Extract<GameEvent, { type: "release" }>): Script {
-    yield* this.showPlayer(ctx, player, event.from === "jail" ? "jail" : "siphon", false);
+  /**
+   * Libération au début du tour (animations de S20 et S21), le plateau du joueur étant déjà montré (pion caché ou siphon) :
+   * la vidéo, puis le pion libre là où `game/` l'a mis (recul de 0x14 après le Turlusiphon). Rien ne bouge le pion entre la
+   * libération et sa présentation (le tour n'a pas encore commencé) : sa position actuelle est celle d'après la libération.
+   */
+  private *release(ctx: SceneContext, player: number, from: "jail" | "turlusiphon"): Script {
+    const event: Extract<GameEvent, { type: "release" }> = { type: "release", player, from };
     const p = this.game.state.players[player];
     const at: Position = { screen: p.screen, row: p.row, x: p.x };
-    yield* this.overlay(ctx, createBoardEventScene({ game: this.game, event, before: at, after: at }, (c) => c.scenes.pop()), false);
+    const scene = createBoardEventScene({ game: this.game, event, before: at, after: at }, (c) => c.scenes.pop());
+    yield* this.overlay(ctx, scene, false, (c) => this.board.moveTo(c, at, { look: "normal", facingRight: p.facingRight }));
   }
 
   /** Piège, lac, pont, fusée, puits, prison, siphon : animation (`events.ts`), puis le pion arrive où `game/` l'a placé. */
@@ -313,9 +339,12 @@ export class GameScene implements Scene {
       this.board.setPlaying(false);
       while (!this.board.walkToward(ctx, target)) yield "frame";
     }
-    yield* this.overlay(ctx, createBoardEventScene({ game: this.game, event, before: from, after: to }, (c) => c.scenes.pop()), false);
     const teleported = to.screen !== from.screen || to.row !== from.row;
-    this.board.moveTo(ctx, to, { arrival: teleported && event.kind !== "jail" && event.kind !== "turlusiphon" });
+    // Pris : le tour s'arrête sur la dernière image de la vidéo (Schtroumpf dans la cage, endormi sur le Turlusiphon), que l'original
+    // ne redessine pas (`2a78:0039`) ; l'écran du tour suivant la remplace.
+    const captive = event.kind === "jail" || event.kind === "turlusiphon";
+    const scene = createBoardEventScene({ game: this.game, event, before: from, after: to }, (c) => c.scenes.pop());
+    yield* this.overlay(ctx, scene, false, (c) => (captive ? this.board.hold() : this.board.moveTo(c, to, { arrival: teleported })));
   }
 
   /** Sortie du plateau par un bord : vidéo `s01b` (gauche) ou `s01c` (droite), le tour est perdu (codes 100 et 101). */
@@ -368,6 +397,8 @@ export class GameScene implements Scene {
     ctx.scenes.push(createPauseScene((c, choice) => this.onPauseChoice(c, choice)), { fade: true });
     yield "resume";
     this.unfreeze(ctx);
+    // Le retour de la pause relance `291e:0401` (`cRam38d02`) : le chrono de la plage d'attente repart de zéro.
+    if (!this.game.isOver()) this.game.takeHand();
     // Un joueur qui précède le joueur courant a pu partir : les indices ont changé.
     if (!this.game.isOver()) this.board.retarget(ctx, this.game.state.current);
   }
@@ -421,8 +452,12 @@ export class GameScene implements Scene {
 
   // --- pièces communes -------------------------------------------------------------------------------
 
-  /** Empile `scene` et attend son retrait (c'est son rappel qui appelle `ctx.scenes.pop`). */
-  private *overlay(ctx: SceneContext, scene: Scene, fade: boolean): Script {
+  /**
+   * Empile `scene` et attend son retrait (c'est son rappel qui appelle `ctx.scenes.pop`). `after` met le plateau à jour dès le
+   * retrait, avant sa première image : sinon il se montrerait une image tel qu'avant la scène (pion debout à l'ancienne place).
+   */
+  private *overlay(ctx: SceneContext, scene: Scene, fade: boolean, after?: (ctx: SceneContext) => void): Script {
+    this.onResume = after ?? null;
     ctx.scenes.push(scene, { fade });
     yield "resume";
   }
@@ -490,4 +525,9 @@ export class GameScene implements Scene {
     this.syncClock(ctx);
     this.game.setPaused(false);
   }
+}
+
+/** Aspect du pion pris par la prison (cage) ou le Turlusiphon (Schtroumpf endormi sur le siphon). */
+function captiveLook(from: "jail" | "turlusiphon"): BoardLook {
+  return from === "jail" ? "jail" : "siphon";
 }

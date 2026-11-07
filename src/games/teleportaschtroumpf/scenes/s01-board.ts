@@ -47,8 +47,12 @@ export type BoardOutput =
   /** Clic droit / Entrée : voix d'aide de la zone du pion. */
   | { kind: "help" };
 
-/** Aspect du pion : normal, prisonnier de la cage (S20) ou avalé par le Turlusiphon (S21, sprite 0x52 / 0x53). */
-export type BoardLook = "normal" | "jail" | "siphon";
+/**
+ * Aspect du pion : normal, prisonnier de la cage (S20, états 1 et 2), caché sans cage (état 3 : tour de la libération, la cage
+ * n'est dessinée que pour les états 1 et 2, `291e:125c`, et le pion a la pose 12, `uRam38d00 = 0xC`) ou avalé par le
+ * Turlusiphon (S21, sprite 0x52 / 0x53, états 5 et 6, `2bd4:08e8`).
+ */
+export type BoardLook = "normal" | "jail" | "hidden" | "siphon";
 
 /** Ce que le plateau montre : un joueur à une position. */
 export interface BoardView {
@@ -147,6 +151,8 @@ export class Board {
   private multiplayer = false;
   private turnSeconds = 0;
   private goalHidden = false;
+  /** L'écran garde l'image qu'une scène empilée y a laissée : rien n'est redessiné jusqu'au prochain `show` (voir `hold`). */
+  private held = false;
   /** But de marche au doigt : abscisse visée sur la rangée où il a été donné (±∞ : jusqu'au bord, vers la rangée suivante). */
   private touchTarget: { screen: number; row: Row; x: number; stuck: number } | null = null;
 
@@ -171,6 +177,7 @@ export class Board {
 
   /** Affiche `view` : fond de l'écran, bandeau, décor, pion ; fondu d'entrée sur demande. */
   show(ctx: SceneContext, game: Game, view: BoardView, fadeIn: boolean): void {
+    this.held = false;
     this.game = game;
     this.view = { ...view };
     this.multiplayer = game.state.players.length > 1;
@@ -186,13 +193,29 @@ export class Board {
 
   /** Redessine le fond et le bandeau (après une scène empilée qui a repris l'écran) sans toucher au pion ni au décor. */
   redraw(ctx: SceneContext): void {
+    if (this.held) return;
     this.drawBackground(ctx);
   }
 
-  /** Le pion arrive à `to` (téléportation, événement) : fond de l'écran d'arrivée, animation d'arrivée si demandée. */
+  /**
+   * Laisse à l'écran la dernière image de la scène qui vient d'être retirée, jusqu'au prochain `show` (écran du tour suivant) :
+   * après la vidéo d'une prise (prison, Turlusiphon), le tour se termine sans que l'original redessine le plateau (`2a78:0039`
+   * ne fait que recharger les sprites, `291e:000e`, et la boucle du tour s'arrête sur `2a78:00da == −1`).
+   */
+  hold(): void {
+    this.held = true;
+  }
+
+  /**
+   * Le pion arrive à `to` (téléportation, événement) : fond de l'écran d'arrivée, animation d'arrivée si demandée ; `look` change
+   * l'aspect du pion (la cage de la prison fait partie du fond, redessiné s'il le faut).
+   */
   moveTo(ctx: SceneContext, to: Position, options: { facingRight?: boolean; arrival?: boolean; look?: BoardLook } = {}): void {
     const from = this.position;
-    this.view = { ...this.view, ...to, look: options.look ?? this.view.look, facingRight: options.facingRight ?? this.view.facingRight };
+    const look = options.look ?? this.view.look;
+    const cageChanged = (look === "jail") !== (this.view.look === "jail");
+    this.view = { ...this.view, ...to, look, facingRight: options.facingRight ?? this.view.facingRight };
+    if (cageChanged && this.view.screen === from.screen) this.drawBackground(ctx);
     this.leave(ctx, from);
     if (options.arrival) this.walker.startArrival(ctx.clock.ticks);
     else this.walker.reset(this.view.facingRight, ctx.clock.ticks);
@@ -229,9 +252,14 @@ export class Board {
     return this.isPlaying;
   }
 
+  /**
+   * Le joueur prend ou perd la main. La perdre (événement à présenter, fin du tour, quelle que soit la cause : marche, bouton,
+   * chrono du tour) oublie le but de marche du doigt : sinon le pion repartirait seul vers lui au tour suivant.
+   */
   setPlaying(playing: boolean): void {
     this.isPlaying = playing;
     this.timerVisible = playing && this.multiplayer;
+    if (!playing) this.touchTarget = null;
   }
 
   /**
@@ -267,7 +295,6 @@ export class Board {
     if (events.length === 0 && press && game.state.phase === "turn") events.push(...game.press("button"));
 
     this.turnSeconds = game.state.turn.elapsed;
-    if (events.length > 0 && !events.every(isEdgeMove)) this.touchTarget = null;
     if (events.length === 0 || events.every(isEdgeMove)) {
       const before = this.view.x;
       this.followGame(ctx);
@@ -280,6 +307,7 @@ export class Board {
 
   /** Dessine : fond, décor, minuteur, pion (`2bd4:000f` : `13fc:0411`, `0771`, `0046`, `0093`). */
   render(ctx: SceneContext): void {
+    if (this.held) return;
     const { surface } = ctx;
     const { sprites } = this.resources;
     surface.restoreBackground();

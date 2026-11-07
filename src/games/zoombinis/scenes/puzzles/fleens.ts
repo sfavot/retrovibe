@@ -9,9 +9,13 @@
  *     cocons déjà pleins), repère, 7 objets d'ambiance ; fabrication des nizibooms (`10e0:1b29` : règle cachée, trois spéciaux sur la branche, les autres sur la terrasse) ; arrivée du
  *     groupe en bas à gauche (200 puis 45 ticks) ; introduction : le premier Zoombini entre par `SCRS` 7035 + pieds. Personne de « sauvé » (`+0x127 = 0`).
  *  2. **Essai** : le joueur glisse un Zoombini sur le repère (438, 357, rayon de prise 100) ; il y court son parcours (`SCRS` 7000 + pieds, absolu, jusqu'à la file de (199, 120)).
- *     Événement 4 : son cousin de la terrasse se tourne vers lui (type 5) ; 6 : si le cousin est sur la branche, le cocon se remplit (`SCRB` 1000 + cocons) et le cousin s'en va ;
- *     7 : le repère se libère (un autre Zoombini peut être déposé, son essai attend la fin du précédent) ; 132 : les essais précédents reculent de 20 pixels et, quand la file de 7
- *     est pleine, le plus ancien sort à gauche (`SCRS` 7010).
+ *     Événement 4 : son cousin de la terrasse se tourne vers lui (type 5) ; 5 (`10e0:23a0`, type 6) : le cousin rejoint le repère : perché, il descend de la branche
+ *     (`SCRS` 4000 + position, 4017 à 4019) ; sur la terrasse, il court jusqu'à (429, 223) (`SCRS` 4004 + position) ; 6 : si le cousin était perché, le cocon se remplit
+ *     (`SCRB` 1000 + cocons) et les autres perchés réagissent sur place (types 7 / 8) ; 7 : le repère se libère (un autre Zoombini peut être déposé, son essai attend la fin du
+ *     précédent) et le cousin court derrière le Zoombini (type 9, `SCRS` 4025 + pieds, absolu : sortie à droite, retour par la droite) jusqu'à la **file des cousins** en
+ *     (214, 207), sous la file des Zoombinis (199, 120), où il reste (`+0x120 = 20`) ; 132 : les essais précédents reculent de 20 pixels, leurs cousins aussi (type 12,
+ *     `SCRS` 4040 + pieds) et, quand la file de 7 est pleine, le plus ancien saute au sol (`SCRS` 5999 + pieds) ; son cousin sort à gauche à l'événement 60 (type 13,
+ *     `4045 + pieds`), puis lui (`7010 + pieds`). À la clôture (`SCRB` 1004 à 1006, événement 136 relayé par `10e0:2f0d`), les cousins de la file s'enfuient (`4050 + pieds`).
  *  3. **Trois cocons** : le dernier essai joue `SCRS` 7005 + pieds ; événements 133 et 134 : les nizibooms de la terrasse s'enfuient (`SCRS` 4056 à 4058) ; événement 30 : séquence de
  *     clôture (`SCRB` 1004 + tirage de 0 à 2) ; à sa fin « Go » est actif et le groupe est « sauvé » (`1168:3dd0(0, 1)`), voix de réussite.
  *  4. **« Go »** : son 996, les Zoombinis partent à pied ; écran suivant (l'hôtel). **Carte** : abandon, groupe perdu.
@@ -21,9 +25,6 @@
  *  - repère de dépôt : un seul point (438, 357) de rayon 100 (`DS:11f4`, début absolu des `SCRS` 7000 : tous les parcours démarrent là) ; l'original ne montre pas de liste de dépôt
  *    séparée de celle d'attente et les 16 places d'attente (`DS:11b4`, 16 points : (56, 379) manquait à l'étude) seraient toutes occupées par un groupe de 16 ; **probable** ;
  *  - un Zoombini déjà essayé ne se reprend pas (l'original le laisse déplaçable sans nouvel essai, `[96fe]`) ;
- *  - les scripts de poursuite des nizibooms de la terrasse (`SCRS` 4004 + position, 4026 à 4050 : ils courent jusqu'à (429, 223) puis suivent le Zoombini) ne sont pas portés : le
- *    cousin d'un essai manqué ne fait que se tourner (`SCRS` 4003) ; ils reviendraient sinon à leur place par un saut non documenté ;
- *  - le cousin perché que l'essai trouve joue les `SCRS` 4020 + 2 (pos − 17) puis 4021 + 2 (pos − 17) (types 7 et 8) et disparaît : **probable** (l'original ne le montre pas) ;
  *  - pas de chargement progressif des 8 `SCRS` d'ambiance (`[7490]`, `10e0:0f51`) ni d'animation de joie des Zoombinis (`[7496]`, `292a(5)`) ni de réactions de groupe de l'événement 135 ;
  *  - le retour d'un Zoombini sorti de la file n'existe pas : il quitte l'écran par la gauche, sauvé ;
  *  - un groupe d'un seul Zoombini n'a pas de `SCRS` 7005 + pieds : la clôture est lancée à la fin de son parcours (7041 + pieds) ; **probable** ;
@@ -111,7 +112,18 @@ export const NIZIBOOM_BASES = {
 const SCRS = {
   blink: [4000, 4001],
   alert: 4003,
+  /** Type 6 (`10e0:1fd1`) : course d'un cousin de la terrasse vers le repère, `4004 + position` ; descente d'un cousin perché, `4000 + position` (4017 à 4019). */
+  dash: 4004,
+  descend: 4000,
   perch: 4020,
+  /** Types 9 à 14, `+ pieds` du niziboom (`+0xef`) : vers la file (9 : 4026 à 4030 ; 10 : groupe d'un seul, 4031 à 4035), sortie à gauche (11 : 4036 à 4040),
+   *  recul d'un cran dans la file (12 : 4041 à 4045), éjection (13 : 4046 à 4050), fuite de la file à la fin (14 : 4051 à 4055). */
+  toLine: 4025,
+  toLineSingle: 4030,
+  outLeft: 4035,
+  lineStep: 4040,
+  lineEject: 4045,
+  lineFlee: 4050,
   fleeFar: 4056,
   fleeMid: 4057,
   fleeNear: 4058,
@@ -119,11 +131,21 @@ const SCRS = {
   trialLast: 7005,
   trialSingle: 7041,
   eject: 7010,
+  /** `292a(9)` : le Zoombini éjecté saute de la file au sol (`5999 + pieds`, 6000 à 6004, (68, 140) → (57, 246)) ; son évènement 61 fait partir son cousin. */
+  jumpDown: 5999,
   back: 7015,
   intro: 7035,
 } as const;
 /** Événements (octet bas du terminateur − 1, `10e0:227e`). */
-const EVENT = { turn: 0, alert: 4, dash: 5, perched: 6, free: 7, closure: 30, queue: 132, fleeNear: 133, fleeFar: 134, vanish: 137 } as const;
+const EVENT = { turn: 0, alert: 4, dash: 5, perched: 6, free: 7, closure: 30, queue: 132, fleeNear: 133, fleeFar: 134, fleeLine: 135, vanish: 137 } as const;
+/** Arrivée de la course du cousin près du repère (`10e0:23a0` : (0x1ad, 0xdf)) et place de la file des cousins (`10e0:24fc` : (0xd6, 0xcf)) ; sortie à gauche (−56, 241). */
+const DASH_END: Point = { x: 429, y: 223 };
+const COUSIN_LINE: Point = { x: 214, y: 207 };
+const COUSIN_OUT: Point = { x: -56, y: 241 };
+/** Évènement du script d'éjection d'un Zoombini qui fait sortir son cousin (`10e0:2b90`, clé 60). */
+const EJECT_COUSIN_EVENT = 60;
+/** Position d'un cousin entré dans la file (`10e0:28b1` : `+0x120 = 0x14`). */
+const LINE_POSITION = 20;
 /** Attente d'un nizibooms : `+0x128` dépasse `[235c] + 16` = 80 (`10e0:0f9f`). */
 const IDLE_LIMIT = 80;
 /** Sortie : point hors écran à droite (`SCRS` 7026 à 7030 finissent en (657, 357)) ; écart entre départs. */
@@ -141,6 +163,10 @@ class Niziboom {
   facing: 0 | 1 = 0;
   /** Compteur d'attente (`+0x128`). */
   counter: number;
+  /** Pieds (point de contact) actuels : `home` au départ, puis la fin du dernier script joué. */
+  position: Point;
+  /** `+0x120` : 0 à 16 terrasse, 17 à 19 branche, 20 dans la file des essais. */
+  pos: number;
   /** Un script autre que l'attente est en cours, ou le nizibooms est parti. */
   busy = false;
   gone = false;
@@ -153,6 +179,8 @@ class Niziboom {
     private readonly scripts: (id: number) => Script | undefined,
   ) {
     this.home = { x: cousin.origin[0], y: cousin.origin[1] };
+    this.position = { ...this.home };
+    this.pos = cousin.position;
     this.counter = cousin.idle;
     this.origin = this.offset(SCRS.blink[0], undefined);
     this.feature = run.features.create({
@@ -169,7 +197,12 @@ class Niziboom {
     });
   }
 
-  /** Décalage d'un script : sa première partie (image 0) tombe sur `home` ; avec `at`, sa dernière partie tombe sur `at`. */
+  /** Pieds du niziboom : 4e valeur de ses attributs affichés (`+0xef`). */
+  get feet(): number {
+    return this.cousin.attrs[3];
+  }
+
+  /** Décalage d'un script : sa première partie (image 0) tombe sur la position actuelle ; avec `at`, sa dernière partie tombe sur `at`. */
   private offset(id: number, at: Point | undefined): Point {
     const script = this.scripts(id);
     if (!script) throw new Error(`Niziboom : SCRS ${id} introuvable`);
@@ -180,7 +213,19 @@ class Niziboom {
       return first ? { x: at.x - first.x, y: at.y - first.y } : { x: 0, y: 0 };
     }
     const first = images[0]?.cells[0];
-    return first ? { x: this.home.x - first.x, y: this.home.y - first.y } : { x: 0, y: 0 };
+    const from = this.position ?? this.home;
+    return first ? { x: from.x - first.x, y: from.y - first.y } : { x: 0, y: 0 };
+  }
+
+  /** Fin d'un script posé avec `origin` : dernière première case (`1168:4741`). */
+  private endOf(id: number): Point {
+    const script = this.scripts(id);
+    let last = script?.images[0]?.cells[0];
+    for (const image of script?.images ?? []) {
+      const first = image.cells[0];
+      if (first && first.w > 0) last = first;
+    }
+    return last ? { x: this.origin.x + last.x, y: this.origin.y + last.y } : this.position;
   }
 
   /** Cases d'une image (pose 3) : le corps (base 0), puis pieds, nez, yeux, cheveux par la table de leur valeur ; image `2 × variante − 1` (`2 ×` si l'objet est retourné). */
@@ -199,19 +244,24 @@ class Niziboom {
     return out;
   }
 
-  /** Joue un script (une fois s'il s'arrête à la fin ; `onEnd` à sa fin). Sans `at` il démarre sur `home`. */
+  /** Joue un script (une fois s'il s'arrête à la fin ; `onEnd` à sa fin). Sans `at` il démarre sur sa position actuelle, avec `at` il y finit. */
   play(id: number, options: { at?: Point; loop?: boolean; onEnd?: () => void } = {}): void {
     if (this.gone) return;
     this.busy = true;
     this.origin = this.offset(id, options.at);
-    this.onEnd = options.onEnd;
+    const end = this.endOf(id);
+    const done = options.onEnd;
+    this.onEnd = () => {
+      this.position = end;
+      done?.();
+    };
     const f = this.run.features;
     this.feature.flags = FeatureFlag.other | (options.loop ? 0 : FeatureFlag.stopAtEnd);
     this.feature.onEvent = (_image, n) => this.event(n);
     f.setScript(this.feature, id);
   }
 
-  /** Pose d'attente : première image de `SCRS` 4000, immobile, sur `home`. */
+  /** Pose d'attente : première image de `SCRS` 4000, immobile, à sa position. */
   rest(): void {
     if (this.gone) return;
     this.busy = false;
@@ -467,8 +517,15 @@ class FleensRun implements FleensProbe {
         }
         break;
       case EVENT.alert:
-        // Essai manqué : le cousin de la terrasse se tourne vers le Zoombini (type 5).
-        if (cousin && !result.special && !cousin.busy && !cousin.gone) cousin.play(SCRS.alert, { onEnd: () => cousin.rest() });
+        // `10e0:235f` : un cousin de la terrasse se tourne vers le Zoombini (type 5).
+        if (cousin && !cousin.gone && cousin.pos <= 16) cousin.play(SCRS.alert, { onEnd: () => cousin.rest() });
+        break;
+      case EVENT.dash:
+        // `10e0:23a0` (type 6) : le cousin vient jusqu'au repère ; perché, il descend de la branche (4017 à 4019), sinon il court depuis la terrasse.
+        if (cousin && !cousin.gone) {
+          const id = cousin.pos <= 16 ? SCRS.dash + cousin.pos : SCRS.descend + cousin.pos;
+          cousin.play(id, { at: DASH_END, onEnd: () => cousin.rest() });
+        }
         break;
       case EVENT.perched:
         if (result.special) this.cocoon(cousin, result.cocoons);
@@ -476,15 +533,17 @@ class FleensRun implements FleensProbe {
       case EVENT.free:
         // `1168:170f(1, 0)` : le repère se libère.
         this.release(member);
+        // `10e0:24fc` : le cousin rejoint la file des cousins, sous la file des Zoombinis (type 9) ; groupe d'un seul : type 10, ou sortie à gauche au troisième cocon (11).
+        if (cousin && !cousin.gone) this.cousinToLine(cousin, result.cocoons);
         break;
       case EVENT.queue:
         this.advanceLine(previous, result.ejected);
         break;
       case EVENT.fleeNear:
-        this.flee((c) => c.position < 4);
+        this.flee((pos) => pos < 4);
         break;
       case EVENT.fleeFar:
-        this.flee((c) => c.position >= 4 && c.position < 17);
+        this.flee((pos) => pos >= 4 && pos < 17);
         break;
       case EVENT.closure:
         this.startClosure();
@@ -505,18 +564,47 @@ class FleensRun implements FleensProbe {
     if (member.target === this.dropTarget) member.target = null;
   }
 
-  /** Le cocon se remplit (`SCRB` 1000 + cocons) et le cousin perché s'en va (types 7 puis 8). */
+  /**
+   * `10e0:23c0` : le cocon se remplit (`SCRB` 1000 + cocons) ; le cousin trouvé n'est plus un spécial à trouver (il est déjà descendu, événement 5), et les spéciaux
+   * encore perchés réagissent sur place : type 7 après le premier cocon (`4020 + 2 (pos − 17)`), type 8 après le deuxième (`+ 1`) ; rien au troisième.
+   */
   private cocoon(cousin: Niziboom | undefined, cocoons: number): void {
     this.features.setScript(this.branch, SCRB.branch + cocoons);
-    if (!cousin || cousin.gone) return;
-    const k = cousin.cousin.position - 17;
-    cousin.play(SCRS.perch + 2 * k, {
-      onEnd: () => cousin.play(SCRS.perch + 2 * k + 1, { onEnd: () => cousin.remove() }),
-    });
+    if (cocoons >= 3) return;
+    for (const niz of this.nizibooms) {
+      if (niz === cousin || niz.gone || niz.pos < 17 || niz.pos > 19) continue;
+      const k = niz.pos - 17;
+      niz.play(SCRS.perch + 2 * k + (cocoons === 2 ? 1 : 0), { onEnd: () => niz.rest() });
+    }
   }
 
-  /** Événement 132 : les essais précédents reculent d'un cran ; avec 7 essais le plus ancien sort à gauche (`SCRS` 7010, puis 7010 + pieds). */
+  /** `10e0:24fc` puis `28b1` : le cousin de l'essai court jusqu'à la file des cousins (214, 207) et y reste (`+0x120 = 20`). */
+  private cousinToLine(cousin: Niziboom, cocoons: number): void {
+    const single = this.state.single;
+    const out = single && cocoons >= 3;
+    const id = (single ? (out ? SCRS.outLeft : SCRS.toLineSingle) : SCRS.toLine) + cousin.feet;
+    cousin.pos = LINE_POSITION;
+    cousin.play(id, { at: out ? COUSIN_OUT : COUSIN_LINE, onEnd: () => (out ? cousin.remove() : cousin.rest()) });
+  }
+
+  /** Évènement 135 (renvoyé par la clôture, `10e0:2f0d` → `26c1`, positions 20 à 25) : les cousins de la file s'enfuient à gauche (type 14 : `4050 + pieds`). */
+  private fleeLine(): void {
+    for (const niz of this.nizibooms) {
+      if (niz.gone || niz.pos < LINE_POSITION) continue;
+      niz.pos = -1;
+      niz.play(SCRS.lineFlee + niz.feet, { onEnd: () => niz.remove() });
+    }
+  }
+
+  /**
+   * Événement 132 (`10e0:2589`) : les essais précédents reculent d'un cran (Zoombini `7015 + pieds`, cousin type 12 `4040 + pieds`, depuis leur place) ; avec 7 essais
+   * le plus ancien sort (`SCRS` 7010, puis il saute au sol, `5999 + pieds`, en faisant partir son cousin, puis 7010 + pieds vers la gauche).
+   */
   private advanceLine(previous: KitMember[], ejected: number | null): void {
+    for (const m of previous) {
+      const cousin = this.cousinOf(m);
+      if (cousin && !cousin.gone && cousin.pos >= LINE_POSITION) cousin.play(SCRS.lineStep + cousin.feet, { onEnd: () => cousin.rest() });
+    }
     const alive = previous.filter((m) => !m.snoid.destroyed);
     alive.forEach((m) => {
       const at = { x: m.snoid.position.x - LINE_STEP, y: m.snoid.position.y };
@@ -536,15 +624,35 @@ class FleensRun implements FleensProbe {
     }
   }
 
+  private cousinOf(member: KitMember): Niziboom | undefined {
+    return this.nizibooms.find((n) => n.cousin.member === member.index);
+  }
+
+  /** Tick `10e0:06a8` (`[7342]`, `[7340]`, `[7344]`) : 7010, puis le saut au sol (6000 + pieds − 1, rappel `2b90` : à l'évènement 61 le cousin sort, type 13), puis 7010 + pieds. */
   private leaveLeft(member: KitMember): void {
     const { snoid } = member;
-    snoid.onEnd = () => {
-      snoid.onEnd = undefined;
+    const cousin = this.cousinOf(member);
+    const out = (): void => {
+      snoid.onEvent = undefined;
       snoid.onEnd = () => {
         snoid.onEnd = undefined;
         snoid.destroy();
       };
       snoid.play(SCRS.eject + snoid.traits.feet, FeatureFlag.stopAtEnd, { kind: "normal" });
+    };
+    const jump = (): void => {
+      snoid.onEvent = (n) => {
+        if (n === EJECT_COUSIN_EVENT && cousin && !cousin.gone) cousin.play(SCRS.lineEject + cousin.feet, { onEnd: () => cousin.remove() });
+      };
+      snoid.onEnd = () => {
+        snoid.onEnd = undefined;
+        out();
+      };
+      snoid.play(SCRS.jumpDown + snoid.traits.feet, FeatureFlag.stopAtEnd, { kind: "normal" });
+    };
+    snoid.onEnd = () => {
+      snoid.onEnd = undefined;
+      jump();
     };
     snoid.play(SCRS.eject, FeatureFlag.stopAtEnd, { kind: "normal", at: { ...snoid.position } });
   }
@@ -563,11 +671,11 @@ class FleensRun implements FleensProbe {
   }
 
   /** Les nizibooms de la terrasse s'enfuient (`1fd1(14)` : `SCRS` 4058 avant la position 4, 4057 avant 12, sinon 4056), puis disparaissent. */
-  private flee(select: (cousin: Cousin) => boolean): void {
+  private flee(select: (pos: number) => boolean): void {
     for (const niz of this.nizibooms) {
-      const c = niz.cousin;
-      if (niz.gone || niz.busy || c.special || !select(c)) continue;
-      const id = c.position < 4 ? SCRS.fleeNear : c.position < 12 ? SCRS.fleeMid : SCRS.fleeFar;
+      // Sur la terrasse seulement (`+0x120` < 17) : les cousins entrés dans la file ont leur propre fuite (événement 135).
+      if (niz.gone || niz.busy || niz.pos >= 17 || !select(niz.pos)) continue;
+      const id = niz.pos < 4 ? SCRS.fleeNear : niz.pos < 12 ? SCRS.fleeMid : SCRS.fleeFar;
       niz.play(id, { onEnd: () => niz.remove() });
     }
   }
@@ -585,6 +693,8 @@ class FleensRun implements FleensProbe {
       delay: DELAY,
       flags: FeatureFlag.flag4000000 | FeatureFlag.stopAtEnd | FeatureFlag.active,
       onEvent: (_image, n) => {
+        // `10e0:2f0d` : l'évènement 136 de la clôture (image 32 ou 35) est renvoyé à `227e` (clé 0x87) : les cousins de la file s'enfuient à gauche.
+        if (n === EVENT.fleeLine) this.fleeLine();
         if (n === FEATURE_END) {
           f.destroy(closure);
           this.closed();

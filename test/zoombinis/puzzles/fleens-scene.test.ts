@@ -184,7 +184,7 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(probe().trial?.index).toBe(index);
   }, 60_000);
 
-  it("un essai juste remplit un cocon : parcours 7000 + pieds, cocon (SCRB 1001), cousin perché parti, file, repère libéré à l'événement 7", async () => {
+  it("un essai juste remplit un cocon : parcours 7000 + pieds, cocon (SCRB 1001), cousin perché descendu dans la file des cousins, repère libéré à l'événement 7", async () => {
     const { probe, tryOnce, until, specials, state, features, settle, mark } = await start();
     const index = specials()[0]!;
     const member = probe().kit.members[index]!;
@@ -198,15 +198,22 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(probe().trial).toBe(member);
     expect(member.snoid.scriptId).toBe(7000 + member.snoid.traits.feet - 1);
     expect(probe().dropTarget.owner).toBe(member);
-    // Événement 6 : le cocon se remplit ; événement 7 : le repère se libère.
+    // Événement 5 (`10e0:23a0`, type 6) : le cousin perché descend de la branche (`SCRS` 4000 + position, 4017 à 4019) jusqu'au repère.
+    await until(() => niz.feature.scriptId === 4000 + niz.cousin.position);
+    // Événement 6 : le cocon se remplit, les autres perchés réagissent sur place (type 7 : 4020 + 2 k) ; événement 7 : le repère se libère.
     await until(() => probe().branch.scriptId === 1001);
+    const others = probe().nizibooms.filter((n) => n.cousin.special && n !== niz);
+    expect(others.length).toBeGreaterThan(0);
+    for (const other of others) expect(other.feature.scriptId).toBe(4020 + 2 * (other.cousin.position - 17));
     await until(() => probe().dropTarget.owner === null);
     expect(probe().trial).toBe(member);
-    // Le cousin perché joue ses types 7 et 8 (4020 + 2 k) puis s'en va.
-    const k = niz.cousin.position - 17;
-    await until(() => niz.feature.scriptId === 4020 + 2 * k || niz.gone);
-    await until(() => niz.gone, 600);
-    expect(features.features).not.toContain(niz.feature);
+    // Type 9 (`10e0:24fc`) : le cousin court jusqu'à la file des cousins, sous la file des Zoombinis, et y reste (`+0x120 = 20`).
+    const feet = niz.cousin.attrs[3];
+    await until(() => niz.feature.scriptId === 4025 + feet);
+    await until(() => !(niz as unknown as { busy: boolean }).busy, 1500);
+    expect(niz.gone).toBe(false);
+    expect(features.features).toContain(niz.feature);
+    expect((niz as unknown as { position: { x: number; y: number } }).position).toEqual({ x: 214, y: 207 });
     // Fin du parcours : en tête de la file (199, 120).
     await settle();
     expect(member.snoid.position).toEqual({ x: 199, y: 120 });
@@ -215,7 +222,7 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(state().closed).toBe(false);
   }, 60_000);
 
-  it("un essai faux ne change aucun compteur : le cousin de la terrasse se tourne (4003), le Zoombini finit dans la file, il ne se reprend pas", async () => {
+  it("un essai faux ne change aucun compteur : le cousin de la terrasse se tourne (4003), court au repère (4004 + position), rejoint la file des cousins (214, 207) ; le Zoombini finit dans la file, il ne se reprend pas", async () => {
     const { probe, tryOnce, until, others, state, settle, drag, mark, wait } = await start();
     const index = others()[0]!;
     const member = probe().kit.members[index]!;
@@ -225,10 +232,14 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(state().trials).toEqual([{ member: index, special: false }]);
     expect(probe().branch.scriptId).toBe(1000);
     await until(() => niz.feature.scriptId === 4003);
+    await until(() => niz.feature.scriptId === 4004 + niz.cousin.position);
+    await until(() => niz.feature.scriptId === 4025 + niz.cousin.attrs[3]);
     await settle();
     expect(state().cocoons).toBe(0);
     expect(niz.gone).toBe(false);
     expect(member.snoid.position).toEqual({ x: 199, y: 120 });
+    await until(() => !(niz as unknown as { busy: boolean }).busy, 1500);
+    expect((niz as unknown as { position: { x: number; y: number } }).position).toEqual({ x: 214, y: 207 });
     // Pas repris : le glissé ne le prend pas.
     const point = { x: 199 - 5, y: 100 };
     await wait(2);
@@ -254,9 +265,20 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     // Au 7e essai le plus ancien est éjecté (le 7e est dans la file au moment de l'événement 132).
     await until(() => state().queue.length === 6 && probe().line.length === 6);
     expect(state().queue).not.toContain(oldest.index);
+    // Le plus ancien saute au sol (`5999 + pieds`) et son cousin sort à gauche (type 13 : `4045 + pieds`, événement 60), puis il sort à son tour.
+    const oldestCousin = probe().nizibooms.find((n) => n.cousin.member === oldest.index)!;
+    await until(() => oldest.snoid.scriptId === 5999 + oldest.snoid.traits.feet || oldest.snoid.destroyed);
+    await until(() => oldestCousin.gone, 900);
     await until(() => oldest.snoid.destroyed, 600);
     await settle();
     expect(probe().line.map((m) => m.snoid.position.x)).toEqual([99, 119, 139, 159, 179, 199]);
+    // Les cousins de la file restent, chacun reculé de 21 points par essai suivant (type 12) : 214, 193, 172…
+    const lineCousins = probe().line.map((m) => probe().nizibooms.find((n) => n.cousin.member === m.index)!);
+    expect(lineCousins.every((n) => !n.gone)).toBe(true);
+    await until(() => lineCousins.every((n) => !(n as unknown as { busy: boolean }).busy), 1500);
+    const xs2 = lineCousins.map((n) => (n as unknown as { position: { x: number } }).position.x);
+    expect(xs2.at(-1)).toBe(214);
+    expect(xs2.at(-2)).toBe(193);
     expect(state().trials).toHaveLength(7);
     expect(state().cocoons).toBe(0);
   }, 240_000);

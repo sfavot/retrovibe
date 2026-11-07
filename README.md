@@ -14,6 +14,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | Armaeth (Grandslam Video, 1994) | jouable (en cours de validation) |
 | SWIV 3D (SCi, 1997) | jouable (en cours de validation) |
 | L'Odyssée des Zoombinis (Broderbund / TERC, 1996) | en préparation (données et études faites, moteur à venir) |
+| Drascula: The Vampire Strikes Back (Alcachofa Soft, 1996) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -213,6 +214,28 @@ Ils viennent de l'image ISO du CD : `scripts/armaeth-extract.sh [archive.7z]` li
 
 Avec `npm run dev` : `src/games/zoombinis/ui/asset-viewer.html` est une visionneuse des ressources des archives Mohawk (images et planches avec leur palette, scripts animés `SCRB` / `SCRS`, sons, MIDI à télécharger, textes, chemins et régions superposés au décor, curseurs).
 
+## Drascula
+
+*Drascula: The Vampire Strikes Back* (Alcachofa Soft, 1996), version française : jeu d'aventure humoristique en pointer-et-cliquer (barre de verbes, inventaire, dialogues à choix, cinématiques, six chapitres). Le moteur est réécrit en TypeScript d'après le moteur `drascula` de ScummVM (GPL v3+), lu pour comprendre et non transposé ligne à ligne. Le jeu est jouable de l'introduction au générique de fin, en cours de validation : souris, clavier et doigt, dix emplacements de sauvegarde (F10 sauvegarde, F7 charge, F9 volume).
+
+### Fichiers de données
+
+`scripts/drascula-extract.sh [jeu.zip [pack-international.zip [drascula.dat]]]` lit les archives placées dans `archives/` (non versionnées) et range dans `original/drascula/` les images `.ALG`, les voix `.ALS`, les vidéos `.BIN`, les fiches de pièces `.ALD` et les dialogues `.CAL` français, `drascula.dat` (le fichier de données du moteur de ScummVM, avec sa note de provenance) et les textes de licence d'Alcachofa Soft (à conserver). `scripts/drascula-music.sh` convertit la musique du pack audio (OGG) en MP3 (`track1.mp3` à `track31.mp3`) ; `npx vite-node scripts/drascula-cover.mts` génère `COVER.png` (l'auberge de Transylvanie, composée par le moteur) et régénère `files.json`.
+Au démarrage, le navigateur charge les données et toutes les images (6 Mo), puis les vidéos du chapitre en cours et du suivant (celles de l'introduction pèsent 15 Mo), le reste en fond ; les voix et la musique sont lues à la demande.
+
+### Architecture
+
+- `src/games/drascula/data/` — lecteurs : images `.ALG` (RLE), fiches `.ALD`, dialogues `.CAL`, vidéos `.BIN` (SSN et animations), voix `.ALS`, `drascula.dat`.
+- `src/games/drascula/engine/` — le moteur sans tête (`DrasculaEngine`, un `tick()` de 10 ms ; séquences en générateurs au lieu des attentes bloquantes de ScummVM), l'état, la marche, les verbes, les dialogues, les sauvegardes (`save.ts`) et, dans `rooms/`, un dossier par chapitre pour la logique des pièces.
+- `src/games/drascula/render/` — composition de l'image 320×200 indexée (décor, héros réduit, personnages, texte, interface), palettes et fondus.
+- `src/games/drascula/audio/` — voix et effets sur la voie unique de ScummVM, musique par pièce (module commun `src/audio/web-sample-output.ts`).
+- `src/games/drascula/cinematics/` — lecteurs de vidéos et cinématiques (introduction, château, fin, générique).
+- `src/games/drascula/ui/` — l'hôte du navigateur (`browser-host.ts`, `preload.ts`), la page du jeu (`app.ts`), l'écran titre, les fenêtres de sauvegarde, de volume et de menu, la page d'aide et de crédits ; `ui/dev.html` lance le jeu seul (`window.__drascula`), `ui/asset-viewer.html` est la visionneuse des ressources et `ui/render-dev.html` un banc d'essai du rendu (`?chapter=4&room=24`).
+
+### Documentation
+
+`docs/drascula/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`), moteur (`engine.md`), rendu (`graphics.md`), son (`audio.md`), dialogues (`talk.md`) et pièces (`rooms.md`, `rooms-chapter-N.md`). Les tests sont dans `test/drascula/` (`full-game.test.ts` joue la solution des six chapitres).
+
 ## Code commun aux jeux
 
 - `src/data/` — lecture binaire (`reader.ts`), page de code 437, Mac OS Roman (`mac-roman.ts`), archives et ressources du moteur Mohawk de Broderbund partagées par Mathémagique et Zoombinis (`mohawk/`), liste des fichiers d'un jeu (`game-files.ts`), fichiers RIFF WAVE (`riff-wave.ts`), vidéos Smacker (`smacker.ts`).
@@ -240,6 +263,6 @@ Référence : [WebFun](https://codeberg.org/cyco/WebFun) (MIT), réimplémentati
 
 ## Licence
 
-Le code est sous [GPL v3 ou ultérieure](LICENSE) : le moteur de Lost in Time est porté de [ScummVM](https://www.scummvm.org/) (GPL v3+),
+Le code est sous [GPL v3 ou ultérieure](LICENSE) : les moteurs de Lost in Time et de Drascula sont portés de [ScummVM](https://www.scummvm.org/) (GPL v3+),
 y compris l'émulateur OPL (MAME, `src/audio/opl2.ts`) utilisé pour la musique AdLib de Lost in Time et d'Armaeth. Les fichiers des jeux de `original/` ne sont pas couverts
-par cette licence : ils restent la propriété de leurs ayants droit.
+par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives).

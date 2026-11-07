@@ -47,6 +47,18 @@ export class TrackPlayer {
     this.audio.muted = value;
   }
 
+  /**
+   * Volume de la piste, de 0 (silence) à 1 : un fondu le baisse pas à pas (`MusicFadeout` de *Drascula*). Il reste en vigueur d'une
+   * piste à l'autre ; 1 par défaut, comme un élément média neuf. Indépendant de `muted`.
+   */
+  get volume(): number {
+    return this.audio.volume;
+  }
+
+  set volume(value: number) {
+    this.audio.volume = Math.min(1, Math.max(0, value));
+  }
+
   /** Charge les métadonnées d'un fichier sans le jouer, pour que le premier `play` démarre vite. */
   preload(url: string): void {
     this.load(url);

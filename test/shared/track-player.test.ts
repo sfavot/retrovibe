@@ -6,6 +6,7 @@ class FakeAudio {
   paused = true;
   ended = false;
   muted = false;
+  volume = 1;
   preload = "";
   src = "";
   readyState = 4;
@@ -46,6 +47,20 @@ describe("TrackPlayer", () => {
     player.stop();
     vi.advanceTimersByTime(200);
     expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  it("le volume se règle entre 0 et 1, indépendamment de la coupure, et survit à une nouvelle piste", () => {
+    expect(player.volume).toBe(1);
+    player.volume = 0.25;
+    expect(audio.volume).toBe(0.25);
+    player.volume = 3;
+    expect(player.volume).toBe(1);
+    player.volume = -1;
+    expect(player.volume).toBe(0);
+    player.volume = 0.5;
+    player.play("a.mp3");
+    expect(player.volume).toBe(0.5);
+    expect(player.muted).toBe(false);
   });
 
   it("piste entière : la fin du fichier déclenche onEnded", () => {

@@ -1,0 +1,20 @@
+drascula.dat : provenance et licence
+====================================
+
+Ce fichier n'est pas une donnee du jeu d'Alcachofa Soft : c'est un fichier de donnees du moteur `drascula` de ScummVM
+(textes en six langues, tables d'objets, de dialogues et d'animations, table de caracteres de la police), cree par
+`devtools/create_drascula/` (format version 7).
+
+Source : https://github.com/scummvm/scummvm/blob/master/dists/engine-data/drascula.dat
+         (archives/drascula.dat ici ; identique octet pour octet au fichier de la branche master au moment de l'extraction)
+Description : https://github.com/scummvm/scummvm/blob/master/dists/engine-data/README
+
+Licence : celle de ScummVM, GNU General Public License version 3 ou, a votre choix, toute version ulterieure
+(https://github.com/scummvm/scummvm/blob/master/COPYING ; en-tete de licence de engines/drascula/ et de
+devtools/create_drascula/ : "either version 3 of the License, or (at your option) any later version").
+Copyright (C) The ScummVM Team (https://www.scummvm.org). Le fichier est distribue avec ce depot sous cette licence,
+sans modification.
+
+Les donnees du jeu (images, voix, videos, fiches de pieces, dialogues, musique) restent la propriete d'Alcachofa Soft S.L. et
+sont redistribuees selon la licence de README-ALCACHOFA.txt et README-ALCACHOFA-INT.txt (a conserver intacts).
+Elles ne sont pas couvertes par la GPL.

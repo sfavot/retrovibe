@@ -6,6 +6,7 @@ import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { installServices } from "../../../src/games/zoombinis/engine/services";
 import { GRAPHICS } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
+import { FEATURES } from "../../../src/games/zoombinis/engine/features";
 import {
   AXIS_COUNTS,
   BLOCKED,
@@ -700,6 +701,53 @@ describe.skipIf(!original.has)("écran de l'hôtel (createHotelScene, HOTEL.MHK)
       await t.until(() => t.zoombinis.lastChange !== null, 600);
       expect(t.zoombinis.lastChange).toMatchObject({ screen: S.xfer, target: nextScreen(S.hotel, "success") });
       expect(t.zoombinis.game.group.members.filter((z: Zoombini) => z.present)).toHaveLength(12);
+      expect(t.engine.error).toBeNull();
+    }
+  }, 240_000);
+
+  it("fin (bug 15) : les socles 10000 + r ne sont pas dessinés hors survol (11a0:0126, bit 0x1000000) ; les étagères repliées (6063 + r) rentrent dans le tronc et ne laissent qu'un rebord", async () => {
+    for (const level of [0, 1, 3] as const) {
+      const t = await start({ level, visits: 5, seed: 21 });
+      const probe = t.probe();
+      await t.toPlay();
+      const features = t.engine.services.get(FEATURES);
+      const { screen } = t.engine.services.get(GRAPHICS);
+      const socles = features.features.filter((f) => f.scriptId >= 10000 && f.scriptId < 10150);
+      expect(socles.length).toBe(level === 0 ? 5 : level === 3 ? 125 : 25);
+      /** Part des pixels opaques d'un objet que l'écran montre tels quels (1 : l'objet est dessiné en entier). */
+      const shown = (f: (typeof socles)[number]) => {
+        let same = 0;
+        let opaque = 0;
+        for (const part of f.parts) {
+          const shape = (part.sheet ?? features.group(f.group)!).images[part.w - 1]!;
+          for (let y = 0; y < shape.height; y++) {
+            for (let x = 0; x < shape.width; x++) {
+              const v = shape.pixels[y * shape.width + x]!;
+              if (v === 0) continue;
+              opaque++;
+              if (screen.pixels[(part.y + y) * 640 + part.x + x] === v) same++;
+            }
+          }
+        }
+        return opaque === 0 ? 0 : same / opaque;
+      };
+      // En jeu : aucun socle n'est visible (surbrillance pointillée réservée au survol).
+      for (const socle of socles) expect(shown(socle)).toBeLessThan(0.5);
+      if (level === 3) continue;
+      const plan = robotPlan(probe.state);
+      for (let member = 0; member < plan.length; member++) {
+        await t.drag(member, probe.point(plan[member]!));
+        await t.settle();
+      }
+      await t.wait(40);
+      // Toutes les étagères ont joué leur repli jusqu'au bout : seul le rebord (forme 82, 45 × 9 au premier étage) reste, et rien ne les recouvre.
+      for (const shelf of probe.shelves.filter((f) => f !== undefined)) {
+        expect(shelf.scriptId).toBeGreaterThanOrEqual(6063);
+        expect(shelf.active).toBe(false);
+        expect(shelf.rect!.bottom - shelf.rect!.top).toBeLessThan(15);
+      }
+      // Rien ne recouvre plus l'emplacement des étagères (avant : les socles, dessinés par-dessus, montraient encore une étagère pleine).
+      for (const socle of socles) expect(shown(socle)).toBeLessThan(0.5);
       expect(t.engine.error).toBeNull();
     }
   }, 240_000);

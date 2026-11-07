@@ -27,7 +27,8 @@
  *  - le rectangle de découpe d'un Zoombini rangé (`+0xe4`) n'est pas porté : l'avant-plan percé suffit à ne le montrer que dans l'ouverture de sa porte ;
  *  - un Zoombini déjà rangé n'est pas reprenable (l'original le laisse déplacer pour trier à l'œil, sans changer de chambre) ;
  *  - un dépôt sur une chambre bloquée renvoie le Zoombini sur sa place d'origine (l'original l'annule sans le déplacer) ;
- *  - le survol (images 1 et 2 des socles `10000 + r`) n'est pas porté ;
+ *  - le survol (images 1 et 2 des socles `10000 + r`) n'est pas porté : les socles, que l'original ne dessine que pendant ce survol (bit `0x1000000`, `11a0:0126`), ne sont jamais
+ *    dessinés (`FLAG_BASE`) ;
  *  - les clics pendant les animations de refus et d'acceptation sont ignorés jusqu'à leur fin (l'original ne bloque que le traitement du Tick) ;
  *  - l'attente de 60 ticks de la défaite (`1090:00c1`) est un délai de la scène, pas une attente bloquante.
  */
@@ -102,7 +103,14 @@ const F = FeatureFlag;
 /** Drapeaux des objets de `12f6` (`0x4188000`, `0xc188000`, `0x508a000`, `0x4008000`, `0x808000`, `0x108000`, `0x8108000`, `0x8188000`). */
 const FLAG_DOOR = F.flag4000000 | F.stopAtEnd | F.noReplay | F.active;
 const FLAG_SHELF = F.region | FLAG_DOOR;
-const FLAG_BASE = F.flag4000000 | F.staticFirst | F.noReplay | F.active | F.firstImage;
+/**
+ * Socles de dépôt (`0x508a000`, niveau 3 : `0x108a000`) : le bit `0x1000000` fait que le rappel de dessin `11a0:0126` ne dessine l'objet que
+ * pendant qu'il joue (`+0xe0 ≠ 0`) ; il s'arrête dès sa première image (`11a0:033a`), donc il n'est jamais dessiné hors du survol (non porté).
+ * Ce sont des surbrillances (planche pointillée posée sur l'étagère), pas des étagères : dessinés en permanence, ils cachaient l'étagère qui
+ * bascule au refus et celles qui se replient à la fin (`3ace`). Le port n'interprète pas encore ce bit au dessin : `noDraw` le remplace ici.
+ */
+const FLAG_BASE = F.flag4000000 | F.staticFirst | F.noReplay | F.active | F.firstImage | F.noDraw;
+const FLAG_BASE_L3 = F.staticFirst | F.noReplay | F.active | F.firstImage | F.noDraw;
 const FLAG_WALL = F.flag4000000 | F.active;
 const FLAG_BARRIER = F.relative | F.active;
 const FLAG_PLAY = F.stopAtEnd | F.active;
@@ -468,7 +476,7 @@ class HotelRun implements HotelProbe {
         });
       }
       for (let room = 0; room < rooms; room++) {
-        f.create({ script: SCRB.baseL3 + room, delay: DELAY.play, flags: F.stopAtEnd | F.noReplay | F.active | F.firstImage, depth: DEPTH.base });
+        f.create({ script: SCRB.baseL3 + room, delay: DELAY.play, flags: FLAG_BASE_L3, depth: DEPTH.base });
       }
       return;
     }

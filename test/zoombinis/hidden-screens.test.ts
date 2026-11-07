@@ -84,6 +84,7 @@ describe.skipIf(!original.has)("écrans cachés 19 et 20 (PICKER.MHK)", () => {
     host.audio.unlock();
     const engine = createZoombinisEngine(host, { seed: 5 });
     const services = await installServices(engine);
+    services.fades.enabled = true;
     const entered: number[] = [];
     engine.register(ScreenId.hiddenShooting, createHiddenShootingScene);
     engine.register(ScreenId.hiddenAsteroids, createHiddenAsteroidsScene);

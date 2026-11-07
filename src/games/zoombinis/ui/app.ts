@@ -66,6 +66,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     await loadText(host);
     engine = createZoombinisEngine(host);
     services = await installServices(engine);
+    // Fondus d'entrée et de sortie de chaque écran (`11a8:302b` / `11a8:3065`), coupés par défaut dans les tests.
+    services.fades.enabled = true;
     loadCursors(host, engine.ctx.resources.require(COMMON_ARCHIVE));
     registerScenes(engine);
     engine.start();

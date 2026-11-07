@@ -24,7 +24,6 @@
  * logique s'arrête pendant qu'une boîte de dialogue est ouverte.
  */
 import type { Archive } from "../../../engine/mohawk/resources";
-import type { Fade } from "../../../engine/mohawk/graphics/palette";
 import { snoidVoiceId } from "../data/zoombini";
 import { DIALOG } from "../engine/dialog";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeaturePart, type Features } from "../engine/features";
@@ -33,7 +32,7 @@ import type { Scene, SceneContext } from "../engine/scene";
 import { ScreenId } from "../engine/scene";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { makeZoombini } from "../game/state";
-import { closeScreen, fadeInScreen, fadeOutScreen, openScreen } from "./screen-kit";
+import { closeScreen, openScreen } from "./screen-kit";
 import { createSnoid, type Snoid } from "./snoid";
 
 const ARCHIVE = "PICKER.MHK";
@@ -208,8 +207,7 @@ export function createHiddenShootingScene(): Scene {
   const walkers: (Snoid | null)[] = [];
   /** `DS:855e` : le Zoombini touché, qui disparaît à l'évènement 0 du tir réussi. */
   let target: Snoid | null = null;
-  let fadeIn: Fade | null = null;
-  let fadeOut: Fade | null = null;
+  /** Retour à la carte demandé (`goTo` fait le fondu de sortie, `1110:2354`) : plus rien ne bouge en attendant. */
   let left = false;
 
   function newRound(): ShootingState {
@@ -294,7 +292,8 @@ export function createHiddenShootingScene(): Scene {
   /** `1110:24e8` : un clic. */
   function click(ctx: SceneContext, x: number, y: number): void {
     if (contains(EXIT_BOX, x, y)) {
-      fadeOut = fadeOutScreen(ctx);
+      left = true;
+      zoombinis.goTo(ctx, ScreenId.map);
       return;
     }
     let hit = walkerAt(x, y);
@@ -383,7 +382,6 @@ export function createHiddenShootingScene(): Scene {
       gameOver = null;
       restartZone = null;
       aiming = true;
-      fadeOut = null;
       left = false;
       openScreen(ctx, archive, { background: BACKGROUND });
       features.defineGroup(0, DECOR_SHEET);
@@ -406,7 +404,6 @@ export function createHiddenShootingScene(): Scene {
       features.create({ script: PANEL, delay: 0 });
       scoreboard = features.create({ script: SCOREBOARD, delay: 1, flags: FeatureFlag.stopAtEnd, onImage: scoreImage });
       ctx.setCursor("hidden");
-      fadeIn = fadeInScreen(ctx);
       ctx.services.get(ZOOMBINIS_SOUND).queue(MUSIC);
     },
     leave(ctx: SceneContext) {
@@ -415,21 +412,12 @@ export function createHiddenShootingScene(): Scene {
       closeScreen(ctx);
     },
     tick(ctx: SceneContext) {
-      if (fadeOut) {
-        // `1110:2354` (fondu de sortie, bloquant) puis la carte ; plus rien ne bouge en attendant.
-        if (fadeOut.done && !left) {
-          left = true;
-          zoombinis.goTo(ctx, ScreenId.map);
-        }
-        return;
-      }
-      if (fadeIn && !fadeIn.done) return;
-      fadeIn = null;
+      if (left) return;
       if (ctx.services.get(DIALOG).isOpen) return;
       aim(ctx);
       updateWalkers(ctx);
       for (const event of ctx.input.buttonEvents) {
-        if (fadeOut) return;
+        if (left) return;
         if (event.down) click(ctx, event.x, event.y);
       }
     },

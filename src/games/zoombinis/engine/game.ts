@@ -9,6 +9,7 @@ import type { ZoombinisContext } from "./context";
 import type { ZoombinisEngine } from "./engine";
 import type { Host } from "./host";
 import { defineService } from "./scene";
+import { SCREEN_FADES } from "./screen-fades";
 import type { ScreenId } from "./scene";
 import { ZOOMBINIS_TEXT } from "./text";
 
@@ -26,13 +27,16 @@ export class ZoombinisGame {
 
   /**
    * Demande l'écran `requested` comme `[8554]` : écriture automatique de la partie nommée (`11a0:141e`), règles de `1108:0000`
-   * (progression, transition `XFER` intercalée, point de reprise), puis changement de scène différé.
+   * (progression, transition `XFER` intercalée, point de reprise), puis fondu de sortie (`11a8:3065`) et changement de scène différé.
    */
   goTo(ctx: ZoombinisContext, requested: number): ScreenChange {
     this.saves.autoSave(this.game, this.session);
     const change = changeScreen(this.game, this.session, requested);
     this.lastChange = change;
-    ctx.scenes.request(change.screen as ScreenId);
+    // `11a8:3065` (fondu de sortie, bloquant) avant la bascule quand les fondus sont actifs (`screen-fades.ts`).
+    const fades = ctx.services.tryGet(SCREEN_FADES);
+    if (fades) fades.request(ctx, change.screen as ScreenId);
+    else ctx.scenes.request(change.screen as ScreenId);
     return change;
   }
 }

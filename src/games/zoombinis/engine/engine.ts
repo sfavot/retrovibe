@@ -1,7 +1,8 @@
 import { Engine, type EngineOptions as MohawkEngineOptions } from "../../../engine/mohawk/engine";
 import { defaultPrefs, type ZoombinisContext, type ZoombinisPrefs } from "./context";
 import type { CursorKind, Host } from "./host";
-import { SCREEN_NAMES, ScreenId } from "./scene";
+import { SCREEN_NAMES, ScreenId, type SceneFactory } from "./scene";
+import { withScreenFades } from "./screen-fades";
 
 export interface EngineOptions {
   /** Graine du hasard ; défaut : l'horloge murale (`host.unixMillis()`, 32 bits bas ; l'original graine sur `time()`, engine.md §8). */
@@ -30,6 +31,11 @@ export class ZoombinisEngine extends Engine<ScreenId, ZoombinisExt, CursorKind> 
       resources: { strlEncoding: "mac-roman" },
     };
     super(host, common);
+  }
+
+  /** Chaque écran passe par les fondus communs (`screen-fades.ts`, `11a8:302b` / `11a8:3065`). */
+  override register(id: ScreenId, factory: SceneFactory): void {
+    super.register(id, () => withScreenFades(id, factory()));
   }
 
   get prefs(): ZoombinisPrefs {

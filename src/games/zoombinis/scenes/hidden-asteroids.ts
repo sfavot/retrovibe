@@ -26,7 +26,6 @@
  * ouverte (comme `11a0:1013`, `DS:a2da`).
  */
 import type { Archive } from "../../../engine/mohawk/resources";
-import type { Fade } from "../../../engine/mohawk/graphics/palette";
 import type { KeyEvent } from "../../../engine/mohawk/input";
 import { DIALOG } from "../engine/dialog";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeaturePart, type FeatureRect, type Features } from "../engine/features";
@@ -34,7 +33,7 @@ import { ZOOMBINIS_GAME, type ZoombinisGame } from "../engine/game";
 import type { Scene, SceneContext } from "../engine/scene";
 import { ScreenId } from "../engine/scene";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
-import { closeScreen, fadeInScreen, fadeOutScreen, openScreen } from "./screen-kit";
+import { closeScreen, openScreen } from "./screen-kit";
 
 const ARCHIVE = "PICKER.MHK";
 /** Fond et palette (`11a8:1475(2000)`) ; planche 1000 avec `REGS` (`11a0:0000(0, 1, 1000)`) et ses 31 scripts (`11a8:14ab(31, 1000)`). */
@@ -172,8 +171,7 @@ export function createHiddenAsteroidsScene(): Scene {
   let lives = START_LIVES;
   let gameOver: Feature | null = null;
   let scoreboard: Feature;
-  let fadeIn: Fade | null = null;
-  let fadeOut: Fade | null = null;
+  /** Retour à la carte demandé (`goTo` fait le fondu de sortie, `1110:311e`). */
   let left = false;
 
   function shapeOf(w: number): { width: number; height: number } | undefined {
@@ -506,7 +504,6 @@ export function createHiddenAsteroidsScene(): Scene {
       nextBonus = BONUS_STEP;
       lives = START_LIVES;
       gameOver = null;
-      fadeOut = null;
       left = false;
       openScreen(ctx, archive, { background: BACKGROUND });
       features.defineGroup(0, SHEET, true);
@@ -514,35 +511,27 @@ export function createHiddenAsteroidsScene(): Scene {
       spawnShip(ctx);
       features.create({ script: PANEL, delay: DECOR_DELAY });
       scoreboard = features.create({ script: SCOREBOARD, delay: DECOR_DELAY, flags: FeatureFlag.stopAtEnd, onImage: scoreImage });
-      fadeIn = fadeInScreen(ctx);
       ctx.services.get(ZOOMBINIS_SOUND).queue(MUSIC);
     },
     leave(ctx: SceneContext) {
       closeScreen(ctx);
     },
     tick(ctx: SceneContext) {
-      if (fadeOut) {
-        // `1110:311e` (fondu de sortie, bloquant) puis la carte.
-        if (fadeOut.done && !left) {
-          left = true;
-          zoombinis.goTo(ctx, ScreenId.map);
-        }
-        return;
-      }
-      if (fadeIn && !fadeIn.done) return;
-      fadeIn = null;
+      if (left) return;
       if (ctx.services.get(DIALOG).isOpen) return;
       update(ctx);
       for (const event of ctx.input.buttonEvents) {
         // `1110:33f0` : un clic gauche n'importe où ramène à la carte.
         if (event.down && event.button === "left") {
-          fadeOut = fadeOutScreen(ctx);
+          // `1110:311e` (fondu de sortie, bloquant, par `goTo`) puis la carte.
+          left = true;
+          zoombinis.goTo(ctx, ScreenId.map);
           return;
         }
       }
     },
     key(event, ctx: SceneContext) {
-      if (fadeOut || (fadeIn && !fadeIn.done) || ctx.services.get(DIALOG).isOpen) return false;
+      if (left || ctx.services.get(DIALOG).isOpen) return false;
       key(ctx, event);
       return false;
     },

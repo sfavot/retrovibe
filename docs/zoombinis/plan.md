@@ -365,10 +365,10 @@ Un lot ne part que si le précédent est vert. Une tâche « règles » qui lais
 
 - **Manuel** (en attente) : le PDF français (175 Mo, 86 pages scannées sans couche de texte, `archives/zoombinis/manuel/`). Trois pistes : page `MANUEL.html` comme
   Mathémagique (transcription par lecture des pages, sans OCR, captures du port), PDF allégé (8 à 10 Mo), ou rien.
-- **Fondus des autres écrans** (en attente) : l'original fait le fondu d'entrée et de sortie (`11a8:302b`, `11a8:3065`) sur tous les écrans ; le port ne le fait qu'à XFER
-  et aux écrans cachés. Un mécanisme commun au changement d'écran est possible, mais décale les délais de la plupart des tests.
-- **Bit `0x1000000`, quatre objets** (en attente) : emplacements des camps, détail de l'arche du choix (4110), dalles des grottes, zone de dépôt des grottes fumantes.
-  L'original ne les dessine qu'en surbrillance, mais le fond n'a pas ce qu'ils montrent : ils restent dessinés (`still`, écart provisoire) jusqu'à confirmation.
+- **Fondus des autres écrans** (décidé, porté) : mécanisme commun (`engine/screen-fades.ts`) sur tous les écrans sauf le logo ; écran et objets gelés pendant les
+  fondus ; coupés par défaut dans les tests, activés par l'application.
+- **Bit `0x1000000`, quatre objets** (décidé, porté) : emplacements des camps, entrée de la grotte du choix (4110), dalles des grottes, wagonnet des grottes fumantes ne sont
+  dessinés qu'au survol d'une zone de dépôt (`1168:1742`), comme l'original ; extension tactile du bug 18 sur ces zones.
 - **Accueil du site** : afficher Zoombinis sur l'accueil seulement après H (décidé). La ligne du registre est ajoutée en fin de vague H.
 - **Défaut du bac** (`ferry.md` §7 point 1, décidé) : un Zoombini repris sur un tabouret puis lâché sur le ponton resterait compté comme assis. Il est **corrigé** (il n'est plus compté assis) et l'écart est noté dans `ferry.md` et `engine-ts.md`, après confirmation dans le code par H4.
 - **Défaut du cristal** (`smoke.md` §3.5, décidé) : quand le second Zoombini manque, `1158:5017` écrit dans la mauvaise table et rend le puzzle insoluble (2,5 % des tirages au niveau 3, 3,6 % au niveau 4). Il est **corrigé** (`bugMissingB = false` par défaut) et l'écart est noté dans `smoke.md`.

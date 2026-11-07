@@ -59,6 +59,28 @@ describe.skipIf(!original.has)("partie complète à travers les vrais écrans", 
     expect(r.engine.error).toBeNull();
   }, 240_000);
 
+  it("chemin A avec les fondus d'écran (11a8:302b / 11a8:3065) : chaque écran sort du noir et la partie va jusqu'au bout", async () => {
+    const r = await boot();
+    r.services.fades.enabled = true;
+    const { palette } = r.services.graphics;
+    // Luminance la plus haute affichée sur chaque écran (somme des entrées 1 à 254 de la palette présentée).
+    const brightest = new Map<number, number>();
+    r.engine.addTickHook((c) => {
+      const id = c.scenes.currentId as number;
+      const lum = palette.output().slice(3, 255 * 3).reduce((sum, v) => sum + v, 0);
+      brightest.set(id, Math.max(brightest.get(id) ?? 0, lum));
+    });
+    await playAdventure(r, "A");
+    expect(r.visited.map(nameOf)).toEqual(PATH_SCREENS.A.map(nameOf));
+    expect(r.arrivals.map(([, n]) => n)).toEqual(new Array(r.arrivals.length).fill(16));
+    await tick(r, 60);
+    for (const id of PATH_SCREENS.A) expect(brightest.get(id) ?? 0, nameOf(id)).toBeGreaterThan(0);
+    // Zoombiniville, fondu d'entrée fini : la palette affichée est celle de l'écran.
+    expect(palette.fade).toBeNull();
+    expect(Array.from(palette.output())).toEqual(Array.from(palette.colors));
+    expect(r.engine.error).toBeNull();
+  }, 240_000);
+
   it("chemin A avec des pertes à l'étape 4 : un Zoombini laissé dans la tanière et un au gouffre sont rendus au camp 2, sans monument ni niveau pour l'étape", async () => {
     const r = await boot();
     await playAdventure(r, "A", { [S.caves]: 1, [S.maze2]: 1 });

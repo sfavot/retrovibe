@@ -121,7 +121,8 @@ export function present(r: Rig, id: number): number {
 
 /** Attend l'écran `id` et que sa scène soit chargée. */
 export async function reach(r: Rig, id: number): Promise<void> {
-  await until(r, `arriver à l'écran ${nameOf(id)}`, () => screenIs(r, id), 6000);
+  // Avec les fondus d'écran, l'écran est gelé pendant son fondu d'entrée (clics perdus) : on attend sa fin.
+  await until(r, `arriver à l'écran ${nameOf(id)}`, () => screenIs(r, id) && !r.services.fades.blocking, 6000);
   await tick(r, 20);
   if (r.arrivals[r.arrivals.length - 1]?.[0] !== id) r.arrivals.push([id, present(r, id)]);
 }

@@ -5,7 +5,8 @@
  *  - ouvre `ZOOMBINI.MHK`, `MIDIMPC.MHK` et `MIDIMAP.DAT` (gardées toute la partie) ;
  *  - crée la surface (`GRAPHICS.screen`) et la palette, et branche `engine.setFrameSource` ;
  *  - enregistre `GRAPHICS` et `ZOOMBINIS_SOUND` dans `engine.services` ;
- *  - ajoute un crochet de tick : palette (fondus, cycles) → préférences musique / effets → présentation si l'image a changé ; et, en dernier
+ *  - enregistre `SCREEN_FADES` (fondus d'écran, `screen-fades.ts`, inactifs tant que `fades.enabled` est faux) ;
+ *  - ajoute un crochet de tick : palette (fondus, cycles) → préférences musique / effets → présentation si l'image a changé ; puis les fondus d'écran ; et, en dernier
  *    (après les features, la partie et la boîte de dialogue), le traitement des files de son.
  * Contrat des scènes : dans `enter`, `sound.setScreenArchive(archive)` ; dans `leave`, `setScreenArchive(null)`.
  */
@@ -21,6 +22,7 @@ import { installFeatures, type Features } from "./features";
 import { installGame, type ZoombinisGame } from "./game";
 import { installDialog } from "./dialog";
 import { installShortcuts } from "./shortcuts";
+import { SCREEN_FADES, ScreenFades } from "./screen-fades";
 
 export const SCREEN_WIDTH = 640;
 export const SCREEN_HEIGHT = 480;
@@ -41,6 +43,8 @@ export interface ZoombinisServices {
   readonly sound: ZoombinisSound;
   readonly features: Features;
   readonly game: ZoombinisGame;
+  /** Fondus d'écran communs (`screen-fades.ts`) ; `fades.enabled` est à mettre à vrai par l'application. */
+  readonly fades: ScreenFades;
 }
 
 export async function installServices(engine: ZoombinisEngine): Promise<ZoombinisServices> {
@@ -65,6 +69,8 @@ export async function installServices(engine: ZoombinisEngine): Promise<Zoombini
 
   engine.services.provide(GRAPHICS, graphics);
   engine.services.provide(ZOOMBINIS_SOUND, sound);
+  const fades = new ScreenFades(palette);
+  engine.services.provide(SCREEN_FADES, fades);
 
   engine.addTickHook((c) => {
     // Un fondu ou un cycle qui change l'affichage doit être présenté même si rien n'a été redessiné.
@@ -78,6 +84,8 @@ export async function installServices(engine: ZoombinisEngine): Promise<Zoombini
     if (sound.musicEnabled !== c.prefs.music) sound.musicEnabled = c.prefs.music;
     if (sound.effectsEnabled !== c.prefs.effects) sound.effectsEnabled = c.prefs.effects;
   });
+  // Après la palette : un fondu de sortie fini demande l'écran suivant ; avant les features, que les fondus gèlent.
+  engine.addTickHook((c) => fades.tick(c));
 
   await installText(engine);
   const features = installFeatures(engine);
@@ -88,7 +96,7 @@ export async function installServices(engine: ZoombinisEngine): Promise<Zoombini
   // `11a8:04b9` traite la file des sons (`11a8:2d3f`) après avoir lu les features : un son posé sur une image de script part dans le tick
   // où cette image s'affiche, pas au suivant (crochet enregistré en dernier, après les features, la partie et la boîte de dialogue).
   engine.addTickHook(() => sound.tick());
-  return { graphics, sound, features, game };
+  return { graphics, sound, features, game, fades };
 }
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {

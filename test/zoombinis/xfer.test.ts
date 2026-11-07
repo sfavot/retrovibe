@@ -18,7 +18,7 @@ import {
   translateSlots,
   XFER_BACKGROUNDS,
 } from "../../src/games/zoombinis/scenes/xfer";
-import { SCREEN_FADE_TICKS } from "../../src/games/zoombinis/scenes/screen-kit";
+import { SCREEN_FADE_TICKS } from "../../src/games/zoombinis/engine/screen-fades";
 import { originalFiles } from "../support/original";
 import { runFor, TestHost } from "./engine-test-host";
 
@@ -161,7 +161,8 @@ describe.skipIf(!original.has)("transition XFER", () => {
     const host = new TestHost();
     host.audio.unlock();
     const engine = createZoombinisEngine(host, { seed });
-    await installServices(engine);
+    // Fondus d'écran actifs, comme dans l'application : la minuterie de XFER part après le fondu d'entrée.
+    (await installServices(engine)).fades.enabled = true;
     const entered: number[] = [];
     const dummy = (id: number): Scene => ({
       enter: () => void entered.push(id),
@@ -262,7 +263,7 @@ describe.skipIf(!original.has)("transition XFER", () => {
   it("falaise (bug 16) : les mouettes 5104 à 5107 (et 5102, 5103, 5108) ne sont dessinées que pendant leur vol (bit 0x1000000, 11a0:0126) ; au repos elles ne restent pas figées", async () => {
     const { host, engine } = await begin({ from: ScreenId.picker, to: ScreenId.bridge, seed: 3 });
     const features = engine.services.get(FEATURES);
-    await runFor(engine, host, TICK_MS * 3);
+    await runFor(engine, host, TICK_MS * (FADE + 3));
     const playOnly = () => features.features.filter((f) => f.scriptId >= 5102 && f.scriptId <= 5108 && f.hasFlag(FeatureFlag.playOnly));
     expect(playOnly()).toHaveLength(7);
     // Au départ, aucune n'est dessinée : leurs pixels sont ceux du fond.
@@ -433,14 +434,19 @@ describe.skipIf(!original.has)("transition XFER", () => {
     expect(lum()).toBeGreaterThan(middle);
     expect(Array.from(level())).toEqual(Array.from(palette.colors));
     expect(palette.fade).toBeNull();
-    // Clic : fondu vers le noir, tenu jusqu'à l'ouverture de l'écran suivant (factice, qui n'ouvre rien).
+    // Clic : fondu vers le noir (bloquant), puis l'écran suivant (factice), qui fait son propre fondu d'entrée depuis ce noir.
     host.click(320, 240);
     await runFor(engine, host, TICK_MS * 12);
     expect(lum()).toBeLessThan(full);
     expect(lum()).toBeGreaterThan(0);
-    await runFor(engine, host, TICK_MS * (FADE + 5));
-    expect(engine.scenes.currentId).toBe(ScreenId.bridge);
+    expect(engine.scenes.currentId).toBe(ScreenId.xfer);
+    await runFor(engine, host, TICK_MS * (FADE - 12));
     expect(lum()).toBe(0);
+    await runFor(engine, host, TICK_MS * 3);
+    expect(engine.scenes.currentId).toBe(ScreenId.bridge);
+    expect(lum()).toBeLessThan(full / 3);
+    await runFor(engine, host, TICK_MS * (FADE + 2));
+    expect(Array.from(level())).toEqual(Array.from(palette.colors));
   });
 
   it("pas d'animation d'attente des Zoombinis dans XFER (DS:235c vaut 0)", async () => {

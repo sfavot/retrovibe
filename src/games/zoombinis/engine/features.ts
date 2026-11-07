@@ -40,6 +40,7 @@ import type { Anchors } from "../data/regs";
 import { SCRIPT_MAX_CELLS, type Script } from "../data/script";
 import { regs, scrb } from "./resources";
 import { defineService } from "./scene";
+import { SCREEN_FADES } from "./screen-fades";
 import type { ZoombinisEngine } from "./engine";
 import { GRAPHICS } from "./services";
 import { ZOOMBINIS_SOUND } from "./sound";
@@ -551,10 +552,10 @@ export class Features {
   }
 
   /** Un tick : fait jouer les features échues (`tick ≥ next`), puis recompose l'écran si l'une a changé. */
-  tick(): void {
+  /** Un tick : chaque objet avance (sauf `frozen`, pendant un fondu d'écran), puis tri et recomposition si besoin. */
+  tick(frozen = false): void {
     const now = this.deps.clock.ticks;
-    for (const feature of [...this.list])
-      if (!feature.destroyed) this.step(feature, now);
+    if (!frozen) for (const feature of [...this.list]) if (!feature.destroyed) this.step(feature, now);
     if (this.depthSort) this.reorder();
     if (this.dirty) this.compose();
   }
@@ -850,6 +851,7 @@ export function installFeatures(engine: FeaturesHost): Features {
     requestPresent: () => ctx.requestPresent(),
   });
   services.provide(FEATURES, features);
-  engine.addTickHook(() => features.tick());
+  // Pendant un fondu d'écran (bloquant dans l'original), les objets ne jouent pas ; l'écran est seulement recomposé s'il le faut.
+  engine.addTickHook(() => features.tick(services.tryGet(SCREEN_FADES)?.blocking === true));
   return features;
 }

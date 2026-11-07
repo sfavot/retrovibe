@@ -27,6 +27,9 @@ import {
  *  - Liste (rôle de `ZOOMBINI.WHO`) : au plus 50 parties, compteur de fichiers (`ZOOM%04d`), nom de 18 caractères au plus pris dans le jeu de `STRL` 1100.
  *  - Partie (rôle de `ZOOMnnnn.txt`) : tout `GameState` ; la partie anonyme est `ZBUser`. L'import des fichiers de l'original est hors périmètre ; l'entraînement n'écrit rien (`ZBtemp.txt` n'existe pas ici).
  *
+ * Lecture : comme l'original, qui ne contrôle que la signature (`0x6B`, `10d0:0734`), seul un texte qui n'est pas une partie de ce format est refusé
+ * (`SaveError("invalid")`) ; un champ abîmé est réparé (`readGame`, `Reader`), et une entrée abîmée de la liste est écartée.
+ *
  * Clés : `retrovibe:zoombinis:who` et `retrovibe:zoombinis:game:<fichier>`. Aucun texte destiné au joueur : les erreurs désignent les messages de `TEXTSTR.MHK` (`SAVE_ERROR_STRL`).
  */
 
@@ -121,41 +124,126 @@ function obj(v: unknown, what: string): Raw {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Raw) : bad(what);
 }
 
-function list(v: unknown, what: string, len?: number): unknown[] {
-  if (!Array.isArray(v) || (len !== undefined && v.length !== len)) return bad(what);
-  return v;
-}
+/**
+ * Lecture tolérante d'une partie (bug 19). L'original ne refuse un fichier que sur sa signature (`0x6B` en tête, `10d0:0734`) et relit le reste
+ * octet par octet, sans contrôle de bornes. Le port refusait toute la partie pour une seule valeur hors bornes ou d'un mauvais type, ce qui rendait
+ * illisible une partie valable par ailleurs. Seuls la racine (JSON, objet, version) et l'objet `game` restent exigés ; chaque champ abîmé est
+ * ramené à une valeur sûre (bornée, arrondie, ou valeur d'une partie neuve) et noté dans `repairs`.
+ */
+class Reader {
+  readonly repairs: string[] = [];
 
-function int(v: unknown, what: string, lo: number, hi: number): number {
-  return typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : bad(what);
-}
-
-function bool(v: unknown, what: string): boolean {
-  return typeof v === "boolean" ? v : bad(what);
-}
-
-function bytes(v: unknown, what: string, len: number): Uint8Array {
-  const a = list(v, what, len);
-  return Uint8Array.from(a.map((n) => int(n, what, 0, 255)));
-}
-
-function attrs(v: unknown, what: string, zeroAllowed: boolean): Attrs {
-  const a = list(v, what, 4).map((n) => int(n, what, zeroAllowed ? 0 : 1, 5));
-  return [a[0]!, a[1]!, a[2]!, a[3]!];
-}
-
-function readReserve(v: unknown, what: string): Reserve {
-  const r = obj(v, what);
-  const out = emptyReserve();
-  out.scroll = int(r.scroll, what, 0, 0xffff);
-  out.count = int(r.count, what, 0, ZOOMBINI_TYPES);
-  for (const item of list(r.entries, what)) {
-    const pair = list(item, what, 2);
-    const index = int(pair[0], what, 0, ZOOMBINI_TYPES - 1);
-    const e = obj(pair[1], what);
-    out.entries[index] = { attrs: attrs(e.attrs, what, true), slot: bytes(e.slot, what, SLOT_BYTES), state: bytes(e.state, what, STATE_BYTES) };
+  private note(what: string): void {
+    if (!this.repairs.includes(what)) this.repairs.push(what);
   }
-  return out;
+
+  obj(v: unknown, what: string): Raw {
+    if (typeof v === "object" && v !== null && !Array.isArray(v)) return v as Raw;
+    this.note(what);
+    return {};
+  }
+
+  /** Entier de `lo` à `hi` : un nombre est arrondi et borné ; autre chose donne `fallback`. */
+  int(v: unknown, what: string, lo: number, hi: number, fallback = lo): number {
+    if (typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi) return v;
+    this.note(what);
+    if (typeof v === "number" && Number.isFinite(v)) return Math.min(hi, Math.max(lo, Math.round(v)));
+    return fallback;
+  }
+
+  bool(v: unknown, what: string, fallback: boolean): boolean {
+    if (typeof v === "boolean") return v;
+    this.note(what);
+    return typeof v === "number" ? v !== 0 : fallback;
+  }
+
+  /** Tableau de `len` éléments (s'il est donné) : complété par `fill(i)` ou tronqué. */
+  list(v: unknown, what: string, len?: number, fill?: (i: number) => unknown): unknown[] {
+    let a: unknown[];
+    if (Array.isArray(v)) a = v;
+    else if (v instanceof Object && len !== undefined) {
+      // Tableau typé passé par `JSON.stringify` : `{ "0": …, "1": … }`.
+      this.note(what);
+      a = Array.from({ length: len }, (_, i) => (v as Raw)[String(i)]);
+    } else {
+      this.note(what);
+      a = [];
+    }
+    if (len === undefined || a.length === len) return a;
+    this.note(what);
+    return Array.from({ length: len }, (_, i) => (i < a.length ? a[i] : fill?.(i)));
+  }
+
+  ints(v: unknown, what: string, len: number, lo: number, hi: number, fallback: readonly number[]): number[] {
+    return this.list(v, what, len, (i) => fallback[i]).map((n, i) => this.int(n, what, lo, hi, fallback[i] ?? lo));
+  }
+
+  bytes(v: unknown, what: string, len: number): Uint8Array {
+    return Uint8Array.from(this.list(v, what, len, () => 0).map((n) => this.int(n, what, 0, 255, 0)));
+  }
+
+  /** Attributs de 1 à 5 (0 admis dans une réserve) ; null s'ils sont inutilisables (le Zoombini est alors écarté). */
+  attrs(v: unknown, what: string, zeroAllowed: boolean): Attrs | null {
+    const lo = zeroAllowed ? 0 : 1;
+    if (!Array.isArray(v) || v.length !== 4 || v.some((n) => typeof n !== "number" || !Number.isInteger(n) || n < lo || n > 5)) {
+      this.note(what);
+      return null;
+    }
+    return [v[0], v[1], v[2], v[3]] as Attrs;
+  }
+
+  reserve(v: unknown, what: string): Reserve {
+    const r = this.obj(v, what);
+    const out = emptyReserve();
+    out.scroll = this.int(r.scroll, what, 0, 0xffff);
+    for (const item of this.list(r.entries, what)) {
+      const pair = Array.isArray(item) && item.length === 2 ? item : null;
+      const index = pair && typeof pair[0] === "number" && Number.isInteger(pair[0]) && pair[0] >= 0 && pair[0] < ZOOMBINI_TYPES ? pair[0] : -1;
+      const e = pair && typeof pair[1] === "object" && pair[1] !== null ? (pair[1] as Raw) : null;
+      const a = e ? this.attrs(e.attrs, what, true) : null;
+      if (index < 0 || !e || !a) {
+        this.note(what);
+        continue;
+      }
+      out.entries[index] = { attrs: a, slot: this.bytes(e.slot, what, SLOT_BYTES), state: this.bytes(e.state, what, STATE_BYTES) };
+    }
+    // Le nombre d'occupés est un invariant (`team.ts`) : recompté plutôt que relu.
+    const occupied = out.entries.filter((e) => isOccupied(e)).length;
+    if (r.count !== occupied) this.note(what);
+    out.count = occupied;
+    return out;
+  }
+
+  group(v: unknown, what: string): GroupBuffer {
+    const g = this.obj(v, what);
+    const members: Zoombini[] = [];
+    for (const m of this.list(g.members, what)) {
+      const z = this.obj(m, what);
+      const a = this.attrs(z.attrs, what, false);
+      if (!a) continue;
+      if (members.length >= GROUP_CAPACITY) {
+        this.note(what);
+        break;
+      }
+      members.push({ attrs: a, id: this.int(z.id, what, 0, 0xffffffff, 0), present: this.bool(z.present, what, true), state: this.bytes(z.state, what, STATE_BYTES) });
+    }
+    return { flagA: this.bool(g.flagA, what, false), flagB: this.bool(g.flagB, what, false), members };
+  }
+
+  options(v: unknown): GameOptions {
+    const o = this.obj(v, "options");
+    const d = newGame().options;
+    return {
+      effects: this.bool(o.effects, "options", d.effects),
+      music: this.bool(o.music, "options", d.music),
+      magneticMouse: this.bool(o.magneticMouse, "options", d.magneticMouse),
+      hideCursorWhileCarrying: this.bool(o.hideCursorWhileCarrying, "options", d.hideCursorWhileCarrying),
+      testMode: this.bool(o.testMode, "options", d.testMode),
+      autoMagnet: this.bool(o.autoMagnet, "options", d.autoMagnet),
+      transitionsOff: this.bool(o.transitionsOff, "options", d.transitionsOff),
+      lessAction: this.bool(o.lessAction, "options", d.lessAction),
+    };
+  }
 }
 
 function writeReserve(r: Reserve): unknown {
@@ -166,41 +254,8 @@ function writeReserve(r: Reserve): unknown {
   return { scroll: r.scroll, count: r.count, entries };
 }
 
-function readGroup(v: unknown, what: string): GroupBuffer {
-  const g = obj(v, what);
-  const members = list(g.members, what);
-  if (members.length > GROUP_CAPACITY) bad(what);
-  return {
-    flagA: bool(g.flagA, what),
-    flagB: bool(g.flagB, what),
-    members: members.map((m): Zoombini => {
-      const z = obj(m, what);
-      return {
-        attrs: attrs(z.attrs, what, false),
-        id: int(z.id, what, 0, 0xffffffff),
-        present: bool(z.present, what),
-        state: bytes(z.state, what, STATE_BYTES),
-      };
-    }),
-  };
-}
-
 function writeGroup(g: GroupBuffer): unknown {
   return { flagA: g.flagA, flagB: g.flagB, members: g.members.map((m) => ({ attrs: m.attrs, id: m.id, present: m.present, state: [...m.state] })) };
-}
-
-function readOptions(v: unknown): GameOptions {
-  const o = obj(v, "options");
-  return {
-    effects: bool(o.effects, "options"),
-    music: bool(o.music, "options"),
-    magneticMouse: bool(o.magneticMouse, "options"),
-    hideCursorWhileCarrying: bool(o.hideCursorWhileCarrying, "options"),
-    testMode: bool(o.testMode, "options"),
-    autoMagnet: bool(o.autoMagnet, "options"),
-    transitionsOff: bool(o.transitionsOff, "options"),
-    lessAction: bool(o.lessAction, "options"),
-  };
 }
 
 /** Partie → JSON versionné (`{ v, game }`). */
@@ -235,8 +290,18 @@ export function serializeGame(game: GameState): string {
   });
 }
 
-/** JSON → partie, avec contrôle de la version, des types et des bornes ; lève `SaveError("invalid")` sinon. */
-export function parseGame(text: string): GameState {
+/** Partie lue et champs réparés (`Reader`). */
+export interface ParsedGame {
+  game: GameState;
+  /** Champs abîmés ramenés à une valeur sûre (vide pour une partie intacte). */
+  repairs: string[];
+}
+
+/**
+ * JSON → partie. Lève `SaveError("invalid")` seulement si le texte n'est pas une partie de ce format (JSON illisible, racine, version, `game`
+ * absent) : l'équivalent de la signature `0x6B` de l'original. Le reste est lu avec réparation (`Reader`).
+ */
+export function readGame(text: string): ParsedGame {
   let root: Raw;
   try {
     root = obj(JSON.parse(text), "racine");
@@ -246,55 +311,64 @@ export function parseGame(text: string): GameState {
   }
   if (root.v !== SAVE_VERSION) bad(`version ${String(root.v)}`);
   const g = obj(root.game, "game");
+  const r = new Reader();
   const out = newGame();
-  out.unknown02 = int(g.unknown02, "unknown02", 0, 0xffff);
-  out.options = readOptions(g.options);
+  out.unknown02 = r.int(g.unknown02, "unknown02", 0, 0xffff);
+  out.options = r.options(g.options);
   // Absente des parties enregistrées avant la vague H : règle non tirée.
-  if (g.fleensRule !== undefined) out.fleensRule = list(g.fleensRule, "fleensRule", 8).map((n) => int(n, "fleensRule", 0, 0xff));
-  out.campDecor = list(g.campDecor, "campDecor", 5).map((n) => int(n, "campDecor", 0, 0xffff));
-  out.townScroll = int(g.townScroll, "townScroll", 0, 5);
-  out.mascots = int(g.mascots, "mascots", 0, 3);
-  out.dialogMemory = list(g.dialogMemory, "dialogMemory", DIALOG_SCREENS.length).map((n) => int(n, "dialogMemory", 0, 0xffff));
-  const c = obj(g.counters, "counters");
+  if (g.fleensRule !== undefined) out.fleensRule = r.ints(g.fleensRule, "fleensRule", 8, 0, 0xff, out.fleensRule);
+  out.campDecor = r.ints(g.campDecor, "campDecor", 5, 0, 0xffff, out.campDecor);
+  out.townScroll = r.int(g.townScroll, "townScroll", 0, 5);
+  out.mascots = r.int(g.mascots, "mascots", 0, 3);
+  out.dialogMemory = r.ints(g.dialogMemory, "dialogMemory", DIALOG_SCREENS.length, 0, 0xffff, out.dialogMemory);
+  const c = r.obj(g.counters, "counters");
   out.counters = {
-    created: int(c.created, "created", 0, ZOOMBINI_TYPES),
-    camp1: int(c.camp1, "camp1", 0, ZOOMBINI_TYPES),
-    camp2: int(c.camp2, "camp2", 0, ZOOMBINI_TYPES),
-    town: int(c.town, "town", 0, 0xffff),
+    created: r.int(c.created, "created", 0, ZOOMBINI_TYPES),
+    camp1: r.int(c.camp1, "camp1", 0, ZOOMBINI_TYPES),
+    camp2: r.int(c.camp2, "camp2", 0, ZOOMBINI_TYPES),
+    town: r.int(c.town, "town", 0, 0xffff),
   };
-  const m = obj(g.masks, "masks");
+  const m = r.obj(g.masks, "masks");
   out.masks = {
-    stage1: int(m.stage1, "masks", 0, 15),
-    stage2: int(m.stage2, "masks", 0, 15),
-    stage3: int(m.stage3, "masks", 0, 15),
-    stage4: int(m.stage4, "masks", 0, 15),
+    stage1: r.int(m.stage1, "masks", 0, 15),
+    stage2: r.int(m.stage2, "masks", 0, 15),
+    stage3: r.int(m.stage3, "masks", 0, 15),
+    stage4: r.int(m.stage4, "masks", 0, 15),
   };
-  out.stageUnbroken = bool(g.stageUnbroken, "stageUnbroken");
-  out.successes = list(g.successes, "successes", PUZZLES).map((n) => int(n, "successes", 0, 255));
-  out.monuments = list(g.monuments, "monuments", MONUMENT_SLOTS).map((item): Monument | null => {
-    if (item === null) return null;
-    const mo = obj(item, "monuments");
+  out.stageUnbroken = r.bool(g.stageUnbroken, "stageUnbroken", out.stageUnbroken);
+  out.successes = r.ints(g.successes, "successes", PUZZLES, 0, 255, out.successes);
+  out.monuments = r.list(g.monuments, "monuments", MONUMENT_SLOTS, () => null).map((item): Monument | null => {
+    if (item === null || item === undefined) return null;
+    if (typeof item !== "object") {
+      r.obj(item, "monuments");
+      return null;
+    }
+    const mo = item as Raw;
     return {
-      stage: int(mo.stage, "monuments", 1, STAGES),
-      level: int(mo.level, "monuments", 1, 4),
-      year: int(mo.year, "monuments", 0, 0xffff),
-      month: int(mo.month, "monuments", 0, 255),
-      day: int(mo.day, "monuments", 0, 255),
+      stage: r.int(mo.stage, "monuments", 1, STAGES),
+      level: r.int(mo.level, "monuments", 1, 4),
+      year: r.int(mo.year, "monuments", 0, 0xffff),
+      month: r.int(mo.month, "monuments", 0, 255),
+      day: r.int(mo.day, "monuments", 0, 255),
     };
   });
-  out.levels = list(g.levels, "levels", STAGES).map((n) => int(n, "levels", 0, 3));
-  out.previousScreen = int(g.previousScreen, "previousScreen", -1, 22);
-  out.resumeScreen = int(g.resumeScreen, "resumeScreen", -1, 22);
-  out.camp1 = readReserve(g.camp1, "camp1");
-  out.camp2 = readReserve(g.camp2, "camp2");
-  out.population = readReserve(g.population, "population");
-  out.pickerGroup = readGroup(g.pickerGroup, "pickerGroup");
-  out.camp1Group = readGroup(g.camp1Group, "camp1Group");
-  out.camp2Group = readGroup(g.camp2Group, "camp2Group");
-  out.group = readGroup(g.group, "group");
-  out.typeCounts = bytes(g.typeCounts, "typeCounts", ZOOMBINI_TYPES);
-  if (out.typeCounts.some((n) => n > 2)) bad("typeCounts");
-  return out;
+  out.levels = r.ints(g.levels, "levels", STAGES, 0, 3, out.levels);
+  out.previousScreen = r.int(g.previousScreen, "previousScreen", -1, 22, out.previousScreen);
+  out.resumeScreen = r.int(g.resumeScreen, "resumeScreen", -1, 22, out.resumeScreen);
+  out.camp1 = r.reserve(g.camp1, "camp1");
+  out.camp2 = r.reserve(g.camp2, "camp2");
+  out.population = r.reserve(g.population, "population");
+  out.pickerGroup = r.group(g.pickerGroup, "pickerGroup");
+  out.camp1Group = r.group(g.camp1Group, "camp1Group");
+  out.camp2Group = r.group(g.camp2Group, "camp2Group");
+  out.group = r.group(g.group, "group");
+  out.typeCounts = Uint8Array.from(r.list(g.typeCounts, "typeCounts", ZOOMBINI_TYPES, () => 0).map((n) => r.int(n, "typeCounts", 0, 2, 0)));
+  return { game: out, repairs: r.repairs };
+}
+
+/** JSON → partie (`readGame` sans la liste des réparations). */
+export function parseGame(text: string): GameState {
+  return readGame(text).game;
 }
 
 // --- Liste et parties ---
@@ -344,13 +418,16 @@ export class SaveStore {
       return bad("liste illisible");
     }
     if (root.v !== SAVE_VERSION) bad("liste : version");
-    const games = list(root.games, "liste", undefined).map((item): SaveEntry => {
-      const e = obj(item, "liste");
-      if (typeof e.name !== "string" || typeof e.file !== "string" || !/^ZOOM\d{4}$/.test(e.file)) return bad("liste : entrée");
-      return { name: e.name, file: e.file };
-    });
-    if (games.length > MAX_SAVES) bad("liste : plus de 50 parties");
-    return { v: SAVE_VERSION, next: int(root.next, "liste : compteur", 0, 9999), games };
+    // Comme pour une partie (`Reader`), seule la racine est exigée : une entrée abîmée est écartée, le compteur ramené au-delà des fichiers listés.
+    const games: SaveEntry[] = [];
+    for (const item of Array.isArray(root.games) ? root.games : []) {
+      const e = typeof item === "object" && item !== null ? (item as Raw) : {};
+      if (typeof e.name !== "string" || typeof e.file !== "string" || !/^ZOOM\d{4}$/.test(e.file)) continue;
+      if (games.length < MAX_SAVES && !games.some((g) => g.name === e.name)) games.push({ name: e.name, file: e.file });
+    }
+    const used = games.reduce((n, g) => Math.max(n, Number(g.file.slice(4)) + 1), 0);
+    const next = typeof root.next === "number" && Number.isInteger(root.next) && root.next >= used && root.next <= 9999 ? root.next : Math.min(9999, used);
+    return { v: SAVE_VERSION, next, games };
   }
 
   private writeWho(who: WhoRecord): void {
@@ -430,6 +507,13 @@ export class SaveStore {
   private readGame(file: string): GameState {
     const text = this.storage.get(gameKey(file));
     if (text === null) throw new SaveError("read", file);
-    return parseGame(text);
+    const { game, repairs } = readGame(text);
+    this.lastRepairs = repairs;
+    // Diagnostic (console du navigateur) : quels champs étaient abîmés.
+    if (repairs.length > 0) console.warn(`Zoombinis : partie ${file} relue avec réparation de : ${repairs.join(", ")}`);
+    return game;
   }
+
+  /** Champs réparés à la dernière lecture d'une partie (`readGame`), pour le diagnostic. */
+  lastRepairs: readonly string[] = [];
 }

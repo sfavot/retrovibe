@@ -12,6 +12,7 @@ import {
   gameFileName,
   normalizeName,
   parseGame,
+  readGame,
   serializeGame,
 } from "../../src/games/zoombinis/game/saves";
 import {
@@ -103,34 +104,92 @@ describe("sérialisation d'une partie", () => {
     expect(parseGame(serializeGame(newGame()))).toEqual(newGame());
   });
 
-  it("données corrompues : JSON, version, types, bornes", () => {
+  it("données qui ne sont pas une partie (équivalent de la signature 0x6B) : JSON, racine, version, objet game", () => {
     const good = JSON.parse(serializeGame(richGame()));
-    const bad = (mutate: (o: any) => void): void => {
-      const o = structuredClone(good);
-      mutate(o);
-      expect(() => parseGame(JSON.stringify(o))).toThrow(SaveError);
-    };
     expect(() => parseGame("pas du json")).toThrow(SaveError);
     expect(() => parseGame("[]")).toThrow(SaveError);
     expect(() => parseGame("null")).toThrow(SaveError);
-    bad((o) => (o.v = 2));
-    bad((o) => (o.game.levels = [0, 0, 0]));
-    bad((o) => (o.game.levels[0] = 4));
-    bad((o) => (o.game.counters.created = 626));
-    bad((o) => (o.game.typeCounts[0] = 3));
-    bad((o) => o.game.typeCounts.pop());
-    bad((o) => (o.game.group.members[0].attrs = [1, 2, 3, 6]));
-    bad((o) => (o.game.group.members[0].state = [1, 2]));
-    bad((o) => (o.game.options.music = 1));
-    bad((o) => (o.game.monuments[0].stage = 5));
-    bad((o) => (o.game.camp1.entries[0] = [700, {}]));
-    bad((o) => delete o.game.population);
+    expect(() => parseGame(JSON.stringify({ ...good, v: 2 }))).toThrow(SaveError);
+    expect(() => parseGame(JSON.stringify({ v: 1 }))).toThrow(SaveError);
     try {
       parseGame("{");
     } catch (e) {
       expect((e as SaveError).kind).toBe("invalid");
       expect((e as SaveError).strl).toEqual([[1028, 0], [1030, 0]]);
     }
+  });
+
+  it("bug 19 : un champ abîmé ne rend plus toute la partie illisible (l'original ne contrôle que la signature) ; il est réparé et signalé", () => {
+    const good = JSON.parse(serializeGame(richGame()));
+    const read = (mutate: (o: any) => void) => {
+      const o = structuredClone(good);
+      mutate(o);
+      return readGame(JSON.stringify(o));
+    };
+    // Intacte : rien à réparer.
+    expect(readGame(JSON.stringify(good)).repairs).toEqual([]);
+    // Bornes : ramenées dans l'intervalle ; nombres non entiers arrondis ; `null` (NaN écrit par JSON.stringify) : valeur d'une partie neuve.
+    let r = read((o) => (o.game.levels[0] = 4));
+    expect(r.game.levels).toEqual([3, 2, 0, 3]);
+    expect(r.repairs).toEqual(["levels"]);
+    r = read((o) => (o.game.counters.created = 626));
+    expect(r.game.counters.created).toBe(625);
+    r = read((o) => (o.game.camp1.scroll = 2.5));
+    expect(r.game.camp1.scroll).toBe(3);
+    r = read((o) => (o.game.counters.camp1 = null));
+    expect(r.game.counters.camp1).toBe(0);
+    expect(r.repairs).toEqual(["camp1"]);
+    r = read((o) => (o.game.counters.camp2 = -3));
+    expect(r.game.counters.camp2).toBe(0);
+    r = read((o) => (o.game.typeCounts[0] = 3));
+    expect(r.game.typeCounts[0]).toBe(2);
+    // Longueurs : complétées ou tronquées.
+    r = read((o) => o.game.typeCounts.pop());
+    expect(r.game.typeCounts).toHaveLength(625);
+    expect(r.game.typeCounts[624]).toBe(0);
+    r = read((o) => (o.game.levels = [0, 0, 0]));
+    expect(r.game.levels).toEqual([0, 0, 0, 0]);
+    r = read((o) => (o.game.dialogMemory = [...o.game.dialogMemory, 5]));
+    expect(r.game.dialogMemory).toHaveLength(16);
+    // Types : booléen écrit en nombre, tableau typé sérialisé en objet.
+    r = read((o) => (o.game.options.music = 1));
+    expect(r.game.options.music).toBe(true);
+    r = read((o) => (o.game.group.members[0].present = 0));
+    expect(r.game.group.members[0]!.present).toBe(false);
+    r = read((o) => (o.game.group.members[0].state = Object.fromEntries(o.game.group.members[0].state.map((v: number, i: number) => [String(i), v]))));
+    expect([...r.game.group.members[0]!.state]).toEqual(good.game.group.members[0].state);
+    r = read((o) => (o.game.group.members[0].state = [1, 2]));
+    expect([...r.game.group.members[0]!.state]).toEqual([1, 2, 0, 0, 0, 0, 0, 0, 0, 0]);
+    // Un Zoombini aux attributs inutilisables est écarté, les autres restent.
+    r = read((o) => (o.game.group.members[0].attrs = [1, 2, 3, 6]));
+    expect(r.game.group.members).toHaveLength(2);
+    expect(r.repairs).toEqual(["group"]);
+    // Réserves : entrée hors de la réserve écartée, nombre d'occupés recompté.
+    r = read((o) => (o.game.camp1.entries[0] = [700, {}]));
+    expect(r.game.camp1.count).toBe(2);
+    r = read((o) => (o.game.camp1.count = 40));
+    expect(r.game.camp1.count).toBe(3);
+    r = read((o) => (o.game.monuments[0].stage = 5));
+    expect(r.game.monuments[0]!.stage).toBe(4);
+    // Champ absent : partie neuve pour ce champ.
+    r = read((o) => delete o.game.population);
+    expect(r.game.population).toEqual(newGame().population);
+    expect(r.repairs).toEqual(["population"]);
+  });
+
+  it("bug 19 : le chargement d'une partie abîmée réussit (SaveStore.load), avec la liste des réparations", () => {
+    const storage = new MemoryStorage();
+    const store = new SaveStore(storage, CHARSET);
+    store.save("Léa", richGame());
+    const key = `${STORAGE_PREFIX}game:ZOOM0000`;
+    const o = JSON.parse(storage.data.get(key)!);
+    o.game.camp1.scroll = 1.5;
+    o.game.counters.camp1 = null;
+    storage.data.set(key, JSON.stringify(o));
+    const game = store.load("Léa");
+    expect(game.camp1.scroll).toBe(2);
+    expect(game.counters.camp1).toBe(0);
+    expect(store.lastRepairs).toEqual(["camp1"]);
   });
 
   it("options ↔ préférences de session", () => {
@@ -220,7 +279,7 @@ describe("liste et parties (rôle du .WHO)", () => {
     expect(SAVE_ERROR_STRL.read).toEqual([[1026, 0]]);
   });
 
-  it("liste corrompue : version, entrée, nombre, compteur", () => {
+  it("liste : racine ou version invalides refusées ; entrée abîmée écartée, liste tronquée à 50, compteur ramené au-delà des fichiers (bug 19)", () => {
     const storage = new MemoryStorage();
     const store = new SaveStore(storage, CHARSET);
     const put = (v: unknown): void => void storage.data.set(`${STORAGE_PREFIX}who`, typeof v === "string" ? v : JSON.stringify(v));
@@ -236,12 +295,13 @@ describe("liste et parties (rôle du .WHO)", () => {
     expect(kind()).toBe("invalid");
     put({ v: 9, next: 0, games: [] });
     expect(kind()).toBe("invalid");
-    put({ v: 1, next: 0, games: [{ name: "a", file: "../etc" }] });
-    expect(kind()).toBe("invalid");
+    put({ v: 1, next: 0, games: [{ name: "a", file: "../etc" }, { name: "b", file: "ZOOM0002" }] });
+    expect(store.list()).toEqual([{ name: "b", file: "ZOOM0002" }]);
     put({ v: 1, next: 0, games: Array.from({ length: 51 }, (_, i) => ({ name: `n${i}`, file: gameFileName(i) })) });
-    expect(kind()).toBe("invalid");
-    put({ v: 1, next: -1, games: [] });
-    expect(kind()).toBe("invalid");
+    expect(store.list()).toHaveLength(50);
+    put({ v: 1, next: -1, games: [{ name: "b", file: "ZOOM0002" }] });
+    // Le compteur repart après le dernier fichier : la partie suivante n'écrase pas `ZOOM0002`.
+    expect(store.save("c", newGame()).entry.file).toBe("ZOOM0003");
     put({ v: 1, next: 3, games: [] });
     expect(kind()).toBe("aucune");
   });

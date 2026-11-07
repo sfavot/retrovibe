@@ -257,6 +257,8 @@ export interface Hazard {
   walk?: readonly [number, number];
   /** Se déclenche sur un appui du bouton (ou l'action automatique) dans cette plage. */
   press?: readonly [number, number];
+  /** Pixels de `press` sans réponse : l'original teste deux plages ouvertes qui laissent un trou de 1 px (`2bd4:08e8`, `0cbc`, `0e9c`). */
+  pressGaps?: readonly number[];
   /** Se déclenche sur appui, ou quand le pion est resté `DWELL_SECONDS` dans cette plage. */
   dwell?: readonly [number, number];
   /** Compté à chaque entrée dans cette plage ; se déclenche à la 5ᵉ (`counter > 4`). */
@@ -274,13 +276,13 @@ export const HAZARDS: readonly Hazard[] = [
   { scene: 14, kind: "wellFall", screen: 2, row: "top", press: [0xd5, 0x13a], effect: { kind: "randomTeleport", screens: [1, 3, 4, 5, 6, 7, 8, 9] } },
   // Écran 3 (2bd4:08e8) : prison, Turlusiphon.
   { scene: 20, kind: "jail", screen: 3, row: "bottom", dwell: [0x94, 0xc4], effect: { kind: "jail", x: 0xac } },
-  { scene: 21, kind: "turlusiphon", screen: 3, row: "bottom", walk: [0x100, 0x112], press: [0xd5, 0x13a], needsFree: true, effect: { kind: "turlusiphon", x: 0x109 } },
+  { scene: 21, kind: "turlusiphon", screen: 3, row: "bottom", walk: [0x100, 0x112], press: [0xd5, 0x13a], pressGaps: [0xff, 0x113], needsFree: true, effect: { kind: "turlusiphon", x: 0x109 } },
   // Écran 4 (2bd4:0af9) : puits S13, piège, lac glacé.
   { scene: 13, kind: "wellDoor", screen: 4, row: "top", press: [0xd5, 0x13a], needsWell: true, effect: { kind: "well", x: 0x116 } },
   { scene: 15, kind: "trap", screen: 4, row: "bottom", walk: [0x95, 0xc5], effect: { kind: "teleport", to: { screen: 9, row: "top", x: 0x10 } } },
   { scene: 18, kind: "ice", screen: 4, row: "bottom", counted: [0xf0, 0x120], effect: { kind: "randomTeleport", screens: [5, 6, 7, 8, 9], counter: "ice" } },
   // Écran 5 (2bd4:0cbc) : Turlusiphon, deux pièges, prison.
-  { scene: 21, kind: "turlusiphon", screen: 5, row: "top", walk: [0x9a, 0xac], press: [0x6c, 0xd3], needsFree: true, effect: { kind: "turlusiphon", x: 0xa3 } },
+  { scene: 21, kind: "turlusiphon", screen: 5, row: "top", walk: [0x9a, 0xac], press: [0x6c, 0xd3], pressGaps: [0x99, 0xad], needsFree: true, effect: { kind: "turlusiphon", x: 0xa3 } },
   { scene: 15, kind: "trap", screen: 5, row: "bottom", walk: [0x1e, 0x4e], effect: { kind: "teleport", to: { screen: 9, row: "bottom", x: 0xd4 } } },
   { scene: 15, kind: "trap", screen: 5, row: "bottom", walk: [0x7b, 0xab], effect: { kind: "teleport", to: { screen: 8, row: "bottom", x: 0xde } } },
   { scene: 20, kind: "jail", screen: 5, row: "bottom", dwell: [0xee, 0x11e], effect: { kind: "jail", x: 0x106 } },
@@ -288,7 +290,7 @@ export const HAZARDS: readonly Hazard[] = [
   { scene: 13, kind: "wellDoor", screen: 6, row: "top", press: [0x07, 0x6a], needsWell: true, effect: { kind: "well", x: 0x41 } },
   { scene: 15, kind: "trap", screen: 6, row: "top", walk: [0x91, 0xc1], effect: { kind: "teleport", to: { screen: 7, row: "bottom", x: 0x10 } } },
   { scene: 17, kind: "rocket", screen: 6, row: "bottom", press: [0x97, 0xc7], effect: { kind: "randomTeleport", screens: [1, 2, 3, 4, 5] } },
-  { scene: 21, kind: "turlusiphon", screen: 6, row: "bottom", walk: [0x100, 0x112], press: [0xd5, 0x13a], needsFree: true, effect: { kind: "turlusiphon", x: 0x109 } },
+  { scene: 21, kind: "turlusiphon", screen: 6, row: "bottom", walk: [0x100, 0x112], press: [0xd5, 0x13a], pressGaps: [0xff, 0x113], needsFree: true, effect: { kind: "turlusiphon", x: 0x109 } },
   // Écran 7 (2bd4:10da) : prison, pont branlant S16.
   { scene: 20, kind: "jail", screen: 7, row: "top", dwell: [0x98, 0xc8], effect: { kind: "jail", x: 0xb0 } },
   { scene: 16, kind: "bridge", screen: 7, row: "bottom", counted: [0x76, 0xa5], effect: { kind: "randomTeleport", screens: [8, 9], counter: "bridge" } },

@@ -302,7 +302,7 @@ export class Game {
     return this.takeEvents();
   }
 
-  /** Pause (S48) : le chrono du tour est gelé ; le chrono global continue (hypothèse). */
+  /** Pause (S48) : le chrono du tour est gelé ; le chrono global continue (sûr : `291e:0401` ne sauve que le slot 1). */
   setPaused(paused: boolean): void {
     this.state.paused = paused;
   }
@@ -647,7 +647,7 @@ export class Game {
       } else {
         // L'appui du Turlusiphon ne répond qu'au bouton ; les autres répondent aussi à l'action automatique.
         const pressRange = h.kind === "turlusiphon" && trigger === "timeout" ? undefined : h.press;
-        if (inRange(p.x, pressRange) || inRange(p.x, h.dwell)) found = h;
+        if ((inRange(p.x, pressRange) && !h.pressGaps?.includes(p.x)) || inRange(p.x, h.dwell)) found = h;
       }
     }
     return found;

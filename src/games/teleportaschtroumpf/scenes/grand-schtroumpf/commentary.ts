@@ -9,7 +9,7 @@ import { hasIngredient, popcount } from "../../game/state";
  * `docs/teleportaschtroumpf/screens-grand-schtroumpf.md`.
  *
  * Chaque code n'est dit qu'une fois par partie (tableau `DS:75B9`, indexé par le code) ; `Commentary` en est la mémoire, à
- * créer à chaque partie (l'original ne réinitialise jamais ses drapeaux d'une partie à l'autre : probable, voir la doc).
+ * créer à chaque partie (l'original les remet à zéro au début de chaque partie : `26ee:003f`, appelée par `28a3:00ad`).
  */
 
 /** Codes 1..5, 11..15… : voix `s42vNNNt.voc`. Les autres (liste ci-dessous) sont des vidéos `s42aNNN.mux`. */

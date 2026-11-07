@@ -51,10 +51,8 @@ Ce document sert de brief commun aux sous-agents. Chaque tâche indique ses entr
   - revue et corrections.
 - Écarts connus restants :
   - Les commentaires du Grand Schtroumpf en tour normal ne se déclenchent jamais, comme dans l'original.
-  - L'attente de fin de bip des menus n'est pas reproduite.
   - La notice PDF a perdu la mise en forme du .doc.
   - La jaquette fournie est celle de l'édition CD-i, avec un filigrane.
-  - Préférence de son en double avec Lost in Time : pourrait passer dans `src/ui/`.
 - **Tactile et souris** (remplace la décision « clavier seul » ci-dessus pour le doigt et le clic) : menus validés au toucher ou au clic (`bf8a141`), chaque écran jouable par gestes (`22fd322`) : toucher, appui long (voix d'aide), glissement.
 - Finitions du 2026-10-27 :
   - menu Parents : une jauge se remplit sous le bouton pendant l'appui tenu de 4 s (rien au repos : l'accès reste caché) ;
@@ -62,10 +60,10 @@ Ce document sert de brief commun aux sous-agents. Chaque tâche indique ses entr
   - S33 : toucher le parchemin propose la formule, en plus du glissement vers le haut ;
   - S30 et S31 revus en jeu avec la règle d'ancrage des images stockées en miroir (`hy8.md`) : saut de S30 continu, S31 inchangé à l'œil ;
   - « mini-jeu lancé en marchant » : c'est l'action automatique des 36 s à plusieurs (`rules.md`, question 10), comportement d'origine gardé ;
-  - S23 et S27 : la poussée de la souris contre un bord n'est pas portée (clavier et doigt suffisent, voir leurs docs).
+  - S23 et S27 : la poussée de la souris contre un bord (`14b3:004c`) n'est portée nulle part, plateau et menus compris (les gestes du doigt sont réservés au toucher) : ce n'est donc pas un manque propre à ces deux mini-jeux, et le porter seulement ici ne rendrait pas le jeu jouable à la souris seule. Décision du 2026-11-07 : laissé tel quel (clavier et doigt).
   - à plusieurs, le minuteur du plateau (l'horloge à coucou) clignote de 30 à 36 s pour annoncer l'action automatique, sans son.
-- Reste ouvert : les questions de `rules.md` et `engine.md` § 8.
-- Limite d'hébergement : le site publié pèse environ 320 Mo ; ajouter `mathemagique` et `zoombinis` tels quels dépasserait le 1 Go de GitHub Pages.
+- Questions de `rules.md` et `engine.md` § 8 traitées le 2026-11-07 (plages de bord, pause, textes, commentaires, drapeaux, action automatique, constante 12, flags MUX) ; restent ouvertes les autres (animations de marche, usage de l'entrée 18 de `CS:2daf:0aa8`, etc.).
+- Limite d'hébergement : les fichiers de jeu publiés pèsent environ 526 Mo pour le 1 Go de GitHub Pages (mesure du 2026-11-07) ; vérifier la marge restante avant d'ajouter un jeu.
 
 ## État au 2026-10-22 (étude d'extraction)
 

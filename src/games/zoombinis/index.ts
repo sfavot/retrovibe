@@ -10,6 +10,8 @@ const GAME_URL = `${import.meta.env.BASE_URL}zoombinis`;
 /** Jaquette : décor de l'île du choix, générée par `scripts/zoombinis/cover.mts`. */
 const COVER_URL = `${GAME_URL}/COVER.png`;
 const COVER_SIZE: [number, number] = [640, 480];
+/** Manuel (page web), servi depuis `original/zoombinis/`. */
+const MANUAL_URL = `${GAME_URL}/MANUEL.html`;
 
 export const zoombinis: GameDefinition = {
   id: "zoombinis",
@@ -52,6 +54,17 @@ export const zoombinis: GameDefinition = {
         h("h1", {}, copy.title),
         play,
         failure,
+        h(
+          "a",
+          {
+            class: "button secondary",
+            href: MANUAL_URL,
+            target: "_blank",
+            rel: "noopener",
+          },
+          copy.manual,
+        ),
+        h("p", { class: "muted" }, copy.manualNote),
         h("h2", { class: "zb-title-controls" }, copy.controlsTitle),
         h(
           "ul",

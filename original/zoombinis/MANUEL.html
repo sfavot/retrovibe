@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>L'Odyssée des Zoombinis : manuel</title>
+<meta name="description" content="Manuel en français de L'Odyssée des Zoombinis, le jeu de logique de Broderbund et du TERC (1996) : l'histoire, Zoombinîle, la carte, les douze épreuves, les camps, Zoombiniville, les options et les commandes.">
+<style>
+:root {
+  --bg: #fbf8f1;
+  --surface: #ffffff;
+  --text: #2b2433;
+  --muted: #5e566a;
+  --accent: #b03a8c;
+  --accent-ink: #ffffff;
+  --accent-soft: #f6e4f0;
+  --line: #e3dccd;
+  --code-bg: #efe9dc;
+  --shadow: 0 1px 3px rgba(43, 36, 51, 0.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17131d;
+    --surface: #211c2a;
+    --text: #ece7f3;
+    --muted: #b0a7bf;
+    --accent: #e48ccb;
+    --accent-ink: #17131d;
+    --accent-soft: #35223a;
+    --line: #3a3347;
+    --code-bg: #2c2538;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 1rem; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 1rem/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 0.4rem;
+  z-index: 10;
+}
+.skip:focus { top: 0.5rem; }
+a { color: var(--accent); text-underline-offset: 0.15em; }
+a:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+.top, main, footer {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+.top { padding-top: 2rem; padding-bottom: 0.5rem; }
+.kicker {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 { margin: 0.1rem 0 0; font-size: clamp(1.8rem, 6vw, 2.5rem); line-height: 1.15; }
+.sub { margin: 0.2rem 0 1.2rem; font-size: 1.15rem; color: var(--muted); }
+nav ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+nav a {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  background: var(--accent-soft);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  text-decoration: none;
+  color: var(--text);
+}
+nav a:hover { background: var(--accent); color: var(--accent-ink); }
+main { padding-top: 1rem; padding-bottom: 2rem; }
+h2 {
+  margin: 2.6rem 0 0.8rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--line);
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+h3 { margin: 1.6rem 0 0.5rem; font-size: 1.15rem; }
+p, ul, ol, table, figure, details { margin: 0 0 1rem; }
+ul, ol { padding-left: 1.4rem; }
+li { margin: 0.25rem 0; }
+li > ul, li > ol { margin: 0.25rem 0 0.25rem; }
+.goal {
+  padding: 0.7rem 1rem;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+figure { text-align: center; }
+figure img, .poly-wrap img { display: block; margin: 0 auto; }
+figure img {
+  width: 100%;
+  max-width: 576px;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow);
+  background: var(--surface);
+}
+figcaption { margin-top: 0.4rem; font-size: 0.9rem; color: var(--muted); }
+.poly-wrap { margin: 0 0 0.5rem; text-align: center; }
+.poly { width: 132px; height: auto; }
+@media (min-width: 36rem) {
+  .poly-wrap { float: right; margin: 0 0 0.5rem 1.2rem; }
+  .poly { width: 150px; }
+}
+.ranks { columns: 12rem; column-gap: 1.5rem; }
+.ranks li { break-inside: avoid; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: var(--surface); }
+th, td { padding: 0.5rem 0.7rem; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { background: var(--accent-soft); }
+code { padding: 0.05em 0.3em; background: var(--code-bg); border-radius: 0.25rem; font-size: 0.92em; }
+details { padding: 0.6rem 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: 0.5rem; }
+summary { cursor: pointer; font-weight: 600; }
+details p { margin: 0.6rem 0 0; }
+footer {
+  padding-top: 1rem;
+  padding-bottom: 2.5rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+h2::after { content: ""; display: block; clear: both; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media print { nav, .skip { display: none; } body { background: #fff; color: #000; } }
+
+</style>
+</head>
+<body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<header class="top">
+<p class="kicker">Broderbund et TERC, 1996</p>
+<h1>L'Odyssée des Zoombinis</h1>
+<p class="sub">Manuel en français</p>
+<nav aria-label="Sommaire"><ol><li><a href="#histoire">L'histoire</a></li><li><a href="#commencer">Pour commencer</a></li><li><a href="#zoombinile">Zoombinîle</a></li><li><a href="#carte">La carte</a></li><li><a href="#gros-brute-gourmand">Le Gros, la Brute et le Gourmand</a></li><li><a href="#marais-quajeux">Le Marais Quajeux</a></li><li><a href="#foret-de-chaussee">La Forêt de Chaussée</a></li><li><a href="#monts-du-desespoir">Les Monts du Désespoir</a></li><li><a href="#zoombiniville">Zoombiniville</a></li><li><a href="#options">Options et menus</a></li><li><a href="#commandes">Commandes</a></li><li><a href="#parents">Pour les parents</a></li><li><a href="#credits">Crédits</a></li></ol></nav>
+</header>
+<main id="contenu">
+<p><em>Cette page reprend, en les réécrivant, les parties du manuel français de 1996 utiles pour jouer. L'installation (Windows, Macintosh), le dépannage et l'assistance technique sont omis. Les noms des lieux, des épreuves et des boutons sont ceux du jeu.</em></p>
+
+<h2 id="histoire">L'histoire</h2>
+<p><strong>L'Odyssée des Zoombinis</strong> est un jeu de logique pour enfants, édité par Broderbund avec le TERC en 1996. Vous guidez de petits personnages bleus, les <strong>Zoombinis</strong>, de leur île jusqu'à une terre promise.</p>
+<p>Les Zoombinis vivaient heureux sur l'île de <strong>Zoombinîle</strong>. Ils se ressemblent sans être pareils (yeux, nez, cheveux, pieds), ce qui n'avait jamais compté pour eux. Ils y fabriquaient de petits objets utiles, connus dans le monde entier. Puis les <strong>Boursouflos</strong> sont arrivés, en proposant d'aider les affaires : ils ont pris le contrôle de l'île, détourné les bénéfices, supprimé les vacances et imposé des heures supplémentaires. Les Zoombinis ont décidé de partir, loin.</p>
+<p>Vous seul pouvez les aider. Il faut les conduire de Zoombinîle à une terre promise, par des régions étranges : mares peuplées de <strong>Trépidants Têtards Tatoués</strong>, bac du ronchon <strong>Père Mathieu</strong>, <strong>pizzosaures</strong> arboricoles, forêts infestées de <strong>Nizibooms</strong>, cavernes des <strong>Monts du Désespoir</strong>. À chaque étape, une épreuve à réussir pour continuer. Des centaines de Zoombinis attendent d'être délivrés. En cas de blocage, dit le manuel, les célèbres explorateurs <strong>Paul et Émile Victotor</strong> ont laissé des paroles de sagesse : ce sont les petites phrases en italique en tête de chaque épreuve.</p>
+
+<h2 id="commencer">Pour commencer</h2>
+<h3>Le voyage en bref</h3>
+<ol>
+<li>Sur <strong>Zoombinîle</strong>, on recrute une équipe de <strong>16 Zoombinis</strong>.</li>
+<li>On choisit une piste à la sortie du camp de base : <strong>le Gros, la Brute et le Gourmand</strong>, puis le <strong>Marais Quajeux</strong> (piste nord) ou la <strong>Forêt de Chaussée</strong> (piste sud), puis les <strong>Monts du Désespoir</strong>.</li>
+<li>Chaque piste compte des épreuves à réussir. Les Zoombinis qui échouent ne sont pas perdus pour toujours : on les retrouve plus tard.</li>
+<li>Les survivants arrivent à <strong>Zoombiniville</strong>, où ils fondent leur nouvelle ville. On repart alors chercher une autre équipe.</li>
+</ol>
+<h3>Deux boutons à connaître</h3>
+<ul>
+<li><strong>Carte</strong> (l'icône de parchemin) : présente à chaque épreuve, à Zoombinîle, dans les camps de base et à Zoombiniville. Elle montre où sont les Zoombinis (voir <a href="#carte">La carte</a>).</li>
+<li><strong>Avance</strong> (la flèche verte, en bas à droite de chaque écran) : mène à l'étape suivante du voyage.</li>
+</ul>
+<h3>Les quatre niveaux de difficulté</h3>
+<p>Dans l'ordre : <strong>Pas si facile</strong> (vert), <strong>Assez difficile</strong> (jaune), <strong>Très difficile</strong> (orange) et <strong>Mission impossible</strong> (rouge).</p>
+<ul>
+<li>Le niveau monte tout seul : quand une équipe de 16 Zoombinis a réussi les trois épreuves d'une piste, la prochaine visite de cette piste se fait au niveau supérieur.</li>
+<li>L'écran de jeu ne change pas forcément, mais les épreuves deviennent plus dures à chaque niveau (règles plus complexes, droit à l'erreur plus faible, aides en moins).</li>
+<li>Sur les écrans de transition, la piste est colorée selon le niveau. La « touche terrain » de la carte rappelle les niveaux déjà franchis.</li>
+<li>Un niveau terminé ne se rejoue pas épreuve par épreuve, sauf en <strong>mode Entraînement</strong> (voir <a href="#options">Options et menus</a>).</li>
+</ul>
+<p><strong>Dans cette version</strong> : le jeu est en français. Les parties sont enregistrées dans le navigateur de cet appareil (voir <a href="#options">Options et menus</a>).</p>
+
+<h2 id="zoombinile">Zoombinîle</h2>
+<p class="goal"><strong>But</strong> : recruter une équipe de 16 Zoombinis avant de partir. Ce n'est pas une épreuve.</p>
+<figure><img src="manuel/zoombinile.jpg" alt="Zoombinîle : les cavernes, la grille des caractéristiques en bas à gauche et la file des Zoombinis recrutés." width="560" height="423" loading="lazy"><figcaption>Zoombinîle : on recrute une équipe de 16 Zoombinis (image du manuel).</figcaption></figure>
+<ol>
+<li>Dans le cadre en bas à gauche, cliquez sur les caractéristiques (yeux, nez, pieds, cheveux) jusqu'à obtenir l'apparence voulue. Chaque Zoombini a une caractéristique de chacun de ces quatre attributs. Pour un tirage au hasard, cliquez sur le <strong>dé</strong> sous le Zoombini.</li>
+<li>Cliquez sur la <strong>flèche verte</strong> qui s'allume au-dessus de lui : il sort de sa caverne.</li>
+<li>À 16 Zoombinis, une flèche verte s'allume en bas à droite : c'est <strong>Avance</strong>, qui lance l'aventure.</li>
+</ol>
+<ul>
+<li>Il faut <strong>16 Zoombinis</strong> pour commencer chaque voyage. <strong>Deux Zoombinis seulement</strong> peuvent avoir exactement les mêmes caractéristiques au cours d'une partie.</li>
+<li><strong>Recrutement automatique</strong> : <strong>Maj + clic sur le dé</strong> fait sortir les Zoombinis tout seuls, jusqu'à former (ou compléter) une équipe de 16.</li>
+<li>Un Zoombini sorti peut être renvoyé dans sa caverne en en choisissant un autre aux caractéristiques différentes.</li>
+</ul>
+<p><strong>Choisir son équipe compte</strong> : les vingt caractéristiques forment quatre attributs (cheveux, yeux, nez, pieds), et la structure de toutes les épreuves en découle. On peut composer une équipe variée, ou avec une ou deux caractéristiques très répandues, ou avec des jumeaux : des personnages très semblables facilitent parfois les épreuves.</p>
+<p><strong>Zoombinis errants</strong> : un Zoombini qui échoue à une épreuve se perd un moment dans la nature, mais il retrouve le dernier refuge. En passant par un camp de base ou par Zoombinîle, vous reverrez des visages familiers : ce sont eux, prêts à repartir.</p>
+
+<h2 id="carte">La carte</h2>
+<figure><img src="manuel/carte.jpg" alt="La carte du voyage : les quatre pistes, la légende du jeu en haut à gauche et la touche terrain en bas à droite." width="560" height="429" loading="lazy"><figcaption>La carte : tout le voyage en un seul coup d'œil (image du manuel).</figcaption></figure>
+<p>La carte garde la trace du voyage. Quand les Zoombinis quittent un endroit, la zone s'illumine à la couleur du niveau de jeu : on voit les étapes franchies, pas celles à venir.</p>
+<ul>
+<li><strong>Les pistes</strong> : quatre pistes de trois épreuves, nommées sur la carte : le Gros, la Brute et le Gourmand, le Marais Quajeux, la Forêt de Chaussée et les Monts du Désespoir.</li>
+<li><strong>Touche terrain</strong> (en bas à droite) : les niveaux de jeu déjà franchis.</li>
+<li><strong>Légende du jeu</strong> (en haut à gauche) : le nom de la partie en titre (par défaut « Partie avec ton nom ») ; à droite du nom de chaque région, le nombre de Zoombinis qui s'y trouvent. Pour renommer la partie : menu Options, Enregistrer partie.</li>
+<li><strong>Menu Options</strong> : le petit bouton gris en haut à droite (voir <a href="#options">Options et menus</a>).</li>
+</ul>
+<p><strong>Abandonner une épreuve</strong> : l'icône de la carte est à côté de la flèche verte au début de chaque épreuve. Un clic dessus quitte l'épreuve, mais on ne peut pas y revenir directement : on choisit alors entre <strong>Zoombinîle</strong>, un <strong>camp de base</strong> ou <strong>Zoombiniville</strong>. Les Zoombinis sont perdus un moment, puis retrouvés à l'Abri du Rocher, au Refuge de Grozarbre ou à Zoombinîle. Hors mode Entraînement, ce sont les seuls endroits accessibles depuis la carte.</p>
+
+<h2 id="gros-brute-gourmand">Le Gros, la Brute et le Gourmand</h2>
+<p class="goal"><strong>La première piste</strong> : après une grosse tempête en mer, les Zoombinis touchent la terre ferme. Les trois épreuves sont du type « <strong>devinez la règle</strong> » : chacune cache une exigence secrète à déduire.</p>
+
+<h3>Les Gorges Allergiques</h3>
+<figure><img src="manuel/gorges.jpg" alt="Les Gorges Allergiques : deux passerelles au-dessus des gorges, des Zoombinis de chaque côté." width="560" height="426" loading="lazy"><figcaption>Les Zoombinis doivent traverser l'une ou l'autre des passerelles.</figcaption></figure>
+<p class="goal"><strong>But</strong> : faire traverser tous les Zoombinis par l'une ou l'autre des deux passerelles qui enjambent les gorges.</p>
+<ul>
+<li>Cliquez sur un Zoombini et posez-le à gauche d'une passerelle, <strong>sur le point lumineux</strong>. Plusieurs Zoombinis peuvent traverser en même temps.</li>
+<li>Les gorges sont allergiques à certaines caractéristiques : un éternuement renvoie le Zoombini à son point de départ, et <strong>un piquet de la passerelle</strong> tombe à chaque fois, ce qui réduit les chances des suivants. À vous de deviner ce qui déplaît aux gorges.</li>
+<li>Quand tous ont traversé, cliquez sur la flèche verte.</li>
+</ul>
+<p><strong>Pour raisonner</strong> : « seuls ceux qui ont le nez rouge passent » regroupe par une caractéristique ; « seuls ceux qui n'ont pas le nez rouge » passe par l'absence d'une caractéristique. Aux niveaux Très difficile et Mission impossible, les règles sont plus complexes et la marge d'erreur est très faible.</p>
+
+<h3>Les Grottes de Passe-Clos</h3>
+<p class="goal"><strong>But</strong> : faire entrer chaque Zoombini dans l'une des quatre grottes, gardées par des gardiens de pierre capricieux : <strong>Lazuli</strong> et <strong>Rocco</strong>, <strong>Caillasse</strong> et <strong>Gravasse</strong>.</p>
+<ul>
+<li>Cliquez sur un Zoombini et posez-le sur le <strong>point lumineux</strong> qui marque le début d'une voie d'accès. Il grimpe vers l'entrée, sauf si un garde en décide autrement.</li>
+<li>Un Zoombini refusé par un garde sera peut-être accepté par un autre, mais les essais sont <strong>limités</strong> : ensuite un éboulement bloque les chemins (les gravats seront déblayés pour le groupe suivant).</li>
+<li>Il faut trouver la règle des gardes. Les deux gros rochers du centre et les deux petits des côtés trient chacun selon une règle différente. Les gardes changent leurs critères d'un groupe à l'autre.</li>
+<li>Cliquez sur la flèche verte : ceux qui sont entrés continuent le voyage.</li>
+</ul>
+<p><strong>Conseil</strong> : même au niveau Pas si facile, c'est ardu. Tâtonnez d'abord, en évitant de faire refuser deux fois un même Zoombini par le même garde. Un attribut compte pour les gros rochers, un autre pour les petits : déduisez-les des refus.</p>
+
+<h3>La Hutte à Pizza</h3>
+<figure><img src="manuel/pizza.jpg" alt="La Hutte à Pizza : la Machinapizza à gauche, le pizzosaure au centre, les Zoombinis en bas." width="560" height="425" loading="lazy"><figcaption>Les Zoombinis doivent livrer LA pizza idéale.</figcaption></figure>
+<p class="goal"><strong>But</strong> : composer la pizza qui plaît à <strong>Vésuvio</strong>, un pizzosaure arboricole obsédé par la pizza, mais très difficile sur la garniture.</p>
+<ul>
+<li>Sur la <strong>Machinapizza</strong>, cliquez sur les boutons de garnitures pour composer la pizza, puis sur <strong>l'image de la pizza</strong>, au-dessus des ingrédients, pour lancer la machine.</li>
+<li>Une pizza avec un ingrédient qui ne convient pas est <strong>jetée dans la fosse</strong> face au pizzosaure. Une pizza incomplète, qui ne contient que des garnitures qu'il aime, est <strong>mise en réserve sur les rochers</strong> derrière lui.</li>
+<li>Quand Vésuvio dévore sa pizza idéale, cliquez sur la flèche verte.</li>
+</ul>
+<p><strong>Aux niveaux supérieurs</strong> : Vésuvio est rejoint par <strong>Gorgonzo</strong> et <strong>Lapinaille</strong>, aux goûts aussi arrêtés (la pizza qui ravit l'un dégoûte l'autre). En plus de la pizza, il faut préparer un <strong>nappage pour la glace</strong> avec les icônes de coupes glacées, à droite de la machine. En <strong>Mission impossible</strong>, regardez bien les pizzas déjà dans la fosse : ce sont des indices précieux.</p>
+<p><strong>Pour raisonner</strong> : les garnitures sont des choix oui/non combinables à volonté, contrairement aux caractéristiques des Zoombinis. Tenter sa chance ne paie pas toujours : proposez des pizzas qui, même refusées, apprennent le plus.</p>
+
+<h3>Camp de base : l'Abri du Rocher</h3>
+<p>Un campement avec une bonne soupe chaude : une étape de repos et un point de ralliement pour les Zoombinis égarés, qui attendent que vous veniez les chercher. Cliquez sur les <strong>barres de chaque côté de l'abri</strong> pour faire défiler les troupes. L'abri peut accueillir autant de Zoombinis qu'on en amène.</p>
+<ul>
+<li>Pour repartir, placez <strong>16 Zoombinis</strong> sur les pavés du chemin, puis cliquez sur l'une des flèches vertes.</li>
+<li>Pas assez de Zoombinis ? Cliquez sur l'<strong>icône de la carte</strong> (entre les flèches vertes), puis sur <strong>Zoombinîle</strong>, recrutez-en d'autres et refaites le voyage. Les Zoombinis restés à l'abri sont toujours là : l'équipe peut mélanger anciens et nouveaux.</li>
+</ul>
+
+<h2 id="marais-quajeux">Le Marais Quajeux (piste nord)</h2>
+<p>En prenant la piste du haut à partir de l'Abri du Rocher, les Zoombinis traversent une région verte et luxuriante, faite de ruisseaux et de marais, jusqu'à un large fleuve qu'on ne passe qu'en empruntant le bac du Père Mathieu. Toutes les épreuves de cette piste jouent sur les <strong>similitudes entre les objets</strong> et sur leur agencement, pour que les voisins aient des points communs.</p>
+
+<h3>Le Bac du Père Mathieu</h3>
+<figure><img src="manuel/bac.jpg" alt="Le Bac du Père Mathieu : les Zoombinis assis sur le bac, le Père Mathieu à droite." width="560" height="433" loading="lazy"><figcaption>Le Père Mathieu est très à cheval sur le positionnement des passagers.</figcaption></figure>
+<p class="goal"><strong>But</strong> : installer chaque Zoombini sur un siège du bac, de sorte que deux voisins aient toujours une caractéristique en commun.</p>
+<ul>
+<li>Le Père Mathieu est d'un abord peu aimable, mais de bonne volonté : il proteste dès qu'un Zoombini n'est pas à côté du bon voisin.</li>
+<li>Placez chacun sur un siège en bois. Vous pouvez les déplacer autant de fois qu'il le faut.</li>
+<li>Quand tous ont leur place définitive, cliquez sur la flèche verte.</li>
+</ul>
+<p><strong>Pour raisonner</strong> : le tâtonnement peut suffire à Pas si facile ; ensuite, il faut être méthodique, et examiner quelles caractéristiques sont communes et lesquelles sont rares.</p>
+
+<h3>La Mare des Trépidants Têtards Tatoués</h3>
+<p class="goal"><strong>But</strong> : faire traverser le marais aux Zoombinis, à dos de têtard, en suivant les nénuphars de même couleur, de même fleur ou de même feuille.</p>
+<ul>
+<li>Cliquez sur un têtard tatoué et posez-le sur le nénuphar qui convient, dans la colonne de gauche. Le Zoombini saute sur son dos. Si le nénuphar est le bon, le têtard rejoint l'autre berge en suivant la piste de sa forme, puis revient à la case départ.</li>
+<li>Un même têtard ne peut faire que <strong>deux traversées</strong>. Posé sur le mauvais nénuphar, il reste coincé et tourne en rond avec son cavalier.</li>
+<li><strong>Aux niveaux supérieurs</strong> : <strong>Gontran</strong>, le Maître des Marais, propose sa <strong>baguette magique</strong>. Cliquez sur la baguette, puis sur le nénuphar à déplacer, puis sur celui qui doit prendre sa place : les deux sont échangés. La poudre magique n'est pas inépuisable, et un échange peut couper un chemin existant. Les <strong>Crabouilles</strong>, crabes violets mutants, viennent aussi barrer la route.</li>
+<li>Quand tout le groupe a traversé, cliquez sur la flèche verte.</li>
+</ul>
+
+<h3>La Fosse de Monte-Pierre</h3>
+<p class="goal"><strong>But</strong> : placer les Zoombinis sur les dalles, au pied d'un mur abrupt, pour déclencher le mécanisme qui les hisse en haut.</p>
+<ul>
+<li>Les dessins gravés <strong>entre les dalles</strong> indiquent les points communs que doivent avoir deux Zoombinis voisins.</li>
+<li>Quand deux Zoombinis sont bien placés, la pierre devient <strong>rouge</strong> : le contact électrique est fait.</li>
+<li>Quand tous ont trouvé leur combinaison, cliquez sur la flèche verte.</li>
+</ul>
+<p><strong>Pour raisonner</strong> : contrairement au Père Mathieu, ici chaque emplacement exige une similitude précise. Il est plus facile de regrouper d'abord les Zoombinis qui ont des caractéristiques en commun. Aux niveaux Très difficile et Mission impossible, des Zoombinis non adjacents peuvent être connectés : ce qui compte est le plus petit nombre de liaisons entre eux, pas la distance.</p>
+
+<h2 id="foret-de-chaussee">La Forêt de Chaussée (piste sud)</h2>
+<p>La piste du bas, à partir de l'Abri du Rocher, mène sous des arbres aux branches tordues, puis jusqu'à une muraille. Les méchants Nizibooms ne sont pas loin. Chaque attribut des Zoombinis (cheveux, yeux, nez, pieds) y devient une direction de l'espace : on range les Zoombinis selon leurs caractéristiques, comme dans un graphique.</p>
+
+<h3>Les Nizibooms</h3>
+<p class="goal"><strong>But</strong> : faire déguerpir les Nizibooms perchés sur la branche.</p>
+<ul>
+<li>Les Nizibooms, cousins mutants des Zoombinis (chassés de Zoombinîle pour leurs mauvaises manières), ressemblent comme des frères aux Zoombinis. Le lien de parenté entre un Zoombini et un Niziboom déclenche la poursuite.</li>
+<li>Cliquez sur un Zoombini et placez-le sur le chemin. Relâchez le bouton quand la <strong>tache lumineuse</strong> apparaît. À vous de trouver quel lien de parenté chasse un Niziboom.</li>
+<li>Quand la voie est libre, cliquez sur la flèche verte.</li>
+</ul>
+<p><strong>Pour raisonner</strong> : il s'agit de trouver la correspondance systématique entre les caractéristiques des Zoombinis et celles des Nizibooms. Aux niveaux supérieurs, le droit à l'erreur est limité : utilisez tous les indices.</p>
+
+<h3>L'Hôtel du Temps Compté</h3>
+<p class="goal"><strong>But</strong> : trouver à chaque Zoombini une chambre pour la nuit, avant la tombée de la nuit.</p>
+<ul>
+<li><strong>Ursula</strong>, l'hôtelière, est sur le point de fermer. Cliquez sur un Zoombini et posez-le sur un rebord de fenêtre. Si le rebord se dérobe, choisissez une autre chambre.</li>
+<li>Surveillez l'<strong>horloge</strong> : à chaque erreur, le crépuscule tombe plus vite.</li>
+<li>Qui se ressemble s'assemble : au niveau Pas si facile, une seule dimension (par exemple tous les cheveux en queue de cheval au même étage) ; deux dimensions à Assez difficile et Très difficile (étage et colonne, avec des chambres condamnées à Très difficile) ; un système en trois dimensions à Mission impossible.</li>
+</ul>
+
+<h3>La Muraille de Signes</h3>
+<p class="goal"><strong>But</strong> : lancer des boules de boue sur les cibles de la muraille pour catapulter les Zoombinis de l'autre côté.</p>
+<ul>
+<li>La <strong>Catapultaboue</strong> fabrique des boules que vous colorez et marquez d'un signe avec des tampons. Une boule qui touche une cible envoie un, deux ou trois Zoombinis de l'autre côté.</li>
+<li>Cliquez sur un bouton de la rangée du bas (couleur) et sur un bouton de la rangée du haut (forme), puis sur la <strong>flèche lumineuse</strong> à droite des boutons. Observez où la boule atterrit pour comprendre la logique de la muraille.</li>
+<li>Le stock de boue est <strong>limité</strong> : pas de gaspillage. Aux niveaux supérieurs, une rangée de boutons de plus colore la forme gravée au centre de la boule.</li>
+<li>Quand tous ont franchi la muraille, cliquez sur la flèche verte.</li>
+</ul>
+<p><strong>Pour raisonner</strong> : à Pas si facile, la muraille est proche de l'hôtel (une correspondance entre caractéristiques et position). Ensuite s'ajoutent des permutations : un même schéma de transformation, qu'on repère en regardant où les boules tombent.</p>
+
+<h3>Camp de base : le Refuge de Grozarbre</h3>
+<p>Encore un coin tranquille pour reprendre des forces avant l'épreuve la plus périlleuse. Alignez vos <strong>16 Zoombinis</strong> sur les pierres au pied de l'arbre et cliquez sur la flèche verte. Si l'équipe n'est pas complète, cliquez sur l'icône de la carte, choisissez Zoombinîle ou l'Abri du Rocher, recrutez et refaites le voyage.</p>
+
+<h2 id="monts-du-desespoir">Les Monts du Désespoir (le voyage sous terre)</h2>
+<p>Dernière partie du périple : tunnels et cavernes. Un faux pas, et un Zoombini peut disparaître dans le puits de mine. Mais les Zoombinis retombent toujours sur leurs pieds.</p>
+
+<h3>La Tanière du Sphinx</h3>
+<p class="goal"><strong>But</strong> : ranger les Zoombinis le long de la piste sinueuse, dans « l'ordre de tri » du sphinx.</p>
+<ul>
+<li>Cliquez sur un Zoombini et posez-le sur une dalle de la piste. S'il est bien placé, il y reste. Sinon, un tunnel secret l'aspire et le remet à la bonne place.</li>
+<li>Les essais sont <strong>limités</strong> : ensuite la porte de sortie s'effondre. Observez les symboles gravés sur le mur : ce sont des indices.</li>
+<li>À <strong>Mission impossible</strong>, il n'y a plus aucune inscription : vous devez deviner seul la loi du sphinx (avec un tri primaire et un tri secondaire).</li>
+<li>Quand vous êtes prêt, cliquez sur la flèche verte.</li>
+</ul>
+<p><strong>Pour raisonner</strong> : le nombre de dalles vides sur une portion de la piste, comparé au nombre de Zoombinis qui ont telle caractéristique, peut donner la solution.</p>
+
+<h3>Le Piège de Cristal</h3>
+<p class="goal"><strong>But</strong> : faire descendre chaque Zoombini le long du rail et passer de l'autre côté du miroir de cristal.</p>
+<ul>
+<li>Placez un Zoombini sur le <strong>chariot</strong>, sous les saillies rocheuses. Choisissez une représentation de Zoombini en haut à droite et posez-la dans le cristal le plus à droite, puis tirez la <strong>manette</strong> sous le chariot. Si le Zoombini ressemble à l'image reflétée, il arrive sans encombre en bas du rail.</li>
+<li>Cliquez sur le <strong>levier</strong> pour réinitialiser les représentations et recommencez pour chaque Zoombini.</li>
+<li>À <strong>Assez difficile</strong>, des cristaux intermédiaires (yeux, cheveux…) modifient l'image projetée sur le miroir central. À <strong>Très difficile</strong> et <strong>Mission impossible</strong>, vous cliquez sur ces panneaux pour les poser de part et d'autre du miroir ; certains alternent entre cinq variantes dans un ordre fixe.</li>
+<li>Quand tous sont passés, cliquez sur la flèche verte.</li>
+</ul>
+<p><strong>Pour raisonner</strong> : le cristal central est comme un signe égal, les panneaux des transformations. Pour trouver la solution, il faut inverser ou combiner les transformations.</p>
+
+<h3>Le Gouffre des Véhibules</h3>
+<p class="goal"><strong>But</strong> : faire passer les Zoombinis de l'autre côté d'un gouffre sans fond, dans des bulles qui suivent un trajet semé de pièges et d'accélérateurs.</p>
+<ul>
+<li>Cliquez sur un Zoombini et posez-le, au bord du précipice, sur la <strong>petite flèche</strong> qui s'allume quand vous approchez. Une bulle l'emporte selon un trajet complexe, mais logique.</li>
+<li>Observez comment la trajectoire réagit aux flèches et aux dessins du quadrillage au-dessus du gouffre : ces symboles guident chaque Zoombini selon ses caractéristiques. Le bon Zoombini sur la bonne plate-forme de départ passe sans encombre.</li>
+<li>Une fois le gouffre franchi, cliquez sur la flèche verte pour sortir des Monts du Désespoir.</li>
+</ul>
+<p><strong>Pour raisonner</strong> : même à Mission impossible, le comportement des objets reste cohérent et prévisible : on peut le déduire en observant la répartition des caractéristiques dans le groupe.</p>
+
+<h2 id="zoombiniville">Zoombiniville</h2>
+<p>La terre promise : une région verdoyante et fertile où les Zoombinis bâtissent maisons, parcs, écoles (où l'on enseigne la culture zoombinesque) et même des piscines. À mesure que de nouvelles équipes arrivent, l'endroit devient une petite ville prospère. Cliquez à gauche ou à droite de l'écran pour en voir davantage.</p>
+<ul>
+<li>Si vous avez conduit une équipe complète de <strong>16 Zoombinis</strong> à bon port, un <strong>monument</strong> est érigé en l'honneur de leur courage. Cliquez sur la <strong>petite plaque</strong> de chaque bâtiment pour lire les exploits des Zoombinis.</li>
+<li><strong>Et ensuite ?</strong> Retourner chercher d'autres Zoombinis : cliquez sur l'icône de la carte pour revenir à Zoombinîle ou dans un camp de base, et recrutez une nouvelle équipe. Verrez-vous s'élever les 16 monuments ?</li>
+</ul>
+
+<h2 id="options">Options et menus</h2>
+<p>Le <strong>menu Options</strong> s'ouvre avec la touche <strong>?</strong> (de n'importe où dans le jeu), ou depuis la carte avec le petit bouton gris en haut à droite. Il regroupe les actions de partie et les réglages ; chacun a aussi son raccourci clavier.</p>
+<p><strong>Dans cette version</strong> : le menu s'ouvre avec la touche <strong>/</strong> (ou <strong>?</strong>), ou, sur écran tactile, avec le bouton <strong>Menu</strong> affiché sur l'écran de jeu.</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">Option</th><th scope="col">Raccourci du manuel</th><th scope="col">Effet</th></tr></thead><tbody>
+<tr><td><strong>Nouvelle partie</strong></td><td>Ctrl + N</td><td>Commence une partie neuve (le jeu démarre toujours sur Zoombinîle ; dès qu'une partie existe, un écran propose Nouvelle partie ou Charger partie).</td></tr>
+<tr><td><strong>Charger partie</strong></td><td>Ctrl + C</td><td>Reprend une partie enregistrée.</td></tr>
+<tr><td><strong>Enregistrer partie</strong></td><td>Ctrl + S</td><td>À tout moment : tapez un nom puis cliquez sur Enregistrer. Le nom s'affiche en haut à gauche de la carte.</td></tr>
+<tr><td><strong>Quitter</strong></td><td>Ctrl + Q</td><td>Quitte le jeu ; si la partie n'a pas été enregistrée, le jeu propose de le faire d'abord.</td></tr>
+<tr><td><strong>Dialogues et effets</strong></td><td>Ctrl + V</td><td>Active ou coupe les dialogues des personnages, les effets sonores des épreuves et les voix des Zoombinis.</td></tr>
+<tr><td><strong>Musique de fond</strong></td><td>Ctrl + Y</td><td>Active ou coupe la musique de fond de toutes les épreuves.</td></tr>
+<tr><td><strong>Souris aimantée</strong></td><td>Ctrl + J</td><td>Une fois un Zoombini choisi, on le déplace sans garder le bouton enfoncé.</td></tr>
+<tr><td><strong>Transitions</strong></td><td>Ctrl + T</td><td>Activées, elles passent directement d'une épreuve à la suivante sans repasser par la carte.</td></tr>
+</tbody></table></div>
+<p><strong>Dans cette version</strong> :</p>
+<ul>
+<li>Pour charger une partie : <strong>Ctrl + L</strong> (Ctrl + C marche aussi).</li>
+<li>Les parties sont enregistrées <strong>dans le navigateur de cet appareil</strong> : elles ne suivent pas d'un appareil à l'autre et disparaissent si vous effacez les données du site.</li>
+<li>Le raccourci <strong>Ctrl + V</strong> coupe ou rétablit la <strong>musique</strong> et <strong>Ctrl + Y</strong> les <strong>voix et effets</strong> : c'est le comportement du jeu d'origine, dont les libellés du menu sont inversés par rapport aux touches.</li>
+<li>La souris aimantée (Ctrl + J) est sans effet dans le navigateur.</li>
+<li>Ctrl + N, Ctrl + T et Ctrl + W sont gardés par le navigateur sous Windows et Linux : utilisez le menu pour ces actions.</li>
+</ul>
+<h3>Options cachées</h3>
+<p>Elles ne figurent pas dans le menu :</p>
+<ul>
+<li><strong>Ctrl + G</strong> : « moins d'action ». Désactive des animations d'arrière-plan pour fluidifier le jeu sur une machine lente ; certains éléments de décor peuvent alors manquer.</li>
+<li><strong>F1</strong> : pendant une épreuve, un indice sonore (toutes les épreuves et tous les niveaux n'en ont pas).</li>
+<li><strong>Mode Entraînement</strong> : il permet de rejouer une épreuve précise d'un niveau (le manuel renvoie à lui sans le détailler dans les pages relues). On ne peut pas y enregistrer la partie. <strong>Dans cette version</strong> : depuis la carte, <strong>Maj</strong> entre en entraînement, puis les touches <strong>1</strong> à <strong>4</strong> choisissent le niveau.</li>
+<li><strong>Ctrl + D, E, F</strong> (allemand, anglais, français) : le CD de 1996 contient les trois langues et choisit celle du système. <strong>Dans cette version</strong> : sans objet, le jeu est en français.</li>
+</ul>
+
+<h2 id="commandes">Commandes</h2>
+<p><strong>Souris ou toucher</strong> : un clic (ou un toucher) suffit pour tout : on prend un Zoombini en cliquant dessus et on le pose en relâchant, ou en cliquant à l'endroit voulu.</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">Touche ou geste</th><th scope="col">Effet</th></tr></thead><tbody>
+<tr><td><strong>Flèche verte</strong> (en bas à droite)</td><td>Étape suivante du voyage</td></tr>
+<tr><td><strong>Icône de la carte</strong></td><td>Ouvre la carte, ou quitte l'épreuve en cours</td></tr>
+<tr><td><strong>Maj + clic sur le dé</strong> (Zoombinîle)</td><td>Recrute automatiquement l'équipe</td></tr>
+<tr><td><strong>/</strong> ou <strong>?</strong>, ou bouton <strong>Menu</strong> (tactile)</td><td>Ouvre le menu Options</td></tr>
+<tr><td><strong>F1</strong></td><td>Indice sonore dans les épreuves</td></tr>
+<tr><td><strong>Ctrl + N, L, S, Q</strong></td><td>Nouvelle partie, charger, enregistrer, quitter</td></tr>
+<tr><td><strong>Ctrl + V, Y, T, G</strong></td><td>Musique, voix et effets, transitions, moins d'action</td></tr>
+<tr><td><strong>Ctrl + I</strong></td><td>À propos (cette version)</td></tr>
+</tbody></table></div>
+<p><strong>Dans cette version</strong> : sur écran tactile, le bouton <strong>Menu</strong> remplace le clavier pour ouvrir le menu Options (enregistrer, charger, réglages).</p>
+
+<h2 id="parents">Pour les parents</h2>
+<p>Le manuel présente le jeu comme un complément éducatif : chaque épreuve a plusieurs niveaux de difficulté et s'adapte aux possibilités de l'enfant. Il n'est jamais question de chiffres, mais on y travaille la logique, la formulation et le test d'hypothèses, le tri, les ensembles, les fonctions et les réseaux. Discuter avec l'enfant de ce qu'il observe (caractéristiques, attributs, hypothèses) l'aide à progresser. Le manuel insiste aussi sur le tâtonnement méthodique, outil habituel des mathématiciens et des scientifiques.</p>
+
+<h2 id="credits">Crédits et mentions</h2>
+<p><strong>L'Odyssée des Zoombinis</strong> (<em>Logical Journey of the Zoombinis</em>) est un jeu <strong>Brøderbund Software et TERC</strong>, © 1996. Conception et développement : Chris Hancock et Scot Osterweil ; localisation française : Linguatech multimédia (conteur : Jean-Claude de Gouros). <em>L'Odyssée des Zoombinis</em> et <em>Brøderbund</em> sont des marques déposées de leurs propriétaires.</p>
+<p><strong>Cette réimplémentation est un projet de fan</strong>, sans lien avec les ayants droit : elle fait tourner le jeu dans le navigateur en lisant les fichiers de données du CD d'origine, qui ne sont pas fournis ici. Cette page n'est pas le manuel d'origine : c'est un texte réécrit, adapté à cette version.</p>
+</main>
+<footer>
+<p>Manuel réécrit d'après le manuel français de 1996 (réimplémentation de fan). Les illustrations sont des images du manuel d'origine, réduites.</p>
+</footer>
+</body>
+</html>

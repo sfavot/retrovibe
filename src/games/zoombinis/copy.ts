@@ -10,6 +10,9 @@ export const copy = {
   play: "Jouer",
   sound: "Son",
   menu: "Menu",
+  // Manuel, sur l'écran de présentation.
+  manual: "Manuel",
+  manualNote: "Manuel de L'Odyssée des Zoombinis réécrit en français (page web, nouvel onglet).",
   controlsTitle: "Contrôles",
   controls: [
     "Souris ou écran tactile : tout se fait en cliquant (ou en touchant).",

@@ -323,6 +323,37 @@ describe.skipIf(!hasOriginalFiles)("plateau : marche, course, saut sur la partie
     await s.run(200);
     expect(s.game.player).toMatchObject({ screen: 1, row: "bottom" });
   }, 60_000);
+
+  it("changement de rangée au bord : le pion marche depuis le bord (4 px par image, touches ignorées) jusqu'à sa position (`291e:13f2`)", async () => {
+    const s = await Session.start();
+    await s.ready();
+    // Droite, rangée haute → basse : x = 1, puis 5, 9, 0x0B (l'original s'arrête à 0x0D, un pas au-delà).
+    s.place({ screen: 2, row: "top", x: 0x13a });
+    const xs: number[] = [];
+    s.host.input.keyDown("ArrowRight");
+    await s.until(() => s.board.shown.row === "bottom");
+    s.host.input.keyUp("ArrowRight");
+    while (s.board.shown.x !== s.game.player.x) {
+      xs.push(s.board.shown.x);
+      await s.run(70);
+    }
+    expect(s.game.player).toMatchObject({ screen: 2, row: "bottom", x: 0x0b });
+    expect(xs[0]).toBe(5);
+    expect(xs.every((x) => x === 5 || x === 9)).toBe(true);
+    // Gauche, rangée haute → basse de l'écran précédent : 0x13E, puis 0x13A, 0x136, 0x134.
+    s.place({ screen: 3, row: "top", x: 0x08 }, false);
+    const ys: number[] = [];
+    s.host.input.keyDown("ArrowLeft");
+    await s.until(() => s.board.shown.screen === 2);
+    s.host.input.keyUp("ArrowLeft");
+    while (s.board.shown.x !== s.game.player.x) {
+      ys.push(s.board.shown.x);
+      await s.run(70);
+    }
+    expect(s.game.player).toMatchObject({ screen: 2, row: "bottom", x: 0x134 });
+    expect(ys[0]).toBe(0x13a);
+    expect(ys.every((x) => x === 0x13a || x === 0x136)).toBe(true);
+  }, 60_000);
 });
 
 describe("minuteur de tour : clignotement avant l'action automatique (ajout du port)", () => {

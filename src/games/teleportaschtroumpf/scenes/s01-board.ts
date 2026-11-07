@@ -8,7 +8,7 @@ import type { SceneContext } from "../engine/scene";
 import { boundsOf, placeFrame } from "../engine/sprites";
 import { TICKS_PER_SECOND } from "../engine/clock";
 import type { Game, GameEvent } from "../game/rules";
-import { HAZARDS, ROW_Y, SCREEN_COUNT, TURN_AUTO_SECONDS, type Position, type Row } from "../game/tables";
+import { EDGE_RIGHT, HAZARDS, ROW_Y, SCREEN_COUNT, TURN_AUTO_SECONDS, type Position, type Row } from "../game/tables";
 import { loadDefaultFont } from "./common/text";
 import { Ambient } from "./board/ambient";
 import { drawHud } from "./board/hud";
@@ -155,6 +155,11 @@ export class Board {
   private held = false;
   /** But de marche au doigt : abscisse visée sur la rangée où il a été donné (±∞ : jusqu'au bord, vers la rangée suivante). */
   private touchTarget: { screen: number; row: Row; x: number; stuck: number } | null = null;
+  /**
+   * Marche d'entrée d'écran en cours (`291e:13f2`) : abscisse que `game/` a déjà donnée au pion et que la scène atteint image
+   * par image ; les touches ne sont pas lues entre-temps (la boucle de l'original ne les lit pas).
+   */
+  private edgeTarget: number | null = null;
 
   constructor(private readonly resources: BoardResources) {}
 
@@ -211,6 +216,7 @@ export class Board {
    * l'aspect du pion (la cage de la prison fait partie du fond, redessiné s'il le faut).
    */
   moveTo(ctx: SceneContext, to: Position, options: { facingRight?: boolean; arrival?: boolean; look?: BoardLook } = {}): void {
+    this.edgeTarget = null;
     const from = this.position;
     const look = options.look ?? this.view.look;
     const cageChanged = (look === "jail") !== (this.view.look === "jail");
@@ -259,7 +265,10 @@ export class Board {
   setPlaying(playing: boolean): void {
     this.isPlaying = playing;
     this.timerVisible = playing && this.multiplayer;
-    if (!playing) this.touchTarget = null;
+    if (!playing) {
+      this.touchTarget = null;
+      this.edgeTarget = null;
+    }
   }
 
   /**
@@ -271,6 +280,11 @@ export class Board {
     const { input } = ctx;
     if (input.justPressed("pause")) return { kind: "pause" };
     if (input.justPressed("cancel")) return { kind: "help" };
+    if (this.edgeTarget !== null) {
+      if (this.walkToward(ctx, this.edgeTarget)) this.edgeTarget = null;
+      this.turnSeconds = game.state.turn.elapsed;
+      return null;
+    }
 
     const touch = this.readTouch(input.touchGesture);
     if (touch === "pause" || touch === "help") return { kind: touch };
@@ -300,6 +314,8 @@ export class Board {
     if (events.length === 0 || events.every(isEdgeMove)) {
       const before = this.view.x;
       this.followGame(ctx);
+      const crossing = events.find(isEdgeMove);
+      if (crossing?.type === "moved") this.startEdgeWalk(ctx, crossing.from);
       if (toward !== 0 && !this.walker.busy) this.trackTouchProgress(before);
       this.advance(ctx);
       this.playZoneSound(ctx);
@@ -444,6 +460,24 @@ export class Board {
     const from = this.position;
     this.view = { ...this.view, screen: p.screen, row: p.row, x: p.x, facingRight: p.facingRight };
     this.leave(ctx, from);
+  }
+
+  /**
+   * Changement de rangée au bord (`291e:13f2`) : l'original ne pose pas le pion d'un coup, il le fait marcher (`2bd4:000f` en
+   * boucle, 4 px par image, sans lire les touches) depuis `x = 1` (rangée haute vers la basse de l'écran) ou `x = 0x13E` (rangée haute vers
+   * la basse de l'écran précédent) jusqu'à `x ≥ 0x0B` ou `x ≤ 0x134`. Les deux autres passages (rangée basse vers l'écran
+   * suivant, rangée basse vers la haute) posent le pion à ces bornes et n'ont qu'une image de marche. `game/` a déjà placé le
+   * pion sur sa position finale : la scène montre le trajet jusque-là (l'original s'arrête à un pas près au-delà : 0x0D, 0x132).
+   */
+  private startEdgeWalk(ctx: SceneContext, from: Position): void {
+    if (from.row !== "top") return;
+    const right = this.view.facingRight;
+    const start = right ? 1 : EDGE_RIGHT;
+    const target = this.view.x;
+    if (right ? start >= target : start <= target) return;
+    this.view = { ...this.view, x: start };
+    this.edgeTarget = target;
+    if (this.walkToward(ctx, target)) this.edgeTarget = null;
   }
 
   /** Bruit de craquement en entrant dans le lac ou sur le pont (`15f9:089f`, seulement si rien ne joue). */

@@ -5,6 +5,8 @@ import type { ZoombinisEngine } from "../engine/engine";
 import { ScreenId } from "../engine/scene";
 import { createLogoScene } from "./logo";
 import { createBaseCampScene, createBcTwoScene } from "./camp";
+import { createHiddenAsteroidsScene } from "./hidden-asteroids";
+import { createHiddenShootingScene } from "./hidden-shooting";
 import { createMapScene } from "./map";
 import { createPickerScene } from "./picker";
 import { createBridgeScene } from "./puzzles/bridge";
@@ -43,4 +45,8 @@ export function registerScenes(engine: ZoombinisEngine): void {
   engine.register(ScreenId.caves, () => createCavesScene());
   engine.register(ScreenId.smoke, () => createSmokeScene());
   engine.register(ScreenId.maze2, () => createMaze2Scene());
+  // Écrans cachés (code secret, `screens.md` §1.7) ; le 21 a le même descripteur que le 19.
+  engine.register(ScreenId.hiddenShooting, createHiddenShootingScene);
+  engine.register(ScreenId.hiddenAsteroids, createHiddenAsteroidsScene);
+  engine.register(ScreenId.hiddenShootingAlias, createHiddenShootingScene);
 }

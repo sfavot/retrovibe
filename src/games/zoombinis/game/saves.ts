@@ -268,6 +268,8 @@ export function serializeGame(game: GameState): string {
       fleensRule: game.fleensRule,
       campDecor: game.campDecor,
       townScroll: game.townScroll,
+      shootingHighScore: game.shootingHighScore,
+      asteroidsHighScore: game.asteroidsHighScore,
       mascots: game.mascots,
       dialogMemory: game.dialogMemory,
       counters: game.counters,
@@ -319,6 +321,9 @@ export function readGame(text: string): ParsedGame {
   if (g.fleensRule !== undefined) out.fleensRule = r.ints(g.fleensRule, "fleensRule", 8, 0, 0xff, out.fleensRule);
   out.campDecor = r.ints(g.campDecor, "campDecor", 5, 0, 0xffff, out.campDecor);
   out.townScroll = r.int(g.townScroll, "townScroll", 0, 5);
+  // `S+0x22` / `S+0x24` : meilleurs scores des écrans cachés 19 et 20 ; absents des parties enregistrées avant leur portage (0, comme une partie neuve).
+  if (g.shootingHighScore !== undefined) out.shootingHighScore = r.int(g.shootingHighScore, "shootingHighScore", 0, 99);
+  if (g.asteroidsHighScore !== undefined) out.asteroidsHighScore = r.int(g.asteroidsHighScore, "asteroidsHighScore", 0, 999);
   out.mascots = r.int(g.mascots, "mascots", 0, 3);
   out.dialogMemory = r.ints(g.dialogMemory, "dialogMemory", DIALOG_SCREENS.length, 0, 0xffff, out.dialogMemory);
   const c = r.obj(g.counters, "counters");

@@ -100,6 +100,22 @@ describe("sérialisation d'une partie", () => {
     expect(back.typeCounts).toBeInstanceOf(Uint8Array);
   });
 
+  it("meilleurs scores des écrans cachés (S+0x22, S+0x24) : enregistrés, relus, bornés ; absents d'une ancienne partie : 0", () => {
+    const g = newGame();
+    g.shootingHighScore = 42;
+    g.asteroidsHighScore = 730;
+    const text = serializeGame(g);
+    expect(parseGame(text).shootingHighScore).toBe(42);
+    expect(parseGame(text).asteroidsHighScore).toBe(730);
+    const o = JSON.parse(text);
+    delete o.game.shootingHighScore;
+    o.game.asteroidsHighScore = 5000;
+    const r = readGame(JSON.stringify(o));
+    expect(r.game.shootingHighScore).toBe(0);
+    expect(r.game.asteroidsHighScore).toBe(999);
+    expect(r.repairs).toEqual(["asteroidsHighScore"]);
+  });
+
   it("partie neuve", () => {
     expect(parseGame(serializeGame(newGame()))).toEqual(newGame());
   });

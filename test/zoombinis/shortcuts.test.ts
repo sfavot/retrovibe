@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { charCodeOf, MIDI_TEST_SONGS } from "../../src/games/zoombinis/engine/shortcuts";
+import { ZOOMBINIS_SOUND } from "../../src/games/zoombinis/engine/sound";
 import type { GameOptions } from "../../src/games/zoombinis/game/state";
 import { originalFiles } from "../support/original";
 import { BACKGROUND, startDialogs } from "./dialog-test-env";
@@ -186,5 +188,78 @@ describe.skipIf(!original.has)("raccourcis clavier de Zoombinis", () => {
       await env.run(100);
       expect(env.dialogs.isOpen).toBe(false);
     }
+  });
+});
+
+describe("code WM_CHAR d'une touche (condensat des codes secrets)", () => {
+  const ev = (key: string, mods: { ctrl?: boolean; alt?: boolean; code?: string } = {}) => ({
+    key,
+    code: mods.code ?? "",
+    ctrl: mods.ctrl ?? false,
+    alt: mods.alt ?? false,
+    shift: false,
+    repeat: false,
+  });
+  it("caractère tapé, Ctrl+lettre = code de contrôle, Alt Gr donne son caractère, touches sans caractère ignorées", () => {
+    expect(charCodeOf(ev("Z"))).toBe(0x5a);
+    expect(charCodeOf(ev(" "))).toBe(0x20);
+    expect(charCodeOf(ev("é"))).toBe(0xe9);
+    expect(charCodeOf(ev("a", { ctrl: true }))).toBe(1);
+    expect(charCodeOf(ev("@", { ctrl: true, alt: true }))).toBe(0x40);
+    expect(charCodeOf(ev("Enter"))).toBe(0x0d);
+    expect(charCodeOf(ev("Backspace"))).toBe(0x08);
+    expect(charCodeOf(ev("ArrowLeft"))).toBeNull();
+    expect(charCodeOf(ev("Shift"))).toBeNull();
+    expect(charCodeOf(ev("€"))).toBeNull();
+  });
+});
+
+describe.skipIf(!original.has)("codes secrets et mode de test (1198:05b3)", () => {
+  /** Ctrl+A puis `text` (lettres, chiffres, espace). */
+  async function typeCode(env: Awaited<ReturnType<typeof startDialogs>>, text: string): Promise<void> {
+    env.ctrl("a");
+    for (const c of text) env.host.press(c === " " ? "Space" : /\d/.test(c) ? `Digit${c}` : `Key${c.toUpperCase()}`, { key: c });
+    await env.run(50);
+  }
+
+  it("le code du mode de test suivi d'Espace lève [a43f] et affiche « you got it »", async () => {
+    const env = await startDialogs();
+    env.host.press("Space", { key: " " });
+    await env.run(50);
+    expect(env.zb.game.options.testMode).toBe(false);
+    expect(env.dialogs.message).toBeNull();
+    await typeCode(env, "5oids ");
+    expect(env.zb.game.options.testMode).toBe(true);
+    expect(env.dialogs.message).toBe("you got it");
+  });
+
+  it("le test MIDI : « midi » et Espace, puis Espace rejoue et Maj+Espace avance dans les 18 morceaux", async () => {
+    const env = await startDialogs();
+    const queue = vi.spyOn(env.engine.services.get(ZOOMBINIS_SOUND), "queue");
+    await typeCode(env, "midi ");
+    expect(env.dialogs.message).toBe("midi test on");
+    await env.run(MESSAGE_MS);
+    env.host.press("Space", { key: " " });
+    await env.run(50);
+    expect(queue).toHaveBeenLastCalledWith(MIDI_TEST_SONGS[0]);
+    expect(env.dialogs.message).toBe(`midi test:${MIDI_TEST_SONGS[0]}`);
+    env.host.press("Space", { key: " ", shift: true });
+    await env.run(50);
+    expect(queue).toHaveBeenLastCalledWith(MIDI_TEST_SONGS[1]);
+    await env.run(MESSAGE_MS);
+    await typeCode(env, "midi ");
+    expect(env.dialogs.message).toBe("midi test off");
+  });
+
+  it("« @ » ne marque les étapes 1, 2 et 4 réussies qu'en mode de test", async () => {
+    const env = await startDialogs();
+    const masks = env.zb.game.masks;
+    env.host.press("Digit0", { key: "@" });
+    await env.run(50);
+    expect(masks).toEqual({ stage1: 0, stage2: 0, stage3: 0, stage4: 0 });
+    env.zb.game.options.testMode = true;
+    env.host.press("Digit0", { key: "@", ctrl: true, alt: true });
+    await env.run(50);
+    expect(masks).toEqual({ stage1: 1, stage2: 1, stage3: 0, stage4: 1 });
   });
 });

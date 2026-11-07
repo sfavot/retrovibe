@@ -103,7 +103,11 @@ export interface GameOptions {
   magneticMouse: boolean;
   /** `S+0x07`, `DS:a43d`, défaut 1 : pointeur masqué pendant le transport d'une pièce (`1168:58c7`, `10f8:6cdf` ; messages « curseur masqué / affiché »). */
   hideCursorWhileCarrying: boolean;
-  /** `S+0x08`, `DS:a43f`, défaut 0 : mode de test (secret ; non porté, conservé tel quel). */
+  /**
+   * `S+0x08`, `DS:a43f`, défaut 0 : mode de test, levé par un code secret tapé au clavier (`1198:05b3`, `game/route.ts` `SECRET_TEST_MODE`). Rien ne le
+   * rabaisse en jeu, mais il suit la partie : écrit et relu avec elle (`10d0:0a31`, `10d0:0863`), remis à 0 par une nouvelle partie (`10d0:089b(1)` puis `10d0:07f5`).
+   * Lire par `testMode(game)`.
+   */
   testMode: boolean;
   /** `S+0x09`, `DS:a43e`, défaut 0 : auto-aimantation. */
   autoMagnet: boolean;
@@ -150,6 +154,10 @@ export interface GameState {
   campDecor: number[];
   /** `S+0x1E` : position de défilement de Zoombiniville, 0 à 5 (6 positions de 320 points sur 1 920). */
   townScroll: number;
+  /** `S+0x22` : meilleur score de l'écran caché 19 (tir aux Zoombinis, `1110:2b23`), 0 à 99. */
+  shootingHighScore: number;
+  /** `S+0x24` : meilleur score de l'écran caché 20 (astéroïdes, `1110:3e95`), 0 à 999. */
+  asteroidsHighScore: number;
   /** `S+0x26` : état des mascottes du choix des Zoombinis, 0 à 3. */
   mascots: number;
   /** `S+0x28…0x47` : mémoire de dialogue des 16 écrans de `DIALOG_SCREENS`. */
@@ -197,6 +205,11 @@ export interface Session {
   previous: number;
   /** `[8558]` : destination réelle quand `XFER` (2) est intercalé, sinon −1. */
   finalTarget: number;
+  /**
+   * `DS:4180` : trajet forcé (1 à 16) par `T` puis `a` à `p` sur la carte (mode de test, en entraînement, `1110:0ab4`) ; 0 sinon. `1108:0177` intercale alors
+   * la transition de ce trajet quel que soit l'écran quitté, et `XFER` revient à la carte (`11b0:139b`, `11b0:16e9`) en le remettant à 0.
+   */
+  forcedTransfer: number;
   /** `[8550]` : dernière épreuve finale d'étape terminée (9, 12, 15, 18 ; 0 au départ). */
   lastFinal: number;
   /** `[96f2]` : 0 = aventure, 1 à 4 = entraînement au niveau 0 à 3 (`1168:515d`). */
@@ -213,6 +226,14 @@ export interface Session {
   name: string | null;
   /** `DS:96ec` / `96f0` : règle des gorges laissée aux grottes (`game/route.ts`, `setBridgeMemory`) ; hors du tampon `S`, jamais sauvegardée. */
   bridgeRule: BridgeRuleMemory | null;
+  /** `DS:6dac` / `DS:0486` : condensat roulant des caractères tapés (`10a8:03d9`, `game/route.ts` `typeSecretKey`) ; valeurs initiales du segment de données. */
+  secret: SecretHash;
+}
+
+/** Condensat des touches (`10a8:03d9`) : `a` = 7 bits par caractère des derniers caractères (`DS:6dac`), `b` = OU exclusif de tous les `a` (`DS:0486`). */
+export interface SecretHash {
+  a: number;
+  b: number;
 }
 
 /** Règle des gorges retenue pour les grottes : `DS:96ec` candidate, `DS:96f0` effectif. */
@@ -226,6 +247,7 @@ export function createSession(): Session {
     screen: -1,
     previous: -1,
     finalTarget: -1,
+    forcedTransfer: 0,
     lastFinal: 0,
     training: 0,
     levelRaised: false,
@@ -234,6 +256,8 @@ export function createSession(): Session {
     quitting: false,
     name: null,
     bridgeRule: null,
+    // Segment de données : `DS:6dac` vaut 0 et `DS:0486` vaut 0xffffffff au lancement.
+    secret: { a: 0, b: 0xffffffff },
   };
 }
 
@@ -266,6 +290,8 @@ export function newGame(): GameState {
     fleensRule: [0, 0, 0, 0, 0, 0, 0, 0],
     campDecor: [0, 0, 0, 0, 0],
     townScroll: 0,
+    shootingHighScore: 0,
+    asteroidsHighScore: 0,
     mascots: 0,
     dialogMemory: new Array<number>(DIALOG_SCREENS.length).fill(0),
     counters: { created: 0, camp1: 0, camp2: 0, town: 0 },
@@ -285,6 +311,11 @@ export function newGame(): GameState {
     group: emptyGroup(),
     typeCounts: new Uint8Array(ZOOMBINI_TYPES),
   };
+}
+
+/** `[a43f]` : le mode de test (`S+0x08`) est-il levé ? Accesseur des écrans qui ont des touches de test (carte, choix, ville, épreuves). */
+export function testMode(game: GameState): boolean {
+  return game.options.testMode;
 }
 
 /** Copie profonde (les tests et `saves.ts` comparent des états). */

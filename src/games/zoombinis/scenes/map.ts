@@ -15,8 +15,14 @@
  *  - les noms des étapes (`STRL` 2006) sont peints dans le fond (`1110:1a3e`) : tous en entraînement, ceux des étapes dont un lieu est actif en aventure.
  * `SCRB` 1006 et 1007 ne sont référencés par aucun code de la carte.
  *
- * Écarts : le bandeau disparaît dès que le pointeur quitte le lieu (l'original attend 60 ms, `1110:199b`) ; les écrans cachés 19 et 20 (code secret) et les
- * touches du mode de test (`+`, `-`, `T`, `a` à `p`) ne sont pas portés ; pas d'animation du bouton du menu.
+ * Écrans cachés et mode de test (`screens.md` §1.7) : en entraînement, les lieux 8 et 9 mènent aux écrans 20 et 19 quand le code secret de l'écran vient d'être tapé
+ * (`game/route.ts`, `mapClick`). En mode de test (`[a43f]`), `+` et `-` règlent le nombre de Zoombinis du prochain groupe d'entraînement (`DS:8810`, 1 à 16, remis à 16
+ * à chaque entrée, `1110:0000`) et l'affichent sur la ligne d'état (« Snoids to practice with = n », `1198:03cf`). En entraînement, `T` affiche « Which Transition (a-p): »
+ * (`1110:0d7b`, `DS:87c8`) ; la touche suivante l'efface et, si c'est `a` à `p`, force le trajet 1 à 16 (`Session.forcedTransfer`, `DS:4180`) et demande l'écran 7
+ * (`1110:0ab4`) : `1108:0177` intercale la transition de ce trajet, qui revient ensuite à la carte (`11b0:139b`, `11b0:16e9`).
+ *
+ * Écarts : le bandeau disparaît dès que le pointeur quitte le lieu (l'original attend 60 ms, `1110:199b`) ; pas d'animation du bouton du menu. Trajet forcé : le décor des
+ * étapes est celui d'une transition ordinaire (`11b0:010f` ne recalcule pas les niveaux d'étape, `DS:acf4`, et en force deux : non reproduit).
  */
 import { drawShape } from "../../../engine/mohawk/graphics/blit";
 import type { Surface } from "../../../engine/mohawk/graphics/surface";
@@ -27,10 +33,11 @@ import { ZOOMBINIS_GAME, type ZoombinisGame } from "../engine/game";
 import type { Scene, SceneContext } from "../engine/scene";
 import { ScreenId } from "../engine/scene";
 import { GRAPHICS } from "../engine/services";
+import { showDebugLine } from "../engine/shortcuts";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { TextFlags, ZOOMBINIS_TEXT, type ZoombinisText } from "../engine/text";
-import { cloneGame, type GameState } from "../game/state";
-import { enterTraining, leaveMap, leaveTraining, mapClick, placeActivation } from "../game/route";
+import { cloneGame, testMode, type GameState } from "../game/state";
+import { TRANSFER_ROUTES, enterTraining, leaveMap, leaveTraining, mapClick, placeActivation, stepTrainingSize } from "../game/route";
 import { closeScreen, openScreen } from "./screen-kit";
 
 const ARCHIVE = "MAP.MHK";
@@ -197,6 +204,10 @@ export function createMapScene(): Scene {
   let levelPanel: Feature;
   let legend: Feature;
   let leaving = false;
+  /** `DS:8810` : taille du prochain groupe d'entraînement (0 = 16), touches `+` / `-` du mode de test. */
+  let trainingSize = 0;
+  /** `DS:87c8` : `T` a été tapé (mode de test, en entraînement) ; la touche suivante choisit le trajet. */
+  let askingTransfer = false;
 
   const training = (): number => zoombinis.session.training;
 
@@ -369,7 +380,7 @@ export function createMapScene(): Scene {
       stashes.set(zoombinis, cloneGame(game));
       session.leftToMap = false;
     }
-    leaveMap(zoombinis.game, session, ctx.rng);
+    leaveMap(zoombinis.game, session, ctx.rng, trainingSize);
     zoombinis.goTo(ctx, screen);
   }
 
@@ -422,6 +433,8 @@ export function createMapScene(): Scene {
       highlight = 0;
       labelText = null;
       leaving = false;
+      trainingSize = 0;
+      askingTransfer = false;
       activation = placeActivation(zoombinis.game, zoombinis.session);
       background = openScreen(ctx, archive, { background: BACKGROUND });
       features.defineGroup(0, SHEET);
@@ -457,6 +470,24 @@ export function createMapScene(): Scene {
     },
     key(event, ctx: SceneContext) {
       if (leaving || event.ctrl || event.alt) return false;
+      // `1110:0ab4` : après `T`, toute touche efface la question ; `a` à `p` forcent le trajet 1 à 16 (`DS:4180`) et demandent l'écran 7.
+      if (askingTransfer && testMode(zoombinis.game)) {
+        askingTransfer = false;
+        zoombinis.session.forcedTransfer = 0;
+        showDebugLine(ctx, "");
+        const letter = event.key.length === 1 ? event.key.toLowerCase().charCodeAt(0) - 0x60 : 0;
+        if (letter >= 1 && letter <= TRANSFER_ROUTES.length) {
+          zoombinis.session.forcedTransfer = letter;
+          leaveTo(ctx, ScreenId.bridge, false);
+          return true;
+        }
+      }
+      // `1110:0d7b` : `T` en entraînement et en mode de test.
+      if (event.code === "KeyT" && testMode(zoombinis.game) && training() !== 0) {
+        showDebugLine(ctx, "Which Transition (a-p):");
+        askingTransfer = true;
+        return true;
+      }
       if (event.code === "ShiftLeft" || event.code === "ShiftRight") {
         setTraining(ctx, "enter");
         return true;
@@ -464,6 +495,11 @@ export function createMapScene(): Scene {
       const digit = /^Digit([1-4])$/.exec(event.code);
       if (digit) {
         setTraining(ctx, Number(digit[1]) - 1);
+        return true;
+      }
+      if ((event.key === "+" || event.key === "-") && testMode(zoombinis.game)) {
+        trainingSize = stepTrainingSize(trainingSize, event.key);
+        showDebugLine(ctx, `Snoids to practice with = ${trainingSize}`);
         return true;
       }
       return false;

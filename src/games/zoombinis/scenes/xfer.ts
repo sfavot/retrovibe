@@ -39,7 +39,7 @@ import { ZOOMBINIS_GAME } from "../engine/game";
 import { ScreenId, type Scene, type SceneContext } from "../engine/scene";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { TextFlags, ZOOMBINIS_TEXT } from "../engine/text";
-import { currentLevel, dialogMemoryIndex } from "../game/route";
+import { TRANSFER_ROUTES, currentLevel, dialogMemoryIndex } from "../game/route";
 import { createSnoid, screenScripts, type Snoid } from "./snoid";
 import { TrailColoring, TRAIL_DELAY, TRAIL_STARTS, trailStartIndex } from "./xfer-trail";
 import { closeScreen, openScreen } from "./screen-kit";
@@ -375,6 +375,9 @@ export function createXferScene(): Scene {
     const change = zoombinis.lastChange;
     previous = zoombinis.session.previous;
     target = change && change.screen === ScreenId.xfer && change.target !== null ? change.target : zoombinis.session.finalTarget;
+    // `11b0:010f` : un trajet forcé (`DS:4180`) impose son départ et son arrivée (`[855a]`, `[8558]`).
+    const forced = TRANSFER_ROUTES[zoombinis.session.forcedTransfer - 1];
+    if (forced) [previous, target] = forced;
   };
 
   function createFeature(ctx: SceneContext, options: FeatureOptions): Feature {
@@ -414,7 +417,11 @@ export function createXferScene(): Scene {
   function finish(ctx: SceneContext): void {
     if (left) return;
     left = true;
-    ctx.services.get(ZOOMBINIS_GAME).goTo(ctx, target);
+    const zoombinis = ctx.services.get(ZOOMBINIS_GAME);
+    // `11b0:139b` / `11b0:16e9` : après un trajet forcé, retour à la carte (`[8554] = 1`) et `DS:4180` remis à 0.
+    const forced = zoombinis.session.forcedTransfer !== 0;
+    zoombinis.session.forcedTransfer = 0;
+    zoombinis.goTo(ctx, forced ? ScreenId.map : target);
   }
 
   return {

@@ -17,9 +17,16 @@ import {
   nextScreen,
   placeActivation,
   resumeScreen,
+  SECRET_MIDI_TEST,
+  SECRET_SCREEN_19,
+  SECRET_SCREEN_20,
+  SECRET_TEST_MODE,
+  secretMatches,
   setBridgeMemory,
   stageOf,
+  stepTrainingSize,
   transferId,
+  typeSecretKey,
 } from "../../src/games/zoombinis/game/route";
 import { type GameDate, type GameState, type Session, type Zoombini, createSession, makeZoombini, newGame } from "../../src/games/zoombinis/game/state";
 import {
@@ -673,5 +680,88 @@ describe("parcours complets", () => {
     const pairs = new Set(g.monuments.map((m) => `${m!.stage}/${m!.level}`));
     expect(pairs.size).toBe(16);
     expect(FIRST_PUZZLE).toBe(7);
+  });
+});
+
+// --- Codes secrets (`10a8:03d9`, `10a8:041f`) ---
+
+/** Tape `text` (un caractère = un code `WM_CHAR`) dans le condensat de la session ; `\x01` = Ctrl+A. */
+function typeSecret(session: Session, text: string): void {
+  for (const c of text) typeSecretKey(session.secret, c.charCodeAt(0));
+}
+
+describe("codes secrets", () => {
+  it("le condensat part de l'état du segment de données et Ctrl+A le remet à zéro", () => {
+    const session = createSession();
+    expect(session.secret).toEqual({ a: 0, b: 0xffffffff });
+    typeSecret(session, "zx");
+    expect(session.secret.a).toBe(((0x7a << 7) | 0x78) >>> 0);
+    typeSecret(session, "\x01");
+    expect(session.secret).toEqual({ a: 0, b: 0 });
+  });
+
+  it("a garde 7 bits par caractère (codes ≥ 0x100 ignorés) et b est le OU exclusif des a successifs", () => {
+    const session = createSession();
+    typeSecret(session, "\x01");
+    typeSecretKey(session.secret, 0x100 + 0x41);
+    expect(session.secret).toEqual({ a: 0, b: 0 });
+    typeSecretKey(session.secret, 0xe9);
+    expect(session.secret).toEqual({ a: 0x69, b: 0x69 });
+    typeSecretKey(session.secret, 0x41);
+    expect(session.secret).toEqual({ a: (0x69 << 7) | 0x41, b: 0x69 ^ ((0x69 << 7) | 0x41) });
+  });
+
+  it("Ctrl+A puis « midi » et Espace donne le code du test MIDI", () => {
+    const session = createSession();
+    typeSecret(session, "\x01midi ");
+    expect(secretMatches(session.secret, SECRET_MIDI_TEST)).toBe(true);
+    typeSecret(session, " ");
+    expect(secretMatches(session.secret, SECRET_MIDI_TEST)).toBe(false);
+  });
+
+  it("« Zapper » tapé dès le lancement donne le code de l'écran 19", () => {
+    const session = createSession();
+    typeSecret(session, "Zapper");
+    expect(secretMatches(session.secret, SECRET_SCREEN_19)).toBe(true);
+  });
+
+  it("seule compte la classe : 4 derniers caractères, 4 bits du 5e, OU exclusif du reste (exemples construits)", () => {
+    const at = (text: string) => {
+      const session = createSession();
+      typeSecret(session, text);
+      return session.secret;
+    };
+    expect(secretMatches(at("\x01acnoids"), SECRET_SCREEN_20)).toBe(true);
+    expect(secretMatches(at("\x01canoids"), SECRET_SCREEN_20)).toBe(true);
+    expect(secretMatches(at("\x015oids "), SECRET_TEST_MODE)).toBe(true);
+    expect(secretMatches(at("\x01acnoidz"), SECRET_SCREEN_20)).toBe(false);
+  });
+
+  it("carte : les lieux 8 et 9 mènent aux écrans 20 et 19 avec leur code, en entraînement seulement", () => {
+    const game = newGame();
+    const session = createSession();
+    typeSecret(session, "Zapper");
+    expect(mapClick(game, session, 9)).toBeNull();
+    session.training = 1;
+    expect(mapClick(game, session, 9)).toEqual({ screen: S.hiddenShooting, leaveTraining: false });
+    expect(mapClick(game, session, 8)).toEqual({ screen: S.slides, leaveTraining: false });
+    typeSecret(session, "\x01acnoids");
+    expect(mapClick(game, session, 8)).toEqual({ screen: S.hiddenAsteroids, leaveTraining: false });
+    expect(mapClick(game, session, 9)).toEqual({ screen: S.fleens, leaveTraining: false });
+  });
+
+  it("taille du groupe d'entraînement du mode de test (`DS:8810`) : + ajoute 1, - retire 1, de 1 à 16", () => {
+    expect(stepTrainingSize(0, "+")).toBe(1);
+    expect(stepTrainingSize(1, "+")).toBe(2);
+    expect(stepTrainingSize(16, "+")).toBe(16);
+    expect(stepTrainingSize(0, "-")).toBe(1);
+    expect(stepTrainingSize(5, "-")).toBe(4);
+    const game = newGame();
+    const session = createSession();
+    session.training = 1;
+    leaveMap(game, session, new MsvcRandom(3), 5);
+    expect(game.group.members).toHaveLength(5);
+    leaveMap(game, session, new MsvcRandom(3), 0);
+    expect(game.group.members).toHaveLength(16);
   });
 });

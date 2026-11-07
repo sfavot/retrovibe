@@ -540,7 +540,11 @@ class ConfirmLayer extends ButtonLayer {
   }
 }
 
-/** Mode 5 : cadre plein écran et défilement des crédits (`11a0:1c52`, `11a0:1f55`) : une ligne de 15 points toutes les 15 ticks, un point par tick. */
+/**
+ * Mode 5 : cadre plein écran et défilement des crédits (`11a0:1c52`, `11a0:1f55`) : une ligne de 15 points toutes les 15 ticks, un point par tick.
+ * Les deux Zoombinis du cadre (images 5 et 6 de `tBMP` 20, 69 × 92 et 58 × 92, en bas à droite et à gauche) ne sont **pas animés** : `11a0:1bd9` ne crée qu'une
+ * feature (`11a0:1c0c`, rappels `1c52` / `1f55`), le `SCRB` 20 n'a qu'une image de six cases (quatre bandes et ces deux images) et aucun `SCRS` n'est chargé.
+ */
 class CreditsLayer implements Layer {
   readonly mode = 5;
   /** Zone de défilement (170…470 × 15…466) : fond noir, texte des crédits. */
@@ -1064,10 +1068,13 @@ export class Dialogs {
 
   // --- Message de raccourci ---
 
-  /** `1168:2117` : plaque de message au bas de l'écran pendant 90 ticks ; sans effet tant qu'une boîte est ouverte (`DS:a2da`). */
-  showMessage(ctx: ZoombinisContext, index: number, type: 0 | 1 | 2): void {
+  /**
+   * `1168:2117` : plaque de message au bas de l'écran pendant 90 ticks ; sans effet tant qu'une boîte est ouverte (`DS:a2da`). `message` : indice dans `STRL` 2023,
+   * ou texte tel quel (chaînes du programme, non traduites, du mode de test : « you got it », « midi test on »…).
+   */
+  showMessage(ctx: ZoombinisContext, message: number | string, type: 0 | 1 | 2): void {
     if (this.isOpen) return;
-    const text = textOf(ctx).strings.get(STRL_OPTIONS, index);
+    const text = typeof message === "string" ? message : textOf(ctx).strings.get(STRL_OPTIONS, message);
     if (text === null) return;
     this.takeSnapshot(ctx);
     this.flash = { text, type, until: ctx.clock.ticks + MESSAGE_TICKS };

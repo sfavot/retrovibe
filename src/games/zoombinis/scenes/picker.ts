@@ -20,7 +20,8 @@
  *
  * Constats de lecture du code (qui corrigent `screens.md` §2) :
  *  - l'action 3 n'efface pas la sélection : elle tire un **nouveau nom** (`1168:1f84`, syllabes de `DS:14c8…14e0`) ; il n'y a pas de bouton « effacer » ;
- *  - le bouton « au hasard » avec `Maj` tenue remplit tout le groupe (le mode de test n'intervient que pour le raccourci de fin de jeu de l'action 1) ;
+ *  - le bouton « au hasard » avec `Maj` tenue remplit tout le groupe (le mode de test n'intervient que pour le raccourci de fin de jeu de l'action 1 : en mode de
+ *    test, `Maj` tenue et groupe vide, « ajouter » met `S+0x48` et `S+0x4E` à 624, `1128:083c`) ;
  *  - le départ ne fait embarquer qu'**un** Zoombini : le premier présent des places 11, 12, 6, 7 (`DS:1ac0`) marche vers la passerelle du bateau
  *    (544, 264, `NODE` 8) ; le groupe part quand il est arrivé et que le son 996 est fini (`1128:0566`) ; un clic pendant l'attente fait partir tout de suite ;
  *  - un Zoombini créé sort de la grotte (nœud 1 de `NODE` 1000, 148 × 215) et marche jusqu'à sa place par `PATH` 1000.
@@ -28,7 +29,7 @@
  * Écarts : le retrait d'un Zoombini se fait au clic (l'original lance `1168:1742`, un glissement de la souris qui le ramène à sa place, et la condition
  * de retrait `1168:166e` demande une zone de dépôt que l'écran ne déclare pas : la cible exacte n'est pas établie) ; les Zoombinis retirés disparaissent
  * sans marcher ; pas d'animation d'attente des Zoombinis (clignements) ; l'enfoncement d'un bouton d'action dure 2 ticks comme `1090:00c1(1, 0, 2, …)` ;
- * mode de test `[a43f]` non porté ; le Zoombini qui embarque ne grimpe pas à l'échelle (il s'arrête au bout du chemin) ; le curseur n'est pas changé
+ * le Zoombini qui embarque ne grimpe pas à l'échelle (il s'arrête au bout du chemin) ; le curseur n'est pas changé
  * (aucun appel dans `1128:*`, les zones de `1038:*` n'ont pas été décodées) ; phrase d'accueil de la première arrivée (`[384c]`, posé par le logo)
  * déduite de l'écran précédent (le logo).
  */
@@ -46,7 +47,7 @@ import { ScreenId } from "../engine/scene";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { TextFlags, ZOOMBINIS_TEXT } from "../engine/text";
 import { addZoombini, groupComplete, isAvailable, pickerEnter, pickerLeave, pickRandomType, remainingToCreate, removeZoombini } from "../game/team";
-import { STATE_BYTES, ZOOMBINI_TYPES, type Zoombini } from "../game/state";
+import { STATE_BYTES, testMode, ZOOMBINI_TYPES, type Zoombini } from "../game/state";
 import { closeScreen, openScreen } from "./screen-kit";
 import { createSnoid, type Snoid } from "./snoid";
 
@@ -547,9 +548,14 @@ function start(ctx: SceneContext, archive: Archive, map: PickerMap) {
     return true;
   }
 
-  function clickAdd(): void {
+  function clickAdd(shift: boolean): void {
     press(Action.add);
     if (complete() || !available() || created() >= ZOOMBINI_TYPES) return;
+    // `1128:083c` : mode de test, `Maj` tenue et groupe vide (`1168:032c`) : il ne reste qu'un Zoombini à créer et à amener à Zoombiniville (fin du jeu à tester).
+    if (testMode(zoombinis.game) && shift && slots.every((slot) => slot === null)) {
+      zoombinis.game.counters.created = ZOOMBINI_TYPES - 1;
+      zoombinis.game.counters.town = ZOOMBINI_TYPES - 1;
+    }
     sound.queue(SOUND_ADD);
     addOne(ctx.clock.ticks);
     name = generateName(ctx.rng);
@@ -690,7 +696,7 @@ function start(ctx: SceneContext, archive: Archive, map: PickerMap) {
       stopSpeaking();
       switch (Number(key)) {
         case Action.add:
-          clickAdd();
+          clickAdd(shift);
           break;
         case Action.guide:
           clickGuide();

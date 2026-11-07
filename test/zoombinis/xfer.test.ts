@@ -308,6 +308,25 @@ describe.skipIf(!original.has)("transition XFER", () => {
     expect(later.after + later.before).toBe(first.before + first.after);
   });
 
+  it("trajet forcé (DS:4180, mode de test de la carte) : la transition du trajet 9 est jouée depuis la carte, puis retour à la carte", async () => {
+    const { host, engine, change } = await begin({
+      from: ScreenId.map,
+      to: ScreenId.bridge,
+      prepare: (_game, session) => {
+        session.training = 1;
+        (session as unknown as { forcedTransfer: number }).forcedTransfer = 9;
+      },
+    });
+    expect(change).toMatchObject({ screen: ScreenId.xfer, target: ScreenId.bridge, transfer: 9 });
+    await runFor(engine, host, TICK_MS * 4);
+    // Trajet 9 : camp 1 → nizibooms, région 3.
+    expect(engine.services.get(FEATURES).group(1)).toBeDefined();
+    await playOut(engine, host);
+    expect(engine.error).toBeNull();
+    expect(engine.scenes.currentId).toBe(ScreenId.map);
+    expect(engine.services.get(ZOOMBINIS_GAME).session.forcedTransfer).toBe(0);
+  }, 60_000);
+
   it("un clic gauche écourte la transition, une touche ne fait rien", async () => {
     const { host, engine } = await begin({ from: ScreenId.pizza, to: ScreenId.baseCamp });
     await runFor(engine, host, TICK_MS * 30);

@@ -6,10 +6,12 @@ import {
   type GameState,
   type GroupBuffer,
   type Monument,
+  type SecretHash,
   type Session,
   type Zoombini,
   DIALOG_SCREENS,
   GROUP_CAPACITY,
+  GROUP_SIZE,
   MAX_LEVEL,
   aliveCount,
   emptyGroup,
@@ -143,7 +145,9 @@ export function changeScreen(game: GameState, session: Session, requested: numbe
   if (to !== S.logo && to !== S.xfer) game.resumeScreen = to;
   session.previous = from;
   if (session.resuming || game.options.transitionsOff) transition = false;
-  const transfer = transition ? transferId(from, to) : null;
+  // `1108:0177` : un trajet forcé (`DS:4180`, mode de test de la carte) intercale toujours sa transition.
+  if (session.forcedTransfer !== 0) transition = true;
+  const transfer = transition ? (session.forcedTransfer !== 0 ? session.forcedTransfer : transferId(from, to)) : null;
   if (transfer === null) transition = false;
 
   session.screen = transition ? S.xfer : to;
@@ -361,11 +365,14 @@ export interface MapClick {
 /**
  * Clic sur le lieu `place` (1 à 16, `1110:0819`). Aventure : seuls Zoombinîle (1), l'abri du rocher (5, étape 1 terminée), l'aire de grozarbre (12, étape 2 ou 3 terminée) et
  * Zoombiniville (16, étape 4 terminée) répondent. Entraînement : tous les lieux d'épreuve répondent ; Zoombinîle quitte l'entraînement ; les camps et la ville quittent l'entraînement
- * s'ils sont atteints dans la partie, sinon rien. Les lieux 8 et 9 mènent aux écrans cachés 20 / 19 derrière un code secret : non portés (toujours 12 et 13).
+ * s'ils sont atteints dans la partie, sinon rien. Les lieux 8 et 9 (donc seulement en entraînement) mènent aux écrans cachés 20 et 19 au lieu des épreuves 12 et 13 quand les
+ * derniers caractères tapés forment le code de l'écran (`10a8:041f`, `SECRET_SCREEN_20` / `SECRET_SCREEN_19`).
  */
 export function mapClick(game: GameState, session: Session, place: number): MapClick | null {
-  const screen = MAP_PLACE_SCREEN[place - 1];
+  let screen = MAP_PLACE_SCREEN[place - 1];
   if (screen === undefined) return null;
+  if (place === 8 && secretMatches(session.secret, SECRET_SCREEN_20)) screen = S.hiddenAsteroids;
+  else if (place === 9 && secretMatches(session.secret, SECRET_SCREEN_19)) screen = S.hiddenShooting;
   const training = session.training !== 0;
   if (place === 1) return { screen, leaveTraining: training };
   let reached: number | null = null;
@@ -409,15 +416,69 @@ export function leaveTraining(session: Session): void {
 
 /**
  * Sortie de la carte (`1110:03b8`). Aventure : le groupe courant est abandonné (« ce groupe de zoombinis sera perdu si tu retournes à la carte ») et les sorties d'écran
- * ne le recopient plus (`session.leftToMap`). Entraînement : un groupe de 16 Zoombinis aux attributs tirés au hasard est créé (rien n'est écrit dans la partie).
+ * ne le recopient plus (`session.leftToMap`). Entraînement : un groupe de 16 Zoombinis aux attributs tirés au hasard est créé (rien n'est écrit dans la partie) ;
+ * `size` (`DS:8810`, réglé par `+` / `-` en mode de test, 0 = 16) en change le nombre.
  */
-export function leaveMap(game: GameState, session: Session, rng: MsvcRandom): void {
+export function leaveMap(game: GameState, session: Session, rng: MsvcRandom, size = 0): void {
   if (session.training === 0) {
     if (!session.leftToMap) {
       session.leftToMap = true;
       game.group = emptyGroup(true, true);
     }
   } else {
-    game.group = trainingGroup(rng);
+    game.group = trainingGroup(rng, size !== 0 ? size : GROUP_SIZE);
   }
+}
+
+/**
+ * `1110:0b46` / `1110:0b57` (mode de test, touches `+` et `-` de la carte) : nombre de Zoombinis du groupe d'entraînement (`DS:8810`) ; `+` ajoute 2 puis retire 1,
+ * `-` retire 1, borné de 1 à 16. La carte le remet à 0 (16) à chaque entrée (`1110:0000`).
+ */
+export function stepTrainingSize(size: number, key: "+" | "-"): number {
+  const next = (key === "+" ? size + 2 : size) - 1;
+  return Math.min(Math.max(next, 1), GROUP_SIZE);
+}
+
+// --- Codes secrets (`10a8:03d9`, `10a8:041f`) ---
+
+/**
+ * Valeurs attendues de `10a8:041f(b, a)` : `a` (`DS:6dac`) et `b` (`DS:0486`). Les constantes sont poussées comme deux doubles mots (`1110:08ae`, `1110:08ce`,
+ * `1198:0640`, `1198:066b`) : le premier est comparé à `DS:0486`, le second à `DS:6dac`.
+ */
+export interface SecretCode {
+  a: number;
+  b: number;
+}
+
+/** Lieu 8 de la carte → écran 20 (`1110:08ae`). Les 4 derniers caractères sont `oids`. */
+export const SECRET_SCREEN_20: SecretCode = { a: 0xedfa7273, b: 0xc07a877d };
+/** Lieu 9 de la carte → écran 19 (`1110:08ce`). Les 4 derniers caractères sont `pper`. */
+export const SECRET_SCREEN_19: SecretCode = { a: 0x1e1c32f2, b: 0x469110d3 };
+/** Espace (`1198:0640`) : lève le mode de test `[a43f]`. Les 4 derniers caractères sont `ids `. */
+export const SECRET_TEST_MODE: SecretCode = { a: 0xfd3939a0, b: 0xa675d204 };
+/** Espace (`1198:066b`) : bascule le test MIDI `[a1f2]`. `Ctrl+A` puis `midi ` le donne. */
+export const SECRET_MIDI_TEST: SecretCode = { a: 0xdd3934a0, b: 0xd09804a9 };
+
+/**
+ * `10a8:03d9(code)` : ajoute un caractère au condensat. Le moteur l'appelle en tête de `1198:05b3` pour tout code < 0x100, c'est-à-dire pour les caractères de
+ * `WM_CHAR` (les touches de `WM_KEYDOWN` arrivent à partir de 0x100). `a = (a << 7 | code & 0x7f)` sur 32 bits, `b ^= a` ; le code 1 (`Ctrl+A`) remet les deux à 0.
+ *
+ * Le condensat ne retient donc que les 4 derniers caractères (7 bits chacun), les 4 bits bas du 5e en partant de la fin, et le OU exclusif de tous les caractères
+ * qui précèdent les 4 derniers (`b` est linéaire), plus l'état initial (`b` = 0xffffffff, l'équivalent d'un caractère 0x7f tapé) : la suite d'origine ne peut pas être
+ * retrouvée, seulement cette classe (`docs/zoombinis/screens.md` §1.7). Le test MIDI se lève par `Ctrl+A` puis `midi ` (mot sans doute d'origine) ; pour les trois
+ * autres codes, aucun mot naturel n'a été retrouvé.
+ */
+export function typeSecretKey(secret: SecretHash, code: number): void {
+  if (code >= 0x100) return;
+  secret.a = ((secret.a << 7) | (code & 0x7f)) >>> 0;
+  secret.b = (secret.b ^ secret.a) >>> 0;
+  if (code === 1) {
+    secret.a = 0;
+    secret.b = 0;
+  }
+}
+
+/** `10a8:041f` : les derniers caractères tapés forment-ils `code` ? */
+export function secretMatches(secret: SecretHash, code: SecretCode): boolean {
+  return secret.a === code.a && secret.b === code.b;
 }

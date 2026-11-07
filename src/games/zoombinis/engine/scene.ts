@@ -47,12 +47,12 @@ export const ScreenId = {
   smoke: 17,
   /** `MAZE2.MHK` : épreuve 12. */
   maze2: 18,
-  /** Sous-écran du sélecteur dans `PICKER.MHK` (rôle inconnu, §2.5). */
-  pickerSubA: 19,
-  /** Autre sous-écran du sélecteur dans `PICKER.MHK` (rôle inconnu, §2.5). */
-  pickerSubB: 20,
-  /** Doublon du 19 dans la table (même descripteur). */
-  pickerSubAAlias: 21,
+  /** `PICKER.MHK` (fond 1001) : écran caché du tir aux Zoombinis (`1110:20f6`), lieu 9 de la carte avec un code secret (`screens.md` §1.7). */
+  hiddenShooting: 19,
+  /** `PICKER.MHK` (fond 2000) : écran caché des astéroïdes (`1110:2f46`), lieu 8 de la carte avec un code secret (`screens.md` §1.7). */
+  hiddenAsteroids: 20,
+  /** Doublon du 19 dans la table (même descripteur `1530:16be`) ; aucun code ne le demande. */
+  hiddenShootingAlias: 21,
   /** Doublon du 0 dans la table (même descripteur). */
   logoAlias: 22,
 } as const;

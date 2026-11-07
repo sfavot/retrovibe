@@ -378,6 +378,16 @@ describe.skipIf(!original.has)("boîte de dialogue de Zoombinis", () => {
     for (let y = 15; y < 466; y++) for (let x = 170; x < 470; x++) if (pixels[y * 640 + x] === 0x26) red++;
     expect(red).toBeGreaterThan(0);
     expect(pixels[240 * 640 + 20]).not.toBe(BACKGROUND);
+    // Les deux Zoombinis du cadre (SCRB 20, une seule image) ne bougent pas pendant que le texte défile.
+    const corners = () => {
+      const copy: number[] = [];
+      for (const [x0, x1] of [[20, 85], [540, 620]] as const) for (let y = 374; y < 466; y++) for (let x = x0; x < x1; x++) copy.push(env.screen().pixels[y * 640 + x]!);
+      return copy;
+    };
+    const before = corners();
+    expect(before.some((p) => p !== 0x2d)).toBe(true);
+    await env.run(17 * 60);
+    expect(corners()).toEqual(before);
     const clicks = env.log.clicks;
     host.click(300, 200);
     await env.run(60);

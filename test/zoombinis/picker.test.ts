@@ -164,6 +164,28 @@ describe.skipIf(!original.has)("choix des Zoombinis (écran 3)", () => {
     expect(zoombinis.game.group.members).toHaveLength(1);
   });
 
+  it("mode de test : Maj + « ajouter » sur un groupe vide ne laisse qu'un Zoombini à créer (S+0x48 = S+0x4E = 624, 1128:083c)", async () => {
+    for (const testMode of [false, true]) {
+      const { zoombinis, host, engine, click } = await start((game) => {
+        game.options.testMode = testMode;
+      });
+      for (let row = 0; row < 4; row++) await click(attribute(row, 2), 20);
+      host.input.moveMouse(...ADD);
+      host.input.mouseDown("left", { shift: true });
+      host.input.mouseUp("left", { shift: true });
+      await runFor(engine, host, 60);
+      const { counters, group } = zoombinis.game;
+      expect(group.members).toHaveLength(1);
+      expect(counters.created).toBe(testMode ? 625 : 1);
+      expect(counters.town).toBe(testMode ? 624 : 0);
+      // Groupe non vide : rien de plus.
+      host.input.mouseDown("left", { shift: true });
+      host.input.mouseUp("left", { shift: true });
+      await runFor(engine, host, 60);
+      expect(zoombinis.game.counters.town).toBe(testMode ? 624 : 0);
+    }
+  });
+
   it("au hasard avec Maj tenue : remplit tout le groupe, avec des Zoombinis tous différents d'au plus deux exemplaires", async () => {
     const { zoombinis, host, engine, snoids } = await start();
     host.input.moveMouse(...RANDOM);

@@ -92,8 +92,8 @@ Sûr (code) :
 | 16 | `1530:0bc4` | `10c8:0000` | `10c8:0945` | `10c8:09a6` | `10c8:1cf5` | `CAVES.MHK` | épreuve 10 |
 | 17 | `1530:21b8` | `1158:0000` | `1158:0c4c` | `1158:0cbe` | `1158:2504` | `SMOKE.MHK` | épreuve 11 |
 | 18 | `1530:180c` | `1118:0000` | `1118:145f` | `1118:1503` | `1118:2989` | `MAZE2.MHK` | épreuve 12 |
-| 19 | `1530:16be` | `1110:20f6` | `1110:2354` | `1110:23ac` | `1110:2b0f` | `PICKER.MHK` | sous-écran du sélecteur (§2.5) |
-| 20 | `1530:1708` | `1110:2f46` | `1110:311e` | `1110:317c` | `1110:35ae` | `PICKER.MHK` | autre sous-écran du sélecteur (§2.5) |
+| 19 | `1530:16be` | `1110:20f6` | `1110:2354` | `1110:23ac` | `1110:2b0f` | `PICKER.MHK` | écran caché : tir aux Zoombinis (§2.5) |
+| 20 | `1530:1708` | `1110:2f46` | `1110:311e` | `1110:317c` | `1110:35ae` | `PICKER.MHK` | écran caché : astéroïdes (§2.5) |
 | 21 | `1530:16be` | (= 19) | | | | | doublon du 19 |
 | 22 | `1530:3890` | (= 0) | | | | | doublon du 0 |
 
@@ -163,9 +163,9 @@ Le parcours est donc : Picker → **Bridge → Tunnels → Pizza** → camp 1 (B
 
 `XFER.MHK` contient 6 jeux (`tBMP` 1000, 2000, … 6000 : un fond 640 × 480 en RLE + une planche multi-images + scripts `SCRB` 1100–6108 et `SCRS` 5199–6204) ; `DS:ad26` (0 à 5) choisit le jeu de la région traversée (0 : début, 1 : étape 1, 2 : Ferry-Lilly-Slides, 3 : Fleens-Hotel-Net, 4 : Caves-Smoke-Maze2, 5 : Town). Le son d'ambiance de la transition est tiré au hasard (`10a8:04e8`) dans une plage d'ids propre au jeu (`DS:ad24`, ex. `0x4e7e`…`0x4e83` = 20094…20099 pour la région 0). `STRL` 2023 : « transitions activées / désactivées » (`Ctrl+T`, `DS:854e`).
 
-### 2.5 Écrans 19, 20 (sous-écrans de `PICKER.MHK`)
+### 2.5 Écrans 19, 20 (écrans cachés de `PICKER.MHK`)
 
-`1110:20f6` (19 et 21) charge le fond `SHPL`/`tBMP` 1001 de `PICKER.MHK`, les groupes de formes 1100 et 1200 (6 + 5 scripts `SCRB` 1100–1105 et 1200–1204) et les sons 1200 / 1201. `1110:2f46` (20) charge le fond 4000, les formes 4100, 4200, 4300, 4400 (`SCRB` 4100–4110). Ils ne sont jamais choisis par une constante visible dans le code (aucun `MOV [8554], 0x13/0x14/0x15`) : **leur rôle est un point ouvert** (**hypothèse** : écrans de gestion des parties, `Charger` / `Enregistrer`, ou fiches d'équipe de `STRL` 2018).
+Deux jeux d'arcade cachés, atteints depuis la carte en entraînement par un code secret (`1110:0819` cas 8 et 9, `screens.md` §1.7, **sûr**). `1110:20f6` (19 et 21) charge le fond `SHPL` / `tBMP` 1001 de `PICKER.MHK`, les groupes de formes 1100 (sans `REGS`) et 1200 (avec `REGS`), 6 + 5 scripts `SCRB` 1100 à 1105 et 1200 à 1204, les sons 1200 / 1201 : le **tir aux Zoombinis**. `1110:2f46` (20) charge le fond 2000, le groupe 1000 (avec `REGS` 1000 / 1001) et ses 31 `SCRB` 1000 à 1030, les sons 3000 à 3002 : les **astéroïdes** (têtes de Zoombinis et Fleens). Les ressources 4000 à 4400 de l'archive sont celles du choix des Zoombinis (écran 3), pas de l'écran 20. Les objets mus par leur rappel (vaisseau, tirs, rochers) sont lus par `11a0:1013`, qui relit l'image courante sans avancer et sans son toutes les `+0x28` ticks (pas pendant une boîte, `[a2da]`) puis appelle `+0x14`. Port : `scenes/hidden-shooting.ts`, `scenes/hidden-asteroids.ts`.
 
 ### 2.6 Schéma d'un handler Enter (modèle : `BaseCamp`, `10b0:0027`)
 
@@ -586,7 +586,7 @@ Le code reçoit le caractère ou la touche ; `1198:05b3(touche)` appelle d'abord
 
 Les libellés de `STRL` 2018 (menu « Options ») portent « Dialogues & effets (ctrl v) » et « Musique de fond (ctrl y) », ce qui est **l'inverse** du code (`Ctrl+V` = file musique, `Ctrl+Y` = file voix / effets). Les messages affichés suivent le code : seule l'indication de touche des libellés est inversée (défaut de l'original, `screens.md` §5.2).
 
-**Mode de débogage** (jamais accessible normalement ; `DS:a43f` posé par une séquence de saisie testée par `10a8:041f` avec un condensé, `0x20` = espace) : messages `you got it`, `Cheat on`, `Step-Mode ON / OFF`, `midi test on / off`, `Free:…`, touches `[` `]` (mode pas à pas), `P` (cadence : `%d-%d-%d` = mini / maxi / moyenne, en images par 600 ticks), `S`, `N`, `*`, `=`, `@`, `^`. Hors périmètre.
+**Mode de test** (`DS:a43f`, levé par `Espace` quand les derniers caractères tapés forment un code testé par `10a8:041f` ; condensat `10a8:03d9`, détail et liste des touches dans `screens.md` §1.7, **sûr**). Table de `1198:05b3` (`CS:0acb`, codes 2 à 0x5e) : 0x20 `Espace` (codes du mode de test et du test MIDI, puis morceaux du test MIDI), 0x26 `&` (palette, `1148:16d0`), 0x2a `*`, 0x3d `=`, 0x40 `@` (étapes 1, 2, 4 réussies), 0x4e `N` (graphe `NODE`, `1168:319b`), 0x50 `P` (cadence : `%d-%d-%d` = mini / maxi / moyenne, en images par 600 ticks), 0x53 `S` (numéros des sons), 0x5b `[` / 0x5d `]` (pas à pas), 0x5e `^` (mémoire libre), 0x18 `Ctrl+X` et 0x1a `Ctrl+Z` ; toutes sauf `Espace` ne font rien hors du mode de test. Messages : « you got it », « midi test on / off » et « midi test:<id> » sur la plaque `1168:2117` ; « Step-Mode ON / OFF », « Snoids to practice with = », « Which Transition (a-p): » sur la ligne d'état `1198:03cf` (en haut à gauche, 310 × 16). « Cheat on » n'est référencé par aucun code relevé.
 
 ### 7.3 Curseurs
 
@@ -606,7 +606,7 @@ résultat ← (graine32 >> 16) mod (n + 1)              (n = 0 → 0)       i.e.
 
 ## 9. Points ouverts
 
-1. **Écrans 19, 20, 21, 22** : 19 et 20 (`PICKER.MHK`, `1110:20f6`, `1110:2f46`) n'ont pas de rôle établi (hypothèse : gestion des parties / équipes) ; aucun transfert `DS:8554 = 0x13…0x16` en constante ; la table a deux doublons (21 = 19, 22 = 0).
+1. ~~Écrans 19, 20, 21, 22~~ : 19 et 20 sont deux jeux cachés (§2.5, `screens.md` §1.7), demandés par `1110:0819` (`SI = 0x14 / 0x13`, pas par une constante `DS:8554`) ; 21 (= 19) et 22 (= 0) ne sont demandés par aucun code relevé.
 2. **`SCRS`** : **résolu** (§3.6, G1). Reste ouvert : les états 1, 2, 3, 4, 6 et 10 de `+0xf4` ne sont lus que dans `1168:4231` / `1168:0ba8` sans les avoir suivis dans tous les écrans (rôles marqués **probable**) ; les bases pour les poses 3 et `0xffff` (Fleens : **hypothèse**, nulles) ; le sens des octets 9 à 18 de la fiche (jamais lus) ; l'usage de la `tBMP` 3001 ; la pose du premier emplacement des scripts de rejet à première partie ≥ `0x13` (partie brute : déduit de la lecture de `4741`, pas observé en jeu).
 3. **Image de 24 parties** : **tranché** (§3.5, `11a0:033a`) : le terminateur n'est pas lu dans la boucle de 24 cases ; il est relu au tour suivant comme premier mot d'une image vide (évènement et son déclenchés, aucun redessin), et le compteur d'images, qui avance d'un cran pour cette image vide, tronque le script d'autant d'images. `script.ts` le reproduit. Reste à confirmer en jeu sur FERRY 1517.
 4. **Terminateurs** : sens des numéros d'événement `0xff01`…`0xff0b`, `0xff3e`, `0xff3f`, `0xfe01`… : ils appellent `+0x10(image, n - 1)`, la signification dépend de chaque épreuve ; `0xffc9…0xffda` : **résolu** (§3.7), déclenchés par le tick des snoids `1168:0ba8`.

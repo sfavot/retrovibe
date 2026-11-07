@@ -22,6 +22,9 @@ const ROCK = [236, 269] as const;
 const GROZARBRE = [442, 211] as const;
 const TOWN = [578, 65] as const;
 const MENU_BUTTON = [600, 30] as const;
+/** Fosse de monte-pierre (lieu 8) et nizibooms (lieu 9). */
+const PLACE_8 = [362, 185] as const;
+const PLACE_9 = [321, 345] as const;
 
 const SCRIPT = { marks: 1000, icons: 1001, legend: 1002, key: 1003, label: 1004, menu: 1005 };
 
@@ -395,5 +398,107 @@ describe.skipIf(!original.has)("carte (écran 1)", () => {
     expect(features.features).toHaveLength(0);
     expect(engine.services.get(GRAPHICS).screen.width).toBe(SCREEN_WIDTH);
     expect(engine.services.get(ZOOMBINIS_SOUND)).toBeDefined();
+  });
+
+  describe("écrans cachés et mode de test", () => {
+    /** Tape `text` comme des caractères (`WM_CHAR`). */
+    function type(host: TestHost, text: string): void {
+      for (const c of text) host.press(/\d/.test(c) ? `Digit${c}` : `Key${c.toUpperCase()}`, { key: c });
+    }
+
+    it("en entraînement, « Zapper » puis le lieu 9 mène à l'écran 19 ; sans le code, à l'épreuve 13", async () => {
+      const { host, engine, entered } = await start((_game, session) => {
+        session.training = 1;
+      });
+      for (const id of [ScreenId.fleens, ScreenId.hiddenShooting, ScreenId.slides, ScreenId.hiddenAsteroids]) {
+        engine.register(id, () => ({ enter: () => void entered.push(id), leave() {}, tick() {} }));
+      }
+      type(host, "Zapper");
+      await runFor(engine, host, 100);
+      host.click(...PLACE_9);
+      await runFor(engine, host, 300);
+      expect(entered).toEqual([ScreenId.hiddenShooting]);
+    });
+
+    it("le lieu 8 sans code mène à l'épreuve 12", async () => {
+      const { host, engine, entered } = await start((_game, session) => {
+        session.training = 1;
+      });
+      engine.register(ScreenId.slides, () => ({ enter: () => void entered.push(ScreenId.slides), leave() {}, tick() {} }));
+      type(host, "Zappe");
+      await runFor(engine, host, 100);
+      host.click(...PLACE_8);
+      await runFor(engine, host, 300);
+      expect(entered).toEqual([ScreenId.slides]);
+    });
+
+    it("mode de test : + et - règlent le prochain groupe d'entraînement et l'affichent sur la ligne d'état", async () => {
+      const { host, engine, entered, drawn, zoombinis } = await start((game, session) => {
+        game.options.testMode = true;
+        session.training = 1;
+      });
+      host.press("Equal", { key: "+" });
+      host.press("Equal", { key: "+" });
+      host.press("Equal", { key: "+" });
+      host.press("Minus", { key: "-" });
+      await runFor(engine, host, 100);
+      expect(drawn).toContain("Snoids to practice with = 2");
+      host.click(...GORGES);
+      await runFor(engine, host, 300);
+      expect(entered).toEqual([ScreenId.bridge]);
+      expect(zoombinis.game.group.members).toHaveLength(2);
+    });
+
+    it("mode de test : T (en entraînement) demande le trajet, « e » force le trajet 5 (DS:4180) et demande l'écran 7 par sa transition", async () => {
+      const { host, engine, entered, drawn, zoombinis } = await start((game, session) => {
+        game.options.testMode = true;
+        session.training = 1;
+      });
+      engine.register(ScreenId.xfer, () => ({ enter: () => void entered.push(ScreenId.xfer), leave() {}, tick() {} }));
+      host.press("KeyT", { key: "t" });
+      await runFor(engine, host, 50);
+      expect(drawn).toContain("Which Transition (a-p):");
+      host.press("KeyE", { key: "e" });
+      await runFor(engine, host, 300);
+      expect(entered).toEqual([ScreenId.xfer]);
+      expect(zoombinis.session.forcedTransfer).toBe(5);
+      expect(zoombinis.lastChange).toMatchObject({ screen: ScreenId.xfer, target: ScreenId.bridge, transfer: 5 });
+    });
+
+    it("T hors du mode de test, ou en aventure, ne demande rien ; après T une touche hors de a à p annule", async () => {
+      const off = await start((_game, session) => {
+        session.training = 1;
+      });
+      off.host.press("KeyT", { key: "t" });
+      await runFor(off.engine, off.host, 50);
+      expect(off.drawn).not.toContain("Which Transition (a-p):");
+      const adventure = await start((game) => {
+        game.options.testMode = true;
+      });
+      adventure.host.press("KeyT", { key: "t" });
+      await runFor(adventure.engine, adventure.host, 50);
+      expect(adventure.drawn).not.toContain("Which Transition (a-p):");
+      const t = await start((game, session) => {
+        game.options.testMode = true;
+        session.training = 1;
+      });
+      t.host.press("KeyT", { key: "t" });
+      t.host.press("KeyZ", { key: "z" });
+      await runFor(t.engine, t.host, 300);
+      expect(t.entered).toEqual([]);
+      expect(t.zoombinis.session.forcedTransfer).toBe(0);
+    });
+
+    it("hors du mode de test, + ne fait rien (groupe de 16)", async () => {
+      const { host, engine, drawn, zoombinis } = await start((_game, session) => {
+        session.training = 1;
+      });
+      host.press("Equal", { key: "+" });
+      await runFor(engine, host, 100);
+      expect(drawn.some((text) => text.startsWith("Snoids"))).toBe(false);
+      host.click(...GORGES);
+      await runFor(engine, host, 300);
+      expect(zoombinis.game.group.members).toHaveLength(16);
+    });
   });
 });

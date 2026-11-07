@@ -147,7 +147,7 @@ Prise d'un Zoombini (`0be9`, région 3) : si `a0e0 = 0` et `9702 < 1` et `96f4 =
 
 Protégé contre la ré-entrée (`DS:3bce`). Dans l'ordre :
 
-1. **Sortie demandée** (`8556 ≠ 0`) : attend la fin de la voix en cours (ids 4000–4701 ou 7000–7099 : `a402`) puis dialogue de perte et changement d'écran, comme dans les gorges.
+1. **Sortie demandée** (`8556 ≠ 0`) : attend la fin de la voix en cours (`a402`, le dernier son démarré, s'il est dans 4000–4699 et joue encore : `bVar4`) puis dialogue de perte et changement d'écran, comme dans les gorges.
 2. **Voix d'avertissement** (`a1a0`/`a19e`) : retombée quand le son est fini.
 3. **Réaction d'un gardien en attente** (`a0e6`) : lancée dès que la voix est libre (`11a8:1b89` + `11a8:3533`), rappel `15a2` ou aucun.
 4. **Effondrement** (`a0d2 = 0`) : voir §2.4 ; sinon traitement de la tête de file si aucun script de marche n'est en cours (`a0e4 = 0`) :
@@ -191,7 +191,7 @@ Sons (sûr pour les ids, **probable** pour l'attribution) : `a2c4 = rand(20069..
 Tranchés en H2 (§8) : 1 (géométrie et `a0ce`), 3 (`1190:1aff`, `1190:41e4`), 4 (`a0f4`), 5 (effet de `a0d2 = 0`) ; 2 en grande partie (tables de voix, §8.3). Restent :
 
 1. Raison visuelle de l'exception `a0ce` du niveau 0 (tunnels bouchés ?), non vérifiée en jeu.
-2. Le corps de `1190:2088` pour les phases au-delà de la conversation (aucune connue) et `DS:a19e` / `DS:a402` (voix « en cours » par identifiant de son) : approchés par « aucun effet en cours ».
+2. Le corps de `1190:2088` pour les phases au-delà de la conversation (aucune connue). La « voix en cours » est portée (**sûr**, `1190:06ff`) : `bVar4` = `a402` dans 4000–4699 et encore en cours, `bVar1` = `a402` dans 7000–7099 et encore en cours ; départ d'une marche, réaction de gardien et voix de réussite attendent ni l'un ni l'autre, l'effondrement et la conversation du budget épuisé seulement `bVar4`, l'avertissement retombe à la fin de son id (`a1a0`). Les pas en boucle (8500 / 8503, `\0SND` répétés `0xffff`) ne retiennent donc rien (avant : « aucun effet en cours », la file restait bloquée).
 3. Compaction des places d'attente de `1190:1aff` et drapeau `0x04000000` de `1190:41e4` : non portés (§8.4).
 4. Même aide vocale `0x16f` que les gorges : F1, sans condition (`1190:1199`).
 

@@ -433,6 +433,37 @@ describe.skipIf(!original.has)("gorges : écran sur les vrais fichiers (BRIDGE.M
     await wait(10);
   });
 
+  it("son de marche : un seul canal, deux traversées ne laissent jamais deux sons en boucle (pas, roulettes… : \\0SND 2000 / 2003 répétés 0xffff)", async () => {
+    const { host, probe, drag, accepting, until, byFront, queued } = await start();
+    const audio = host.audio;
+    const playing = () => audio.waves.filter((w) => audio.isWavePlaying(w.handle));
+    let maxPlaying = 0;
+    // Relevé toutes les 10 ticks (pas de `until`).
+    const watch = async (done: () => boolean) => {
+      await until(() => {
+        maxPlaying = Math.max(maxPlaying, playing().length);
+        return done();
+      });
+    };
+    // Pieds 4 et 5 (roulettes, hélice…) : leurs scripts de traversée relancent un son en boucle toutes les deux images.
+    const crossers = byFront()
+      .filter((i) => probe().kit.members[i]!.snoid.traits.feet >= 4)
+      .slice(0, 2);
+    expect(crossers).toHaveLength(2);
+    for (const index of crossers) {
+      const member = probe().kit.members[index]!;
+      await drag(index, BRIDGE_ANCHORS[accepting(index)]);
+      await watch(() => probe().statuses[index] === "crossed");
+      await watch(() => member.snoid.resting);
+    }
+    // Les pas ont bien été joués, en boucle.
+    expect(queued.some((id) => id >= 2000 && id <= 2008)).toBe(true);
+    expect(audio.waves.some((w) => w.loop)).toBe(true);
+    // Jamais plus d'un son à la fois, donc jamais deux boucles superposées.
+    expect(maxPlaying).toBeLessThanOrEqual(1);
+    expect(playing().filter((w) => w.loop).length).toBeLessThanOrEqual(1);
+  });
+
   it("une pose refusée revient : une erreur de plus, le visage éternue, il retourne dans la falaise de gauche et peut être repris", async () => {
     const { probe, drag, accepting, until, byFront, features, wait } = await start();
     const index = byFront().find((i) => accepting(i) === 1)!;

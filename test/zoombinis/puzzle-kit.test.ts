@@ -500,6 +500,26 @@ describe.skipIf(!original.has)("kit des épreuves (H0)", () => {
       expect(zoombinis.game.successes[0]! & 0x10).toBe(0);
     });
 
+    it("« go » : l'écran suit la fin du son 996 même si un pas en boucle d'un Zoombini qui part joue encore (1028:0d9e(996), pas le silence)", async () => {
+      const { host, kit, zoombinis, sound, tickOnce, ticks } = await start({ setup: standing(), spec: { buttons: { go: {} } } });
+      kit().markAll(false);
+      for (const i of [0, 4, 9]) kit().members[i]!.zoombini.present = true;
+      kit().goEnabled = true;
+      host.click(BUTTON_GO.left + 5, BUTTON_GO.top + 5);
+      await tickOnce();
+      expect(kit().departing).toBe(true);
+      // Les scripts de marche des pieds 4 relancent le son 2000 (répété 0xffff) toutes les deux images.
+      let loops = 0;
+      for (let i = 0; i < 600 && !zoombinis.lastChange; i++) {
+        sound.queue(2000);
+        await tickOnce();
+        loops = host.audio.waves.filter((w) => w.loop && host.audio.isWavePlaying(w.handle)).length;
+      }
+      await ticks(1);
+      expect(zoombinis.lastChange).toMatchObject({ screen: S.xfer });
+      expect(loops).toBeLessThanOrEqual(1);
+    });
+
     it("un clic pendant la marche de sortie change d'écran tout de suite", async () => {
       const { host, kit, zoombinis, tickOnce, ticks } = await start({ setup: standing(), spec: { buttons: { go: {} } } });
       kit().goEnabled = true;

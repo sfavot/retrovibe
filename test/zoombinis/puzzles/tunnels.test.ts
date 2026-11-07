@@ -432,6 +432,29 @@ describe.skipIf(!original.has)("écran des grottes de passe-clos (TUNNELS.MHK)",
     expect(zoombinis.game.group.members).toHaveLength(16);
   });
 
+  it("sons de marche en boucle (8500 / 8503, pieds 4 et 5) : ils ne retiennent pas la file, chaque Zoombini posé ensuite monte à son tour", async () => {
+    const { dragTo, right, until, scene, kit, host } = await start(0);
+    const audio = host.audio;
+    const playing = () => audio.waves.filter((w) => audio.isWavePlaying(w.handle));
+    const walkers = kit()
+      .members.map((m, i) => ({ m, i }))
+      .filter(({ m }) => m.snoid.traits.feet >= 4)
+      .map(({ i }) => i)
+      .slice(0, 3);
+    expect(walkers).toHaveLength(3);
+    let maxPlaying = 0;
+    for (const i of walkers) {
+      await dragTo(i, right(i));
+      await until(() => {
+        maxPlaying = Math.max(maxPlaying, playing().length);
+        return scene.debug.statusOf(i) === "arrived" && !scene.debug.busy;
+      });
+    }
+    expect(audio.waves.some((w) => w.loop)).toBe(true);
+    expect(maxPlaying).toBeLessThanOrEqual(1);
+    expect(walkers.every((i) => scene.debug.statusOf(i) === "arrived")).toBe(true);
+  });
+
   it("une mauvaise entrée : le Zoombini part, revient par le script de retour, rejoint une place d'attente et coûte une erreur", async () => {
     const { dragTo, wrong, until, scene, kit } = await start(1);
     const entrance = wrong(0);

@@ -97,9 +97,11 @@ describe("ZoombinisSound : routage et files", () => {
 
   it("route les ids par plage : < 1000 et ≥ 20000 vers ZOOMBINI, 1000…19999 vers l'écran", () => {
     const { sink, sound } = setup();
-    for (const id of [150, 1500, 19999, 20010, 905]) sound.queue(id);
-    expect(sink.played).toHaveLength(0);
-    sound.tick();
+    for (const id of [150, 1500, 19999, 20010, 905]) {
+      sound.queue(id);
+      expect(sink.played).toHaveLength(sink.markers.length);
+      sound.tick();
+    }
     expect(sink.markers).toEqual([0x81, 0x85, 0x86, 0x84, 0x82]);
   });
 
@@ -134,19 +136,77 @@ describe("ZoombinisSound : routage et files", () => {
     sound.queue(30000);
     expect(sound.pending).toEqual({ effects: QUEUE_SIZE, musics: 1 });
     sound.tick();
-    expect(sink.played).toHaveLength(QUEUE_SIZE);
+    expect(sink.played).toHaveLength(1);
     expect(sound.pending).toEqual({ effects: 0, musics: 0 });
     for (let i = 0; i < QUEUE_SIZE + 5; i++) sound.queue(30001);
     expect(sound.pending.musics).toBe(QUEUE_SIZE);
   });
 
-  it("joue dans l'ordre d'arrivée et laisse plusieurs effets sonner ensemble", () => {
+  it("un seul canal : à priorité égale le plus récent l'emporte, les autres ids en file sont perdus, le son en cours est coupé", () => {
     const { sink, sound } = setup();
     sound.queue(905);
     sound.queue(150);
     sound.tick();
-    expect(sink.markers).toEqual([0x82, 0x81]);
-    expect(sound.effectsPlaying).toBe(2);
+    expect(sink.markers).toEqual([0x81]);
+    expect(sound.effectsPlaying).toBe(1);
+    expect(sound.currentEffect).toBe(150);
+    sound.queue(1500);
+    sound.tick();
+    expect(sink.markers).toEqual([0x81, 0x85]);
+    expect(sink.played[0]!.stopped).toBe(true);
+    expect(sound.effectsPlaying).toBe(1);
+    expect(sound.currentEffect).toBe(1500);
+  });
+
+  it("priorités de l'écran (`11a8:313a` / `317c`) : un son plus prioritaire n'est pas coupé et l'emporte dans la file", () => {
+    const { sink, sound } = setup();
+    // Table de base : 996…997 seulement, priorité 32 ; tout le reste vaut 0.
+    expect(sound.priorityOf(999)).toBe(0);
+    expect(sound.priorityOf(996)).toBe(32);
+    sound.setScreenArchive(Object.assign(archive({ [TAG_SND]: { 1500: wave(0x85), 19999: wave(0x86) } }), { name: "TUNNELS.MHK" }));
+    // Grottes (`1190:0107`) : base, puis 20000…29999 (31), 4000…4699 (30) … 8500…8599 (23).
+    expect([sound.priorityOf(996), sound.priorityOf(20010), sound.priorityOf(4000), sound.priorityOf(8503), sound.priorityOf(1500)]).toEqual([32, 31, 30, 23, 0]);
+    sound.queue(20010);
+    sound.queue(150);
+    sound.tick();
+    expect(sink.markers).toEqual([0x84]);
+    // La voix (31) joue : un son de priorité 0 est perdu, elle continue.
+    sound.queue(1500);
+    sound.tick();
+    expect(sink.markers).toEqual([0x84]);
+    expect(sink.played[0]!.stopped).toBe(false);
+    expect(sound.pending.effects).toBe(0);
+    // Elle finit : le suivant passe.
+    sink.played[0]!.stopped = true;
+    sound.queue(1500);
+    sound.tick();
+    expect(sink.markers).toEqual([0x84, 0x85]);
+  });
+
+  it("la ville et le bac vident la table avant d'y poser leurs plages ; un écran inconnu garde la table de base", () => {
+    const { sound } = setup();
+    const named = (name: string) => Object.assign(archive({}), { name });
+    sound.setScreenArchive(named("TOWN.MHK"));
+    expect([sound.priorityOf(3000), sound.priorityOf(20000), sound.priorityOf(996)]).toEqual([32, 31, 30]);
+    sound.setScreenArchive(named("original/zoombinis/bridge.mhk"));
+    expect([sound.priorityOf(996), sound.priorityOf(20000), sound.priorityOf(175)]).toEqual([32, 31, 25]);
+    sound.setScreenArchive(named("LOGO.MHK"));
+    expect([sound.priorityOf(996), sound.priorityOf(20000)]).toEqual([32, 0]);
+    sound.setScreenArchive(null);
+    expect(sound.priorityOf(997)).toBe(32);
+  });
+
+  it("un son en boucle (pas d'un Zoombini) est coupé par le son suivant : jamais deux boucles en même temps", () => {
+    const { sink, sound } = setup();
+    for (let i = 0; i < 6; i++) {
+      sound.queue(999);
+      sound.tick();
+    }
+    expect(sink.played.filter((p) => p.loop && !p.stopped)).toHaveLength(1);
+    sound.queue(150);
+    sound.tick();
+    expect(sink.played.filter((p) => p.loop && !p.stopped)).toHaveLength(0);
+    expect(sound.effectsPlaying).toBe(1);
   });
 
   it("id 0 sur la file musique : rejoue la dernière musique ; sans musique, ne fait rien", () => {
@@ -172,30 +232,27 @@ describe("ZoombinisSound : isPlaying(id)", () => {
     const { sink, sound } = setup();
     expect(sound.isPlaying(150)).toBe(false);
     sound.queue(150);
-    sound.queue(905);
     expect(sound.isPlaying(150)).toBe(true);
     sound.tick();
     expect(sound.isPlaying(150)).toBe(true);
-    expect(sound.isPlaying(905)).toBe(true);
     expect(sound.isPlaying(999)).toBe(false);
-    // Le son 150 finit tout seul, 905 continue.
+    // Le son 150 finit tout seul.
     sink.played[0]!.stopped = true;
     expect(sound.isPlaying(150)).toBe(false);
+    sound.queue(905);
+    sound.tick();
     expect(sound.isPlaying(905)).toBe(true);
     sound.stopEffects();
     expect(sound.isPlaying(905)).toBe(false);
   });
 
-  it("deux lectures du même id : en cours tant qu'il en reste une ; les ids de l'écran et des voix se distinguent", () => {
-    const { sink, sound } = setup();
+  it("les ids de l'écran et des voix se distinguent ; un son coupé par le suivant n'est plus en cours", () => {
+    const { sound } = setup();
     sound.queue(1500);
-    sound.queue(1500);
-    sound.queue(20010);
     sound.tick();
     expect(sound.isPlaying(1500)).toBe(true);
-    sink.played[0]!.stopped = true;
-    expect(sound.isPlaying(1500)).toBe(true);
-    sink.played[1]!.stopped = true;
+    sound.queue(20010);
+    sound.tick();
     expect(sound.isPlaying(1500)).toBe(false);
     expect(sound.isPlaying(20010)).toBe(true);
   });
@@ -261,6 +318,7 @@ describe("ZoombinisSound : drapeaux et arrêts", () => {
   it("boucle un WAVE de répétition 0xffff, pas les autres", () => {
     const { sink, sound } = setup();
     sound.queue(999);
+    sound.tick();
     sound.queue(150);
     sound.tick();
     expect(sink.played.map((p) => p.loop)).toEqual([true, false]);
@@ -365,6 +423,7 @@ describe.runIf(original.has)("ZoombinisSound sur les fichiers originaux", () => 
     expect(id).toBeDefined();
     const voice = zoombini.ids(TAG_SND).find((n) => n >= 20000 && n < 30000)!;
     sound.queue(id);
+    sound.tick();
     sound.queue(voice);
     sound.tick();
     expect(sink.played).toHaveLength(2);

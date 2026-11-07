@@ -30,7 +30,6 @@
  *
  *  - la compaction des places d'attente de `1190:1aff` n'est pas portée : le Zoombini renvoyé prend la première place libre de la liste préférée
  *    (15, 10 à gauche ; 11, 6 à droite), sinon la première libre ; une entrée de file pleine (5) refuse le dépôt au lieu de laisser le Zoombini bloqué ;
- *  - « voix en cours » (`DS:a402`, ids 4000…4701 et 7000…7099) est ici « aucun effet en cours ou en file » : plus large, jamais plus étroit ;
  *  - saisir un Zoombini pendant une phrase la coupe (l'original vide toute la file, Zoombinis en attente compris : défaut non reproduit) ;
  *  - les Zoombinis arrivés ne peuvent pas être repris ;
  *  - `DS:96ec` / `96f0` (règle du pont) sont lus dans la session (`bridgeAvoidCount`, écrite par les gorges) : le filtre du niveau 0 reçoit l'effectif de la règle des gorges.
@@ -348,8 +347,8 @@ export function createTunnelsScene(): TunnelsScene {
   /** `a0fe` : 0 rien, 1 effondrement lancé (phrase du gardien), 2 plafond à lancer, 3 plafond lancé. */
   let collapseStage = 0;
   let collapseDone = false;
-  /** `a19e` : voix d'avertissement en cours. */
-  let warningPlaying = false;
+  /** `a1a0` / `a19e` : voix d'avertissement en cours (son 4700 à 4703), 0 si aucune. */
+  let warningVoice = 0;
   let reaction: Reaction | null = null;
   /** `a1a6` : voix de réussite en attente. */
   let finalVoice = 0;
@@ -394,7 +393,7 @@ export function createTunnelsScene(): TunnelsScene {
         talkToken = 0;
         collapseStage = 0;
         collapseDone = false;
-        warningPlaying = false;
+        warningVoice = 0;
         reaction = null;
         finalVoice = 0;
         danceQuota = 0;
@@ -483,7 +482,7 @@ export function createTunnelsScene(): TunnelsScene {
         kit.goEnabled = canContinue(st, collapseDone);
         // `DS:96f4` : le transport est fini d'office quand le budget est épuisé.
         if (st.budget === 0) kit.endCarry();
-        if (warningPlaying && quiet()) warningPlaying = false;
+        if (warningVoice !== 0 && !ctx.services.get(ZOOMBINIS_SOUND).isPlaying(warningVoice)) warningVoice = 0;
         stepReaction(ctx);
         stepQueue(ctx);
         stepIdle(ctx);
@@ -503,9 +502,24 @@ export function createTunnelsScene(): TunnelsScene {
   // -------------------------------------------------------------------------------------------------------------------------
   // Outils
 
-  /** Plus aucun son en file ni en cours (approximation de « la voix en cours », `DS:a402` : le moteur ne suit pas les ids). */
+  /**
+   * `1190:06ff` : la « voix en cours » est le dernier son démarré (`DS:a402`) s'il joue encore, selon sa plage : 4000 à 4699 (consignes, gardiens :
+   * `bVar4`) ou 7000 à 7099 (`bVar1`). Un pas en boucle d'un Zoombini (8500 à 8508) ou un autre effet ne retient rien.
+   */
+  function speaking(min: number, max: number): boolean {
+    const sound = currentCtx!.services.get(ZOOMBINIS_SOUND);
+    const id = sound.currentEffect;
+    return id >= min && id <= max && sound.isPlaying(id);
+  }
+
+  /** `bVar4` : une voix 4000 à 4699 joue. */
+  function voiceBusy(): boolean {
+    return speaking(4000, 4699);
+  }
+
+  /** Ni `bVar4` ni `bVar1` : aucune voix 4000 à 4699 ni 7000 à 7099 ne joue. */
   function quiet(): boolean {
-    return kit!.soundIdle();
+    return !voiceBusy() && !speaking(7000, 7099);
   }
 
   /** Tirage dans une table de répliques (`1098:0098` sans remise sur la taille de la table). */
@@ -743,11 +757,11 @@ export function createTunnelsScene(): TunnelsScene {
       return;
     }
     if (st.budget === 0) {
-      if (shouldCollapse(st, busy) && quiet()) startCollapse(ctx);
-      else if (!busy && queue[0]?.kind === "talk" && quiet()) stepTalk(ctx, queue[0]);
+      if (shouldCollapse(st, busy) && !voiceBusy()) startCollapse(ctx);
+      else if (!busy && queue[0]?.kind === "talk" && !voiceBusy()) stepTalk(ctx, queue[0]);
       return;
     }
-    if (warningPlaying || busy) return;
+    if (warningVoice !== 0 || busy) return;
     const head = queue[0];
     if (!head) return;
     if (head.kind === "talk") stepTalk(ctx, head);
@@ -849,8 +863,8 @@ export function createTunnelsScene(): TunnelsScene {
   function returned(ctx: SceneContext, entry: WalkEntry): void {
     const { slot, verdict } = entry;
     const { snoid } = slot.member;
-    if (!warningPlaying && entry.warning !== null) {
-      warningPlaying = true;
+    if (warningVoice === 0 && entry.warning !== null) {
+      warningVoice = entry.warning;
       ctx.services.get(ZOOMBINIS_SOUND).queue(entry.warning);
       dropStones(ctx);
     }

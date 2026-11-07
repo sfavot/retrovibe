@@ -446,6 +446,8 @@ export class PuzzleKit {
   private goOn = false;
   /** Fin du départ lancé par `pressGo` (`GoOptions.end`). */
   private goEnd: "sound" | "depart" = "sound";
+  /** Le son 996 du départ a été mis en file (`pressGo` ou `playGoSound`). */
+  private goSoundQueued = false;
   /** Gelé : l'épreuve a changé d'écran, est en train de le faire, ou mène seule un départ (`suspend`). */
   private halted = false;
   /** Bouton à l'image enfoncée, et fin de cette image (0 : tant que le bouton de la souris est tenu). */
@@ -660,7 +662,8 @@ export class PuzzleKit {
     this.runDue();
     if (this.spec.waitAnimations ?? true) for (const member of this.members) if (!member.walking && this.carry?.member !== member) member.snoid.tickWait();
     this.input(this.ctx.input);
-    if (this.departing && this.goEnd === "sound" && this.soundDone()) this.finish("success");
+    // `1028:0d9e(996)` : on attend la fin du « Go » lui-même, pas le silence (un pas en boucle d'un Zoombini qui part ne doit pas bloquer).
+    if (this.departing && this.goEnd === "sound" && this.goSoundQueued && !this.sound.isPlaying(SOUND_GO)) this.finish("success");
   }
 
   /** Lance les départs échus (`+0x24 ≤ maintenant`, `1168:0ba8`), le plus ancien d'abord. */
@@ -1124,9 +1127,11 @@ export class PuzzleKit {
     if (options.saveAll) this.markAll(true);
     const walk = this.spec.exitWalk;
     this.goEnd = options.end ?? "sound";
+    this.goSoundQueued = false;
     if ((options.sound ?? "now") === "now") {
       this.sound.stopEffects();
       this.sound.queue(SOUND_GO);
+      this.goSoundQueued = true;
     }
     this.departing = true;
     if (options.depart) options.depart();
@@ -1139,6 +1144,7 @@ export class PuzzleKit {
   /** Le son de départ 996, quand `pressGo({ sound: "later" })` l'a différé. */
   playGoSound(): void {
     this.sound.queue(SOUND_GO);
+    this.goSoundQueued = true;
   }
 
   /**

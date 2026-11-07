@@ -846,7 +846,8 @@ export function seatOf(play: SlidesPlay, member: number): number {
 
 /**
  * Dépôt d'un membre sur l'emplacement de rang `slot` (`1170:08f5`) : l'emplacement qu'il occupait est libéré, l'occupant éventuel de `slot` est renvoyé
- * à une position d'attente. Renvoie cet occupant déplacé (−1 si aucun).
+ * à une position d'attente. Renvoie cet occupant déplacé (−1 si aucun). L'écran ne l'appelle jamais sur un emplacement pris (`1168:1742` ne retient pas
+ * une cible occupée, voir `slides.md` §9) : le renvoi n'est qu'une garde de cohérence.
  */
 export function place(play: SlidesPlay, member: number, slot: number): number {
   const from = play.seat.indexOf(member);

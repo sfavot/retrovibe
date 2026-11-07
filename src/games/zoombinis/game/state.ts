@@ -211,6 +211,14 @@ export interface Session {
   quitting: boolean;
   /** Nom de la partie enregistrée (null = partie anonyme `ZBUser`). */
   name: string | null;
+  /** `DS:96ec` / `96f0` : règle des gorges laissée aux grottes (`game/route.ts`, `setBridgeMemory`) ; hors du tampon `S`, jamais sauvegardée. */
+  bridgeRule: BridgeRuleMemory | null;
+}
+
+/** Règle des gorges retenue pour les grottes : `DS:96ec` candidate, `DS:96f0` effectif. */
+export interface BridgeRuleMemory {
+  candidate: number;
+  count: number;
 }
 
 export function createSession(): Session {
@@ -225,6 +233,7 @@ export function createSession(): Session {
     leftToMap: false,
     quitting: false,
     name: null,
+    bridgeRule: null,
   };
 }
 

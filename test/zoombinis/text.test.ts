@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Surface } from "../../src/engine/mohawk/graphics/surface";
 import { createZoombinisEngine } from "../../src/games/zoombinis/engine/engine";
 import { FONTS, installText, TextFlags, ZOOMBINIS_TEXT, ZoombinisText, TextStrings } from "../../src/games/zoombinis/engine/text";
@@ -6,6 +6,9 @@ import { ZOOMBINI_SCREEN_NAMES_STRL } from "../../src/games/zoombinis/data/archi
 import { emSize, thresholdAlpha } from "../../src/ui/mohawk/font-raster";
 import { originalFiles } from "../support/original";
 import { FakeText, TestHost } from "./engine-test-host";
+
+// Les écrans simulent des centaines de ticks : 20 s de marge pour une machine chargée.
+vi.setConfig({ testTimeout: 20_000 });
 
 const original = originalFiles("zoombinis", "files.json");
 

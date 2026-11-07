@@ -1,6 +1,6 @@
 /**
  * Textes de l'interface du site (hors textes du jeu, qui viennent de `TEXTSTR.MHK`).
- * ⚠ Copy à valider : regroupée pour être relue et ajustée en un seul endroit.
+ * Copy validée, regroupée pour être relue et ajustée en un seul endroit.
  */
 export const copy = {
   title: "L'Odyssée des Zoombinis",

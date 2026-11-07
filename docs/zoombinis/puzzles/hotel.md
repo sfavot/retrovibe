@@ -187,7 +187,9 @@ Garde `[132a] == 0` et `[74a4] ≠ 0`. Dans l'ordre : pompe `11a8:04b9` ; sortie
 - Groupe courant reconstruit par `1168:36e1` : attributs inchangés (les objets reprennent les octets d'origine), fiche[8] = 1 pour les rangés, 0 sinon.
 - Progression : `S+0x5D |= 1 << niveau` ; si aucun perdu : `S+0x5D |= 0x10 << niveau` ; perdus rendus au camp 1 (`S+0x4A`). Le monument et le passage de niveau se font à l'écran 15.
 
-## 7. Points ouverts
+## 7. Points ouverts (état avant H10)
+
+Les six points ci-dessous étaient ouverts à l'étude (T8) ; la tâche H10 les a relus sur le corpus et tranchés, voir § 8. Le texte est laissé tel qu'il était pour garder la trace de ce qui a été corrigé.
 
 1. Niveau 2 : la première pose étant « gratuite » (`[74ca] = 1` à tous les niveaux), il faut vérifier en jeu si les étiquettes pré-établies sont écrasées (peut-être que `[74ca]` est remis à 0 par la relance `10e8:12f6` au niveau 2).
 2. Coordonnées des chambres et du hall (les tables de `11a8:0ed9`) ; ordre exact des emplacements 1…25 / 1…125 (`D74c4`) ; chaîne `SCRB` complète de chaque réaction.
@@ -195,3 +197,47 @@ Garde `[132a] == 0` et `[74a4] ≠ 0`. Dans l'ordre : pompe `11a8:04b9` ; sortie
 4. Écart exact « fond de niveau » (tBMP 5000 / 5001 / 5002) ; rôle de `[74c6] == 2` (niveau 1).
 5. Sort des Zoombinis déjà rangés en cas d'échec : tous sauvés si acceptés avant la défaite (cohérent avec `+0x127`), non testé.
 6. Détail du nombre d'erreurs : `[74ee]` dépend de la complétion de l'introduction ; confirmer en jeu les seuils 7 / 10 / 8 / 10.
+
+## 8. Relecture et écran (tâche H10)
+
+Règles : `src/games/zoombinis/game/puzzles/hotel.ts` ; écran : `src/games/zoombinis/scenes/puzzles/hotel.ts` (fabrique `createHotelScene`) ; tests : `test/zoombinis/puzzles/hotel.test.ts`. Tables de données lues dans les segments du module (`1428` : tableaux de travail et coordonnées, `1438` : places du hall) extraits de `ZOOMBINI._EX`. Confiance : **sûr** (code lu), **probable** (déduit d'un usage), signalés.
+
+### 8.1 Corrections de l'étude
+
+- **Le « personnage guide » est un coucou** (`SCRB 6000 à 6012`, en haut à gauche, niveaux 0 à 2) : `6000` le fait descendre, `6000 + n` marque le cran `n` (la forme `34@48` va de 2 à 13), `6012` est le coucou final (voix 6006). Les « répliques » de l'étude sont ces crans, pas des paroles. Le personnage qui parle est l'**écureuil du portier** : `SCRB 7000 à 7006` (introductions), `7500 à 7502` (explications), `7503 à 7506` (défaite), `7507 à 7509` (victoire) ; `7007 à 7010` ne contiennent que des sons (formes vides). **Sûr** pour les ids et les appels, **probable** pour leur rôle (rendu relu image par image).
+- **Niveau 3, voix de défaite** : `10e8:11a6` tire `rand(0..3)` mais pousse la constante `0x1d4c` : le son joué est **7500**, pas `7503` à `7505`. **Sûr.**
+- **`SCRB 6000 à 6087`** : 6013 + r = **portes** (4 images, `17…20`, son 6007 / 6008), 6038 + r = **étagères** qui basculent au refus (50 images, événement 11), 6063 + r = étagères **repliées** (7 images) jouées par `3ace` à la défaite et à la réussite. L'étude disait « lampes ». Au niveau 3 : portes `9002 + r mod 5`, étagères `9007 + r mod 5` ; `9000` et `9001` ne sont lus par aucun code (restes). `10000 + r` (niveau 3 : `10025 + r`) : socles de dépôt, dessinés après tout le reste.
+- **Refus** : `SCRS 13000 + r` (29 images, délai 3, le Zoombini rebondit de 16 pixels à gauche) puis, à son événement de fin (`10e8:349f`), `SCRS 14000 + r` (21 images) ancré de façon à finir en `(x chambre − 23, 410 + 5·⌊r / 5⌋)` ; au niveau 3 `13025 + r mod 5`, puis `14025 + r mod 25` finissant en `(x − 15, 410 + 5·⌊r / 25⌋)`. Les Zoombinis qui se trouvent à ±20 pixels de l'atterrissage entre `y = 400` et `440` sont écartés (`10e8:3bae`). **Sûr.**
+- **Acceptation** : `SCRS 13030 + 5·g + (pieds − 1)` avec `g` = 0, 1, 2 selon `r < 10`, `r < 15`, sinon (niveaux 0 à 2) ; `13045 + 5·(r mod 5) + pieds − 1` au niveau 3 (ancré, il finit en `(x + 5, y − 15)`). Le Zoombini est ensuite posé en `(757a, 757c)` : formule de `10e8:3620` (pile 0 ou `% 3 == 1` : `x − 8`, `% 3 == 2` : `x − 1`, sinon `x + 6`, `y = pile + (y chambre − 9) − 1` ; niveau 3 : `(x + 5 − 2·(pile − 1), y − 17 − (pile − 1))`). Le premier de la chambre ouvre sa porte ; la pile compte de 0 puis 2 à 6. **Sûr.**
+- **Arrivée du groupe** : l'`Enter` copie 20 points de `DS:12d6` (ligne d'attente de la scénette d'entrée) ; après la relance, `10e8:0ad5` donne 16 places au bas de l'écran (`1438:000a`, de `(504, 458)` à `(17, 453)`). Aucun appel à `1168:2505` / `274e` : **les Zoombinis sont debout, sans entrée à pied.** **Sûr.**
+- **Boutons** : planche `tBMP 8000` (go 1 / 2 / 3, carte 5 / 6), dessinés à la relance (`10e8:0cc4`), comme les autres épreuves.
+- **Voix d'aide** `DS:a2c4 = 0x4e71` (20081), rejouée par F1.
+
+### 8.2 Les six points ouverts, tranchés
+
+1. **Étiquettes du niveau 2 et `[74ca]`** : à la fin de `10e8:1896`, `11c8:6a5c` remet à zéro `1428:0316` et `0348` (`10e8:1cc4` à `1cd4`) : **les étiquettes pré-établies sont effacées**. Elles ne servent qu'à désigner les chambres **bloquées** (celles où aucun Zoombini du groupe n'irait dans cette disposition cachée) ; le joueur apprend les étiquettes à la volée comme au niveau 1, et la première pose gratuite n'écrase rien. Les chambres bloquées sont dessinées sur le plan de la palissade pendant la scénette d'entrée (`SCRB 11000 + dessin` aux points de `REGS 11000` / `11001`) puis, à la relance, sur leur porte (`SCRB 11004 + dessin`, `REGS 11004` / `11005`). Le j-ième dessin tiré va à la j-ième chambre bloquée **dans l'ordre des chambres** (et non dans celui du tirage : `local_6` de `12f6`). Une disposition cachée valide existe toujours (le robot l'utilise). **Sûr.** Ordre des tirages : `A`, `B`, `C` jusqu'à acceptation ; pour chacune des 5 colonnes, `rand(0..4)` rejeté si pris, pour la colonne puis la ligne ; `rand(0..cand − 1)` pour le nombre (`min(8, … + 1, cand)`) ; pour chaque chambre, `rand(0..cand − 1)` rejeté si déjà bloquée, puis `rand(0..3)` pour le dessin.
+2. **Coordonnées** : `1428:0388` (25 chambres) et `1428:03f0` (125) sont des données initiales du segment `1428` (`ROOM_POINTS_25`, `ROOM_POINTS_125`, copiées dans `hotel.ts`) : les chambres 0 à 4 forment la colonne de gauche de haut en bas (`r mod 5` = rangée, `⌊r / 5⌋` = colonne de l'écran) ; au niveau 3 `r mod 5` est l'abscisse dans le bloc, `⌊(r mod 25) / 5⌋` la rangée et `⌊r / 25⌋` le bloc. Niveau 0 : seules les chambres 4, 9, 14, 19, 24 de la table (la rangée du bas). Carré de prise : 25 pixels (`DS:9706` 15 + 10) aux niveaux 0 à 2, 10 au niveau 3. Portes et étagères du niveau 3 : `REGS 9000`–`9003` (`[⌊r / 5⌋ + 1]`) plus les décalages de colonne `DS:132c` / `1336` et `1438:0000`. **Sûr.**
+3. **`[74ae]` et `S+0x3A`** : `S+0x3A` est le **compteur de visites** de l'écran 14 (mémoire de dialogue, 12 bits, déjà compté par `1168:5c57`, que `dialogChoice` porte) : aucun octet du tampon à ajouter à l'état. Niveau 0 : `[74ae] = 0` à la première visite (compteur ≤ 1), sinon `rand(0..2) + 1` ; niveaux 1 à 3 : 4, 5, 6. C'est le numéro de la scénette d'entrée (`SCRB 7000 + [74ae]`). Après la relance, une scénette d'explication `SCRB 7500 + niveau` joue pour `[74ae] == 0` (aussitôt), `== 4` (après 180 ticks) et `== 5` (aussitôt) ; la partie (cadran, musique) commence quand elle finit ou qu'un clic l'abandonne. **Sûr** pour le calcul, **probable** pour l'enchaînement exact (minuteur `[7508]`, drapeau `[74b0]`).
+4. **Fonds** : l'`Enter` charge toujours 5000 (la forêt et la palissade, avec l'avant-plan `SCRB 11500 + {0, 1, 1, 2}` et la bande `11800`) ; la relance recharge 5001 aux niveaux 0 à 2 et 5002 au niveau 3 (`10e8:09c1` : `0x1388 + DI`). `[74c6]` n'est écrit qu'à `10e8:3e78` (3) et à l'`Enter` (0) : `[74c6] == 2` n'est jamais vrai, `10e8:3e14` est du **code mort**. **Sûr.** Les avant-plans percés `SCRB 11503` (niveaux 1 et 2), `11504` (niveau 0), `11505` (niveau 3) sont des murs de tronc découpés aux portes : le Zoombini rangé n'est visible que dans l'ouverture de sa porte.
+5. **Sort des rangés en cas d'échec** : `+0x127` est posé à l'acceptation et seuls les objets à zéro sont perdus par `1168:36e1` : **les rangés restent sauvés**, les autres sont perdus (rendus au camp 1). **Sûr.**
+6. **Seuils** : `[74ee]` est mis à `F` par la première pose (`10e8:1cea`), quoi qu'ait fait l'introduction ; chaque refus l'incrémente (`10e8:10ce` / `10fd`) et la défaite est à `[74ee] ≥ 12` (`10e8:116b`) : **7, 10, 8, 10 refus**. L'introduction du cadran joue `6001 … 6000 + F` et laisse `[74ee]` à `F + 1`, sans effet puisque la première pose le remet à `F`. **Sûr.**
+
+### 8.3 Déroulé complet porté
+
+Voir l'en-tête de `scenes/puzzles/hotel.ts` : entrée (5000 + scénette), relance (5001 / 5002, groupe debout, chambres dans l'ordre de `12f6`), explication, cadran et musique `30020 + niveau`, pose, fin (réussite : voix 175 à 198 puis, niveaux 0 à 2, étagères repliées et `SCRB 7507 + rand(0..2)` ; défaite : coucou `6012`, voix 6006, étagères repliées, `SCRB 7503 + rand(0..3)` ; niveau 3 : 60 ticks puis le son 7500), « go » actif dès un rangé.
+
+### 8.4 Écarts
+
+- le groupe n'est créé qu'à la relance (l'original le crée dès l'entrée sur 20 places du hall, `DS:12d6`) ;
+- le rectangle de découpe d'un Zoombini rangé (`+0xe4`, événement 15) n'est pas porté : l'avant-plan percé suffit ;
+- un Zoombini déjà rangé n'est pas reprenable (l'original le laisse déplacer, sans effet sur la chambre) ;
+- un dépôt sur une chambre bloquée renvoie le Zoombini sur sa place (l'original l'annule sans le déplacer) ;
+- le survol des socles (images 1 et 2 de `10000 + r`, `DS:9708`) n'est pas porté ;
+- les clics pendant l'animation de refus ou d'acceptation sont ignorés jusqu'à sa fin (l'original ne retarde que le traitement) ;
+- l'attente de défaite (`1090:00c1`, 60 ticks) est un délai de la scène ;
+- le tirage inutile du niveau 3 (`rand(0..3)` avant le son 7500) est conservé ;
+- ordre des tirages : la variante `[74ae]` (`10e8:0425`, niveau 0), puis `1896`, puis, en cours de partie, ceux des scénettes : respecté ; le `rand(0..3)` de `10e8:0846` (à chaque fin de cran) est omis.
+
+### 8.5 Copy
+
+Aucun texte visible : l'épreuve ne contient que des images et des voix de l'original.

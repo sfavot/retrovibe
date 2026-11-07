@@ -22,6 +22,9 @@ import { createSnoid, snoidAssets, type Snoid } from "../../src/games/zoombinis/
 import { originalFiles } from "../support/original";
 import { runFor, TestHost } from "./engine-test-host";
 
+// Les écrans simulent des centaines de ticks : 20 s de marge pour une machine chargée.
+vi.setConfig({ testTimeout: 20_000 });
+
 const original = originalFiles("zoombinis", "files.json");
 
 /** Un tick de 17 ms (le simulateur tourne à 60 Hz : on avance image par image et on lit l'horloge du moteur). */

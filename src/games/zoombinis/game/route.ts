@@ -2,6 +2,7 @@ import type { MsvcRandom } from "../../../engine/mohawk/rng";
 import { ScreenId } from "../engine/scene";
 import {
   type GameDate,
+  type BridgeRuleMemory,
   type GameState,
   type GroupBuffer,
   type Monument,
@@ -379,6 +380,26 @@ export function mapClick(game: GameState, session: Session, place: number): MapC
 export function enterTraining(session: Session, level: number): void {
   if (!Number.isInteger(level) || level < 0 || level > 3) throw new RangeError(`enterTraining : niveau ${level} hors de 0 à 3`);
   session.training = level + 1;
+}
+
+/*
+ * Règle des gorges laissée pour les grottes (`DS:96ec` candidate, `DS:96f0` effectif) : variables du programme, hors du tampon de partie `S` (adresses
+ * de la zone de données, jamais écrites par la sauvegarde) ; gardées dans la session (`session.bridgeRule`).
+ */
+
+/** Écrit la mémoire du niveau 0 : `10c0:131a` la remet à 0 à chaque tirage puis la renseigne au niveau 0 si une seule candidate avait l'effectif retenu (`null` sinon). */
+export function setBridgeMemory(session: Session, memory: BridgeRuleMemory | null): void {
+  session.bridgeRule = memory;
+}
+
+/**
+ * Effectif à éviter au niveau 0 des grottes (`avoidCount` de `drawRules`, `1190:2748`) : `DS:96f0` quand `DS:96ec` et `DS:96f0` sont non nuls, sinon 0.
+ * `1190:0000` remet les deux à 0 en entraînement (`DS:96f2 ≠ 0`) : la mémoire est alors effacée et rien n'est évité.
+ */
+export function bridgeAvoidCount(session: Session): number {
+  if (session.training !== 0) session.bridgeRule = null;
+  const memory = session.bridgeRule;
+  return memory && memory.candidate !== 0 && memory.count !== 0 ? memory.count : 0;
 }
 
 /** `1110:0dd4` : retour en aventure. */

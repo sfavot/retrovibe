@@ -5,6 +5,7 @@ import {
   FIRST_PUZZLE,
   MAP_PLACE_SCREEN,
   TRANSFER_ROUTES,
+  bridgeAvoidCount,
   changeScreen,
   currentLevel,
   enterTraining,
@@ -16,6 +17,7 @@ import {
   nextScreen,
   placeActivation,
   resumeScreen,
+  setBridgeMemory,
   stageOf,
   transferId,
 } from "../../src/games/zoombinis/game/route";
@@ -191,6 +193,29 @@ describe("changement d'écran (1108:0000)", () => {
     expect(changeScreen(game, session, S.bridge)).toEqual({ screen: S.bridge, target: null, transfer: null });
     expect(game.previousScreen).toBe(S.xfer);
     expect(game.stageUnbroken).toBe(true);
+  });
+
+  it("règle des gorges laissée aux grottes (DS:96ec / 96f0) : mémoire par session, hors sauvegarde, effacée en entraînement", () => {
+    const session = createSession();
+    expect(bridgeAvoidCount(session)).toBe(0);
+    setBridgeMemory(session, { candidate: 0x0200, count: 7 });
+    expect(bridgeAvoidCount(session)).toBe(7);
+    // Une autre session ne la voit pas ; la partie ne la contient pas.
+    expect(bridgeAvoidCount(createSession())).toBe(0);
+    expect(JSON.stringify(newGame())).not.toContain("candidate");
+    // `DS:96ec` ou `DS:96f0` nul : rien à éviter.
+    setBridgeMemory(session, { candidate: 0, count: 7 });
+    expect(bridgeAvoidCount(session)).toBe(0);
+    setBridgeMemory(session, { candidate: 0x0200, count: 0 });
+    expect(bridgeAvoidCount(session)).toBe(0);
+    setBridgeMemory(session, null);
+    expect(bridgeAvoidCount(session)).toBe(0);
+    // `1190:0000` : en entraînement les deux sont remises à 0, et le restent au retour en aventure.
+    setBridgeMemory(session, { candidate: 0x0200, count: 7 });
+    session.training = 2;
+    expect(bridgeAvoidCount(session)).toBe(0);
+    session.training = 0;
+    expect(bridgeAvoidCount(session)).toBe(0);
   });
 
   it("pas de transition : vers la carte, depuis la carte / la ville, option, reprise", () => {

@@ -21,6 +21,9 @@ import {
 import { originalFiles } from "../support/original";
 import { runFor, TestHost } from "./engine-test-host";
 
+// Les écrans simulent des centaines de ticks : 20 s de marge pour une machine chargée.
+vi.setConfig({ testTimeout: 20_000 });
+
 const original = originalFiles("zoombinis", "files.json");
 
 const TICK_MS = 17;

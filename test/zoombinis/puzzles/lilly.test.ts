@@ -190,12 +190,31 @@ describe("dépôt, pas et arrivée (étang fait à la main)", () => {
   it("refuse un dépôt quand tous les jetons sont lancés", () => {
     const state = corridor();
     const toad = toadB0(state);
-    for (let i = 0; i < 3; i++) {
+    // Un crapaud de valeur 0 de plus, pour dépasser ses deux traversées : tous les nénuphars de la colonne 0 valent B = 3 sauf la rangée 5.
+    for (let i = 0; i < 2; i++) {
       expect(drop(state, toad.index, 5)).toBe(true);
       runToads(state);
     }
-    expect(state.launched).toBe(3);
+    expect(state.launched).toBe(2);
+    state.group = 2;
     expect(drop(state, toad.index, 5)).toBe(false);
+  });
+
+  it("un crapaud ne fait que deux traversées : après la deuxième il est sorti et ne peut plus être déposé (10f8:3c03, 3614)", () => {
+    const state = createLilly(new MsvcRandom(1), 0, 4, synthetic());
+    handPond(state, Array.from({ length: 12 }, (_, col) => ({ col, row: 5 })));
+    const toad = toadB0(state);
+    expect(drop(state, toad.index, 5)).toBe(true);
+    runToads(state);
+    expect(toad).toMatchObject({ trips: 1, active: false, retired: false, listed: true });
+    expect(canDrop(state, toad.index, 5)).toBe(true);
+    expect(drop(state, toad.index, 5)).toBe(true);
+    runToads(state);
+    expect(toad).toMatchObject({ trips: 2, active: false, retired: true, listed: false });
+    expect(canDrop(state, toad.index, 5)).toBe(false);
+    expect(drop(state, toad.index, 5)).toBe(false);
+    expect(state.saved).toEqual([true, true, false, false]);
+    expect(state.arrivals).toBe(2);
   });
 
   it("le crapaud traverse le couloir pas à pas : 11 sauts à droite, puis la sortie", () => {
@@ -486,6 +505,19 @@ describe("robot (gabarits synthétiques)", () => {
         expect(outcome(state)).toMatchObject({ saved: n, lost: 0 });
         expect(state.launched).toBe(n);
       }
+  });
+
+  it("n'utilise jamais un crapaud plus de deux fois : 16 Zoombinis demandent 8 crapauds au moins", () => {
+    for (let seed = 1; seed <= 6; seed++) {
+      const state = createLilly(new MsvcRandom(seed), 0, 16, synthetic());
+      const plan = planLilly(state);
+      const uses = new Map<number, number>();
+      for (const move of plan) if (move.kind === "drop") uses.set(move.toad, (uses.get(move.toad) ?? 0) + 1);
+      expect(Math.max(...uses.values())).toBe(2);
+      expect(uses.size).toBe(8);
+      playPlan(state, plan);
+      expect(outcome(state)).toMatchObject({ saved: 16, lost: 0 });
+    }
   });
 
   it("ne modifie pas l'état qu'on lui donne", () => {

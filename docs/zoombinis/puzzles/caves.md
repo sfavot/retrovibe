@@ -200,11 +200,47 @@ Rien de propre à l'épreuve. Exit `10c8:0945` : `11b8:00e8(1)`, `11a8:021c` (qu
 
 ## 7. Points ouverts
 
-1. Le test des 11 rectangles du sol (`DS:0d0a`) : qu'un dépôt sur le sol laisse le Zoombini « libre » (et qu'il soit ensuite repris) est lu dans `10c8:130f` mais n'a pas été vérifié visuellement ; l'effet de `[724a]` (pile de positions) est supposé.
+1. ~~Le test des 11 rectangles du sol (`DS:0d0a`)~~ : **tranché en H12**, voir §8.1 (rectangles relevés dans le segment de données, rôle de `[724a]`).
 2. Correspondance exacte attribut ↔ nom (cheveux, yeux, nez, pieds) et ↔ images de `tBMP 10000` : l'indice `valeur + 5 × attribut` est établi, pas le nom des attributs (hypothèse commune à toutes les épreuves).
 3. Le détail visuel des scripts `8200 + …` (qui fait quoi à chaque image) et le rôle exact des `SCRS 12004` / `12005` pendant le rejet.
-4. Une pose correcte déclenche-t-elle un son ? Aucun id n'a été relevé dans `10c8:130f` ; seul le rejet en joue (probable).
+4. ~~Une pose correcte déclenche-t-elle un son ?~~ : **tranché en H12**, non, voir §8.2.
 5. Les `SCRB 6000–6012` ne sont pas tous référencés depuis `Enter` (le lion de départ `6003` n'apparaît que par `[0c08]`) ; `SCRS 12000–12003`, `12008–12011`, `tBMP 8000`, `tBMP 8400` et `REGS 202` sont des restes (voir §1).
 6. Comportement si la valeur d'un attribut vaut 0 ou plus de 5 (jamais produit en jeu).
 7. `10c8:2d1c` (affichage de débogage) et la table de touches `DS:1eff` non détaillées.
 8. Cohérence du nombre d'exemplaires : au plus 2 Zoombinis identiques dans un groupe (`screens.md` §2.2) ; le tirage n'en dépend pas.
+
+## 8. Tâche H12 : points tranchés, corrections et écarts du port
+
+Code : `game/puzzles/caves.ts` (règles), `scenes/puzzles/caves.ts` (écran, `createCavesScene()`), tests `test/zoombinis/puzzles/caves.test.ts`. Les tables de données ci-dessous ont été lues dans le segment de données de `ZOOMBINI.EXE` (segment 167 du NE, `DS = 1530`), pas dans la décompilation.
+
+### 8.1 Point 1 : dépôt sur le sol (tranché, **sûr**)
+
+- Les 12 rectangles `DS:0d02 + 8i` (`i = 0 … 11`, gauche / haut / droite / bas, bornes comprises, point = pieds du Zoombini, `11d8:0000`) : le rectangle 0 est **nul** `(0,0,0,0)` (jamais touché), les 11 autres dessinent l'escalier du sol de gauche : `(0,0,195,130)`, `(0,128,175,147)`, `(0,146,155,165)`, `(0,164,135,191)`, `(0,190,120,214)`, `(0,213,100,236)`, `(0,235,87,250)`, `(0,249,67,269)`, `(0,268,40,289)`, `(0,288,27,357)`, `(0,356,36,394)`. Le test s'arrête au premier rectangle touché ; l'indice 0 ne se confond donc avec aucun succès. Les 20 places d'attente du groupe (`DS:0d62`, `11a8:0ed9(1, 0d62, 20)`) sont toutes dans ces rectangles.
+- Dans un rectangle : aucune action, le Zoombini reste où il est lâché, libre (sans place) ; il peut être repris tant qu'il n'est pas posé (la condition de saisie ne regarde que les emplacements de dalle `[717a + 2s]`).
+- Hors rectangle (gouffre) : verrou `[0bf8]`, `[7228]` = son identifiant (donc `[7102]` occupé), la position d'origine est empilée (`[724a + 4 × [729a]]`, une seule entrée à la fois puisque le verrou interdit une deuxième prise) et `10c8:0e74(2)` joue `SCRS` 12012 (chute, voix à l'image 1, événement 10 à la fin) puis, par `10c8:1137` cas 10, `SCRS` 12013 **qui finit sur la position dépilée** (retour d'où il a été pris : place d'attente ou point du sol), événement 0x14 à la fin : `[7102] = 0`, `[0bf8] = ([0c0c] == [0c0a])`. Aucune pénalité, aucun cran. Port : la pile est la position d'origine du kit (`DropInfo.origin`), `onDropOutside` renvoie la place quittée pour qu'il la retrouve.
+
+### 8.2 Point 4 : son d'une pose juste (tranché, **sûr**)
+
+Aucun. La branche « dalle valable » de `10c8:130f` ne contient aucun appel à `11a0:0ee7`, sauf la voix de réussite quand `[0c16] == [0c1c]` (tout le groupe posé) ; `1168:1742`, `1168:166e`, `1168:1647` et `11a8:2a0a` n'en contiennent pas non plus, et les `SCRS` 13000 à 13004 (le pas sur place) n'ont aucun terminateur de son. Les sons de l'épreuve sont ceux des scripts : retournement des dalles (`SCRB` 8200 à 8204), lion (6000 à 6008), voix du Zoombini aux `SCRS` 12005 (image 10), 12012 (image 1) et 12013 (image 7).
+
+### 8.3 Corrections à l'étude (lues en relisant `10c8:0e74`, `10c8:0000`, `10c8:09a6`)
+
+- **Qui joue quoi pendant un rejet** : les phases 0 et 1 de `10c8:0e74` ne touchent pas le Zoombini mais les features des **dalles allumées** `[71f8 + 2s]` (`[7168]` pour la dalle lâchée, `[716a]` pour la dalle valable) : elles reçoivent `SCRB` `8200 + 4(s − 1)` et `+ 2` (la poussière `+ 1` / `+ 3` est une feature créée derrière le Zoombini, `11a8:1f5c`). Leurs rappels (`10c8:1137`) font jouer les `SCRS` au Zoombini : événement 1 (image 1 du retournement de la dalle lâchée) → `SCRS` 12004 (rebond, depuis sa position, `10c8:10d1(1, …)`, sans destination) ; événement 5 (dernière image) → phase 2 ; événement 2 (image 1 du retournement de la dalle valable) → `SCRS` 12005 (`10c8:10d1(0, …)`, **destination = ancre de la dalle valable**, `[716e]` posé par `10c8:27a6`). Le Zoombini n'est donc pas « sous » une dalle : 12004 finit sur une image vide, 12005 commence par cinq images vides, puis il ressort sur la dalle valable avec des étoiles.
+- **Dalles allumées** : `[71f8 + 2s]` n'existe que pour les dalles 5 à 20 (les dalles 12 à 15 sont aux adresses `DS:7210` à `7216`, créées hors boucle) ; les dalles 1 à 4 n'en ont pas, ce qui concorde avec leur remplissage (§2.1). Le script allumé `9000 + s − 1` a deux images (dalle, image vide) : après le rejet (`10c8:09a6`, étape 3, `[7222]`) les deux dalles jouent leur script allumé : un éclair d'une image, pas un état durable.
+- **Remplissage** : l'objet `[71f8]` joue `SCRB` `9024 + [0c1e]` (tBMP 9025, images 1 à 4 de 186×79, 159×73, 108×74, 66×67, des plaques de sol sombre posées sur les `[0c1e]` premières dalles, à partir de `(223, 127)`) ; `10c8:0000` écrit cet objet dans `[02f0 + 2i]`, la table de **propriétaires des cibles** : les dalles de remplissage ne sont donc jamais libres pour le glisser-déposer (le port ne les met pas dans les cibles du kit ; une dalle déjà occupée n'est pas non plus une cible libre, la branche « dalle occupée » de `10c8:2635` n'est atteinte que par les tests de règles).
+- **Pas sur place à la pose juste** : `[7224]` empile le Zoombini posé et le Tick lui fait jouer `SCRS` 12999 + pieds (13000 à 13004) vers `[7176]` = l'ancre de **sa propre dalle** (le Zoombini est déjà posé là par l'état 4 du glisser-déposer) : le script n'a aucun déplacement (première et dernière images identiques), c'est un pas sur place. **Le dernier Zoombini posé n'est pas empilé** (`else if ([0c16] == [0c1c])`, qui lance la voix, saute l'empilement), probable défaut de l'original, reproduit. Variante d'attente `+0xf1` (`DS:0dba + 2s`) et sens `+0xf2` (`DS:0de4 + 2s`) de la dalle : `[2, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 1]` et tournées à gauche pour les dalles 5, 6, 7, 17, 18, 19 (le chemin y descend vers la gauche).
+- **Sortie** : `[7100] == 0` au « go » → `[70fe]` : le Tick attend `[7102] == 0` (fin d'un rejet ou d'une chute) puis joue `SCRB` 6002 sur la tête `[722e]` (événement 10 → `[7100] = 2`), **puis seulement** le son 996 et le départ (`10c8:16c2`, 30 ticks d'écart, de la dalle 20 à la dalle 1, trois au plus lancés explicitement). Le son 996 n'est donc pas joué au clic. Tout clic sur l'écran pendant que `[8556] ≠ 0` quitte tout de suite (`10c8:130f`, branche `else`).
+- **Hiéroglyphes** (`10c8:18df`) : l'image est centrée sur l'abscisse de l'emplacement (`x − largeur / 2`), son ordonnée est `y[k] − REGS201[k]` avec `k` = **l'emplacement** (1 à 10), non le numéro d'image (**probable** : c'est ce que le code lit ; les valeurs, de 6 à 9, ne changent que de quelques pixels). `REGS 200` est chargé mais jamais lu. Éclat du niveau 1 (`[70fa]`, Tick étape 4) : onze redessins à 30 ticks d'écart (`[70fa]` : 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6) de la région `DS:0db2` `(314, 24)-(436, 102)` ; l'étude disait « trois » ; ce que `10c8:1a1f` (rappel de dessin, non désassemblé) dessine à chaque redessin n'est pas établi.
+- **Boutons** : régions carte `(589, 392)-(628, 429)` et « go » `(589, 430)-(628, 467)` ; images de `tBMP` 11000 (carte 5 / 6, « go » 1 grisé / 2 / 3) dessinées en haut à gauche de la région.
+- **Fond** : `tBMP` / `SHPL` 5000 (pas 1000). Groupes de formes dans l'ordre : 6000 (`SCRB` 6000 à 6012), 9000, 7000, 8200, 9025.
+
+### 8.4 Écarts du port (voir aussi l'en-tête de `scenes/puzzles/caves.ts`)
+
+- **Rayon de prise des dalles** : 15 (`DS:9706` par défaut, l'épreuve ne le règle pas) ; **probable** : l'original utilise peut-être le polygone de la région 3.
+- **Ordre de dessin** : le retournement est joué par une feature propre (profondeur 0,5) au-dessus de la dalle, qui est masquée pendant l'animation (la première et la dernière image du script sont la dalle au repos) ; le remplissage est dessiné **au-dessus** des dalles (l'original le crée avant elles) ; ordre des Zoombinis arrivés par ordonnée.
+- **Poussière et rattachement** : la poussière est une feature indépendante ; les objets d'accroche des dalles (script 6000, rappels `10c8:18c7` / `18d3`, `11a8:2a0a`) et `11a8:1f5c` ne sont pas portés.
+- **Pose juste** : le Zoombini est posé d'un coup sur l'ancre (état 4 du kit) puis joue son pas sur place ; la marche de l'original sur la distance de dépôt (au plus 15 pixels) n'est pas portée.
+- **Danse de victoire** : tirage sans remise par `NoRepeatPool` (l'original : `1098:0098` avec le masque `[7238]` et `DS:[2i]`, dont l'indexation est ambiguë) ; **probable**.
+- **Éclat du niveau 1** et voix attendue `0x4e44` avant la sortie : non portés. Touches de débogage : non portées.
+- **Aucun texte** : les consignes sont des voix de l'original ; aucune copy à valider.
+

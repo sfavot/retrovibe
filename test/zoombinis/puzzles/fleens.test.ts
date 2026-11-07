@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MohawkArchive } from "../../../src/data/mohawk/mohawk";
 import { MsvcRandom } from "../../../src/engine/mohawk/rng";
 import { parseRegs } from "../../../src/games/zoombinis/data/regs";
@@ -26,6 +26,9 @@ import {
 } from "../../../src/games/zoombinis/game/puzzles/fleens";
 import { type Zoombini, makeZoombini } from "../../../src/games/zoombinis/game/state";
 import { originalFiles } from "../../support/original";
+
+// Le robot explore les mondes possibles sur 48 parties : 20 s de marge pour une machine chargée.
+vi.setConfig({ testTimeout: 20_000 });
 
 const original = originalFiles("zoombinis", "files.json");
 

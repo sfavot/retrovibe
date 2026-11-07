@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ZOOMBINI_SCREENS, screenInfo } from "../../src/games/zoombinis/data/archives";
 import { DIALOG } from "../../src/games/zoombinis/engine/dialog";
 import { createZoombinisEngine } from "../../src/games/zoombinis/engine/engine";
@@ -16,6 +16,9 @@ import { ZOOMBINIS_GAME } from "../../src/games/zoombinis/engine/game";
 import { ZOOMBINIS_SOUND } from "../../src/games/zoombinis/engine/sound";
 import { originalFiles } from "../support/original";
 import { runFor, TestHost } from "./engine-test-host";
+
+// Les écrans simulent des centaines de ticks : 20 s de marge pour une machine chargée.
+vi.setConfig({ testTimeout: 20_000 });
 
 const original = originalFiles("zoombinis", "files.json");
 

@@ -174,6 +174,12 @@ export interface Toad {
   listed: boolean;
   /** Traversées réussies. */
   trips: number;
+  /**
+   * Définitivement sorti : un crapaud ne fait que deux traversées. À la deuxième arrivée (`+0x10b == 2`, `10f8:3c03`) il joue la sortie `SCRB 10059`, dont l'événement 54
+   * (`10f8:3614`) le retire de la liste `DS:7cf2` ; `11a8:20e8` détruit alors l'objet. Après la première, la sortie `10057` -> scène de berge -> `10058` le ramène au
+   * repos et son événement 49 (`10f8:3b23`) remet `+0xc2` à 0 : il peut être redéposé.
+   */
+  retired: boolean;
 }
 
 export interface Frog {
@@ -417,6 +423,7 @@ export function createLilly(rng: MsvcRandom, level: LillyLevel, group: number, t
       landed: false,
       listed: true,
       trips: 0,
+      retired: false,
     });
   }
   return {
@@ -639,7 +646,7 @@ export function precomputeToad(toad: Toad, pond: Pond): void {
 /** Le nénuphar de la première colonne de la rangée `row` est libre et porte la caractéristique du tatouage (`10f8:6cdf`). */
 export function canDrop(state: LillyState, toadIndex: number, row: number): boolean {
   const toad = state.toads[toadIndex];
-  if (!toad || toad.active || state.launched >= state.group || row < 0 || row >= POND_SIZE) return false;
+  if (!toad || toad.active || toad.retired || state.launched >= state.group || row < 0 || row >= POND_SIZE) return false;
   const lily = state.pond.cells[cellIndex(0, row)]!;
   return !lily.occupied && matches(lily, toad.kind, toad.value);
 }
@@ -766,9 +773,10 @@ export function stepToad(state: LillyState, toad: Toad): ToadStep {
 }
 
 /**
- * Événement 30 de l'arrivée (`10f8:3c03`) : le Zoombini est sauvé, `DS:7bca` monte, la case de la colonne 11 est libérée, le crapaud rentre (il pourra
- * être déposé de nouveau ; la scène attend la fin de son animation de retour). Le crapaud sort de la liste `DS:7cf2` à la fin de sa première sortie
- * (`10f8:3614`, **probable** : lu au désassemblage de la plage que Ghidra n'a pas décompilée).
+ * Événement 30 de l'arrivée (`10f8:3c03`) : le Zoombini est sauvé, `DS:7bca` monte, la case de la colonne 11 est libérée, le crapaud rentre. **Un crapaud ne fait que deux
+ * traversées** (`+0x10b`, jamais remis à 0) : après la première il revient au repos (la scène attend la fin de son retour, qui remet `+0xc2` à 0, `10f8:3b23`) et peut
+ * être déposé de nouveau ; après la deuxième il est retiré de la liste `DS:7cf2` et détruit (`10f8:3614`, `11a8:20e8`) : `retired`. Sûr : 12 crapauds font 24 traversées,
+ * pour 16 Zoombinis au plus.
  */
 export function arrive(state: LillyState, toad: Toad): boolean {
   if (!toad.active || !toad.landed) return false;
@@ -780,7 +788,10 @@ export function arrive(state: LillyState, toad: Toad): boolean {
   toad.target = 0;
   toad.active = false;
   toad.landed = false;
-  toad.listed = false;
+  if (toad.trips >= 2) {
+    toad.retired = true;
+    toad.listed = false;
+  }
   toad.token = -1;
   return true;
 }
@@ -1101,24 +1112,37 @@ function cheapestRepair(state: LillyState, toad: Toad): Repair | null {
 }
 
 /**
- * Robot : choisit les coups pour sauver le plus de Zoombinis. Un seul chemin suffit pour tout le groupe, car un crapaud rentré peut être redéposé : le robot
- * prend le tatouage dont le chemin demande le moins d'échanges (aucun au niveau 0), prévoit ces échanges (nénuphar manquant <-> nénuphar libre de la bonne valeur
- * hors du chemin, dans la limite du budget de la fée) puis redépose ce crapaud `group − launched` fois, chaque fois à la rangée de départ du chemin. Sans chemin
- * réparable, il ne joue rien. L'état n'est pas modifié. Les cases occupées (grenouilles, crapauds en cours de route) comptent comme des obstacles à l'instant du calcul.
+ * Robot : choisit les coups pour sauver le plus de Zoombinis. Un crapaud ne fait que deux traversées : le robot simule la partie sur une copie de l'état et, tant qu'il
+ * reste des jetons, prend le crapaud qui n'est pas sorti dont le chemin demande le moins d'échanges (aucun au niveau 0), prévoit ces échanges (nénuphar manquant <->
+ * nénuphar libre de la bonne valeur hors du chemin, dans la limite du budget de la fée), puis le dépose deux fois (une seule s'il ne reste qu'un jeton), chaque fois à
+ * la rangée de départ du chemin. Sans chemin réparable il s'arrête. L'état n'est pas modifié. Les cases occupées (grenouilles, crapauds en cours de route) comptent
+ * comme des obstacles à l'instant du calcul.
  */
 export function planLilly(state: LillyState): LillyMove[] {
-  const left = state.group - state.launched;
-  if (left <= 0) return [];
-  let best: Repair | null = null;
-  for (const toad of state.toads) {
-    if (toad.active) continue;
-    const repair = cheapestRepair(state, toad);
-    if (!repair || repair.gaps.length > repair.donors.length || repair.gaps.length > exchangesLeft(state)) continue;
-    if (!best || repair.gaps.length < best.gaps.length || (repair.gaps.length === best.gaps.length && repair.path.length < best.path.length)) best = repair;
+  const sim = structuredClone(state);
+  const moves: LillyMove[] = [];
+  for (let guard = 0; guard < TOAD_COUNT * 2 && sim.group - sim.launched > 0; guard++) {
+    let best: Repair | null = null;
+    for (const toad of sim.toads) {
+      if (toad.active || toad.retired) continue;
+      const repair = cheapestRepair(sim, toad);
+      if (!repair || repair.gaps.length > repair.donors.length || repair.gaps.length > exchangesLeft(sim)) continue;
+      if (!best || repair.gaps.length < best.gaps.length || (repair.gaps.length === best.gaps.length && repair.path.length < best.path.length)) best = repair;
+    }
+    if (!best) break;
+    const toad = sim.toads[best.toad]!;
+    best.gaps.forEach((gap, i) => {
+      const move = { kind: "exchange" as const, a: gap, b: best!.donors[i]! };
+      if (exchange(sim, move.a, move.b)) moves.push(move);
+    });
+    const times = Math.min(2 - toad.trips, sim.group - sim.launched);
+    for (let k = 0; k < times; k++) {
+      const row = best.path[0]!.row;
+      if (!drop(sim, toad.index, row)) break;
+      moves.push({ kind: "drop", toad: toad.index, row });
+      runToads(sim);
+    }
   }
-  if (!best) return [];
-  const moves: LillyMove[] = best.gaps.map((gap, i) => ({ kind: "exchange" as const, a: gap, b: best!.donors[i]! }));
-  for (let i = 0; i < left; i++) moves.push({ kind: "drop", toad: best.toad, row: best.path[0]!.row });
   return moves;
 }
 

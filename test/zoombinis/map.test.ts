@@ -10,6 +10,9 @@ import type { GameState } from "../../src/games/zoombinis/game/state";
 import { originalFiles } from "../support/original";
 import { runFor, TestHost } from "./engine-test-host";
 
+// Les écrans simulent des centaines de ticks : 20 s de marge pour une machine chargée.
+vi.setConfig({ testTimeout: 20_000 });
+
 const original = originalFiles("zoombinis", "files.json");
 
 /** Centres des lieux utilisés (`1530:1634`) : Zoombinîle, gorges allergiques, abri du rocher, aire de grozarbre, Zoombiniville, fosse de monte-pierre. */

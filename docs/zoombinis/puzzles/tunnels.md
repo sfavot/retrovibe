@@ -74,11 +74,11 @@ Tout est tiré à l'Enter (après la création du groupe et de ses 16 objets), s
 | 3 | droite, intérieure (x ≈ 421) | `¬A'` | `¬A' ∧ ¬B'` |
 | 4 | droite, extérieure (x ≈ 506) | `¬A'` | `¬A' ∧ B'` |
 
-`sortie` reçoit le résultat du **premier embranchement** seul (`A'` pour les entrées 1-2, `¬A'` pour 3-4) ; la valeur renvoyée est « **faux choix** » (vrai quand la condition ci-dessus est fausse). Exactement une entrée est correcte pour un Zoombini donné à 2 règles ; deux (une par côté) à 1 règle, sauf :
+`sortie` reçoit le résultat du **premier embranchement** seul (`A'` pour les entrées 1-2, `¬A'` pour 3-4) ; la valeur renvoyée est « **faux choix** » (vrai quand la condition ci-dessus est fausse). Exactement une entrée est correcte pour un Zoombini donné à 2 règles ; deux (une par côté) à 1 règle, puis l'exception suivante en retire une : **il n'y a qu'une seule entrée valable par Zoombini, à tous les niveaux** (H2) :
 
-- **Niveau 0 seulement** (`1190:0be9`, `a0ce`) : `a0ce = rand(0..1)` est tiré à chaque entrée dans l'écran. Si `a0ce = 0` seules les entrées **extérieures 1 et 4** sont valables (une entrée « correcte » 2 ou 3 est comptée **fausse**) ; si `a0ce = 1` seules les entrées **intérieures 2 et 3** (1 et 4 sont fausses). (Lecture du code, sûr ; la raison visuelle — deux tunnels bouchés au niveau 0 — est **probable** : à vérifier sur les décors 6004–6011.)
+- **Niveau 0 seulement** (`1190:0be9`, `a0ce`) : `a0ce = rand(0..1)` est tiré une fois par entrée dans l'écran, en tête d'`Enter` (`1190:0000`, premier tirage). Si `a0ce = 0` seules les entrées **extérieures 1 et 4** sont valables (une entrée « correcte » 2 ou 3 est comptée **fausse**) ; si `a0ce = 1` seules les entrées **intérieures 2 et 3** (1 et 4 sont fausses). (Lecture du code, sûr ; la raison visuelle — deux tunnels bouchés au niveau 0 — reste **probable**, non vérifiée en jeu.)
 
-Les chaînes de débogage `Left / Bottom accept:`, `Left / Top accept:`, `Right / Bottom accept:`, `Right / Top accept:`, `Right accepts:`, `Left accepts:` (dans `1190:1206…`) correspondent à ces `w` : une règle avec `w₀ ≠ 0` est « acceptée à gauche » ; avec 2 règles, `w₁ ≠ 0` = « haut ». Soit, avec nos formules : entrée 1 = gauche + haut, 2 = gauche + bas, 3 = droite + bas, 4 = droite + haut (**probable**, l'association « extérieur = haut » n'est pas visible à l'écran).
+Les chaînes de débogage `Left / Bottom accept:`, `Left / Top accept:`, `Right / Bottom accept:`, `Right / Top accept:`, `Right accepts:`, `Left accepts:` (dans `1190:1206…`) correspondent à ces `w` : une règle avec `w₀ ≠ 0` est « acceptée à gauche » ; avec 2 règles, `w₁ ≠ 0` = « haut ». Soit, avec nos formules : entrée 1 = gauche + haut, 2 = gauche + bas, 3 = droite + bas, 4 = droite + haut (**sûr** depuis H2 : les places d'arrivée de `1510:0040` / `0x80` / `0xc0` / `0x100` placent les tunnels des entrées 1 et 4 en haut de l'écran, y 60 à 133, et ceux des entrées 2 et 3 en bas, y 213 à 283).
 
 ### 2.4 Erreurs, fin
 
@@ -188,9 +188,60 @@ Sons (sûr pour les ids, **probable** pour l'attribution) : `a2c4 = rand(20069..
 
 ## 7. Points ouverts
 
-1. Géométrie des tunnels : association entrée → « haut / bas » et raison visuelle du filtre `a0ce` au niveau 0 (à confirmer sur les décors, `SCRB` 6004–6011 ?).
-2. Le mot 6 de l'entrée de file (script de renvoi `a10e`) et la table de voix `3a5a…3ae6` : ids exacts non extraits.
-3. Corps de `1190:41e4` et de `1190:1aff` (tirage d'une place d'attente de repli).
-4. Rôle précis de `a0f4` (réussites consécutives par entrée) dans le choix des voix.
-5. Conséquence visible de `a0d2 = 0` pour les Zoombinis déjà dans un tunnel (ils restent comptés arrivés ; ceux en cours reviennent en bas) : non testé en jeu.
-6. Même aide vocale `0x16f` que les gorges (identité de la touche).
+Tranchés en H2 (§8) : 1 (géométrie et `a0ce`), 3 (`1190:1aff`, `1190:41e4`), 4 (`a0f4`), 5 (effet de `a0d2 = 0`) ; 2 en grande partie (tables de voix, §8.3). Restent :
+
+1. Raison visuelle de l'exception `a0ce` du niveau 0 (tunnels bouchés ?), non vérifiée en jeu.
+2. Le corps de `1190:2088` pour les phases au-delà de la conversation (aucune connue) et `DS:a19e` / `DS:a402` (voix « en cours » par identifiant de son) : approchés par « aucun effet en cours ».
+3. Compaction des places d'attente de `1190:1aff` et drapeau `0x04000000` de `1190:41e4` : non portés (§8.4).
+4. Même aide vocale `0x16f` que les gorges : F1, sans condition (`1190:1199`).
+
+## 8. Points tranchés et écarts du portage (tâche H2)
+
+Code : `src/games/zoombinis/game/puzzles/tunnels.ts` (règles, pur), `src/games/zoombinis/scenes/puzzles/tunnels.ts` (`createTunnelsScene`), tests `test/zoombinis/puzzles/tunnels.test.ts`.
+
+### 8.1 Règles
+
+- **Ordre des tirages** à l'`Enter` (`1190:0107`) : `a0ce` (`1190:0000`), puis, après la création du groupe (`1168:0858`, un tirage d'attente par membre), les règles, puis `a2c4 = rand(20069..20070)`, la phrase d'introduction (`2137(1)`, tirage sans remise) et `a0f0 = rand(5400..10800)`. À chaque dépôt, les tirages sans remise des gardiens (§8.3) suivent l'ordre de `1190:0be9`.
+- **Candidates** (les attributs s'énumèrent 4, 3, 2, 1 : l'octet bas du candidat est l'attribut 4, table `CS:2ae0`) : niveaux 0 et 1, 20 candidates (attribut puis valeur 1 à 5) ; niveau 2, 40 (attribut puis paire de `DS:3c24` : 12, 13, 14, 15, 23, 24, 25, 34, 35, 45) ; niveau 3, 150 (paires d'attributs (4, 3), (4, 2), (4, 1), (3, 2), (3, 1), (2, 1) de `DS:3c4c` / `3c64`, la valeur de l'attribut haut en boucle externe). L'ordre sert au départage des ex æquo (`rand(1..k)`, k-ième dans l'ordre).
+- **Paire de règles** (`3a48`, `2d12`) : 4 classes `A∧B…`, classes non vides maximales, écart total minimal des six couples, tirage parmi les ex æquo ; puis `w₀`, `w₁` (`rand(0..1)` chacun). Les paires i = j ne comptent aucune classe et sont donc exclues d'office.
+- **Niveau 0** : effectif cible `n/2`, `n/2 + 1`, `n/2 − 1`, `n/2 − 2`… (jamais `n/2 + 2`) ; `a0ce` à 0 : seules les entrées 1 et 4 sont valables ; à 1 : seules 2 et 3. **Une seule entrée est donc valable par Zoombini à tous les niveaux** (le robot en prend une, et sauve tout le groupe sans erreur).
+- **Filtre de la règle du pont** (`DS:96ec` / `96f0`) : implémenté (`avoidCount`) et branché : les gorges écrivent leur règle de niveau 0 dans la session (`setBridgeMemory`), l'écran des grottes lit `bridgeAvoidCount(session)` (effectif non nul si la candidate l'est aussi ; en entraînement, `1190:0000` remet les deux à 0 : la mémoire est effacée). Ces variables sont dans la zone de données, pas dans le tampon `S` : elles ne sont pas sauvegardées, comme dans l'original. Plus d'écart.
+- **Budget** : 16, 18, 20, 22 ; une erreur retire 1 **au départ du Zoombini** dans le tunnel (pas au dépôt, pas au retour) ; avertissements aux budgets avant décrément 5, 4, 3, 2 (voix 4700 à 4703, jouées au retour, avec une chute de pierres `SCRB` 7001 + rand(0..2), **probable** pour l'argument du tirage).
+- **Effondrement** (point 5, **sûr** pour la logique, **probable** pour l'abscisse du renvoi) : à `a0d2 = 0`, plus personne n'est pris (`96f4` termine un transport) ; l'effondrement ne démarre que quand aucune marche n'est en cours (`a0e4 = 0`) et qu'aucune voix ne joue : le Zoombini de la dernière erreur finit donc son retour. Alors `1190:14bc` fait redescendre les quatre premières entrées de la file (ceux restés aux entrées) à y = 460 (`0x1cc`), non sauvés ; les arrivés restent sauvés ; une phrase du gardien 3 (`2137(2)`, 4420 à 4422) précède le plafond (`SCRB` 7000, son 7000) ; à sa fin `a0e2 = 1`, et une voix de regret (20045 à 20048) peut partir (`rand(0..4) > niveau` ou moins de 4 visites, au moins un sauvé et un perdu). « Continuer » est actif si au moins un est arrivé et si l'effondrement est fini.
+- **Réussites consécutives `a0f4`** (point 4) : +1 au **dépôt** d'un bon choix, remis à 0 par une erreur ; la réaction d'un gardien n'a lieu que si le compteur vaut moins de 2 **après** l'incrément, donc seulement à la **première** réussite consécutive d'une entrée (au départ pour le gardien extérieur, à l'arrivée pour le gardien du tunnel).
+
+### 8.2 Écran
+
+- **Table des événements `1190:1673`** (clés `CS:1acf`) : −1 → `17e1` (arrivée ou retour), 0 → `16d2` (le Zoombini se retourne ; pose `4dc9(a0f4 − 1)` jamais utilisée ici), 10 → `1707` (enchaînement sur le script de retour `a10e`, qui finit au point `DS:3bec + 4 × ⌊(a10e − 8000) / 2⌋` : (145, 455), (210, 434), (430, 434), (476, 455) ; `1190:41e4` puis `1168:3f76`), 13 → `174b` (le gardien joue son choc `a112`, puis, au rappel `1639`, sa réplique `a114`), 240 à 243 → `16c6`, 250 à 253 → `16b1` (poses, jamais émises par les `SCRS` de l'écran).
+- **Code de trajet** `SI` (0 à 7) du dépôt : entrée 1 → `A' ? 1 : 0`, 2 → `A' ? 3 : 2`, 3 → `¬A' ? 4 : 5`, 4 → `¬A' ? 6 : 7` (`A'` = premier embranchement bon). Gardien du trajet `DS:3b96` = [0, 1, 0, 2, 2, 3, 1, 3] ; choc = `SCRB` 6004 + `SI` ; marche correcte = `SCRS` 8500 + 4 × (pieds − 1) + (entrée − 1) ; marche fausse = 8519 + 5 × `SI` + pieds ; retour = 8000 + `SI`. Les quatre gardiens sont les `SCRB` 6000 à 6003 (créés dans l'ordre 1, 2, 0, 3) : 0 à gauche (42, 292), 1 en haut (255, 76), 2 au milieu (266, 241), 3 à droite (511, 303).
+- **Arrivée** : le script de marche est posé depuis la position du Zoombini (la première case de l'image 0 tombe sur les pieds, `1168:3f76`) ; à sa fin le Zoombini est à la dernière case et marche (état 10 puis 7) vers la prochaine place libre du tunnel. **Probable** : l'original ne met pas la position à jour à la fin d'un script d'écran ; l'écran la déduit de la dernière case.
+- **Places d'arrivée** (`1510:0040` entrée 1, `0x80` entrée 4, `0xc0` entrée 2, `0x100` entrée 3, 16 points) et d'attente (`1510:0000`) : relevées dans le NE, voir le code. Points d'accroche des entrées `DS:3bb6`.
+- **Boutons** : `tBMP` 400, images 1 (« go » grisé), 2 (« go »), 3 (« go » enfoncé), 5 (carte), 6 (carte enfoncée) ; positions (600, 441) et (600, 403) (`1190:0574`). Le bouton enfoncé est tenu 6 ticks (**probable**, l'original fait une pause de `1090:00c1`).
+- **Animations de victoire** : `SCRS` 8559 + pieds, un arrivé tiré sans remise toutes les 60 ticks (120 avec « moins d'action »), quota +1 à 10 et 12 arrivés, +2 à 14, +2 au dernier ; au dernier sauvé, voix de réussite 20055 à 20063.
+
+### 8.3 Voix des gardiens (table `3a5a…3ae6` et `1190:2137`, extraites)
+
+Chaque identifiant est un `SCRB` joué sur le gardien (avec son `\0SND` du même numéro). Tirages sans remise (`1098:0098`) :
+
+| Rôle | Gardien | Ids |
+|---|---|---|
+| réplique après un choc (10, `4005` limité à 3 répétitions) | 0 | 4000 à 4009 |
+| réaction du gardien extérieur gauche, premier embranchement bon à gauche (11) | 0 | 4010 à 4020 |
+| réplique après un choc (4) / réaction à un bon choix (6) | 1 | 4600 à 4603 / 4604 à 4609 |
+| réplique après un choc (8) / réaction à un bon choix (8) | 2 | 4200 à 4207 / 4208 à 4215 |
+| réplique après un choc (7, `4416` limité) | 3 | 4404, 4403, 4413, 4414, 4415, 4416, 4400 |
+| réaction du gardien extérieur droit (6) | 3 | 4417, 4405, 4406, 4407, 4401, 4418 |
+
+Conversations de `2137` (entrée de file d'identifiant 0, traitée par `2088` : A, B, seconde réplique de A, seconde réplique de B) : encouragement (10 variantes, `2137(0)`), introduction (4 variantes à la première visite de l'exécution, `DS:a18e = 1`, sinon 8), effondrement (4420 à 4422), sortie par « go » (8 tous sauvés, 9 avec perdus, 7 après effondrement). Les listes exactes sont dans `TALK_*` du code de l'écran. Les répliques de choc et de réaction se jouent sur le gardien du trajet ; l'introduction et l'encouragement tiennent la file (5 entrées au plus).
+
+### 8.4 Écarts
+
+- **`1190:1aff`** (point 3) : le Zoombini renvoyé prend la première place libre de la liste préférée (15 puis 10 pour les entrées 1 et 2 ; 11 puis 6 pour 3 et 4 : `DS:3bfc` / `3c00`, **sûr**), sinon la première libre. La compaction qui précède (des occupants glissent vers l'avant, boucles `1c2c`…`1d89`) n'est pas portée. `1190:41e4` (efface le drapeau `0x04000000` de l'occupant de l'entrée voisine, 1 → 2 et 4 → 3) n'est pas porté : sans effet visible connu.
+- **File pleine** : l'original laisse un Zoombini déposé sans décision quand la file a déjà 5 entrées ; l'écran refuse alors le dépôt.
+- **Prise pendant une phrase** : l'original vide toute la file (Zoombinis déposés compris, qui restent bloqués à l'entrée) ; l'écran ne coupe que la phrase.
+- **« Voix en cours »** : approchée par « aucun effet en cours ou en file » (le jeu teste les ids 4000 à 4701 et 7000 à 7099).
+- **Arrivés non reprenables** (l'original les laisse glisser sans suite).
+- **Compteurs de répétitions et tirages sans remise** de l'original sont conservés d'un écran à l'autre (`DS`) ; l'écran les remet à zéro à chaque visite. `DS:a18e` (visites de l'exécution) est conservé par le module.
+- **Mémoire de dialogue** `S+0x2c` : +1 à l'entrée en aventure (même règle que le choix des Zoombinis, plafonnée à 12 bits), **probable**.
+- **Profondeurs** : cave 0,1, entrées 0,2, gardiens 0,3, rochers 0,4, Zoombinis 1 + y / 1000, boutons 2,9, plafond et pierres 3 : l'original les range par ordre de création.
+- Le plafond montre son image 49 (`SCRB` 7000, en partie hors de l'écran) comme image fixe avant l'effondrement : drapeaux de création `0xd181000` de l'original ; la chute de pierres 7001 à 7003 n'est créée qu'à la demande (l'original la crée à l'entrée sans que l'on sache si elle s'affiche).

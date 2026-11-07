@@ -17,7 +17,8 @@ import type { Attrs } from "../state";
  * Temps : un « instant » est une image d'animation (le jeu en affiche une toutes les quelques ticks, valeur non extraite ; seul l'ordre compte).
  * Durées lues dans les scripts : un pas de case = 6 images (`SCRS 15015`…, 7 images, la dernière lance le pas suivant), réservation de la case
  * d'arrivée à la 4e (`+0xc8 = 3`), tourbillon `SCRS 14006` (26 images), rejet de collision `SCRS 14004` (6 images) après 6 images de gerbe
- * (`SCRB 10012` : événement `0x3e` à l'image 6), premier pas à l'image 30 du script de rampe, rampe libérée à l'image 34 ou 35.
+ * (`SCRB 10012` : événement `0x3e` à l'image 6), atterrissage `SCRB 10040` + `SCRS 14007` (7 images avant de quitter la liste en vol), premier pas à l'image 30
+ * du script de rampe, rampe libérée à l'image 34 ou 35.
  */
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -33,7 +34,7 @@ export const MAZE2_MAP_BASE = 16600;
 export const MAZE2_MAP_COUNT = 10;
 /** Un Zoombini est dessiné à la position de sa case plus ce décalage (`1100:0b69`). */
 export const MAZE2_SPRITE_OFFSET = { x: 4, y: -38 } as const;
-/** Zoombinis lancés non rejetés au plus (`1118:2285` : refus si `[890e] ≥ 10`). */
+/** Zoombinis dans la liste en vol au plus (`1118:2285` : refus si `[890e] ≥ 10`) ; un atterrissage ou un rejet les en retire (`1118:3263`, `1118:3784`). */
 export const MAZE2_MAX_FLIGHTS = 10;
 
 /** Types de case (`kind`, mot `+0x6c`). Les sorties valent `0x14` à `0x17`. */
@@ -976,7 +977,7 @@ export interface Maze2World {
   kinds: Int16Array;
   members: Maze2Member[];
   flights: Maze2Flight[];
-  /** `[88f8]` : identifiants lancés et non rejetés (au plus 10). */
+  /** `[88f8]` : identifiants lancés, ni rejetés ni arrivés depuis plus de 7 images (au plus 10). */
   launched: number[];
   /** Instants où chaque rampe (indice = numéro) est de nouveau libre. */
   rampFreeAt: number[];

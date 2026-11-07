@@ -9,6 +9,9 @@ import { generateName, nameOf, createPickerScene } from "../../src/games/zoombin
 import { originalFiles } from "../support/original";
 import { runFor, TestHost } from "./engine-test-host";
 
+// Les écrans simulent des centaines de ticks : 20 s de marge pour une machine chargée.
+vi.setConfig({ testTimeout: 20_000 });
+
 const original = originalFiles("zoombinis", "files.json");
 
 /** Centres des boutons (`1470:0000` et suivants) : attribut `row` (0 à 3) de valeur `value` (1 à 5), et les actions. */

@@ -25,7 +25,7 @@ produits par les vagues ci-dessous.
   Zoombiniville, menu et dialogues, raccourcis, sauvegardes), épreuves provisoires 7 à 18 (touches `R`, `1`…`9`, `E`), présentation
   du site prête (`index.ts`, `copy.ts` à valider, jaquette) mais absente du registre jusqu'à la fin de H ; saisie de texte commune
   (`src/ui/mohawk/text-input.ts`). Détail par écran : `engine-ts.md`, `screens.md`.
-- Vague H en cours (lot H-a : kit des épreuves et tâches « règles »).
+- Vague H : les 12 épreuves sont portées et enregistrées (kit commun `scenes/puzzle-kit.ts`, règles `game/puzzles/`, écrans `scenes/puzzles/`), et le test de partie complète `test/zoombinis/full-game.test.ts` passe par les deux chemins, avec pertes et rechargement ; copy du site validée (`copy.ts`) et jeu inscrit au registre (`src/games/registry.ts`), donc présent sur l’accueil.
 
 ## Parcours
 
@@ -226,7 +226,7 @@ G1 doit être fini avant G7 à G10.
   - « Jouer » ;
   - contrôles et raccourcis ;
   - chargement et erreurs.
-- **Restent à valider** : « Zoombinis » (libellé du canvas) et « Son ».
+- **Validée** : toute la copy du site (`copy.ts`), libellé du canvas et « Son » compris.
 
 ## Vague H : les 12 épreuves
 
@@ -355,6 +355,7 @@ Un lot ne part que si le précédent est vert. Une tâche « règles » qui lais
 - **Manuel** : le PDF français (175 Mo, `archives/zoombinis/manuel/`) sera transcrit en page web (vague J), textes à valider.
 - **Accueil du site** : afficher Zoombinis sur l'accueil seulement après H (décidé). La ligne du registre est ajoutée en fin de vague H.
 - **Défaut du bac** (`ferry.md` §7 point 1, décidé) : un Zoombini repris sur un tabouret puis lâché sur le ponton resterait compté comme assis. Il est **corrigé** (il n'est plus compté assis) et l'écart est noté dans `ferry.md` et `engine-ts.md`, après confirmation dans le code par H4.
+- **Défaut du cristal** (`smoke.md` §3.5, décidé) : quand le second Zoombini manque, `1158:5017` écrit dans la mauvaise table et rend le puzzle insoluble (2,5 % des tirages au niveau 3, 3,6 % au niveau 4). Il est **corrigé** (`bugMissingB = false` par défaut) et l'écart est noté dans `smoke.md`.
 
 ## Vagues
 

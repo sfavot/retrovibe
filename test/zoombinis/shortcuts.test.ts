@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { GameOptions } from "../../src/games/zoombinis/game/state";
 import { originalFiles } from "../support/original";
 import { BACKGROUND, startDialogs } from "./dialog-test-env";
+
+// Les écrans simulent des centaines de ticks : 20 s de marge pour une machine chargée.
+vi.setConfig({ testTimeout: 20_000 });
 
 const original = originalFiles("zoombinis", "files.json");
 

@@ -198,11 +198,11 @@ function inc5(x: number): number {
  *  4. Cristaux 5 et 6 : niveau 3, deux leurres tirés sur le modèle de la phase 1 ; niveau 4, un leurre est une copie « décalée de 1 » du cristal 3 ou 4 (ou 1 ou 2) et l'autre un
  *     cristal à un attribut aléatoire.
  *
- * `bugMissingB` (défaut vrai, comme l'original) : si B est absent (dernier Zoombini d'un groupe impair) et que le cristal 1 ou 2 incrémente un attribut, l'original écrit
+ * `bugMissingB` (défaut faux : défaut de l'original corrigé, décision de la vague H ; vrai le reproduit) : si B est absent (dernier Zoombini d'un groupe impair) et que le cristal 1 ou 2 incrémente un attribut, l'original écrit
  * `R = B[a] + 1 = 1` au lieu de `S` (`1158:5017` : écriture à `[BX + 0x953c]` au lieu de `0x9584`), donc l'état suivi de A devient 1 au lieu de sa vraie valeur + 1 : les cristaux 3 et 4
  * sont alors construits sur un état faux. Faux = comportement corrigé (écrit `S`, plafond `inc5`).
  */
-export function generateCrystals(rng: MsvcRandom, level: 3 | 4, a: Attrs, b: Attrs | null, bugMissingB = true): CrystalPuzzle {
+export function generateCrystals(rng: MsvcRandom, level: 3 | 4, a: Attrs, b: Attrs | null, bugMissingB = false): CrystalPuzzle {
   const A: number[] = [...a];
   const B: number[] = b ? [...b] : [0, 0, 0, 0];
   const R = table(9);
@@ -549,7 +549,7 @@ function blankState(level: SmokeLevel, members: readonly Attrs[]): SmokeState {
  *  3. `04e8(20067, 20066)` : voix d'introduction.
  * Aux niveaux 3-4 le groupe arrive un par un : `current` est le premier membre (case 0), les cristaux sont sur les étagères dans l'ordre.
  */
-export function createSmoke(rng: MsvcRandom, level: SmokeLevel, members: readonly Attrs[], bugMissingB = true): SmokeState {
+export function createSmoke(rng: MsvcRandom, level: SmokeLevel, members: readonly Attrs[], bugMissingB = false): SmokeState {
   if (members.length < 1 || members.length > 16) throw new Error("smoke : un groupe compte de 1 à 16 Zoombinis");
   const s = blankState(level, members);
   const n = members.length;
@@ -765,7 +765,7 @@ export function endTurn(s: SmokeState, rng: MsvcRandom): TurnEnd | null {
  *  - niveaux 3-4 : `236b` : permutation des 6 étagères (`04e8(6 − k, 1)`, 6 tirages), puis `4dbf` pour le nouveau A et son B ; le Zoombini suivant se pose sur le cristal gauche.
  * `42c0(p)` : `p` = membres restants ; jumelle d'indice `04e8(min(8, p) − 1, 0)` ; 4 attributs de 1 à 4 par silhouette (la valeur 5 n'apparaît plus que par la référence).
  */
-export function newRound(s: SmokeState, rng: MsvcRandom, bugMissingB = true): boolean {
+export function newRound(s: SmokeState, rng: MsvcRandom, bugMissingB = false): boolean {
   if (!s.awaitingRound) return false;
   s.awaitingRound = false;
   s.left = [];
@@ -892,7 +892,7 @@ export function robotApply(s: SmokeState, plan: SmokeRobotPlan): SmokeTest | nul
  * Joue une partie entière avec le robot : à chaque tour le robot compose et tire, `endTurn` enregistre, `newRound` tire. S'arrête si le robot ne trouve aucun plan (le reste est perdu).
  * Renvoie le nombre de tours joués.
  */
-export function playRobot(s: SmokeState, rng: MsvcRandom, bugMissingB = true): number {
+export function playRobot(s: SmokeState, rng: MsvcRandom, bugMissingB = false): number {
   let turns = 0;
   while (!isFinished(s)) {
     if (s.awaitingRound && !newRound(s, rng, bugMissingB)) break;

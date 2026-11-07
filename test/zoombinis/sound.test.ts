@@ -167,6 +167,60 @@ describe("ZoombinisSound : routage et files", () => {
   });
 });
 
+describe("ZoombinisSound : isPlaying(id)", () => {
+  it("un effet est « en cours » dès la file, tant qu'une de ses lectures n'est pas finie, puis plus", () => {
+    const { sink, sound } = setup();
+    expect(sound.isPlaying(150)).toBe(false);
+    sound.queue(150);
+    sound.queue(905);
+    expect(sound.isPlaying(150)).toBe(true);
+    sound.tick();
+    expect(sound.isPlaying(150)).toBe(true);
+    expect(sound.isPlaying(905)).toBe(true);
+    expect(sound.isPlaying(999)).toBe(false);
+    // Le son 150 finit tout seul, 905 continue.
+    sink.played[0]!.stopped = true;
+    expect(sound.isPlaying(150)).toBe(false);
+    expect(sound.isPlaying(905)).toBe(true);
+    sound.stopEffects();
+    expect(sound.isPlaying(905)).toBe(false);
+  });
+
+  it("deux lectures du même id : en cours tant qu'il en reste une ; les ids de l'écran et des voix se distinguent", () => {
+    const { sink, sound } = setup();
+    sound.queue(1500);
+    sound.queue(1500);
+    sound.queue(20010);
+    sound.tick();
+    expect(sound.isPlaying(1500)).toBe(true);
+    sink.played[0]!.stopped = true;
+    expect(sound.isPlaying(1500)).toBe(true);
+    sink.played[1]!.stopped = true;
+    expect(sound.isPlaying(1500)).toBe(false);
+    expect(sound.isPlaying(20010)).toBe(true);
+  });
+
+  it("effets coupés : un id refusé par la file n'est pas en cours", () => {
+    const { sound } = setup();
+    sound.effectsEnabled = false;
+    sound.queue(150);
+    expect(sound.isPlaying(150)).toBe(false);
+  });
+
+  it("musique : en file, en cours (seulement la dernière), arrêtée ; l'id 0 jamais", () => {
+    const { sound } = setup();
+    expect(sound.isPlaying(30000)).toBe(false);
+    sound.queue(30000);
+    expect(sound.isPlaying(30000)).toBe(true);
+    sound.tick();
+    expect(sound.isPlaying(30000)).toBe(true);
+    expect(sound.isPlaying(30001)).toBe(false);
+    expect(sound.isPlaying(0)).toBe(false);
+    sound.stopMusic();
+    expect(sound.isPlaying(30000)).toBe(false);
+  });
+});
+
 describe("ZoombinisSound : drapeaux et arrêts", () => {
   it("effets coupés : les ids < 30000 sont ignorés, la musique passe", () => {
     const { sink, sound } = setup();

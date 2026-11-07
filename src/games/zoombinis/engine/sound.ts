@@ -94,7 +94,8 @@ export class ZoombinisSound {
   private screen: MohawkArchive | null = null;
   private readonly effects: number[] = [];
   private readonly musics: number[] = [];
-  private readonly waves = new Set<WaveHandle>();
+  /** Effets / voix en cours de sortie, avec l'id demandé (`isPlaying`). */
+  private readonly waves = new Map<WaveHandle, number>();
   private readonly player: MidiPlayer;
   private readonly zoombini: MohawkArchive;
   private readonly midimpc: MohawkArchive;
@@ -159,6 +160,20 @@ export class ZoombinisSound {
   }
 
   /**
+   * Le son `id` est-il en file ou en cours ? Effet ou voix (id < 30000) : dans la file des effets, ou une de ses lectures n'est pas finie ;
+   * musique (id ≥ 30000) : dans la file des musiques, ou c'est la musique en cours. L'id 0 (« rappelle la dernière musique ») n'est jamais « en cours ».
+   * Le moteur d'origine ne suit pas les ids : c'est une exactitude de plus que `effectsPlaying` / `pending`, sans rien changer à la lecture.
+   */
+  isPlaying(id: number): boolean {
+    if (id === 0) return false;
+    if (id >= MUSIC_MIN_ID) return this.musics.includes(id) || (this.musicPlaying && this.lastMusic === id);
+    if (this.effects.includes(id)) return true;
+    this.prune();
+    for (const played of this.waves.values()) if (played === id) return true;
+    return false;
+  }
+
+  /**
    * `11a0:0ee7` : met `id` dans la file de son genre (musique : id 0 ou ≥ 30000 ; sinon effets / voix). Ignoré si le drapeau du genre est
    * coupé ; file pleine : l'id est perdu (l'original affiche `Que overflow id: ` en mode de débogage).
    */
@@ -186,7 +201,7 @@ export class ZoombinisSound {
   /** Coupe tous les effets et voix et vide leur file (la musique continue). */
   stopEffects(): void {
     this.effects.length = 0;
-    for (const handle of this.waves) this.audio.stopWave(handle);
+    for (const handle of this.waves.keys()) this.audio.stopWave(handle);
     this.waves.clear();
   }
 
@@ -216,7 +231,7 @@ export class ZoombinisSound {
     const bytes = archive?.find(TAG_SND, id);
     if (!archive || !bytes || !isWave(bytes)) return;
     const handle = this.audio.playWave(loadPcm(archive, id), isLooping(archive, id));
-    this.waves.add(handle);
+    this.waves.set(handle, id);
   }
 
   private playMusic(requested: number): void {
@@ -232,7 +247,7 @@ export class ZoombinisSound {
   }
 
   private prune(): void {
-    for (const handle of this.waves) if (!this.audio.isWavePlaying(handle)) this.waves.delete(handle);
+    for (const handle of [...this.waves.keys()]) if (!this.audio.isWavePlaying(handle)) this.waves.delete(handle);
   }
 }
 

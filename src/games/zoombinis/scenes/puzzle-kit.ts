@@ -31,9 +31,24 @@
  *
  * Écarts assumés : pas de transport au clavier (`DS:96fe`) ; pas de fin de transport forcée par un minuteur de l'épreuve (`DS:96f4`) sauf par
  * `endCarry()` ; la mise en surbrillance des cibles pendant le transport est un simple rappel `onHover` ; pas de pose fixe (`DS:96fa`) ;
- * le curseur masqué demande le type `hidden` (`HIDDEN_CURSOR`), que `CursorKind` et l'hôte du navigateur ne connaissent pas encore (voir
- * `engine-ts.md`).
+ * le curseur masqué est le type `hidden` (`HIDDEN_CURSOR`, `none` dans le navigateur).
+ *
+ * ## Ce que l'épreuve peut brancher (sans rien contourner)
+ *
+ *  - **Boutons** : `spec.buttons.map` / `go` (rectangle, images fournies par l'épreuve que le kit dessine, durée de l'image enfoncée, rappel de
+ *    pression `onPress`) ; état lisible `buttonState()` / `pressed`. `goEnabled` redessine tout seul.
+ *  - **Pointeur** : `spec.onPointer` reçoit chaque appui et relâchement, même quand le kit est suspendu.
+ *  - **Transport d'objet** : `carryObject(spec)` fait porter par le pointeur autre chose qu'un Zoombini (crapaud, baguette, cristal…) avec le même
+ *    protocole (`1168:58c7`) ; le transport d'un Zoombini en est un cas particulier. `cancelObjectCarry()` l'abandonne.
+ *  - **Dépôt non accepté** : `spec.onDropOutside` décide où va le Zoombini (ponton, place d'attente de repli) avant le retour par défaut.
+ *  - **Marches** : `walk(membre, destination, arrivée, options)` tient `walking` / `arrived` et rend la main si le marcheur est repris.
+ *  - **Arrivée** : `arrive({ …, standing: true })` met tout le groupe debout (sans entrée à pied).
+ *  - **Sortie** : `markAll` marque « sauvé » ; `pressGo({ saveAll, depart, sound, end })` (son 996 tout de suite ou différé, fin au son ou menée par
+ *    l'épreuve) ; `finish()` ; `suspend()` / `resume()` gèlent le kit pendant un départ propre à l'épreuve ; `soundIdle()` dit si plus aucun son ne
+ *    joue, `isPlaying(id)` si le son `id` est en file ou en cours.
  */
+import type { Shape } from "../../../data/mohawk/shap";
+import { drawShape } from "../../../engine/mohawk/graphics/blit";
 import type { Input } from "../../../engine/mohawk/input";
 import { DIALOG, confirmLeaveToMap } from "../engine/dialog";
 import { FEATURES, type Feature } from "../engine/features";
@@ -92,8 +107,8 @@ export const BUTTON_GO: Readonly<Rect> = { left: 600, top: 441, right: 639, bott
 /** Zone où un Zoombini transporté peut aller (`DS:6092` par défaut dans l'original) : l'écran entier. */
 export const SCREEN_BOUNDS: Readonly<Rect> = { left: 0, top: 0, right: SCREEN_WIDTH - 1, bottom: SCREEN_HEIGHT - 1 };
 
-/** Curseur masqué pendant le transport (`11e8:77bc`). Absent de `CursorKind` tant que ni l'hôte ni son type ne le déclarent : voir `engine-ts.md`. */
-export const HIDDEN_CURSOR = "hidden" as CursorKind;
+/** Curseur masqué pendant le transport (`11e8:77bc`) : `hidden` de `CursorKind`, associé à `none` par l'hôte du navigateur. */
+export const HIDDEN_CURSOR: CursorKind = "hidden";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Musique
@@ -173,6 +188,140 @@ export interface DropInfo {
   origin: Point;
 }
 
+/** Les deux boutons de l'angle bas-droit. */
+export type ButtonId = "map" | "go";
+
+/** État affiché d'un bouton : le « go » est grisé tant que l'épreuve ne l'active pas (`goEnabled`) ; la carte n'est jamais grisée. */
+export type ButtonState = "disabled" | "normal" | "down";
+
+/** Images d'un bouton, fournies par l'épreuve (planche de son archive). Une image absente n'est pas dessinée. */
+export interface KitButtonImages {
+  normal?: Shape;
+  down?: Shape;
+  /** Seulement pour « go ». */
+  disabled?: Shape;
+}
+
+/**
+ * Un bouton géré par le kit. `{}` suffit : rectangle par défaut (`BUTTON_MAP` / `BUTTON_GO`), pas d'image, image enfoncée tant que le bouton est
+ * tenu, action par défaut.
+ */
+export interface KitButtonSpec {
+  rect?: Readonly<Rect>;
+  /** Images : si une épreuve en donne, le kit les dessine (feature de profondeur `buttons.depth`) ; sinon elle dessine d'après `buttonState`. */
+  images?: KitButtonImages;
+  /**
+   * Durée (ticks) de l'image enfoncée après un clic. Absente : l'image est enfoncée tant que le bouton de la souris est tenu sur le bouton
+   * (pas pendant un transport ; « go » seulement s'il est actif).
+   */
+  hold?: number;
+  /**
+   * Rappel de pression, appelé au clic (pour « go » : seulement s'il est actif) avant l'action par défaut (`pressMap` / `pressGo`). Vrai : l'épreuve
+   * a traité le clic, le kit ne fait rien de plus ; faux ou rien : l'action par défaut suit. L'image enfoncée est déjà demandée.
+   */
+  onPress?: (kit: PuzzleKit) => boolean | void;
+}
+
+/** Une image de la planche de boutons commune aux épreuves : « go » 1 grisé / 2 actif / 3 enfoncé, carte 5 / 6 (rang 1-based, `10c0:045f`). */
+export function sheetButtonImages(shapes: readonly Shape[]): { map: KitButtonImages; go: KitButtonImages } {
+  return {
+    map: { normal: shapes[4], down: shapes[5] },
+    go: { disabled: shapes[0], normal: shapes[1], down: shapes[2] },
+  };
+}
+
+/** Un événement du pointeur, vu par `spec.onPointer`. */
+export interface PointerInfo {
+  x: number;
+  y: number;
+  /** Appui (vrai) ou relâchement (faux). */
+  down: boolean;
+  button: string;
+}
+
+/** Où va un Zoombini dont le dépôt n'est pas accepté, au lieu de sa place d'origine (`spec.onDropOutside`). */
+export interface OutsidePlacement {
+  /** Destination (pieds). */
+  at: Point;
+  /** Y va à pied (marche du kit, non comptée dans `walking`) au lieu d'y être posé d'un coup. À pied, il part du point de dépôt. */
+  walk?: boolean;
+  /** Place d'attente qu'il occupe désormais (liste B ; et cible libre correspondante). Absente : aucune. */
+  place?: DropTarget | null;
+}
+
+/** Options d'une marche lancée par l'épreuve (`PuzzleKit.walk`). */
+export interface WalkOptions {
+  /** Compte dans `walking` puis `arrived` (`DS:9702` / `9704`). Défaut vrai. */
+  counted?: boolean;
+  /** Reste saisissable pendant la marche (`member.walking` reste faux) ; une prise annule la marche. Défaut faux. */
+  pickable?: boolean;
+}
+
+/** Options de `pressGo`. */
+export interface GoOptions {
+  /** `1168:3dd0(0, 1)` : tout le groupe est sauvé avant le départ. */
+  saveAll?: boolean;
+  /** Départ fourni par l'épreuve, à la place de la marche `exitWalk` des sauvés. */
+  depart?: () => void;
+  /**
+   * Son de départ : `"now"` (défaut) coupe les effets et joue 996 tout de suite ; `"later"` ne joue rien, l'épreuve le lance à son heure
+   * (`playGoSound()`, sans couper les effets en cours).
+   */
+  sound?: "now" | "later";
+  /**
+   * Fin du départ : `"sound"` (défaut) : `finish("success")` quand le son est fini ; `"depart"` : l'épreuve mène tout le départ et appelle
+   * `finish("success")` elle-même, le kit est gelé (`suspend`, plus d'animation d'attente ni de prise) et seul un clic quitte tout de suite.
+   * Dans les deux cas un clic pendant le départ quitte l'écran.
+   */
+  end?: "sound" | "depart";
+}
+
+/** Un dépôt d'objet (`carryObject`) : la cible libre prise, d'où il vient, où il est lâché. */
+export interface ObjectDrop {
+  /** Cible libre prise par le carré de prise, ou null. */
+  target: DropTarget | null;
+  /** Cible occupée avant le transport (`ObjectCarrySpec.from`). */
+  from: DropTarget | null;
+  /** Position de l'objet au relâchement, et à la prise. */
+  position: Point;
+  origin: Point;
+}
+
+/**
+ * Un objet quelconque que l'épreuve fait porter par le pointeur (`PuzzleKit.carryObject`) : même protocole que le transport d'un Zoombini
+ * (`1168:58c7` : souris aimantée, auto-aimantation, curseur masqué, fin forcée `endCarry`). L'épreuve dessine l'objet : le kit lui donne la
+ * position à chaque tick (`onMove`) et la profondeur de transport (`feature`).
+ */
+export interface ObjectCarrySpec {
+  /** Position de l'objet à la prise (retour par défaut, `ObjectDrop.origin`). */
+  origin: Point;
+  /** Écart entre le pointeur et l'objet à la prise (défaut 0, 0 : l'objet est sous le pointeur). */
+  grab?: Point;
+  /** Dessin de l'objet : passé devant tout (`CARRY_DEPTH`) pendant le transport. Le kit ne lui rend pas sa profondeur : l'épreuve le fait dans `onDrop` / `onReturn`. */
+  feature?: Feature | null;
+  /** Cible occupée avant le transport. */
+  from?: DropTarget | null;
+  /** Cibles de dépôt (défaut : aucune) et demi-côté du carré de prise (défaut : celui du kit) ; une cible occupée n'est jamais prise. */
+  targets?: readonly DropTarget[];
+  radius?: number;
+  /** Zone du transport (défaut : celle du kit). */
+  bounds?: Readonly<Rect>;
+  /** Curseur masqué pendant le transport (défaut : l'option `hideCursorWhileCarrying`). */
+  hideCursor?: boolean;
+  /** À chaque tick : position de l'objet (pointeur moins `grab`, borné) et sens du pointeur depuis le tick précédent (−1 gauche, 1 droite, 0). */
+  onMove?: (position: Point, direction: -1 | 0 | 1) => void;
+  /** Cible libre survolée (null = aucune), quand elle change. */
+  onHover?: (target: DropTarget | null) => void;
+  /**
+   * Décision du relâchement : vrai = accepté (`onDrop`), faux = refusé (`onReturn`), `"keep"` = l'objet reste en main, collé, et le clic suivant
+   * décide de nouveau (l'épreuve a déjà agi sur ce relâchement). Défaut : accepté s'il y a une cible libre autre que `from`.
+   */
+  decide?: (drop: ObjectDrop) => boolean | "keep";
+  /** Le transport est fini (curseur rendu) : dépôt accepté / refusé. */
+  onDrop?: (drop: ObjectDrop) => void;
+  onReturn?: (drop: ObjectDrop) => void;
+}
+
 export interface PuzzleKitSpec {
   /** Écran de l'épreuve (7 à 18). */
   screen: number;
@@ -196,14 +345,19 @@ export interface PuzzleKitSpec {
   introVoice?: number;
   /** F1 est-elle prise en ce moment ? Défaut : toujours. Aux gorges (`10c0:0d20`) : épreuve active et plus personne en marche (`DS:9702 ≤ 0`). */
   helpAllowed?: () => boolean;
-  /** Boutons : `null` = absent. Défaut `BUTTON_MAP` ; le « go » n'existe que si l'épreuve le donne. */
-  buttons?: { map?: Readonly<Rect> | null; go?: Readonly<Rect> | null };
+  /** Boutons : `null` = absent. Défaut : la carte (`BUTTON_MAP`) ; le « go » n'existe que si l'épreuve le donne. `depth` : profondeur des images dessinées par le kit. */
+  buttons?: { map?: KitButtonSpec | null; go?: KitButtonSpec | null; depth?: number };
   /** Marche de sortie de `pressGo` (`1168:2982(écart, y, x)`) : point hors écran et écart entre départs (45). */
   exitWalk?: { x: number; y: number; step?: number };
   /** Peut-on prendre ce Zoombini ? Défaut : personne en marche (`DS:9702 < 1`) et lui-même immobile. */
   canPick?: (member: KitMember) => boolean;
-  /** Appui sur l'écran avant toute prise : vrai = l'épreuve l'a traité. */
+  /** Appui sur l'écran, après les boutons et avant toute prise : vrai = l'épreuve l'a traité. */
   onPointerDown?: (x: number, y: number) => boolean;
+  /**
+   * Chaque appui et relâchement, avant tout le reste, y compris pendant un transport et quand le kit est suspendu (`suspend()`), sauf boîte de
+   * dialogue ouverte. Vrai sur un appui : l'épreuve l'a pris, le kit l'ignore.
+   */
+  onPointer?: (event: PointerInfo) => boolean | void;
   /** Décision d'un dépôt (défaut : accepté s'il y a une cible). */
   decide?: (drop: DropInfo) => boolean;
   /** Retours : prise, cible survolée (null = aucune), dépôt accepté, retour à l'origine, entrée à pied terminée. */
@@ -211,6 +365,12 @@ export interface PuzzleKitSpec {
   onHover?: (target: DropTarget | null, member: KitMember) => void;
   onDrop?: (drop: DropInfo) => void;
   onReturn?: (drop: DropInfo) => void;
+  /**
+   * Dépôt non accepté (hors de toute cible libre, refusé par `decide`, ou reposé sur la place quittée : `drop.target` le dit), avant le retour par
+   * défaut. Renvoyer un `OutsidePlacement` envoie le Zoombini ailleurs que sur sa place d'origine (la place quittée reste libre, `onReturn` n'est pas
+   * appelé) ; ne rien renvoyer laisse le retour par défaut, suivi de `onReturn`.
+   */
+  onDropOutside?: (drop: DropInfo) => OutsidePlacement | null | void;
   onArrived?: (member: KitMember) => void;
 }
 
@@ -220,6 +380,8 @@ export interface ArrivalSpec {
   step: number;
   /** Ajouté à l'ordonnée des places pour ceux qui entrent à pied (paramètre de `1168:2505` : 0, −20 au camp, 100, 200). */
   yOffset?: number;
+  /** Tout le groupe est debout sur ses places, sans entrée à pied (l'hôtel : l'original n'appelle ni `1168:2505` ni `1168:274e`). `session.resuming` est consommé comme d'habitude. */
+  standing?: boolean;
 }
 
 /** Date du jour (monument de fin d'étape). */
@@ -239,7 +401,9 @@ interface Scheduled {
 }
 
 interface Carry {
-  member: KitMember;
+  /** Objet porté (un Zoombini est un cas particulier : voir `pick`) et le membre, s'il s'agit d'un Zoombini. */
+  spec: ObjectCarrySpec;
+  member: KitMember | null;
   /** Pieds à la prise et cible alors occupée. */
   origin: Point;
   from: DropTarget | null;
@@ -250,11 +414,13 @@ interface Carry {
   sticky: boolean;
   held: boolean;
   startedAt: number;
-  depth: number;
   hidden: boolean;
   hover: DropTarget | null;
   /** Fin demandée par l'épreuve (`DS:96f4`). */
   forced: boolean;
+  targets: readonly DropTarget[];
+  radius: number;
+  bounds: Readonly<Rect>;
 }
 
 export class PuzzleKit {
@@ -262,15 +428,11 @@ export class PuzzleKit {
   /** Places d'attente (liste B) et cibles de dépôt (liste A). */
   readonly waitingPlaces: DropTarget[];
   readonly targets: DropTarget[];
-  /** Bouton « go » actif (l'épreuve le règle : par exemple tant qu'un Zoombini est sauvé). */
-  goEnabled = false;
   /** Voix d'introduction (`DS:a2c4`). */
   introVoice: number;
   /** `DS:9702` : Zoombinis lancés à pied et pas encore arrivés ; `DS:9704` : arrivés depuis. */
   walking = 0;
   arrived = 0;
-  /** L'épreuve a changé d'écran (ou est en train : une sortie ne se déclenche qu'une fois). */
-  left = false;
   /** Sortie « go » en cours : l'écran change quand le son est fini ou au clic suivant. */
   departing = false;
 
@@ -279,10 +441,22 @@ export class PuzzleKit {
   private readonly radius: number;
   private readonly bounds: Readonly<Rect>;
   private readonly scheduled: Scheduled[] = [];
+  /** Marches lancées par l'épreuve (`walk`), pour les annuler à la prise. */
+  private readonly walks = new Map<KitMember, { counted: boolean }>();
+  private goOn = false;
+  /** Fin du départ lancé par `pressGo` (`GoOptions.end`). */
+  private goEnd: "sound" | "depart" = "sound";
+  /** Gelé : l'épreuve a changé d'écran, est en train de le faire, ou mène seule un départ (`suspend`). */
+  private halted = false;
+  /** Bouton à l'image enfoncée, et fin de cette image (0 : tant que le bouton de la souris est tenu). */
+  private pressedId: ButtonId | null = null;
+  private pressedUntil = 0;
   private carry: Carry | null = null;
   private unhookSave: (() => void) | null = null;
   private introPlaying = false;
   private finished = false;
+  /** `leave()` a été appelé. */
+  private gone = false;
 
   constructor(ctx: SceneContext, spec: PuzzleKitSpec) {
     this.ctx = ctx;
@@ -293,6 +467,39 @@ export class PuzzleKit {
     this.waitingPlaces = spec.places.map((p) => createTarget(p));
     this.targets = [...(spec.targets ? spec.targets(this.waitingPlaces) : this.waitingPlaces)];
     this.hookSave();
+    this.hookButtons();
+  }
+
+  // ------------------------------------------------------------------------------------------------------------------------
+  // État
+
+  /** Bouton « go » actif (l'épreuve le règle : par exemple tant qu'un Zoombini est sauvé). Un changement redessine les boutons. */
+  get goEnabled(): boolean {
+    return this.goOn;
+  }
+
+  set goEnabled(on: boolean) {
+    if (on === this.goOn) return;
+    this.goOn = on;
+    this.features.invalidate();
+  }
+
+  /** L'épreuve a changé d'écran (ou est en train : une sortie ne se déclenche qu'une fois), ou le kit est suspendu. */
+  get left(): boolean {
+    return this.halted;
+  }
+
+  /**
+   * Gèle le kit : plus d'arrivée, d'animation d'attente, de prise ni de clic de bouton ; seul `spec.onPointer` reçoit encore les événements du
+   * pointeur. À appeler quand l'épreuve mène seule un départ (le bac fait glisser son radeau) ; elle le termine par `finish()`.
+   */
+  suspend(): void {
+    this.halted = true;
+  }
+
+  /** Dégèle le kit (sans effet après `finish()` ou `leave()`). */
+  resume(): void {
+    if (!this.finished && !this.gone) this.halted = false;
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -314,19 +521,34 @@ export class PuzzleKit {
     return this.ctx.services.tryGet(DIALOG)?.isOpen ?? false;
   }
 
-  /** Le Zoombini transporté, s'il y en a un. */
+  /** Plus aucun son (effet ou voix) en file ni en cours, quel qu'en soit l'id (`isPlaying` pour un son précis). */
+  soundIdle(): boolean {
+    return this.soundDone();
+  }
+
+  /** Le son `id` est en file ou en cours (`ZoombinisSound.isPlaying`). */
+  isPlaying(id: number): boolean {
+    return this.sound.isPlaying(id);
+  }
+
+  /** Le Zoombini transporté, s'il y en a un (null pour un objet : voir `carryingObject`). */
   get carrying(): KitMember | null {
     return this.carry?.member ?? null;
   }
 
+  /** Un objet de l'épreuve est transporté (`carryObject`). */
+  get carryingObject(): boolean {
+    return this.carry !== null && this.carry.member === null;
+  }
+
   /** Cible libre prise par le carré de prise autour de `point` (la première de la liste A, comme `1168:1742`), ou null. */
   findTarget(point: Point, own: KitMember | null = null): DropTarget | null {
-    const r = this.radius;
-    for (const target of this.targets) {
-      if (target.owner !== null && target.owner !== own) continue;
-      if (target.x >= point.x - r && target.x <= point.x + r && target.y >= point.y - r && target.y <= point.y + r) return target;
-    }
-    return null;
+    return findIn(this.targets, this.radius, point, own);
+  }
+
+  /** `finish()` a été appelé : l'écran change (contrairement à `left`, qui est aussi vrai quand le kit est seulement suspendu). */
+  get finishing(): boolean {
+    return this.finished;
   }
 
   private depthAt(point: Point): number {
@@ -348,8 +570,8 @@ export class PuzzleKit {
     if (places.length < present.length) {
       throw new RangeError(`PuzzleKit : ${present.length} Zoombinis pour ${places.length} places d'attente`);
     }
-    // `DS:9a26` : entrée à pied, hors reprise (`DS:970a`) et hors « moins d'action » (`S+0x20`).
-    const walkIn = !game.options.lessAction && !session.resuming;
+    // `DS:9a26` : entrée à pied, hors reprise (`DS:970a`), hors « moins d'action » (`S+0x20`) et hors `standing` ; la reprise est consommée dans tous les cas.
+    const walkIn = !game.options.lessAction && !session.resuming && !arrival.standing;
     session.resuming = false;
     this.walking = 0;
     this.arrived = 0;
@@ -419,11 +641,26 @@ export class PuzzleKit {
 
   /** À appeler à chaque tick de la scène. */
   tick(): void {
-    if (this.left || this.dialogOpen) return;
+    if (this.finished || this.gone) return;
+    this.refreshPressed();
+    if (this.dialogOpen) return;
+    if (this.halted) {
+      // Gelé : seul le crochet de pointeur reste à l'écoute.
+      for (const event of this.ctx.input.buttonEvents) {
+        this.spec.onPointer?.({ x: event.x, y: event.y, down: event.down, button: event.button });
+        if (this.finished) return;
+        // Départ mené par l'épreuve (`pressGo({ end: "depart" })`) : un clic quitte tout de suite.
+        if (this.departing && event.down) {
+          this.finish("success");
+          return;
+        }
+      }
+      return;
+    }
     this.runDue();
     if (this.spec.waitAnimations ?? true) for (const member of this.members) if (!member.walking && this.carry?.member !== member) member.snoid.tickWait();
     this.input(this.ctx.input);
-    if (this.departing && this.soundDone()) this.finish("success");
+    if (this.departing && this.goEnd === "sound" && this.soundDone()) this.finish("success");
   }
 
   /** Lance les départs échus (`+0x24 ≤ maintenant`, `1168:0ba8`), le plus ancien d'abord. */
@@ -443,9 +680,12 @@ export class PuzzleKit {
   private input(input: Input): void {
     let pressed = false;
     for (const event of input.buttonEvents) {
-      if (!event.down) continue;
+      const taken = this.spec.onPointer?.({ x: event.x, y: event.y, down: event.down, button: event.button });
+      if (this.left) return;
+      if (!event.down || (taken && event.down)) continue;
       if (this.carry) {
-        pressed = true;
+        // Un objet de l'épreuve ne réagit qu'au bouton gauche ; un Zoombini transporté, à tous (comportement d'origine du kit).
+        if (this.carry.member || event.button === "left") pressed = true;
         continue;
       }
       if (event.button !== "left") continue;
@@ -460,18 +700,100 @@ export class PuzzleKit {
   }
 
   private click(x: number, y: number): boolean {
-    const { buttons } = this.spec;
-    const map = buttons?.map === undefined ? BUTTON_MAP : buttons.map;
-    if (inside(map, x, y)) {
-      this.pressMap();
+    const map = this.buttonSpec("map");
+    if (map && inside(this.buttonRect("map"), x, y)) {
+      this.press("map", map);
+      if (!map.onPress?.(this)) this.pressMap();
       return true;
     }
-    if (inside(buttons?.go, x, y)) {
-      this.pressGo();
+    const go = this.buttonSpec("go");
+    if (go && inside(this.buttonRect("go"), x, y)) {
+      if (this.goEnabled) {
+        this.press("go", go);
+        if (!go.onPress?.(this)) this.pressGo();
+      }
       return true;
     }
     if (this.spec.onPointerDown?.(x, y)) return true;
     return this.pick(x, y);
+  }
+
+  // ------------------------------------------------------------------------------------------------------------------------
+  // 1 bis. Boutons carte et « go »
+
+  private buttonSpec(id: ButtonId): KitButtonSpec | null {
+    const given = this.spec.buttons?.[id];
+    if (given !== undefined) return given;
+    return id === "map" ? {} : null;
+  }
+
+  private buttonRect(id: ButtonId): Readonly<Rect> {
+    return this.buttonSpec(id)?.rect ?? (id === "map" ? BUTTON_MAP : BUTTON_GO);
+  }
+
+  /** Image du bouton `id` : grisé (« go » inactif), enfoncé, ou normal. */
+  buttonState(id: ButtonId): ButtonState {
+    if (id === "go" && !this.goEnabled) return "disabled";
+    return this.pressedId === id ? "down" : "normal";
+  }
+
+  /** Bouton dont l'image est enfoncée en ce moment. */
+  get pressed(): ButtonId | null {
+    return this.pressedId;
+  }
+
+  private setPressed(id: ButtonId | null, until = 0): void {
+    this.pressedUntil = until;
+    if (id === this.pressedId) return;
+    this.pressedId = id;
+    this.features.invalidate();
+  }
+
+  /** Clic sur un bouton : image enfoncée pour `hold` ticks (sans `hold`, `refreshPressed` la suit tant que la souris est tenue). */
+  private press(id: ButtonId, spec: KitButtonSpec): void {
+    if (spec.hold !== undefined) this.setPressed(id, this.ctx.clock.ticks + spec.hold);
+  }
+
+  /** Fin d'une image enfoncée à durée, ou image enfoncée tant que le bouton de la souris est tenu sur un bouton sans `hold`. */
+  private refreshPressed(): void {
+    if (this.pressedUntil > 0) {
+      if (this.ctx.clock.ticks >= this.pressedUntil) this.setPressed(null);
+      return;
+    }
+    const input = this.ctx.input;
+    let held: ButtonId | null = null;
+    if (input.isButtonDown("left") && !this.carry && !this.halted) {
+      for (const id of ["map", "go"] as const) {
+        const spec = this.buttonSpec(id);
+        if (!spec || spec.hold !== undefined || (id === "go" && !this.goEnabled)) continue;
+        if (inside(this.buttonRect(id), input.mouseX, input.mouseY)) {
+          held = id;
+          break;
+        }
+      }
+    }
+    this.setPressed(held);
+  }
+
+  /** Dessine les images des boutons par une feature, si l'épreuve en a fourni. */
+  private hookButtons(): void {
+    const specs = (["map", "go"] as const).map((id) => [id, this.buttonSpec(id)] as const);
+    if (!specs.some(([, spec]) => spec?.images)) return;
+    this.features.create({
+      script: 0,
+      delay: 0,
+      depth: this.spec.buttons?.depth ?? 0,
+      flags: 0,
+      onAfterDraw: (_feature, screen) => {
+        for (const [id, spec] of specs) {
+          const images = spec?.images;
+          if (!images) continue;
+          const state = this.buttonState(id);
+          const shape = state === "disabled" ? images.disabled : state === "down" ? images.down : images.normal;
+          if (shape) drawShape(screen, shape, this.buttonRect(id).left, this.buttonRect(id).top, 8);
+        }
+      },
+    });
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -496,53 +818,100 @@ export class PuzzleKit {
     if (!member) return false;
     const allowed = this.spec.canPick ? this.spec.canPick(member) : this.walking < 1;
     if (!allowed) return false;
-    const { prefs } = this.ctx;
+    // Un marcheur repris abandonne sa marche : le kit rend ses compteurs.
+    this.cancelWalk(member);
     const position = member.snoid.position;
+    const origin = { x: position.x, y: position.y };
+    const depth = member.snoid.feature.depth;
     const from = member.target;
     // La place quittée est libérée (`1168:1742` : propriétaire remis à 0 dans les deux listes).
     for (const target of [...this.targets, ...this.waitingPlaces]) if (target.owner === member) target.owner = null;
-    const hidden = prefs.hideCursorWhileCarrying;
-    this.carry = {
-      member,
-      origin: { x: position.x, y: position.y },
-      from,
+    // Un Zoombini est un objet transporté comme un autre, avec ses cibles, sa décision et ses suites propres.
+    const spec: ObjectCarrySpec = {
+      origin,
       grab: { x: x - position.x, y: y - position.y },
-      lastX: x,
-      sticky: prefs.magneticMouse,
-      held: true,
-      startedAt: this.ctx.clock.ticks,
-      depth: member.snoid.feature.depth,
-      hidden,
-      hover: null,
-      forced: false,
+      feature: member.snoid.feature,
+      from,
+      targets: this.targets,
+      radius: this.radius,
+      onMove: (at, direction) => {
+        // Tourné du côté où il va (`+0xf2`).
+        if (direction < 0) member.snoid.setFacing(1);
+        else if (direction > 0) member.snoid.setFacing(0);
+        member.snoid.setPosition(at);
+      },
+      onHover: (target) => this.spec.onHover?.(target, member),
+      // Relâché sur la place qu'il vient de quitter : rien à décider, il y retourne.
+      decide: (drop) => drop.target !== null && drop.target !== from && (this.spec.decide ? this.spec.decide(this.dropInfo(member, drop)) : true),
+      onDrop: (drop) => this.memberDropped(member, this.dropInfo(member, drop)),
+      onReturn: (drop) => this.memberRejected(member, this.dropInfo(member, drop), depth),
     };
-    this.features.restack(member.snoid.feature, CARRY_DEPTH);
+    this.beginCarry(spec, member, x);
     member.snoid.delay = CARRY_DELAY;
     member.snoid.play(CARRY_SCRIPT_BASE + member.snoid.traits.feet);
-    if (hidden) this.ctx.setCursor(HIDDEN_CURSOR);
     this.spec.onPick?.(member);
     return true;
   }
 
-  /** Fin de transport demandée par l'épreuve (`DS:96f4 = 1`) : le Zoombini est déposé là où il est. */
+  /**
+   * Fait porter un objet de l'épreuve par le pointeur, avec le protocole du transport d'un Zoombini (`1168:58c7`) : souris aimantée (clic-clic),
+   * auto-aimantation, curseur masqué, fin forcée par `endCarry()`. Renvoie faux si un transport est déjà en cours (ou si le kit est gelé).
+   * À appeler à l'appui, depuis `spec.onPointer` (l'appui est alors pris par l'épreuve : le kit ne le compte pas comme clic de dépôt).
+   */
+  carryObject(spec: ObjectCarrySpec): boolean {
+    if (this.carry || this.left || this.departing) return false;
+    this.beginCarry(spec, null, this.ctx.input.mouseX);
+    return true;
+  }
+
+  /** Abandonne le transport d'un objet sans rien décider (ni `onDrop` ni `onReturn`) : curseur rendu, l'objet reste où l'épreuve l'a mis. */
+  cancelObjectCarry(): void {
+    const carry = this.carry;
+    if (!carry || carry.member) return;
+    this.carry = null;
+    if (carry.hidden) this.ctx.setCursor("system");
+  }
+
+  private beginCarry(spec: ObjectCarrySpec, member: KitMember | null, pointerX: number): void {
+    const { prefs } = this.ctx;
+    const hidden = spec.hideCursor ?? prefs.hideCursorWhileCarrying;
+    this.carry = {
+      spec,
+      member,
+      origin: { ...spec.origin },
+      from: spec.from ?? null,
+      grab: { x: spec.grab?.x ?? 0, y: spec.grab?.y ?? 0 },
+      lastX: pointerX,
+      sticky: prefs.magneticMouse,
+      held: true,
+      startedAt: this.ctx.clock.ticks,
+      hidden,
+      hover: null,
+      forced: false,
+      targets: spec.targets ?? [],
+      radius: spec.radius ?? this.radius,
+      bounds: spec.bounds ?? this.bounds,
+    };
+    if (spec.feature) this.features.restack(spec.feature, CARRY_DEPTH);
+    if (hidden) this.ctx.setCursor(HIDDEN_CURSOR);
+  }
+
+  /** Fin de transport demandée par l'épreuve (`DS:96f4 = 1`) : l'objet est déposé là où il est. */
   endCarry(): void {
     if (this.carry) this.carry.forced = true;
   }
 
   private updateCarry(input: Input, pressed: boolean): void {
     const carry = this.carry!;
-    const { member } = carry;
-    const x = Math.max(this.bounds.left, Math.min(this.bounds.right, input.mouseX - carry.grab.x));
-    const y = Math.max(this.bounds.top, Math.min(this.bounds.bottom, input.mouseY - carry.grab.y));
-    // Tourné du côté où il va (`+0xf2`).
-    if (input.mouseX < carry.lastX) member.snoid.setFacing(1);
-    else if (input.mouseX > carry.lastX) member.snoid.setFacing(0);
+    const x = Math.max(carry.bounds.left, Math.min(carry.bounds.right, input.mouseX - carry.grab.x));
+    const y = Math.max(carry.bounds.top, Math.min(carry.bounds.bottom, input.mouseY - carry.grab.y));
+    const direction = input.mouseX < carry.lastX ? -1 : input.mouseX > carry.lastX ? 1 : 0;
     carry.lastX = input.mouseX;
-    member.snoid.setPosition({ x, y });
-    const hover = this.findTarget({ x, y }, member);
+    carry.spec.onMove?.({ x, y }, direction);
+    const hover = findIn(carry.targets, carry.radius, { x, y }, carry.member);
     if (hover !== carry.hover) {
       carry.hover = hover;
-      this.spec.onHover?.(hover, member);
+      carry.spec.onHover?.(hover);
     }
     // `1168:58c7` : le transport continue tant qu'elle renvoie 1.
     let down = input.isButtonDown("left");
@@ -563,32 +932,75 @@ export class PuzzleKit {
       if (carry.held && !down) carry.held = false;
       if (!carry.held && down) done = true;
     }
-    if (done) this.drop(x, y);
+    if (done) this.drop(carry, { x, y });
   }
 
-  private drop(x: number, y: number): void {
-    const carry = this.carry!;
+  private drop(carry: Carry, position: Point): void {
+    const { spec } = carry;
+    const target = findIn(carry.targets, carry.radius, position, carry.member);
+    const info: ObjectDrop = { target, from: carry.from, position, origin: carry.origin };
+    // La décision se prend le transport déjà fini (`kit.carrying` est nul pour l'épreuve), sauf si elle garde l'objet en main.
     this.carry = null;
-    const { member } = carry;
-    const position = { x, y };
-    const target = this.findTarget(position, member);
-    const info: DropInfo = { member, target, from: carry.from, position, origin: carry.origin };
-    // Relâché sur la place qu'il vient de quitter : rien à décider, il y retourne.
-    const accepted = target !== null && target !== carry.from && (this.spec.decide ? this.spec.decide(info) : true);
+    const verdict = spec.decide ? spec.decide(info) : target !== null && target !== carry.from;
+    if (verdict === "keep" && !carry.forced) {
+      this.carry = carry;
+      carry.sticky = true;
+      carry.held = false;
+      return;
+    }
     if (carry.hidden) this.ctx.setCursor("system");
-    const where = accepted ? { x: target.x, y: target.y } : carry.origin;
+    if (verdict === true) spec.onDrop?.(info);
+    else spec.onReturn?.(info);
+  }
+
+  private dropInfo(member: KitMember, drop: ObjectDrop): DropInfo {
+    return { member, target: drop.target, from: drop.from, position: drop.position, origin: drop.origin };
+  }
+
+  /** Dépôt accepté d'un Zoombini : posé d'un coup sur la cible, qui devient la sienne. */
+  private memberDropped(member: KitMember, info: DropInfo): void {
+    const target = info.target!;
+    const where = { x: target.x, y: target.y };
     this.snap(member, where);
-    this.features.restack(member.snoid.feature, accepted ? this.depthAt(where) : carry.depth);
-    if (accepted) {
-      target.owner = member;
-      member.target = target;
-      if (this.waitingPlaces.includes(target)) member.waiting = target;
-      this.spec.onDrop?.(info);
+    this.features.restack(member.snoid.feature, this.depthAt(where));
+    target.owner = member;
+    member.target = target;
+    if (this.waitingPlaces.includes(target)) member.waiting = target;
+    this.spec.onDrop?.(info);
+  }
+
+  /** Dépôt non accepté d'un Zoombini : l'épreuve peut l'envoyer ailleurs (`onDropOutside`), sinon il retourne d'un coup à sa place d'origine. */
+  private memberRejected(member: KitMember, info: DropInfo, depth: number): void {
+    const outside = this.spec.onDropOutside?.(info);
+    if (outside) {
+      this.placeOutside(member, info, outside, depth);
+      return;
+    }
+    this.snap(member, info.origin);
+    this.features.restack(member.snoid.feature, depth);
+    if (info.from) info.from.owner = member;
+    member.target = info.from;
+    if (info.from && this.waitingPlaces.includes(info.from)) member.waiting = info.from;
+    this.spec.onReturn?.(info);
+  }
+
+  /** Le Zoombini va où l'épreuve l'a décidé (`onDropOutside`) : posé d'un coup, ou à pied depuis le point de dépôt ; la place quittée reste libre. */
+  private placeOutside(member: KitMember, info: DropInfo, outside: OutsidePlacement, depth: number): void {
+    const { at, place = null } = outside;
+    member.target = null;
+    member.waiting = null;
+    if (place) {
+      place.owner = member;
+      member.waiting = place;
+      member.target = place;
+    }
+    if (outside.walk) {
+      this.snap(member, info.position);
+      this.features.restack(member.snoid.feature, depth);
+      this.walk(member, at, () => this.features.restack(member.snoid.feature, this.depthAt(at)), { counted: false });
     } else {
-      if (carry.from) carry.from.owner = member;
-      member.target = carry.from;
-      if (carry.from && this.waitingPlaces.includes(carry.from)) member.waiting = carry.from;
-      this.spec.onReturn?.(info);
+      this.snap(member, at);
+      this.features.restack(member.snoid.feature, this.depthAt(at));
     }
   }
 
@@ -600,6 +1012,43 @@ export class PuzzleKit {
     snoid.setFacing(0);
     snoid.moveTo(where);
     snoid.idle();
+  }
+
+  // ------------------------------------------------------------------------------------------------------------------------
+  // 3 bis. Marches lancées par l'épreuve
+
+  /**
+   * Marche de `member` vers `dest` (`Snoid.walkTo`), tenue par le kit : le membre est « en marche » (ni pris ni déposé, sauf `pickable`), `walking` monte
+   * puis, à l'arrivée, redescend et `arrived` monte (`counted`, comme `DS:9702` / `9704`), puis `onArrive`. Une nouvelle marche remplace la précédente ;
+   * reprendre un marcheur `pickable` l'annule et rend ses compteurs.
+   */
+  walk(member: KitMember, dest: Point, onArrive?: (member: KitMember) => void, options: WalkOptions = {}): void {
+    const counted = options.counted ?? true;
+    this.cancelWalk(member);
+    if (!options.pickable) member.walking = true;
+    if (counted) this.walking += 1;
+    this.walks.set(member, { counted });
+    member.snoid.onArrive = () => {
+      member.snoid.onArrive = undefined;
+      this.walks.delete(member);
+      member.walking = false;
+      if (counted && this.walking > 0) {
+        this.walking -= 1;
+        this.arrived += 1;
+      }
+      onArrive?.(member);
+    };
+    member.snoid.walkTo(dest);
+  }
+
+  /** Abandonne la marche lancée par `walk` de `member`, s'il y en a une : plus de rappel d'arrivée, compteurs rendus. */
+  cancelWalk(member: KitMember): void {
+    const walk = this.walks.get(member);
+    if (!walk) return;
+    this.walks.delete(member);
+    member.snoid.onArrive = undefined;
+    member.walking = false;
+    if (walk.counted && this.walking > 0) this.walking -= 1;
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -652,31 +1101,44 @@ export class PuzzleKit {
     if (this.left || this.departing) return;
     this.sound.stopEffects();
     this.sound.queue(SOUND_MAP);
-    this.left = true;
+    this.suspend();
     confirmLeaveToMap(
       this.ctx,
       () => {
-        this.left = false;
+        this.resume();
         this.finish("failure");
       },
       () => {
-        this.left = false;
+        this.resume();
       },
     );
   }
 
   /**
-   * Bouton « go » (seulement s'il est actif, `goEnabled`) : son 996, départ à pied des sauvés vers `exitWalk`, puis changement d'écran quand
-   * le son est fini ou au clic suivant. Renvoie vrai si la sortie est lancée.
+   * Bouton « go » (seulement s'il est actif, `goEnabled`) : son 996 (ou différé, `sound`), départ à pied des sauvés vers `exitWalk` (ou départ de
+   * l'épreuve, `depart`), puis changement d'écran quand le son est fini, quand l'épreuve le demande (`end: "depart"`) ou au clic suivant. Le kit ne marque personne « sauvé » de lui-même : l'épreuve l'a fait (`+0x127`)
+   * ou demande `saveAll` (`1168:3dd0(0, 1)`). Renvoie vrai si la sortie est lancée.
    */
-  pressGo(): boolean {
+  pressGo(options: GoOptions = {}): boolean {
     if (this.left || this.departing || !this.goEnabled) return false;
+    if (options.saveAll) this.markAll(true);
     const walk = this.spec.exitWalk;
-    this.sound.stopEffects();
-    this.sound.queue(SOUND_GO);
-    if (walk) this.departSaved(walk.x, walk.y, walk.step);
+    this.goEnd = options.end ?? "sound";
+    if ((options.sound ?? "now") === "now") {
+      this.sound.stopEffects();
+      this.sound.queue(SOUND_GO);
+    }
     this.departing = true;
+    if (options.depart) options.depart();
+    else if (walk) this.departSaved(walk.x, walk.y, walk.step);
+    // Départ mené par l'épreuve : le kit se gèle (après `depart`, qui peut encore compter sur lui) et ne garde que le clic.
+    if (this.goEnd === "depart") this.suspend();
     return true;
+  }
+
+  /** Le son de départ 996, quand `pressGo({ sound: "later" })` l'a différé. */
+  playGoSound(): void {
+    this.sound.queue(SOUND_GO);
   }
 
   /**
@@ -686,7 +1148,7 @@ export class PuzzleKit {
   finish(outcome: "success" | "failure"): void {
     if (this.finished) return;
     this.finished = true;
-    this.left = true;
+    this.halted = true;
     const zoombinis = this.zoombinis;
     const { game, session } = zoombinis;
     const { screen, party } = this.spec;
@@ -770,16 +1232,17 @@ export class PuzzleKit {
   // ------------------------------------------------------------------------------------------------------------------------
   // Fin de scène
 
-  /** `leave` de l'épreuve : retire l'action d'enregistrement, rend le curseur, remet le Zoombini transporté à sa place. */
+  /** `leave` de l'épreuve : retire l'action d'enregistrement, rend le curseur, remet le Zoombini transporté à sa place (un objet reste où il est). */
   leave(): void {
-    this.left = true;
+    this.gone = true;
+    this.halted = true;
     this.unhookSave?.();
     this.unhookSave = null;
     const carry = this.carry;
     if (carry) {
       this.carry = null;
       if (carry.hidden) this.ctx.setCursor("system");
-      if (carry.from) carry.from.owner = carry.member;
+      if (carry.member && carry.from) carry.from.owner = carry.member;
     }
     this.scheduled.length = 0;
   }
@@ -788,6 +1251,15 @@ export class PuzzleKit {
   get snoidFeatures(): Feature[] {
     return this.members.map((m) => m.snoid.feature);
   }
+}
+
+/** Première cible libre (ou à `own`) de `targets` dans le carré de demi-côté `radius` autour de `point` (`1168:1742`). */
+function findIn(targets: readonly DropTarget[], radius: number, point: Point, own: KitMember | null): DropTarget | null {
+  for (const target of targets) {
+    if (target.owner !== null && target.owner !== own) continue;
+    if (target.x >= point.x - radius && target.x <= point.x + radius && target.y >= point.y - radius && target.y <= point.y + radius) return target;
+  }
+  return null;
 }
 
 /** Tri croissant stable par abscisse (insertion avant le premier plus grand, comme `1168:280c`). */

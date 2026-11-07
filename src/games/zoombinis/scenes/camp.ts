@@ -28,10 +28,16 @@
  *  - le camp 2 n'a qu'une sortie (écran 16) ; son décor est un jeu de 10 zones de clic qui rejouent ou changent le script d'une feature (`10b8:0a0c`), sans état
  *    mémorisé dans la partie, alors que les 5 objets du camp 1 (champignons, `SCRB` 1111 à 1115) mémorisent leur image dans `S+0x14` (`10b0:0a2a`).
  *
+ * Ordre de dessin (`11a8:231b`, `docs/zoombinis/screens.md` §3.3) : l'écran active `features.setDepthSort(true)` ; à chaque tour du moteur les features sont rangées
+ * d'après le bord bas du rectangle de leur image (bord gauche à égalité ; le plus bas est devant). Les 16 emplacements et les features `0x8000` restent au fond ;
+ * le décor est trié une fois ; les Zoombinis le sont à chaque tick ; les features `0x1000` (lattes du présentoir, boutons, 1107) restent devant. Au camp 1 un
+ * Zoombini passe donc derrière le rocher 1110 (bord bas 346, colonne x de 321 à 394, drapeaux `0x50000000`) et devant le décor plus haut (insecte, champignons),
+ * et les Zoombinis des places sont derrière le premier plan 1100 à 1103 ; au camp 2 tout le décor est au fond ou plus haut : rien ne change à l'écran.
+ *
  * Écarts : le glisser-déposer d'un Zoombini du groupe le rend à sa place s'il n'est lâché ni sur le présentoir ni près d'une place libre (l'original lance
  * `1168:1742`, dont les zones de dépôt `1520:00fc` ne sont pas déclarées par ces écrans : le rayon de 36 points est choisi) ; pas de surbrillance des places
  * pendant le glissement ; pas d'animation d'attente ; le curseur n'est pas changé ; l'arrêt du son 2000 coupe tous les effets (pas d'arrêt par identifiant) ;
- * tri devant / derrière des décors (`11a8:231b`) non porté (les Zoombinis sont au-dessus de tout le décor) ; les champignons ne sont pas créés par `10b0:0027`
+ * le Zoombini porté par le pointeur est devant tout (extension : l'ordre de `1168:1742` n'est pas établi) ; la lecture de `drapeaux == 1` d'un Zoombini devient « bit snoid » (voir `Features.reorder`) ; les lattes du présentoir sont une feature `0x1000` (l'original en a une `0x9000`) ; les champignons ne sont pas créés par `10b0:0027`
  * (**hypothèse** : ils le sont ailleurs, leur image mémorisée est restituée à l'entrée) ; aucune musique n'est lancée par ces écrans (aucun appel dans `10b0:0027`).
  */
 import type { Shape } from "../../../data/mohawk/shap";
@@ -111,10 +117,11 @@ const EXIT_GAP = 45;
 /** Les 16 features d'emplacement : images fixes jouées une fois dès la création (`0x108a000`). */
 const PLACE_FLAGS = FeatureFlag.staticFirst | FeatureFlag.noReplay | FeatureFlag.active | FeatureFlag.firstImage;
 const { staticFirst, stopAtEnd, noReplay, active, random, queueScript, stopEachImage } = FeatureFlag;
-/** Drapeaux inconnus du lecteur de features : `0x1000` (feature 1107 de `BASECAMP`), `0x50000000` (1110) et `0x4000000` (6002, 6004, 6006 à 6008 de `BCTWO`). */
-const UNREAD_1000 = 0x1000;
-const UNREAD_5 = 0x50000000;
-const UNREAD_4 = 0x4000000;
+/** Drapeaux de tri de `11a8:231b` : `0x1000` (feature 1107 de `BASECAMP`), `0x50000000` (1110) et `0x4000000` (6002, 6004, 6006 à 6008 de `BCTWO`). */
+const { overlay, limitLeft, limitRight, flag4000000 } = FeatureFlag;
+const UNREAD_1000 = overlay;
+const UNREAD_5 = limitLeft | limitRight;
+const UNREAD_4 = flag4000000;
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Données de chaque camp
@@ -454,7 +461,9 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
   let onceDone = false;
 
   // --- Décor (`10b0:0027`, `10b8:0030`) ---
-  features.create({ script: 0, delay: 0, depth: 0, flags: 0, onAfterDraw: (_feature, screen) => paintShelfBase(screen) });
+  // Dessin sans script : le présentoir (`0xc000` dans l'original) reste au fond, lattes et boutons (`0x1000`) devant les Zoombinis.
+  features.setDepthSort(true);
+  features.create({ script: 0, delay: 0, flags: active, onAfterDraw: (_feature, screen) => paintShelfBase(screen) });
   spec.places.forEach((_place, i) => features.create({ script: spec.placeScript + i, delay: 7, flags: PLACE_FLAGS }));
   decor = spec.decor.features.map((params) => features.create(params));
   const mush = spec.decor.mushrooms;
@@ -471,8 +480,8 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
     }
   }
   if (spec.decor.insect) insect = decor.find((feature) => feature.scriptId === spec.decor.insect!.script);
-  features.create({ script: 0, delay: 0, depth: 0.3, flags: 0, onAfterDraw: (_feature, screen) => paintShelfFront(screen) });
-  features.create({ script: 0, delay: 0, depth: 0.5, flags: 0, onAfterDraw: (_feature, screen) => paintButtons(screen) });
+  features.create({ script: 0, delay: 0, flags: overlay, onAfterDraw: (_feature, screen) => paintShelfFront(screen) });
+  features.create({ script: 0, delay: 0, flags: overlay, onAfterDraw: (_feature, screen) => paintButtons(screen) });
 
   // --- Arrivée (`10b0:0027`) : réserve, groupe, présentoir ---
   const hadSurvivors = initial.group.members.some((member) => member.present);
@@ -484,7 +493,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
   arrival.party.slice(0, spec.places.length).forEach((zoombini, rank) => {
     const place = spec.places[rank]!;
     const entering = rank >= standing;
-    const snoid = createSnoid(ctx, zoombini, { position: entering ? { x: ENTRY_X, y: place.y } : place, depth: depthOf(place.y) });
+    const snoid = createSnoid(ctx, zoombini, { position: entering ? { x: ENTRY_X, y: place.y } : place });
     const occupant: Occupant = { zoombini, snoid, walking: entering, arriving: entering };
     slots[rank] = occupant;
     if (entering) {
@@ -504,10 +513,6 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
 
   // ------------------------------------------------------------------------------------------------------------------------
   // Utilitaires
-
-  function depthOf(y: number): number {
-    return 1 + y / 1000;
-  }
 
   /** Nombre de colonnes (`10b0:171b`) : fin de la réserve + 10 arrondi à 5 près, 50 à 625 entrées. */
   function rowsFor(r: Reserve): number {
@@ -819,11 +824,12 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
 
   function snoidAt(x: number, y: number): { occupant: Occupant; slot: number } | null {
     let found: { occupant: Occupant; slot: number } | null = null;
+    const order = features.features;
     slots.forEach((occupant, slot) => {
       const rect = occupant?.snoid.feature.rect;
       if (!occupant || !rect || occupant.walking) return;
       if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) {
-        if (!found || occupant.snoid.depth >= found.occupant.snoid.depth) found = { occupant, slot };
+        if (!found || order.indexOf(occupant.snoid.feature) >= order.indexOf(found.occupant.snoid.feature)) found = { occupant, slot };
       }
     });
     return found;
@@ -831,7 +837,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
 
   function beginDrag(occupant: Occupant, slot: number | null, shelfIndex: number, x: number, y: number): void {
     drag = { occupant, slot, shelfIndex, lastX: x };
-    features.restack(occupant.snoid.feature, 3);
+    occupant.snoid.feature.raised = true;
     occupant.snoid.moveTo({ x, y });
   }
 
@@ -844,7 +850,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
     if (!zoombini) return false;
     recompute();
     layoutShelf();
-    const snoid = createSnoid(ctx, zoombini, { position: { x, y }, depth: 3 });
+    const snoid = createSnoid(ctx, zoombini, { position: { x, y } });
     beginDrag({ zoombini, snoid, walking: false, arriving: false }, null, index, x, y);
     return true;
   }
@@ -903,7 +909,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
   /** Le Zoombini marche jusqu'à sa place (`+0xe6` = position d'origine). */
   function settle(occupant: Occupant, place: number): void {
     const where = spec.places[place]!;
-    features.restack(occupant.snoid.feature, depthOf(where.y));
+    occupant.snoid.feature.raised = false;
     occupant.walking = true;
     occupant.snoid.onArrive = () => {
       occupant.walking = false;

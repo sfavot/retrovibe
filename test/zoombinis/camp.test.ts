@@ -79,8 +79,8 @@ describe.skipIf(!original.has).each([1, 2] as const)("camp de base %i", (camp) =
     const features = engine.services.get(FEATURES);
     const zoombinis = services.game;
     const all = () => features.features.filter((f) => f.hasFlag(FeatureFlag.snoid));
-    /** Les Zoombinis du groupe (profondeur au-dessus de 1) et ceux du présentoir (0,2). */
-    const group = () => all().filter((f) => f.depth > 1);
+    /** Les Zoombinis du groupe (profondeur de création 1 ou plus) et ceux du présentoir (0,2) ; l'ordre de dessin, lui, est dynamique (`Features.reorder`). */
+    const group = () => all().filter((f) => f.depth >= 1);
     const shelf = () => all().filter((f) => f.depth < 1);
     const click = async (at: Pt, wait = 40) => {
       host.click(at[0], at[1]);
@@ -477,6 +477,68 @@ describe.skipIf(!original.has).each([1, 2] as const)("camp de base %i", (camp) =
     const dialogs = engine.services.get(DIALOG) as unknown as { beforeSave: (() => void)[] };
     for (const hook of dialogs.beforeSave) hook();
     expect(groupReserve(zoombinis.game).members).toHaveLength(16);
+  });
+
+  it("ordre de dessin (`11a8:231b`) : emplacements au fond, premier plan et boutons devant les Zoombinis, décor trié par son bord bas", async () => {
+    const { features, group, engine, host } = await start((game) => {
+      game.group.members = members(16);
+      game.counters.created = 16;
+    });
+    await runFor(engine, host, 30000);
+    const order = features.features;
+    const z = group().map((f) => order.indexOf(f));
+    const first = Math.min(...z);
+    const last = Math.max(...z);
+    const script = (id: number) => order.findIndex((f) => f.scriptId === id);
+    // Les 16 `SCRB` d'emplacement (`0x8000`) sont devant rien : toujours derrière les Zoombinis.
+    const places = order.filter((f) => f.hasFlag(FeatureFlag.active) && f.script && f.scriptId >= (camp === 1 ? 1200 : 7000) && f.scriptId < (camp === 1 ? 1216 : 7016));
+    expect(places).toHaveLength(16);
+    for (const place of places) expect(order.indexOf(place)).toBeLessThan(first);
+    // Les features sans script (lattes du présentoir, boutons) sont `0x1000` : devant les Zoombinis.
+    const overlays = order.filter((f) => f.hasFlag(FeatureFlag.overlay));
+    expect(overlays.length).toBeGreaterThanOrEqual(2);
+    for (const overlay of overlays) expect(order.indexOf(overlay)).toBeGreaterThan(last);
+    if (camp === 1) {
+      // Premier plan 1100 à 1103 (bord bas 473 ou 480) : devant les Zoombinis (bord bas ≤ 393) ; l'insecte 1104 (bord bas 276) : derrière.
+      for (const id of [1100, 1101, 1102, 1103]) expect(script(id)).toBeGreaterThan(last);
+      expect(script(1104)).toBeLessThan(first);
+    } else {
+      // Camp 2 : tout le décor est `0x8000` ou a son bord bas plus haut que celui des Zoombinis.
+      for (const id of [6005, 6011, 6010, 6002, 6009, 6006, 6007, 6008, 6000, 6004]) expect(script(id)).toBeLessThan(first);
+    }
+  });
+
+  it.skipIf(camp !== 1)("un Zoombini qui marche derrière le rocher 1110 (`limitLeft` / `limitRight`) est caché par lui, puis repasse devant", async () => {
+    const { features, group, engine, host } = await start((game) => {
+      game.group.members = members(16);
+      game.counters.created = 16;
+    });
+    await runFor(engine, host, 30000);
+    const rock = () => features.features.findIndex((f) => f.scriptId === 1110);
+    const place0 = PLACES[camp][0]!;
+    // Place 0 déplacée vers le haut du camp 1 (hors du rocher : ses bords gauche / droite sont 321 et 394) puis lâchée hors de toute place : il y retourne à pied.
+    host.input.moveMouse(place0[0], place0[1]);
+    host.input.mouseDown("left");
+    await runFor(engine, host, 60);
+    host.input.moveMouse(340, 296);
+    await runFor(engine, host, 60);
+    const held = group().find((f) => f.rect && f.rect.bottom < 346 && f.rect.left >= 321 && f.rect.right <= 394);
+    expect(held).toBeDefined();
+    // Porté par le pointeur : devant tout (même les `overlay`).
+    expect(features.features.at(-1)).toBe(held);
+    host.input.mouseUp("left");
+    const states: { bottom: number; behind: boolean }[] = [];
+    for (let k = 0; k < 40; k++) {
+      await runFor(engine, host, 20);
+      const r = held!.rect!;
+      if (r.left >= 321 && r.right <= 394) states.push({ bottom: r.bottom, behind: features.features.indexOf(held!) < rock() });
+    }
+    {
+      // Dans la colonne du rocher, derrière tant que le bord bas est au-dessus de celui du rocher (346) (critère de `25ad` / `2737`) ; de retour sur sa place (bord bas 356), devant.
+      expect(states.length).toBeGreaterThan(0);
+      for (const s of states) expect(s.behind).toBe(s.bottom < 346);
+      expect(features.features.indexOf(held!)).toBeGreaterThan(rock());
+    }
   });
 
   it("deux écrans de camp se suivent sans reste d'état : features et personnages détruits à la sortie", async () => {

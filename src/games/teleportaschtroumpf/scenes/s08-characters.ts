@@ -168,6 +168,8 @@ class CharactersScene implements Scene {
       axis: "vertical",
       highlight: paletteHighlight(BUTTON_TEXT_ENTRY, [c[0], c[1], c[2]]),
       changeSound: CLICK_SOUND,
+      // Attente de fin de bruitage de l'original : `21ee:09d0..09e4`.
+      waitEffectEnd: true,
       areas: () => BUTTON_SPRITES.map((sprite, i) => spriteArea(sprites, sprite, BUTTON_X, BUTTON_Y[i])),
     });
     await this.menu.load(ctx);

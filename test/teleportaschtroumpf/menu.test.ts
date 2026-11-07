@@ -30,7 +30,7 @@ interface Harness {
 
 async function harness(
   axis: "vertical" | "horizontal" | "none",
-  options: { wrap?: boolean; initial?: number; changeSound?: string; changeSoundIfIdle?: boolean; areas?: MenuOptions["areas"] } = {},
+  options: { wrap?: boolean; initial?: number; changeSound?: string; changeSoundIfIdle?: boolean; waitEffectEnd?: boolean; areas?: MenuOptions["areas"] } = {},
 ): Promise<Harness> {
   const input = new Input();
   const palette = new Palette();
@@ -279,6 +279,66 @@ describe("Menu", () => {
       h.input.mouseMove(150, 85);
       h.step();
       expect(h.menu.index).toBe(0);
+    });
+  });
+  describe("attente de fin de bruitage (21ee:11e6, while (0b42(1, 0)) 1764:018a)", () => {
+    it("ne relit pas les touches tant que le bip du déplacement sonne", async () => {
+      const h = await harness("vertical", { changeSound: "bip.voc", waitEffectEnd: true });
+      h.input.keyDown("ArrowDown");
+      h.busy.effect = true; // le bip vient de partir
+      h.step();
+      h.input.keyUp("ArrowDown");
+      expect(h.menu.index).toBe(1);
+      // Appuis pendant le bip : perdus, comme dans la boucle d'origine.
+      h.input.keyDown("ArrowDown");
+      h.step();
+      h.input.keyUp("ArrowDown");
+      h.step();
+      expect(h.menu.index).toBe(1);
+      h.busy.effect = false;
+      h.input.keyDown("ArrowDown");
+      h.step();
+      expect(h.menu.index).toBe(2);
+    });
+
+    it("garde la validation en suspens jusqu'à la fin du bruitage, puis la rend une seule fois", async () => {
+      const h = await harness("vertical", { waitEffectEnd: true });
+      h.busy.effect = true;
+      h.input.keyDown("Space");
+      expect(h.step()).toBeNull();
+      h.input.keyUp("Space");
+      expect(h.step()).toBeNull();
+      h.busy.effect = false;
+      expect(h.step()).toEqual({ kind: "validate", index: 0 });
+      expect(h.step()).toBeNull();
+    });
+
+    it("sans l'option (S04, menu parents : pas de boucle d'attente à 21ee:1b9f), le menu n'attend pas", async () => {
+      const h = await harness("vertical", { changeSound: "bip.voc" });
+      h.busy.effect = true;
+      h.input.keyDown("Space");
+      expect(h.step()).toEqual({ kind: "validate", index: 0 });
+      h.input.keyUp("Space");
+      h.input.keyDown("ArrowDown");
+      h.step();
+      expect(h.menu.index).toBe(1);
+    });
+
+    it("sans bruitage, la validation sort tout de suite", async () => {
+      const h = await harness("vertical", { waitEffectEnd: true });
+      h.input.keyDown("Space");
+      expect(h.step()).toEqual({ kind: "validate", index: 0 });
+    });
+
+    it("l'entrée dans la scène abandonne l'attente restante", async () => {
+      const h = await harness("vertical", { waitEffectEnd: true });
+      h.busy.effect = true;
+      h.input.keyDown("Space");
+      h.step();
+      h.input.keyUp("Space");
+      h.menu.enter(h.ctx);
+      h.busy.effect = false;
+      expect(h.step()).toBeNull();
     });
   });
 });

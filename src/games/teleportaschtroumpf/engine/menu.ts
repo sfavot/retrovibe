@@ -132,6 +132,12 @@ export interface MenuOptions {
    */
   changeSoundIfIdle?: boolean;
   /**
+   * Attente de fin de bruitage à la fin de chaque itération (`while (348d:0b42(1, 0)) 1764:018a`) : les touches ne sont relues
+   * et une validation ne sort qu'une fois le bruitage fini. Défaut faux : seuls les menus de l'original qui ont cette boucle
+   * l'activent (S07, S08, S09, S46, S48, S49, S41), pas S04. Chaque activation cite l'adresse de la boucle.
+   */
+  waitEffectEnd?: boolean;
+  /**
    * Ajout du port pour le doigt et la souris (l'original n'a que le clavier) : zones des entrées, calculées à `enter` (l'écran
    * est alors dessiné). Cliquer une entrée la sélectionne et la valide ; au doigt, elle se valide au relâchement et l'appui
    * long joue sa voix d'aide. Un appui hors des zones ne fait rien ; la souris qui survole une entrée la sélectionne. Sans
@@ -167,6 +173,12 @@ export class Menu {
   /** Dernière position de survol traitée : la souris immobile ne reprend pas la sélection changée au clavier. */
   private hoverX = -1;
   private hoverY = -1;
+  /**
+   * Attente de fin de bruitage (`while (348d:0b42(1, 0)) 1764:018a`, fin de chaque itération de la boucle d'origine) : tant
+   * qu'elle dure, les entrées ne sont pas lues et l'événement de l'itération (`held`) reste en suspens.
+   */
+  private settling = false;
+  private held: MenuEvent | null = null;
 
   constructor(private readonly options: MenuOptions) {
     this.current = options.initial ?? 0;
@@ -196,6 +208,8 @@ export class Menu {
     this.options.highlight?.select?.(ctx, this.current);
     this.areas = this.options.areas?.(ctx) ?? [];
     this.hoverX = this.hoverY = -1;
+    this.settling = false;
+    this.held = null;
   }
 
   /** Entrée dont la zone contient (x, y), ou `null` (aucune zone, ou menu sans zones). */
@@ -212,8 +226,31 @@ export class Menu {
     this.options.highlight?.select?.(ctx, index);
   }
 
-  /** Un pas : navigation, validation, aide. Renvoie l'événement de ce pas, s'il y en a un. */
+  /**
+   * Un pas : navigation, validation, aide. Renvoie l'événement de ce pas, s'il y en a un.
+   *
+   * Avec `waitEffectEnd` (comme l'original, `21ee:11e6..11fa` pour S07), chaque itération se termine par l'attente de la fin du bruitage : le bip d'un déplacement doit finir avant
+   * que les touches soient relues, et une validation ne sort du menu qu'une fois le bruitage fini. Sans bloquer la boucle :
+   * pendant l'attente le pas ne fait rien (les appuis de ces pas sont perdus, la boucle d'origine ne les lit pas non plus).
+   */
   update(ctx: SceneContext): MenuEvent | null {
+    if (!this.options.waitEffectEnd) return this.read(ctx);
+    if (this.settling) {
+      if (ctx.voice.effectPlaying) return null;
+      this.settling = false;
+      const held = this.held;
+      this.held = null;
+      if (held) return held;
+    }
+    const event = this.read(ctx);
+    if (!ctx.voice.effectPlaying) return event;
+    this.settling = true;
+    this.held = event;
+    return null;
+  }
+
+  /** Une itération de lecture des entrées (sans l'attente de fin de bruitage). */
+  private read(ctx: SceneContext): MenuEvent | null {
     const { input } = ctx;
     const { axis, wrap = true } = this.options;
     if (input.pointerHovering && (input.mouseX !== this.hoverX || input.mouseY !== this.hoverY)) {

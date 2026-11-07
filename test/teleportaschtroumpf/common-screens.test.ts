@@ -64,6 +64,8 @@ async function session(host = new TestHost()) {
     await runFor(engine, host, ms);
     host.input.keyUp(code);
     await runFor(engine, host, 100);
+    // Les menus attendent la fin du bip avant de relire les touches : le joueur aussi.
+    await runUntil(engine, host, () => !engine.ctx.voice.effectPlaying);
   };
   const click = async (button = 0) => {
     host.input.mouseDown(button);

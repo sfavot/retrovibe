@@ -66,6 +66,8 @@ class PauseScene implements Scene {
     areas: () => CHOICES.map((_, i) => paletteBounds(this.mcg.pixels, PALETTE_FIRST_BUTTON + i, AREA_MARGIN)),
     changeSound: CLICK_SOUND,
     changeSoundIfIdle: true,
+    // Attente de fin de bruitage de l'original : `269a:04d4..04e8`.
+    waitEffectEnd: true,
   });
 
   constructor(private readonly onDone: (ctx: SceneContext, choice: PauseChoice) => void) {}

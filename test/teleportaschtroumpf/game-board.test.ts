@@ -455,4 +455,30 @@ describe.skipIf(!hasOriginalFiles)("plateau au doigt (ajout du port)", () => {
     await s.settle("PauseScene");
     expect(outputs).toEqual(["help", "pause"]);
   }, 60_000);
+
+  it("clic gauche sur le bandeau du bas : la pause ; ailleurs : le bouton du pion, sans pause", async () => {
+    const s = await Session.start();
+    await s.ready();
+    const outputs: string[] = [];
+    const step = s.board.step.bind(s.board);
+    vi.spyOn(s.board, "step").mockImplementation((ctx) => {
+      const out = step(ctx);
+      if (out) outputs.push(out.kind);
+      return out;
+    });
+    const press = vi.spyOn(s.game, "press");
+    s.host.input.mouseMove(150, 60);
+    s.host.input.mouseDown(0);
+    s.host.input.mouseUp(0);
+    await s.run(200);
+    expect(press).toHaveBeenCalledWith("button");
+    expect(outputs).not.toContain("pause");
+    press.mockClear();
+    s.host.input.mouseMove(150, 180);
+    s.host.input.mouseDown(0);
+    s.host.input.mouseUp(0);
+    await s.settle("PauseScene");
+    expect(outputs).toContain("pause");
+    expect(press).not.toHaveBeenCalled();
+  }, 60_000);
 });

@@ -25,26 +25,68 @@ const { WebAudioSink } = await import("../../src/ui/mohawk/web-sink");
 
 function fakeContext() {
   const gain = { gain: { value: 1 }, connect: () => {} };
-  return {
+  const started: number[] = [];
+  const ctx = {
     currentTime: 0,
     state: "running",
     destination: {},
+    worklets: 0,
+    started,
     createGain: () => gain,
-    audioWorklet: { addModule: async () => {} },
+    createBuffer: (_channels: number, length: number, sampleRate: number) => ({ length, sampleRate, getChannelData: () => new Float32Array(length) }),
+    createBufferSource() {
+      return { connect: () => {}, start: () => started.push(1), stop: () => {}, onended: null, buffer: null, loop: false };
+    },
+    audioWorklet: {
+      addModule: async () => {
+        ctx.worklets++;
+      },
+    },
     resume: async () => {},
   };
+  return ctx;
 }
 
+type FakeContext = ReturnType<typeof fakeContext>;
+let ctxs: FakeContext[] = [];
+
 async function readySink() {
-  const ctx = fakeContext();
+  const created: FakeContext[] = [];
+  ctxs = created;
   vi.stubGlobal("fetch", async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) }));
-  const sink = new WebAudioSink({ createContext: () => ctx as unknown as AudioContext });
+  const sink = new WebAudioSink({
+    createContext: () => {
+      const ctx = fakeContext();
+      created.push(ctx);
+      return ctx as unknown as AudioContext;
+    },
+  });
   sink.startMidiLoading();
   sink.unlock();
   await new Promise<void>((resolve) => sink.onReady(resolve));
   sent.length = 0;
-  return { sink, ctx };
+  const [wave, midi] = created;
+  return { sink, wave: wave!, ctx: midi! };
 }
+
+describe("WebAudioSink : contextes", () => {
+  it("joue les WAVE dans un contexte sans worklet, séparé de celui du synthétiseur", async () => {
+    const { sink, wave, ctx } = await readySink();
+    expect(ctxs).toHaveLength(2);
+    expect(wave.worklets).toBe(0);
+    expect(ctx.worklets).toBe(1);
+    sink.playWave({ samples: new Float32Array(4000), sampleRate: 11025 }, false);
+    expect(wave.started).toHaveLength(1);
+    expect(ctx.started).toHaveLength(0);
+  });
+
+  it("prend l'horloge du contexte MIDI pour `now()`", async () => {
+    const { sink, wave, ctx } = await readySink();
+    wave.currentTime = 5;
+    ctx.currentTime = 2;
+    expect(sink.now()).toBe(2000);
+  });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

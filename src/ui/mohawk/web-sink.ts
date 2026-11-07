@@ -1,7 +1,10 @@
 /**
  * `AudioSink` pour le navigateur (partagé par Mathémagique et Zoombinis) : Web Audio pour les WAVE, `spessasynth_lib` (soundfont General MIDI) pour le MIDI.
  *
- * - Le contexte n'est créé qu'au premier `unlock()` (geste de l'utilisateur). Avant, `now()` vaut 0 et rien ne sort.
+ * - Deux contextes, créés au premier `unlock()` (geste de l'utilisateur) ; avant, `now()` vaut 0 et rien ne sort. Les WAVE ont leur propre
+ *   contexte, sans worklet : WebKit (Safari, iPad) rend tout un contexte qui a un `AudioWorklet` sur le fil du worklet, puis le fait passer
+ *   par une FIFO de 96 quanta (`AudioDestinationResampler`) qui retarde sa sortie et cède quand le synthétiseur peine ; les bruitages et les
+ *   voix arrivaient alors bien après l'image qui les déclenche. Le synthétiseur MIDI vit dans le second contexte, qui donne `now()`.
  * - WAVE : un `AudioBufferSourceNode` par voix (plusieurs en même temps, boucle, détection de fin par `onended`).
  * - MIDI : le synthétiseur (`WorkletSynthesizer`) est créé quand `unlock()` a eu lieu **et** que `startMidiLoading()` a été demandé
  *   (l'app attend la première image pour ne pas concurrencer le chargement du jeu) ; la soundfont réduite (18 Mo) se charge en tâche
@@ -29,7 +32,7 @@ const FLUSH_INTERVAL_MS = 8;
 
 export interface WebAudioSinkOptions {
   soundfontUrl?: string;
-  /** Crée le contexte audio (par défaut `new AudioContext()`), pour les essais. */
+  /** Crée chaque contexte audio, WAVE puis MIDI (par défaut `new AudioContext({ latencyHint: "interactive" })`), pour les essais. */
   createContext?: () => AudioContext;
 }
 
@@ -39,8 +42,12 @@ interface QueuedMessage {
 }
 
 export class WebAudioSink implements AudioSink {
+  /** Contexte des WAVE (sans worklet : sortie directe). */
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  /** Contexte du synthétiseur MIDI (worklet) ; son horloge est `now()`. */
+  private midiCtx: AudioContext | null = null;
+  private midiMaster: GainNode | null = null;
   private muted = false;
   private suspended = false;
   private resuming = 0;
@@ -72,12 +79,10 @@ export class WebAudioSink implements AudioSink {
   unlock(): void {
     if (this.closed) return;
     if (!this.ctx) {
-      this.ctx = this.options.createContext?.() ?? new AudioContext();
-      this.master = this.ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : 1;
-      this.master.connect(this.ctx.destination);
+      [this.ctx, this.master] = this.createOutput();
+      [this.midiCtx, this.midiMaster] = this.createOutput();
     }
-    if (this.ctx.state === "suspended" && !this.suspended) this.startResume(this.ctx);
+    if (!this.suspended) for (const ctx of this.contexts) if (ctx.state === "suspended") this.startResume(ctx);
     this.tryStartMidi();
   }
 
@@ -108,14 +113,27 @@ export class WebAudioSink implements AudioSink {
     return () => this.readyListeners.delete(listener);
   }
 
-  private tryStartMidi(): void {
-    if (this.closed || !this.midiWanted || this.midiStarted || !this.ctx || !this.master) return;
-    this.midiStarted = true;
-    void this.startMidi(this.ctx, this.master);
+  private createOutput(): [AudioContext, GainNode] {
+    const ctx = this.options.createContext?.() ?? new AudioContext({ latencyHint: "interactive" });
+    const master = ctx.createGain();
+    master.gain.value = this.muted ? 0 : 1;
+    master.connect(ctx.destination);
+    return [ctx, master];
   }
 
+  private get contexts(): AudioContext[] {
+    return [this.ctx, this.midiCtx].filter((ctx): ctx is AudioContext => ctx !== null);
+  }
+
+  private tryStartMidi(): void {
+    if (this.closed || !this.midiWanted || this.midiStarted || !this.midiCtx || !this.midiMaster) return;
+    this.midiStarted = true;
+    void this.startMidi(this.midiCtx, this.midiMaster);
+  }
+
+  /** Horloge du contexte MIDI (celle des messages datés). */
   now(): number {
-    return (this.ctx?.currentTime ?? 0) * 1000;
+    return (this.midiCtx?.currentTime ?? 0) * 1000;
   }
 
   // --- WAVE ---------------------------------------------------------------------------------------------------
@@ -161,7 +179,7 @@ export class WebAudioSink implements AudioSink {
     return buffer;
   }
 
-  /** Sortie utilisable : contexte démarré, ou figé / en reprise (les voix y sont seulement en pause). */
+  /** Sortie des WAVE utilisable : contexte démarré, ou figé / en reprise (les voix y sont seulement en pause). */
   private get live(): boolean {
     return this.ctx?.state === "running" || ((this.suspended || this.resuming > 0) && this.ctx !== null);
   }
@@ -254,24 +272,21 @@ export class WebAudioSink implements AudioSink {
 
   setMuted(muted: boolean): void {
     this.muted = muted;
-    if (this.master) this.master.gain.value = muted ? 0 : 1;
+    for (const master of [this.master, this.midiMaster]) if (master) master.gain.value = muted ? 0 : 1;
   }
 
   suspend(): void {
     this.suspended = true;
-    const ctx = this.ctx;
-    if (!ctx) return;
-    void this.enqueue(() => (ctx.state === "running" ? ctx.suspend() : undefined));
+    for (const ctx of this.contexts) void this.enqueue(() => (ctx.state === "running" ? ctx.suspend() : undefined));
   }
 
   resume(): void {
     this.suspended = false;
-    if (this.ctx) this.startResume(this.ctx);
+    for (const ctx of this.contexts) this.startResume(ctx);
   }
 
-  /** Exécute `op` tout de suite si aucune transition n'est en cours, sinon à la suite : le dernier appel gagne. */
   /**
-   * Libère toute la sortie (page quittée) : voix WAVE arrêtées, MIDI coupé, synthétiseur détruit, contexte fermé. Définitif et
+   * Libère toute la sortie (page quittée) : voix WAVE arrêtées, MIDI coupé, synthétiseur détruit, contextes fermés. Définitif et
    * idempotent ; `unlock()` ne fait plus rien ensuite.
    */
   close(): void {
@@ -280,20 +295,24 @@ export class WebAudioSink implements AudioSink {
     this.closed = true;
     this.readyListeners.clear();
     for (const handle of [...this.voices.keys()]) this.stopWave(handle);
-    const { synth, ctx } = this;
+    const { synth } = this;
+    const contexts = this.contexts;
     this.synth = null;
     this.midiReady = false;
     this.master = null;
     this.ctx = null;
+    this.midiMaster = null;
+    this.midiCtx = null;
     try {
       synth?.destroy();
     } catch {
       // déjà libéré
     }
     // Derrière les transitions suspend / resume en cours : fermer un contexte en pleine transition lèverait.
-    if (ctx) void this.enqueue(() => (ctx.state === "closed" ? undefined : ctx.close()));
+    for (const ctx of contexts) void this.enqueue(() => (ctx.state === "closed" ? undefined : ctx.close()));
   }
 
+  /** Exécute `op` tout de suite si aucune transition n'est en cours, sinon à la suite : le dernier appel gagne. */
   private enqueue(op: () => Promise<void> | undefined): Promise<unknown> {
     const run = (): Promise<unknown> => Promise.resolve(op()).catch(() => undefined);
     this.transitions++;

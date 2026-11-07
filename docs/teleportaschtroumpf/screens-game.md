@@ -27,6 +27,6 @@ Par tour : musique aléatoire `s52m00Nm` (`28a3:0007`), plateau `291e:0401` → 
 - Le bouton est un appui (front), pas un bouton tenu ; clavier d'origine seul, souris : boutons.
 - Gestes du doigt (ajout du port ; clavier et souris inchangés) : toucher le décor fait marcher le pion jusque-là sur sa rangée (près d'un bord : jusqu'au bord), toucher le pion est le bouton, glisser vers le haut saute du côté du glissement, toucher le bandeau du bas met en pause (P), l'appui long joue la voix d'aide (clic droit).
 - Bandeau sans objectif avant S19, comme l'original (`Board.setGoalHidden`) ; S19 le complète, puis le plateau le redessine entier.
-- Poussée hors des lignes de séparation (`2813:0886`) et marche d'entrée d'écran (`291e:13f2`) instantanées, sans animation.
+- Poussée hors des lignes de séparation (`2813:0886`) instantanée ; marche d'entrée d'écran (`291e:13f2`) animée depuis le bord, 4 px par image, touches ignorées (`Board.startEdgeWalk` ; voir `rules.md`, question 3).
 - Fondu de 0x20 pas après la voix d'accroche : fondu normal.
 - Grand Schtroumpf (S19, S42, S11, `26ee:0f17`, `26ee:027e`) : voir `screens-grand-schtroumpf.md`. Non reproduit ici : animations S13 à S21 (souches).

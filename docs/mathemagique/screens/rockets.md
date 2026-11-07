@@ -191,7 +191,14 @@ Après les zones 3 à 10, le panneau stop est redessiné et le mode reste actif.
 
 ### 1.9 Séquence secrète (code mort)
 
-À la fin d'une partie, si `dernierType == 4` et que l'historique de touches `DS:4f1c`/`0b73` (`1018:03fd`, sept bits par touche) correspond aux dernières frappes `z`, `e`, `r`, `o` (mode ami, `1070:09b7`) ou `h`, `o`, `m`, `e` (mode Poly, `1070:0958`), la scène joue `SCR` 1050 (éclair + effets de palette par le hook `1070:19e4`) puis `SCR` 2050 (Poly passée aux rayons X, 73 images). **La condition finale est `1098:036f(0) == 0x600`** : cette fonction ne renvoie que `0x800` (Maj), `0x400` (Ctrl) ou leur union (`1098:036f`, `GetKeyState` 0x10 et 0x11) : `0x600` est **inatteignable**. La séquence est du code mort dans cette version. Hors périmètre de l'implémentation TS (à signaler seulement).
+À la fin d'un tour (fin de `1070:01c2`, après les annonces), si `dernierType == 4` (`7c1c`) et que l'historique de touches `DS:4f1c`/`0b73` (`1018:03fd`, sept bits par touche) correspond, `1018:043a(X, H)` compare le couple à une constante :
+
+| Site | Condition | Mode | Constantes `(X, H)` | Frappes (4 dernières, `H`) | Effet |
+|---|---|---|---|---|---|
+| `1070:0958` | `mode = 1` (`7c04 ≠ 0`) | contre Poly | `0xa6575855`, `0x0d1bf6e5` | `h`, `o`, `m`, `e` | `1018:03fd(-1)` (efface l'historique), `7c1a = 0`, `1d25(0x802)` = `SCR` 1050 puis 2050 (Poly aux rayons X, hook `1070:19e4`), puis `1d25(2000)` (Poly revient, `7c1a = 1`) |
+| `1070:09b7` | `mode = 0` (`7c04 = 0`) | contre un ami | `0x5beea427`, `0x0f59796f` | `z`, `e`, `r`, `o` | `1018:03fd(-1)`, `1d25(0x802)` seul : `SCR` 1050 puis 2050, sans rejouer 2000 |
+
+Le `H` des quatre lettres seules est vérifié par `historyOf` (`zero` : `0x0f59796f`, `home` : `0x0d1bf6e5`) ; le `X` d'origine suppose des frappes antérieures (comme les 7 codes partiels du hub, `common.md` §4.3). **Les deux sites exigent en plus `1098:036f(0) == 0x600`**, relu dans le désassemblage (`1070:0977` `CMP AX,0x600`, `1070:09d3`) : cette fonction renvoie `param | 0x800` si `GetKeyState(0x10)` (Maj) et `| 0x400` si `GetKeyState(0x11)` (Ctrl) : `0x600` est **inatteignable** (valeurs possibles : 0, `0x400`, `0x800`, `0xc00`). La séquence est du **code mort** dans cette version : l'original ne l'a jamais déclenchée, le port ne la déclenche pas non plus (la scène n'a d'ailleurs pas de gestionnaire de touches) et aucune copy n'est concernée. Pinné par `test/mathemagique/rockets.test.ts` (« séquences secrètes de fin de partie »).
 
 ## 2. Mise en page, ressources, animations
 

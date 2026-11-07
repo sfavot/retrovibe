@@ -86,6 +86,7 @@ const WELCOME_FADE_TICKS = 30;
 interface PendingTransition {
   blinds: Blinds;
   target: "menu" | "board";
+  /** Fin de la transition (la suivante d'une chaîne se lance ici). */
   done: () => void;
   /** Ticks déjà joués : le clic qui a lancé la transition ne doit pas l'achever dans le même tick. */
   age: number;
@@ -423,7 +424,12 @@ class HiddenSceneImpl implements HiddenScene {
     }
   }
 
-  private beginTransition(rect: Rect, ticks: number, target: "menu" | "board", done: () => void): void {
+  /**
+   * Lance des stores vénitiens (`1018:09b8`). `prepare` s'exécute AVANT la composition de l'écran cible et avant la première bande : c'est là que
+   * l'original installe la palette (`10a8:0dc4` / `0e86` ne sont pas des fondus, voir hidden.md §3.3), jamais à la fin des stores.
+   */
+  private beginTransition(rect: Rect, ticks: number, target: "menu" | "board", prepare: () => void, done: () => void = () => {}): void {
+    prepare();
     this.paintWork(target);
     this.transition = { blinds: new Blinds(rect, ticks), target, done, age: 0 };
     this._phase = "transition";
@@ -445,7 +451,8 @@ class HiddenSceneImpl implements HiddenScene {
     this.transition = null;
     this.showing = t.target;
     t.done();
-    this.repaint();
+    // Une transition enchaînée (`done` en a lancé une autre) compose son propre écran : pas de repaint de l'état final.
+    if (this.transition === null) this.repaint();
   }
 
   private loadMenuPalette(level: number): void {
@@ -457,13 +464,38 @@ class HiddenSceneImpl implements HiddenScene {
   private pressLevel(level: number): void {
     const wasMenu = this.session.mode === "menu";
     if (!this.session.pressLevel(level)) return;
-    // Depuis un puzzle : écran entier ; au menu : la télé seule (hidden.md §3.3).
-    this.beginTransition(wasMenu ? HIDDEN_TV_WITH_BORDERS : HIDDEN_SCREEN, wasMenu ? MENU_BLINDS_TICKS : SCREEN_BLINDS_TICKS, "menu", () => {
-      this._board = null;
-      this._rewardScr = this._jingleSnd = null;
-      this.loadMenuPalette(this.session.level);
-      this._phase = "menu";
-    });
+    // `1030:0717` : depuis un puzzle, `1030:1e02` vide la télé puis une première transition efface (ancienne palette) : écran entier si les pièces
+    // étaient actives (`31ce & 1` nul), télé seule 15 ticks si le puzzle était fini ; `10a8:0dc4` installe alors d'un coup la palette du menu et une
+    // dernière transition de 15 ticks sur la télé révèle les vignettes. Depuis un autre menu, seule la dernière a lieu.
+    const reveal = () =>
+      this.beginTransition(
+        HIDDEN_TV_WITH_BORDERS,
+        MENU_BLINDS_TICKS,
+        "menu",
+        () => {
+          this._board = null;
+          this._rewardScr = this._jingleSnd = null;
+          this.loadMenuPalette(this.session.level);
+        },
+        () => {
+          this._phase = "menu";
+        },
+      );
+    if (wasMenu) {
+      reveal();
+      return;
+    }
+    const piecesWereActive = this._phase !== "solved";
+    this.beginTransition(
+      piecesWereActive ? HIDDEN_SCREEN : HIDDEN_TV_WITH_BORDERS,
+      piecesWereActive ? SCREEN_BLINDS_TICKS : MENU_BLINDS_TICKS,
+      "board",
+      () => {
+        this._board = null;
+        this._rewardScr = this._jingleSnd = null;
+      },
+      reveal,
+    );
   }
 
   private beginLaunch(k: number): void {
@@ -482,14 +514,30 @@ class HiddenSceneImpl implements HiddenScene {
     // Ordre des tirages de l'original : découpage, jingle (18eb), puis dispersion (0c67).
     this._jingleSnd = hiddenEndJingle(ctx.rng);
     board.scatter(ctx.rng);
-    this._board = board;
     this.photoId = hiddenPhotoShplId(level, k);
     this._rewardScr = hiddenRewardId(level, k);
-    this.attach(board);
-    this.beginTransition(HIDDEN_SCREEN, SCREEN_BLINDS_TICKS, "board", () => {
-      this.services.graphics.palette.loadShpl(this.archive.shpl(this.photoId));
-      this._phase = "playing";
-    });
+    // `1030:0490` : (1) `1030:1e02` vide la télé et `1018:09b8` révèle la télé vide en 15 ticks, encore avec la palette du menu ; (2) `10a8:0dc4`
+    // installe d'un coup la palette de la photo, `1030:0c67` disperse et dessine, puis révèle l'écran entier en 30 ticks.
+    this.beginTransition(
+      HIDDEN_TV_WITH_BORDERS,
+      MENU_BLINDS_TICKS,
+      "board",
+      () => {},
+      () =>
+        this.beginTransition(
+          HIDDEN_SCREEN,
+          SCREEN_BLINDS_TICKS,
+          "board",
+          () => {
+            this.services.graphics.palette.loadShpl(this.archive.shpl(this.photoId));
+            this._board = board;
+            this.attach(board);
+          },
+          () => {
+            this._phase = "playing";
+          },
+        ),
+    );
   }
 
   // --- Pièces ---
@@ -605,11 +653,17 @@ class HiddenSceneImpl implements HiddenScene {
     // Même découpage, nouvelle dispersion (pas de nouveau tirage), pièces réactivées.
     this.session.reset();
     board.scatter(this.ctx.rng);
-    this.beginTransition(HIDDEN_SCREEN, SCREEN_BLINDS_TICKS, "board", () => {
-      this.services.graphics.palette.loadShpl(this.archive.shpl(this.photoId));
-      this.ensureMusic();
-      this._phase = "playing";
-    });
+    // `1030:0c67` : aucun changement de palette (`0dc4` n'est appelée que par `0717` et `0490`) ; une seule transition de 30 ticks.
+    this.beginTransition(
+      HIDDEN_SCREEN,
+      SCREEN_BLINDS_TICKS,
+      "board",
+      () => {},
+      () => {
+        this.ensureMusic();
+        this._phase = "playing";
+      },
+    );
   }
 
   // --- Poly, musique, sortie ---

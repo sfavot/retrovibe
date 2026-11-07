@@ -620,6 +620,27 @@ describe.skipIf(!original.has)("muraille de signes : écran (écran 15, NET.MHK)
     expect(engine.error).toBeNull();
   });
 
+  it("trois tirs manqués : la marque de boue de chaque tir reste sur sa dalle (une feature par tir, DS:8b0c[k], 1120:2e87 / 248b)", async () => {
+    const { probe, ready, choose, fire, ticks, features } = await start(0);
+    await ready();
+    const state = probe().state;
+    const empties = state.groups.map((g, t) => (g === 0 ? t : -1)).filter((t) => t >= 0).slice(0, 3);
+    expect(empties).toHaveLength(3);
+    for (const tile of empties) {
+      await choose(selectorsFor(state, tile));
+      await fire();
+      await ticks(160);
+      await ready();
+    }
+    expect(state.misses).toBe(3);
+    const marks = features.features.filter((f) => f.scriptId === 7023);
+    expect(marks).toHaveLength(3);
+    // Chacune sur sa dalle : trois rectangles distincts, toujours dessinés.
+    const corners = new Set(marks.map((f) => `${f.rect!.left},${f.rect!.top}`));
+    expect(corners.size).toBe(3);
+    expect(marks.every((f) => f.parts.length > 0)).toBe(true);
+  });
+
   it.each([0, 3])("niveau %i, tir qui libère un groupe : il passe le mur (balançoire, saut, vol, réception, file d'arrivée), « go » devient actif, la dalle est passée", async (level) => {
     const { probe, ready, choose, fire, ticks, crossed, engine, zoombinis, scripts } = await start(level, { size: 6 });
     await ready();

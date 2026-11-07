@@ -313,7 +313,10 @@ export function createNetScene(): Scene {
   let launcher: Feature;
   let bubble: Feature;
   let button: Feature;
-  let splash: Feature | null = null;
+  /** Marques des tirs sur le mur, une par tir, jamais retirées (`DS:8b0c[k]`, `k` = `1468:0234`, compteur de tirs). */
+  let splashes: Feature[] = [];
+  /** Symboles réglés au moment du tir (`+0x1e` de la feature du tir). */
+  let shotView: BallView | undefined;
   let flight: Feature | null = null;
   const selectorFeatures: (Feature | null)[] = [null, null, null];
   const tileFeatures = new Map<number, Feature>();
@@ -337,7 +340,6 @@ export function createNetScene(): Scene {
   let flightStep = 0;
   let flightToken = 0;
   let flightPlacement: BallPlacement | null = null;
-  let splashPlacement: BallPlacement | null = null;
 
   // Zoombinis.
   let statuses: Status[] = [];
@@ -397,11 +399,11 @@ export function createNetScene(): Scene {
   const view = (): BallView => ({ selectors: state!.selectors, previous: state!.previous });
 
   /** Rappel d'image de la catapulte, de la boule en vol et de l'impact (`1120:213e`) : images des symboles, et position imposée si `placement` en donne une. */
-  function ballHook(placement: () => BallPlacement | null): FeatureImageHook {
+  function ballHook(placement: () => BallPlacement | null, fixed?: ReturnType<typeof view>): FeatureImageHook {
     return (_feature, parts): FeaturePart[] =>
       parts.map((part, index) => {
         if (part.w <= 0 || part.w >= 0xb9) return part;
-        const out: FeaturePart = { w: ballImage(part.w, view()), x: part.x, y: part.y };
+        const out: FeaturePart = { w: ballImage(part.w, fixed ?? view()), x: part.x, y: part.y };
         const at = placement();
         if (at) {
           out.x = index === 0 ? at.x : at.x + at.dx;
@@ -562,6 +564,7 @@ export function createNetScene(): Scene {
   /** `1120:2e87` : la boule part de la catapulte (image 7020 + ordre selon la colonne) et avance de cinq positions, une toutes les 3 ticks, vers la dalle. */
   function startFlight(tile: number, kind: 0 | 1 | 2): void {
     clearFlight();
+    shotView = { selectors: [...state!.selectors], previous: [...state!.previous] } as BallView;
     const target = tilePoint(tile);
     const dx = Math.trunc((FLIGHT_START.x - target.x) / 6);
     const dy = Math.trunc((FLIGHT_START.y - target.y) / 6);
@@ -600,14 +603,13 @@ export function createNetScene(): Scene {
     const s = state!;
     const released = impact(s, tile);
     const target = tilePoint(tile);
-    splashPlacement = { x: target.x, y: target.y, dx: level() < 2 ? 0x15 : 3, dy: 7 };
+    // `1120:2e87` crée pour chaque tir sa propre feature (`DS:8b0c[k]`, `k` incrémenté à chaque tir) ; à l'impact `248b` elle devient la marque de boue (`SCRB` 7023 / 7024), qui
+    // reste sur la dalle jusqu'à la fin de l'épreuve : les marques des tirs précédents restent visibles, c'est l'information du joueur.
+    const placement: BallPlacement = { x: target.x, y: target.y, dx: level() < 2 ? 0x15 : 3, dy: 7 };
     const script = SCRB.splash[level() < 2 ? 0 : 1]!;
-    if (!splash) {
-      splash = features.create({ script, delay: DELAY, flags: PLAYING, depth: DEPTH.splash, onImage: ballHook(() => splashPlacement) });
-    } else {
-      splash.onImage = ballHook(() => splashPlacement);
-      features.setScript(splash, script);
-    }
+    // Les symboles de la marque sont ceux du tir (`+0x1e` de la feature, posé à `2e87`), pas ceux réglés ensuite pour le tir suivant.
+    const fixed = shotView ?? { selectors: [...state!.selectors], previous: [...state!.previous] } as BallView;
+    splashes.push(features.create({ script, delay: DELAY, flags: PLAYING, depth: DEPTH.splash, onImage: ballHook(() => placement, fixed) }));
     if (released > 0) {
       pendingRelease = released;
       joysLeft = lessAction() ? JOY_COUNT - 1 : JOY_COUNT;
@@ -858,9 +860,8 @@ export function createNetScene(): Scene {
       releaseColumn = 0;
       flight = null;
       flightToken += 1;
-      splash = null;
+      splashes = [];
       flightPlacement = null;
-      splashPlacement = null;
       nextToSend = 0;
       sending = false;
       arrivedCount = 0;
@@ -958,7 +959,7 @@ export function createNetScene(): Scene {
       tileFeatures.clear();
       selectorFeatures.fill(null);
       flight = null;
-      splash = null;
+      splashes = [];
       wallFeature = null;
       closeScreen(c);
     },

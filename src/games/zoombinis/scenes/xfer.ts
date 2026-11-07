@@ -18,7 +18,8 @@
  *   `SCRB` (fond + 101 et + 102) posés devant eux couvrent les coins bas.
  * - Région 0 : fond 5000, Zoombinis en petit posés tous à `(200, 235)` (`1168:5a13(0)`) ; toutes les `ad28` à `ad28 + 1` échéances de `acf0` (`now + 30 × [3, 6]`), un Zoombini
  *   joue le `SCRS` 5199 + pieds (203 images, `1168:3f76`), ou (40 % des tirages, dès le premier départ passé) une animation de décor `SCRB` 5104 à 5107 est relancée.
- *   `SCRB` 5102 et 5103 se déclenchent une seule fois aux évènements 10 et 11 d'un `SCRS` ; 5100 passe derrière le Zoombini à son deuxième évènement 0.
+ *   `SCRB` 5102 et 5103 se déclenchent une seule fois aux évènements 10 et 11 d'un `SCRS` ; 5100, créé après les Zoombinis, les cache à (200, 235) ; au deuxième évènement 0 d'un `SCRS`, `11a8:2a0a(5100, 1, Zoombini)` remet ce Zoombini juste après 5100
+ *   dans la liste (juste devant lui) : ceux qui attendent restent cachés.
  * - Région 5 : fond 6000, même départ échelonné (`now + 40 × [3, 6]`, sans animation de décor) ; les évènements 26 d'un `SCRS` 6200 à 6204 (en fin de marche) font passer 6104
  *   devant lui et comptent ; au cinquième, `SCRB` 6108 est joué et son évènement 30 termine la transition ; l'évènement 50 compte une arrivée de plus à Zoombiniville
  *   (`S+0x4E`, affiché sur `SCRB` 6105 avec `STRL` 2008, `11b0:1e7b`).
@@ -67,6 +68,8 @@ const WALK_SCRIPT_BASE: readonly number[] = [5199, 0, 0, 0, 0, 6199];
 /** Profondeurs : décor derrière les Zoombinis (0, ordre de création), Zoombinis, décor devant eux. */
 const MEMBERS = 10;
 const FRONT = 1000;
+/** Région 0 : profondeur de `SCRB` 5100 (pan de falaise), entre les Zoombinis et 5101. */
+const CLIFF_DEPTH = FRONT - 1;
 
 const STRL_TITLES = 2006;
 const STRL_POPULATION = 2008;
@@ -346,6 +349,8 @@ export function createXferScene(): Scene {
   let left = false;
   let nextTimer = 0;
   let released = 0;
+  /** Région 0 : Zoombinis déjà passés devant 5100. */
+  let cliffPassed = 0;
   let wasIdle = false;
   let arrivals = 0;
   let finalStarted = false;
@@ -407,6 +412,7 @@ export function createXferScene(): Scene {
       stackable = undefined;
       finale = undefined;
       released = 0;
+      cliffPassed = 0;
       arrivals = 0;
       finalStarted = false;
       wasIdle = false;
@@ -456,7 +462,8 @@ export function createXferScene(): Scene {
         for (const id of [5104, 5105, 5106, 5107]) ambient.push(createFeature(ctx, { script: id, delay: 6, flags: hold }));
         createFeature(ctx, { script: 5108, delay: 6, flags: hold });
         addMembers(present.map(() => ({ ...CLIFF_START })));
-        const options: FeatureOptions = { script: 5100, delay: 0, flags: 0, depth: FRONT };
+        // Créés après les Zoombinis, donc devant eux (`11a8:0ad6` ajoute en fin de liste) : 5100 cache ceux qui attendent à (200, 235), 5101 vient encore devant.
+        const options: FeatureOptions = { script: 5100, delay: 0, flags: 0, depth: CLIFF_DEPTH };
         stackable = createFeature(ctx, options);
         createFeature(ctx, { script: 5101, delay: 0, flags: 0, depth: FRONT });
       } else if (region === 5) {
@@ -582,10 +589,14 @@ export function createXferScene(): Scene {
     const features = ctx.services.get(FEATURES);
     switch (n) {
       case 0:
-        // `+0xf2` inversé ; deuxième évènement : 5100 passe derrière lui.
+        // `+0xf2` inversé ; deuxième évènement : `11a8:2a0a(5100, 1, Zoombini)` le réinsère juste après 5100 dans la liste, donc juste devant lui ; les
+        // Zoombinis qui attendent restent derrière 5100, ceux déjà partis restent devant celui-ci (chacun est inséré contre 5100).
         member.snoid.setFacing(member.snoid.facing === 0 ? 1 : 0);
         member.turns++;
-        if (region === 0 && member.turns === 2) restack(ctx, member.depth - 0.5);
+        if (region === 0 && member.turns === 2) {
+          cliffPassed++;
+          ctx.services.get(FEATURES).restack(member.snoid.feature, CLIFF_DEPTH + 0.5 / cliffPassed);
+        }
         break;
       case 10:
       case 11: {

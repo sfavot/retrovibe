@@ -231,6 +231,31 @@ describe.skipIf(!original.has)("transition XFER", () => {
     expect(town.some((f) => f.scriptId >= 6200 && f.scriptId <= 6204)).toBe(true);
   });
 
+  it("falaise (région 0) : ceux qui attendent restent cachés derrière le pan 5100 ; au 2e évènement 0, le Zoombini qui descend passe juste devant lui (11a8:2a0a)", async () => {
+    const { host, engine } = await begin({ from: ScreenId.picker, to: ScreenId.bridge });
+    const features = engine.services.get(FEATURES);
+    const order = () => features.features;
+    let passed = 0;
+    await runFor(engine, host, TICK_MS * 3);
+    expect(engine.scenes.currentId).toBe(ScreenId.xfer);
+    for (let t = 0; t < 1400 && engine.scenes.currentId === ScreenId.xfer; t += 5) {
+      await runFor(engine, host, TICK_MS * 5);
+      const list = order();
+      const cliff = list.findIndex((f) => f.scriptId === 5100);
+      const front = list.findIndex((f) => f.scriptId === 5101);
+      if (cliff < 0) break;
+      const snoids = list.filter((f) => f.hasFlag(FeatureFlag.snoid));
+      // Ceux qui attendent à (200, 235), en pose 100 : jamais devant le pan de falaise (avant le correctif, tous passaient devant au premier départ).
+      for (const f of snoids.filter((f) => f.scriptId < 5200)) expect(list.indexOf(f), `t=${t}`).toBeLessThan(cliff);
+      // Ceux qui sont passés devant restent derrière 5101, le dernier passé contre 5100.
+      const ahead = snoids.filter((f) => list.indexOf(f) > cliff);
+      for (const f of ahead) expect(list.indexOf(f)).toBeLessThan(front);
+      passed = Math.max(passed, ahead.length);
+    }
+    expect(passed).toBeGreaterThanOrEqual(2);
+    expect(engine.error).toBeNull();
+  });
+
   it("un clic gauche écourte la transition, une touche ne fait rien", async () => {
     const { host, engine } = await begin({ from: ScreenId.pizza, to: ScreenId.baseCamp });
     await runFor(engine, host, TICK_MS * 30);

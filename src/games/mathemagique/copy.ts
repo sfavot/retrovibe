@@ -1,6 +1,6 @@
 /**
  * Textes de l'interface (hors textes du jeu, qui viennent des fichiers de données).
- * ⚠ Copy à valider : regroupée pour être relue et ajustée en un seul endroit.
+ * Regroupés ici pour être relus et ajustés en un seul endroit.
  */
 export const copy = {
   title: "Math Workshop (Mathémagique)",

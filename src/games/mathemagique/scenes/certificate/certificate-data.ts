@@ -145,7 +145,7 @@ const OPERATION_FILE_NAMES = ["addition", "soustraction", "multiplication", "div
 
 /**
  * Nom du fichier PNG proposé au téléchargement : `certificat-<opération>-<nom>.png` (minuscules, sans accent, tirets).
- * ⚠ Copy à valider (nom visible dans la boîte d'enregistrement).
+ * Le nom est visible dans la boîte d'enregistrement.
  */
 export function certificateFileName(playerName: string, operation: number): string {
   const slug = playerName

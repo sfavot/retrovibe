@@ -1,6 +1,6 @@
 /**
  * Textes de l'interface (hors dialogues du jeu, qui viennent du fichier de données).
- * ⚠ Copy à valider : regroupée ici pour être relue et ajustée en un seul endroit.
+ * Regroupés ici pour être relus et ajustés en un seul endroit.
  */
 export const copy = {
   title: "Indiana Jones and his Desktop Adventures",

@@ -18,7 +18,8 @@
  *    se déroule (`busy` = `DS:a0e4`) et que plus aucune voix ne joue : script de marche `SCRS` 8500 + 4 × (pieds − 1) + (entrée − 1) (correct) ou
  *    8519 + 5 × code + pieds (faux choix : marche partielle, choc du gardien à l'événement 13, puis retour par `SCRS` 8000 + code et marche vers une
  *    place d'attente). Une erreur coûte 1 au budget **dès le départ**.
- *  - Arrivée (événement −1 d'une marche correcte) : le Zoombini est sauvé, marche jusqu'à la prochaine place libre du tunnel (16 points par tunnel) ;
+ *  - Arrivée (événement −1 d'une marche correcte) : le Zoombini est sauvé, passe derrière la cave 9000 (on ne le voit plus que par l'ouverture du
+ *    tunnel, jusqu'à la sortie par « go » comprise), marche jusqu'à la prochaine place libre du tunnel (16 points par tunnel) ;
  *    réaction du gardien à la première réussite consécutive de l'entrée ; au dernier sauvé, voix de réussite ; animations de victoire des arrivés
  *    (quota 10, 12, 14 et fin), période 60 ticks (120 avec « moins d'action »).
  *  - Budget épuisé : plus personne n'est pris, dès qu'aucune marche n'est en cours les Zoombinis restés aux entrées sont renvoyés en bas (perdus), un
@@ -120,6 +121,8 @@ const ARRIVAL_PLACES: readonly (readonly Point[])[] = [
   [[414, 217], [389, 223], [373, 228], [357, 233], [415, 238], [399, 247], [382, 249], [362, 255], [419, 259], [400, 263], [381, 267], [363, 276], [420, 271], [401, 278], [387, 283], [371, 268]],
   [[403, 60], [381, 61], [362, 64], [346, 69], [412, 80], [392, 84], [372, 87], [353, 93], [414, 98], [401, 103], [382, 107], [363, 110], [415, 118], [403, 121], [387, 123], [370, 127]],
 ].map((tunnel) => tunnel.map(([x, y]) => ({ x: x!, y: y! })));
+/** Profondeur de la cave `SCRB` 9000 ; les arrivés passent juste devant dans la liste, donc derrière elle à l'écran (`hideBehindCave`). */
+const CAVE_DEPTH = 0.1;
 /** Rayon de prise `DS:9706` (`1190:0000`). */
 const DROP_RADIUS = 40;
 /** Cible de la marche de sortie (`1190:0cae` : `1168:2982(45, …, 30, 670)`). */
@@ -382,6 +385,12 @@ export function createTunnelsScene(): TunnelsScene {
   let entranceTargets: DropTarget[] = [];
   let pillars: Feature[] = [];
   let ceiling: Feature | null = null;
+  /**
+   * Arrivés, dans leur ordre de la liste de dessin (tous juste avant la cave), et arrivés de chaque tunnel (`DS:a046`, `a086`, `a0a6`, `a066`, comptés par
+   * `a190`, `a194`, `a196`, `a192`) : voir `arrived`.
+   */
+  let behindCave: Feature[] = [];
+  let tunnelArrivals: Feature[][] = [];
   /** Tirages sans remise (`DS:3a6e…3aee`, `3c08…3c20`) : état conservé le temps de l'écran. */
   const pools = new Map<string, NoRepeatPool>();
   /** Compteurs de répétitions limitées (`a198`, `a19a`), remis à 0 par un bon choix. */
@@ -441,11 +450,13 @@ export function createTunnelsScene(): TunnelsScene {
         // Décor, dans l'ordre de création de l'original : cave, entrées, gardiens, pans de rocher, plafond. L'ordre de dessin est celui de `11a8:231b`, actif
         // dans cet écran (`11a8:021c` l'a laissé allumé ; seul l'effondrement l'éteint, `1190:0b06`) : les drapeaux d'ordre sont ceux de `1190:0107` — cave
         // (`0x8000`) et entrées (`0x0108a000`) au fond, gardiens « déjà triés » (`0x0c180000`), pans de rocher triés une fois (0), plafond devant (`0x0d181000`).
-        // Un Zoombini passe donc derrière un gardien ou un pan de rocher dont le bord bas est plus bas que le sien (sortie le long des tunnels du haut).
+        // Un Zoombini passe donc derrière un gardien ou un pan de rocher dont le bord bas est plus bas que le sien ; un arrivé passe derrière la cave (`hideBehindCave`).
         features.setDepthSort(true);
         // Bit `0x1000000` (`playOnly`) : entrées (`0x0108a000`) et plafond (`0x0d181000`) seulement ; cave (`0x8000`), gardiens (`0x0c180000`) et pans (0) n'en ont pas.
         const { active, flag4000000, overlay, still, playOnly, stopAtEnd } = FeatureFlag;
-        features.create({ script: 9000, delay: DECOR_DELAY, depth: 0.1, flags: still | stopAtEnd | active });
+        features.create({ script: 9000, delay: DECOR_DELAY, depth: CAVE_DEPTH, flags: still | stopAtEnd | active });
+        behindCave = [];
+        tunnelArrivals = Array.from({ length: ENTRANCES }, () => []);
         for (let e = 0; e < ENTRANCES; e++) features.create({ script: 5000 + e, delay: DECOR_DELAY, depth: 0.2, flags: playOnly | stopAtEnd | active });
         pillars = [];
         for (const c of PILLAR_ORDER) pillars[c] = features.create({ script: 6000 + c, delay: DECOR_DELAY, depth: 0.3, flags: still | stopAtEnd | flag4000000 });
@@ -934,7 +945,7 @@ export function createTunnelsScene(): TunnelsScene {
     snoid.onEnd = undefined;
     snoid.onEvent = undefined;
     snoid.walkTo({ x: place.x, y: place.y });
-    ctx.services.get(FEATURES).restack(snoid.feature, 1 + place.y / 1000);
+    hideBehindCave(ctx, snoid.feature, entrance);
     // `1190:19a9…`: quota d'animations (10, 12, 14 arrivés) ; au dernier, voix de réussite et deux animations de plus.
     if (st.saved === st.total) {
       danceQuota += 2;
@@ -945,6 +956,25 @@ export function createTunnelsScene(): TunnelsScene {
       danceQuota += 2;
     }
     if (first && entry.scriptA !== 0) reaction = { pillar: entry.pillar, script: entry.scriptA, release: true };
+  }
+
+  /**
+   * `1190:1839` puis `1190:1985` : l'arrivé reçoit les drapeaux `0x4008000` (il reste en tête de la liste de dessin, `11a8:231b`, et n'est plus trié) et
+   * `11a8:2a0a` le replace **juste avant la cave** (`a19c`) s'il est le premier de son tunnel, sinon **juste après** l'arrivé précédent du même tunnel. La cave
+   * (rocher de la moitié droite, ouvertures transparentes) est donc dessinée devant lui : on ne le voit plus que par l'ouverture de son tunnel, à l'arrêt
+   * comme à la sortie par « go » (`NODE` / `PATH` 1000), qui passe derrière le rocher. Les drapeaux tiennent jusqu'à la fin de l'écran (seul `1168:36e1`
+   * les remet à 1). Profondeur : entre ses deux voisins de la liste, sous celle de la cave (seuls les arrivés ont une profondeur plus petite).
+   */
+  function hideBehindCave(ctx: SceneContext, feature: Feature, entrance: Entrance): void {
+    const mates = tunnelArrivals[entrance - 1]!;
+    const previous = mates[mates.length - 1];
+    const at = previous ? behindCave.indexOf(previous) + 1 : behindCave.length;
+    const below = at > 0 ? behindCave[at - 1]!.depth : 0;
+    const above = at < behindCave.length ? behindCave[at]!.depth : CAVE_DEPTH;
+    feature.flags |= FeatureFlag.active | FeatureFlag.flag4000000;
+    ctx.services.get(FEATURES).restack(feature, (below + above) / 2);
+    behindCave.splice(at, 0, feature);
+    mates.push(feature);
   }
 
   /** Retour d'un faux choix : avertissement, pierres, marche vers une place d'attente. */

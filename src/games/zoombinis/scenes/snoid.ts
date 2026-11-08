@@ -190,6 +190,12 @@ export interface SnoidPlacement {
   at?: Point;
 }
 
+/**
+ * Bits d'ordre de dessin (`+0x20`, `11a8:231b`) qu'un écran pose sur un Zoombini (`0x4008000` : en tête de liste, plus trié ; par exemple les grottes de
+ * passe-clos, `1190:1839`) : la lecture d'un script ne les efface pas.
+ */
+const DRAW_ORDER_FLAGS = FeatureFlag.active | FeatureFlag.flag4000000;
+
 /** Une carte vide : la marche va droit vers la destination. */
 const NO_MAP: WalkMap = { nodes: [], paths: [] };
 
@@ -447,7 +453,8 @@ export class Snoid {
     const features = this.ctx.services.get(FEATURES);
     this.id = scriptId;
     this.flags = flags;
-    this.feature.flags = FeatureFlag.snoid | flags;
+    // Les bits d'ordre de dessin posés par l'écran restent (dans l'original, jouer un script ne réécrit pas `+0x20`).
+    this.feature.flags = FeatureFlag.snoid | flags | (this.feature.flags & DRAW_ORDER_FLAGS);
     this.feature.onEvent = (_image, n) => this.event(n);
     features.setScript(this.feature, scriptId);
   }

@@ -66,8 +66,8 @@ const BACKGROUND = 5000;
 const BUTTONS_SHEET = 6000;
 const GROUP_STONES = 7000;
 const GROUP_SPARKS = 8000;
-/** `SCRB` : pierre, montée, décors 7003 à 7012, anneau, étincelles 8000 + k. */
-const SCRB = { stone: 7000, rise: 7002, decor: 7003, ring: 7013, sparks: 8000 } as const;
+/** `SCRB` : pierre, pierre nue (case vide), montée, décors 7003 à 7012, anneau, étincelles 8000 + k. */
+const SCRB = { stone: 7000, bare: 7001, rise: 7002, decor: 7003, ring: 7013, sparks: 8000 } as const;
 /** `SCRS` : montée d'un Zoombini avec sa pierre, danse 13000 + pieds, rejet 14000 + k (hauteur) puis vol 14003. */
 const SCRS = { rise: 13000, dance: 13000, kick: 14000, flight: 14003 } as const;
 /** Délai entre images de toutes les features de l'écran (`11a8:0ad6`) : 6 ticks. */
@@ -81,8 +81,18 @@ const STONE_BOX = { width: 45, height: 22 } as const;
 const RISE_HEIGHT = 73;
 /** Événements du terminateur (octet bas − 1) : 90 à 92 = étincelles (image 2), 93 = fin (image 9). */
 const EVENT = { sparks: 90, sparksEnd: 93 } as const;
-/** Pièces de l'image de la pierre (`1170:20cc`, §5.2 de l'étude) : connecteurs 0, 1, 5 ; symboles 73 à 76 ; sommets de départ / relié 103 et 109 ; emplacement libre 110. */
+/**
+ * Pièces de l'image de la pierre (`SCRB` 7000 et 7002, filtres `1170:20cc` et `1170:250c`, §5.2 de l'étude) : connecteurs 0 à 5 ; symboles 73 à 76 ;
+ * contour orange 103 (emplacement libre) ; sommets rouge 109 et bleu 110 (pierre « haute » : départ, liaison montée, emplacement relié, variantes 0 et 1).
+ */
 const PART = { conn0: 4, conn1: 8, conn2: 12, conn3: 16, conn4: 20, conn5: 24, symbol0: 73, symbol3: 76, outline: 103, redTop: 109, blueTop: 110 } as const;
+/**
+ * Image du symbole de chaque attribut (cheveux, yeux, nez, pieds) : `1170:20cc` garde 0x49 pour `0x201`, 0x4a pour `0x1fe`, 0x4b pour `0x200`, 0x4c pour `0x1ff`
+ * (table `CS:22ea` relue sur les octets) ; les dessins concordent (74 une touffe, 76 un œil, 75 un nez, 73 un pied).
+ */
+const SYMBOL_IMAGE = [74, 76, 75, 73] as const;
+/** Montée (`1170:250c`) : un connecteur gardé prend sa couleur, image `w + DS:9d60` (0x30 : rouge, variante 0 ; 0x18 : bleu, variante 1). */
+const RISE_CONNECTOR_SHIFT = [0x30, 0x18] as const;
 /** Cycle de palette du niveau 3 (`1170:2312`) : trois entrées dès 30 (tableau de 236 entrées dès 10, entrées 20 à 22), un cran toutes les 7 ticks. */
 const CYCLE = { first: 30, count: 3, period: 7 } as const;
 /** Danse de victoire : un Zoombini toutes les 30 ticks (`1170:0532` étape 5), au plus 20 essais de tirage. */
@@ -100,6 +110,66 @@ const DEPTH = { stone: 0.2, row: 0.02, ring: 0.005, front: 0.5, sparks: 0.6 } as
 /** Drapeaux d'une pierre au repos (une image, jouée tout de suite) et en montée (7 images, s'arrête à la fin). */
 const STONE_FLAGS = FeatureFlag.relative | FeatureFlag.stopEachImage | FeatureFlag.firstImage | FeatureFlag.active;
 const RISE_FLAGS = FeatureFlag.relative | FeatureFlag.stopAtEnd | FeatureFlag.active;
+
+/** Connecteur gardé si le bit de direction du masque est posé (`1170:20cc`, `1170:23a2`, `1170:250c`) ; les autres pièces ne sont pas des connecteurs. */
+function connectorKept(mask: number, w: number): boolean {
+  switch (w) {
+    case PART.conn0:
+      return (mask & 1) !== 0;
+    case PART.conn1:
+      return (mask & 2) !== 0;
+    case PART.conn2:
+      return (mask & 4) !== 0;
+    case PART.conn3:
+      return (mask & 8) !== 0;
+    case PART.conn4:
+      return (mask & 16) !== 0;
+    case PART.conn5:
+      return (mask & 32) !== 0;
+    default:
+      return true;
+  }
+}
+
+/** Ce qui décide de l'image d'une pierre : symbole (liaison), code d'état de l'original, masque des connecteurs, variante de départ (`DS:9d5e − 0x1f8`), montée en cours. */
+export interface StoneLook {
+  attr: number | null;
+  code: number;
+  mask: number;
+  variant: 0 | 1;
+  rising: boolean;
+}
+
+/**
+ * Filtre des pièces d'une pierre. Au repos (`SCRB` 7000, `1170:20cc`, table `CS:22ea` : 10 pièces puis 10 cibles, relue sur les octets) :
+ *  - socle 98 toujours ; connecteurs 4, 8, 24 selon les bits 0, 1, 5 du masque ; symbole de l'attribut `a` (`SYMBOL_IMAGE`) si le contenu vaut `0x1fe + a` ;
+ *  - **contour orange 103** si et seulement si la case est un **emplacement libre** (`0x1fa`) : là où l'on peut poser un Zoombini ;
+ *  - **sommet rouge 109** si la case est haute (`0x1f6` liaison montée, `0x1f8` départ, `0x1fc` emplacement relié) et la variante 0 ;
+ *  - **sommet bleu 110** si elle est haute (`0x1f6`, `0x1f9`, `0x1fc`) et la variante 1 (niveau 3 seulement, tirée).
+ * En montée (`SCRB` 7002, `1170:250c`, table `CS:26a0`) : mêmes sommets ; un connecteur gardé passe à sa couleur (`w + DS:9d60`). Le script de montée ne porte
+ * ni symbole ni contour.
+ */
+export function filterStoneParts(parts: readonly FeaturePart[], look: StoneLook): FeaturePart[] {
+  const { attr, code, mask, variant, rising } = look;
+  const high = code === STATE.linkRaised || code === STATE.slotConnected || code === (variant === 1 ? STATE.startAlt : STATE.start);
+  const kept: FeaturePart[] = [];
+  for (const part of parts) {
+    const { w } = part;
+    if (w >= PART.symbol0 && w <= PART.symbol3) {
+      if (attr !== null && SYMBOL_IMAGE[attr] === w) kept.push(part);
+    } else if (w === PART.outline) {
+      if (code === STATE.slotFree) kept.push(part);
+    } else if (w === PART.redTop) {
+      if (variant === 0 && high) kept.push(part);
+    } else if (w === PART.blueTop) {
+      if (variant === 1 && high) kept.push(part);
+    } else if (connectorKept(mask, w)) {
+      const connector = w === PART.conn0 || w === PART.conn1 || w === PART.conn5;
+      kept.push(rising && connector ? { ...part, w: w + RISE_CONNECTOR_SHIFT[variant] } : part);
+    }
+  }
+  return kept;
+}
 
 /** Étape de la sortie après « go ». */
 type Stage = "rising" | "pause" | "walking";
@@ -121,6 +191,8 @@ export interface SlidesProbe {
   readonly cycling: boolean;
   /** Features des pierres (`undefined` : case vide), anneaux par rang d'emplacement et cibles de dépôt par rang. */
   readonly stones: readonly (Feature | undefined)[];
+  /** Pierres nues (`SCRB` 7001) des cases vides du plateau. */
+  readonly bare: readonly Feature[];
   readonly rings: readonly Feature[];
   readonly slots: readonly DropTarget[];
   /** Pierres qui s'élèvent (« go »). */
@@ -152,6 +224,7 @@ class SlidesRun implements SlidesProbe {
   celebrating = false;
   cycling = false;
   readonly stones: (Feature | undefined)[] = new Array<Feature | undefined>(STONE_COUNT).fill(undefined);
+  readonly bare: Feature[] = [];
   readonly rings: Feature[] = [];
   readonly slots: DropTarget[] = [];
   readonly rising: number[] = [];
@@ -257,11 +330,17 @@ class SlidesRun implements SlidesProbe {
     return DEPTH.stone + Math.trunc(i / BOARD_COLS) * DEPTH.row;
   }
 
-  /** Une feature `SCRB` 7000 par pierre non vide, posée sur la position de la pierre (le script place la première partie en (308, 152)). */
+  /**
+   * Une feature par case, posée sur la position de la pierre (les scripts placent leur première partie en (308, 152)) : `SCRB` 7000 filtré selon l'état pour
+   * une pierre du plateau ; `SCRB` 7001 (pierre nue, image 97, sans filtre) pour une case vide (`1150:0000`, fin : état 500). Tout le fond de la fosse est pavé.
+   */
   private createStones(): void {
     this.board.stones.forEach((stone, i) => {
-      if (stone.kind === "void") return;
       const position = stonePosition(i);
+      if (stone.kind === "void") {
+        this.bare.push(this.features.create({ script: SCRB.bare, delay: DELAY, flags: STONE_FLAGS, depth: this.stoneDepth(i), position }));
+        return;
+      }
       this.stones[i] = this.features.create({
         script: SCRB.stone,
         delay: DELAY,
@@ -294,50 +373,20 @@ class SlidesRun implements SlidesProbe {
     });
   }
 
-  /** Connecteur gardé si le bit de direction du masque est posé (`1170:20cc`, `1170:23a2`). */
-  private connectorKept(mask: number, w: number): boolean {
-    switch (w) {
-      case PART.conn0:
-        return (mask & 1) !== 0;
-      case PART.conn1:
-        return (mask & 2) !== 0;
-      case PART.conn2:
-        return (mask & 4) !== 0;
-      case PART.conn3:
-        return (mask & 8) !== 0;
-      case PART.conn4:
-        return (mask & 16) !== 0;
-      case PART.conn5:
-        return (mask & 32) !== 0;
-      default:
-        return true;
-    }
-  }
-
-  /**
-   * Filtre des pièces d'une pierre (`1170:20cc`, table `1170:22ea`) : connecteurs selon le masque ; symbole de la liaison ; sommet « haut » (liaison montée, départ,
-   * emplacement relié) : contour 103 (variante 0) ou sommet rouge 109 (variante 1) ; sommet bleu 110 pour un emplacement libre. Pierre qui monte (`1170:250c`) : sommet
-   * rouge ou bleu selon la variante, connecteurs selon le masque.
-   */
   private stoneParts(i: number, parts: FeaturePart[]): FeaturePart[] {
     const stone = this.board.stones[i]!;
-    const mask = this.masks[i]!;
-    const code = stateCode(this.board, this.ev, i);
-    const alt = this.board.startVariant === 1;
-    const high = code === STATE.linkRaised || code === STATE.start || code === STATE.startAlt || code === STATE.slotConnected;
-    const rising = this.rising.includes(i);
-    return parts.filter(({ w }) => {
-      if (w >= PART.symbol0 && w <= PART.symbol3) return !rising && stone.kind === "link" && stone.attr === w - PART.symbol0;
-      if (w === PART.outline) return !rising && !alt && high;
-      if (w === PART.redTop) return alt && (rising || high);
-      if (w === PART.blueTop) return rising ? !alt : code === STATE.slotFree;
-      return this.connectorKept(mask, w);
+    return filterStoneParts(parts, {
+      attr: stone.kind === "link" ? stone.attr : null,
+      code: stateCode(this.board, this.ev, i),
+      mask: this.masks[i]!,
+      variant: this.board.startVariant,
+      rising: this.rising.includes(i),
     });
   }
 
   private ringParts(i: number, parts: FeaturePart[]): FeaturePart[] {
     const mask = this.masks[i]!;
-    return parts.filter(({ w }) => this.connectorKept(mask, w));
+    return parts.filter(({ w }) => connectorKept(mask, w));
   }
 
   /** Rejoue les pierres dont l'état ou le masque a changé (`11a8:1be6(1, 7000, feature)`). */

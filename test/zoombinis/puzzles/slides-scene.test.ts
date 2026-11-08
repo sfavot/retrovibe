@@ -10,7 +10,7 @@ import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
 import { STATE, WAITING_POSITIONS, createPlay, evaluate, robot, slotPosition, stateCode, stonePosition, type Placement } from "../../../src/games/zoombinis/game/puzzles/slides";
 import { dialogMemoryIndex, nextScreen } from "../../../src/games/zoombinis/game/route";
 import { makeZoombini, type GameState, type Session, type Zoombini } from "../../../src/games/zoombinis/game/state";
-import { createSlidesScene, type SlidesProbe, type SlidesScene } from "../../../src/games/zoombinis/scenes/puzzles/slides";
+import { createSlidesScene, filterStoneParts, type SlidesProbe, type SlidesScene, type StoneLook } from "../../../src/games/zoombinis/scenes/puzzles/slides";
 import { originalFiles } from "../../support/original";
 import { runFor, TestHost } from "../engine-test-host";
 
@@ -161,18 +161,28 @@ describe.skipIf(!original.has)("monte-pierre : écran sur les vrais fichiers (SL
       expect(feature.position).toEqual(stonePosition(i));
       expect(feature.parts.length).toBeGreaterThan(0);
     });
-    // Un emplacement libre montre le sommet bleu (110), pas le contour (103) ; une pierre de départ le contour, pas le sommet bleu.
-    const slotStone = probe().stones[board.slots[0]!]!;
-    expect(slotStone.parts.some((p) => p.w === 110)).toBe(true);
-    expect(slotStone.parts.some((p) => p.w === 103)).toBe(false);
-    const startStone = probe().stones[board.starts[0]!]!;
-    expect(startStone.parts.some((p) => p.w === 110)).toBe(false);
-    expect(startStone.parts.some((p) => p.w === (board.startVariant === 1 ? 109 : 103))).toBe(true);
-    // Les symboles des liaisons à symbole sont dessinés (pièces 73 à 76), seulement pour leur attribut.
+    // Les cases vides sont pavées d'une pierre nue (`SCRB` 7001, image 97, `1150:0000`) : le fond de la fosse est couvert de 117 pierres.
+    const voids = board.stones.flatMap((s, i) => (s.kind === "void" ? [i] : []));
+    expect(probe().bare).toHaveLength(voids.length);
+    probe().bare.forEach((feature, k) => {
+      expect(feature.scriptId).toBe(7001);
+      expect(feature.position).toEqual(stonePosition(voids[k]!));
+      expect(feature.parts.map((p) => p.w)).toEqual([97]);
+    });
+    // À l'arrivée, avant toute pose (`1170:20cc`) : le contour orange (103) entoure exactement les 16 emplacements libres ; les pierres de départ, et elles
+    // seules, ont le sommet de couleur (rouge 109, ou bleu 110 pour la variante 1 du niveau 3) ; aucune liaison n'est montée.
+    const withPart = (w: number) => probe().stones.flatMap((f, i) => (f?.parts.some((p) => p.w === w) ? [i] : []));
+    const top = board.startVariant === 1 ? 110 : 109;
+    expect(withPart(103)).toEqual([...board.slots].sort((a, b) => a - b));
+    expect(withPart(top)).toEqual([...board.starts].sort((a, b) => a - b));
+    expect(withPart(top === 109 ? 110 : 109)).toEqual([]);
+    expect(ev.raised.some(Boolean)).toBe(false);
+    // Les symboles des liaisons à symbole sont dessinés, seulement celui de leur attribut : cheveux 74, yeux 76, nez 75, pieds 73 (`1170:20cc`).
+    const symbolImage = [74, 76, 75, 73];
     board.stones.forEach((stone, i) => {
       if (stone.kind !== "link") return;
-      const symbols = probe().stones[i]!.parts.filter((p) => p.w >= 73 && p.w <= 76).map((p) => p.w - 73);
-      expect(symbols).toEqual(stone.attr === null ? [] : [stone.attr]);
+      const symbols = probe().stones[i]!.parts.filter((p) => p.w >= 73 && p.w <= 76).map((p) => p.w);
+      expect(symbols).toEqual(stone.attr === null ? [] : [symbolImage[stone.attr]]);
     });
     expect(ev.goEnabled).toBe(false);
     expect(features.features.length).toBeGreaterThan(40);
@@ -193,10 +203,11 @@ describe.skipIf(!original.has)("monte-pierre : écran sur les vrais fichiers (SL
     expect(probe().kit.goEnabled).toBe(true);
     expect(probe().kit.buttonState("go")).toBe("normal");
     expect(queued).toContain(8504);
-    // Le sommet de l'emplacement relié est le contour 103 (ou rouge 109), plus le sommet bleu libre.
+    // L'emplacement relié perd le contour orange (103) et prend le sommet rouge (109) ; la liaison montée aussi.
     const stone = probe().stones[board.slots[first.slot]!]!;
-    await until(() => stone.parts.some((p) => p.w === (board.startVariant === 1 ? 109 : 103)), 100);
-    expect(stone.parts.some((p) => p.w === 110)).toBe(false);
+    await until(() => stone.parts.some((p) => p.w === 109), 100);
+    expect(stone.parts.some((p) => p.w === 103)).toBe(false);
+    probe().ev.raised.forEach((up, i) => up && expect(probe().stones[i]!.parts.some((p) => p.w === 109)).toBe(true));
     expect(stateCode(board, probe().ev, board.slots[first.slot]!)).toBe(STATE.slotConnected);
     expect(queued.some((id) => id >= 20055 && id <= 20063)).toBe(false);
   });
@@ -336,6 +347,12 @@ describe.skipIf(!original.has)("monte-pierre : écran sur les vrais fichiers (SL
     expect(probe().stage).toBe("rising");
     await wait(2);
     expect(probe().rising.every((i) => probe().stones[i]!.scriptId === 7002)).toBe(true);
+    // Les pierres qui montent ont le sommet rouge (109) et des connecteurs rouges (`w + 0x30`, `1170:250c`), plus de connecteur gris.
+    for (const i of probe().rising) {
+      const ws = probe().stones[i]!.parts.map((p) => p.w);
+      expect(ws).toContain(109);
+      expect(ws.some((w) => w === 4 || w === 8 || w === 24)).toBe(false);
+    }
     expect(features.features.some((f) => f.scriptId === 13000)).toBe(true);
     // Les marqueurs de sauvetage : seul le relié est sauvé.
     probe().kit.members.forEach((m, i) => expect(m.zoombini.present).toBe(i === first.member));
@@ -587,6 +604,47 @@ describe.skipIf(!original.has)("monte-pierre : écran sur les vrais fichiers (SL
       expect(t.probe().kit.waitingPlaces.every((place) => place.owner === null)).toBe(true);
       expect(t.probe().ev.victory).toBe(true);
     });
+  });
+});
+
+describe("monte-pierre : image d'une pierre selon son état (`1170:20cc` au repos, `1170:250c` en montée)", () => {
+  /** Pièces de l'image 0 du `SCRB` 7000 (socle, sommets, contour, symboles, connecteurs 5, 0, 1). */
+  const STONE = [98, 109, 110, 103, 73, 74, 75, 76, 24, 4, 8].map((w) => ({ w, x: 0, y: 0 }));
+  /** Pièces d'une image du `SCRB` 7002 (montée). */
+  const RISE = [86, 109, 110, 24, 4, 8].map((w) => ({ w, x: 0, y: 0 }));
+  const look = (code: number, more: Partial<StoneLook> = {}): StoneLook => ({ attr: null, code, mask: 0, variant: 0, rising: false, ...more });
+  const ws = (parts: { w: number; x: number; y: number }[], l: StoneLook) => filterStoneParts(parts, l).map((p) => p.w);
+
+  it("emplacement libre : contour orange 103 sur le socle, sans sommet de couleur (les deux variantes)", () => {
+    expect(ws(STONE, look(STATE.slotFree))).toEqual([98, 103]);
+    expect(ws(STONE, look(STATE.slotFree, { variant: 1 }))).toEqual([98, 103]);
+  });
+
+  it("symbole d'une liaison : celui de son attribut, cheveux 74, yeux 76, nez 75, pieds 73 (table `CS:22ea`)", () => {
+    expect([0, 1, 2, 3].map((attr) => ws(STONE, look(STATE.linkLow, { attr })))).toEqual([
+      [98, 74],
+      [98, 76],
+      [98, 75],
+      [98, 73],
+    ]);
+  });
+
+  it("emplacement occupé non relié, liaison basse, pierre libre : socle gris seul (plus le symbole de la liaison)", () => {
+    expect(ws(STONE, look(STATE.slotOccupied))).toEqual([98]);
+    expect(ws(STONE, look(STATE.linkLow, { attr: 2 }))).toEqual([98, 75]);
+    expect(ws(STONE, look(STATE.linkLow))).toEqual([98]);
+  });
+
+  it("pierre haute (départ, liaison montée, emplacement relié) : sommet rouge 109 en variante 0, bleu 110 en variante 1, jamais le contour", () => {
+    for (const code of [STATE.start, STATE.linkRaised, STATE.slotConnected]) expect(ws(STONE, look(code))).toEqual([98, 109]);
+    for (const code of [STATE.startAlt, STATE.linkRaised, STATE.slotConnected]) expect(ws(STONE, look(code, { variant: 1 }))).toEqual([98, 110]);
+    expect(ws(STONE, look(STATE.linkRaised, { attr: 0 }))).toEqual([98, 109, 74]);
+  });
+
+  it("connecteurs selon les bits 0, 1 et 5 du masque ; en montée, ils prennent la couleur du sommet (w + 0x30 rouge, w + 0x18 bleu)", () => {
+    expect(ws(STONE, look(STATE.linkLow, { mask: 1 | 32 }))).toEqual([98, 24, 4]);
+    expect(ws(RISE, look(STATE.slotConnected, { mask: 1 | 2, rising: true }))).toEqual([86, 109, 52, 56]);
+    expect(ws(RISE, look(STATE.startAlt, { mask: 32, rising: true, variant: 1 }))).toEqual([86, 110, 48]);
   });
 });
 

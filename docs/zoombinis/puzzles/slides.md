@@ -123,7 +123,7 @@ Après un dépôt sur l'emplacement `k` (case `s = S14:0240[9c7c]`) :
 
 Conséquence : dans chaque rangée, un Zoombini est relié s'il est en tête de rangée (juste après la pierre de départ), ou si toutes les liaisons qui le séparent du départ sont montées. Deux Zoombinis qui ne partagent pas l'attribut demandé **bloquent** la rangée. **Sûr.**
 
-Attribut demandé : le symbole `0x1fe + a`, `a` = 0 à 3 est l'indice de l'attribut ([../screens.md](../screens.md) §2.1 : ordre cheveux, yeux, nez, pieds **non vérifié**). Les sprites de symbole sont les parties `0x49`, `0x4a`, `0x4b`, `0x4c` de l'image de la pierre (§5.2).
+Attribut demandé : le symbole `0x1fe + a`, `a` = 0 à 3 est l'indice de l'attribut ([../screens.md](../screens.md) §2.1 : ordre cheveux, yeux, nez, pieds **non vérifié**). Image du symbole (§5.2, table relue sur les octets) : attribut 0 → partie 74 (`0x4a`), 1 → 76 (`0x4c`), 2 → 75 (`0x4b`), 3 → 73 (`0x49`) ; les dessins (une touffe, un œil, un nez, un pied) confirment l'ordre cheveux, yeux, nez, pieds. **Sûr.**
 
 ### 2.4 Règle de montée, niveaux 2 et 3 (`1170:3dc0`, `1170:3aa3`, `1170:3ca9`, `1170:40b5`)
 
@@ -318,7 +318,7 @@ Format : [../engine.md](../engine.md) §3.2. Délai entre images : **6 ticks** (
 | `SCRB` | Images | Rôle | Confiance |
 |---|---:|---|---|
 | 7000 | 2 | **pierre** : image 0 = composition de toutes les parties (base 98, 109, 110, 103, symboles 73 à 76, connecteurs 4, 8, 24…) ; image 1 vide. Le callback `1170:20cc` retire les parties selon l'état de la case (§5.2). Rejouée par `11a8:1be6(1, 7000, feature)` à chaque changement d'état | sûr |
-| 7001 | 1 | pierre nue (image 97) | probable |
+| 7001 | 1 | **pierre nue** (image 97, sans filtre) : posée par `1150:0000` (fin) sur chaque case **vide** (état 500) ; tout le fond de la fosse (117 cases) est donc pavé | sûr |
 | 7002 | 7 | **montée** de la pierre : images 2 à 6 translatées de `y = 134, 125, 110, 95, 79` (la pierre s'élève de 55 pixels) ; callback `1170:250c` ; jouée sur les cases `0x1f6` / `0x1fc` / départ lors de « go » | sûr |
 | 7003 à 7010 | 1 | décors fixes (3 à 8 : avant-plan du bord droit, y de 96 à 278 ; 7010 : bord gauche `(129, 294)`) ; 7003 et 7012 identiques `(504, 96)` | sûr |
 | 7011 | 1 | décor `(0, 203)` | sûr |
@@ -327,21 +327,40 @@ Format : [../engine.md](../engine.md) §3.2. Délai entre images : **6 ticks** (
 
 Événements (octet bas du terminateur − 1, callback `1170:4bb8`) : `0x5a`, `0x5b`, `0x5c` (images 2 de 8000, 8001, 8002) lancent le `SCRS` 14000, 14001 ou 14002 sur le Zoombini rejeté (`1168:3f76`) ; `0x5d` (image 9) lance le `SCRS` 14003 (vol de 24 images, point de départ aléatoire `x = 70 + rand(0..42)`, `y = 152 + rand(0..200)`) et remet `DS:9c70 ← 0`. Les événements `0xf0…0xf3` et `0xfa…0xfd` pilotent des poses de Zoombini (`1168:4dc9`). **Probable** (le sens « rejet » vient du nom des scripts `SCRS` 14000+ et de la remise à zéro de `9c70`).
 
-### 5.2 Filtre des pierres (`1170:20cc`, table `1170:22ea`)
+### 5.2 Filtre des pierres (`1170:20cc`, table `CS:22ea`)
 
-Chaque pièce (« partie ») d'une image de pierre porte un numéro `w` d'image de `tBMP` 7000 ; le callback retire la pièce si la condition de présence n'est pas remplie. Valeurs de `w` : **sûres** (table relue) ; sens des pièces : **probable**.
+Chaque pièce (« partie ») d'une image de pierre porte un numéro `w` d'image de `tBMP` 7000 ; le callback cherche `w` parmi les 10 premiers mots de la table `CS:22ea`, saute à la cible rangée **10 mots plus loin** (`JMP CS:[BX+0x14]`) et y retire la pièce (`11a0:0fa6`) si la condition n'est pas remplie ; une pièce absente de la table est toujours gardée (socle 98). Table relue sur les octets du NE (segment à `0x6ea00`) : pièces `4 8 0x18 0x49 0x4a 0x4b 0x4c 0x67 0x6d 0x6e`, cibles `2125 2145 2165 21eb 2185 21c9 21a7 22ab 220d 225c`. **Sûr** (H-SLIDES-couleurs ; la première version de ce tableau appariait les pièces aux cibles en décalant d'un cran les sommets et les symboles).
 
-| `w` | Pièce | Gardée si |
+| `w` | Pièce (dessin vérifié) | Gardée si |
 |---:|---|---|
-| 4 | connecteur 0 | bit 0 du masque de la case posé |
+| 98 | socle gris | toujours |
+| 4 | connecteur 0 (gris) | bit 0 du masque de la case posé |
 | 8 | connecteur 1 | bit 1 posé |
 | 0x18 | connecteur 5 | bit 5 posé |
-| 0x49, 0x4a, 0x4b, 0x4c | symbole d'attribut 0, 1, 2, 3 | `+4 = 0x1fe, 0x1ff, 0x200, 0x201` |
-| 0x67 | pierre de départ `0x1f8`, état haut | état ∈ {`0x1f6`, `0x1f8`, `0x1fc`} et `9d5e ≠ 0x1f9` |
-| 0x6d | pierre de départ `0x1f9`, état haut | état ∈ {`0x1f6`, `0x1f9`, `0x1fc`} et `9d5e = 0x1f9` |
-| 0x6e | pierre « emplacement » | état = `0x1fa` |
+| 0x4a (74) | symbole « cheveux » (une touffe) | `+4 = 0x1fe` (attribut 0) |
+| 0x4c (76) | symbole « yeux » (un œil) | `+4 = 0x1ff` (attribut 1) |
+| 0x4b (75) | symbole « nez » | `+4 = 0x200` (attribut 2) |
+| 0x49 (73) | symbole « pieds » | `+4 = 0x201` (attribut 3) |
+| 0x67 (103) | **contour orange** | état = `0x1fa` (**emplacement libre**) |
+| 0x6d (109) | **sommet rouge** | état ∈ {`0x1f6`, `0x1f8`, `0x1fc`} et `9d5e ≠ 0x1f9` |
+| 0x6e (110) | **sommet bleu** | état ∈ {`0x1f6`, `0x1f9`, `0x1fc`} et `9d5e = 0x1f9` |
 
-`1170:23a2` (anneau) applique le même principe aux 6 connecteurs (`4, 8, 0xc, 0x10, 0x14, 0x18` contre les bits 0 à 5) en décalant les pièces de `-0x16` en x et `+6` en y ; `1170:250c` (montée) filtre les pièces `0x67`/`0x6d` etc. selon le même principe (table `1170:26a0`, 5 entrées).
+`1170:23a2` (anneau) applique le même principe aux 6 connecteurs (`4, 8, 0xc, 0x10, 0x14, 0x18` contre les bits 0 à 5) en décalant les pièces de `-0x16` en x et `+6` en y. `1170:250c` (montée, `SCRB` 7002 : pièces 86 à 90, 109, 110, 24, 4, 8 ; ni symbole ni contour) a la table `CS:26a0` (5 entrées : `4 8 0x18 0x6d 0x6e` → `2604 262e 2658 2565 25b5`) : sommets comme au repos ; un connecteur dont le bit est posé est **gardé et recoloré** (`w += DS:9d60` : `+0x30`, connecteurs rouges 52, 56, 72, en variante 0 ; `+0x18`, connecteurs bleus 28, 32, 48, en variante 1), les autres retirés. **Sûr.**
+
+### 5.2.1 Ce que montrent les pierres
+
+| Case (état) | Image | À l'arrivée sur l'écran |
+|---|---|---|
+| vide (`500`) | pierre nue `SCRB` 7001 (image 97, plus sombre, sans connecteur) | tout le reste de la fosse |
+| emplacement libre (`0x1fa`) | socle + **contour orange** | exactement `n` pierres (16 au plus) : là où l'on peut poser un Zoombini |
+| emplacement occupé non relié (`0x1fb`) | socle gris (le contour disparaît) | aucun |
+| emplacement relié (`0x1fc`) | socle + **sommet rouge** (bleu en variante 1) | aucun |
+| liaison basse (`0x1f5`) | socle gris + symbole de l'attribut, ou rien (liaison libre, pierre libre des niveaux 2 et 3) | toutes les liaisons |
+| liaison montée (`0x1f6`) | socle + **sommet rouge** (bleu) + symbole | aucune |
+| départ (`0x1f8` / `0x1f9`) | socle + **sommet rouge** (`0x1f8`) ou **bleu** (`0x1f9`, niveau 3 seulement, une fois sur deux) | toutes : 1 par rangée aux niveaux 0 et 1 (4 de suite pour les rangées impaires quand il y a plus de 7 unités), 3 au niveau 2, 1 au niveau 3 |
+| anneau (`SCRB` 7013) | ondulation autour d'un emplacement libre survolé par un Zoombini porté | caché |
+
+Donc, avant toute pose : orange = les `n` emplacements libres, rouge (ou bleu) = les seules pierres de départ, le reste gris. Une pierre devient rouge (bleue) quand elle est reliée au départ ; « go » fait monter toutes les pierres rouges (bleues). Nombre d'emplacements : `n` à tous les niveaux (§3) ; aux niveaux 2 et 3, les emplacements non retenus parmi 18 ou 26 sont de simples pierres grises sans contour.
 
 ### 5.3 Sons
 
@@ -434,11 +453,11 @@ Port : `src/games/zoombinis/scenes/puzzles/slides.ts` (`createSlidesScene(): Sli
 - **Sortie** : `1168:2982(45, 0, y, x)` : `x = 800`, `y = 200` aux niveaux 2 et 3 ; `x = 1280`, `y = 240` aux niveaux 0 et 1 (ordre des arguments de la signature `2982(écart, ?, y, x)` du kit). L'écran suivant est demandé au **premier arrivé** (`9704 > 0`) quand le son 996 est fini ; les autres marchent encore (ils sont sauvés, le moteur les range).
 
 **Lectures probables du port**
-- **Pierre** (`SCRB` 7000, une image rejouée à chaque changement d'état, sans `REGS`) : pièces 98 (socle, toujours), 103 (contour, variante 0 de la pierre de départ) ou 109 (sommet rouge, variante 1) quand la pierre est « haute » (liaison montée, départ, emplacement relié), 110 (sommet bleu) pour un emplacement libre, 73 à 76 (symbole) pour la liaison de cet attribut, 4 / 8 / 24 selon les bits 0 / 1 / 5 du masque. Les pièces 12, 16, 20 et les connecteurs bleus et rouges (25 à 72) ne sont portés par aucun script de la pierre : les connecteurs des directions 2, 3, 4 viennent des voisins (masques symétriques).
+- **Pierre** (`SCRB` 7000, une image rejouée à chaque changement d'état, sans `REGS`) : filtre de §5.2 (porté par `filterStoneParts`, relu sur les octets : **sûr**). Les pièces 12, 16, 20 ne sont portées par aucun script de la pierre : les connecteurs des directions 2, 3, 4 viennent des voisins (masques symétriques). Les cases vides reçoivent la pierre nue `SCRB` 7001. Corrigé après un signalement (pierres orange à l'arrivée) : le port affichait le contour orange sur les pierres hautes et le sommet bleu sur les emplacements libres, les symboles de trois attributs sur trois sur la mauvaise image, aucune pierre sur les cases vides, et des connecteurs gris pendant la montée.
 - **Anneau** (`SCRB` 7013) : caché au repos, il ondule (11 images, son 7002 à l'image 2) quand un Zoombini porté survole l'emplacement libre. L'original l'anime peut-être autrement (déclencheur non relevé).
 - **Rejet** : étincelles (images 1 à 9), le Zoombini est lancé à l'image 2 (`SCRS` 14000 + k, 2 images) puis caché ; à l'image 9 (événement `0x5d`, `9c70 ← 0`) il revient en vol (`SCRS` 14003 finissant au point tiré `x = 70 + rand(0..42)`, `y = 152 + rand(0..200)`) puis marche jusqu'à une position d'attente libre. Pendant le vol il n'est ni pris ni posé. Cacher le Zoombini entre le coup et le vol est une **hypothèse** (il pourrait rester à sa dernière image).
 - **Décors** (`SCRB` 7003 à 7012) : le décor `j` (7003 à 7008) est rangé devant les rangées jusqu'à `2j + 1` ; 7009 et 7010 devant les pierres, 7011 et 7012 devant tout le plateau mais derrière les Zoombinis.
-- **Montée** (`SCRB` 7002 sur toute case montée, reliée ou de départ ; `SCRS` 13000 pour les reliés) : les pierres voisines non montées perdent leur connecteur vers elles (`1150:2c72`) ; le Zoombini reste en haut (73 pixels plus haut) puis part ; sommet bleu ou rouge selon la variante. Fin de la **première** montée : son 7001, 60 ticks, son 996, départs (45 ticks, le plus à droite d'abord).
+- **Montée** (`SCRB` 7002 sur toute case montée, reliée ou de départ ; `SCRS` 13000 pour les reliés) : les pierres voisines non montées perdent leur connecteur vers elles (`1150:2c72`) ; le Zoombini reste en haut (73 pixels plus haut) puis part ; sommet rouge (variante 0) ou bleu (variante 1), connecteurs recolorés (§5.2). Fin de la **première** montée : son 7001, 60 ticks, son 996, départs (45 ticks, le plus à droite d'abord).
 - **Marche de sortie** : au niveau 3 seulement, le long de `PATH` 1000 (les `NODE` / `PATH` ne sont chargés qu'à ce niveau, `1168:2a5c`), droit ailleurs.
 - **Danse** : tirage avec remise (jusqu'à 20 essais), `SCRS` 13000 + valeur du pied (attribut 3), arrêt après autant de danses que de membres ou au clic.
 

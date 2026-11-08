@@ -382,8 +382,9 @@ const original = originalFiles("zoombinis", "files.json");
 const S = ScreenId;
 const TICK_MS = 17;
 
-function party(count: number): Zoombini[] {
-  return Array.from({ length: count }, (_, i) => makeZoombini([1 + (i % 5), 1 + (Math.floor(i / 5) % 5), 1 + (i % 3), 1], i + 1));
+/** Un groupe de `count` Zoombinis, dont le premier (le livreur) a les pieds `feet` (1 à 5). */
+function party(count: number, feet = 1): Zoombini[] {
+  return Array.from({ length: count }, (_, i) => makeZoombini([1 + (i % 5), 1 + (Math.floor(i / 5) % 5), 1 + (i % 3), i === 0 ? feet : 1], i + 1));
 }
 
 /** Centre d'un rectangle de région. */
@@ -391,7 +392,7 @@ const center = (rect: { left: number; top: number; right: number; bottom: number
 
 describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", () => {
   /** L'épreuve au niveau `level` ; les ensembles aimés peuvent être imposés avant la fin de l'introduction. Le son n'est pas déverrouillé : les voix durent 0 ms. */
-  async function start(level: number, options: { size?: number; liked?: number[]; lessAction?: boolean; testMode?: boolean } = {}) {
+  async function start(level: number, options: { size?: number; liked?: number[]; lessAction?: boolean; testMode?: boolean; feet?: number } = {}) {
     const host = new TestHost();
     const engine = createZoombinisEngine(host, { seed: 11 });
     const services = await installServices(engine);
@@ -402,7 +403,7 @@ describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", 
       else engine.register(id, () => ({ enter: () => void entered.push(id), leave() {}, tick() {} }));
     }
     const zoombinis = services.game;
-    zoombinis.game.group.members = party(options.size ?? 16);
+    zoombinis.game.group.members = party(options.size ?? 16, options.feet);
     zoombinis.game.stageUnbroken = true;
     zoombinis.game.levels = [level, 0, 0, 0];
     zoombinis.game.options.lessAction = options.lessAction ?? false;
@@ -661,6 +662,88 @@ describe.skipIf(!original.has)("hutte à pizza : écran (écran 9, PIZZA.MHK)", 
     walkTo.mockRestore();
     playSpy.mockRestore();
     placed.mockRestore();
+  });
+
+  it.each([1, 2, 3, 4, 5])("pieds %i : la pizza portée est la trajectoire 12001 + pieds − 1, au même rythme (6 ticks par image, même à la première livraison) et image pour image que le livreur (13005 + pieds − 1)", async (feet) => {
+    const { clickIngredients, serveClick, ticks, intro, features, engine } = await start(0, { liked: [mask(0, 1)], lessAction: true, feet });
+    await intro();
+    await clickIngredients(mask(2));
+    await serveClick();
+    const pizzaOf = () => features.features.find((f) => f.scriptId >= 12001 && f.scriptId <= 12015);
+    const delivererOf = () => features.features.find((f) => f.scriptId === 13004 + feet);
+    let seen: number | undefined;
+    const changes: number[] = [];
+    let last = -1;
+    let shown = 0;
+    for (let t = 0; t < 700; t++) {
+      await ticks(1);
+      const pizza = pizzaOf();
+      const walker = delivererOf();
+      if (!pizza || !walker) continue;
+      seen = pizza.scriptId;
+      // Image pour image : la pizza suit la tête du livreur (même indice d'image) pendant tout le trajet.
+      if (pizza.image < 17) {
+        expect(walker.image).toBe(pizza.image);
+        shown++;
+      }
+      if (pizza.image !== last) {
+        changes.push(engine.ctx.clock.ticks);
+        last = pizza.image;
+      }
+    }
+    expect(seen).toBe(12000 + feet);
+    expect(shown).toBeGreaterThan(40);
+    // Un changement d'image tous les 6 ticks (l'échantillonnage du test à 17 ms peut sauter un tick de loin en loin) : l'ancien port jouait la première livraison à 2.
+    const span = changes[19]! - changes[1]!;
+    expect(span / 18).toBeGreaterThan(5.8);
+    expect(span / 18).toBeLessThan(6.2);
+  });
+
+  it("niveau 1 : la pizza servie est dessinée devant les trolls et la table (SCRB 8020, 8021, 9026… portent un morceau de table), et Arno devant Willa (1130:54c8, 3799)", async () => {
+    const { clickIngredients, serveClick, ticks, intro, features } = await start(1, { liked: [mask(0), mask(1), 0], lessAction: true });
+    await intro();
+    const inRange = (id: number, lo: number, hi: number) => id >= lo && id <= hi;
+    const arno = () => features.features.find((f) => inRange(f.scriptId, 8000, 8032) || inRange(f.scriptId, 8034, 8035))!;
+    const willa = () => features.features.find((f) => inRange(f.scriptId, 9000, 9034))!;
+    const table = () => features.features.find((f) => f.scriptId === 8033)!;
+    expect(arno().depth).toBeGreaterThan(willa().depth);
+    expect(willa().depth).toBeGreaterThan(table().depth);
+    await clickIngredients(mask(2));
+    await serveClick();
+    // Repas manqué : la pizza est devant tout le décor, trolls et morceaux de table compris, pendant tout le trajet puis posée sur la table.
+    for (let t = 0; t < 400; t++) {
+      await ticks(1);
+      const pizza = features.features.find((f) => inRange(f.scriptId, 12001, 12015));
+      if (!pizza) continue;
+      expect(pizza.depth).toBeGreaterThan(arno().depth);
+      expect(pizza.depth).toBeGreaterThan(willa().depth);
+      expect(pizza.depth).toBeGreaterThan(table().depth);
+      expect(features.features.indexOf(pizza)).toBeGreaterThan(features.features.indexOf(arno()));
+    }
+  });
+
+  it("niveau 1 : le repas parfait d'Arno retire la pizza servie (8d9e) avant son départ ; celui de Willa aussi, et plus aucune pizza ne reste sur la table", async () => {
+    const { clickIngredients, serveClick, ticks, intro, features, state } = await start(1, { liked: [mask(0), mask(1), 0], lessAction: true });
+    await intro();
+    const flights = () => features.features.filter((f) => f.scriptId >= 12000 && f.scriptId <= 12015);
+    await clickIngredients(mask(0));
+    await serveClick();
+    for (let t = 0; t < 1500 && state.trolls[0] !== "content"; t++) await ticks(1);
+    expect(state.trolls[0]).toBe("content");
+    await ticks(1200);
+    expect(flights()).toHaveLength(0);
+    await clickIngredients(mask(1));
+    await serveClick();
+    // Willa est servie en second : sa pizza suit la trajectoire de Willa (12006 + pieds − 1), puis disparaît aussi.
+    let willaFlight = 0;
+    for (let t = 0; t < 1500; t++) {
+      await ticks(1);
+      const f = flights().find((x) => x.scriptId >= 12006);
+      if (f) willaFlight = f.scriptId;
+    }
+    expect(willaFlight).toBe(12006);
+    expect(state.trolls[1]).toBe("content");
+    expect(flights()).toHaveLength(0);
   });
 
   it("repas manqué : le troll mange puis lance la pizza (SCRB 8020, couches du repas aux images 17 à 20), et l'assiette ne tombe qu'à la fin du lancer, comme 1130:415d → 0d85 → 478e", async () => {

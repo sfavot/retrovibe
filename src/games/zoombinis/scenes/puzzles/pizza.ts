@@ -10,8 +10,8 @@
  *  1. entrée : narrateur (`5358`, voix `15000…15006`), puis chaque troll joue son introduction (`SCRB` 8032, 9034, 10038), puis une réplique d'attente (`4de0`) ; ensuite le
  *     service est permis. Les boutons peuvent être basculés dès l'entrée (la bascule n'attend que la fin de l'animation du four) ;
  *  2. service (régions 3 et 12) : les boutons repartent à zéro, le four joue (`SCRB` 7066 et 7057 / 7058) ; à son évènement 33 la pizza sort
- *     (`SCRB` 12000), à son évènement 61 le livreur la prend (`SCRS` 13000 + pieds − 1), à sa fin il la porte jusqu'au premier troll à servir (13005 / 13010 / 13015) pendant
- *     que la pizza suit (12001 / 12006 / 12011, au rythme du livreur : groupe `1f5c`) ; le livreur (premier Zoombini du groupe) attend au comptoir (`DS:1b6e`), où il
+ *     (`SCRB` 12000), à son évènement 61 le livreur la prend (`SCRS` 13000 + pieds − 1), à sa fin il la porte jusqu'au premier troll à servir (13005 / 13010 / 13015 + pieds − 1) pendant
+ *     que la pizza suit (12001 / 12006 / 12011 + pieds − 1, au rythme de la pizza, meneuse du groupe `1f5c`) ; le livreur (premier Zoombini du groupe) attend au comptoir (`DS:1b6e`), où il
  *     monte dès l'arrivée du groupe (`4cb5`) et revient après chaque repas (`4571`) ;
  *  3. verdicts (`serveMeal`) : les trolls réagissent à tour de rôle ; un troll content part avec sa pizza (`SCRB` 8021 / 9027 / 10031, parties filtrées par ses ingrédients
  *     aimés) et arrête la chaîne ; si aucun n'est content le dernier qui a réagi (celui du premier verdict « incomplet » sinon) lance l'assiette (`SCRB` 8020 / 9026 / 10030),
@@ -78,7 +78,11 @@ const OVEN_SERVE = 7066;
 const DOOR_SERVE = [7057, 7058] as const;
 /** Table des trolls (`8033`, `DS:8d50`), planche 8000 image 1 en (419, 295). */
 const TABLE_SCRIPT = 8033;
-/** Pizza qui sort du four (`12000`, créée à l'évènement 33 du four), puis portée par le livreur jusqu'au troll servi : `12001`, `12006` ou `12011` (`1130:37b2`). */
+/**
+ * Pizza qui sort du four (`12000`, créée à l'évènement 33 du four), puis portée par le livreur jusqu'au troll servi : `12001`, `12006` ou `12011` **+ pieds − 1**
+ * (`1130:37b2` : `SI = 12001 + 5 (troll − 1) + pieds − 1`, comme le geste du livreur `13005 + 5 (troll − 1) + pieds − 1`). Chaque type de pieds a sa propre
+ * trajectoire de pizza, calée sur la tête de son livreur (27 à 36 images, comme les `SCRS` 13005 à 13019).
+ */
 const FLIGHT_FIRST = 12000;
 const FLIGHT_CARRIED = [12001, 12006, 12011] as const;
 /**
@@ -120,8 +124,13 @@ const DELAY = 6;
 /** Flags des objets de décor (`0x188000`) et des assiettes ou de la pizza en vol (`0x4108000`, qui jouent dès la création). */
 const STATIC = FeatureFlag.noReplay | FeatureFlag.stopAtEnd | FeatureFlag.active;
 const PLAYING = FeatureFlag.stopAtEnd | FeatureFlag.active;
-/** Profondeurs : le décor, le four, les boutons, la table, la pizza, les trolls, les assiettes ; les Zoombinis du kit sont à 1 + y / 1000. */
-const DEPTH = { oven: 0, preview: 0.1, buttons: 0.2, table: 0.3, flight: 0.35, trolls: 0.4, plates: 0.5, deliverer: 1 } as const;
+/**
+ * Profondeurs : le décor, le four, les boutons, la table, les trolls, la pizza servie, les assiettes ; les Zoombinis du kit sont à 1 + y / 1000.
+ * Ordre de dessin de l'original (`1130:54c8`, `3799`, `11a8:2a0a`, de l'arrière vers l'avant) : Shyler derrière Willa derrière Arno (chaque troll est inséré derrière le
+ * précédent, qui est devant lui), et la pizza servie devant tout (`2a0a(pizza, 1, table)` la place devant la table, donc devant les trolls dont l'image porte parfois
+ * un morceau de table : `SCRB` 8020, 8021, 9026, 9027, 10030, 10031).
+ */
+const DEPTH = { oven: 0, preview: 0.1, buttons: 0.2, table: 0.3, trolls: [0.42, 0.4, 0.41] as const, flight: 0.45, plates: 0.5, deliverer: 1 } as const;
 
 /** Rectangles de prise des ingrédients, par niveau et indice `k` (régions 4 à 11 de `1130:1803`, §4.2). `null` : pas de bouton à ce niveau. */
 export const PIZZA_INGREDIENT_REGIONS: readonly (readonly (Rect | null)[])[] = [
@@ -448,10 +457,15 @@ export function createPizzaScene(): Scene {
       if (!flight || flight.destroyed) drawFlight(result.meal);
       const both = join(2, () => verdicts(result));
       const hook: FeatureImageHook = (_f, parts) => plateLayers(parts, result.meal, level());
-      // `1f5c(pizza, livreur)` (`1130:386a`) : un groupe avance au rythme de son meneur (`11a0:033a`, `1520:06da`), ici le livreur, placé avant la pizza
-      // dans la liste (`2a0a`) : la pizza prend son délai (2 à la première livraison, `1130:4cb5` ; 6 ensuite, `1130:4571`). Les deux partent dans le même tick.
-      flight!.delay = deliverer()?.snoid.delay ?? DELAY;
-      play(flight!, FLIGHT_CARRIED[towards]!, both, hook);
+      // `1f5c(pizza, livreur)` (`1130:386a`) : le groupe avance au rythme de son meneur (`11a0:033a`, `1520:06da`), le premier de la liste lue par le moteur. Les
+      // features `0x8000` (la pizza : `0x108000`) restent en tête de la liste (`11a8:231b`), avant les Zoombinis : le meneur est la pizza, de délai 6 (`1130:36ab`).
+      // Le livreur suit image pour image, au même rythme, même à sa première livraison où son délai de marche est 2 (`1130:4cb5`) ; chaque type de pieds a sa
+      // pizza (12001 + pieds − 1), de même nombre d'images utiles que son geste. Les deux partent dans le même tick.
+      const member = deliverer();
+      const feet = member?.snoid.traits.feet ?? 1;
+      if (member && !member.snoid.destroyed) member.snoid.delay = DELAY;
+      flight!.delay = DELAY;
+      play(flight!, FLIGHT_CARRIED[towards]! + feet - 1, both, hook);
       delivererGesture(DELIVERER_CARRY[towards]!, both);
     });
     const ovenEvents = oven.onEvent;
@@ -707,7 +721,7 @@ export function createPizzaScene(): Scene {
       }
       features.create({ script: TABLE_SCRIPT, delay: DELAY, flags: STATIC, depth: DEPTH.table });
       for (let k = 0; k < 3; k++) {
-        trolls[k] = state.trolls[k] === "absent" ? null : features.create({ script: TROLL_OBJECT[k]!, delay: DELAY, flags: STATIC, depth: DEPTH.trolls });
+        trolls[k] = state.trolls[k] === "absent" ? null : features.create({ script: TROLL_OBJECT[k]!, delay: DELAY, flags: STATIC, depth: DEPTH.trolls[k]! });
       }
       // Assiettes de départ du niveau 3 (`595f`).
       for (const plate of state.plates) addPlateFeature(plate);

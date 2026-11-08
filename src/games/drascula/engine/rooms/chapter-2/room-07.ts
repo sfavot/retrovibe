@@ -1,5 +1,5 @@
 import type { DrasculaEngine } from "../../loop";
-import { type Sequence } from "../../sequence";
+import { type Sequence } from "../../../../../engine/sequence";
 import { setVisible } from "../../room-kit";
 import { Verb } from "../../state";
 import { checkIngredients } from "./anim-kit";

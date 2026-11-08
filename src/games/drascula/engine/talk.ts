@@ -1,6 +1,7 @@
 import type { Roll, TalkView } from "../render/renderer";
 import { pauseTicks } from "./cadence";
-import { type Sequence, pause, unskippable } from "./sequence";
+import { type Sequence, unskippable } from "../../../engine/sequence";
+import { pause } from "./cadence";
 
 /**
  * Réplique dite : texte en sous-titre, voix et tête qui parle, jusqu'à la fin de la voix ou une touche. Socle de toutes les

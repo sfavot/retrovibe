@@ -10,6 +10,8 @@
  * `FRAME_TICKS`. La cadence de l'exécutable d'origine (DOS) n'est pas connue : à confirmer sous ScummVM (`plan.md`, « Cadence »).
  */
 
+import { type Sequence, wait } from "../../../engine/sequence";
+
 /** Durée d'un tick du moteur (ms) : l'unité de `getTime()` de ScummVM. Seule constante de temps du moteur. */
 export const TICK_MS = 10;
 
@@ -34,3 +36,13 @@ export const CLICK_DELAY_TICKS = delayTicks(50);
 
 /** Le héros fait un pas quand `getTime()` a avancé d'au moins 6 depuis le pas précédent (`increaseFrameNum`). */
 export const WALK_STEP_TICKS = 6;
+
+/** `pause(n)` de ScummVM en séquence : attend `pauseTicks(n)` ticks (n x 30 ms). */
+export function pause(units: number): Sequence {
+  return wait(pauseTicks(units));
+}
+
+/** `delay(ms)` de ScummVM en séquence : attend `delayTicks(ms)` ticks (2 x ms). */
+export function delay(ms: number): Sequence {
+  return wait(delayTicks(ms));
+}

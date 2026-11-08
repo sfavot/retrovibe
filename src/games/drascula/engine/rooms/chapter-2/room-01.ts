@@ -1,6 +1,7 @@
 import type { RoomPainter } from "../../../render/renderer";
 import type { DrasculaEngine } from "../../loop";
-import { type Sequence, pause } from "../../sequence";
+import { type Sequence } from "../../../../../engine/sequence";
+import { pause } from "../../cadence";
 import { Verb } from "../../state";
 import { setLight } from "./anim-kit";
 import { Church, Flag } from "./ids";

@@ -3,7 +3,7 @@ import { placeDrascula } from "../../../render/actors";
 import type { RoomPainter } from "../../../render/renderer";
 import { FRAME_TICKS } from "../../cadence";
 import type { DrasculaEngine } from "../../loop";
-import { type Sequence } from "../../sequence";
+import { type Sequence } from "../../../../../engine/sequence";
 import { Verb } from "../../state";
 import { Flag, Item, Tavern } from "./ids";
 

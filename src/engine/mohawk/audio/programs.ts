@@ -5,7 +5,7 @@
  * Un canal commence au programme 0 (banque 0) ; la banque vient des contrôleurs 0 (MSB) et 32 (LSB), le programme du dernier
  * `Cn`. Le canal 10 (indice 9) est la batterie : le « programme » y désigne le kit, les touches jouées sont les instruments.
  */
-import { type Song, isNoteOn } from "./smf";
+import { type Song, isNoteOn } from "../../../audio/smf";
 
 export interface UsedPreset {
   /** Batterie (canal 10) ou timbre mélodique. */

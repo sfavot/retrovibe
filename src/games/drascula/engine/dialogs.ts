@@ -3,7 +3,8 @@ import type { DatTalkSequence } from "../data/dat";
 import type { DialogState } from "../render/font";
 import { TextColor } from "../render/palette";
 import type { DrasculaEngine } from "./loop";
-import { type Sequence, delay, pause, wait } from "./sequence";
+import { type Sequence, wait } from "../../../engine/sequence";
+import { delay, pause } from "./cadence";
 import { IgorType } from "../render/heads";
 import { Verb } from "./state";
 

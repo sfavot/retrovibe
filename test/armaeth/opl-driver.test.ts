@@ -5,8 +5,8 @@ import {
   OplDriver,
   OplRecorder,
   noteFrequencyWord,
-  type OplSink,
 } from "../../src/games/armaeth/audio/opl-driver";
+import type { OplSink } from "../../src/audio/opl-stream";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 
 type Write = [reg: number, value: number];

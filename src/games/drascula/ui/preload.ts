@@ -1,4 +1,5 @@
-import { type GameFiles, baseName, extensionOf } from "../data/files";
+import { type Fetcher, FileStore, loadInto } from "../../../ui/file-store";
+import { type GameFiles, extensionOf } from "../data/files";
 
 /**
  * Préchargement des fichiers du jeu. Le moteur lit les fichiers en synchrone (`DrasculaHost.readFile`), l'hôte du navigateur les
@@ -48,74 +49,6 @@ export function chapterVideos(files: GameFiles, chapter: number): string[] {
     if (path === undefined) throw new Error(`vidéo absente de la liste des fichiers : ${name}`);
     return path;
   });
-}
-
-/** Fichiers du jeu en mémoire, par nom (casse indifférente) : ce que lit `DrasculaHost.readFile`. */
-export class FileStore {
-  private readonly bytes = new Map<string, Uint8Array>();
-
-  private static key(name: string): string {
-    return baseName(name).toUpperCase();
-  }
-
-  has(name: string): boolean {
-    return this.bytes.has(FileStore.key(name));
-  }
-
-  get(name: string): Uint8Array | undefined {
-    return this.bytes.get(FileStore.key(name));
-  }
-
-  set(name: string, data: Uint8Array): void {
-    this.bytes.set(FileStore.key(name), data);
-  }
-
-  get size(): number {
-    return this.bytes.size;
-  }
-}
-
-/** Chargeur d'un fichier (`fetchBytes(base, chemin)`) ; injecté pour les tests. */
-export type Fetcher = (path: string) => Promise<Uint8Array>;
-
-/** Fichiers chargés en même temps au plus. */
-const CONCURRENCY = 8;
-
-/**
- * Charge `paths` dans `store` (ceux qui y sont déjà sont sautés) par petits lots ; `onProgress(chargé, total)` compte en octets
- * (taille du manifeste). Une erreur arrête les chargements non commencés et est relancée.
- */
-export async function loadInto(
-  store: FileStore,
-  files: GameFiles,
-  paths: readonly string[],
-  fetcher: Fetcher,
-  onProgress?: (done: number, total: number) => void,
-): Promise<void> {
-  const wanted = paths.filter((path) => !store.has(path));
-  const sizeOf = (path: string): number => files.size(path) ?? 0;
-  const total = wanted.reduce((sum, path) => sum + sizeOf(path), 0);
-  let done = 0;
-  let next = 0;
-  let failure: unknown;
-  let failed = false;
-  onProgress?.(0, total);
-  const worker = async (): Promise<void> => {
-    while (!failed && next < wanted.length) {
-      const path = wanted[next++];
-      try {
-        store.set(path, await fetcher(path));
-      } catch (error) {
-        failed = true;
-        failure = error;
-        return;
-      }
-      done += sizeOf(path);
-      onProgress?.(done, total);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, wanted.length) }, worker));
-  if (failed) throw failure;
 }
 
 /**

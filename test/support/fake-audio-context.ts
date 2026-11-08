@@ -50,6 +50,19 @@ export class FakeAudioContext {
     return source;
   }
 
+  /** Octets reçus par `decodeAudioData`, et le tampon rendu (`decoded`, ou une erreur si `decodeFails`). */
+  readonly decodedInputs: ArrayBuffer[] = [];
+  decoded = { sampleRate: 44100, length: 4410, channels: 1 };
+  decodeFails = false;
+
+  async decodeAudioData(data: ArrayBuffer) {
+    this.decodedInputs.push(data);
+    if (this.decodeFails) throw new Error("EncodingError");
+    const { sampleRate, length, channels } = this.decoded;
+    const planes = Array.from({ length: channels }, (_, c) => new Float32Array(length).fill((c + 1) / 10));
+    return { sampleRate, length, duration: length / sampleRate, numberOfChannels: channels, getChannelData: (c: number) => planes[c] };
+  }
+
   async resume(): Promise<void> {
     this.resumes++;
     this.state = "running";

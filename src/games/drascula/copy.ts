@@ -20,7 +20,7 @@ export const copy = {
     "Souris : cliquer un verbe de la barre du haut, puis un objet ou un personnage. Sans verbe, un clic fait marcher le héros ou franchir une porte. Clic droit : l'inventaire.",
     "Écran tactile : toucher = clic, appui long = clic droit. Toucher l'écran pendant une réplique la coupe. Le bouton « Passer » saute une scène.",
     "Clavier : F1 à F6 choisissent un verbe, F8 lâche le verbe ou l'objet choisi. F10 sauvegarde, F7 charge, F9 règle le volume, T affiche ou masque les sous-titres.",
-    "Échap coupe la réplique en cours ou saute la scène. Espace met le jeu en pause, et le reprend.",
+    "Échap coupe la réplique en cours ou saute la plupart des scènes. Espace met le jeu en pause, et le reprend.",
   ],
 
   // Chargement et erreurs.
@@ -157,7 +157,7 @@ export const copy = {
     "La barre des verbes est en anglais, comme dans le jeu d'origine : WALK (marcher), LOOK (regarder), TAKE (prendre), OPEN (ouvrir), CLOSE (fermer), TALK (parler), PUSH (pousser).",
     "Le clic droit (ou l'appui long au doigt) ouvre l'inventaire. Cliquer un objet de l'inventaire le prend en main : on peut alors l'utiliser sur un autre objet, de l'inventaire ou de l'écran. Dans l'inventaire, deux clics droits (ou F8) lâchent le verbe ou l'objet choisi.",
     "Si le héros cache un objet, visez une autre partie de cet objet.",
-    "Pendant une réplique, une touche (ou un toucher de l'écran) la coupe. Échap coupe la réplique en cours ou saute la scène. Espace met le jeu en pause à tout moment, et le reprend.",
+    "Pendant une réplique, une touche (ou un toucher de l'écran) la coupe. Échap coupe la réplique en cours ou saute la plupart des scènes. Espace met le jeu en pause à tout moment, et le reprend.",
   ],
   helpKeysTitle: "Raccourcis clavier",
   helpKeys: [
@@ -168,7 +168,7 @@ export const copy = {
     ["F9", "volume de la musique"],
     ["T", "afficher ou masquer les sous-titres"],
     ["Espace", "pause ou reprise, à tout moment"],
-    ["Échap", "couper la réplique en cours ou sauter la scène"],
+    ["Échap", "couper la réplique en cours ou sauter la plupart des scènes"],
   ] as readonly (readonly [string, string])[],
   helpSavesTitle: "Sauvegardes",
   helpSaves:

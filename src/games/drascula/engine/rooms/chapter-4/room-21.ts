@@ -1,7 +1,7 @@
 import { animate } from "../../../cinematics/player";
 import type { DrasculaEngine } from "../../loop";
 import { setVisible, toggleDoor } from "../../room-kit";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Verb } from "../../state";
 import { DoorIndex, Flag, Item, Outside } from "./ids";
 

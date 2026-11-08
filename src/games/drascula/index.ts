@@ -1,7 +1,7 @@
 import { copy as shared } from "../../ui/copy";
 import type { GameDefinition } from "../types";
 import { copy } from "./copy";
-import "./ui/style.css";
+import "../../ui/point-click.css";
 import { COVER_SIZE, COVER_URL, GAME_URL, renderTitle } from "./ui/title";
 
 export const drascula: GameDefinition = {

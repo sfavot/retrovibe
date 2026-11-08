@@ -1,14 +1,17 @@
-import "./style.css";
-import { FixedStepClock } from "../../../engine/clock";
+import { syncSkipButton } from "../../../ui/point-click-touch";
+import "../../../ui/point-click.css";
 import { prefixedStorage } from "../../../engine/storage";
 import { h } from "../../../ui/dom";
+import { FileStore, loadInto } from "../../../ui/file-store";
 import { MissingFilesError, fetchBytes } from "../../../ui/files";
 import { leaveGame, mountGameShell } from "../../../ui/game-shell";
 import { withIcons } from "../../../ui/icons";
 import { IndexedPresenter } from "../../../ui/indexed-canvas";
 import { localStorageStore } from "../../../ui/local-storage";
 import { bindCanvasPointer, bindKeyboard } from "../../../ui/pointer";
+import { dialogOverlay, parseVolume, renderLeaveDialog, renderMenuDialog, renderSlotDialog, renderVolumeDialog, volumeKey } from "../../../ui/point-click-dialogs";
 import { soundPrefKey } from "../../../ui/sound-prefs";
+import { TickScheduler } from "../../../ui/tick-scheduler";
 import { DrasculaAudio, createSoundPrefs } from "../audio/audio";
 import { copy } from "../copy";
 import { type GameFiles, fetchGameFiles } from "../data/files";
@@ -20,11 +23,8 @@ import { BrowserHost, createSoundFiles } from "./browser-host";
 import { renderHelp } from "./help";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "./input";
 import { keyAction } from "./keys";
-import { renderLeaveDialog, renderMenuDialog } from "./menu-dialog";
-import { ChapterLoader, FileStore, baseFiles, chapterVideos, loadInto } from "./preload";
-import { SAVE_PREFIX, SaveSlots, loadFromSlot, resultMessage, saveToSlot } from "./saves";
-import { renderSlotDialog } from "./slot-dialog";
-import { VOLUME_KEY, parseVolume, renderVolumeDialog } from "./volume-dialog";
+import { ChapterLoader, baseFiles, chapterVideos } from "./preload";
+import { SAVE_PREFIX, createSaveSlots, loadFromSlot, resultMessage, saveToSlot, summarizeSlots } from "./saves";
 
 export interface AppOptions {
   /** URL du dossier des fichiers du jeu, sans barre finale (ex. `./drascula`). */
@@ -41,24 +41,10 @@ export interface AppOptions {
 
 /** Préférence des sous-titres (`"0"` = masqués ; affichés par défaut, comme ScummVM). */
 const SUBTITLES_KEY = "retrovibe:drascula:subtitles";
+/** Préférence du volume de la musique. */
+const VOLUME_KEY = volumeKey("drascula");
 /** Durée d'affichage d'un message (ms). */
 const NOTICE_MS = 3500;
-
-/** Cadence du moteur sur les images de l'écran : ticks de 10 ms, rattrapage limité (`engine/cadence.ts`). */
-class TickScheduler {
-  private readonly clock = new FixedStepClock({ tickMs: TICK_MS, maxCatchUpTicks: MAX_CATCH_UP_TICKS });
-
-  due(now: number): number {
-    this.clock.update(now);
-    let count = 0;
-    while (this.clock.consume()) count++;
-    return count;
-  }
-
-  resync(): void {
-    this.clock.resync();
-  }
-}
 
 /** Sortie du jeu (`exit()`, après le générique) : retour à l'accueil du site, ou redémarrage sur la page de dev. */
 function leave(container: HTMLElement, options: AppOptions): void {
@@ -82,15 +68,15 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   // --- Page ----------------------------------------------------------------------------------------------------------------
   const pauseNotice = h(
     "div",
-    { class: "dra-pause", role: "status", hidden: true },
+    { class: "pc-pause", role: "status", hidden: true },
     h("strong", {}, copy.paused),
     h("span", {}, copy.pausedHint),
     h("button", { type: "button", class: "primary", onclick: () => togglePause() }, copy.resume),
   );
-  const notice = h("p", { class: "dra-notice", role: "status", "aria-live": "polite", hidden: true });
+  const notice = h("p", { class: "pc-notice", role: "status", "aria-live": "polite", hidden: true });
   const progress = h("progress", { max: 100, value: 0, "aria-label": copy.loading });
   const loadingText = h("span", {}, copy.loading);
-  const loading = h("div", { class: "dra-loading", role: "status" }, loadingText, progress);
+  const loading = h("div", { class: "pc-loading", role: "status" }, loadingText, progress);
 
   /**
    * Bouton de la barre tactile. Il ne prend pas le focus au toucher ou au clic (le canvas le garde) ; au clavier, il le garde.
@@ -106,13 +92,15 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     return button;
   };
   const skipButton = touchButton(copy.skip, copy.skipLabel, () => host?.input.key("Escape"));
+  skipButton.disabled = true;
+  skipButton.setAttribute("aria-disabled", "true");
   const pauseButton = touchButton(copy.pause, copy.pauseLabel, () => togglePause());
   const menuButton = touchButton(copy.menu, copy.menuLabel, () => openMenu());
   const touchBar = h(
     "div",
-    { class: "touch-bar dra-touch-bar" },
-    h("div", { class: "dra-touch-group" }, menuButton, skipButton),
-    h("div", { class: "dra-touch-group" }, pauseButton),
+    { class: "touch-bar pc-touch-bar" },
+    h("div", { class: "pc-touch-group" }, menuButton, skipButton),
+    h("div", { class: "pc-touch-group" }, pauseButton),
   );
   const shell = mountGameShell({
     container,
@@ -120,12 +108,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     logicalHeight: SCREEN_HEIGHT,
     copy: { canvasLabel: copy.canvasLabel, sound: copy.sound, loadError: copy.loadError, runtimeError: copy.runtimeError, missingFiles: copy.missingFiles },
     backLabel: options.backLabel,
-    classes: { root: "dra", stage: "dra-stage", canvas: "dra-canvas" },
+    classes: { root: "pc-game", stage: "pc-stage", canvas: "pc-canvas" },
     stageChildren: [notice, pauseNotice],
     afterStage: [touchBar],
   });
   // En portrait, la barre a la largeur de l'écran du jeu (que le shell dimensionne).
-  new ResizeObserver(() => touchBar.style.setProperty("--dra-screen-width", `${shell.canvas.offsetWidth}px`)).observe(shell.canvas);
+  new ResizeObserver(() => touchBar.style.setProperty("--pc-screen-width", `${shell.canvas.offsetWidth}px`)).observe(shell.canvas);
   shell.main.append(loading);
   // Le pied de page (avec le lien de retour) n'existe qu'une fois le jeu lancé : pendant le chargement, et si celui-ci échoue, le lien est posé ici.
   const earlyBack = options.backLabel ? h("a", { class: "back-link", href: "#/" }, options.backLabel) : null;
@@ -193,12 +181,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   loading.remove();
   earlyBack?.remove();
   const game = host;
-  const slots = new SaveSlots(game.storage);
+  const slots = createSaveSlots(game.storage);
   const prefs = createSoundPrefs(store, audio);
   if (options.debug) (window as unknown as { __drascula: unknown }).__drascula = { engine, host: game, loader, slots };
 
   // --- Pause et fenêtres ---------------------------------------------------------------------------------------------------
-  const scheduler = new TickScheduler();
+  const scheduler = new TickScheduler(TICK_MS, MAX_CATCH_UP_TICKS);
   let tabHidden = false;
   let userPaused = false;
   /** Fenêtre ouverte par-dessus le jeu (sauvegardes, volume, menu) ; l'aide a la sienne (`helpView`). */
@@ -235,12 +223,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const openModal = (dialog: HTMLElement): void => {
     if (modal) closeModal();
     modal = dialog;
-    // Un clic sur le fond (hors de la fenêtre) la ferme, comme Échap.
-    const backdrop = h("div", { class: "dra-overlay" }, dialog);
-    backdrop.addEventListener("pointerdown", (event) => {
-      if (event.target === backdrop) closeModal();
-    });
-    shell.main.append(backdrop);
+    shell.main.append(dialogOverlay(dialog, closeModal));
     applyPause();
   };
 
@@ -251,8 +234,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
     openModal(
       renderSlotDialog({
+        copy,
         mode: "save",
-        slots,
+        summaries: () => summarizeSlots(slots),
         close: closeModal,
         choose(slot) {
           const result = saveToSlot(engine, slots, slot, Date.now());
@@ -265,8 +249,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const openLoad = (): void => {
     openModal(
       renderSlotDialog({
+        copy,
         mode: "load",
-        slots,
+        summaries: () => summarizeSlots(slots),
         close: closeModal,
         async choose(slot) {
           const stored = slots.read(slot);
@@ -288,6 +273,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const openVolume = (): void => {
     openModal(
       renderVolumeDialog(
+        copy,
         game.volume,
         (level) => {
           game.setUserVolume(level);
@@ -305,7 +291,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       shell.dispose();
       options.toTitle();
     };
-    openModal(renderLeaveDialog(leaveNow, closeModal));
+    openModal(renderLeaveDialog(copy, leaveNow, closeModal));
   };
   const toggleSubtitles = (): void => {
     engine.subtitlesEnabled = !engine.subtitlesEnabled;
@@ -319,6 +305,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     };
     openModal(
       renderMenuDialog(
+        copy,
         {
           save: again(openSave),
           load: again(openLoad),
@@ -349,7 +336,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   };
   const openHelp = (): void => {
     if (helpView) return;
-    helpView = h("div", { class: "dra-help-overlay" }, renderHelp(options.base, closeHelp, copy.helpResume));
+    helpView = h("div", { class: "pc-help-overlay" }, renderHelp(options.base, closeHelp, copy.helpResume));
     if (shell.main.classList.contains("is-fullscreen")) {
       // En plein écran, c'est `main` qui occupe l'écran : l'aide s'ouvre dedans, par-dessus l'écran du jeu masqué.
       helpView.classList.add("is-inside");
@@ -361,8 +348,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
     applyPause();
   };
-  const menuLink = h("button", { type: "button", class: "toggle dra-menu-link", "aria-label": copy.menuLabel, onclick: () => openMenu() }, ...withIcons(copy.menu, "menu"));
-  const helpLink = h("button", { type: "button", class: "toggle dra-help-link", onclick: () => openHelp() }, ...withIcons(copy.helpLink, "help"));
+  const menuLink = h("button", { type: "button", class: "toggle pc-menu-link", "aria-label": copy.menuLabel, onclick: () => openMenu() }, ...withIcons(copy.menu, "menu"));
+  const helpLink = h("button", { type: "button", class: "toggle pc-help-link", onclick: () => openHelp() }, ...withIcons(copy.helpLink, "help"));
   shell.toggles.append(menuLink, helpLink);
 
   // --- Entrées -------------------------------------------------------------------------------------------------------------
@@ -477,6 +464,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       if (loading.isConnected) loading.remove();
       for (let ticks = scheduler.due(now); ticks > 0; ticks--) engine.tick();
       engine.render();
+      syncSkipButton(skipButton, engine.canSkip);
     },
   });
   if (options.restore) say(copy.loadDone);

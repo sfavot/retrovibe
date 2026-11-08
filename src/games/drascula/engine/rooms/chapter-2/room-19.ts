@@ -1,5 +1,6 @@
 import type { DrasculaEngine } from "../../loop";
-import { type Sequence, pause } from "../../sequence";
+import { type Sequence } from "../../../../../engine/sequence";
+import { pause } from "../../cadence";
 import { bareHiccup, showBackground, updateAnim } from "./anim-kit";
 import { freezeRoom } from "../../room-kit";
 

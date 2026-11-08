@@ -1,6 +1,6 @@
 import type { DrasculaEngine } from "../../loop";
 import type { ChapterScript } from "../../script";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Verb } from "../../state";
 import { bedroomPainter, tickBedroom } from "./bedroom-view";
 import { igorLeaves, disguise, undress } from "./disguise";

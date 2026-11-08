@@ -1,6 +1,6 @@
 import { animate } from "../../../cinematics/player";
 import type { DrasculaEngine } from "../../loop";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Verb } from "../../state";
 import { Flag, Item, Workshop } from "./ids";
 import { updateVisible } from "./screen";

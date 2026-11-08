@@ -3,7 +3,7 @@ import type { DrasculaEngine } from "../../../src/games/drascula/engine/loop";
 import { CHAPTERS, drasculaScript } from "../../../src/games/drascula/engine/rooms";
 import { assembleScript } from "../../../src/games/drascula/engine/rooms/assemble";
 import type { ChapterScript } from "../../../src/games/drascula/engine/script";
-import type { Sequence } from "../../../src/games/drascula/engine/sequence";
+import type { Sequence } from "../../../src/engine/sequence";
 import { ROOM_CHAPTERS } from "../engine/rooms";
 
 const fakeEngine = (chapter: number) => ({ chapter }) as unknown as DrasculaEngine;

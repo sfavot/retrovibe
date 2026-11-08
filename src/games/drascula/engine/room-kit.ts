@@ -1,5 +1,6 @@
 import type { DrasculaEngine } from "./loop";
-import { type Sequence, pause, wait } from "./sequence";
+import { type Sequence, wait } from "../../../engine/sequence";
+import { pause } from "./cadence";
 import type { Plane } from "../render/plane";
 import { type RoomObject, Verb } from "./state";
 

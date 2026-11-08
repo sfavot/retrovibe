@@ -3,7 +3,8 @@ import { ANY_ROOM, DEFAULT_ROOM, INVENTORY_ROOM, findRoomAction } from "../../..
 import type { DrasculaEngine } from "../../../src/games/drascula/engine/loop";
 import { rectContains } from "../../../src/games/drascula/engine/room";
 import type { GameScript } from "../../../src/games/drascula/engine/script";
-import { type Sequence, pause, skippable, wait } from "../../../src/games/drascula/engine/sequence";
+import { type Sequence, skippable, wait } from "../../../src/engine/sequence";
+import { pause } from "../../../src/games/drascula/engine/cadence";
 import { Verb } from "../../../src/games/drascula/engine/state";
 import { hasOriginalFiles } from "../helpers";
 import { CHAPTER_START_ROOMS, ROOM_CHAPTERS } from "./rooms";

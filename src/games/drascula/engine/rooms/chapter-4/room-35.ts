@@ -1,7 +1,7 @@
 import type { RoomPainter } from "../../../render/renderer";
 import type { DrasculaEngine } from "../../loop";
 import { setVisible } from "../../room-kit";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Verb } from "../../state";
 import { afterDisguisePart } from "./disguise";
 import { Cupboard, Flag, Item } from "./ids";

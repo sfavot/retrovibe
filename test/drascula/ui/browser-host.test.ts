@@ -4,11 +4,9 @@ import type { DrasculaAudio } from "../../../src/games/drascula/audio/audio";
 import { GameFiles } from "../../../src/games/drascula/data/files";
 import { drasculaScript } from "../../../src/games/drascula/engine/rooms";
 import { BrowserHost, createSoundFiles } from "../../../src/games/drascula/ui/browser-host";
-import { FileStore } from "../../../src/games/drascula/ui/preload";
-import { describeSave, roomName, SAVE_PREFIX, SaveSlots } from "../../../src/games/drascula/ui/saves";
-import { slotLabel, slotSelectable } from "../../../src/games/drascula/ui/slot-dialog";
-import { latestSave } from "../../../src/games/drascula/ui/title";
-import { VOLUME_KEY, parseVolume } from "../../../src/games/drascula/ui/volume-dialog";
+import { FileStore } from "../../../src/ui/file-store";
+import { describeSave, roomName, SAVE_PREFIX, createSaveSlots } from "../../../src/games/drascula/ui/saves";
+import { parseVolume, slotLabel, slotSelectable, volumeKey } from "../../../src/ui/point-click-dialogs";
 import { copy } from "../../../src/games/drascula/copy";
 import { hasOriginalFiles, listOriginal, byExtension } from "../helpers";
 import { Player } from "../engine/test-host";
@@ -138,7 +136,7 @@ describe("volume mémorisé", () => {
     expect(parseVolume("250")).toBe(1);
     expect(parseVolume("-5")).toBe(0);
     expect(parseVolume("abc")).toBe(1);
-    expect(VOLUME_KEY).toBe("retrovibe:drascula:music-volume");
+    expect(volumeKey("drascula")).toBe("retrovibe:drascula:music-volume");
   });
 });
 
@@ -163,25 +161,25 @@ describe("sauvegardes : noms de lieux et sélecteur", () => {
     const w = startInTavern();
     const save = w.engine.saveGame()!;
     const storage = new MemoryStorage();
-    const slots = new SaveSlots(prefixedStorage(storage, SAVE_PREFIX));
+    const slots = createSaveSlots(prefixedStorage(storage, SAVE_PREFIX));
     expect(slots.write(3, save, Date.UTC(2026, 10, 7, 15, 5))).toBe(true);
     expect(describeSave(slots.read(3)!)).toMatch(/^Chapitre 6 – La taverne de Drascula – .*2026/);
   });
 
   it("« Continuer » reprend la sauvegarde la plus récente ; aucune : null", () => {
-    const slots = new SaveSlots(prefixedStorage(new MemoryStorage(), SAVE_PREFIX));
-    expect(latestSave(slots)).toBeNull();
+    const slots = createSaveSlots(prefixedStorage(new MemoryStorage(), SAVE_PREFIX));
+    expect(slots.latest()).toBeNull();
   });
 
   it.skipIf(!hasOriginalFiles)("la plus récente par date, pas par numéro d'emplacement", () => {
     const p = new Player();
     p.settle();
     const save = p.engine.saveGame()!;
-    const slots = new SaveSlots(prefixedStorage(new MemoryStorage(), SAVE_PREFIX));
+    const slots = createSaveSlots(prefixedStorage(new MemoryStorage(), SAVE_PREFIX));
     slots.write(2, save, 3000);
     slots.write(5, save, 1000);
     slots.write(9, save, 2000);
-    expect(latestSave(slots)?.savedAt).toBe(3000);
+    expect(slots.latest()?.savedAt).toBe(3000);
   });
 
   it("charger : un emplacement vide n'est pas choisissable ; sauvegarder : tous le sont", () => {
@@ -190,8 +188,8 @@ describe("sauvegardes : noms de lieux et sélecteur", () => {
     expect(slotSelectable("load", empty)).toBe(false);
     expect(slotSelectable("load", full)).toBe(true);
     expect(slotSelectable("save", empty)).toBe(true);
-    expect(slotLabel(empty)).toBe("Emplacement 4 : emplacement vide");
-    expect(slotLabel(full)).toBe("Emplacement 5 : Chapitre 1 – L'auberge – 7 nov.");
+    expect(slotLabel(copy, empty)).toBe("Emplacement 4 : emplacement vide");
+    expect(slotLabel(copy, full)).toBe("Emplacement 5 : Chapitre 1 – L'auberge – 7 nov.");
   });
 });
 

@@ -27,7 +27,7 @@ import { TextColor } from "../render/palette";
 import type { TalkView } from "../render/renderer";
 import { pauseTicks } from "./cadence";
 import type { DrasculaEngine } from "./loop";
-import { type Sequence, wait, waitUntil } from "./sequence";
+import { type Sequence, wait, waitUntil } from "../../../engine/sequence";
 import { type TalkLine, speak } from "./talk";
 
 /**

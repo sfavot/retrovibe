@@ -2,7 +2,7 @@ import type { RoomPainter } from "../../../render/renderer";
 import { placeDrascula, placeIgor } from "../../../render/actors";
 import type { DrasculaEngine } from "../../loop";
 import { setDoor } from "../../room-kit";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Verb } from "../../state";
 import { Corridor, Flag } from "./ids";
 

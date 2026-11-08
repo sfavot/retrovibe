@@ -12,6 +12,8 @@ import { MIN_BUFFER_RATE, createMonoBuffer } from "./pcm";
  * - Couper le son (`setMuted`) ramène le gain général à 0 sans arrêter les sources : même durée, même fin.
  * - `suspend()` / `resume()` (onglet masqué) figent le contexte ; la durée passée suspendue est ajoutée à la fin des voix.
  *
+ * `decode` (voix compressées de Flight of the Amazon Queen) est la seule entrée d'octets compressés.
+ *
  * Écart avec Lost in Time : pas de file de lecture (`queuePcm`) ni de musique AdLib, qui restent propres à ce jeu ; pas de
  * rappel de fin (les moteurs interrogent `playing`), pour que la fin reste celle de l'horloge du jeu.
  */
@@ -89,6 +91,19 @@ export class WebSampleOutput {
       this.master.connect(this.ctx.destination);
     }
     return this.ctx;
+  }
+
+  /**
+   * Décode un fichier audio compressé (MP3, Ogg, WAV selon le navigateur) en échantillon mono, à la fréquence du contexte
+   * (`decodeAudioData` rééchantillonne). Le contexte est créé au besoin (il reste suspendu jusqu'à `unlock()`), pour pouvoir
+   * précharger avant le premier geste ; `bytes` n'est pas modifié (copié avant le décodage, qui détache son tampon).
+   * Un fichier à plusieurs canaux ne garde que le premier.
+   */
+  async decode(bytes: Uint8Array): Promise<Sample> {
+    const ctx = this.ensure();
+    const copy = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const buffer = await ctx.decodeAudioData(copy);
+    return { data: new Float32Array(buffer.getChannelData(0)), rate: buffer.sampleRate };
   }
 
   /** À appeler de façon synchrone dans un geste de l'utilisateur : crée puis reprend le contexte. */

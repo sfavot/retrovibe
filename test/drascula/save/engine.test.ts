@@ -3,13 +3,13 @@ import { MemoryStorage, prefixedStorage } from "../../../src/engine/storage";
 import { DrasculaEngine } from "../../../src/games/drascula/engine/loop";
 import { Inn } from "../../../src/games/drascula/engine/rooms/chapter-1/ids";
 import { Verb } from "../../../src/games/drascula/engine/state";
-import { SAVE_PREFIX, SaveSlots, loadFromSlot, saveToSlot } from "../../../src/games/drascula/ui/saves";
+import { SAVE_PREFIX, createSaveSlots, loadFromSlot, saveToSlot } from "../../../src/games/drascula/ui/saves";
 import { hasOriginalFiles } from "../helpers";
 import { Walkthrough } from "../walkthrough";
 
 function setup(options: ConstructorParameters<typeof Walkthrough>[0] = {}) {
   const raw = new MemoryStorage();
-  const slots = new SaveSlots(prefixedStorage(raw, SAVE_PREFIX));
+  const slots = createSaveSlots(prefixedStorage(raw, SAVE_PREFIX));
   return { raw, slots, w: new Walkthrough(options) };
 }
 

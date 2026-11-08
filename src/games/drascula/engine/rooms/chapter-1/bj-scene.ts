@@ -3,7 +3,8 @@ import { HALF_PAL, TextColor } from "../../../render/palette";
 import type { RoomPainter } from "../../../render/renderer";
 import { hiccup } from "../../room-kit";
 import type { DrasculaEngine } from "../../loop";
-import { type Sequence, pause, skippable } from "../../sequence";
+import { type Sequence, skippable } from "../../../../../engine/sequence";
+import { pause } from "../../cadence";
 import { Track } from "../../state";
 import { Inn } from "./ids";
 

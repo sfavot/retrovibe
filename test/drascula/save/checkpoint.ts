@@ -1,7 +1,7 @@
 import { FRAME_TICKS } from "../../../src/games/drascula/engine/cadence";
 import type { SaveData } from "../../../src/games/drascula/engine/save";
 import type { GameState } from "../../../src/games/drascula/engine/state";
-import { SaveSlots } from "../../../src/games/drascula/ui/saves";
+import { createSaveSlots } from "../../../src/games/drascula/ui/saves";
 import { FakeStorage } from "../../support/fake-host";
 import { Player } from "../engine/test-host";
 import { playChapter6Intro } from "../solutions";
@@ -27,7 +27,7 @@ export class CheckpointWalkthrough extends Walkthrough {
   differences: string[] = [];
   roomAtSwap: number | null = null;
   before: GameState | null = null;
-  readonly slots = new SaveSlots(new FakeStorage());
+  readonly slots = createSaveSlots(new FakeStorage());
   private rests = 0;
 
   constructor(

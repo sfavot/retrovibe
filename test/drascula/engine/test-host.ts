@@ -2,7 +2,7 @@ import { FakeStorage } from "../../support/fake-host";
 import { FRAME_TICKS, TICK_MS } from "../../../src/games/drascula/engine/cadence";
 import type { DrasculaHost, DrasculaInput } from "../../../src/games/drascula/engine/host";
 import { DrasculaEngine, type DrasculaEngineOptions } from "../../../src/games/drascula/engine/loop";
-import type { Sequence } from "../../../src/games/drascula/engine/sequence";
+import type { Sequence } from "../../../src/engine/sequence";
 import { readManifest, readOriginal } from "../helpers";
 
 /** Fréquence des `.ALS` et marges de silence sautées par le jeu (`formats.md`). */

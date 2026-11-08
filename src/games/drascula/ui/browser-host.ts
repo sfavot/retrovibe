@@ -1,9 +1,9 @@
 import type { HostStorage } from "../../../engine/storage";
+import type { Fetcher, FileStore } from "../../../ui/file-store";
 import type { DrasculaAudio } from "../audio/audio";
 import type { SoundFiles } from "../audio/voice";
 import { type GameFiles } from "../data/files";
 import type { DrasculaHost, DrasculaInput } from "../engine/host";
-import { type Fetcher, FileStore } from "./preload";
 import { InputQueue } from "./input";
 
 /**

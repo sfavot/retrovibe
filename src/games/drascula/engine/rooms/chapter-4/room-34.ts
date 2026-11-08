@@ -1,7 +1,8 @@
 import type { DrasculaEngine } from "../../loop";
 import type { RoomPainter } from "../../../render/renderer";
 import { toggleDoor } from "../../room-kit";
-import { type Sequence, pause } from "../../sequence";
+import { type Sequence } from "../../../../../engine/sequence";
+import { pause } from "../../cadence";
 import { Track, Verb } from "../../state";
 import { Anim, DoorIndex, Flag, Item, Study } from "./ids";
 

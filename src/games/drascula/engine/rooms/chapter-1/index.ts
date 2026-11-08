@@ -1,6 +1,6 @@
 import type { DrasculaEngine } from "../../loop";
 import type { ChapterScript } from "../../script";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { barmanAndBj, bedroomPainter, isBackDoor } from "./bj-scene";
 import { Flag, REFUSED_DOOR_SPEECH } from "./ids";
 import { barmanDialog, innPainter, pianistDialog, room62, tickInn } from "./room-62";

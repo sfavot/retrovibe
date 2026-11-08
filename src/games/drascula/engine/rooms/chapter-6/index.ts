@@ -1,6 +1,6 @@
 import type { DrasculaEngine } from "../../loop";
 import type { ChapterScript } from "../../script";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { HERO_OBJECT, Verb } from "../../state";
 import { activatePendulum } from "../../../cinematics";
 import { HALF_PAL } from "../../../render/palette";

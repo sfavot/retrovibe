@@ -1,5 +1,6 @@
 import type { DrasculaEngine } from "../../loop";
-import { type Sequence, pause } from "../../sequence";
+import { type Sequence } from "../../../../../engine/sequence";
+import { pause } from "../../cadence";
 import { Track, Verb } from "../../state";
 import { CoffinRoom, Flag } from "./ids";
 

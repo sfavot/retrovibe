@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Flight of the Amazon Queen — rendu</title>
+    <link rel="icon" type="image/svg+xml" href="../../../ui/favicon.svg" />
+    <style>
+      body {
+        margin: 0;
+        padding: 12px;
+        background: #14161a;
+        color: #e8e8e8;
+        font-family: system-ui, sans-serif;
+      }
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      input[type="number"] {
+        width: 5em;
+      }
+      canvas {
+        display: block;
+        width: 960px;
+        max-width: 100%;
+        image-rendering: pixelated;
+        background: #000;
+        cursor: none;
+      }
+      output {
+        display: block;
+        margin-top: 6px;
+        font: 12px ui-monospace, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./render-dev.ts"></script>
+  </body>
+</html>

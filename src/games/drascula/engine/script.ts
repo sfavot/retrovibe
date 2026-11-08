@@ -1,6 +1,6 @@
 import type { DrasculaEngine } from "./loop";
 import type { RoomPainter } from "../render/renderer";
-import type { Sequence } from "./sequence";
+import type { Sequence } from "../../../engine/sequence";
 
 /**
  * Points d'extension du moteur pour la logique propre au jeu (vague P : pièces, cinématiques, dialogues). Chaque point correspond

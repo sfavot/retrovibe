@@ -1,7 +1,7 @@
 import { animate } from "../../../cinematics/player";
 import type { DrasculaEngine } from "../../loop";
 import { hiccup, setVisible } from "../../room-kit";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Track, Verb } from "../../state";
 import { Flag, Item, Tree } from "./ids";
 import { updateVisible } from "./world";

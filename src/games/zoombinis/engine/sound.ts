@@ -34,7 +34,7 @@ import { isWave, parseWave } from "../../../data/mohawk/wave";
 import { loadPcm } from "../../../engine/mohawk/audio/pcm";
 import { MidiPlayer, parsePrograms, parseSysx, type ProgramEntry } from "../../../engine/mohawk/audio/sequencer";
 import type { AudioSink, WaveHandle } from "../../../engine/mohawk/audio/sink";
-import { parseSong, type Song } from "../../../engine/mohawk/audio/smf";
+import { parseSong, type Song } from "../../../audio/smf";
 import { defineService } from "../../../engine/mohawk/scene";
 import { TAG_TMID } from "../data/archives";
 

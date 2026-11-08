@@ -4,6 +4,7 @@ import {
   OPL_VOICE_OPERATORS_RHYTHM,
   oplFrequency,
 } from "../data/music";
+import type { OplSink } from "../../../audio/opl-stream";
 
 /**
  * Couche OPL2 du pilote musical embarqué dans `AM1.EXE` (code `40f7`, données `406e`) : image des 256
@@ -16,13 +17,6 @@ import {
  * qui diffèrent, par numéro croissant. Seules la coupure de touche (`keyOff`) et l'initialisation
  * écrivent directement.
  */
-
-/** Destination des écritures de registres OPL2 (ports `0x388`/`0x389` du pilote d'origine). */
-export interface OplSink {
-  write(reg: number, value: number): void;
-  /** Facultatif : appelé au début de chaque tick de 50 Hz, avec son numéro (pour horodater les écritures). */
-  beginTick?(tick: number): void;
-}
 
 /** Écriture horodatée : `tick` est le numéro du tick de 50 Hz (0 = initialisation). */
 export interface OplWrite {

@@ -1,6 +1,6 @@
 import type { DrasculaEngine } from "../../loop";
 import type { ChapterScript } from "../../script";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Verb } from "../../state";
 import { Room } from "./ids";
 import { arrival, boneThrow, room49 } from "./room-49";

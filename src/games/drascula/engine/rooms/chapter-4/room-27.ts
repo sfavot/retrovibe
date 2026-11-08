@@ -1,6 +1,6 @@
 import type { DrasculaEngine } from "../../loop";
 import { toggleDoor } from "../../room-kit";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Verb } from "../../state";
 import { Corridor, DoorIndex, Flag, Item } from "./ids";
 import { LOCKED_DOOR_SPEECH } from "./room-21";

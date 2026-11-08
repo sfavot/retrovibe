@@ -131,4 +131,26 @@ describe("WebSampleOutput", () => {
     output.close();
     expect(ctx.closed).toBe(true);
   });
+
+  it("decode rend un échantillon mono à la fréquence du contexte, sans toucher aux octets reçus", async () => {
+    const { ctx, output } = setup();
+    ctx.decoded = { sampleRate: 48000, length: 480, channels: 2 };
+    const bytes = new Uint8Array([1, 2, 3, 4, 5]).subarray(1, 4);
+    const sample = await output.decode(bytes);
+    expect(sample.rate).toBe(48000);
+    expect(sample.data).toHaveLength(480);
+    expect(sample.data[0]).toBeCloseTo(0.1); // premier canal seulement
+    expect([...new Uint8Array(ctx.decodedInputs[0])]).toEqual([2, 3, 4]);
+    expect([...bytes]).toEqual([2, 3, 4]);
+    // le contexte existe (suspendu) : on peut précharger avant le geste, puis unlock le reprend
+    expect(ctx.state).toBe("suspended");
+    expect(output.play(sample).playing).toBe(true);
+    expect(ctx.sources).toHaveLength(0);
+  });
+
+  it("decode refuse un fichier illisible", async () => {
+    const { ctx, output } = setup();
+    ctx.decodeFails = true;
+    await expect(output.decode(new Uint8Array(3))).rejects.toThrow();
+  });
 });

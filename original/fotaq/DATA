@@ -1,0 +1,485 @@
+.8
+.c
+.i 3
+A game by
+.i 11
+Steve Stamatiadis
+.i 3
+and
+.i 11
+John Passfield
+
+.i 9
+Copyright (c) 1994, Interactive Binary Illusions
+.p 0
+.4
+.l
+.i 5
+Story and Game Design
+.i 14
+John Passfield
+Steve Stamatiadis
+.p 4
+.6
+.r
+.i 5
+
+
+
+
+Programming
+.i 14
+John Passfield
+Tony Ball
+.p 0
+.1
+.l
+.i 5
+
+
+
+Graphics and Animation
+.i 14
+Steve Stamatiadis
+.p 4
+.6
+.l
+.i 5
+.r
+
+
+
+Script
+.i 14
+John Passfield
+(extra words by Steve)
+.p 0
+.1
+.l
+.i 5
+
+Music and sound effects
+.i 14
+Richard Joseph
+Graham King
+David Punshon
+Chris Maule
+Jason Page
+.p 3
+.9
+.r
+.i 5
+Project Management
+.i 14
+Graeme Boxall
+.p 0
+.1
+.l
+.i 5
+
+Quality Assurance
+.i 14
+Graeme Boxall
+Dan Thompson
+Vanessa Sanders
+Eric Matthews
+Simon Knight
+John Phillips
+Richard Hewison
+.p 3
+.6
+.r
+.i 5
+
+
+
+Quality Assurance
+.i 14
+Paul Coppins
+Bill Passfield
+Laurence Scotford
+Sarah Tanser
+Mark Lane
+Steve Kelly
+Mark Dearling
+.p 0
+.1
+.l
+.i 5
+
+Voice Artists
+.i 14
+Brad Lavelle
+Bill Hootkins
+Penelope Keith
+Tom Hill
+Enn Reitel
+Jon Coleman
+Debbie Arnold
+Barry James
+Lisa Valdez
+Jessica Martin
+Regina Reagan
+Jocelyn Voldovoz
+Mike Hurley
+.p 2
+.9
+.r
+.i 5
+
+Voice Direction
+.i 14
+Will Jeffries
+.p 0
+END.1
+.l
+
+.i 15
+Story and Game Design
+.i 30
+ John Passfield
+  Steve Stamatiadis
+.l
+
+.i 15
+Programming
+.i 30
+ John Passfield
+  Tony Ball
+
+.i 15
+Graphics and Animation
+.i 30
+ Steve Stamatiadis
+
+.i 15
+Script
+.i 30
+ John Passfield
+  (extra words by Steve)
+.p 10
+
+.i 15
+Music and sound effects
+.i 30
+ Richard Joseph
+  Graham King
+   David Punshon
+    Chris Maule
+     Jason Page
+
+.i 15
+Voice Direction
+.i 30
+ Will Jeffries
+.i 222
+      with
+.i 30
+  John Passfield
+   Steve Stamatiadis
+
+.i 15
+Sound Engineer
+.i 30
+ Ben Baird
+
+.p 5
+.l
+.1
+
+.i 15
+Voice Artists
+
+.i 30
+Brad Lavelle
+.i 222
+    Joe King
+
+.i 30
+Tom Hill
+.i 222
+    Sparky
+     Jimmy Cook
+      Gorillla
+       Skip
+        Prisoner with Puppet
+         Wedgewood
+          Guard Dog
+           Monkey
+            Eddy
+             Rico
+.1
+.p 5
+
+.i 15
+Voice Artists
+
+.i 30
+Bill Hootkins
+.i 222
+    Frank Ironstein
+     Bellboy
+      Bud
+       John
+        Chef
+         Spaced out Prisoner
+
+.i 30
+Enn Reitel
+.i 222
+    Anderson
+     Klunk
+      Rico
+       Henry
+        Charon
+         Crystal Robot
+.p 5
+.1
+
+.i 15
+Voice Artists
+
+.i 30
+Penelope Keith
+.i 222
+    Temple Guardian
+
+.i 30
+Jon Coleman
+.i 222
+    Trader Bob
+
+.i 30
+Debbie Arnold
+.i 222
+    Princess Azura
+     Lola
+      Amazon Guard
+       Showering Amazon
+.p 5
+.1
+
+.i 15
+Voice Artists
+
+.i 30
+Barry James
+.i 222
+    Ian
+     Pygmy Chief
+
+.i 30
+Lisa Valdez
+.i 222
+    Faye Russel
+     Rita
+
+.i 30
+Jessica Martin
+.i 222
+    Naomi
+     Secretary
+      Zombie Woman
+.p 5
+.1
+
+.i 15
+Voice Artists
+
+.i 30
+Regina Reagan
+.i 222
+    Mary-Lou Cook
+     Witch Doctor
+      Lola
+
+.i 30
+Mike Hurley
+.i 222
+    Klunk
+     Big Hugh
+.p 5
+.1
+
+.i 15
+Quality Assurance
+.i 30
+ Graeme Boxall
+  Dan Thompson
+   Vanessa Sanders
+    Eric Matthews
+     Simon Knight
+      John Phillips
+       Richard Hewison
+.p 5
+.1
+
+.i 15
+Quality Assurance
+.i 30
+ Paul Coppins
+  Bill Passfield
+   Laurence Scotford
+    Sarah Tanser
+     Mark Lane
+      Steve Kelly
+       Mark Dearling
+.p 5
+.1
+
+.i 223
+For Renegade, UK
+
+.i 15
+Managing Director
+.i 30
+Dan Thompson
+
+.i 15
+Marketing and Sales Manager
+.i 30
+Tom Watson
+
+.i 15
+Project Manager
+.i 30
+Graeme Boxall
+
+.i 15
+Production
+.i 30
+Abby Hains
+.p 5
+
+.1
+.i 223
+For Renegade, UK
+
+.i 15
+General help and assistance
+.i 30
+Toni Cannard
+Sarah Tanser
+Mark Lane
+
+.i 15
+Finance
+.i 30
+David Christopher
+.p 5
+.1
+
+.i 223
+For Bitmap Brothers, UK
+
+.i 15
+Special thanks to
+.i 30
+Eric Matthews
+Steve Kelly
+Mike Montgomery
+.p 5
+.1
+
+.i 223
+For Interactive Binary Illusions,
+Australia
+
+.i 15
+JASPAR Game Engine and
+other development systems
+.i 30
+John Passfield
+
+.i 15
+JASPAR PC Conversion
+.i 30
+Tony Ball
+John Passfield
+.1
+
+.i 15
+PC/Amiga Graphics Routines
+.i 30
+Tony Ball
+.p 5
+.1
+
+.i 223
+For Interactive Binary Illusions,
+Australia
+
+.i 15
+Dynalum System
+.i 30
+Tony Ball
+Steve Stamatiadis
+John Passfield
+
+.i 15
+Character Design
+.i 30
+Steve Stamatiadis
+
+.i 15
+Game Editing
+.i 30
+John Passfield
+
+.i 15
+Promotional Art Work
+.i 30
+Peter Mullins
+.p 5
+
+.1
+
+.i 15
+Special thanks to
+.i 30
+ Ron Gilbert
+  Aric Wilmunder
+   George Lucas
+    Steven Spielberg
+     John Williams
+      Halloween Harry
+
+
+.i 15
+Extra special thanks to
+.i 30
+ Peter Mullins
+  Liz Pickering
+   Hugh Fleming
+    George Stamatiadis
+     Darren Roach
+      John Barry
+.p 5
+
+.i 223
+.c
+.5
+Recorded at Sound Development
+Studios, London
+.p 5
+
+.5
+Commander Rocket appears
+courtesy of Binary Comics
+.p 5
+
+.5
+Big Stick joke appears
+courtesy of Eric Mathews
+.p 5
+
+.5
+Flight of the Amazon Queen
+trade mark (TM) Renegade
+.p 5
+
+.5
+Characters copyright (c) 1994 by
+John Passfield and Steve Stamatiadis
+.p 5
+END

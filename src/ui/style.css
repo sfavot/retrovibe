@@ -49,6 +49,7 @@ button {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.45rem 0.8rem;
+  min-height: 44px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -85,7 +86,6 @@ button.secondary {
 
 /* Lien présenté comme un bouton (secondaire) : même aspect que `button`. */
 a.button {
-  display: block;
   text-align: center;
   text-decoration: none;
   color: var(--muted);
@@ -93,6 +93,10 @@ a.button {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.45rem 0.8rem;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.15s, border-color 0.15s;
 }
 
@@ -272,6 +276,10 @@ a.button:hover {
   font-size: 0.9rem;
   text-decoration: none;
   align-self: flex-start;
+  /* Zone de clic de 44 px de haut, texte centré : l'aspect du lien ne change pas. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 
 .back-link:hover {
@@ -340,7 +348,10 @@ a.button:hover {
 }
 
 .choices span {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   text-align: center;
   padding: 0.45rem;
   border: 1px solid var(--line);
@@ -1271,12 +1282,13 @@ a.button:hover {
 /* Sans barre tactile (Mathémagique, Téléportaschtroumpf) : les colonnes de côté ne portent que les icônes du pied de page, l'écran
    prend le reste de la largeur. */
 .game-shell.is-touch-landscape:not(:has(> .touch-bar)) {
-  --game-shell-aside: 40px;
+  --game-shell-aside: 44px;
 }
 
 /* Avec barre tactile : Son et Plein écran côte à côte sous les boutons de droite. */
 .game-shell.is-touch-landscape:has(> .touch-bar) .game-shell-toggles {
   flex-direction: row;
+  flex-wrap: wrap;
   justify-content: flex-end;
 }
 
@@ -1344,10 +1356,11 @@ a.button:hover {
    libellé, masqué, reste le nom du bouton pour les lecteurs d'écran. */
 .game-shell.is-touch-landscape .game-shell-footer :is(.back-link, button) {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 50%;

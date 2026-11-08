@@ -2,7 +2,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GameFiles } from "../../../src/games/drascula/data/files";
-import { ChapterLoader, CHAPTER_VIDEOS, FileStore, baseFiles, chapterVideos, loadInto } from "../../../src/games/drascula/ui/preload";
+import { FileStore } from "../../../src/ui/file-store";
+import { ChapterLoader, CHAPTER_VIDEOS, baseFiles, chapterVideos } from "../../../src/games/drascula/ui/preload";
 import { hasOriginalFiles, readManifest } from "../helpers";
 
 const SRC = join(import.meta.dirname, "../../../src/games/drascula");
@@ -70,37 +71,6 @@ describe("baseFiles", () => {
   it("drascula.dat, les fiches, les dialogues et toutes les images ; ni vidéos, ni voix, ni musique, ni jaquette", () => {
     const files = new GameFiles(entries({ "drascula.dat": 1, "14.ALD": 1, "OP_1.CAL": 1, "96.ALG": 1, "CIELO.ALG": 1, "LEV.BIN": 1, "5.ALS": 1, "track1.mp3": 1, "COVER.png": 1, "README-ALCACHOFA.txt": 1 }));
     expect(baseFiles(files).sort()).toEqual(["14.ALD", "96.ALG", "CIELO.ALG", "OP_1.CAL", "drascula.dat"].sort());
-  });
-});
-
-describe("FileStore", () => {
-  it("noms insensibles à la casse, chemin ignoré", () => {
-    const store = new FileStore();
-    store.set("96.ALG", new Uint8Array([1]));
-    expect(store.has("96.alg")).toBe(true);
-    expect(store.get("original/96.Alg")).toEqual(new Uint8Array([1]));
-    expect(store.get("97.alg")).toBeUndefined();
-  });
-});
-
-describe("loadInto", () => {
-  const files = new GameFiles(entries({ "A.ALG": 100, "B.ALG": 300, "C.ALG": 600 }));
-
-  it("charge tout, compte le progrès en octets, saute ce qui est déjà là", async () => {
-    const store = new FileStore();
-    store.set("A.ALG", new Uint8Array(1));
-    const asked: string[] = [];
-    const progress: [number, number][] = [];
-    await loadInto(store, files, ["A.ALG", "B.ALG", "C.ALG"], async (path) => (asked.push(path), bytes(path)), (done, total) => progress.push([done, total]));
-    expect(asked.sort()).toEqual(["B.ALG", "C.ALG"]);
-    expect(store.get("C.ALG")).toEqual(bytes("C.ALG"));
-    expect(progress[0]).toEqual([0, 900]);
-    expect(progress.at(-1)).toEqual([900, 900]);
-  });
-
-  it("une erreur de chargement est relancée", async () => {
-    const store = new FileStore();
-    await expect(loadInto(store, files, ["A.ALG", "B.ALG"], async (path) => { if (path === "B.ALG") throw new Error("HTTP 404"); return bytes(path); })).rejects.toThrow("HTTP 404");
   });
 });
 

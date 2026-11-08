@@ -3,7 +3,8 @@ import { COMPLETE_PAL, HALF_PAL, TextColor } from "../../../render/palette";
 import type { RoomPainter } from "../../../render/renderer";
 import type { DrasculaEngine } from "../../loop";
 import { setDoor } from "../../room-kit";
-import { type Sequence, delay, pause, wait } from "../../sequence";
+import { type Sequence, wait } from "../../../../../engine/sequence";
+import { delay, pause } from "../../cadence";
 import { Track, Verb } from "../../state";
 import { Bedroom, Flag } from "./ids";
 

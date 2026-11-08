@@ -1,7 +1,7 @@
 import { animate, clearScreen } from "../../../cinematics/player";
 import type { RoomPainter } from "../../../render/renderer";
 import type { DrasculaEngine } from "../../loop";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { Track, Verb } from "../../state";
 import { Corridor, Dungeon, Flag, Item } from "./ids";
 

@@ -10,7 +10,7 @@ import { collectPrograms, presetKey } from "../../src/engine/mohawk/audio/progra
 import { rhythmRewrite } from "../../src/games/mathemagique/audio/rhythm-rewrite";
 import { MidiPlayer, parsePrograms, parseSysx, type PlayOptions } from "../../src/engine/mohawk/audio/sequencer";
 import type { MidiSink } from "../../src/engine/mohawk/audio/sink";
-import { type Song, bpmOf, isNoteOn, parseSong } from "../../src/engine/mohawk/audio/smf";
+import { type Song, bpmOf, isNoteOn, parseSong } from "../../src/audio/smf";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 
 // --- Données synthétiques ------------------------------------------------------------------------------------------

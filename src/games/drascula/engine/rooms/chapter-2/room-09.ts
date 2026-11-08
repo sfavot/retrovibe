@@ -1,7 +1,8 @@
 import { HALF_PAL } from "../../../render/palette";
 import type { RoomPainter } from "../../../render/renderer";
 import type { DrasculaEngine } from "../../loop";
-import { type Sequence, delay, pause, wait } from "../../sequence";
+import { type Sequence, wait } from "../../../../../engine/sequence";
+import { delay, pause } from "../../cadence";
 import { Verb } from "../../state";
 import { restoreHeroSheets, showBackground } from "./anim-kit";
 import { Anim, BlindAlley, Flag, Item } from "./ids";

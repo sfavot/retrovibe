@@ -15,6 +15,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | SWIV 3D (SCi, 1997) | jouable (en cours de validation) |
 | L'Odyssée des Zoombinis (Broderbund / TERC, 1996) | en préparation (données et études faites, moteur à venir) |
 | Drascula: The Vampire Strikes Back (Alcachofa Soft, 1996) | jouable (en cours de validation) |
+| Flight of the Amazon Queen (Interactive Binary Illusions, 1995) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -167,7 +168,7 @@ Ils viennent de l'image ISO du CD : `scripts/armaeth-extract.sh [archive.7z]` li
 ### Architecture
 
 - `src/games/armaeth/data/` — lecteurs : archives VGA, sprites, scènes (décor et masque de profondeur), palette, textes et dictionnaire, scripts de commandes, police, monde (salles et objets), tables, son (`A1FMIX.SYS`).
-- `src/games/armaeth/engine/` — le moteur (`ArmaethEngine`, un `tick()` par image à 50 Hz) et sa frontière avec l'environnement (`host.ts`) ; `audio/` — pilote et séquenceur OPL2, `web-opl.ts` pour le navigateur.
+- `src/games/armaeth/engine/` — le moteur (`ArmaethEngine`, un `tick()` par image à 50 Hz) et sa frontière avec l'environnement (`host.ts`) ; `audio/` — pilote et séquenceur OPL2, la sortie OPL2 du navigateur (`web-opl.ts`) est commune, dans `src/audio/`.
 - `src/games/armaeth/ui/` — l'hôte du navigateur (`browser-host.ts` : fichiers préchargés, clavier DOS, souris et doigt, sauvegardes en base64), la page du jeu (`app.ts`), l'écran de présentation (`title.ts`) et la page d'aide (`help.ts`).
 - `src/games/armaeth/ui/asset-viewer.html` — visionneuse des ressources (avec `npm run dev`).
 
@@ -236,6 +237,27 @@ Au démarrage, le navigateur charge les données et toutes les images (6 Mo), pu
 
 `docs/drascula/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`), moteur (`engine.md`), rendu (`graphics.md`), son (`audio.md`), dialogues (`talk.md`) et pièces (`rooms.md`, `rooms-chapter-N.md`). Les tests sont dans `test/drascula/` (`full-game.test.ts` joue la solution des six chapitres).
 
+## Flight of the Amazon Queen
+
+*Flight of the Amazon Queen* (John Passfield et Steven Stamatiadis, 1995), version française parlante distribuée par ScummVM : aventure en pointer-et-cliquer (12 verbes, inventaire, dialogues à choix, cinématiques, voix pour presque chaque réplique) où Joe King, pilote, traverse la jungle pour sauver une princesse. Le moteur est réécrit en TypeScript d'après le moteur `queen` de ScummVM (GPL v3+), lu pour comprendre et non transposé ligne à ligne. Le jeu est jouable de l'introduction au générique de fin, en cours de validation : souris, clavier (touches de ScummVM : O, F, D, N, E, P, A, U pour les verbes) et doigt, dix emplacements de sauvegarde (F10 sauvegarde, F7 charge, F9 volume, F1 ou F5 ouvre le menu).
+
+### Fichiers de données
+
+`scripts/fotaq-extract.sh` découpe `queen.1c` (archive `archives/FOTAQ_Fr_Talkie_1.0.zip`, non versionnée) en 7 671 fichiers rangés dans `original/fotaq/` (décors `.PCX`, banques de sprites, `.JAS`, dialogues `.DOG`, cinématiques `.CUT`, musique AdLib `AQBANK.MUS`, `README-FOTAQ.txt` à conserver) ; `scripts/fotaq-voices.sh` convertit les 6 751 voix et effets en MP3 (`voices/`). `npx vite-node scripts/fotaq-cover.mts` génère `COVER.png` (l'avion, composé par le moteur) et régénère `files.json`.
+Au démarrage, le navigateur charge les données (14 Mo : banques de sprites, dialogues, cinématiques, musique), puis le décor de chaque pièce avant d'y entrer (les pièces voisines se chargent en fond) ; les voix sont lues à la demande, celles de la scène sont préchargées.
+
+### Architecture
+
+- `src/games/fotaq/data/` — lecteurs : `queen.1c` découpé, banques de sprites, décors `.PCX`, `QUEEN.JAS` et `QUEEN2.JAS`, dialogues, cinématiques, musique.
+- `src/games/fotaq/engine/` — le moteur sans tête (`FotaqEngine`, un `tick()` de 100 ms ; séquences en générateurs), l'état, la marche, les verbes, les dialogues, les cinématiques, les sauvegardes (`save.ts`) et, dans `specials/`, la logique codée en dur par zone du jeu.
+- `src/games/fotaq/render/` — composition de l'image 320×200 indexée (décor défilant, Joe et les personnages à l'échelle, panneau, texte), palettes, fondus, lumière dynamique.
+- `src/games/fotaq/audio/` — voix et effets MP3, musique AdLib (module commun d'émulation `src/audio/`).
+- `src/games/fotaq/ui/` — l'hôte du navigateur (`browser-host.ts`, `preload.ts`), la page du jeu (`app.ts`), les touches, l'écran titre et la page d'aide ; les fenêtres de sauvegarde, de volume et de menu, l'écran titre et l'aide sont les composants communs de `src/ui/` (`point-click-*.ts`, partagés avec Drascula) ; `ui/dev.html` lance le jeu seul (`window.__fotaq`), `ui/asset-viewer.html` est la visionneuse des ressources et `ui/render-dev.html` un banc d'essai du rendu (`?room=1`).
+
+### Documentation
+
+`docs/fotaq/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`), moteur (`engine.md`), rendu (`graphics.md`), son (`audio.md`), dialogues (`talk.md`), cinématiques (`cutaway.md`) et logique codée en dur (`specials.md`). Les tests sont dans `test/fotaq/` (`full-game.test.ts` joue l'aventure du début à la fin).
+
 ## Code commun aux jeux
 
 - `src/data/` — lecture binaire (`reader.ts`), page de code 437, Mac OS Roman (`mac-roman.ts`), archives et ressources du moteur Mohawk de Broderbund partagées par Mathémagique et Zoombinis (`mohawk/`), liste des fichiers d'un jeu (`game-files.ts`), fichiers RIFF WAVE (`riff-wave.ts`), vidéos Smacker (`smacker.ts`).
@@ -265,4 +287,4 @@ Référence : [WebFun](https://codeberg.org/cyco/WebFun) (MIT), réimplémentati
 
 Le code est sous [GPL v3 ou ultérieure](LICENSE) : les moteurs de Lost in Time et de Drascula sont portés de [ScummVM](https://www.scummvm.org/) (GPL v3+),
 y compris l'émulateur OPL (MAME, `src/audio/opl2.ts`) utilisé pour la musique AdLib de Lost in Time et d'Armaeth. Les fichiers des jeux de `original/` ne sont pas couverts
-par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives).
+par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives). Les données de Flight of the Amazon Queen sont © John Passfield et Steven Stamatiadis, redistribuées selon la licence de `original/fotaq/README-FOTAQ.txt` (à conserver ; ce portage en est une version modifiée : données extraites de `queen.1c`, voix converties en MP3).

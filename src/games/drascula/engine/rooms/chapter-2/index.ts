@@ -1,6 +1,6 @@
 import type { DrasculaEngine } from "../../loop";
 import type { ChapterScript } from "../../script";
-import type { Sequence } from "../../sequence";
+import type { Sequence } from "../../../../../engine/sequence";
 import { setVisible } from "../../room-kit";
 import { Track, Verb } from "../../state";
 import { Bedroom, Cemetery, ChapelWall, Chapel, Crossroads, DOOR_FLAGS, Flag, HERO, Hut, Inn, Item, Lab, Well, WorldMap } from "./ids";

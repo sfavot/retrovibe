@@ -1,7 +1,8 @@
 import type { DrasculaEngine } from "../../loop";
 import { IgorType } from "../../../render/heads";
 import { roomObject, setVisible, toggleDoor } from "../../room-kit";
-import { type Sequence, pause } from "../../sequence";
+import { type Sequence } from "../../../../../engine/sequence";
+import { pause } from "../../cadence";
 import { Track, Verb } from "../../state";
 import { disguise } from "./disguise";
 import { Anim, Bedroom, DoorIndex, Flag, HERO, Item } from "./ids";

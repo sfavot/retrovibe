@@ -1,7 +1,8 @@
 import type { DrasculaEngine } from "../../loop";
 import { Plane } from "../../../render/plane";
 import type { DrasculaRenderer, RoomPainter } from "../../../render/renderer";
-import { type Sequence, pause } from "../../sequence";
+import { type Sequence } from "../../../../../engine/sequence";
+import { pause } from "../../cadence";
 import { roomObject } from "../../room-kit";
 import { Track, Verb } from "../../state";
 import { Flag, Gate, Item, Speech, VAMPIRE_CONVERSATION } from "./ids";

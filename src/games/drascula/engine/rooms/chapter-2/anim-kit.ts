@@ -2,7 +2,8 @@ import type { Plane } from "../../../render/plane";
 import type { DrasculaRenderer, Scene } from "../../../render/renderer";
 import { LIGHT_END, LIGHT_FIRST } from "../../../render/palette";
 import type { DrasculaEngine } from "../../loop";
-import { type Sequence, pause, wait } from "../../sequence";
+import { type Sequence, wait } from "../../../../../engine/sequence";
+import { pause } from "../../cadence";
 import { Flag } from "./ids";
 
 /**

@@ -1,4 +1,4 @@
-import type { OplSink } from "../audio/opl-driver";
+import type { OplSink } from "../../../audio/opl-stream";
 import type { KeyEvent } from "./interface";
 
 /**

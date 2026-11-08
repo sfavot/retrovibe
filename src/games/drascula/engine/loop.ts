@@ -23,7 +23,8 @@ import { DrasculaData } from "./resources";
 import { applyChapter2Hero, createRoomState, objectIndex, placeHero, rectContains } from "./room";
 import { type SaveData, restoreObjects, restoreState, savedFields, snapshotState } from "./save";
 import type { GameScript } from "./script";
-import { type Sequence, SequenceRunner, delay, pause, wait } from "./sequence";
+import { type Sequence, SequenceRunner, wait } from "../../../engine/sequence";
+import { delay, pause } from "./cadence";
 import { type GameState, HERO_OBJECT, LAST_CHAPTER, type RoomObject, type RoomState, STEP_X, STEP_Y, Track, Verb, createGameState } from "./state";
 import { type Speaker, type Subtitle, speak, voiceFile } from "./talk";
 import { Talkers } from "./talkers";
@@ -209,6 +210,14 @@ export class DrasculaEngine implements Speaker {
   /** Une séquence a la main (la boucle principale attend). */
   get busy(): boolean {
     return this.runner.active;
+  }
+
+  /**
+   * Un appui sur Échap aurait un effet : une partie sautable de la séquence en cours (cinématique, introduction…) ou une réplique
+   * en cours (toute touche la coupe). Lecture seule : le traitement de la touche (`takeSkip`, `speak`) est inchangé.
+   */
+  get canSkip(): boolean {
+    return this.runner.active && (this.runner.skippable || this.subtitle !== null);
   }
 
   /** On peut sauvegarder : pas pendant une séquence, comme `_canSaveLoad` de ScummVM (vague S). */

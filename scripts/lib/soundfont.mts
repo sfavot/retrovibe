@@ -9,7 +9,7 @@ import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { BasicMIDI, SoundBankLoader, type BasicPreset, type PresetsWithKeyCombinations } from "spessasynth_core";
 import { collectPrograms } from "../../src/engine/mohawk/audio/programs";
-import { parseSong } from "../../src/engine/mohawk/audio/smf";
+import { parseSong } from "../../src/audio/smf";
 
 export interface ReductionSoundfont {
   /** Fichiers MIDI standard (SMF) du jeu. */

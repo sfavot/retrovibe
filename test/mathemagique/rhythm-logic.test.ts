@@ -4,7 +4,7 @@ import { parseMidi } from "../../src/data/mohawk/midi";
 import { keepFirstMeasure } from "../../src/games/mathemagique/audio/rhythm-rewrite";
 import { MidiPlayer, parsePrograms, parseSysx } from "../../src/engine/mohawk/audio/sequencer";
 import type { MidiSink } from "../../src/engine/mohawk/audio/sink";
-import { type MarkerEvent, type Song, parseSong } from "../../src/engine/mohawk/audio/smf";
+import { type MarkerEvent, type Song, parseSong } from "../../src/audio/smf";
 import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import {
   LEVEL_COUNT,

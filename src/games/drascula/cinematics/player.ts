@@ -2,7 +2,7 @@ import { AnimateDecoder, parseAnimate, playedFrameCount } from "../data/bin-anim
 import { SsnDecoder, parseSsn } from "../data/bin-ssn";
 import { TICK_MS } from "../engine/cadence";
 import type { DrasculaEngine } from "../engine/loop";
-import { type Sequence, skippable, waitUntil } from "../engine/sequence";
+import { type Sequence, skippable, waitUntil } from "../../../engine/sequence";
 import { COMPLETE_PAL, HALF_PAL, TextColor } from "../render/palette";
 import { centerText } from "../render/font";
 import { placeDrascula, placeIgor } from "../render/actors";

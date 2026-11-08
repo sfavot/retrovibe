@@ -1,6 +1,7 @@
 import { findBank, findTrack, mixKey, type Mix, type MixBank, bankData } from "../data/mix";
 import { EFFECT_ENTRY_SIZE, EFFECT_SLOTS, INSTRUMENT_SIZE, NOTE_DURATIONS, TRACK_SLOTS } from "../data/music";
-import { MELODIC_VOICES, OPL_MAX_ATTENUATION, OplDriver, RHYTHM_VOICES, noteFrequencyWord, type OplSink } from "./opl-driver";
+import { MELODIC_VOICES, OPL_MAX_ATTENUATION, OplDriver, RHYTHM_VOICES, noteFrequencyWord } from "./opl-driver";
+import type { OplSink } from "../../../audio/opl-stream";
 
 /**
  * Séquenceur musical d'*Armaeth* : reproduit, sur la sortie AdLib / OPL2, le pilote embarqué dans

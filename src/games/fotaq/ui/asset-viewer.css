@@ -1,0 +1,21 @@
+@import "../../../ui/asset-viewer/shell.css";
+
+/* Règles propres à Flight of the Amazon Queen. */
+table { border-collapse: collapse; margin: 4px 0 12px; }
+th, td { text-align: left; padding: 1px 10px 1px 0; vertical-align: top; }
+th { color: #7f8696; font-weight: normal; position: sticky; top: -16px; background: #15161a; }
+td.text, .text { white-space: pre-wrap; word-break: break-word; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bar label { display: inline-flex; gap: 4px; align-items: center; }
+.bar output { color: #9aa1b2; }
+.frames { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.frames figure { margin: 0; }
+.frames .empty-frame { min-width: 60px; }
+a { color: #6aa2ff; }
+ul.tree { list-style: none; margin: 2px 0 6px 6px; padding: 0 0 0 12px; border-left: 1px solid #2a2c33; }
+ul.tree > li { margin: 6px 0; }
+pre.text { white-space: pre-wrap; margin: 0 0 12px; }
+audio { max-width: 100%; }
+@media (max-width: 800px) {
+  .asset-viewer { grid-template-columns: 1fr; grid-template-rows: 40vh 1fr; }
+}

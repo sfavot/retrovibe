@@ -1,4 +1,4 @@
-import { h } from "../../../ui/dom";
+import { renderHelpPage } from "../../../ui/point-click-pages";
 import { copy } from "../copy";
 
 /**
@@ -7,38 +7,23 @@ import { copy } from "../copy";
  * servis tels quels avec les données). `onBack` : retour à l'écran titre, ou au jeu en cours (`backLabel`).
  */
 export function renderHelp(base: string, onBack: () => void, backLabel: string = copy.helpBack): HTMLElement {
-  const back = h("button", { type: "button", class: "secondary", onclick: onBack }, backLabel);
-  const section = (title: string, ...content: (HTMLElement | null)[]): HTMLElement => h("section", { class: "dra-help-section" }, h("h2", {}, title), ...content);
-  const paragraphs = (texts: readonly string[]): HTMLElement[] => texts.map((text) => h("p", {}, text));
-  const page = h(
-    "article",
-    { class: "dra-help" },
-    h("header", { class: "dra-help-bar" }, h("h1", {}, copy.helpTitle), back),
-    section(copy.helpHowTitle, ...paragraphs(copy.helpHow)),
-    section(
-      copy.helpKeysTitle,
-      h(
-        "dl",
-        { class: "dra-help-keys" },
-        ...copy.helpKeys.flatMap(([keys, effect]) => [h("dt", {}, h("kbd", {}, keys)), h("dd", {}, effect)]),
-      ),
-    ),
-    section(copy.helpSavesTitle, h("p", {}, copy.helpSaves)),
-    section(
-      copy.helpAboutTitle,
-      ...paragraphs(copy.helpAbout),
-      h(
-        "ul",
-        { class: "dra-help-links" },
-        ...copy.helpLicenceLinks.map(([file, label]) =>
-          h("li", {}, h("a", { href: `${base}/${file}`, target: "_blank", rel: "noopener" }, label)),
-        ),
-        h("li", {}, h("a", { href: copy.sourceUrl, target: "_blank", rel: "noopener" }, copy.helpSource)),
-        h("li", {}, h("a", { href: "https://www.scummvm.org", target: "_blank", rel: "noopener" }, copy.helpScummvm)),
-      ),
-    ),
-    h("footer", { class: "dra-help-foot" }, h("button", { type: "button", class: "secondary", onclick: onBack }, backLabel)),
+  return renderHelpPage(
+    copy.helpTitle,
+    [
+      { title: copy.helpHowTitle, paragraphs: copy.helpHow },
+      { title: copy.helpKeysTitle, keys: copy.helpKeys },
+      { title: copy.helpSavesTitle, paragraphs: [copy.helpSaves] },
+      {
+        title: copy.helpAboutTitle,
+        paragraphs: copy.helpAbout,
+        links: [
+          ...copy.helpLicenceLinks.map(([file, label]) => [`${base}/${file}`, label] as const),
+          [copy.sourceUrl, copy.helpSource],
+          ["https://www.scummvm.org", copy.helpScummvm],
+        ],
+      },
+    ],
+    onBack,
+    backLabel,
   );
-  queueMicrotask(() => back.focus({ preventScroll: true }));
-  return page;
 }

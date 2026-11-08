@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pauseTicks } from "../../../src/games/drascula/engine/cadence";
-import type { Sequence } from "../../../src/games/drascula/engine/sequence";
+import type { Sequence } from "../../../src/engine/sequence";
 import { placeDrascula, placeIgor } from "../../../src/games/drascula/render/actors";
 import { IgorType } from "../../../src/games/drascula/render/heads";
 import { Plane } from "../../../src/games/drascula/render/plane";

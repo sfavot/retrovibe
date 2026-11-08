@@ -3,7 +3,8 @@ import { copy } from "../../../src/games/drascula/copy";
 import { MemoryStorage, prefixedStorage } from "../../../src/engine/storage";
 import { SAVE_VERSION, snapshotState } from "../../../src/games/drascula/engine/save";
 import { createGameState } from "../../../src/games/drascula/engine/state";
-import { SAVE_PREFIX, SLOT_COUNT, SaveSlots, describeSave, resultMessage, slotKey } from "../../../src/games/drascula/ui/saves";
+import { slotKey } from "../../../src/engine/save-slots";
+import { SAVE_PREFIX, SLOT_COUNT, createSaveSlots, describeSave, resultMessage, summarizeSlots } from "../../../src/games/drascula/ui/saves";
 
 function sampleSave(chapter = 2, room = 14) {
   const state = createGameState(chapter);
@@ -13,7 +14,7 @@ function sampleSave(chapter = 2, room = 14) {
 
 function slots() {
   const raw = new MemoryStorage();
-  return { raw, slots: new SaveSlots(prefixedStorage(raw, SAVE_PREFIX)) };
+  return { raw, slots: createSaveSlots(prefixedStorage(raw, SAVE_PREFIX)) };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -21,7 +22,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("emplacements de sauvegarde", () => {
   it("dix emplacements, tous vides au départ, appelés par leur numéro", () => {
     const { slots: s } = slots();
-    const all = s.summaries();
+    const all = summarizeSlots(s);
     expect(all).toHaveLength(SLOT_COUNT);
     expect(all.map((slot) => slot.slot)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(all.every((slot) => slot.empty && slot.savedAt === null)).toBe(true);
@@ -43,7 +44,7 @@ describe("emplacements de sauvegarde", () => {
   it("la description dit le chapitre, le lieu et la date", () => {
     const { slots: s } = slots();
     s.write(1, sampleSave(5, 53), Date.UTC(2026, 10, 7, 15, 5));
-    const summary = s.summaries()[0];
+    const summary = summarizeSlots(s)[0];
     expect(summary.empty).toBe(false);
     expect(summary.description).toMatch(/^Chapitre 5 – Le laboratoire de Frankenstein – /);
     expect(summary.description).toContain("2026");
@@ -58,7 +59,7 @@ describe("emplacements de sauvegarde", () => {
     expect(s.read(1)!.save.chapter).toBe(3);
     s.clear(1);
     expect(s.read(1)).toBeNull();
-    expect(s.summaries()[0].empty).toBe(true);
+    expect(summarizeSlots(s)[0].empty).toBe(true);
   });
 
   it("une valeur illisible vaut emplacement vide, sans exception : JSON cassé, texte, autre version, champ manquant, date absente", () => {
@@ -77,13 +78,13 @@ describe("emplacements de sauvegarde", () => {
       "drascula:slot09": "",
     };
     for (const [key, value] of Object.entries(cases)) raw.set(key, value);
-    const all = s.summaries();
+    const all = summarizeSlots(s);
     expect(all.slice(0, 9).every((slot) => slot.empty)).toBe(true);
     expect(s.read(1)).toBeNull();
     expect(warn).toHaveBeenCalled();
     // un emplacement bon à côté reste lisible
     raw.set("drascula:slot10", JSON.stringify(good));
-    expect(s.summaries()[9].empty).toBe(false);
+    expect(summarizeSlots(s)[9].empty).toBe(false);
   });
 
   it("un emplacement qui n'existe pas n'écrit rien et ne lit rien", () => {
@@ -97,7 +98,7 @@ describe("emplacements de sauvegarde", () => {
 
   it("une écriture refusée par le stockage est signalée, pas levée", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const full = new SaveSlots({ get: () => null, set: () => false, remove: () => {} });
+    const full = createSaveSlots({ get: () => null, set: () => false, remove: () => {} });
     expect(full.write(1, sampleSave(), 1)).toBe(false);
     expect(warn).toHaveBeenCalledTimes(1);
   });

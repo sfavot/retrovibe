@@ -1,7 +1,7 @@
 import type { HostStorage } from "../../../engine/storage";
 import { IndexedPresenter } from "../../../ui/indexed-canvas";
 import { bindCanvasPointer, bindKeyboard } from "../../../ui/pointer";
-import { WebOpl } from "../audio/web-opl";
+import { WebOpl } from "../../../audio/web-opl";
 import type { ArmaethFrame, ArmaethHost, ArmaethStorage, HostInput, HostKey } from "../engine/host";
 import { HeldArrows, InputQueue, SCREEN_HEIGHT, SCREEN_WIDTH, buttonMask, heroKeyOf, mapKey } from "./input";
 import { createSaveStorage } from "./saves";

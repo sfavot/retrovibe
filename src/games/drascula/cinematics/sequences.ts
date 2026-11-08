@@ -2,7 +2,8 @@ import { IgorType } from "../render/heads";
 import type { Scene } from "../render/renderer";
 import { COMPLETE_PAL, HALF_PAL, TextColor } from "../render/palette";
 import type { DrasculaEngine } from "../engine/loop";
-import { type Sequence, delay, pause, skippable, wait } from "../engine/sequence";
+import { type Sequence, skippable, wait } from "../../../engine/sequence";
+import { delay, pause } from "../engine/cadence";
 import { Track } from "../engine/state";
 import { animate, clearScreen, playSsn, printOnScreen, showPicture, showScene, showSurface } from "./player";
 

@@ -1,0 +1,383 @@
+/* Jeux de pointer-et-cliquer sur canvas (Drascula, Flight of the Amazon Queen) : écran à l'échelle entière, pixels nets, écran de présentation, fenêtres, barre tactile, page d'aide. Préfixe `pc-`. */
+
+.pc-canvas {
+  /* Le curseur est dessiné par le jeu. */
+  cursor: none;
+  image-rendering: pixelated;
+}
+
+/* Jaquette de l'écran de présentation : 320×200, pixel art. */
+.pc-title-picture {
+  width: min(480px, calc(100vw - 32px));
+  aspect-ratio: 8 / 5;
+  image-rendering: pixelated;
+}
+
+.pc-title-note {
+  margin: 0;
+}
+
+.pc-title-controls {
+  margin: 0.4rem 0 0;
+  font-size: 1rem;
+}
+
+.pc-error:empty {
+  display: none;
+}
+
+.pc-error {
+  margin: 0;
+  color: var(--danger, #e8836b);
+}
+
+.pc-title-root {
+  display: contents;
+}
+
+/* Liste des emplacements ouverte depuis l'écran titre (« Charger une partie »). */
+.pc-title-slots {
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px 40px;
+}
+
+.pc-title-slots .pc-dialog {
+  width: min(32rem, 100%);
+}
+
+/* Sur un appareil tactile, le bouton « Reprendre » suffit : l'indication de la touche Espace n'a pas de sens. */
+@media (pointer: coarse) {
+  .pc-pause > span {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ fenêtres par-dessus l'écran */
+
+.pc-stage {
+  position: relative;
+}
+
+/* La feuille du shell met `line-height: 0` sur l'écran (pas d'interligne sous le canvas) : les couches de texte posées dessus le rétablissent. */
+.pc-pause,
+.pc-notice,
+.pc-stage > .pc-loading {
+  line-height: 1.4;
+}
+
+/* Fenêtre par-dessus toute la page (pas seulement l'écran de 320 x 200, trop petit pour dix emplacements) ; posée dans la page du jeu
+   (`main`), qui est l'élément en plein écran. */
+.pc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+  background: #000b;
+}
+
+.pc-dialog {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(30rem, 100%);
+  max-height: 100%;
+  padding: 14px 16px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.pc-dialog h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+
+.pc-dialog-status {
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--warn);
+  font-size: 0.9rem;
+}
+
+.pc-dialog button:focus-visible,
+.pc-help button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.pc-slots,
+.pc-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-slot,
+.pc-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+}
+
+.pc-slot {
+  min-height: 44px;
+}
+
+.pc-slot-number {
+  flex: none;
+  width: 1.6em;
+  color: var(--accent);
+  font-weight: 700;
+  text-align: center;
+}
+
+.pc-slot.is-empty .pc-slot-text {
+  color: var(--muted);
+}
+
+.pc-slot-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
+.pc-slot-question {
+  flex: 1 1 100%;
+}
+
+.pc-slot-current {
+  flex: 1 1 100%;
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.pc-dialog:focus {
+  outline: none;
+}
+
+.pc-slot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pc-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pc-volume-row input[type="range"] {
+  flex: 1;
+  min-height: 44px;
+  accent-color: var(--accent);
+}
+
+.pc-volume-value {
+  min-width: 3.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Message passager et pause : pastilles sur l'écran. */
+.pc-notice {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin: 0 auto;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: #000d;
+  color: #fff;
+  font-size: 0.875rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+.pc-notice[hidden],
+.pc-pause[hidden] {
+  display: none;
+}
+
+.pc-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #000a;
+  text-align: center;
+}
+
+/* Chargement des fichiers (avant le jeu, puis pastille si le chapitre suivant n'est pas là). */
+.pc-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(24rem, 100%);
+  margin: 24px auto;
+  font-size: 0.95rem;
+}
+
+.pc-loading progress {
+  width: 100%;
+  height: 10px;
+  accent-color: var(--accent);
+}
+
+.pc-stage > .pc-loading {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  width: auto;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: #000d;
+  color: #fff;
+}
+
+/* ------------------------------------------------------------------ barre tactile */
+
+.pc-touch-group {
+  display: contents;
+}
+
+@media (pointer: coarse) {
+  .pc-touch-bar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    width: var(--pc-screen-width, 100%);
+  }
+
+  .pc-touch-bar button {
+    padding-inline: 0.5rem;
+  }
+
+  /* « Passer » grisé : rien n'est sautable pour l'instant (texte encore lisible, ni survol ni curseur d'attente). */
+  .pc-touch-bar button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: transparent;
+    border-style: dashed;
+  }
+
+  /* Le bouton « Menu » de la barre tactile remplace celui du pied de page. */
+  .pc-menu-link {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ page d'aide */
+
+.pc-help {
+  box-sizing: border-box;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+.pc-help-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.pc-help-bar h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--accent);
+}
+
+.pc-help-section h2 {
+  margin: 24px 0 8px;
+  font-size: 1.15rem;
+  color: var(--accent);
+}
+
+.pc-help p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.pc-help-keys {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.pc-help-keys dt,
+.pc-help-keys dd {
+  margin: 0;
+}
+
+.pc-help kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel-2);
+  font: inherit;
+  font-size: 0.9em;
+}
+
+.pc-help-links {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+  line-height: 1.7;
+}
+
+.pc-help a {
+  color: var(--accent);
+}
+
+.pc-help-foot {
+  margin-top: 28px;
+}
+
+/* Aide ouverte par-dessus le jeu : la page du jeu est masquée, pas démontée. */
+.pc-help-overlay {
+  min-height: 100dvh;
+}
+
+.pc-help-overlay.is-inside {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: auto;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.pc-game.is-fullscreen:fullscreen {
+  position: relative;
+}

@@ -12,7 +12,7 @@
  * - Réécriture : `rewrite(events, song)` remplace la liste d'événements avant la lecture (voir `rhythm-rewrite.ts`).
  * - Tempo : `setBpm` change la vitesse en cours de route (les événements déjà planifiés gardent leur instant).
  */
-import { type MarkerEvent, type Song, type SongEvent, bpmOf, findNamedMarker, initialMicrosPerQuarter } from "./smf";
+import { type MarkerEvent, type Song, type SongEvent, bpmOf, findNamedMarker, initialMicrosPerQuarter } from "../../../audio/smf";
 import type { MidiSink } from "./sink";
 
 /** Remplace les événements d'un morceau avant sa lecture (liste triée par temps, finissant par un `end`). */

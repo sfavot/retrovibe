@@ -112,7 +112,8 @@ dupliqué (Téléportaschtroumpf, Lost in Time et Mathémagique en ont déjà ch
 | `engine/rng.ts` (`MsvcRandom`, `NoRepeatPool`) | commun : même congruence, même sortie | `src/engine/mohawk/rng.ts` |
 | `engine/resources.ts` | commun : cache par archive et `Archive.memo(tag, id, décodeur)` ; décodeurs communs (`SHPL`, `STRL` avec encodage, `\0SND`, `tMID`, `SHAP`, `tBMP`) ; le jeu ajoute les siens (`SCR` ; `SCRB`, `SCRS`, `NODE`, `PATH`, `REGS`) | `src/engine/mohawk/resources.ts` |
 | `graphics/frame.ts`, `surface.ts`, `palette.ts`, `blit.ts`, `data/palette.ts` | commun : taille de surface et cadre en paramètres (576 × 432 dans 640 × 480 pour Mathémagique, 640 × 480 sans bordure pour Zoombinis) ; `tBMP` décode vers le même `Shape` que `SHAP` | `src/engine/mohawk/graphics/` |
-| `audio/sink.ts`, `smf.ts`, `sequencer.ts`, `programs.ts`, `pcm.ts` | commun (WAVE, séquenceur MIDI, `SYSX`, inventaire des timbres) | `src/engine/mohawk/audio/` |
+| `audio/sink.ts`, `sequencer.ts`, `programs.ts`, `pcm.ts` | commun (WAVE, séquenceur MIDI, `SYSX`, inventaire des timbres) | `src/engine/mohawk/audio/` |
+| `smf.ts` | commun (analyseur MIDI standard, promu pour Flight of the Amazon Queen) | `src/audio/` |
 | `audio/web-sink.ts`, `render/canvas-presenter.ts`, `ui/browser-host.ts` | commun : taille du canvas, origine de la zone de jeu, curseurs et URL de la soundfont en paramètres | `src/ui/mohawk/` |
 | `scripts/mathemagique/soundfont.mts` | logique commune, une soundfont réduite **par jeu** (chaque jeu sert ses fichiers depuis son dossier `original/`) | `scripts/lib/soundfont.mts` + deux scripts minces |
 | `engine/sound.ts` | **propre au jeu** : Mathémagique a des canaux voix / effet et la préférence « Ambient Sounds » ; Zoombinis a deux files de 32 places, des drapeaux musique / effets et un routage par plage d'id (`engine.md` §6.2) | reste ; Zoombinis écrit le sien |

@@ -14,17 +14,21 @@
  *  3. **Explication** : au niveau 0 à la première visite, aux niveaux 1 et 2 toujours, l'écureuil explique (`SCRB 7500 + niveau`, après 180 ticks au niveau 1) ; un clic l'abandonne.
  *     Puis le cadran (niveaux 0 à 2) descend (`SCRB 6000`) et marque ses `F` premiers crans (`6001` à `6000 + F`) ; la musique `30020 + niveau` démarre.
  *  4. **Pose** : un Zoombini lâché dans le carré de prise d'une chambre (`1168:1742`) est jugé par `place`. *Accepté* : il monte dans la chambre (`SCRS 13030 + …`, `13045 + …`
- *     au niveau 3), prend sa place dans la pile (`10e8:3620`), la porte de la chambre s'ouvre pour le premier, « go » devient actif. *Refusé* : l'étagère bascule
+ *     au niveau 3 ; pose 1 dès l'évènement 251, rangé derrière l'avant-plan percé à l'évènement 15, `10e8:33bb`), puis marche jusqu'à sa place dans la pile
+ *     (`10e8:3620`, `10e8:121b` ; niveau 3 : posé sur place), la porte de la chambre s'ouvre pour le premier, « go » devient actif. *Refusé* : l'étagère bascule
  *     (`6038 + r`, `9007 + r mod 5`), le Zoombini rebondit (`SCRS 13000 + r`) puis tombe au sol (`14000 + r`, `14025 + …`), le cran suivant du cadran joue, la lumière baisse
  *     (palette × 88 / 90 / 92 % : `10e8:2698`), au cran 9 une réplique, au douzième la défaite.
  *  5. **Fin** : tous rangés (voix 175 à 198 puis, niveaux 0 à 2, étagères repliées et scénette de victoire `7507 + rand(0..2)`) ou défaite (cran 12 : coucou `6012`, voix 6006,
- *     étagères repliées, scénette `7503 + rand(0..3)` ; niveau 3 : attente de 60 ticks puis le son 7500). Le joueur sort par « go » : les non rangés sont perdus.
+ *     étagères repliées, scénette `7503 + rand(0..3)` ; niveau 3 : attente de 60 ticks puis le son 7500). Le joueur sort par « go » : son 996 puis écran
+ *     suivant, personne ne marche (les rangés restent dans leurs chambres) ; les non rangés sont perdus.
  *
  * ## Écarts avec l'original (voir aussi `docs/zoombinis/puzzles/hotel.md`)
  *
  *  - la scénette d'introduction et le groupe : l'original crée le groupe dès l'entrée sur vingt places du hall (`DS:12d6`) ; le groupe n'apparaît ici qu'à la relance, sur les
  *    seize places du bas, **debout** (l'original n'appelle ni `1168:2505` ni `1168:274e` : aucune entrée à pied) ;
- *  - le rectangle de découpe d'un Zoombini rangé (`+0xe4`) n'est pas porté : l'avant-plan percé suffit à ne le montrer que dans l'ouverture de sa porte ;
+ *  - le rectangle de découpe d'un Zoombini rangé (`+0xe4`, posé à l'évènement 15) n'est pas porté : replacé derrière l'avant-plan percé, il ne se voit que
+ *    dans l'ouverture de sa porte ;
+ *  - ordre de dessin : profondeurs fixes qui reproduisent celui de `11a8:231b` (voir `DEPTH`) au lieu du tri dynamique ;
  *  - un Zoombini déjà rangé n'est pas reprenable (l'original le laisse déplacer pour trier à l'œil, sans changer de chambre) ;
  *  - un dépôt sur une chambre bloquée renvoie le Zoombini sur sa place d'origine (l'original l'annule sans le déplacer) ;
  *  - (porté) le survol d'une chambre allume son socle `10000 + r` (bit `0x1000000` : dessiné seulement pendant ce survol, `11a0:0126`, `1168:1742`) ; hors survol il n'est pas
@@ -93,19 +97,33 @@ const BUTTONS_SHEET = 8000;
 /** Barrières : planches `tBMP 11000` (niveau 2, ancres `REGS 11002` / `11003`) et `12000` (niveau 3, sans ancre). */
 const BARRIER_SHEET = [0, 0, 11000, 12000] as const;
 
-/** Profondeurs (l'original ordonne par création, `12f6` : portes, barrières, avant-plan, étagères, socles) : les Zoombinis sont à `1 + y / 1000`. */
+/**
+ * Profondeurs. L'original range l'écran par `11a8:231b` (actif dans toutes les épreuves, `11a8:021c` : `29c4(1)`) : tous les objets de `12f6` portent le
+ * bit « actif » `0x8000` et restent en tête de liste, dans leur ordre de création (portes, barrières, avant-plan percé, étagères, socles ; puis le cadran
+ * `0x108000` et les scénettes `0x8108000`), et les Zoombinis (mobiles) sont insérés **après** eux : un Zoombini est toujours dessiné devant le décor de
+ * l'hôtel (bug 24 : l'étagère passait devant le Zoombini qui rebondit). Seule exception : à l'évènement 15 de sa montée (`10e8:344b`), le Zoombini accepté
+ * est replacé juste derrière l'avant-plan percé (`11a8:2a0a(mur, 0, Zoombini)`, drapeaux `0x4008000`) : rangé, il ne se voit plus que par l'ouverture de
+ * sa porte, derrière son étagère. Les Zoombinis du hall sont à `1 + y / 1000` : le décor de la partie est sous 1.
+ */
 const DEPTH = {
-  door: 0.5,
-  barrier: 0.6,
-  wall: 2,
-  /** Un Zoombini qui monte ou qui tombe passe devant l'avant-plan. */
+  door: 0.1,
+  barrier: 0.15,
+  /** Zoombini rangé (après l'évènement 15 de sa montée) : juste derrière l'avant-plan percé. */
+  stored: 0.25,
+  wall: 0.3,
+  shelf: 0.4,
+  base: 0.45,
+  clock: 0.5,
+  scene: 0.6,
+  /** Un Zoombini qui monte, rebondit ou tombe passe devant les autres. */
   acting: 3,
-  shelf: 3.5,
-  base: 3.6,
-  clock: 4,
   buttons: 5,
-  scene: 6,
+  /** Scénette de l'entrée (avant la relance, sans Zoombinis) : devant l'avant-plan 11500 et le plan de la palissade, comme avant. */
+  entryScene: 6,
 } as const;
+
+/** Évènements des `SCRS` de montée (rappel `10e8:33bb`, table `CS:359f`) : 15 range le Zoombini derrière l'avant-plan, 250 à 253 imposent la pose 0 à 3. */
+const EVENT = { turn: 0, stored: 15, pendingPose: 240, pose: 250 } as const;
 
 
 const F = FeatureFlag;
@@ -228,6 +246,18 @@ export function stackPosition(level: number, tableRoom: number, room: Point, pil
   return { x: base + 6, y };
 }
 
+/**
+ * Pieds d'un Zoombini à la fin d'un script `normal` lancé sans point d'arrivée depuis `start` : en état 8, `1168:4741` recale la position sur la première
+ * partie de chaque image (`+0xa6 = partie − (+0xaa)`) ; elle finit donc décalée comme la première partie de la dernière image l'est de celle de la première.
+ */
+function scriptEnd(snoid: KitMember["snoid"], start: Point): Point {
+  const images = snoid.feature.script?.images ?? [];
+  const first = images.find((image) => (image.cells[0]?.w ?? 0) > 0)?.cells[0];
+  const last = [...images].reverse().find((image) => (image.cells[0]?.w ?? 0) > 0)?.cells[0];
+  if (!first || !last) return start;
+  return { x: start.x + last.x - first.x, y: start.y + last.y - first.y };
+}
+
 /** `SCRS` de la montée d'un Zoombini accepté (`10e8:3620`). */
 export function acceptScript(level: number, tableRoom: number, room: number, feet: number): number {
   if (level === 3) return SCRS.acceptL3 + (room % 5) * 5 + feet - 1;
@@ -267,6 +297,9 @@ class HotelRun implements HotelProbe {
   /** Étape suivante de l'introduction du cadran (`DS:74ee` de 1 à `F`), ou 0. */
   private clockIntro = 0;
   private explainAt = -1;
+  /** Poses lues dans les évènements des montées, appliquées au tick de l'écran ; pose en attente de l'évènement 0 (`DS:7506`). */
+  private readonly poses: { snoid: KitMember["snoid"]; pose: number }[] = [];
+  private pendingPose: number | null = null;
   private ended = false;
   private skipped = false;
 
@@ -381,8 +414,9 @@ class HotelRun implements HotelProbe {
     f.create({ script: SCRB.strip, delay: DELAY.play, flags: F.stopAtEnd, depth: 3 });
   }
 
-  /** Crée la scénette `script` (objet `DS:74aa`) ; `onEnd` reçoit `FEATURE_END`. */
-  private sceneObject(script: number, flags: number, onEnd?: (n: number) => void, depth: number = DEPTH.scene): Feature {
+  /** Crée la scénette `script` (objet `DS:74aa`) ; `onEnd` reçoit `FEATURE_END`. En partie, elle est derrière les Zoombinis (`0x8108000`, en tête de liste). */
+  private sceneObject(script: number, flags: number, onEnd?: (n: number) => void): Feature {
+    const depth = this.kit ? DEPTH.scene : DEPTH.entryScene;
     this.dropScene();
     this.lastScene = script;
     const feature = this.features.create({ script, delay: DELAY.play, flags, depth });
@@ -431,7 +465,8 @@ class HotelRun implements HotelProbe {
       depthOf: (p) => 1 + p.y / 1000,
       introVoice: HELP_VOICE,
       buttons: { map: { images: images.map }, go: { images: images.go }, depth: DEPTH.buttons },
-      exitWalk: { x: 680, y: 316 },
+      // Pas de `exitWalk` : le « go » de l'hôtel (`10e8:1cea` région 2) ne fait que jouer 996 et lever `DS:8556` ; le Tick sort à la fin du son
+      // (`10e8:07ca`), sans `1168:2982` ni `NODE` / `PATH` (aucun appel dans le segment `10e8`). Les rangés restent dans leurs chambres (bug 25).
       canPick: (member) => this.canPick(member),
       decide: (drop) => this.decide(drop),
       onDrop: (drop) => this.dropped(drop),
@@ -689,13 +724,25 @@ class HotelRun implements HotelProbe {
     f.restack(snoid.feature, DEPTH.acting);
     const feet = snoid.traits.feet;
     const script = acceptScript(level, table, room, feet);
-    snoid.onEvent = undefined;
+    const start = { ...snoid.position };
+    snoid.onEvent = (n) => this.climbEvent(snoid, n);
     snoid.onEnd = () => {
       snoid.onEnd = undefined;
-      snoid.setPosition(final);
-      snoid.idle();
-      f.restack(snoid.feature, this.depthAt(final.y));
+      snoid.onEvent = undefined;
+      f.restack(snoid.feature, DEPTH.stored);
       this.acting -= 1;
+      if (level === 3) {
+        snoid.setPosition(final);
+        snoid.idle();
+      } else {
+        // `10e8:121b` : `1168:4231(…, 7)` puis destination `(757a, 757c)` : le Zoombini marche, depuis la fin de sa montée, jusqu'à sa place de pile.
+        snoid.setPosition(scriptEnd(snoid, start));
+        snoid.onArrive = () => {
+          snoid.onArrive = undefined;
+          snoid.setPosition(final);
+        };
+        snoid.walkTo(final);
+      }
       if (result.completed) this.afterCompletion();
     };
     snoid.play(script, F.stopAtEnd, { kind: "normal", at: level === 3 ? { x: point.x + 5, y: point.y - 15 } : undefined });
@@ -706,6 +753,27 @@ class HotelRun implements HotelProbe {
         door.notifyEnd = false;
         f.setScript(door, level === 3 ? SCRB.doorL3 + (room % 5) : SCRB.door + table);
       }
+    }
+  }
+
+  /**
+   * Évènements de la montée (`10e8:33bb`, table `CS:359f`) : 0 retourne le Zoombini et applique la pose en attente, 15 le range derrière l'avant-plan percé,
+   * 240 à 243 mettent une pose en attente (`DS:7506`), 250 à 253 imposent la pose 0 à 3 (`1168:4dc9`). Les `SCRS` 13030 à 13069 passent en pose 1 (de dos,
+   * le nez derrière le corps) à leur image 5 : sans elle, leurs images de dos se lisaient en pose 0 et le nez prenait l'image d'un autre nez (bug 23).
+   * L'original compose l'image (`1168:4741`) **avant** d'appeler le rappel : la pose vaut pour les images suivantes. Le port lit l'évènement avant de
+   * composer l'image qui le porte ; la pose est donc appliquée au tick de l'écran, qui suit celui des features, avant l'image suivante.
+   */
+  private climbEvent(snoid: KitMember["snoid"], n: number): void {
+    if (n === EVENT.stored) {
+      this.features.restack(snoid.feature, DEPTH.stored);
+    } else if (n === EVENT.turn) {
+      snoid.setFacing(snoid.facing === 0 ? 1 : 0);
+      if (this.pendingPose !== null) this.poses.push({ snoid, pose: this.pendingPose });
+      this.pendingPose = null;
+    } else if (n >= EVENT.pendingPose && n < EVENT.pendingPose + 4) {
+      this.pendingPose = n - EVENT.pendingPose;
+    } else if (n >= EVENT.pose && n < EVENT.pose + 4) {
+      this.poses.push({ snoid, pose: n - EVENT.pose });
     }
   }
 
@@ -828,6 +896,8 @@ class HotelRun implements HotelProbe {
 
   tick(): void {
     const now = this.ctx.clock.ticks;
+    // Poses des évènements lus par les features à ce tick : elles valent à partir de l'image suivante (voir `climbEvent`).
+    for (const { snoid, pose } of this.poses.splice(0)) if (!snoid.destroyed) snoid.setPose(pose);
     if (this.ctx.services.tryGet(DIALOG)?.isOpen) {
       this.kit?.tick();
       return;

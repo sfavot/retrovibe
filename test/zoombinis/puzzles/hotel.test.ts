@@ -477,7 +477,8 @@ describe.skipIf(!original.has)("écran de l'hôtel (createHotelScene, HOTEL.MHK)
       host.input.mouseUp("left");
       await wait(4);
     };
-    const settle = () => until(() => !probe().busy);
+    /** Fin des animations, y compris la courte marche d'un rangé vers sa place de pile (`10e8:121b`). */
+    const settle = () => until(() => !probe().busy && !probe().kit!.members.some((m) => m.snoid.walking));
     const palette = () => services && engine.services.get(GRAPHICS).palette.colors;
     return { host, engine, services, zoombinis, entered, scene, queued, probe, wait, until, toPlay, drag, grab, settle, palette };
   }
@@ -688,6 +689,113 @@ describe.skipIf(!original.has)("écran de l'hôtel (createHotelScene, HOTEL.MHK)
       expect(t.engine.error).toBeNull();
     }
   }, 120_000);
+
+  it("montée (bug 23) : à l'évènement 251 de son image 5, le SCRS de montée passe en pose 1 (`10e8:33bb`) : de dos, le nez reste le sien, derrière le corps", async () => {
+    for (const level of LEVELS) {
+      // Nez 5 (le dernier : son image + 5 tomberait sur les pieds) et nez 1.
+      for (const nose of [5, 1]) {
+        const t = await start({ level, visits: 5, attrs: (i) => [1 + (i % 5), 1 + ((i * 2) % 5), i === 0 ? nose : 1 + ((i * 3) % 5), 1 + ((i * 4) % 5)] as Attrs });
+        const probe = t.probe();
+        await t.toPlay();
+        const member = probe.kit!.members[0]!;
+        // Une chambre utile (au niveau 2, certaines sont bloquées).
+        const room = robotPlan(probe.state)[0]!;
+        await t.drag(0, probe.point(room));
+        expect(probe.state.placed[0]).toBe(room);
+        const script = member.snoid.scriptId;
+        expect(script).toBe(acceptScript(level, tablePoint(level, room), room, member.snoid.traits.feet));
+        /** Variantes de nez de la grande planche (`14c0:0312`) : 172 à 191, quatre par valeur. */
+        const own = [171 + 4 * (nose - 1) + 1, 171 + 4 * nose];
+        let images = 0;
+        let back = 0;
+        while (member.snoid.scriptId === script && images < 400) {
+          const feature = member.snoid.feature;
+          const parts = feature.parts.map((part) => Math.ceil(part.w / 2));
+          for (const variant of parts) {
+            if (variant >= 172 && variant <= 191) {
+              expect(variant, `image ${feature.image} du SCRS ${script}`).toBeGreaterThanOrEqual(own[0]!);
+              expect(variant, `image ${feature.image} du SCRS ${script}`).toBeLessThanOrEqual(own[1]!);
+            }
+            // Variante 192 et au-delà = pieds : seule la première partie (emplacement des pieds) peut en être une.
+          }
+          expect(parts.slice(1).every((v) => v < 192), `image ${feature.image} : des pieds hors de leur emplacement`).toBe(true);
+          // Images de dos (pose 1) : le nez est dessiné avant le corps (variantes 1 à 11).
+          if (feature.image >= 6 && parts.length >= 3) {
+            back++;
+            expect(parts[1]!).toBeGreaterThanOrEqual(172);
+            expect(parts[2]!).toBeLessThanOrEqual(11);
+          }
+          await t.wait(1);
+          images++;
+        }
+        expect(back).toBeGreaterThan(0);
+        await t.settle();
+        expect(t.engine.error).toBeNull();
+      }
+    }
+  }, 240_000);
+
+  it("ordre de dessin (bug 24, `11a8:231b`) : un Zoombini est devant le décor de l'hôtel (étagères, avant-plan, portes, socles) ; rangé (évènement 15, `11a8:2a0a`), il passe juste derrière l'avant-plan percé", async () => {
+    for (const level of LEVELS) {
+      const t = await start({ level, visits: 5 });
+      const probe = t.probe();
+      await t.toPlay();
+      const features = t.engine.services.get(FEATURES);
+      const order = (f: object) => features.features.indexOf(f as (typeof features.features)[number]);
+      const wall = features.features.find((f) => f.scriptId >= 11503 && f.scriptId <= 11505)!;
+      expect(wall).toBeDefined();
+      const decor = [...probe.shelves, ...probe.doors].filter((f) => f !== undefined);
+      // Au repos dans le hall : devant tout le décor de la partie (et le cadran).
+      for (const member of probe.kit!.members) {
+        expect(order(member.snoid.feature)).toBeGreaterThan(order(wall));
+        for (const f of decor) expect(order(member.snoid.feature)).toBeGreaterThan(order(f));
+      }
+      const room = robotPlan(probe.state)[0]!;
+      await t.drag(0, probe.point(room));
+      expect(probe.state.placed[0]).toBe(room);
+      const climber = probe.kit!.members[0]!;
+      // Pendant la montée, devant son étagère, jusqu'à l'évènement 15.
+      await t.wait(4);
+      expect(order(climber.snoid.feature)).toBeGreaterThan(order(probe.shelves[room]!));
+      await t.settle();
+      // Rangé : derrière l'avant-plan percé et les étagères, devant sa porte.
+      expect(order(climber.snoid.feature)).toBeLessThan(order(wall));
+      expect(order(climber.snoid.feature)).toBeLessThan(order(probe.shelves[room]!));
+      expect(order(climber.snoid.feature)).toBeGreaterThan(order(probe.doors[room]!));
+      // Refus : le Zoombini qui rebondit sur l'étagère, puis tombe, passe devant elle et devant l'avant-plan.
+      await t.drag(1, probe.point(room));
+      const bouncer = probe.kit!.members[1]!;
+      for (let i = 0; i < 6 && probe.busy; i++) {
+        expect(order(bouncer.snoid.feature)).toBeGreaterThan(order(probe.shelves[room]!));
+        expect(order(bouncer.snoid.feature)).toBeGreaterThan(order(wall));
+        await t.wait(10);
+      }
+      await t.settle();
+      expect(order(bouncer.snoid.feature)).toBeGreaterThan(order(wall));
+      expect(t.engine.error).toBeNull();
+    }
+  }, 120_000);
+
+  it("« go » (bug 25, `10e8:1cea` région 2) : aucun Zoombini ne sort à pied, les rangés restent dans leurs chambres jusqu'au changement d'écran", async () => {
+    const t = await start({ level: 1, visits: 5 });
+    const probe = t.probe();
+    await t.toPlay();
+    await t.drag(0, probe.point(7));
+    await t.settle();
+    const kit = probe.kit!;
+    const at = kit.members.map((m) => ({ ...m.snoid.position }));
+    t.host.click(BUTTON_GO.left + 5, BUTTON_GO.top + 5);
+    for (let i = 0; i < 200 && t.zoombinis.lastChange === null; i++) {
+      kit.members.forEach((m, k) => {
+        expect(m.snoid.walking, `membre ${k}`).toBe(false);
+        expect(m.snoid.position).toEqual(at[k]);
+      });
+      await t.wait(5);
+    }
+    expect(t.zoombinis.lastChange).toMatchObject({ screen: S.xfer, target: nextScreen(S.hotel, "success") });
+    expect(t.zoombinis.game.group.members.filter((z: Zoombini) => z.present)).toHaveLength(1);
+    expect(t.engine.error).toBeNull();
+  });
 
   it("chambre bloquée (niveau 2) : le Zoombini retourne sur sa place sans erreur ni acceptation", async () => {
     const t = await start({ level: 2, visits: 5 });

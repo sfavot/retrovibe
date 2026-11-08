@@ -28,10 +28,20 @@ function fakeContext() {
   const started: number[] = [];
   const ctx = {
     currentTime: 0,
-    state: "running",
+    state: "running" as AudioContextState | "interrupted",
     destination: {},
     worklets: 0,
     started,
+    gain,
+    calls: [] as string[],
+    /** Vrai : `resume()` reste en attente, comme WebKit pendant une interruption (`addReaction(Running, …)`). */
+    holdResume: false,
+    onstatechange: null as (() => void) | null,
+    /** Change l'état comme le navigateur, avec l'évènement `statechange`. */
+    setState(state: AudioContextState | "interrupted") {
+      ctx.state = state;
+      ctx.onstatechange?.();
+    },
     createGain: () => gain,
     createBuffer: (_channels: number, length: number, sampleRate: number) => ({ length, sampleRate, getChannelData: () => new Float32Array(length) }),
     createBufferSource() {
@@ -42,7 +52,22 @@ function fakeContext() {
         ctx.worklets++;
       },
     },
-    resume: async () => {},
+    resume: () => {
+      ctx.calls.push("resume");
+      if (ctx.holdResume) return new Promise<void>(() => {});
+      ctx.state = "running";
+      return Promise.resolve();
+    },
+    suspend: () => {
+      ctx.calls.push("suspend");
+      ctx.state = "suspended";
+      return Promise.resolve();
+    },
+    close: () => {
+      ctx.calls.push("close");
+      ctx.state = "closed";
+      return Promise.resolve();
+    },
   };
   return ctx;
 }
@@ -114,5 +139,102 @@ describe("WebAudioSink : reset du MIDI", () => {
     sink.midi.reset();
     sink.midi.reset();
     expect(sent.filter((s) => (s.message[0] & 0xf0) === 0x80)).toEqual([]);
+  });
+});
+
+describe("WebAudioSink : reprise après une interruption d'iOS", () => {
+  const pcm = { samples: new Float32Array(4000), sampleRate: 11025 };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("relance au geste un contexte `interrupted`, et pas seulement `suspended`", async () => {
+    const { sink, wave, ctx } = await readySink();
+    wave.holdResume = true;
+    ctx.holdResume = true;
+    wave.setState("interrupted");
+    ctx.setState("interrupted");
+    wave.calls.length = 0;
+    ctx.calls.length = 0;
+    sink.unlock();
+    expect(wave.calls).toEqual(["resume"]);
+    expect(ctx.calls).toEqual(["resume"]);
+  });
+
+  it("redemande la reprise dès que le navigateur arrête un contexte de lui-même", async () => {
+    const { wave } = await readySink();
+    wave.calls.length = 0;
+    wave.setState("interrupted");
+    expect(wave.calls).toEqual(["resume"]);
+    expect(wave.state).toBe("running");
+  });
+
+  it("une reprise tenue en attente ne bloque ni les gestes suivants, ni la pause, ni la fermeture", async () => {
+    const { sink, wave } = await readySink();
+    wave.holdResume = true;
+    wave.setState("interrupted");
+    sink.unlock();
+    await Promise.resolve();
+    wave.calls.length = 0;
+    wave.holdResume = false;
+    sink.unlock();
+    expect(wave.calls).toEqual(["resume"]);
+    expect(wave.state).toBe("running");
+    sink.suspend();
+    sink.resume();
+    sink.close();
+    expect(wave.calls).toEqual(["resume", "suspend", "resume", "close"]);
+  });
+
+  it("le son revient au geste qui suit une interruption : les WAVE rejouent", async () => {
+    const { sink, wave } = await readySink();
+    wave.holdResume = true;
+    wave.setState("interrupted");
+    sink.playWave(pcm, false);
+    expect(wave.started).toHaveLength(0);
+    wave.holdResume = false;
+    sink.unlock();
+    sink.playWave(pcm, false);
+    expect(wave.started).toHaveLength(1);
+  });
+
+  it("une voix d'un contexte interrompu ne reste pas « en cours » : elle est abandonnée passé le délai de reprise", async () => {
+    vi.useFakeTimers({ toFake: ["performance"] });
+    const { sink, wave } = await readySink();
+    const handle = sink.playWave(pcm, false);
+    wave.holdResume = true;
+    wave.setState("interrupted");
+    sink.unlock();
+    expect(sink.isWavePlaying(handle)).toBe(true);
+    vi.advanceTimersByTime(2000);
+    expect(sink.isWavePlaying(handle)).toBe(false);
+    // Le son revenu, la voix abandonnée ne repart pas.
+    wave.holdResume = false;
+    sink.unlock();
+    expect(sink.isWavePlaying(handle)).toBe(false);
+  });
+
+  it("garde les voix pendant la pause du jeu (onglet masqué)", async () => {
+    vi.useFakeTimers({ toFake: ["performance"] });
+    const { sink } = await readySink();
+    const handle = sink.playWave(pcm, false);
+    sink.suspend();
+    vi.advanceTimersByTime(5000);
+    expect(sink.isWavePlaying(handle)).toBe(true);
+    sink.resume();
+    expect(sink.isWavePlaying(handle)).toBe(true);
+  });
+
+  it("le bouton Son coupé puis remis rend le gain aux deux sorties, plusieurs fois de suite", async () => {
+    const { sink, wave, ctx } = await readySink();
+    for (let i = 0; i < 3; i++) {
+      sink.setMuted(true);
+      expect([wave.gain.gain.value, ctx.gain.gain.value]).toEqual([0, 0]);
+      sink.setMuted(false);
+      sink.unlock();
+      expect([wave.gain.gain.value, ctx.gain.gain.value]).toEqual([1, 1]);
+    }
+    expect([wave.state, ctx.state]).toEqual(["running", "running"]);
   });
 });

@@ -10,6 +10,10 @@
  *   (l'app attend la première image pour ne pas concurrencer le chargement du jeu) ; la soundfont réduite (18 Mo) se charge en tâche
  *   de fond (`scripts/lib/soundfont.mts`). Tant qu'il n'est pas prêt, les messages MIDI sont ignorés sans erreur ;
  *   `onReady` signale le moment où il le devient.
+ * - Reprise : chaque geste (`unlock()`), le retour de l'onglet (`resume()`), un `statechange` et un son demandé relancent tout contexte qui ne
+ *   tourne pas, `interrupted` d'iOS compris (appel, Siri, verrouillage, changement de sortie). Les appels partent directement au navigateur :
+ *   WebKit garde en attente un `resume()` fait pendant une interruption, et une file de transitions resterait bloquée derrière lui. Une voix
+ *   d'un contexte qui ne repart pas est abandonnée (`isWavePlaying` faux) au lieu de rester « en cours » sans fin.
  * - `close()` libère tout (voix, synthétiseur, contexte) quand la page est quittée.
  * - Les messages MIDI datés partent vers le worklet au plus `FLUSH_WINDOW_MS` avant leur heure : le worklet ne sait pas
  *   annuler un message planifié, alors que `reset()` doit pouvoir couper net ce que le séquenceur a planifié d'avance. Les note-on
@@ -29,6 +33,13 @@ export const SOUNDFONT_URL = `${import.meta.env.BASE_URL}mathemagique/mathemagiq
 /** Au plus cette avance (ms) entre l'envoi au worklet et l'heure d'un message. */
 const FLUSH_WINDOW_MS = 30;
 const FLUSH_INTERVAL_MS = 8;
+/** Délai (ms) pendant lequel un contexte dont l'hôte vient de demander la reprise compte encore comme actif (voix gardées). */
+const RESUME_GRACE_MS = 1000;
+
+/** Promesse d'une transition du contexte, sans suite : un refus (pas de geste, contexte fermé) attend simplement la prochaine reprise. */
+function settle(promise: Promise<void>): void {
+  promise.catch(() => undefined);
+}
 
 export interface WebAudioSinkOptions {
   soundfontUrl?: string;
@@ -49,10 +60,10 @@ export class WebAudioSink implements AudioSink {
   private midiCtx: AudioContext | null = null;
   private midiMaster: GainNode | null = null;
   private muted = false;
+  /** Pause demandée par le jeu (onglet masqué) : les contextes doivent rester arrêtés, et les voix n'y sont qu'en pause. */
   private suspended = false;
-  private resuming = 0;
-  private transition: Promise<unknown> = Promise.resolve();
-  private transitions = 0;
+  /** Heure (`performance.now()`) de la dernière reprise demandée par l'hôte (geste, retour de l'onglet). */
+  private resumedAt = Number.NEGATIVE_INFINITY;
 
   private nextHandle = 1;
   private readonly voices = new Map<WaveHandle, AudioBufferSourceNode>();
@@ -82,7 +93,7 @@ export class WebAudioSink implements AudioSink {
       [this.ctx, this.master] = this.createOutput();
       [this.midiCtx, this.midiMaster] = this.createOutput();
     }
-    if (!this.suspended) for (const ctx of this.contexts) if (ctx.state === "suspended") this.startResume(ctx);
+    this.requestResume();
     this.tryStartMidi();
   }
 
@@ -118,6 +129,9 @@ export class WebAudioSink implements AudioSink {
     const master = ctx.createGain();
     master.gain.value = this.muted ? 0 : 1;
     master.connect(ctx.destination);
+    // iOS arrête un contexte de lui-même (`interrupted` : appel, Siri, verrouillage, changement de sortie…, puis parfois `suspended`) : on
+    // redemande aussitôt la reprise, que WebKit tient en attente jusqu'à la fin de l'interruption ; le prochain geste la redemande aussi.
+    ctx.onstatechange = () => this.revive(ctx);
     return [ctx, master];
   }
 
@@ -141,6 +155,7 @@ export class WebAudioSink implements AudioSink {
   playWave(sound: PcmSound, loop: boolean): WaveHandle {
     const handle = this.nextHandle++;
     const ctx = this.ctx;
+    if (ctx && ctx.state !== "running") this.revive(ctx);
     if (!ctx || ctx.state !== "running" || !this.master || sound.samples.length === 0) return handle;
     const source = ctx.createBufferSource();
     source.buffer = this.bufferOf(ctx, sound);
@@ -166,8 +181,16 @@ export class WebAudioSink implements AudioSink {
     }
   }
 
+  /**
+   * Faux dès que la sortie ne progresse plus d'elle-même (contexte interrompu ou arrêté hors pause du jeu, au-delà du délai de reprise) :
+   * la voix est alors abandonnée, sinon un moteur qui attend sa fin (canal unique des Zoombinis, voix enchaînées) resterait bloqué, et
+   * elle repartirait au retour du son par-dessus les suivantes.
+   */
   isWavePlaying(handle: WaveHandle): boolean {
-    return this.voices.has(handle) && this.live;
+    if (!this.voices.has(handle)) return false;
+    if (this.live) return true;
+    this.stopWave(handle);
+    return false;
   }
 
   private bufferOf(ctx: AudioContext, sound: PcmSound): AudioBuffer {
@@ -179,9 +202,14 @@ export class WebAudioSink implements AudioSink {
     return buffer;
   }
 
-  /** Sortie des WAVE utilisable : contexte démarré, ou figé / en reprise (les voix y sont seulement en pause). */
+  /**
+   * Sortie des WAVE qui avance ou va avancer : contexte démarré, figé par la pause du jeu (les voix y sont seulement en pause), ou dont la
+   * reprise vient d'être demandée (`RESUME_GRACE_MS`). Une reprise que le navigateur tient en attente (iOS interrompu) ne compte pas au-delà.
+   */
   private get live(): boolean {
-    return this.ctx?.state === "running" || ((this.suspended || this.resuming > 0) && this.ctx !== null);
+    const ctx = this.ctx;
+    if (!ctx || ctx.state === "closed") return false;
+    return ctx.state === "running" || this.suspended || performance.now() - this.resumedAt < RESUME_GRACE_MS;
   }
 
   // --- MIDI ---------------------------------------------------------------------------------------------------
@@ -277,12 +305,12 @@ export class WebAudioSink implements AudioSink {
 
   suspend(): void {
     this.suspended = true;
-    for (const ctx of this.contexts) void this.enqueue(() => (ctx.state === "running" ? ctx.suspend() : undefined));
+    for (const ctx of this.contexts) if (ctx.state !== "closed") settle(ctx.suspend());
   }
 
   resume(): void {
     this.suspended = false;
-    for (const ctx of this.contexts) this.startResume(ctx);
+    this.requestResume();
   }
 
   /**
@@ -308,24 +336,26 @@ export class WebAudioSink implements AudioSink {
     } catch {
       // déjà libéré
     }
-    // Derrière les transitions suspend / resume en cours : fermer un contexte en pleine transition lèverait.
-    for (const ctx of contexts) void this.enqueue(() => (ctx.state === "closed" ? undefined : ctx.close()));
+    for (const ctx of contexts) {
+      ctx.onstatechange = null;
+      if (ctx.state !== "closed") settle(ctx.close());
+    }
   }
 
-  /** Exécute `op` tout de suite si aucune transition n'est en cours, sinon à la suite : le dernier appel gagne. */
-  private enqueue(op: () => Promise<void> | undefined): Promise<unknown> {
-    const run = (): Promise<unknown> => Promise.resolve(op()).catch(() => undefined);
-    this.transitions++;
-    this.transition = (this.transitions === 1 ? run() : this.transition.then(run)).finally(() => {
-      this.transitions--;
-    });
-    return this.transition;
+  /** Reprise demandée par l'hôte (geste, retour de l'onglet) : chaque contexte arrêté, quelle qu'en soit la raison, est relancé. */
+  private requestResume(): void {
+    if (this.suspended || this.closed) return;
+    this.resumedAt = performance.now();
+    for (const ctx of this.contexts) this.revive(ctx);
   }
 
-  private startResume(ctx: AudioContext): void {
-    this.resuming++;
-    void this.enqueue(() => ctx.resume()).finally(() => {
-      this.resuming--;
-    });
+  /**
+   * Relance `ctx` s'il ne tourne pas alors qu'il le devrait. Chaque appel part directement au navigateur : une reprise tenue en attente
+   * (iOS interrompu) ne doit retenir ni les suivantes ni `suspend` / `close`.
+   */
+  private revive(ctx: AudioContext): void {
+    if (this.suspended || this.closed || ctx.state === "running" || ctx.state === "closed") return;
+    settle(ctx.resume());
   }
+
 }

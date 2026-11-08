@@ -17,7 +17,8 @@
  *     (colonnes 1 à 3), 7029 (colonne 0) ou 7030 (colonne 4) ; à l'événement 3 la boule part de (484, 318) et atteint la dalle en cinq pas de 3 ticks, puis impact (`SCRB` 7023 / 7024 sur la dalle) ;
  *  5. à la fin de la catapulte : munition de moins (`endOfShot`), puis, si un groupe est libéré, chaque Zoombini libéré passe : la colonne réagit (`SCRB` 8000 + colonne), la balançoire joue 8005 + place (la
  *     boulette tombe, événement 21) et le Zoombini de cette place saute (`SCRS` 13016 +…), vole au-dessus du mur (14000 + place), est reçu de l'autre côté (13031 +…) puis rejoint le point de la file d'arrivée
- *     (`1468:01F4`) ; les suivants montent à la balançoire (`SCRS` 13001 +…, depuis (233, 392)) ;
+ *     (`1468:01F4`) ; après la balançoire du dernier du groupe, les suivants montent à la balançoire (`SCRS` 13001 +…, depuis (233, 392)), s'y retournent (événement 0) et
+ *     attendent (`1168:4231(0, 2)`) ; la fin de la montée rend le tir (`1120:2900`, `8ba6 = 0`) ;
  *  6. « go » devient actif au premier arrivé ; il sauve ceux qui ont passé (`+0x127`), les autres sont perdus ; la carte les abandonne tous.
  *
  * Écarts avec l'original (aussi dans `net.md` §8) : voir la fin de ce commentaire.
@@ -196,7 +197,7 @@ const FLIGHT_DELAY = 3;
 const TABLE_SHAPE = [2, 3, 0, 1, 4] as const;
 const TABLE_KIND = [4, 0, 2, 1, 3] as const;
 
-/** Inactivité (`1120:0554`) : 7200 ticks sans tir, 720 ticks après le dernier mouvement d'un groupe libéré. */
+/** Inactivité (`1120:0554`) : 7200 ticks sans tir ; 720 ticks après le dernier mouvement d'un groupe libéré (filet : le verrou tombe d'ordinaire plus tôt, `unlockAfterRelease`). */
 const IDLE_TICKS = 7200;
 const LOCK_TICKS = 720;
 /** Délai entre deux animations de joie (30 ticks) et leur nombre (3, ou 2 avec « moins d'action »). */
@@ -333,6 +334,8 @@ export function createNetScene(): Scene {
   /** Tir en cours (`[8b8c]`) et dernier tir pas encore réglé (`[8ba6]`) ; clics bloqués (`[89e0]`) ; fin du tir : horodatage (`[8bae]`). */
   let locked = true;
   let shotPending = false;
+  /** Animation de tir de la catapulte en cours (`[8ba4]`, du clic à `shotEnded`). */
+  let firing = false;
   let inputBlocked = true;
   let lastActivity = 0;
   /** Premier rechargement (`[8b58]`), dernier tir manqué (`[8b8e]`), niveau de la bulle (`[8b4c]`). */
@@ -353,7 +356,11 @@ export function createNetScene(): Scene {
   let leverSlots: { member: number; ready: boolean }[] = [];
   let nextToSend = 0;
   let sending = false;
+  /** Zoombinis en train de jouer leur montée à la balançoire (`[89f2…89f6]` non nuls). */
+  let climbing = 0;
   let arrivedCount = 0;
+  /** Pose en attente des événements 240 à 243 (`[89de]`, 0 : aucune), appliquée par l'événement 0. */
+  let pendingPose = 0;
   let joysLeft = 0;
   let nextJoy = 0;
   let timers: { at: number; run: () => void }[] = [];
@@ -580,6 +587,7 @@ export function createNetScene(): Scene {
     if (!canFire()) return;
     shotPending = true;
     locked = true;
+    firing = true;
     lastActivity = ctx.clock.ticks;
     playOn(button, SCRB.buttonPressed);
     const tile = aim(s);
@@ -664,6 +672,7 @@ export function createNetScene(): Scene {
   function shotEnded(): void {
     const s = state!;
     if (gone) return;
+    firing = false;
     const last = endOfShot(s);
     if (last) {
       const zoombinis = ctx.services.get(ZOOMBINIS_GAME);
@@ -687,11 +696,35 @@ export function createNetScene(): Scene {
     releaseNext();
   }
 
+  /**
+   * Après un tir qui a libéré un groupe, le tir redevient permis (`8ba6 = 0`, bouton `SCRB` 10018) sans attendre les 720 ticks du Tick (`1120:0554`, simple filet), aux
+   * moments où `1120:2900` le rend :
+   *  - `"climbed"` : fin de la montée d'un Zoombini à la balançoire, quand plus personne d'autre n'est en train d'y monter (événement −1, `1120:2bef`, `[89f2…89f6]` nuls) ;
+   *  - `"released"` : fin du passage du groupe ; le remplaçant part alors vers la balançoire et c'est la fin de sa montée qui lève le verrou ; si personne ne part (file vide),
+   *    le verrou tombe tout de suite (`1120:2c25`) ;
+   *  - `"arrival"` : un Zoombini reçu de l'autre côté part vers la file d'arrivée alors que tous sont libérés ou qu'il ne reste personne à envoyer (`1120:2cba`, `[89dc]`).
+   * Pas pendant le passage du groupe : chaque réaction de colonne le remet (`8ba6++`). `locked` (`8b8c`) reste à la charge du rechargement (`finishReload`) : l'original le
+   * lève aussi au même moment, même pendant un rechargement, ce que le port ne fait pas.
+   */
+  function unlockAfterRelease(reason: "climbed" | "released" | "arrival"): void {
+    const s = state;
+    if (gone || !s || !shotPending || firing || releasing || pendingRelease > 0 || flight !== null) return;
+    if (reason === "arrival" && !(isWon(s) || !kit || nextToSend >= kit.members.length)) return;
+    if (reason === "released" && (sending || climbing > 0)) return;
+    if (reason === "climbed" && climbing > 0) return;
+    shotPending = false;
+    flash(SCRB.buttonHint);
+    lastActivity = ctx.clock.ticks;
+  }
+
   /** Un Zoombini de moins à passer (`8b9a−−`) : la colonne réagit, puis la balançoire lance le Zoombini de la place la plus à gauche occupée. */
   function releaseNext(): void {
     if (gone) return;
     if (pendingRelease <= 0) {
       releasing = false;
+      // `1120:0554` : la montée des remplaçants attend la fin des réactions de colonne et des balançoires du groupe (`[8b9e]`, `[8ba0]`, `[8b9a]`).
+      sendNext();
+      unlockAfterRelease("released");
       return;
     }
     pendingRelease -= 1;
@@ -759,13 +792,21 @@ export function createNetScene(): Scene {
       });
     };
     snoid.play(jumpScript(slot, nose), FeatureFlag.stopAtEnd, { kind: "normal" });
-    // La place est libre : le suivant monte.
-    sendNext();
+    // La place est libre ; le remplaçant ne part qu'après la balançoire du dernier du groupe (`releaseNext`).
   }
 
-  /** Événements 250 à 253 des `SCRS` : pose imposée tout de suite (`1168:4dc9`). */
+  /**
+   * Événements de pose des `SCRS` (`1120:2900`, table `CS:2d55`) : 250 à 253 imposent la pose tout de suite (`1168:4dc9`) ; 240 à 243 la mettent en attente (`[89de] = n − 239`) ;
+   * 0 retourne le Zoombini (`+0xf2` inversé) et applique la pose en attente. Les montées à la balançoire s'en servent pour finir tournées, dans la pose 1.
+   */
   function poseEvent(snoid: KitMember["snoid"], n: number): void {
     if (n >= 250 && n <= 253) snoid.setPose(n - 250);
+    else if (n >= 240 && n <= 243) pendingPose = n - 239;
+    else if (n === 0) {
+      snoid.setFacing(snoid.facing === 0 ? 1 : 0);
+      if (pendingPose !== 0) snoid.setPose(pendingPose - 1);
+      pendingPose = 0;
+    }
   }
 
   function walkToArrival(member: KitMember): void {
@@ -775,6 +816,7 @@ export function createNetScene(): Scene {
     arrivedCount += 1;
     member.snoid.onEvent = undefined;
     member.snoid.onEnd = undefined;
+    unlockAfterRelease("arrival");
     kit!.walk(
       member,
       point,
@@ -815,11 +857,16 @@ export function createNetScene(): Scene {
       snoid.onEnd = () => {
         snoid.onEnd = undefined;
         snoid.onEvent = undefined;
+        // `1120:2900`, événement −1 d'une montée : `1168:4231(0, 2)`, le Zoombini attend sur la balançoire dans sa pose d'attente (tourné par l'événement 0).
+        snoid.idle();
         statuses[index] = "lever";
         leverSlots[slot] = { member: index, ready: true };
         sending = false;
+        climbing -= 1;
         sendNext();
+        unlockAfterRelease("climbed");
       };
+      climbing += 1;
       snoid.play(id, FeatureFlag.stopAtEnd, { kind: "normal", at: end });
     };
     const at = member.snoid.position;
@@ -884,6 +931,7 @@ export function createNetScene(): Scene {
       state = newNet(ctx.rng, chosen, Math.max(1, party.length));
       locked = true;
       shotPending = false;
+      firing = false;
       inputBlocked = true;
       lastActivity = ctx.clock.ticks;
       firstReload = true;
@@ -898,7 +946,9 @@ export function createNetScene(): Scene {
       flightPlacement = null;
       nextToSend = 0;
       sending = false;
+      climbing = 0;
       arrivedCount = 0;
+      pendingPose = 0;
       joysLeft = 0;
       timers = [];
       busy.clear();
@@ -1013,7 +1063,7 @@ export function createNetScene(): Scene {
         nextJoy = now + JOY_GAP;
         joy();
       }
-      // Inactivité (`1120:0554`) : rappel du bouton après 7200 ticks sans tir ; après un tir qui a libéré un groupe, le verrou tombe 720 ticks après son dernier mouvement.
+      // Inactivité (`1120:0554`) : rappel du bouton après 7200 ticks sans tir ; après un tir qui a libéré un groupe, au plus tard 720 ticks après son dernier mouvement (filet, `unlockAfterRelease`).
       if (!shotPending) {
         if (now - lastActivity > IDLE_TICKS && !inputBlocked) {
           locked = false;

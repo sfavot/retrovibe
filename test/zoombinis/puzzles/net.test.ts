@@ -696,7 +696,7 @@ describe.skipIf(!original.has)("muraille de signes : écran (écran 15, NET.MHK)
     const markIndex = list.findIndex((f) => f.scriptId === (level < 2 ? 7023 : 7024));
     expect(markIndex).toBeGreaterThan(tileIndex);
     expect(probe().kit.goEnabled).toBe(false);
-    // Le verrou `[8ba6]` d'un tir qui a libéré un groupe ne tombe que 720 ticks après le dernier mouvement du groupe.
+    // Le verrou `[8ba6]` d'un tir qui a libéré un groupe tient pendant le passage du groupe.
     expect(probe().shotPending).toBe(true);
     expect(probe().canFire).toBe(false);
     await ticks(1400);
@@ -714,6 +714,62 @@ describe.skipIf(!original.has)("muraille de signes : écran (écran 15, NET.MHK)
     await ready(3000);
     expect(probe().shotPending).toBe(false);
     expect(zoombinis.game.group.members).toHaveLength(6);
+  });
+
+  it("montée à la balançoire : l'événement 0 retourne le Zoombini, puis il attend dans sa pose d'attente (1120:2900, `1168:4231(0, 2)`), sans rester sur la dernière image de la montée", async () => {
+    for (const level of [0, 2]) {
+      const { probe, ready, ticks } = await start(level);
+      await ready();
+      await ticks(300);
+      const { lever, kit } = probe();
+      expect(lever.map((entry) => entry.member)).toEqual([2, 1, 0]);
+      for (const entry of lever) {
+        const snoid = kit.members[entry.member]!.snoid;
+        // Pose d'attente (`SCRS` 100 + variante), plus le script de montée (13001 à 13015) figé sur sa dernière image (de profil, ou de dos à la place de gauche).
+        expect(snoid.resting, `membre ${entry.member}`).toBe(true);
+        // Arrivé à (233, 392) en marchant vers la droite (`+0xf2 = 0`), il est retourné par l'événement 0 de la montée.
+        expect(snoid.facing, `membre ${entry.member}`).toBe(1);
+      }
+    }
+  });
+
+  it("après un groupe libéré, le tir revient à la fin de la montée du remplaçant (1120:2900, `8ba6 = 0`), pas 720 ticks après la dernière colonne ; un sélecteur changé pendant le passage ne bloque rien", async () => {
+    const { probe, ready, choose, fire, ticks, now, clickRect } = await start(0);
+    await ready();
+    const state = probe().state;
+    const target = state.groups.findIndex((g) => g === 3);
+    const selectors = selectorsFor(state, target);
+    await choose(selectors);
+    await fire();
+    const t0 = now();
+    let lastColumn = -1;
+    let seen = false;
+    let changed = false;
+    while (!probe().canFire && now() - t0 < 3000) {
+      await ticks(1);
+      const p = probe();
+      // `pendingRelease` (`8b9a`) baisse à chaque réaction de colonne : à 0, c'est la dernière ; l'ancien verrou tombait 720 ticks plus tard.
+      if (p.pendingRelease > 0) seen = true;
+      else if (seen && lastColumn < 0) lastColumn = now();
+      if (!changed && !p.locked) {
+        // Pendant le passage du groupe, la forme change (`1b9b` : sélecteur permis dès que `8b8c` est retombé).
+        changed = true;
+        await clickRect(NET_SYMBOL_REGIONS[2]![(selectors[2]! + 1) % 5]!, 1);
+        expect(state.selectors[2]).toBe((selectors[2]! + 1) % 5);
+      }
+    }
+    expect(changed).toBe(true);
+    expect(lastColumn).toBeGreaterThan(0);
+    expect(probe().canFire).toBe(true);
+    const unlocked = now();
+    expect(unlocked - lastColumn).toBeLessThan(600);
+    // Un remplaçant vient d'arriver sur la balançoire (les trois places ont été vidées par le groupe), et personne n'y est en pleine montée.
+    expect(probe().lever.some((entry) => entry.member >= 3 && entry.ready)).toBe(true);
+    // Le tir suivant part au premier clic.
+    await fire();
+    expect(probe().shotPending).toBe(true);
+    await ticks(200);
+    expect(state.shots).toBe(2);
   });
 
   it("une dalle déjà passée donne un tir manqué", async () => {

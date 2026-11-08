@@ -611,6 +611,53 @@ describe.skipIf(!original.has)("écran des grottes de passe-clos (TUNNELS.MHK)",
     expect(behindGuardian).toBe(true);
   });
 
+  it("sortie par « go » depuis le tunnel du bas à droite : départ au nœud qui suit le plus proche (1168:2f9f, rang k + 1), la cave 9000 reste au fond (0x8000)", async () => {
+    // Niveau 2, graine 3 : les membres 4 et 6 ont l'entrée 3 ; ils prennent les places (414, 217) puis (389, 223) du tunnel.
+    const { dragTo, right, until, scene, kit, host, ticks, zoombinis, features } = await start(2);
+    const saved = [4, 6];
+    for (const i of saved) {
+      expect(right(i)).toBe(3);
+      await dragTo(i, 3);
+      await until(() => scene.debug.statusOf(i) === "arrived");
+      await until(() => !scene.debug.busy && scene.debug.queueLength === 0 && !kit().members[i]!.snoid.walking);
+    }
+    const [far, near] = saved.map((i) => kit().members[i]!.snoid);
+    expect(far!.position).toEqual({ x: 414, y: 217 });
+    expect(near!.position).toEqual({ x: 389, y: 223 });
+    const cave = features.features.find((f) => f.scriptId === 9000)!;
+    host.click(620, 460);
+    await ticks(2);
+    const trail = new Map(saved.map((i) => [i, [] as string[]]));
+    let caveBehind = true;
+    for (let t = 0; t < 1500 && zoombinis.lastChange === null; t += 2) {
+      for (const [k, snoid] of [far!, near!].entries()) {
+        const seen = trail.get(saved[k]!)!;
+        const at = `${snoid.position.x},${snoid.position.y}`;
+        if (seen[seen.length - 1] !== at) seen.push(at);
+        const list = features.features;
+        if (list.includes(snoid.feature) && list.indexOf(cave) > list.indexOf(snoid.feature)) caveBehind = false;
+      }
+      await ticks(2);
+    }
+    // Chemin 2 : (304, 238) → (494, 228) → (536, 80) → (670, 30). Depuis (414, 217) le nœud le plus proche est (494, 228) : l'original repart du
+    // nœud suivant et monte tout droit vers (536, 80), à travers la paroi (même trajet que l'original, pas de raccourci du port).
+    const farTrail = trail.get(4)!;
+    expect(farTrail).not.toContain("494,228");
+    const top = farTrail.indexOf("536,80");
+    expect(top).toBeGreaterThan(0);
+    for (const point of farTrail.slice(0, top)) {
+      const [x, y] = point.split(",").map(Number) as [number, number];
+      // Sur le segment (414, 217) → (536, 80), à un pas près (au plus 13 px en x, 10 en y par pas en secteur 3).
+      expect(Math.abs((x - 414) * (80 - 217) - (y - 217) * (536 - 414)) / Math.hypot(122, 137)).toBeLessThan(10);
+    }
+    // Depuis (389, 223) le plus proche est (304, 238) : il passe par (494, 228) avant de monter.
+    const nearTrail = trail.get(6)!;
+    expect(nearTrail.indexOf("494,228")).toBeGreaterThan(0);
+    expect(nearTrail.indexOf("494,228")).toBeLessThan(nearTrail.indexOf("536,80"));
+    // `11a8:231b` garde les objets `0x8000` en tête de liste : la cave 9000 est dessinée derrière les Zoombinis qui sortent.
+    expect(caveBehind).toBe(true);
+  });
+
   it("le bouton carte demande l'avertissement, puis mène à la carte sans réussite", async () => {
     const { host, ticks, zoombinis, engine } = await start(0);
     host.click(620, 420);

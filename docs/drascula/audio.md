@@ -4,7 +4,7 @@ Vague A. Référence de comportement : `sound.cpp` de ScummVM (`playFile`, `stop
 
 | Module | Rôle |
 | --- | --- |
-| `src/audio/web-sample-output.ts` (E3, commun) | `WebSampleOutput` : contexte créé à `unlock()`, gain général, coupure sans arrêt des sources, `suspend()` / `resume()`, `play(sample, {loop})` rend une `SampleVoice` (`playing`, `duration`, `stop()`). |
+| `src/audio/web-sample-output.ts` (E3, commun) | `WebSampleOutput` : contexte créé à `unlock()`, gain général, coupure sans arrêt des sources, `suspend()` / `resume()`, `play(sample, {loop, passes})` rend une `SampleVoice` (`playing`, `duration`, `stop(fadeSeconds?)`) ; `onContext` / `connection()` laissent un jeu brancher une autre source sur le même contexte (Lost in Time : file `queuePcm` et musique AdLib). |
 | `audio/voice.ts` | `SoundChannel` : voie unique des `.ALS` (voix, effets `S*.ALS`), marges de 32 octets et contournement de `3.ALS` (`data/als.ts`), chargement synchrone ou différé (`SoundFiles`). |
 | `audio/music.ts` | `DrasculaMusic` : piste `p` du `.ALD` -> `track<p>.mp3` (1 à 31) par `TrackPlayer`, jouée une fois. |
 | `audio/audio.ts` | `DrasculaAudio` (les six méthodes de son de l'hôte + `unlock`, `suspend`, `resume`, `setMuted`, `close`) et `createSoundPrefs` (`retrovibe:drascula:sound`). |

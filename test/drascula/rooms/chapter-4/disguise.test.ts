@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Anim, Bedroom, Flag, Item, Landing } from "../../../../src/games/drascula/engine/rooms/chapter-4/ids";
 import { Verb } from "../../../../src/games/drascula/engine/state";
 import { hasOriginalFiles } from "../../helpers";
-import { heroPoint, speech, startIn, useOnHero } from "./support";
+import { heroPoint, repaint, speech, startIn, useOnHero } from "./support";
 
 /**
  * Le déguisement : `animation_6_4` (Igor s'en va), `animation_5_4` (le héros se déguise, sort de la chambre) et `animation_7_4`
@@ -70,6 +70,40 @@ describe.skipIf(!hasOriginalFiles)("chapitre 4 : le déguisement en Drascula", (
       w.settle(60_000);
       expect(w.engine.gfx.back.pixels).toEqual(w.engine.gfx.sheet(99).pixels);
       expect(w.engine.gfx.front.pixels).toEqual(w.engine.gfx.sheet(96).pixels);
+    });
+
+    it("pendant le fondu au noir qui suit i30, le héros déguisé reste à l'écran : aucun pixel de 99.ALG (feuille « de dos » rechargée) dans sa zone", () => {
+      const w = ready();
+      w.takeItem(Item.Wig);
+      const at = heroPoint(w);
+      w.player.click(at.x, at.y);
+      w.until(() => w.host.sounds.includes("i30.als"));
+      const fullPalette = w.engine.gfx.palette.shown.slice();
+      // Le fondu commence : la palette affichée s'éloigne de celle du jeu.
+      w.until(() => w.engine.gfx.palette.shown.some((v, i) => v !== fullPalette[i]));
+      const { x, y } = w.state.hero;
+      const gfx = w.engine.gfx;
+      const dress = gfx.sheet("anh_dr.alg");
+      const plain = gfx.sheet(99);
+      // 99.ALG est bien la feuille de `back` à ce moment, et ses pixels de la zone diffèrent de ceux du déguisement.
+      expect(gfx.back.pixels).toEqual(plain.pixels);
+      let differing = 0;
+      for (let dy = 0; dy < 78; dy++) for (let dx = 0; dx < 45; dx++) if (plain.at(93 + dx, 1 + dy) !== dress.at(93 + dx, 1 + dy)) differing++;
+      expect(differing).toBeGreaterThan(100);
+      let fromPlain = 0;
+      let frames = 0;
+      for (let i = 0; i < 10 && w.engine.gfx.palette.shown.some((v) => v !== 0); i++, w.wait(8)) {
+        const screen = repaint(w).screen;
+        frames++;
+        for (let dy = 0; dy < 78; dy++) {
+          for (let dx = 0; dx < 45; dx++) {
+            const p = plain.at(93 + dx, 1 + dy);
+            if (p !== 255 && p !== dress.at(93 + dx, 1 + dy) && screen.at(x + dx, y + dy) === p) fromPlain++;
+          }
+        }
+      }
+      expect(frames).toBeGreaterThan(3);
+      expect(fromPlain).toBe(0);
     });
 
     it("Échap saute la métamorphose, la suite est la même", () => {

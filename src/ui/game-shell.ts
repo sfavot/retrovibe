@@ -31,7 +31,8 @@ export interface GameShellOptions {
   logicalWidth: number;
   logicalHeight: number;
   /**
-   * `integer` : le shell dimensionne le canvas à l'échelle entière la plus grande qui tient (fractionnaire en dessous de 1).
+   * `integer` : le shell dimensionne le canvas à l'échelle entière la plus grande qui tient quand elle vaut au moins 2 ;
+   *   en dessous, l'échelle est fractionnaire (l'écran remplit la place plutôt que de rester à 1×).
    *   Sur écran tactile, l'échelle devient fractionnaire : sur un téléphone, l'échelle entière laisserait l'écran à 1×.
    * `fractional` : le shell dimensionne le canvas à la plus grande échelle qui tient, même fractionnaire (écrans déjà grands,
    *   comme le 640×480 de Mathémagique, qu'une échelle entière laisserait à 1 sur la plupart des fenêtres).
@@ -94,9 +95,12 @@ export interface GameShell {
 /** Marge sous l'écran (en plus de ce que la page occupe déjà autour). */
 export const BOTTOM_MARGIN = 16;
 
+/** Échelle entière minimale : en dessous, l'échelle entière laisserait l'écran minuscule (1× dans une fenêtre qui en permettrait presque 2×). */
+export const MIN_INTEGER_SCALE = 2;
+
 /**
- * Échelle la plus grande qui tient dans la place disponible : entière (fractionnaire seulement en dessous de 1), ou
- * fractionnaire partout avec `integer = false`.
+ * Échelle la plus grande qui tient dans la place disponible : entière à partir de 2× (pixels nets et réguliers), fractionnaire
+ * en dessous (l'écran remplit la place au lieu de rester à 1× ou de rapetisser), ou fractionnaire partout avec `integer = false`.
  */
 export function fitScale(
   availableWidth: number,
@@ -106,7 +110,7 @@ export function fitScale(
   integer = true,
 ): number {
   const fit = Math.min(availableWidth / logicalWidth, availableHeight / logicalHeight);
-  return integer && fit >= 1 ? Math.floor(fit) : Math.max(fit, 0.1);
+  return integer && fit >= MIN_INTEGER_SCALE ? Math.floor(fit) : Math.max(fit, 0.1);
 }
 
 /** Mesures de la page utiles au calcul de l'échelle (pixels CSS). */

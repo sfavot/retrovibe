@@ -2,16 +2,22 @@ import { describe, expect, it } from "vitest";
 import { asideWidth, canvasMayTakeFocus, contentHeight, failureMessage, fitScale, shellScale } from "../../src/ui/game-shell";
 import { MissingFilesError } from "../../src/ui/files";
 
-describe("fitScale (échelle entière du canvas)", () => {
+describe("fitScale (échelle du canvas : entière dès 2×, sinon fractionnaire)", () => {
   it("prend la plus grande échelle entière qui tient", () => {
     expect(fitScale(1300, 1000, 640, 480)).toBe(2);
-    expect(fitScale(700, 500, 640, 480)).toBe(1);
     expect(fitScale(1000, 1000, 320, 200)).toBe(3);
+    expect(fitScale(640, 400, 320, 200)).toBe(2);
   });
 
   it("est limitée par la dimension la plus étroite", () => {
     expect(fitScale(3000, 400, 320, 200)).toBe(2);
     expect(fitScale(640, 3000, 320, 200)).toBe(2);
+  });
+
+  it("devient fractionnaire sous 2× : l'écran remplit la place au lieu de rester à 1×", () => {
+    expect(fitScale(700, 500, 640, 480)).toBeCloseTo(1.0417);
+    expect(fitScale(600, 1000, 320, 200)).toBeCloseTo(1.875);
+    expect(fitScale(639.9, 1000, 320, 200)).toBeCloseTo(1.9997, 3);
   });
 
   it("devient fractionnaire sous 1, jamais nulle", () => {
@@ -34,12 +40,12 @@ describe("shellScale (mesures de la page -> échelle)", () => {
   });
 
   it("le message de chargement encore affiché (60 px de plus autour de l'écran) ferait tomber à 1× : il doit être masqué avant la mesure", () => {
-    expect(shellScale({ ...base, mainHeight: base.mainHeight + 60 }, 320, 200)).toBe(1);
+    expect(shellScale({ ...base, mainHeight: base.mainHeight + 60 }, 320, 200)).toBeLessThan(2);
   });
 
   it("une barre tactile sous l'écran réduit la place disponible", () => {
     expect(shellScale({ ...base, mainHeight: 240 + 160, viewportHeight: 800 }, 320, 200)).toBe(2);
-    expect(shellScale({ ...base, mainHeight: 240 + 160 }, 320, 200)).toBe(1);
+    expect(shellScale({ ...base, mainHeight: 240 + 160 }, 320, 200)).toBeCloseTo(1.32);
   });
 
   it("fractionnaire sur demande", () => {

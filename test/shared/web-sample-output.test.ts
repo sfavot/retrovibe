@@ -124,6 +124,87 @@ describe("WebSampleOutput", () => {
     expect(output.activeCount).toBe(0);
   });
 
+  it("passes : un nombre fini de passes, une durée multipliée, une lecture bornée", async () => {
+    const { clock, ctx, output } = setup();
+    output.unlock();
+    await flush();
+    const voice = output.play(SECOND, { passes: 3 });
+    expect(voice.duration).toBe(1);
+    expect(ctx.sources[0].loop).toBe(true);
+    expect(ctx.sources[0].startArgs).toEqual([0, 0, 3]);
+    clock.advance(2999);
+    expect(voice.playing).toBe(true);
+    clock.advance(1);
+    expect(voice.playing).toBe(false);
+    const once = output.play(SECOND, { passes: 1 });
+    expect(ctx.sources[1].loop).toBe(false);
+    expect(ctx.sources[1].startArgs).toEqual([]);
+    expect(once.playing).toBe(true);
+    output.play(SECOND, { passes: Infinity });
+    expect(ctx.sources[2].loop).toBe(true);
+    expect(ctx.sources[2].startArgs).toEqual([]);
+  });
+
+  it("stop(fondu) : la source passe par un gain qui descend à 0, la voix s'achève avec le fondu", async () => {
+    const { clock, ctx, output } = setup();
+    output.unlock();
+    await flush();
+    ctx.currentTime = 10;
+    const voice = output.play(SECOND, { loop: true });
+    voice.stop(0.5);
+    const fade = ctx.gains[1];
+    expect(fade.ramps).toEqual([{ value: 0, at: 10.5 }]);
+    expect(ctx.sources[0].stopAt).toBe(10.5);
+    expect(ctx.sources[0].stopped).toBe(true);
+    expect(voice.playing).toBe(true);
+    clock.advance(499);
+    expect(voice.playing).toBe(true);
+    clock.advance(1);
+    expect(voice.playing).toBe(false);
+    voice.stop(0.5); // sans effet : un seul fondu
+    expect(ctx.gains).toHaveLength(2);
+  });
+
+  it("stop(fondu) puis stop() coupe net ; sans source, stop(fondu) arrête simplement la voix", () => {
+    const { ctx, output } = setup();
+    const silent = output.play(SECOND);
+    silent.stop(1);
+    expect(silent.playing).toBe(false);
+    output.unlock();
+    ctx.state = "running";
+    const voice = output.play(SECOND, { loop: true });
+    voice.stop(1);
+    voice.stop();
+    expect(voice.playing).toBe(false);
+    expect(output.activeCount).toBe(0);
+  });
+
+  it("onContext reçoit le contexte et le gain général une fois ; connection() les rend sans geste", () => {
+    const ctx = new FakeAudioContext();
+    const seen: unknown[][] = [];
+    const output = new WebSampleOutput({
+      now: () => 0,
+      createContext: () => ctx.asContext(),
+      onContext: (c, master) => seen.push([c, master]),
+    });
+    expect(seen).toHaveLength(0);
+    const first = output.connection();
+    expect(ctx.state).toBe("suspended");
+    expect(first.master).toBe(ctx.gains[0]);
+    output.unlock();
+    output.connection();
+    expect(seen).toEqual([[ctx, ctx.gains[0]]]);
+  });
+
+  it("un contexte créé pendant la suspension de l'onglet est suspendu aussi", async () => {
+    const ctx = new FakeAudioContext(false); // déjà autorisé : démarre running
+    const output = new WebSampleOutput({ now: () => 0, createContext: () => ctx.asContext() });
+    output.suspend();
+    output.connection();
+    await flush();
+    expect(ctx.state).toBe("suspended");
+  });
+
   it("close() libère le contexte", async () => {
     const { ctx, output } = setup();
     output.unlock();

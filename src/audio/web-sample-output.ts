@@ -1,8 +1,11 @@
 import { MIN_BUFFER_RATE, createMonoBuffer } from "./pcm";
 
 /**
- * Sortie d'échantillons PCM via Web Audio, commune aux jeux (extraite de `WebAudioSoundBackend` de Lost in Time ; les autres
- * jeux ont chacun leur variante de `createBufferSource`, voir `docs/drascula/plan.md`, E3). Aucun jeu n'est encore migré.
+ * Sortie d'échantillons PCM via Web Audio, commune aux jeux (extraite de `WebAudioSoundBackend` de Lost in Time). Utilisée par
+ * Drascula, Flight of the Amazon Queen et Lost in Time (`playSample`). Les autres jeux gardent leur sortie propre : leur besoin n'est
+ * pas le même (Téléportaschtroumpf : position et fin de lecture lues sur l'horloge réelle du contexte pour synchroniser les vidéos ;
+ * SWIV 3D : gain, panoramique et vitesse changés pendant la lecture, rappel de fin ; Mathémagique et Zoombinis : deux contextes, reprise
+ * des interruptions iOS, diagnostic ; Indiana Jones : WAV stéréo décodés par le navigateur, sans mute ni pause).
  *
  * - Le contexte n'est créé qu'à `unlock()` (à appeler dans un geste de l'utilisateur). Avant cela, ou tant qu'un contexte
  *   reste bloqué par la politique d'autoplay, `play` ne produit aucun son.
@@ -14,8 +17,8 @@ import { MIN_BUFFER_RATE, createMonoBuffer } from "./pcm";
  *
  * `decode` (voix compressées de Flight of the Amazon Queen) est la seule entrée d'octets compressés.
  *
- * Écart avec Lost in Time : pas de file de lecture (`queuePcm`) ni de musique AdLib, qui restent propres à ce jeu ; pas de
- * rappel de fin (les moteurs interrogent `playing`), pour que la fin reste celle de l'horloge du jeu.
+ * Lost in Time garde sa file de lecture planifiée (`queuePcm`) et sa musique AdLib, qu'il branche sur le même contexte et le même
+ * gain général (`onContext`, `connection()`) ; pas de rappel de fin (les moteurs interrogent `playing`), pour que la fin reste celle de l'horloge du jeu.
  */
 
 /** Échantillons mono flottants dans [-1, 1[ (voir `pcm.ts` pour convertir un PCM 8 ou 16 bits). */
@@ -26,8 +29,10 @@ export interface Sample {
 }
 
 export interface PlayOptions {
-  /** Joue en boucle jusqu'à `stop()`. */
+  /** Joue en boucle jusqu'à `stop()` (équivaut à `passes: Infinity`). */
   loop?: boolean;
+  /** Nombre total de passes (1 par défaut) ; `Infinity` : en boucle. Ignoré si `loop` est vrai. */
+  passes?: number;
 }
 
 /** Lecture d'un échantillon. */
@@ -36,7 +41,11 @@ export interface SampleVoice {
   readonly playing: boolean;
   /** Durée d'une passe, en secondes. */
   readonly duration: number;
-  stop(): void;
+  /**
+   * Arrête la voix. Avec `fadeSeconds` > 0, le volume de la voix descend à 0 en autant de secondes puis elle s'arrête : elle ne
+   * compte plus comme « en cours » que pendant ce fondu.
+   */
+  stop(fadeSeconds?: number): void;
 }
 
 export interface WebSampleOutputOptions {
@@ -44,16 +53,20 @@ export interface WebSampleOutputOptions {
   now(): number;
   /** Crée le contexte (par défaut `new AudioContext()`) ; point d'injection des tests. */
   createContext?: () => AudioContext;
+  /** Appelé une fois, à la création du contexte, avec son gain général : pour y brancher une autre source (musique, file de lecture). */
+  onContext?: (ctx: AudioContext, master: GainNode) => void;
 }
 
 class Voice implements SampleVoice {
   stopped = false;
   source: AudioBufferSourceNode | null = null;
+  /** Gain du fondu, créé à l'arrêt progressif. */
+  fade: GainNode | null = null;
 
   constructor(
     private readonly output: WebSampleOutput,
     readonly duration: number,
-    readonly loop: boolean,
+    public loop: boolean,
     /** Fin logique, sur l'horloge de l'hôte (ms) ; décalée par les suspensions. */
     public endAt: number,
   ) {}
@@ -62,8 +75,9 @@ class Voice implements SampleVoice {
     return !this.stopped && (this.loop || this.output.clockNow() < this.endAt);
   }
 
-  stop(): void {
-    this.output.release(this);
+  stop(fadeSeconds = 0): void {
+    if (fadeSeconds > 0) this.output.fadeOut(this, fadeSeconds);
+    else this.output.release(this);
   }
 }
 
@@ -89,8 +103,20 @@ export class WebSampleOutput {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.mutedFlag ? 0 : 1;
       this.master.connect(this.ctx.destination);
+      this.options.onContext?.(this.ctx, this.master);
+      // Créé pendant une suspension (onglet masqué) : un contexte déjà `running` doit être figé aussi.
+      if (this.suspendedAt !== null) {
+        const ctx = this.ctx;
+        void this.enqueue(() => (ctx.state === "running" ? ctx.suspend() : undefined));
+      }
     }
     return this.ctx;
+  }
+
+  /** Contexte et gain général (créés au besoin, restent suspendus jusqu'à `unlock()`), pour brancher une autre source sur la même sortie. */
+  connection(): { ctx: AudioContext; master: GainNode } {
+    const ctx = this.ensure();
+    return { ctx, master: this.master! };
   }
 
   /**
@@ -173,8 +199,9 @@ export class WebSampleOutput {
   /** Joue un échantillon (en plus de ceux en cours : le remplacement d'une voix est l'affaire de l'appelant). */
   play(sample: Sample, options: PlayOptions = {}): SampleVoice {
     const duration = sample.data.length / Math.max(MIN_BUFFER_RATE, sample.rate);
-    const loop = options.loop ?? false;
-    const voice = new Voice(this, duration, loop, this.clockNow() + duration * 1000);
+    const passes = options.loop ? Infinity : Math.max(1, options.passes ?? 1);
+    const loop = passes === Infinity;
+    const voice = new Voice(this, duration, loop, this.clockNow() + duration * passes * 1000);
     if (sample.data.length === 0) {
       voice.stopped = true;
       return voice;
@@ -185,13 +212,15 @@ export class WebSampleOutput {
     if (ctx && this.master && this.live) {
       const source = ctx.createBufferSource();
       source.buffer = this.buffer(ctx, sample);
-      source.loop = loop;
+      source.loop = passes > 1;
       source.connect(this.master);
       source.onended = () => {
         source.disconnect();
+        voice.fade?.disconnect();
         if (voice.source === source) voice.source = null;
       };
-      source.start();
+      if (passes === Infinity || passes === 1) source.start();
+      else source.start(0, 0, source.buffer.duration * passes);
       voice.source = source;
     }
     return voice;
@@ -211,6 +240,28 @@ export class WebSampleOutput {
       // déjà arrêtée
     }
     source.disconnect();
+    voice.fade?.disconnect();
+  }
+
+  /** Arrêt progressif : la source passe par un gain qui descend à 0, et la voix s'achève avec le fondu. */
+  fadeOut(voice: Voice, seconds: number): void {
+    const source = voice.source;
+    const ctx = this.ctx;
+    if (!source || !ctx || !this.master || voice.fade || voice.stopped) {
+      if (!voice.fade) this.release(voice);
+      return;
+    }
+    const fade = ctx.createGain();
+    const end = ctx.currentTime + seconds;
+    fade.gain.setValueAtTime(fade.gain.value, ctx.currentTime);
+    fade.gain.linearRampToValueAtTime(0, end);
+    source.disconnect();
+    source.connect(fade);
+    fade.connect(this.master);
+    source.stop(end);
+    voice.fade = fade;
+    voice.loop = false;
+    voice.endAt = Math.min(voice.endAt, this.clockNow() + seconds * 1000);
   }
 
   /** Voix encore en cours (les voix finies sont oubliées au passage). */

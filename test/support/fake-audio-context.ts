@@ -3,26 +3,40 @@ export class FakeSource {
   buffer: { duration: number; sampleRate: number; length: number } | null = null;
   loop = false;
   started = false;
+  /** Arguments de `start()` (`[]` : lecture simple) et de `stop()`. */
+  startArgs: number[] = [];
+  stopAt: number | undefined;
   stopped = false;
   onended: (() => void) | null = null;
   connect(): void {}
   disconnect(): void {}
-  start(): void {
+  start(...args: number[]): void {
     this.started = true;
+    this.startArgs = args;
   }
-  stop(): void {
+  stop(at?: number): void {
     this.stopped = true;
+    this.stopAt = at;
   }
 }
 
 export class FakeGain {
-  gain = { value: 1 };
+  readonly ramps: { value: number; at: number }[] = [];
+  gain = {
+    value: 1,
+    setValueAtTime: (): void => {},
+    linearRampToValueAtTime: (value: number, at: number): void => {
+      this.ramps.push({ value, at });
+    },
+  };
   connect(): void {}
+  disconnect(): void {}
 }
 
 export class FakeAudioContext {
   state: "suspended" | "running" | "closed";
   readonly destination = {};
+  currentTime = 0;
   readonly sources: FakeSource[] = [];
   readonly gains: FakeGain[] = [];
   resumes = 0;

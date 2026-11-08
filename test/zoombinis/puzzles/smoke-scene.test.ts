@@ -5,7 +5,7 @@ import { DIALOG } from "../../../src/games/zoombinis/engine/dialog";
 import { createZoombinisEngine } from "../../../src/games/zoombinis/engine/engine";
 import { FEATURES } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
-import { installServices } from "../../../src/games/zoombinis/engine/services";
+import { GRAPHICS, installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
 import { ZOOMBINIS_TEXT } from "../../../src/games/zoombinis/engine/text";
 import { isFinished, robotPlan, transform, type SmokeState } from "../../../src/games/zoombinis/game/puzzles/smoke";
@@ -20,6 +20,7 @@ import {
   type SmokeProbe,
   type SmokeScene,
 } from "../../../src/games/zoombinis/scenes/puzzles/smoke";
+import { BUTTON_GO, BUTTON_MAP } from "../../../src/games/zoombinis/scenes/puzzle-kit";
 import { originalFiles } from "../../support/original";
 import { runFor, TestHost } from "../engine-test-host";
 
@@ -224,6 +225,19 @@ describe.skipIf(!original.has)("cristal : écran sur les vrais fichiers (SMOKE.M
       expect(state().current).toBe(0);
       expect(probe().crystalAt(1)).not.toBeNull();
       expect(probe().secondTarget).toEqual(level === 4 ? { x: 616, y: 253 } : null);
+    }
+  });
+
+  it.each([1, 2, 3, 4] as const)("niveau %i : les boutons carte et « go » sont dessinés devant l'avant-plan (SCRB 11077) (bug 33)", async (level) => {
+    const { wait, features, engine } = await start(level, 16);
+    await wait(300);
+    const { screen } = engine.services.get(GRAPHICS);
+    const background = (features as unknown as { background: { pixels: Uint8Array } }).background.pixels;
+    for (const rect of [BUTTON_MAP, BUTTON_GO]) {
+      let drawn = 0;
+      for (let y = rect.top; y < rect.bottom; y++) for (let x = rect.left; x < rect.right; x++) if (screen.pixels[y * 640 + x] !== background[y * 640 + x]) drawn++;
+      // L'image d'un bouton couvre l'essentiel de son rectangle (39 × 37).
+      expect(drawn, JSON.stringify(rect)).toBeGreaterThan(900);
     }
   });
 

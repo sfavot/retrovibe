@@ -90,6 +90,11 @@ export const DEFAULT_RADIUS = 15;
 export const CARRY_DELAY = 3;
 /** Profondeur d'un Zoombini transporté (l'original le met devant tout : id `0xfffd`). */
 export const CARRY_DEPTH = 1000;
+/**
+ * Profondeur par défaut des images des boutons : devant tout le décor et les Zoombinis (les boutons de l'original portent `0x1000` et passent devant tout),
+ * derrière un objet porté (`CARRY_DEPTH`). Une profondeur de 0 les cachait derrière un avant-plan (cristal : `SCRB` 11077, bug 33).
+ */
+export const BUTTONS_DEPTH = 100;
 /** Script d'animation de transport : `145 + pieds` (état 5, `146…150`). */
 export const CARRY_SCRIPT_BASE = 145;
 /** Variante d'attente posée par l'état 4 quand le Zoombini est « téléporté » sur sa destination. */
@@ -356,7 +361,7 @@ export interface PuzzleKitSpec {
   introVoice?: number;
   /** F1 est-elle prise en ce moment ? Défaut : toujours. Aux gorges (`10c0:0d20`) : épreuve active et plus personne en marche (`DS:9702 ≤ 0`). */
   helpAllowed?: () => boolean;
-  /** Boutons : `null` = absent. Défaut : la carte (`BUTTON_MAP`) ; le « go » n'existe que si l'épreuve le donne. `depth` : profondeur des images dessinées par le kit. */
+  /** Boutons : `null` = absent. Défaut : la carte (`BUTTON_MAP`) ; le « go » n'existe que si l'épreuve le donne. `depth` : profondeur des images dessinées par le kit (défaut `BUTTONS_DEPTH`, devant tout le décor). */
   buttons?: { map?: KitButtonSpec | null; go?: KitButtonSpec | null; depth?: number };
   /** Marche de sortie de `pressGo` (`1168:2982(écart, y, x)`) : point hors écran et écart entre départs (45). */
   exitWalk?: { x: number; y: number; step?: number };
@@ -801,7 +806,7 @@ export class PuzzleKit {
     this.features.create({
       script: 0,
       delay: 0,
-      depth: this.spec.buttons?.depth ?? 0,
+      depth: this.spec.buttons?.depth ?? BUTTONS_DEPTH,
       // Les boutons restent devant tout quand l'écran trie son décor (`0x1000` des boutons de l'original).
       flags: FeatureFlag.overlay,
       onAfterDraw: (_feature, screen) => {

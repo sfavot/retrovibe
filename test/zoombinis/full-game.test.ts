@@ -4,6 +4,7 @@ import { DIALOG } from "../../src/games/zoombinis/engine/dialog";
 import { resumeScreen } from "../../src/games/zoombinis/game/route";
 import { correctEntrances, type Entrance } from "../../src/games/zoombinis/game/puzzles/tunnels";
 import { resetTunnelsVisits, type TunnelsScene } from "../../src/games/zoombinis/scenes/puzzles/tunnels";
+import { BUTTON_GO, BUTTON_MAP } from "../../src/games/zoombinis/scenes/puzzle-kit";
 import { originalFiles } from "../support/original";
 import { boot, CAMP_EXITS, dragMember, leaveCamp, MIDDLE_STAGE, nameOf, pickGroup, PATH_SCREENS, playAdventure, playTunnels, puzzle, reach, screenIs, tick, until } from "./full-game-robot";
 
@@ -16,8 +17,29 @@ const S = ScreenId;
 describe.skipIf(!original.has)("partie complète à travers les vrais écrans", () => {
   it.each(["A", "B"] as const)("chemin %s : de la partie neuve à Zoombiniville avec les 16 Zoombinis, monuments et marques de réussite", async (path) => {
     const r = await boot();
+    // Boutons carte et « go » dessinés dans chaque épreuve (bug 33 : cachés derrière l'avant-plan du cristal) : pixels changés dans leur rectangle.
+    const buttonPixels = new Map<number, [number, number]>();
+    r.engine.addTickHook((c) => {
+      const id = c.scenes.currentId as number;
+      if (id < S.bridge || id > S.maze2) return;
+      const background = (r.services.features as unknown as { background: { pixels: Uint8Array } | null }).background?.pixels;
+      if (!background) return;
+      const { pixels } = r.services.graphics.screen;
+      const counts = [BUTTON_MAP, BUTTON_GO].map((rect) => {
+        let n = 0;
+        for (let y = rect.top; y < rect.bottom; y++) for (let x = rect.left; x < rect.right; x++) if (pixels[y * 640 + x] !== background[y * 640 + x]) n++;
+        return n;
+      });
+      const best = buttonPixels.get(id) ?? [0, 0];
+      buttonPixels.set(id, [Math.max(best[0], counts[0]!), Math.max(best[1], counts[1]!)]);
+    });
     await playAdventure(r, path);
     const { game } = r.zb;
+    for (const screen of PATH_SCREENS[path].filter((id) => id >= S.bridge && id <= S.maze2)) {
+      const [map, go] = buttonPixels.get(screen) ?? [0, 0];
+      expect(map, `${nameOf(screen)} : bouton carte`).toBeGreaterThan(500);
+      expect(go, `${nameOf(screen)} : bouton « go »`).toBeGreaterThan(500);
+    }
 
     // Écrans traversés dans l'ordre du parcours (les transitions sont coupées, aucun écran de transfert).
     expect(r.visited.map(nameOf)).toEqual(PATH_SCREENS[path].map(nameOf));

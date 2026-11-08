@@ -7,12 +7,15 @@
  *    `REGS` 10000 / 10001), plages de `SCRB` 11000, 14000 à 14004 et 10000 à 10166 (`10f8:0000`) ;
  *  - l'étang de 12 × 12 nénuphars dessiné d'après l'état : image `B + 1` de `tBMP` 13000 puis le motif (`10f8:4f53`, `4d54`), halo des nénuphars choisis (`51c3`, `54b9`) ;
  *  - 12 crapauds sur la berge gauche (`SCRB 10043 + rangée`), tatoués d'après `DS:14b6` (image du tatouage = 79 + t, 67 + t, 91 + t, 103 + t selon le cap : `10f0:0ac1`) ;
- *  - la file de jetons des Zoombinis (`SCRB 10109 + i`, ceux de l'entrée du niveau 1 : `10089 + i`) : la variante du jeton est les cheveux − 1 (`10f8:3ea3`) ;
+ *  - la file de jetons des Zoombinis (`SCRB 10109 + i`, ceux de l'entrée du niveau 1 : `10089 + i`) : la variante du jeton est les cheveux − 1 (`10f8:3ea3`) ; au dépôt le
+ *    jeton rejoue `10109 + i` (il quitte sa place) puis marche ;
  *  - le glisser-déposer d'un crapaud sur un nénuphar de la première colonne (`10f8:6cdf`, `1b3a`) : la zone survolée est éclairée si le dépôt est valide ; le jeton marche
  *    jusqu'au crapaud (`10019 + rangée`, événement 26), le crapaud se tend (`10000`, événement 20) puis saute de nénuphar en nénuphar (`10001` à `10004`, événement 10 :
  *    prochain pas 30 ticks plus tard, `10f8:20bc`), arrive à la berge droite (`10031 + rangée`, événement 30 : `arrive`), le Zoombini y marche (`10129 + rangée`) ;
- *  - la sortie du crapaud : première traversée `10057`, scène de la berge (`10060` à `10065`), retour `10058` puis repos ; deuxième traversée `10059` puis le crapaud disparaît
- *    (un crapaud ne fait que deux traversées) ;
+ *  - la sortie du crapaud : première traversée `10057` (bonds jusqu'au haut de la berge droite), scène de la berge le long du haut (`10060` à `10065`), retour `10058`
+ *    (bonds jusqu'à sa place de repos) ; deuxième traversée `10059` (bonds jusqu'au bas de l'étang) puis le crapaud disparaît (deux traversées au plus) ; chaque script
+ *    repart de la position où le précédent s'arrête (événements 30, 44, 60) et les rappels d'image recalent sauts et bonds (`Motion`) ;
+ *  - le Zoombini arrivé : `10129 + rangée` puis sa place d'attente `10141 + i` au bord droit ;
  *  - la fée (niveaux 2 à 4) : baguette-jauge `SCRB 10078 + g` qu'on prend et qui choisit deux nénuphars libres de l'étang, échange après une courte animation de halo, sons
  *    12000 à 12003 ; la fée de la berge `SCRB 11000` se pose à l'entrée ;
  *  - les grenouilles (niveaux 3 et 4) : création toutes les 480 ticks (la première à 600), sauts `10071` / `10077` / `10073` / `10075`, sortie `10069` ;
@@ -27,7 +30,7 @@ import type { Archive } from "../../../../engine/mohawk/resources";
 import type { Shape } from "../../../../data/mohawk/shap";
 import type { Point } from "../../data/zoombini";
 import { DIALOG } from "../../engine/dialog";
-import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeaturePart } from "../../engine/features";
+import { FEATURES, FeatureFlag, type Feature, type FeaturePart } from "../../engine/features";
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import { regs } from "../../engine/resources";
 import { ScreenId, type Scene, type SceneContext } from "../../engine/scene";
@@ -98,6 +101,7 @@ const TOKEN_WALK = 10019;
 const TOKEN_ENTRY = 10089;
 const TOKEN_QUEUE = 10109;
 const TOKEN_LANDING = 10129;
+const TOKEN_WAIT = 10141;
 const FROG_ARRIVAL = 10067;
 const FROG_EXIT = 10069;
 /** Sauts des grenouilles par cap (haut, droite, bas, gauche) : `10f0:1207` (`274f + 8`, `+ 0xe`, `+ 10`, `+ 0xc`). */
@@ -136,6 +140,10 @@ const DROP_ZONES: readonly (readonly [number, number, number, number])[] = [
   [91, 355, 125, 383],
   [88, 384, 120, 532],
 ];
+/** Cible fixe des bonds de la première sortie `10057` (`10f8:2ba3` : `0x257`, `0x37`, le haut de la berge droite où commence la scène de berge). */
+const EXIT_FIRST_TARGET: Point = { x: 0x257, y: 0x37 };
+/** Cible fixe des bonds de la deuxième sortie `10059` (`10f8:31d2` : `0x1e4`, `0x1c2`, le plongeon en bas de l'étang). */
+const EXIT_SECOND_TARGET: Point = { x: 0x1e4, y: 0x1c2 };
 /** Repos de la baguette-jauge (`10f8:0000`, `10f8:6cdf`). */
 const WAND_REST: Point = { x: 0x26, y: 0x19f };
 /** Étang de la fée (`DS2:2498`, `24a0`, `24a8`) : rectangle et deux bords obliques (`10f8:6cdf`). */
@@ -160,13 +168,25 @@ const REGRET_LAST = 20048;
 /** Une seule exécution du délai entre images : 6 ticks (décor), 7 (crapauds, `rand(3, 6)` en réalité), 8 (grenouilles : `rand(4, 7)`). */
 const FRAME_DELAY = 6;
 
-/** Profondeurs (les crapauds sont à `0.3 + rangée / 100`, celui qu'on tient à `CARRY_DEPTH` du kit). */
+/**
+ * Profondeurs. L'écran coupe le tri du moteur (`11a8:29c4(0)`, `10f8:0000`) : l'ordre est celui de la liste, chaque objet créé devant les précédents, puis
+ * déplacé « juste devant » un repère par `11a8:2a0a`. Ordre de création : étang, jetons, crapauds (`10f8:484e`), avant-plans `14000` à `14004`, baguette et fée, puis
+ * 12 repères invisibles `DS:7cb0[rangée]` (`SCRB 14000`, rappels vides `10f8:519f` / `51b1`). Un crapaud déposé (`10f8:1b3a`), à chaque pas (`10f8:0bd7`), et une
+ * grenouille (rangée d'arrivée pour un saut vers le bas) passent juste devant le repère de leur rangée : devant tous les avant-plans, la rangée la plus basse devant.
+ * Le crapaud qui revient (`10058`) passe juste devant `14001` (`DS:7c9e`), le Zoombini arrivé juste devant `14003` (`DS:7ca2`, `10f8:3c03`). Le crapaud tenu est à
+ * `CARRY_DEPTH` du kit.
+ */
 const DEPTH_POND = 0.1;
+const DEPTH_TOKEN = 0.2;
 const DEPTH_TOAD = 0.3;
-const DEPTH_FROG = 0.5;
-const DEPTH_TOKEN = 0.6;
-const DEPTH_FAIRY = 0.65;
-const DEPTH_FOREGROUND = 0.9;
+const DEPTH_FOREGROUND = 0.7;
+/** Juste devant `14001` (`10f8:0bd7`, file `DS2:0438`). */
+const DEPTH_RETURN = 0.715;
+/** Juste devant `14003` (`10f8:3c03`). */
+const DEPTH_LANDED = 0.735;
+const DEPTH_FAIRY = 0.76;
+/** Juste devant le repère `DS:7cb0[rangée]` : `DEPTH_ON_POND + rangée / 100`. */
+const DEPTH_ON_POND = 0.8;
 const DEPTH_BUTTONS = 0.95;
 
 /** Drapeaux de création : première image seule, position relative ; lecture complète ensuite par `setScript`. */
@@ -178,6 +198,44 @@ const KIND_BASE: Readonly<Record<number, number>> = { 1: 0, 2: 3, 3: 7 };
 /** Numéro du tatouage `(kind, value)` (image `272 + t`). */
 function tattooOf(kind: number, value: number): number {
   return (KIND_BASE[kind] ?? 0) + value;
+}
+
+/** Applique le recalage `motion` aux parties de l'image `image` d'un script (coordonnées d'écran avant la soustraction des ancres `REGS`). */
+function applyMotion(motion: Motion, image: number, parts: FeaturePart[]): void {
+  const all = (x: number | null, y: number | null): void => {
+    for (const part of parts) {
+      if (x !== null) part.x = x;
+      if (y !== null) part.y = y;
+    }
+  };
+  // Division entière de l'original (`idiv`, vers zéro).
+  const between = (from: number, to: number, n: number): number => from + Math.trunc((to - from) / n);
+  const { from, to } = motion;
+  switch (motion.kind) {
+    case "jump":
+      // `10f8:20bc` : événement 12 (image 2) au milieu, 13 et 14 (images 3 à 6) sur l'abscisse d'arrivée.
+      if (image === 2) {
+        if (motion.horizontal) all(between(from.x, to.x, 2), null);
+        else all(null, between(from.y, to.y, 2));
+      } else if (image >= 3 && image <= 6) all(to.x, null);
+      return;
+    case "hop": {
+      // `10f8:2ba3` / `373e` / `31d2` : pas = (cible − départ) / 3 ; image 3 un pas, image 4 deux, puis la cible.
+      if (image < 3) return;
+      if (image >= 5) return all(to.x, to.y);
+      const k = image - 2;
+      all(from.x + k * Math.trunc((to.x - from.x) / 3), from.y + k * Math.trunc((to.y - from.y) / 3));
+      return;
+    }
+    case "frog": {
+      // `10f8:267b` : toutes les parties sur la première, image 2 au milieu, images 6 et 7 sur la case d'arrivée.
+      const first = parts[0];
+      if (image === 2) all(between(from.x, to.x, 2), between(from.y, to.y, 2));
+      else if (image >= 6) all(to.x, to.y);
+      else if (first) all(first.x, first.y);
+      return;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -198,6 +256,19 @@ type ToadPhase =
   /** Sorti pour de bon (deuxième traversée). */
   | "gone";
 
+/**
+ * Recalage des images d'un script par le rappel d'image de l'original (les scripts sont dessinés pour une seule case ou une seule rangée) :
+ *  - `jump` : saut d'une case (`10f8:20bc`, événements 12 à 14 de `10001` à `10004`) : image 2 au milieu du saut (x pour un saut horizontal, y pour un vertical),
+ *    images 3 à 6 sur l'abscisse de la case d'arrivée ;
+ *  - `hop` : bonds vers un point fixe (`10f8:2ba3` pour `10057`, `373e` pour `10058`, `31d2` pour `10059`) : images 0 à 2 telles quelles, images 3 et 4 au tiers
+ *    puis aux deux tiers du chemin depuis la position de départ, images 5 et suivantes sur la cible ;
+ *  - `frog` : saut de grenouille (`10f8:267b`) : toutes les parties sur la première, image 2 au milieu du saut, images 6 et 7 sur la case d'arrivée.
+ */
+type Motion =
+  | { kind: "jump"; horizontal: boolean; from: Point; to: Point }
+  | { kind: "hop"; from: Point; to: Point }
+  | { kind: "frog"; from: Point; to: Point };
+
 interface ToadView {
   toad: Toad;
   feature: Feature;
@@ -206,8 +277,10 @@ interface ToadView {
   nextAt: number;
   /** Variante du Zoombini porté (cheveux − 1). */
   rider: number;
-  /** Sortie en attente de son tour (un seul crapaud à la fois par file de sortie). */
-  waitingExit: boolean;
+  /** Recalage du script en cours (voir `Motion`). */
+  motion: Motion | null;
+  /** Profondeur au repos : `DEPTH_TOAD + index / 100` au départ, `DEPTH_RETURN` après un retour (`10058`). */
+  restDepth: number;
 }
 
 interface TokenView {
@@ -221,6 +294,8 @@ interface FrogView {
   feature: Feature;
   phase: "arriving" | "ready" | "hop" | "exit";
   nextAt: number;
+  /** Recalage du saut en cours (`10f8:267b`). */
+  motion: Motion | null;
 }
 
 /** Ce que l'écran laisse voir à l'extérieur (tests, outils de développement). Rempli à l'entrée. */
@@ -232,6 +307,8 @@ export interface LillyProbe {
   toads: ToadView[];
   frogs: FrogView[];
   tokens: TokenView[];
+  /** Zoombinis arrivés sur la berge droite (`10129 + rangée` puis l'attente `10141 + i`), dans l'ordre d'arrivée. */
+  bank: Feature[];
   /** Baguette-jauge (niveaux 2 à 4). */
   wand: Feature | null;
   /** Origine d'un nénuphar à l'écran. */
@@ -316,6 +393,9 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
   const rowX = regs(archive, ROW_ORIGINS.x);
   const rowY = regs(archive, ROW_ORIGINS.y);
   const origin = (col: number, row: number): Point => lilyOrigin(col, row, rowX, rowY);
+  /** Ancres de la planche 10000 (`REGS 10000` / `10001`), que les rappels de l'original ajoutent ou retirent eux-mêmes. */
+  const anchorX = regs(archive, 10000);
+  const anchorY = regs(archive, 10001);
 
   // Groupe de la scène : copie des présents du tampon (le kit ne crée que ceux-là).
   const party: Zoombini[] = game.group.members
@@ -345,8 +425,6 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
   let regretDone = false;
   const startedAt = ctx.clock.ticks;
   const hops: { toad: number; at: number }[] = [];
-  /** Files de sortie : un seul crapaud à la fois jouant `10057` (première traversée) et `10059` (deuxième) (`DS:7c6e`, `7c70`). */
-  const exitBusy = { first: false, second: false };
 
   // --- Voix d'accueil (`DS:a2c4`) ---
   const slot = dialogMemoryIndex(SCREEN);
@@ -383,34 +461,43 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
   const haloShown = (): boolean => haloRow !== null || picks.length > 0;
 
   // --- Avant-plans des berges (`SCRB 14000` à `14004`) ---
-  for (const script of FOREGROUNDS) {
-    features.create({ script, delay: FRAME_DELAY, depth: DEPTH_FOREGROUND, flags: FeatureFlag.still | FeatureFlag.firstImage });
-  }
+  FOREGROUNDS.forEach((script, i) => {
+    features.create({ script, delay: FRAME_DELAY, depth: DEPTH_FOREGROUND + i / 100, flags: FeatureFlag.still | FeatureFlag.firstImage });
+  });
 
   // --- Crapauds (`10f8:484e`) ---
   const toadViews: ToadView[] = [];
   const isRiderScript = (id: number): boolean => (id >= TOAD_STRETCH && id <= TOAD_STRETCH + 16) || (id >= TOAD_ARRIVAL && id < TOAD_ARRIVAL + 12);
+  const isBankScene = (id: number): boolean => id >= TOAD_SCENE && id < TOAD_SCENE + 6;
   for (const toad of state.toads) {
-    const view: ToadView = { toad, feature: undefined as unknown as Feature, phase: "rest", nextAt: 0, rider: 0, waitingExit: false };
+    const restDepth = DEPTH_TOAD + toad.index / 100;
+    const view: ToadView = { toad, feature: undefined as unknown as Feature, phase: "rest", nextAt: 0, rider: 0, motion: null, restDepth };
     view.feature = features.create({
       script: TOAD_REST + toad.index,
       delay: toad.frameDelay,
-      depth: DEPTH_TOAD + toad.index / 100,
+      depth: restDepth,
       position: REST_POSITIONS[toad.index],
       flags: STATIC_FLAGS,
-      // `10f0:0ac1` : le tatouage est la deuxième case (famille de cap + t), le Zoombini porté la troisième (+ cheveux − 1).
       onImage: (feature, parts: FeaturePart[]) => {
-        const tattoo = parts[1];
-        if (tattoo && tattoo.w >= 67 && tattoo.w <= 114) tattoo.w += toad.tattoo;
+        const second = parts[1];
+        if (isBankScene(feature.scriptId)) {
+          // Scènes de berge (`10f0:0fbc` pour les caractéristiques A et B, `10f0:0e41` pour C) : la deuxième case, quelle qu'elle soit, + t (C : + t − 7).
+          if (second) second.w += toad.kind === 3 ? toad.tattoo - KIND_BASE[3]! : toad.tattoo;
+          return parts;
+        }
+        // `10f0:0ac1`, `10f8:2ba3`, `373e`, `31d2` : le tatouage est la deuxième case (famille de cap + t), le Zoombini porté la troisième (+ cheveux − 1).
+        if (second && second.w >= 67 && second.w <= 114) second.w += toad.tattoo;
         const rider = parts[2];
         if (rider && isRiderScript(feature.scriptId)) rider.w += view.rider;
+        if (view.motion) applyMotion(view.motion, feature.image, parts);
         return parts;
       },
     });
     toadViews.push(view);
   }
 
-  // --- Jetons des Zoombinis (`10f8:0000`, `10f8:3ea3`) ---
+  // --- Jetons des Zoombinis (`10f8:0000`, `10f8:3ea3`) ; ceux qui sont arrivés sur la berge droite (`10f8:3c03`) ---
+  const bank: Feature[] = [];
   const tokens: TokenView[] = party.map((z, index) => ({ index, feature: null, variant: Math.max(0, z.attrs[0] - 1) }));
   const introTokens = level === 0 ? tokens.slice(-2) : [];
   for (const token of tokens) {
@@ -524,18 +611,15 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
     if (!drop(state, toad.index, row)) return false;
     view.phase = "setup";
     view.rider = tokens[toad.token]?.variant ?? 0;
-    // Le crapaud se pose sur le nénuphar de la première colonne (position de la case) et se met à sa profondeur de rangée.
-    features.restack(view.feature, DEPTH_TOAD + row / 100);
+    // Le crapaud se pose sur le nénuphar de la première colonne (position de la case) et passe juste devant le repère de sa rangée (`10f8:1b3a`).
+    features.restack(view.feature, DEPTH_ON_POND + row / 100);
+    view.motion = null;
     play(view.feature, TOAD_REST + toad.index, origin(0, row), null);
-    // Le jeton suivant de la file marche jusqu'à lui ; à son événement 26 il monte dessus (`10f0:1134`) et le crapaud se tend.
+    // Le jeton suivant quitte sa place de la file (`10109 + i`, `10f8:1b3a`) ; à son événement 2 il marche jusqu'au crapaud (`10019 + rangée`, file `DS2:04b6`).
     const token = tokens[toad.token];
     if (token?.feature) {
-      play(token.feature, TOKEN_WALK + row, null, (n) => {
-        if (n === 26) stretchToad(view, row);
-        else if (n === FEATURE_END) {
-          if (token.feature) features.destroy(token.feature);
-          token.feature = null;
-        }
+      play(token.feature, TOKEN_QUEUE + token.index, null, (n) => {
+        if (n === 2) walks.push({ token, view, row });
       });
     } else stretchToad(view, row);
     if (hasFairy(state) && state.fairy.gauge === FAIRY_GAUGE && state.launched === state.group) regret();
@@ -568,6 +652,8 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
 
   function stepToadView(view: ToadView): void {
     const { toad } = view;
+    // `10f8:0bd7` : avant le pas, le crapaud passe juste devant le repère de sa rangée (celle qu'il quitte).
+    features.restack(view.feature, DEPTH_ON_POND + toad.row / 100);
     const result = stepToad(state, toad);
     if (result.kind === "wait") {
       view.nextAt = now();
@@ -576,7 +662,9 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
     if (result.kind === "jump") {
       view.phase = "hop";
       hops.push({ toad: toad.index, at: now() });
-      play(view.feature, TOAD_JUMP + result.heading, origin(result.from.col, result.from.row), (n) => {
+      const from = origin(result.from.col, result.from.row);
+      view.motion = { kind: "jump", horizontal: result.heading % 2 === 1, from, to: origin(result.to.col, result.to.row) };
+      play(view.feature, TOAD_JUMP + result.heading, from, (n) => {
         if (n === 12) settleToad(state, toad);
         else if (n === 10) {
           // Fin du saut : le crapaud est posé, il attend 30 ticks avant le suivant (`10f8:20bc` cas 10).
@@ -588,115 +676,207 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
     }
     // Sortie vers la berge droite : l'arrivée est `SCRB 10031 + rangée`, son événement 30 sauve le Zoombini.
     view.phase = "arriving";
+    view.motion = null;
     play(view.feature, TOAD_ARRIVAL + result.row, origin(11, result.row), (n) => {
       if (n === 30) arrived(view, result.row);
     });
   }
 
+  /**
+   * Position de la première case telle qu'elle est dessinée (avant l'ancre), là où le script suivant doit commencer : c'est ce que font les événements 30
+   * (`10f8:3c03`) et 44 (`10f8:2f64`), sur une image vide, en rajoutant l'ancre à la première case du tampon (`+0x32 + REGS 10000[w]`).
+   */
+  function drawnFirst(feature: Feature): Point {
+    const part = feature.parts[0];
+    if (!part) return { x: feature.position.x, y: feature.position.y };
+    return { x: part.x + (anchorX[part.w] ?? 0), y: part.y + (anchorY[part.w] ?? 0) };
+  }
+
   /** Événement 30 (`10f8:3c03`) : le Zoombini est sauvé et marche sur la berge droite ; le crapaud part. */
   function arrived(view: ToadView, row: number): void {
-    const { toad } = view;
+    const { toad, feature } = view;
     const saved = toad.token;
     if (!arrive(state, toad)) return;
     syncGo();
-    // Le Zoombini débarque (`SCRB 10129 + rangée`) sur la berge droite.
-    const variant = tokens[saved]?.variant ?? 0;
-    const bank = features.create({
+    // Les scripts suivants partent de là où l'arrivée s'est arrêtée (`+0xd6` = `+0xda` = première case + ancre).
+    const at = drawnFirst(feature);
+    feature.position.x = at.x;
+    feature.position.y = at.y;
+    // Le Zoombini quitte le crapaud : la troisième case du tampon est vidée (`+0x3c = 0`).
+    if (feature.parts.length > 2) {
+      feature.parts = feature.parts.slice(0, 2);
+      feature.buffer[2]!.w = 0;
+      features.invalidate();
+    }
+    // Le jeton du Zoombini débarque (`SCRB 10129 + rangée`) sur la berge droite, juste devant `14003` ; à son événement 3 il attend (`10141 + i`).
+    const token = tokens[saved];
+    const variant = token?.variant ?? 0;
+    const landed = features.create({
       script: TOKEN_LANDING + row,
       delay: FRAME_DELAY,
-      depth: DEPTH_TOKEN,
+      depth: DEPTH_LANDED,
       flags: FeatureFlag.stopAtEnd | FeatureFlag.noReplay | FeatureFlag.firstImage,
       onImage: (_feature, parts: FeaturePart[]) => {
         if (parts[0]) parts[0].w += variant;
         return parts;
       },
     });
-    features.setScript(bank, TOKEN_LANDING + row);
+    landed.onEvent = (_image, n) => {
+      if (n === 3) waiting.push({ feature: landed, index: saved });
+    };
+    features.setScript(landed, TOKEN_LANDING + row);
+    bank.push(landed);
     if (state.arrivals === state.group) kit.playSuccessVoice();
     view.phase = "leaving";
-    view.waitingExit = true;
+    view.motion = null;
+    // `+0x10b` : première traversée -> file `DS2:03e4` (`10057`), deuxième -> `DS2:040e` (`10059`).
+    (toad.trips >= 2 ? exits.second : exits.first).push(view);
   }
 
-  /** Lance les sorties en attente : une par file (`DS:7c6e`, `7c70`). */
-  function startExits(): void {
-    for (const view of toadViews) {
-      if (!view.waitingExit) continue;
-      const second = view.toad.trips >= 2;
-      const key = second ? "second" : "first";
-      if (exitBusy[key]) continue;
-      exitBusy[key] = true;
-      view.waitingExit = false;
+  /**
+   * Files de l'original (`10f8:0bd7`), dépilées à chaque tour (la dernière entrée d'abord) ; chaque sortie n'a qu'un crapaud à la fois :
+   *  - `DS2:03e4` -> `10057` tant que `DS:7c6e` est libre ; l'événement 44 (`10f8:2f64`) libère la case d'abordage et met le crapaud dans `DS2:0462` ;
+   *  - `DS2:0462` -> la scène de berge (une des trois du kind) ; son événement 60 (`10f8:30ba`) libère `7c6e` et met le crapaud dans `DS2:0438` ;
+   *  - `DS2:0438` -> `10058` tant que `DS:7c6c` est libre ; l'événement 49 (`10f8:3b23`) le rend saisissable, et le tour suivant le pose au repos (`DS:7c68`) ;
+   *  - `DS2:040e` -> `10059` tant que `DS:7c70` est libre ; l'événement 54 (`10f8:3614`) libère la case d'abordage, le tour suivant détruit l'objet (`DS:7c72`) ;
+   *  - `DS2:04e0` -> l'attente du Zoombini arrivé (`10141 + i`, `i` = rang du jeton).
+   */
+  const exits = { first: [] as ToadView[], scene: [] as ToadView[], back: [] as ToadView[], second: [] as ToadView[] };
+  const busy = { first: null as ToadView | null, back: null as ToadView | null, second: null as ToadView | null };
+  let resting: ToadView | null = null;
+  let retiring: ToadView | null = null;
+  const waiting: { feature: Feature; index: number }[] = [];
+  const walks: { token: TokenView; view: ToadView; row: number }[] = [];
+
+  function runQueues(): void {
+    while (exits.first.length > 0 && !busy.first) {
+      const view = exits.first.pop()!;
+      busy.first = view;
       const row = view.toad.row;
-      const done = (): void => {
+      startHop(view, TOAD_EXIT_FIRST, EXIT_FIRST_TARGET, (n) => {
+        if (n !== 44) return;
         releaseLanding(state, row);
-        exitBusy[key] = false;
-      };
-      if (second) {
-        // Deuxième traversée : `10059`, puis l'objet est détruit (événement 54).
-        play(view.feature, TOAD_EXIT_SECOND, null, (n) => {
-          if (n !== 54) return;
-          done();
-          view.phase = "gone";
-          features.destroy(view.feature);
-        });
-      } else {
-        // Première traversée : `10057`, la scène de la berge (une des trois du kind, `10f8:0bd7`), puis `10058` ramène le crapaud au repos.
-        play(view.feature, TOAD_EXIT_FIRST, null, (n) => {
-          if (n === 44) done();
-          else if (n === FEATURE_END) {
-            const scene = TOAD_SCENE + 2 * rng.range(0, 2) + (view.toad.kind === 3 ? 1 : 0);
-            play(view.feature, scene, null, (m) => {
-              if (m === FEATURE_END) returnToad(view);
-            });
-          }
-        });
-      }
+        // `10f8:2f64` : la scène part de la cible des bonds.
+        const at = drawnFirst(view.feature);
+        view.feature.position.x = at.x;
+        view.feature.position.y = at.y;
+        exits.scene.push(view);
+      });
+    }
+    while (exits.back.length > 0 && !busy.back) {
+      const view = exits.back.pop()!;
+      busy.back = view;
+      features.restack(view.feature, DEPTH_RETURN);
+      view.restDepth = DEPTH_RETURN;
+      startHop(view, TOAD_RETURN, REST_POSITIONS[view.toad.index]!, (n) => {
+        // `10f8:3b23` : le crapaud redevient saisissable (`+0xc2 = 0`) ; le tour suivant le pose au repos (`DS:7c68`).
+        if (n === 49) resting = view;
+      });
+    }
+    if (resting) {
+      const view = resting;
+      resting = null;
+      busy.back = null;
+      view.motion = null;
+      view.phase = "rest";
+      play(view.feature, TOAD_REST + view.toad.index, REST_POSITIONS[view.toad.index]!, null);
+    }
+    while (exits.scene.length > 0 && busy.first) {
+      const view = exits.scene.pop()!;
+      view.motion = null;
+      const scene = TOAD_SCENE + 2 * rng.range(0, 2) + (view.toad.kind === 3 ? 1 : 0);
+      const row = view.toad.row;
+      play(view.feature, scene, null, (n) => {
+        if (n !== 60) return;
+        // `10f8:30ba` : le retour part de la première case de cette image (tampon avant l'ancre).
+        view.feature.position.x = view.feature.buffer[0]!.x;
+        view.feature.position.y = view.feature.buffer[0]!.y;
+        releaseLanding(state, row);
+        exits.back.push(view);
+        busy.first = null;
+      });
+    }
+    while (exits.second.length > 0 && !busy.second) {
+      const view = exits.second.pop()!;
+      busy.second = view;
+      const row = view.toad.row;
+      startHop(view, TOAD_EXIT_SECOND, EXIT_SECOND_TARGET, (n) => {
+        if (n !== 54) return;
+        releaseLanding(state, row);
+        retiring = view;
+      });
+    }
+    if (retiring) {
+      const view = retiring;
+      retiring = null;
+      busy.second = null;
+      view.phase = "gone";
+      features.destroy(view.feature);
+    }
+    while (walks.length > 0) {
+      const { token, view, row } = walks.pop()!;
+      if (!token.feature) continue;
+      // À son événement 26 (dernière image, case vide) le Zoombini est monté : le jeton disparaît et le crapaud se tend (`10f0:1134`).
+      play(token.feature, TOKEN_WALK + row, null, (n) => {
+        if (n !== 26) return;
+        if (token.feature) features.destroy(token.feature);
+        token.feature = null;
+        stretchToad(view, row);
+      });
+    }
+    while (waiting.length > 0) {
+      const { feature, index } = waiting.pop()!;
+      feature.onEvent = undefined;
+      features.setScript(feature, TOKEN_WAIT + index);
     }
   }
 
-  /** `SCRB 10058` : le crapaud revient le long de la berge gauche ; à son événement 49 (`10f8:3b23`) il est au repos et peut être repris. */
-  function returnToad(view: ToadView): void {
-    play(view.feature, TOAD_RETURN, null, (n) => {
-      if (n !== 49) return;
-      view.phase = "rest";
-      features.restack(view.feature, DEPTH_TOAD + view.toad.index / 100);
-      play(view.feature, TOAD_REST + view.toad.index, REST_POSITIONS[view.toad.index]!, null);
-    });
+  /** Joue une sortie à bonds (`10057`, `10058`, `10059`) depuis la position courante vers `target`. */
+  function startHop(view: ToadView, script: number, target: Point, onEvent: (n: number) => void): void {
+    view.motion = { kind: "hop", from: { x: view.feature.position.x, y: view.feature.position.y }, to: target };
+    play(view.feature, script, null, onEvent);
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
   // Grenouilles (`10f8:0bd7`, `10f8:4a84`, `10f0:1207`)
 
-  const frogPosition = (col: number, row: number): Point => {
+  /** La grenouille naît 17 pixels au-dessus de sa case (`10f8:0bd7` : `+2`, `−0x11`) ; `10067` la descend sur la case (`origin`). */
+  const frogBirth = (col: number, row: number): Point => {
     const o = origin(col, row);
     return { x: o.x + 2, y: o.y - 17 };
   };
+  const isFrogJump = (id: number): boolean => (FROG_JUMPS as readonly number[]).includes(id);
 
   function spawnFrogView(): void {
     const frog = spawnFrog(state);
     if (!frog) return;
     nextFrogAt = now() + FROG_PERIOD_TICKS;
     const tattoo = (): number => tattooOf(frog.kind, frog.value);
-    const feature = features.create({
+    const view: FrogView = { frog, feature: undefined as unknown as Feature, phase: "arriving", nextAt: 0, motion: null };
+    view.feature = features.create({
       script: FROG_ARRIVAL,
       delay: rng.range(4, 7),
-      depth: DEPTH_FROG + frog.row / 100,
-      position: frogPosition(frog.col, frog.row),
+      depth: DEPTH_ON_POND + frog.row / 100,
+      position: frogBirth(frog.col, frog.row),
       flags: STATIC_FLAGS,
-      // `10f0:0c4f` : la variante n'a que sa première case ; sinon la deuxième (image 272) devient le tatouage.
-      onImage: (_feature, parts: FeaturePart[]) => {
-        if (frog.variant) return parts.slice(0, 1);
-        for (const part of parts.slice(1)) if (part.w === 272) part.w += tattoo();
+      // `10f0:0c4f` (arrivée, sortie) et `10f8:267b` (sauts) : la variante n'a que sa première case (sauf à la dernière image d'un saut où elle adopte une
+      // valeur, `+0x64`) ; sinon la case 272 devient le tatouage.
+      onImage: (feature, parts: FeaturePart[]) => {
+        const jump = isFrogJump(feature.scriptId);
+        if (frog.variant && !(jump && feature.image === 7 && frog.adopted)) parts = parts.slice(0, 1);
+        else for (const part of parts.slice(1)) if (part.w === 272) part.w += tattoo();
+        if (jump && view.motion) applyMotion(view.motion, feature.image, parts);
         return parts;
       },
     });
-    const view: FrogView = { frog, feature, phase: "arriving", nextAt: 0 };
     frogViews.push(view);
-    play(feature, FROG_ARRIVAL, frogPosition(frog.col, frog.row), (n) => {
-      if (n === FEATURE_END || n === 70) {
-        view.phase = "ready";
-        view.nextAt = now() + FROG_STEP_TICKS;
-      }
+    play(view.feature, FROG_ARRIVAL, frogBirth(frog.col, frog.row), (n) => {
+      if (n !== 70) return;
+      // `10f8:2509` événement 70 : la position devient la case (première case du tampon), la grenouille entre dans la file des pas.
+      view.feature.position.x = view.feature.buffer[0]!.x;
+      view.feature.position.y = view.feature.buffer[0]!.y;
+      view.phase = "ready";
+      view.nextAt = now() + view.feature.delay;
     });
   }
 
@@ -709,8 +889,10 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
     }
     if (result.kind === "exit") {
       view.phase = "exit";
+      view.motion = null;
+      features.restack(view.feature, DEPTH_ON_POND + frog.row / 100);
       play(view.feature, FROG_EXIT, null, (n) => {
-        if (n === FEATURE_END || n === 80) {
+        if (n === 80) {
           features.destroy(view.feature);
           frogViews.splice(frogViews.indexOf(view), 1);
         }
@@ -718,12 +900,19 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
       return;
     }
     view.phase = "hop";
-    features.restack(view.feature, DEPTH_FROG + result.to.row / 100);
-    play(view.feature, FROG_JUMPS[result.heading]!, frogPosition(result.from.col, result.from.row), (n) => {
-      if (n !== FEATURE_END) return;
-      settleFrog(state, frog);
-      view.phase = "ready";
-      view.nextAt = now() + FROG_STEP_TICKS;
+    // `10f8:0bd7` : juste devant le repère de la rangée d'arrivée pour un saut vers le bas, de la rangée quittée sinon.
+    features.restack(view.feature, DEPTH_ON_POND + (result.heading === 2 ? result.to.row : result.from.row) / 100);
+    const from = origin(result.from.col, result.from.row);
+    view.motion = { kind: "frog", from, to: origin(result.to.col, result.to.row) };
+    play(view.feature, FROG_JUMPS[result.heading]!, from, (n) => {
+      if (n === 74) settleFrog(state, frog);
+      else if (n === 71) {
+        // `10f8:267b` image 7 : la grenouille est sur sa nouvelle case, prochain pas 35 ticks plus tard.
+        view.feature.position.x = view.motion!.to.x;
+        view.feature.position.y = view.motion!.to.y;
+        view.phase = "ready";
+        view.nextAt = now() + FROG_STEP_TICKS;
+      }
     });
   }
 
@@ -772,7 +961,8 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
   /** Remet le crapaud sur la berge, à sa place de repos. */
   function restToad(view: ToadView): void {
     view.phase = "rest";
-    features.restack(view.feature, DEPTH_TOAD + view.toad.index / 100);
+    view.motion = null;
+    features.restack(view.feature, view.restDepth);
     play(view.feature, TOAD_REST + view.toad.index, REST_POSITIONS[view.toad.index]!, null);
   }
 
@@ -948,7 +1138,7 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
     // Niveaux 2 à 4 : l'événement 1 de la jauge lève le verrou ; si on a pris la baguette avant, personne ne le lève (le script est rejoué à chaque tick).
     if (lock > 0 && level >= 1 && now() - startedAt > 4 * FRAME_DELAY) lock = 0;
     advanceExchange();
-    startExits();
+    runQueues();
     if (haloShown()) {
       const phase = Math.floor(now() / HALO_TICKS) % 4;
       if (phase !== lastHaloPhase) {
@@ -974,6 +1164,7 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: LillyProbe) 
     toads: toadViews,
     frogs: frogViews,
     tokens,
+    bank,
     wand,
     origin,
     get lock() {

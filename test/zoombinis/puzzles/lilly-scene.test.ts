@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { MohawkArchive } from "../../../src/data/mohawk/mohawk";
 import { decodeTbmp } from "../../../src/data/mohawk/tbmp";
+import { parseRegs } from "../../../src/games/zoombinis/data/regs";
 import { DIALOG } from "../../../src/games/zoombinis/engine/dialog";
 import { createZoombinisEngine } from "../../../src/games/zoombinis/engine/engine";
-import { FEATURES } from "../../../src/games/zoombinis/engine/features";
+import { FEATURES, type Feature } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
 import {
   FAIRY_GAUGE,
+  exchange,
   cellIndex,
   dropRows,
   shortestPath,
@@ -181,8 +183,9 @@ describe.skipIf(!original.has)("écran des têtards tatoués (createLillyScene)"
     expect(view.phase).toBe("setup");
     expect(probe.state.launched).toBe(1);
     expect(probe.state.pond.cells[cellIndex(0, row)]!.occupied).toBe(true);
-    // Le jeton marche (`10019 + rangée`), puis le crapaud se tend (`10000`) et saute.
-    expect(probe.tokens[0]!.feature!.scriptId).toBe(10019 + row);
+    // Le jeton quitte sa place de la file (`10109 + i`), marche (`10019 + rangée`), puis le crapaud se tend (`10000`) et saute.
+    expect(probe.tokens[0]!.feature!.scriptId).toBe(10109);
+    await t.until(() => probe.tokens[0]!.feature?.scriptId === 10019 + row, 200);
     await t.until(() => view.phase === "ready" || view.phase === "hop");
     expect(probe.tokens[0]!.feature).toBeNull();
     await t.until(() => view.phase === "arriving", 6000);
@@ -208,6 +211,93 @@ describe.skipIf(!original.has)("écran des têtards tatoués (createLillyScene)"
     expect(view.feature.scriptId).toBe(10043 + toad.index);
     expect(toad).toMatchObject({ trips: 1, retired: false });
     expect(probe.state.pond.landing[toad.row]).toBe(false);
+    expect(t.engine.error).toBeNull();
+  }, 60_000);
+
+  it("retour d'un crapaud : l'arrivée, la sortie 10057, la scène de berge et le retour 10058 s'enchaînent là où le précédent s'arrête, jusqu'à sa place de repos", async () => {
+    const t = await start({ level: 0, size: 3 });
+    const probe = t.probe();
+    await t.until(() => probe.lock === 0, 600);
+    t.corridor(5);
+    const view = t.toadB0();
+    const rest = REST[view.toad.index]!;
+    await t.dragToad(view.toad.index, 5);
+    await t.until(() => view.phase === "arriving", 8000);
+    // Image par image : (script, image, point dessiné de la première case avant l'ancre).
+    const frames: { id: number; image: number; at: { x: number; y: number } }[] = [];
+    for (let i = 0; i < 6000 && !(view.phase === "rest" && view.feature.scriptId === 10043 + view.toad.index && view.feature.parts.length > 0); i++) {
+      await t.ticks(1);
+      const last = frames[frames.length - 1];
+      const at = drawnFirst(view.feature);
+      if (!last || last.id !== view.feature.scriptId || last.image !== view.feature.image || last.at.x !== at.x || last.at.y !== at.y)
+        frames.push({ id: view.feature.scriptId, image: view.feature.image, at });
+    }
+    expect(view.phase).toBe("rest");
+    const of = (id: number) => frames.filter((f) => f.id === id);
+    const isScene = (id: number) => id >= 10060 && id <= 10065;
+    const scene = frames.filter((f) => isScene(f.id));
+    // 10057 part de la fin de l'arrivée et bondit jusqu'au haut de la berge droite (599, 55), où commence la scène (`10f8:2ba3`, `2f64`).
+    const arrival = of(10031 + 5);
+    expect(of(10057)[0]!.at).toEqual(arrival[arrival.length - 1]!.at);
+    for (const f of of(10057).filter((f) => f.image >= 5)) expect(f.at).toEqual({ x: 599, y: 55 });
+    expect(scene[0]!.at).toEqual({ x: 599, y: 55 });
+    // 10058 part de la dernière image de la scène et bondit jusqu'à la place de repos du crapaud (`10f8:30ba`, `373e`) : pas de téléportation au repos.
+    expect(of(10058)[0]!.at).toEqual(scene[scene.length - 1]!.at);
+    for (const f of of(10058).filter((f) => f.image >= 5)) expect(f.at).toEqual(rest);
+    expect(drawnFirst(view.feature)).toEqual(rest);
+    // Rien ne sort de l'écran ni ne retraverse l'étang : la scène longe le haut, le retour descend la berge gauche.
+    for (const f of scene) expect(f.at.y, `${f.id}#${f.image}`).toBeLessThan(140);
+    for (const f of of(10058)) expect(f.at.x, `10058#${f.image}`).toBeLessThan(130);
+    expect(t.engine.error).toBeNull();
+  }, 60_000);
+
+  it("sauts d'un crapaud : chaque saut se pose exactement sur l'abscisse de sa case (recalage des événements 12 à 14, `10f8:20bc`), même entre deux rangées décalées", async () => {
+    const t = await start({ level: 0, size: 3 });
+    const probe = t.probe();
+    await t.until(() => probe.lock === 0, 600);
+    // Couloir en L : rangée 7 jusqu'à la colonne 5, descente en rangée 8 (abscisses décalées de 9 pixels, le script de saut n'en prévoit que 4).
+    t.corridor(7, [...Array.from({ length: 6 }, (_, col) => ({ col, row: 7 })), ...Array.from({ length: 7 }, (_, i) => ({ col: 5 + i, row: 8 }))]);
+    const view = t.toadB0();
+    await t.dragToad(view.toad.index, 7);
+    let landings = 0;
+    let vertical = 0;
+    let previous = view.phase;
+    for (let i = 0; i < 8000 && view.phase !== "arriving" && view.phase !== "leaving"; i++) {
+      await t.ticks(1);
+      if (view.phase === "ready" && previous === "hop") {
+        landings++;
+        if (view.feature.scriptId === 10003) vertical++;
+        const o = probe.origin(view.toad.col, view.toad.row);
+        const at = drawnFirst(view.feature);
+        expect(at.x, `saut ${landings} (${view.feature.scriptId}) vers ${view.toad.col}, ${view.toad.row}`).toBe(o.x);
+        expect(Math.abs(at.y - o.y)).toBeLessThanOrEqual(2);
+      }
+      previous = view.phase;
+    }
+    expect(landings).toBeGreaterThanOrEqual(11);
+    expect(vertical).toBe(1);
+  }, 60_000);
+
+  it("Zoombinis arrivés : chacun marche jusqu'à la berge droite (10129 + rangée) puis à sa propre place d'attente (10141 + rang du jeton), et y reste", async () => {
+    const t = await start({ level: 0, size: 3 });
+    const probe = t.probe();
+    await t.until(() => probe.lock === 0, 600);
+    t.corridor(5);
+    const view = t.toadB0();
+    for (let trip = 1; trip <= 2; trip++) {
+      await t.dragToad(view.toad.index, 5);
+      await t.until(() => probe.state.arrivals === trip, 8000);
+      if (trip === 1) await t.until(() => view.phase === "rest", 4000);
+    }
+    await t.until(() => probe.bank.length === 2 && probe.bank.every((f, i) => f.scriptId === 10141 + i && !f.active), 1500);
+    for (const f of probe.bank) {
+      expect(f.destroyed).toBe(false);
+      expect(t.features.features).toContain(f);
+      expect(f.parts.length).toBeGreaterThan(0);
+    }
+    // Pas empilés sur la même case (la fin de 10129 + rangée est commune à toutes les rangées).
+    const [a, b] = probe.bank.map((f) => f.rect!);
+    expect(a!.top).not.toBe(b!.top);
     expect(t.engine.error).toBeNull();
   }, 60_000);
 
@@ -452,6 +542,41 @@ describe.skipIf(!original.has)("écran des têtards tatoués (createLillyScene)"
     expect(t.engine.error).toBeNull();
   }, 60_000);
 
+  it("grenouilles : posée sur sa case à la fin de son arrivée (événement 70), chaque saut part de la case et se pose sur la suivante (`10f8:267b`), puis elle sort par le bas", async () => {
+    const t = await start({ level: 2, size: 6 });
+    const probe = t.probe();
+    await t.until(() => probe.lock === 0, 600);
+    await t.until(() => probe.frogs.some((v) => v.phase === "ready" && !v.frog.variant), 1500);
+    const view = probe.frogs.find((v) => v.phase === "ready" && !v.frog.variant)!;
+    const { frog } = view;
+    expect(drawnFirst(view.feature)).toEqual(probe.origin(frog.col, frog.row));
+    // Un échange qui touche sa valeur calcule son champ de distance : elle descend vers la rangée la plus basse de sa composante.
+    const state = probe.state;
+    const free = state.pond.cells.map((c, i) => ({ c, i })).filter(({ c }) => !c.occupied);
+    const a = free.find(({ c, i }) => c.attrs[(frog.kind || 1) - 1] === frog.value && Math.floor(i / 12) >= 6)!;
+    const b = free.find(({ i }) => i !== a.i && Math.floor(i / 12) >= 9)!;
+    expect(exchange(state, { col: a.i % 12, row: Math.floor(a.i / 12) }, { col: b.i % 12, row: Math.floor(b.i / 12) })).toBe(true);
+    let landings = 0;
+    let previous = view.phase;
+    let cell = { col: frog.col, row: frog.row };
+    for (let i = 0; i < 6000 && landings < 3 && frog.alive; i++) {
+      await t.ticks(1);
+      if (view.phase === "hop" && previous !== "hop") {
+        // Image 0 du saut : sur la case quittée, pas 17 pixels au-dessus.
+        await t.until(() => view.feature.image === 0 && view.feature.parts.length > 0 && view.feature.scriptId !== 10067, 20);
+        expect(drawnFirst(view.feature), `départ du saut ${landings + 1}`).toEqual(probe.origin(cell.col, cell.row));
+      }
+      if (view.phase === "ready" && previous === "hop") {
+        landings++;
+        cell = { col: frog.col, row: frog.row };
+        expect(drawnFirst(view.feature), `saut ${landings}`).toEqual(probe.origin(frog.col, frog.row));
+      }
+      previous = view.phase;
+    }
+    expect(landings).toBeGreaterThanOrEqual(1);
+    expect(t.engine.error).toBeNull();
+  }, 60_000);
+
   it("« suite » : son 996, puis l'écran suivant ; les Zoombinis dont le crapaud n'est pas arrivé sont perdus et rendus au camp 1", async () => {
     const t = await start({ level: 0, size: 4 });
     const probe = t.probe();
@@ -519,6 +644,20 @@ describe.skipIf(!original.has)("écran des têtards tatoués (createLillyScene)"
     expect(t.queued).toContain(probe.welcome);
   });
 });
+
+/** Ancres de la planche 10000 (`REGS 10000` / `10001`). */
+const ANCHORS = original.has
+  ? (() => {
+      const archive = MohawkArchive.parse(original.read("LILLY.MHK"));
+      return { x: parseRegs(archive.get("REGS", 10000)), y: parseRegs(archive.get("REGS", 10001)) };
+    })()
+  : { x: new Int16Array(0), y: new Int16Array(0) };
+
+/** Point d'écran où la première case de l'image courante est posée (avant son ancre). */
+function drawnFirst(feature: Feature): { x: number; y: number } {
+  const part = feature.parts[0]!;
+  return { x: part.x + (ANCHORS.x[part.w] ?? 0), y: part.y + (ANCHORS.y[part.w] ?? 0) };
+}
 
 /** Positions de repos des crapauds (`DS2:23e8`). */
 const REST: readonly { x: number; y: number }[] = [

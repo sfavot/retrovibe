@@ -9,11 +9,12 @@
  *  1. **Entrée** : fond et palette 5000, groupe de formes 11000 (positions absolues), les 78 `SCRB` (décor, machine, wagonnets), objets de puzzle dessinés avec la planche 10000
  *     (`REGS` 10000 / 10001), intro du cristal géant (`SCRB` 11015 / 11016, puis 11017), musique `30030 + niveau`. Niveaux 1-2 : le groupe attend à gauche (20 places `DS:21f0`) ;
  *     niveaux 3-4 : les Zoombinis arrivent en wagonnet (`SCRB` 11033 / 11034, `SCRS` 12038 / 12039) dans l'ordre du groupe.
- *  2. **Préparer** (niveaux 1-2) : glisser un Zoombini sur le wagonnet de gauche, puis une des 8 silhouettes sur le cristal de droite (filtres fixes au niveau 2). (Niveaux 3-4) :
+ *  2. **Préparer** (niveaux 1-2) : le wagonnet vide arrive (`SCRB` 11032) ; glisser un Zoombini sur le wagonnet de gauche, puis une des 8 silhouettes sur le cristal de droite (filtres fixes au niveau 2). (Niveaux 3-4) :
  *     glisser les 6 cristaux sur les 2 × 3 emplacements de la voie.
  *  3. **Levier** (zone `DS:2018`, `SCRB` 11002) : image 3, événement 2 : test (`pull`), fiches comparées affichées, balayage `SCRB` 11018 / 11019 (événement 4) puis séquence de résultat
- *     (11024 à 11031 : le Zoombini marche, `SCRS` 11999… à 12014…, les fiches rebondissent, événement 17 : le wagonnet de sortie `SCRB` 11036 + k roule avec le Zoombini
- *     `SCRS` 12020 + k, événement 50 : fin de tour). Sauvé : garé dans son wagonnet (`SCRB` 11071 − k) et « go » actif ; piégé : au fond de la voie, le wagonnet roule à vide.
+ *     (11024 à 11031, qui dessinent aussi le wagonnet qui part : celui d'arrivée est caché ; le Zoombini marche, `SCRS` 11999… à 12014…, les fiches rebondissent
+ *     puis reviennent au repos, événement 17 : le wagonnet de sortie `SCRB` 11036 + k roule avec le Zoombini
+ *     `SCRS` 12020 + k, événement 50 : fin de tour). Sauvé : garé dans son wagonnet (`SCRB` 11071 − k) et « go » actif ; piégé : au fond de la voie, le wagonnet roule à vide. Niveaux 1-2 : un wagonnet vide revient (11032).
  *  4. **Tour suivant** : le levier clignote (`SCRB` 11005) ; le tirer refait le puzzle (`newRound`, `SCRB` 11004). Niveau 4 : le second de la paire est testé tout seul avec la
  *     même disposition contre la cible n° 8 (socle `SCRB` 11011).
  *  5. **Fin de série** : voix de réussite et danse de victoire si personne n'est perdu (un Zoombini sauvé tiré sans remise toutes les 30 ticks, `SCRS` 12044 + pieds) ; sinon voix de
@@ -27,8 +28,6 @@
  *    **probable**. Le levier ne se tire pas avant l'arrivée du premier (l'original l'arme dès l'entrée) ;
  *  - `SCRS` 12038 se termine sur une image vide (événement 25, sans cas) : le Zoombini est remis en pose d'attente sur la plate-forme à la fin ;
  *  - le test du niveau 4 pour le second se lance à la fin du socle `SCRB` 11011 (événement 18) ; la cible n° 8 glisse de (580, 258) à (548, 255) ; **probable** ;
- *  - fiches : orientations 0 et 2 (cristal de fond 65 et 66) et rebonds par les 8 ordonnées connues (l'événement 16 est répété 9 fois en 11030 : la dernière valeur est conservée) ;
- *    **probable** ;
  *  - le Zoombini garé garde la dernière image de sa traversée ; « go » ne fait partir que les trois premiers wagonnets et les trois premiers sauvés (`SCRS` 12041 à 12043), depuis leur
  *    place ; « go » est sans effet pendant un tour ;
  *  - rayon de surbrillance des emplacements (`SCRB` 11006 / 11007) et dalle verte (11076) : jouées une fois au début du transport ;
@@ -224,14 +223,22 @@ const RIGHT_CASES: readonly (readonly Rect[])[] = [
   [{ left: 350, top: 230, right: 400, bottom: 293 }, { left: 419, top: 230, right: 469, bottom: 293 }, { left: 485, top: 230, right: 535, bottom: 293 }],
 ];
 
-/** Fiches comparées (porte-fiche `DS:2030`) : abscisses, ordonnée de repos et rebonds (`DS:2038`…, 8 valeurs connues). */
+/**
+ * Fiches comparées (porte-fiche `DS:2030`) : abscisses, ordonnée de repos et rebonds, un par événement 16 (`DS:2038` / `DS:2070` réussite, 13 entrées ;
+ * `DS:20a8` / `DS:20ec` échec, 17 entrées ; abscisses constantes). Les séquences de résultat envoient 12 (réussite) ou 15 (échec) événements 16 : les fiches
+ * montent (ou descendent) puis reviennent à leur ordonnée de repos.
+ */
 const FICHE_X = [317, 354] as const;
 const FICHE_HOME_Y = 254;
-const BOUNCE_SAVED = [263, 248, 236, 210, 201, 192, 201, 210] as const;
-const BOUNCE_LOST = [257, 261, 264, 267, 270, 274, 277, 280] as const;
+const BOUNCE_SAVED = [263, 248, 236, 210, 201, 192, 201, 210, 236, 248, 263, 254, 254] as const;
+const BOUNCE_LOST = [257, 261, 264, 267, 270, 274, 277, 280, 277, 270, 267, 264, 261, 257, 254, 254, 254] as const;
 
-/** Orientations des objets (`1140:0000`, `ORIENTATION_SET`) : silhouette 1, cristal ou filtre de gauche 0, de droite 2, étagère 7, cristal gauche des niveaux 3-4 8, cible 5, seconde cible 3. */
-const ORIENTATION = { left: 0, silhouette: 1, right: 2, second: 3, target: 5, shelf: 7, leftHigh: 8 } as const;
+/**
+ * Orientations des objets (`+0xf1`, posées par `1158:4a01` et `1158:4500`, dessinées par `1140:0000`, `ORIENTATION_SET`) : silhouette 1 ; filtre, cristal posé de gauche 0, de droite 2 ;
+ * étagère 7 ; cible 5, seconde cible 3 ; cristal de gauche de l'écran (le Zoombini testé, tous niveaux) 8, cristal de droite (la silhouette posée, sur le cristal vide du
+ * socle) 5 ; fiches comparées 5 (gauche) et 3 (droite), sans cristal de fond.
+ */
+const ORIENTATION = { left: 0, silhouette: 1, right: 2, second: 3, target: 5, shelf: 7, crystalLeft: 8, crystalRight: 5, ficheLeft: 5, ficheRight: 3 } as const;
 
 /** Voix, danse, sortie : écart de la danse de victoire (30 ticks), nombre de wagonnets qui partent au « go ». */
 const DANCE_GAP = 30;
@@ -254,7 +261,8 @@ const PLAYS = F.flag4000000 | F.stopAtEnd | F.active;
 /** Un objet de puzzle dessiné avec la planche 10000 (silhouette, filtre, cristal, cible, fiche). */
 interface Piece {
   readonly feature: Feature;
-  readonly orientation: number;
+  /** Orientation (`+0xf1`) : fixe, ou selon la place (cristal posé à gauche, à droite, ou sur son étagère). */
+  readonly orientation: number | (() => number);
   /** Position de repos ; null = absent. */
   readonly place: () => Point | null;
   /** Attributs affichés ; null = rien. */
@@ -273,8 +281,9 @@ export interface SmokeProbe {
   /** Niveaux 3-4 : le Zoombini courant est arrivé sur la plate-forme. */
   readonly ready: boolean;
   readonly leaving: boolean;
-  /** Fiches comparées affichées (après le levier), ou null. */
+  /** Fiches comparées affichées (après le levier), ou null ; leur ordonnée (repos 254, puis les rebonds de l'événement 16). */
   readonly fiches: { left: Attrs; right: Attrs } | null;
+  readonly ficheY: number;
   /** Script du levier et de la cible n° 8 (niveau 4). */
   readonly leverScript: number;
   readonly secondTarget: Point | null;
@@ -289,6 +298,8 @@ export interface SmokeProbe {
   readonly crystalPoint: Point;
   /** Point d'une case d'insertion (côté, indice) pour le nombre de cristaux déjà posés du côté. */
   casePoint(side: SmokeSide, slot: number): Point;
+  /** Orientation (`+0xf1`) avec laquelle un objet est dessiné : cristaux de l'écran, fiches, ou cristal n° `n` (1 à 6). */
+  orientationOf(piece: "crystalLeft" | "crystalRight" | "ficheLeft" | "ficheRight" | number): number | null;
   readonly hasWon: boolean;
 }
 
@@ -306,6 +317,12 @@ function scriptEnd(archive: Archive, id: number): Point | null {
 
 function inside(rect: Rect, x: number, y: number): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+/** Plus petit rectangle qui contient les deux (null si aucun). */
+function union(a: Rect | null, b: Rect | null): Rect | null {
+  if (!a || !b) return a ?? b;
+  return { left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom) };
 }
 
 function centre(rect: Rect): Point {
@@ -351,6 +368,8 @@ class SmokeRun implements SmokeProbe {
   private readonly silhouettes: Piece[] = [];
   private readonly crystals: Piece[] = [];
   private readonly ficheView: Piece[] = [];
+  private crystalLeft: Piece | null = null;
+  private crystalRight: Piece | null = null;
 
   /** Cible n° 8 : position (niveau 4) ; la cible n° 7 est cachée pendant le test du second. */
   private target8At: Point | null = null;
@@ -403,7 +422,8 @@ class SmokeRun implements SmokeProbe {
     f.create({ script: SCRB.front2, delay: DELAY.none, flags: STILL, depth: DEPTH.front });
     this.lever = f.create({ script: SCRB.leverTest, delay: DELAY.lever, flags: STILL });
     if (low) {
-      this.wagonA = f.create({ script: SCRB.emptyWagon, delay: DELAY.default, flags: STILL });
+      // `0x4108000` (sans `0x2000`) : le wagonnet vide arrive sur la plate-forme de gauche dès l'entrée (`SCRB` 11032, 9 images).
+      this.wagonA = f.create({ script: SCRB.emptyWagon, delay: DELAY.default, flags: PLAYS });
       // Zone de dépôt (le wagonnet de gauche) : `0x108a000` (`1158:07c7`), avec le bit `0x1000000` : dessinée seulement pendant sa surbrillance, quand un
       // Zoombini porté la survole (`1168:1742`, `DropTarget.highlight`).
       this.dropZone = f.create({ script: SCRB.dropZone, delay: 7, flags: STILL_BIT });
@@ -416,9 +436,10 @@ class SmokeRun implements SmokeProbe {
     };
 
     this.buildPieces();
-    // Au doigt (extension tactile, bug 18), le wagonnet est pris aussi quand le doigt est sur l'image de la zone de dépôt.
+    // Au doigt (extension tactile, bug 18), le wagonnet est pris aussi quand le doigt est sur son image : celle du wagonnet vide (11032) ou de la zone de dépôt.
     const dropZone = this.dropZone;
-    this.wagonTarget = createTarget(SMOKE_WAGON, "wagon", dropZone ? () => dropZone.rect : undefined);
+    const wagon = this.wagonA;
+    this.wagonTarget = createTarget(SMOKE_WAGON, "wagon", dropZone ? () => union(dropZone.rect, wagon.rect) : undefined);
     if (dropZone) this.wagonTarget.highlight = dropZone;
     const buttons = sheetButtonImages(archive.tbmpImages(BUTTONS_SHEET));
     this.kit = createPuzzleKit(ctx, {
@@ -503,6 +524,19 @@ class SmokeRun implements SmokeProbe {
     return centre(cases[slot]!);
   }
 
+  orientationOf(piece: "crystalLeft" | "crystalRight" | "ficheLeft" | "ficheRight" | number): number | null {
+    const found =
+      typeof piece === "number"
+        ? this.crystals[piece - 1]
+        : piece === "crystalLeft"
+          ? this.crystalLeft
+          : piece === "crystalRight"
+            ? this.crystalRight
+            : this.ficheView[piece === "ficheLeft" ? 0 : 1];
+    if (!found) return null;
+    return typeof found.orientation === "number" ? found.orientation : found.orientation();
+  }
+
   // ------------------------------------------------------------------------------------------------------------------------
   // Aides d'animation
 
@@ -529,7 +563,7 @@ class SmokeRun implements SmokeProbe {
   // ------------------------------------------------------------------------------------------------------------------------
   // Objets de puzzle (planche 10000)
 
-  private addPiece(orientation: number, place: () => Point | null, attrs: () => Attrs | null, depth: number = DEPTH.piece): Piece {
+  private addPiece(orientation: Piece["orientation"], place: () => Point | null, attrs: () => Attrs | null, depth: number = DEPTH.piece): Piece {
     const piece: Piece = {
       orientation,
       place,
@@ -546,7 +580,8 @@ class SmokeRun implements SmokeProbe {
     const at = piece.override ?? piece.place();
     const attrs = piece.attrs();
     if (!at || !attrs) return [];
-    return objectParts(piece.orientation, attrs).map((w) => ({ w, x: at.x - (this.anchorX[w] ?? 0), y: at.y - (this.anchorY[w] ?? 0) }));
+    const orientation = typeof piece.orientation === "number" ? piece.orientation : piece.orientation();
+    return objectParts(orientation, attrs).map((w) => ({ w, x: at.x - (this.anchorX[w] ?? 0), y: at.y - (this.anchorY[w] ?? 0) }));
   }
 
   private drawPiece(piece: Piece, screen: Surface): void {
@@ -587,10 +622,10 @@ class SmokeRun implements SmokeProbe {
         FILTER_POS.forEach((at, i) => this.addPiece(i < 2 ? ORIENTATION.left : ORIENTATION.right, () => at, () => s()?.filters[i] ?? null));
       }
       // Cristal de gauche (le Zoombini testé) et de droite (la silhouette posée), `26d7`.
-      this.addPiece(ORIENTATION.left, () => LEFT_CRYSTAL_POS, () => (s()?.current != null ? s()!.members[s()!.current!]! : null));
-      this.addPiece(ORIENTATION.right, () => RIGHT_CRYSTAL_POS, () => (s()?.silhouette != null ? s()!.silhouettes[s()!.silhouette!]! : null));
+      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (s()?.current != null ? s()!.members[s()!.current!]! : null));
+      this.crystalRight = this.addPiece(ORIENTATION.crystalRight, () => RIGHT_CRYSTAL_POS, () => (s()?.silhouette != null ? s()!.silhouettes[s()!.silhouette!]! : null));
     } else {
-      this.addPiece(ORIENTATION.leftHigh, () => LEFT_CRYSTAL_POS, () => (this.ready && s()?.current != null ? s()!.members[s()!.current!]! : null));
+      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (this.ready && s()?.current != null ? s()!.members[s()!.current!]! : null));
       this.addPiece(
         ORIENTATION.target,
         () => (this.targetsShown && !s()?.second ? RIGHT_CRYSTAL_POS : null),
@@ -604,8 +639,9 @@ class SmokeRun implements SmokeProbe {
         );
       }
       for (let n = 1; n <= 6; n++) {
+        // `1158:1429` : 0 posé à gauche, 2 posé à droite, 7 repris (sur l'étagère ou porté).
         this.crystals[n - 1] = this.addPiece(
-          ORIENTATION.shelf,
+          () => (s()?.left.includes(n) ? ORIENTATION.left : s()?.right.includes(n) ? ORIENTATION.right : ORIENTATION.shelf),
           () => this.crystalPlace(n),
           () => this.crystalAttrs(n),
         );
@@ -614,14 +650,14 @@ class SmokeRun implements SmokeProbe {
     // Fiches comparées `[9422]` / `[9424]`.
     for (const side of [0, 1]) {
       this.ficheView[side] = this.addPiece(
-        side === 0 ? ORIENTATION.left : ORIENTATION.right,
+        side === 0 ? ORIENTATION.ficheLeft : ORIENTATION.ficheRight,
         () => (this.fiches ? { x: FICHE_X[side]!, y: this.ficheY } : null),
         () => (this.fiches ? (side === 0 ? this.fiches.left : this.fiches.right) : null),
       );
     }
   }
 
-  private ficheY = FICHE_HOME_Y;
+  ficheY = FICHE_HOME_Y;
 
   /** Position d'un cristal : posé sur la voie (selon le nombre du côté) ou sur son étagère (`[94dc]`). */
   private crystalPlace(n: number): Point | null {
@@ -923,8 +959,9 @@ class SmokeRun implements SmokeProbe {
     if (!pending) return;
     const [back, front] = RESULT[this.level <= 2 ? "low" : "high"][pending.saved ? "saved" : "lost"];
     this.ficheStep = 0;
-    // Niveaux 1-2 : un wagonnet vide revient sur la plate-forme de gauche.
-    if (this.level <= 2) this.play(this.wagonA, SCRB.emptyWagon);
+    // Niveaux 1-2 (`1158:34b0`) : le wagonnet d'arrivée passe en `0x5188000` sans jouer (caché) ; la séquence de résultat dessine elle-même le wagonnet qui part
+    // avec le Zoombini. Le wagonnet vide suivant n'arrive qu'à la fin du tour.
+    if (this.level <= 2) this.still(this.wagonA, SCRB.emptyWagon, true);
     this.play(this.crystalFront, front);
     this.play(this.crystalBack, back, (n) => this.resultEvent(n));
   }
@@ -994,6 +1031,12 @@ class SmokeRun implements SmokeProbe {
     // Le wagonnet est garé à sa place ; celui de sortie revient au repos.
     this.parked[k] = this.features.create({ script: SCRB.parked - k, delay: DELAY.default, flags: STILL, depth: DEPTH.parked });
     this.still(this.wagonOut, SCRB.wagonOut, true);
+    // Niveaux 1-2 (`1158:0cbe`, `[94ac]` étape 5) : le wagonnet d'arrivée, vidé, reprend ses drapeaux de création (`0x4108000`) et rejoue 11032 : un wagonnet
+    // vide arrive sur la plate-forme pour le Zoombini suivant.
+    if (this.level <= 2) {
+      this.wagonA.flags &= ~(F.playOnly | F.still | F.noReplay);
+      this.play(this.wagonA, SCRB.emptyWagon);
+    }
     const before = s.savedCount;
     const end = endTurn(s, this.ctx.rng);
     if (!end || !member) return;

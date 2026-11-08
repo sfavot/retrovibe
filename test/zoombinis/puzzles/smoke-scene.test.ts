@@ -3,7 +3,7 @@ import { MohawkArchive } from "../../../src/data/mohawk/mohawk";
 import { parseScrb, parseScrs } from "../../../src/games/zoombinis/data/script";
 import { DIALOG } from "../../../src/games/zoombinis/engine/dialog";
 import { createZoombinisEngine } from "../../../src/games/zoombinis/engine/engine";
-import { FEATURES } from "../../../src/games/zoombinis/engine/features";
+import { FEATURES, FeatureFlag } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { GRAPHICS, installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
@@ -736,6 +736,117 @@ describe.skipIf(!original.has)("cristal : écran sur les vrais fichiers (SMOKE.M
     scene.leave(engine.ctx);
     expect(dialogs.beforeSave).toHaveLength(0);
   });
+
+  it("bug 30 : orientations de `1158:4a01` / `1158:1429` (cristal gauche 8, cristal droit 5 sur le cristal vide du socle, fiches 5 et 3, cristaux posés 0 / 2, étagère 7)", async () => {
+    const low = await start(1);
+    expect(low.probe().orientationOf("crystalLeft")).toBe(8);
+    expect(low.probe().orientationOf("crystalRight")).toBe(5);
+    expect(low.probe().orientationOf("ficheLeft")).toBe(5);
+    expect(low.probe().orientationOf("ficheRight")).toBe(3);
+    const high = await start(3);
+    await high.arrived();
+    const { probe, state, prepareHigh } = high;
+    expect(probe().orientationOf("crystalLeft")).toBe(8);
+    expect(probe().orientationOf(1)).toBe(7);
+    await prepareHigh([1], [2]);
+    expect(state().left).toEqual([1]);
+    expect(state().right).toEqual([2]);
+    expect(probe().orientationOf(1)).toBe(0);
+    expect(probe().orientationOf(2)).toBe(2);
+    expect(probe().orientationOf(3)).toBe(7);
+  }, 60_000);
+
+  it.each([
+    ["réussi", false],
+    ["raté", true],
+  ] as const)("bug 31 : test %s, les fiches rebondissent puis reviennent au repos (y = 254, tables `DS:2038` / `DS:20a8` entières)", async (_name, losing) => {
+    const { probe, state, prepareLow, losingPlan, pullLever, until } = await start(1);
+    const plan = losing ? losingPlan() : robotPlan(state())!;
+    await prepareLow(plan.member!, plan.silhouette!);
+    await pullLever();
+    const seen = new Set<number>();
+    await until(() => {
+      if (probe().fiches) seen.add(probe().ficheY);
+      return state().tested === 1;
+    }, 1500);
+    // Les fiches sont encore là (jusqu'au levier « nouveau tirage », `1158:3094`), revenues dans leur porte-fiche.
+    expect(probe().fiches).not.toBeNull();
+    expect(probe().ficheY).toBe(254);
+    expect([...seen].some((y) => y !== 254)).toBe(true);
+  }, 60_000);
+
+  it("bug 31 : niveaux 1-2, le wagonnet vide arrive à l'entrée (11032), est caché pendant le résultat (la séquence dessine celui qui part) et revient à la fin du tour", async () => {
+    const { probe, state, prepareLow, pullLever, until, features } = await start(1);
+    const wagon = features.features.find((f) => f.scriptId === 11032)!;
+    await until(() => !wagon.active, 200);
+    // Joué dès l'entrée, arrêté sur sa dernière image : le wagonnet est sur la plate-forme de gauche, sous le Zoombini posé.
+    expect(wagon.hasFlag(FeatureFlag.playOnly)).toBe(false);
+    expect(wagon.hasFlag(FeatureFlag.still)).toBe(false);
+    expect(wagon.image).toBe(8);
+    expect(wagon.rect!.left).toBeGreaterThanOrEqual(20);
+    const plan = robotPlan(state())!;
+    await prepareLow(plan.member!, plan.silhouette!);
+    await pullLever();
+    await until(() => features.features.some((f) => f.scriptId === 11024));
+    // `1158:34b0` : `0x5188000`, sans jouer : invisible pendant que 11024 emmène le Zoombini sur son propre wagonnet.
+    expect(wagon.hasFlag(FeatureFlag.playOnly)).toBe(true);
+    expect(wagon.active).toBe(false);
+    await until(() => state().tested === 1, 1500);
+    // Fin de tour (`[94ac]`) : drapeaux de création, 11032 rejoué depuis la gauche de l'écran.
+    expect(wagon.hasFlag(FeatureFlag.playOnly)).toBe(false);
+    expect(wagon.active).toBe(true);
+    expect(wagon.image).toBeLessThan(8);
+    await until(() => !wagon.active, 200);
+    expect(wagon.image).toBe(8);
+    expect(probe().locked).toBe(false);
+  }, 60_000);
+
+  it("bug 30 : au doigt, toucher un Zoombini puis le wagonnet, toucher une silhouette puis le cristal (souris inchangée)", async () => {
+    const { probe, state, grab, wait, host, features, until } = await start(1);
+    (host as unknown as { pointerIsTouch: boolean }).pointerIsTouch = true;
+    const wagonFeature = features.features.find((f) => f.scriptId === 11032)!;
+    await until(() => !wagonFeature.active, 200);
+    const plan = robotPlan(state())!;
+    const tap = async (point: Point) => {
+      host.input.moveMouse(point.x, point.y);
+      host.input.mouseDown("left");
+      await wait(1);
+      host.input.mouseUp("left");
+      await wait(6);
+    };
+    await tap(grab(plan.member!)!);
+    expect(probe().kit.carrying).toBeTruthy();
+    // Le doigt touche le bas de l'image du wagonnet vide (11032), loin de l'ancre des pieds : le Zoombini porté, sous le doigt, est hors du carré de prise.
+    const wagon = wagonFeature.rect!;
+    await tap({ x: (wagon.left + wagon.right) >> 1, y: wagon.bottom - 1 });
+    expect(probe().kit.carrying).toBeFalsy();
+    expect(state().current).toBe(plan.member);
+    expect(probe().kit.members[plan.member!]!.snoid.position).toEqual(SMOKE_WAGON);
+    await tap(probe().silhouetteAt(plan.silhouette!)!);
+    expect(probe().kit.carryingObject).toBeTruthy();
+    expect(state().silhouette).toBeNull();
+    await tap(probe().crystalPoint);
+    expect(probe().kit.carryingObject).toBeFalsy();
+    expect(state().silhouette).toBe(plan.silhouette);
+  }, 60_000);
+
+  it("bug 30 : niveau 3 au doigt, toucher un cristal puis une case de la voie le pose", async () => {
+    const { probe, state, wait, host, arrived } = await start(3);
+    await arrived();
+    (host as unknown as { pointerIsTouch: boolean }).pointerIsTouch = true;
+    const tap = async (point: Point) => {
+      host.input.moveMouse(point.x, point.y);
+      host.input.mouseDown("left");
+      await wait(1);
+      host.input.mouseUp("left");
+      await wait(6);
+    };
+    await tap(probe().crystalAt(4)!);
+    expect(probe().kit.carryingObject).toBeTruthy();
+    await tap(probe().casePoint("right", 0));
+    expect(probe().kit.carryingObject).toBeFalsy();
+    expect(state().right).toEqual([4]);
+  }, 60_000);
 
   it("les `SCRB` et `SCRS` de l'archive ont les événements que l'écran attend", () => {
     const archive = MohawkArchive.parse(original.read("SMOKE.MHK"));

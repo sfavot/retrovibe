@@ -238,3 +238,67 @@ describe("WebAudioSink : reprise après une interruption d'iOS", () => {
     expect([wave.state, ctx.state]).toEqual(["running", "running"]);
   });
 });
+
+describe("WebAudioSink : réglages d'essai et sonde du diagnostic", () => {
+  function sinkWith(experiment: ConstructorParameters<typeof WebAudioSink>[0]) {
+    const created: FakeContext[] = [];
+    const sink = new WebAudioSink({
+      ...experiment,
+      createContext: () => {
+        const ctx = fakeContext();
+        created.push(ctx);
+        return ctx as unknown as AudioContext;
+      },
+    });
+    return { sink, created };
+  }
+
+  it("un seul contexte pour les WAVE et le synthétiseur, fermé une seule fois", async () => {
+    vi.stubGlobal("fetch", async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) }));
+    const { sink, created } = sinkWith({ experiment: { singleContext: true } });
+    sink.startMidiLoading();
+    sink.unlock();
+    await new Promise<void>((resolve) => sink.onReady(resolve));
+    expect(created).toHaveLength(1);
+    expect(created[0]!.worklets).toBe(1);
+    sink.playWave({ samples: new Float32Array(100), sampleRate: 11025 }, false);
+    expect(created[0]!.started).toHaveLength(1);
+    sink.close();
+    expect(created[0]!.calls.filter((call) => call === "close")).toHaveLength(1);
+  });
+
+  it("sans synthétiseur : aucun worklet n'est chargé", async () => {
+    const { sink, created } = sinkWith({ experiment: { noMidi: true } });
+    sink.startMidiLoading();
+    sink.unlock();
+    await Promise.resolve();
+    expect(created.map((ctx) => ctx.worklets)).toEqual([0, 0]);
+    expect(sink.diagnostics.synth).toBe("off");
+  });
+
+  it("setExperiment n'a plus d'effet une fois les contextes créés", () => {
+    const { sink, created } = sinkWith({});
+    sink.unlock();
+    sink.setExperiment({ singleContext: true });
+    expect(created).toHaveLength(2);
+    expect(sink.diagnostics.wave).not.toBe(sink.diagnostics.midi);
+  });
+
+  it("la sonde voit les contextes créés et chaque WAVE, lancé ou abandonné, sans changer la lecture", () => {
+    const { sink, created } = sinkWith({});
+    const roles: string[] = [];
+    const starts: { started: boolean; state: string; when: number | undefined; ctxTime: number | null }[] = [];
+    sink.setProbe({ contextCreated: (role) => roles.push(role), waveStarted: (event) => starts.push(event) });
+    sink.unlock();
+    expect(roles).toEqual(["wave", "midi"]);
+    created[0]!.currentTime = 1.5;
+    sink.playWave({ samples: new Float32Array(100), sampleRate: 11025 }, false);
+    created[0]!.state = "closed";
+    sink.playWave({ samples: new Float32Array(100), sampleRate: 11025 }, false);
+    expect(starts).toEqual([
+      expect.objectContaining({ started: true, state: "running", when: undefined, ctxTime: 1.5 }),
+      expect.objectContaining({ started: false, state: "closed" }),
+    ]);
+    expect(created[0]!.started).toHaveLength(1);
+  });
+});

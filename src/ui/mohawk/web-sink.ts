@@ -20,6 +20,8 @@
  *   déjà partis mais pas encore joués reçoivent de `reset()` un note-off à la même heure : sinon la note démarre après la coupure et
  *   reste tenue sans fin.
  * - Muet = gain maître à 0 (WAVE et MIDI) ; la lecture continue, comme le moteur l'attend.
+ * - Diagnostic (`audio-debug.ts`) : `setExperiment` change la façon de créer la sortie (un seul contexte, pas de synthétiseur, `latencyHint`,
+ *   fréquence) pour comparer sur l'appareil, et `setProbe` signale chaque contexte créé et chaque WAVE lancé, sans rien changer à la lecture.
  */
 import { WorkletSynthesizer } from "spessasynth_lib";
 // Le processeur du worklet est un fichier à part : `?url` le fait copier par Vite dans les assets (chemin relatif à `base`).
@@ -41,10 +43,48 @@ function settle(promise: Promise<void>): void {
   promise.catch(() => undefined);
 }
 
+/** Réglages d'essai de la sortie, pour comparer sur l'appareil (paramètres d'URL de `audio-debug.ts`). Par défaut : réglages normaux. */
+export interface AudioExperiment {
+  /** Un seul contexte pour les WAVE et le synthétiseur (la sortie d'avant la séparation des contextes). */
+  readonly singleContext?: boolean;
+  /** Pas de synthétiseur MIDI : la musique est muette, aucun worklet n'est chargé. */
+  readonly noMidi?: boolean;
+  /** `latencyHint` des contextes (par défaut `"interactive"`). */
+  readonly latencyHint?: AudioContextLatencyCategory | number;
+  /** Fréquence imposée aux contextes (par défaut celle de la sortie de l'appareil). */
+  readonly sampleRate?: number;
+}
+
+/** Rôle d'un contexte créé : WAVE, MIDI, ou les deux (`singleContext`). */
+export type AudioContextRole = "wave" | "midi" | "shared";
+
+/** Un WAVE demandé à la sortie, vu par le diagnostic. */
+export interface WaveStartEvent {
+  readonly handle: WaveHandle;
+  /** `performance.now()` juste avant `start()` (ou au refus). */
+  readonly perfTime: number;
+  /** `currentTime` (s) du contexte WAVE à cet instant ; `null` sans contexte. */
+  readonly ctxTime: number | null;
+  /** État du contexte WAVE au moment de la demande. */
+  readonly state: string;
+  /** Vrai si `start()` a été appelé ; faux si le son a été abandonné (contexte arrêté, son vide). */
+  readonly started: boolean;
+  /** Heure passée à `start(when)` ; `undefined` : `start()` sans heure (lecture immédiate). */
+  readonly when: number | undefined;
+  readonly durationMs: number;
+}
+
+/** Observateur de diagnostic : n'agit pas sur la lecture. */
+export interface AudioProbe {
+  contextCreated?(role: AudioContextRole, ctx: AudioContext): void;
+  waveStarted?(event: WaveStartEvent): void;
+}
+
 export interface WebAudioSinkOptions {
   soundfontUrl?: string;
   /** Crée chaque contexte audio, WAVE puis MIDI (par défaut `new AudioContext({ latencyHint: "interactive" })`), pour les essais. */
   createContext?: () => AudioContext;
+  experiment?: AudioExperiment;
 }
 
 interface QueuedMessage {
@@ -79,19 +119,40 @@ export class WebAudioSink implements AudioSink {
   /** Note-on confiés au worklet avec une heure encore à venir (le worklet les jouera même après `reset()`). */
   private posted: QueuedMessage[] = [];
   private flushTimer: ReturnType<typeof setInterval> | undefined;
+  private experiment: AudioExperiment;
+  private probe: AudioProbe | null = null;
 
   readonly midi: MidiSink = {
     send: (message, atMs) => this.sendMidi(message, atMs),
     reset: () => this.resetMidi(),
   };
 
-  constructor(private readonly options: WebAudioSinkOptions = {}) {}
+  constructor(private readonly options: WebAudioSinkOptions = {}) {
+    this.experiment = options.experiment ?? {};
+  }
+
+  /** Réglages d'essai (diagnostic) ; sans effet une fois les contextes créés (premier `unlock()`). */
+  setExperiment(experiment: AudioExperiment): void {
+    if (!this.ctx) this.experiment = experiment;
+  }
+
+  /** Observateur de diagnostic (`null` pour le retirer). */
+  setProbe(probe: AudioProbe | null): void {
+    this.probe = probe;
+  }
+
+  /** Contextes et état du synthétiseur, pour le diagnostic (lecture seule). */
+  get diagnostics(): { wave: AudioContext | null; midi: AudioContext | null; synth: "off" | "waiting" | "loading" | "ready" } {
+    const synth = this.experiment.noMidi ? "off" : this.midiReady ? "ready" : this.midiStarted ? "loading" : "waiting";
+    return { wave: this.ctx, midi: this.midiCtx, synth };
+  }
 
   unlock(): void {
     if (this.closed) return;
     if (!this.ctx) {
-      [this.ctx, this.master] = this.createOutput();
-      [this.midiCtx, this.midiMaster] = this.createOutput();
+      const single = this.experiment.singleContext === true;
+      [this.ctx, this.master] = this.createOutput(single ? "shared" : "wave");
+      [this.midiCtx, this.midiMaster] = single ? [this.ctx, this.master] : this.createOutput("midi");
     }
     this.requestResume();
     this.tryStartMidi();
@@ -124,8 +185,10 @@ export class WebAudioSink implements AudioSink {
     return () => this.readyListeners.delete(listener);
   }
 
-  private createOutput(): [AudioContext, GainNode] {
-    const ctx = this.options.createContext?.() ?? new AudioContext({ latencyHint: "interactive" });
+  private createOutput(role: AudioContextRole): [AudioContext, GainNode] {
+    const { latencyHint = "interactive", sampleRate } = this.experiment;
+    const ctx = this.options.createContext?.() ?? new AudioContext(sampleRate ? { latencyHint, sampleRate } : { latencyHint });
+    this.probe?.contextCreated?.(role, ctx);
     const master = ctx.createGain();
     master.gain.value = this.muted ? 0 : 1;
     master.connect(ctx.destination);
@@ -136,11 +199,12 @@ export class WebAudioSink implements AudioSink {
   }
 
   private get contexts(): AudioContext[] {
-    return [this.ctx, this.midiCtx].filter((ctx): ctx is AudioContext => ctx !== null);
+    const contexts = [this.ctx, this.midiCtx].filter((ctx): ctx is AudioContext => ctx !== null);
+    return contexts.length === 2 && contexts[0] === contexts[1] ? [contexts[0]] : contexts;
   }
 
   private tryStartMidi(): void {
-    if (this.closed || !this.midiWanted || this.midiStarted || !this.midiCtx || !this.midiMaster) return;
+    if (this.closed || this.experiment.noMidi || !this.midiWanted || this.midiStarted || !this.midiCtx || !this.midiMaster) return;
     this.midiStarted = true;
     void this.startMidi(this.midiCtx, this.midiMaster);
   }
@@ -156,7 +220,10 @@ export class WebAudioSink implements AudioSink {
     const handle = this.nextHandle++;
     const ctx = this.ctx;
     if (ctx && ctx.state !== "running") this.revive(ctx);
-    if (!ctx || ctx.state !== "running" || !this.master || sound.samples.length === 0) return handle;
+    if (!ctx || ctx.state !== "running" || !this.master || sound.samples.length === 0) {
+      this.reportWave(handle, ctx, sound, false);
+      return handle;
+    }
     const source = ctx.createBufferSource();
     source.buffer = this.bufferOf(ctx, sound);
     source.loop = loop;
@@ -165,8 +232,22 @@ export class WebAudioSink implements AudioSink {
       if (this.voices.get(handle) === source) this.voices.delete(handle);
     };
     this.voices.set(handle, source);
+    this.reportWave(handle, ctx, sound, true);
     source.start();
     return handle;
+  }
+
+  private reportWave(handle: WaveHandle, ctx: AudioContext | null, sound: PcmSound, started: boolean): void {
+    this.probe?.waveStarted?.({
+      handle,
+      perfTime: performance.now(),
+      ctxTime: ctx?.currentTime ?? null,
+      state: ctx?.state ?? "absent",
+      started,
+      // `start()` est appelé sans heure : lecture dès le prochain quantum du contexte.
+      when: undefined,
+      durationMs: (sound.samples.length / sound.sampleRate) * 1000,
+    });
   }
 
   stopWave(handle: WaveHandle): void {

@@ -5,6 +5,7 @@ import { localStorageStore as createLocalStorageStore } from "../../../ui/local-
 import { withIcons } from "../../../ui/icons";
 import { h } from "../../../ui/dom";
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
+import { AudioDebugOverlay, readAudioDebugParams } from "../../../ui/mohawk/audio-debug";
 import { fetchGameFiles } from "../data/files";
 import { copy } from "../copy";
 import { COMMON_ARCHIVE } from "../data/archives";
@@ -54,6 +55,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let host: ZoombinisBrowserHost;
   let engine: ZoombinisEngine;
   let services: ZoombinisServices;
+  // Diagnostic audio sur l'appareil (`?audiodebug`, `audio=…`, `latency=…`, `rate=…` : `ui/mohawk/audio-debug.ts`).
+  const audioDebug = readAudioDebugParams(location.search);
+  let overlay: AudioDebugOverlay | null = null;
   try {
     // Manifeste absent, illisible ou remplacé par une page d'erreur : le jeu n'est pas installé.
     const files = await fetchGameFiles(options.base).catch((error: unknown) => {
@@ -61,6 +65,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     });
     host = createZoombinisBrowserHost(options.base, files, shell.canvas, () => leave(container, options));
     if (host.textInput) shell.stage.append(host.textInput.element);
+    host.audio.setExperiment(audioDebug.experiment);
+    if (audioDebug.overlay) {
+      overlay = new AudioDebugOverlay(host.audio, audioDebug.experiment);
+      shell.stage.append(overlay.element);
+    }
     // Débloque le son tant que l'activation du clic est valable.
     host.audio.unlock();
     await loadText(host);
@@ -71,6 +80,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     loadCursors(host, engine.ctx.resources.require(COMMON_ARCHIVE));
     registerScenes(engine);
     engine.start();
+    overlay?.watch(services.sound);
   } catch (error) {
     shell.fail(error, "load");
     return;
@@ -88,11 +98,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     sound: { prefs: new SoundPrefs(createLocalStorageStore(), host.audio, GAME_ID), storageKey: soundPrefKey(GAME_ID), unlock: () => host.audio.unlock() },
     onDispose: () => {
       stopWatchingReady();
+      overlay?.dispose();
       host.silence();
       host.close();
     },
     onFrame: () => {
+      const tickStart = overlay ? performance.now() : 0;
       engine.frame(host.now());
+      overlay?.frame(performance.now() - tickStart);
       // Un écran n'a pas pu se charger : même traitement qu'une erreur d'exécution, la boucle s'arrête.
       if (engine.error) throw engine.error.error;
       shell.setLoading(engine.loading);

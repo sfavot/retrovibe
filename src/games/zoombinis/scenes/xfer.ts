@@ -34,8 +34,9 @@
  *
  * ## Écarts
  *
- * - Pendant le fondu d'entrée, les features décoratives créées par l'Enter tournent déjà (l'original bloque tout) ; les Zoombinis et la minuterie, eux, attendent. Titre et texte de population : police et couleurs de l'original non relevées
- *   (grande police, blanc cerné de noir), rectangle de population déduit du `SCRB` 6105.
+ * - Fin des `SCRS` de départ (régions 0 et 5) : leur dernière image est vide ; faute de la rendre vide (`Features.readImage`), le Zoombini est retiré à la fin du script.
+ * - Texte cerné (titres, population) : polices, drapeaux, rectangles et couleurs relevés (`11b0:0fe9`, `11b0:1e7b`, `10a8:0cd2`) ; la police courante du contexte au
+ *   moment de la population est supposée être la petite (**probable** : c'est la seule où « population de » / « zoombiniville 16 » tient dans le panneau).
  */
 import type { Rect, Surface } from "../../../engine/mohawk/graphics/surface";
 import type { Archive } from "../../../engine/mohawk/resources";
@@ -43,7 +44,7 @@ import { FEATURES, FeatureFlag, type Feature, type FeatureOptions, type FeatureP
 import { ZOOMBINIS_GAME } from "../engine/game";
 import { ScreenId, type Scene, type SceneContext } from "../engine/scene";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
-import { TextFlags, ZOOMBINIS_TEXT } from "../engine/text";
+import { TextFlags, ZOOMBINIS_TEXT, type FontName } from "../engine/text";
 import { TRANSFER_ROUTES, currentLevel, dialogMemoryIndex } from "../game/route";
 import { createSnoid, screenScripts, type Snoid } from "./snoid";
 import { TrailColoring, TRAIL_DELAY, TRAIL_STARTS, trailStartIndex } from "./xfer-trail";
@@ -87,9 +88,22 @@ const TITLE_RECTS: readonly (readonly [number, number, number, number])[] = [
   [127, 29, 299, 81],
   [135, 29, 323, 82],
 ];
-/** Indices de palette du texte (hypothèse : 255 blanc, 0 noir) et couleur du cerne. */
-const TEXT_COLOR = 255;
-const OUTLINE_COLOR = 0;
+/**
+ * Texte cerné (`10a8:0cd2(texte, drapeaux, rectangle, encre, cerne)`) : quatre copies décalées d'un pixel dans la couleur du cerne, puis le texte.
+ * Titres des régions 1 à 4 (`11b0:0fe9`) : grande police (`DS:963c`, `11e8:875a`), centrés (`0x22`), encre 0x0a et cerne 0x2d (blanc et noir dans ces palettes).
+ * Population de la région 5 (`11b0:1e7b`) : police courante du contexte (la petite, `DS:9638`), drapeaux 1 (ni centré ni à droite : à gauche, en haut, avec
+ * retour à la ligne), rectangle de `SCRB` 6105 décalé de (10, 4) en haut à gauche seulement, encre 0xd1 et cerne 0x70 (beige et brun rouge du fond 6000).
+ */
+interface TextStyle {
+  font: FontName;
+  flags: number;
+  ink: number;
+  outline: number;
+}
+const TITLE_STYLE: TextStyle = { font: "large", flags: TextFlags.center | TextFlags.vcenter, ink: 0x0a, outline: 0x2d };
+const POPULATION_STYLE: TextStyle = { font: "small", flags: 0, ink: 0xd1, outline: 0x70 };
+/** Décalage du texte de population dans le rectangle de 6105 (`11b0:1ee8` : gauche + 10, haut + 4 ; droite et bas inchangés). */
+const POPULATION_INSET = { left: 10, top: 4 } as const;
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Règles (fonctions pures)
@@ -412,13 +426,13 @@ export function createXferScene(): Scene {
     ctx.services.get(FEATURES).restack(stackable, depth);
   }
 
-  function shadowText(ctx: SceneContext, surface: Surface, text: string, rect: Rect): void {
+  function shadowText(ctx: SceneContext, surface: Surface, text: string, rect: Rect, style: TextStyle): void {
     const drawer = ctx.services.tryGet(ZOOMBINIS_TEXT);
     if (!drawer) return;
-    const flags = TextFlags.center | TextFlags.vcenter;
-    // `10a8:0cd2` : quatre copies décalées d'un pixel (`10a8:0d9e`), puis le texte.
-    for (const [dx, dy] of [[-1, 0], [0, -1], [1, 0], [0, 1]] as const) drawer.drawText(surface, "large", text, { ...rect, x: rect.x + dx, y: rect.y + dy }, flags, OUTLINE_COLOR);
-    drawer.drawText(surface, "large", text, rect, flags, TEXT_COLOR);
+    // `10a8:0cd2` : quatre copies décalées d'un pixel (`10a8:0d9e`) dans la couleur du cerne, puis le texte.
+    for (const [dx, dy] of [[-1, 0], [0, -1], [1, 0], [0, 1]] as const)
+      drawer.drawText(surface, style.font, text, { ...rect, x: rect.x + dx, y: rect.y + dy }, style.flags, style.outline);
+    drawer.drawText(surface, style.font, text, rect, style.flags, style.ink);
   }
 
   /** `11b0:1326` : envoi à la destination ; `goTo` fait le fondu vers le noir (bloquant) avant la bascule. */
@@ -521,7 +535,10 @@ export function createXferScene(): Scene {
           const rect = feature.rect;
           if (!text || !rect) return;
           const line = text.strings.get(STRL_POPULATION, 1) ?? "";
-          shadowText(ctx, screen, `${line} ${population}`, { x: rect.left + 10, y: rect.top + 4, w: rect.right - rect.left - 20, h: rect.bottom - rect.top - 8 });
+          // `11b0:1e7b` : « %s %d » (la chaîne porte son retour à la ligne, `\r`), à gauche et en haut du panneau.
+          const x = rect.left + POPULATION_INSET.left;
+          const y = rect.top + POPULATION_INSET.top;
+          shadowText(ctx, screen, `${line} ${population}`, { x, y, w: rect.right - x, h: rect.bottom - y }, POPULATION_STYLE);
         };
         const options: FeatureOptions = { script: 6104, delay: 0, flags: 0 };
         stackable = createFeature(ctx, options);
@@ -569,7 +586,7 @@ export function createXferScene(): Scene {
         createFeature(ctx, { script: bg + 102, delay: 0, flags: 0, depth: FRONT });
         const title = ctx.services.tryGet(ZOOMBINIS_TEXT)?.strings.get(STRL_TITLES, region) ?? "";
         const [x0, y0, x1, y1] = TITLE_RECTS[region]!;
-        if (title) shadowText(ctx, background, title, { x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+        if (title) shadowText(ctx, background, title, { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, TITLE_STYLE);
       }
 
       features.invalidate();
@@ -641,6 +658,10 @@ export function createXferScene(): Scene {
     const member = members[released++];
     if (!member) return;
     member.turns = 0;
+    // La dernière image des `SCRS` 5200 à 5204 et 6200 à 6204 est vide (une case nulle) : l'original n'y dessine plus rien (`11a0:033a` vide le tampon),
+    // le Zoombini sort donc de l'image. `Features.readImage` garde l'image précédente quand la première case est vide : à la fin du script, le Zoombini
+    // est retiré, sans quoi les arrivés restaient figés au bout du chemin (bug 35).
+    member.snoid.onEnd = (snoid) => snoid.destroy();
     member.snoid.play(WALK_SCRIPT_BASE[region]! + member.snoid.traits.feet, FeatureFlag.stopAtEnd);
   }
 

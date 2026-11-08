@@ -5,6 +5,7 @@ import { ZOOMBINIS_GAME } from "../../src/games/zoombinis/engine/game";
 import { ScreenId, type Scene } from "../../src/games/zoombinis/engine/scene";
 import { GRAPHICS, installServices } from "../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../src/games/zoombinis/engine/sound";
+import { TextFlags, ZOOMBINIS_TEXT } from "../../src/games/zoombinis/engine/text";
 import { TRANSFER_REGION, TRANSFER_ROUTES } from "../../src/games/zoombinis/game/route";
 import { makeZoombini, newGame, type Zoombini } from "../../src/games/zoombinis/game/state";
 import {
@@ -455,5 +456,54 @@ describe.skipIf(!original.has)("transition XFER", () => {
     const snoids = engine.services.get(FEATURES).features.filter((f) => f.hasFlag(FeatureFlag.snoid));
     // Aucun SCRS d'attente 130 à 145 : seulement l'attente (100 à 104) ou la marche (6200 à 6204).
     expect(snoids.every((f) => f.scriptId < 130 || f.scriptId >= 6200 || f.scriptId < 100)).toBe(true);
+  });
+
+  it("ville (bug 35) : « population de\rzoombiniville n » en petite police, à gauche et en haut du panneau 6105 (+10, +4), beige 0xd1 cerné de 0x70 (11b0:1e7b)", async () => {
+    const { host, engine } = await begin({ from: ScreenId.maze2, to: ScreenId.town });
+    const text = engine.services.get(ZOOMBINIS_TEXT);
+    const draw = vi.spyOn(text, "drawText");
+    await runFor(engine, host, TICK_MS * (SCREEN_FADE_TICKS + 900));
+    const sign = engine.services.get(FEATURES).features.find((f) => f.scriptId === 6105)!;
+    const rect = sign.rect!;
+    const calls = draw.mock.calls.filter(([, , value]) => value.startsWith(text.strings.get(2008, 1)!));
+    expect(calls.length).toBeGreaterThan(0);
+    const [, font, value, box, flags, color] = calls[calls.length - 1]!;
+    expect(value).toMatch(/^population de\rzoombiniville \d+$/i);
+    expect(font).toBe("small");
+    expect(flags & (TextFlags.center | TextFlags.vcenter)).toBe(0);
+    expect(box).toEqual({ x: rect.left + 10, y: rect.top + 4, w: rect.right - rect.left - 10, h: rect.bottom - rect.top - 4 });
+    expect(color).toBe(0xd1);
+    expect(calls.some(([, , , , , c]) => c === 0x70)).toBe(true);
+  });
+
+  it("titres des régions 1 à 4 : grande police, centrés, blanc 0x0a cerné de noir 0x2d (11b0:0fe9)", async () => {
+    const { host, engine } = await begin({ from: ScreenId.pizza, to: ScreenId.baseCamp });
+    // Le titre est dessiné à l'entrée de XFER, au tick suivant la demande.
+    const spy = vi.spyOn(engine.services.get(ZOOMBINIS_TEXT), "drawText");
+    await runFor(engine, host, TICK_MS * 10);
+    const title = spy.mock.calls.find(([, , , , , color]) => color === 0x0a);
+    expect(title).toBeDefined();
+    expect(title![1]).toBe("large");
+    expect(title![4]).toBe(TextFlags.center | TextFlags.vcenter);
+    expect(spy.mock.calls.some(([, , , , , color]) => color === 0x2d)).toBe(true);
+  });
+
+  it.each([
+    [ScreenId.picker, ScreenId.bridge, 5200],
+    [ScreenId.maze2, ScreenId.town, 6200],
+  ] as const)("de %i vers %i (bug 35) : un Zoombini dont le SCRS de départ finit (dernière image vide) quitte l'image au lieu de rester au bout du chemin", async (from, to, base) => {
+    const { host, engine } = await begin({ from, to });
+    const features = engine.services.get(FEATURES);
+    let ended = 0;
+    const seen = new Set<{ destroyed: boolean }>();
+    for (let t = 0; t < 2500; t += 5) {
+      await runFor(engine, host, TICK_MS * 5);
+      // Compté pendant la transition seulement (la sortie de l'écran détruit tout).
+      if (engine.scenes.currentId !== ScreenId.xfer) break;
+      for (const f of features.features) if (f.hasFlag(FeatureFlag.snoid) && f.scriptId >= base && f.scriptId <= base + 4) seen.add(f);
+      ended = [...seen].filter((f) => f.destroyed).length;
+    }
+    // Avant le correctif, aucun ne quittait l'écran : ils restaient figés sur l'avant-dernière image, au bout du chemin.
+    expect(ended).toBeGreaterThan(0);
   });
 });

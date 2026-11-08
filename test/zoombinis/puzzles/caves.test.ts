@@ -716,6 +716,36 @@ describe.skipIf(!original.has)("sphinx : écran sur les vrais fichiers (CAVES.MH
     await wait(5);
   });
 
+  it("pendant un rejet, une image dont la première case est vide efface l'image précédente : le Zoombini disparaît entre le rebond et le saut, un seul couvercle par dalle (bug 29)", async () => {
+    const { probe, drag, wrongSlot, byFront, anchor, until, features, wait } = await start();
+    const index = byFront()[0]!;
+    const member = probe().kit.members[index]!;
+    await drag(index, anchor(wrongSlot(index)));
+    // Les deux scripts d'une dalle (`SCRB` 8200 + 4(s − 1) + 0 à 3) se passent le relais : quand le couvercle (`+ 0`, `+ 2`) est à `w == 0`, la poussière (`+ 1`, `+ 3`) dessine
+    // la pièce qui le remplace ; si l'image précédente restait affichée, la dalle montrerait deux couvercles à la fois (trois pierres avec la poussière).
+    const checked = new Set<string>();
+    const hiddenSnoid: number[] = [];
+    for (let ticks = 0; probe().busy && ticks < 1500; ticks++) {
+      await wait(1);
+      for (const f of features.features) {
+        if (f.destroyed || !f.script) continue;
+        const flip = f.scriptId >= 8200 && f.scriptId < 8280;
+        if (!flip && f !== member.snoid.feature) continue;
+        const first = f.script.images[f.image]?.cells[0];
+        if (!first || first.w !== 0) continue;
+        expect(f.parts, `script ${f.scriptId}, image ${f.image}`).toEqual([]);
+        checked.add(`${f.scriptId}:${f.image}`);
+        if (!flip) hiddenSnoid.push(f.scriptId);
+      }
+    }
+    expect(probe().busy).toBe(false);
+    // Le couvercle de la dalle lâchée (image 4 de `+ 0`) et celui de la dalle valable (image 5 de `+ 2`) sont passés par une image vide, de même que le Zoombini (fin de 12004, début de 12005).
+    const right = probe().state.slotOf[index]!;
+    expect([...checked].some((key) => key.startsWith(`${8200 + 4 * (right - 1) + 2}:`))).toBe(true);
+    expect(hiddenSnoid).toContain(12004);
+    await until(() => member.snoid.resting);
+  });
+
   it("pendant un rejet, la saisie est refusée ; elle reprend après", async () => {
     const { probe, drag, wrongSlot, byFront, anchor, until, host, wait, state } = await start();
     const [first, second] = byFront();

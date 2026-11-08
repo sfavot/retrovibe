@@ -22,7 +22,7 @@
  *  - rayon de prise des dalles 15 (`DS:9706` par défaut : l'épreuve ne le règle pas) ; **probable** ;
  *  - le Zoombini posé sur une dalle est posé d'un coup (état 4 du kit) puis fait son pas sur place : l'original lui fait marcher la distance de dépôt (au plus 15 pixels) ;
  *  - le retournement de dalle est joué par une feature propre (profondeur 0,5) au-dessus de la dalle, qui est masquée pendant l'animation : l'original rejoue le script sur la
- *    feature de la dalle allumée `[71f8 + 2s]` (ordre de dessin non porté) ; la dalle allumée (`SCRB` 9000 + s − 1, deux images) n'est qu'un éclair d'une image ;
+ *    feature de la dalle allumée `[71f8 + 2s]` (ordre de dessin non porté) ; la dalle allumée (`SCRB` 9000 + s − 1, deux images) n'est qu'un éclair (la seconde image, sans case, laisse la première affichée) ;
  *  - les poussières (`SCRB` 8201 / 8203 + 4(s − 1)) sont des features de même profondeur, sans le rattachement au Zoombini (`11a8:1f5c`) ; les objets d'accroche des dalles
  *    (scripts 6000 et rappels `10c8:18c7` / `18d3`) ne sont pas portés ;
  *  - l'éclat d'introduction des hiéroglyphes du niveau 1 (3 redessins à 30 ticks, `[70fa]`) n'est pas porté : `10c8:1a1f` n'est pas désassemblé ; la rangée est fixe ;

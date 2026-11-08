@@ -554,6 +554,23 @@ describe("features : lecteur de scripts (scripts synthétiques)", () => {
     expect(calls).toBe(0);
   });
 
+  it("une image dont la première case est vide efface l'image précédente : plus de parties, plus de rectangle (cache de rampe du gouffre, bug 34)", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    const bg = new Surface(32, 32);
+    bg.fill(9);
+    h.features.setBackground(bg);
+    const feature = h.spawn([{ cells: [[2, 5, 6]] }, { cells: [[0, 0, 0]] }, { cells: [] }], { flags: FeatureFlag.stopAtEnd | FeatureFlag.active | FeatureFlag.firstImage });
+    h.tick();
+    expect(pixelAt(h, 5, 6)).toBe(2);
+    h.tick();
+    expect(feature.parts).toEqual([]);
+    expect(feature.rect).toBeNull();
+    expect(pixelAt(h, 5, 6)).toBe(9);
+    h.tick();
+    expect(pixelAt(h, 5, 6)).toBe(9);
+  });
+
   it("appelle les rappels avant et après le dessin avec la surface", () => {
     const h = new Harness();
     h.features.setGroup(0, sheet());

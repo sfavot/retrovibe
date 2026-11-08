@@ -727,7 +727,13 @@ export class Features {
       break;
     }
     if (ended) this.finish(feature);
-    if (firstWord <= 0) return;
+    // Première case vide (`w = 0`) : l'image efface la précédente et ne dessine rien, sans rectangle ni rappel d'image (`11a0:033a`).
+    if (firstWord === 0) {
+      feature.parts = [];
+      feature.rect = null;
+      return;
+    }
+    if (firstWord < 0) return;
 
     let parts: FeaturePart[] = [];
     for (const entry of buffer) {

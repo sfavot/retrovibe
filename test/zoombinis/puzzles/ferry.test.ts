@@ -310,6 +310,10 @@ describe.skipIf(!original.has)("écran du bac (createFerryScene)", () => {
     host.audio.unlock();
     const engine = createZoombinisEngine(host, { seed: 11 });
     const services = await installServices(engine);
+    // Ids mis en file (`11a0:0ee7`) depuis l'entrée de l'écran, dans l'ordre.
+    const queued: number[] = [];
+    const queue = services.sound.queue.bind(services.sound);
+    services.sound.queue = (id: number) => (queued.push(id), queue(id));
     const entered: number[] = [];
     let probe!: FerryProbe;
     for (const id of Object.values(S)) {
@@ -350,7 +354,7 @@ describe.skipIf(!original.has)("écran du bac (createFerryScene)", () => {
     const settle = async (limit = 2500) => {
       for (let i = 0; i < limit && probe.busy; i += 10) await ticks(10);
     };
-    return { host, engine, services, zoombinis, entered, probe: () => probe, ticks, features, drag, seatPoint, settle };
+    return { host, engine, services, zoombinis, entered, queued, probe: () => probe, ticks, features, drag, seatPoint, settle };
   }
 
   it("entre sur le fond 1300 avec le radeau du niveau, les Zoombinis sur le ponton et le bouton go grisé", async () => {
@@ -707,5 +711,26 @@ describe.skipIf(!original.has)("écran du bac (createFerryScene)", () => {
     const t = await start();
     const probe = t.probe();
     expect([20073, 20074]).toContain(probe.kit.introVoice);
+    await t.ticks(300);
+    t.queued.length = 0;
+    t.host.press("F1", { key: "F1" });
+    await t.ticks(2);
+    expect(t.queued).toEqual([probe.kit.introVoice]);
+  });
+
+  it("l'entrée ne rejoue pas la voix du narrateur déjà dite par la transition : le père mathieu se fait entendre", async () => {
+    const t = await start();
+    // Première visite du programme : le père mathieu joue l'introduction `SCRB` 1803 (sons 1831 puis 1832 dans ses terminateurs).
+    expect(t.probe().frog.scriptId).toBe(1803);
+    const heard: number[] = [];
+    for (let i = 0; i < 600; i += 5) {
+      await t.ticks(5);
+      if (heard[heard.length - 1] !== t.services.sound.currentEffect) heard.push(t.services.sound.currentEffect);
+    }
+    // 20073 / 20074 (priorité 31) auraient fait jeter 1831 et 1832 (priorité 30) : `11a8:317c`.
+    expect(t.queued).not.toContain(20073);
+    expect(t.queued).not.toContain(20074);
+    expect(t.queued).toContain(1831);
+    expect(heard).toContain(1831);
   });
 });

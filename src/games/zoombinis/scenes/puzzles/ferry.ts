@@ -115,7 +115,7 @@ const SPLASH_WATER = 1705;
 const SPLASH_SIDE = 1706;
 /** `SCRS` d'arrivée de l'éclaboussure (variantes 7 à 9). */
 const SPLASH_ARRIVAL = 1907;
-/** Son 999 (clic) est `SOUND_MAP` du kit ; sons de la voix du narrateur à l'entrée (`DS:a2c4`). */
+/** Son 999 (clic) est `SOUND_MAP` du kit ; sons de la voix d'aide du narrateur (`DS:a2c4`, rejouée par F1). */
 const NARRATOR_FIRST = 20073;
 const NARRATOR_FIRST_VISIT = 20074;
 /** Décalage de l'éclaboussure latérale 1706 : `place − 14` (`10d8:1614`). */
@@ -394,7 +394,7 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
   const seatTargets: DropTarget[] = raft.seats.map((seat) => createTarget(seat.anchor, seat.index, () => seatFeatures[seat.index]?.rect ?? null));
   const seatOf = (target: DropTarget | null): number | null => (target && seatTargets.includes(target) ? (target.tag as number) : null);
 
-  // Voix du narrateur de l'entrée (`DS:a2c4`, `1108:035b`) : 20074 à la première visite du niveau 1, sinon 20073 au niveau 0, sinon l'une des deux.
+  // Voix d'aide du narrateur (`DS:a2c4`) : 20074 à la première visite du niveau 1, sinon 20073 au niveau 0, sinon l'une des deux.
   const slot = dialogMemoryIndex(SCREEN);
   const choice = dialogChoice(game.dialogMemory[slot]!, level, session.training !== 0);
   game.dialogMemory[slot] = choice.memory;
@@ -448,7 +448,9 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
   kit.arrive({ startDelay: 30, step: 45 });
   kit.playMusic();
   kit.playEntryJingle();
-  sound.queue(introVoice);
+  // `introVoice` (`DS:a2c4`) n'est pas dite à l'entrée : c'est l'aide vocale, rejouée par F1. Le narrateur de l'arrivée est déjà celui de la transition
+  // (`XFER`, 20013 à 20016, même arbre de choix) ; la mettre en file ici la rejouait, et sa priorité (31, `FERRY.MHK`) fait jeter les sons 1831 et 1832
+  // (priorité 30) de l'introduction du père mathieu, qui parlait sans qu'on l'entende (`11a8:317c`, un seul canal).
   ctx.requestPresent();
 
   // --- Dépôt accepté ou refusé (`10d8:0984`, code 3) ---

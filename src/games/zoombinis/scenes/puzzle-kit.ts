@@ -290,6 +290,11 @@ export interface GoOptions {
    * Dans les deux cas un clic pendant le départ quitte l'écran.
    */
   end?: "sound" | "depart";
+  /**
+   * Retient le changement d'écran du mode `"sound"` tant qu'il rend vrai, même une fois le son fini (`[9702] != 0` : sorties de l'épreuve en cours, `10e0:06a8`).
+   * Un clic pendant le départ quitte toujours tout de suite. Défaut : rien ne retient.
+   */
+  hold?: () => boolean;
 }
 
 /** Un dépôt d'objet (`carryObject`) : la cible libre prise, d'où il vient, où il est lâché. */
@@ -469,6 +474,7 @@ export class PuzzleKit {
   private goEnd: "sound" | "depart" = "sound";
   /** Le son 996 du départ a été mis en file (`pressGo` ou `playGoSound`). */
   private goSoundQueued = false;
+  private goHold: (() => boolean) | undefined;
   /** Gelé : l'épreuve a changé d'écran, est en train de le faire, ou mène seule un départ (`suspend`). */
   private halted = false;
   /** Bouton à l'image enfoncée, et fin de cette image (0 : tant que le bouton de la souris est tenu). */
@@ -684,7 +690,7 @@ export class PuzzleKit {
     if (this.spec.waitAnimations ?? true) for (const member of this.members) if (!member.walking && this.carry?.member !== member) member.snoid.tickWait();
     this.input(this.ctx.input);
     // `1028:0d9e(996)` : on attend la fin du « Go » lui-même, pas le silence (un pas en boucle d'un Zoombini qui part ne doit pas bloquer).
-    if (this.departing && this.goEnd === "sound" && this.goSoundQueued && !this.sound.isPlaying(SOUND_GO)) this.finish("success");
+    if (this.departing && this.goEnd === "sound" && this.goSoundQueued && !this.sound.isPlaying(SOUND_GO) && !this.goHold?.()) this.finish("success");
   }
 
   /** Lance les départs échus (`+0x24 ≤ maintenant`, `1168:0ba8`), le plus ancien d'abord. */
@@ -1168,6 +1174,7 @@ export class PuzzleKit {
     const walk = this.spec.exitWalk;
     this.goEnd = options.end ?? "sound";
     this.goSoundQueued = false;
+    this.goHold = options.hold;
     if ((options.sound ?? "now") === "now") {
       this.sound.stopEffects();
       this.sound.queue(SOUND_GO);

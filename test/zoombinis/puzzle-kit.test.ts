@@ -1092,6 +1092,35 @@ describe.skipIf(!original.has)("kit des épreuves (H0)", () => {
       });
     });
 
+    describe("hold : retenir le changement d'écran après le son 996", () => {
+      it("sans hold l'écran change à la fin du son ; avec hold il attend que hold rende faux, et un clic quitte tout de suite", async () => {
+        const plain = await start({ size: 4, setup: standing() });
+        plain.kit().goEnabled = true;
+        plain.kit().pressGo({ saveAll: true });
+        let plainTicks = 0;
+        for (; plainTicks < 600 && !plain.zoombinis.lastChange; plainTicks++) await plain.tickOnce();
+        expect(plain.zoombinis.lastChange).toMatchObject({ screen: S.xfer });
+
+        let held = true;
+        const h = await start({ size: 4, setup: standing() });
+        h.kit().goEnabled = true;
+        h.kit().pressGo({ saveAll: true, hold: () => held });
+        for (let i = 0; i < plainTicks + 120; i++) await h.tickOnce();
+        expect(h.zoombinis.lastChange).toBeNull();
+        held = false;
+        for (let i = 0; i < 10 && !h.zoombinis.lastChange; i++) await h.tickOnce();
+        expect(h.zoombinis.lastChange).toMatchObject({ screen: S.xfer });
+
+        const clicked = await start({ size: 4, setup: standing() });
+        clicked.kit().goEnabled = true;
+        clicked.kit().pressGo({ saveAll: true, hold: () => true });
+        await clicked.ticks(3);
+        clicked.host.click(300, 300);
+        await clicked.ticks(3);
+        expect(clicked.zoombinis.lastChange).toMatchObject({ screen: S.xfer });
+      });
+    });
+
     describe("son", () => {
       it("soundIdle() dit si aucun son n'est en file ni en cours", async () => {
         const h = await start({ setup: standing(), spec: { introVoice: 20071 } });

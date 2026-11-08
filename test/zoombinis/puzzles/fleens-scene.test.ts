@@ -349,6 +349,55 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(game.group.members.map((z) => z.attrs)).toEqual(party(16).map((z) => z.attrs));
   }, 240_000);
 
+  it("« Go » : les Zoombinis de la file descendent de la branche par les SCRS 7021 à 7030, le plus récent d'abord, au lieu de marcher droit à travers l'arbre", async () => {
+    const { probe, tryOnce, settle, specials, until, host, wait, zoombinis, engine, state } = await start();
+    for (const index of specials()) {
+      await tryOnce(index);
+      await settle();
+    }
+    await until(() => state().closed, 900);
+    // La file des essais : du plus ancien au plus récent, le plus récent en tête de branche (199, 120).
+    const line = [...probe().line];
+    expect(line).toHaveLength(3);
+    const feet = line.map((m) => m.snoid.traits.feet);
+    expect(line.map((m) => m.snoid.position.x)).toEqual([159, 179, 199]);
+    const seen = line.map(() => [] as number[]);
+    const starts = line.map(() => -1);
+    const trail = line.map(() => [] as { x: number; y: number }[]);
+    host.click(620, 460);
+    for (let tick = 0; tick < 1500 && zoombinis.lastChange?.screen !== S.xfer; tick += 1) {
+      await wait(1);
+      line.forEach((m, k) => {
+        if (m.snoid.destroyed) return;
+        const id = m.snoid.feature.scriptId;
+        if (seen[k]!.at(-1) !== id) seen[k]!.push(id);
+        if (starts[k] < 0 && id >= 7026 && id <= 7030) starts[k] = tick;
+        // Les pieds (milieu du bas du rectangle de la feature) : `position` n'avance qu'à la fin d'un script.
+        const r = m.snoid.feature.rect;
+        if (r) trail[k]!.push({ x: (r.left + r.right) / 2, y: r.bottom });
+      });
+    }
+    expect(engine.error).toBeNull();
+    // L'écran suivant attend la fin de la dernière descente (`[9702] == 0`) : tous ont fini leur script quand il change.
+    expect(line.every((m) => m.snoid.destroyed)).toBe(true);
+    // Jamais de marche droite (scripts de marche 105 à 129) : le plus récent descend par 7025 + pieds, les autres avancent d'un cran (7020 + pieds) puis descendent à leur tour.
+    for (const ids of seen) expect(ids.filter((id) => id >= 105 && id <= 129)).toEqual([]);
+    expect(seen[2]).toContain(7025 + feet[2]!);
+    expect(seen[1]).toContain(7020 + feet[1]!);
+    expect(seen[1]).toContain(7025 + feet[1]!);
+    expect(seen[0]).toContain(7020 + feet[0]!);
+    expect(seen[0]).toContain(7025 + feet[0]!);
+    // L'ordre de départ : le plus récent, puis celui d'avant, puis le plus ancien.
+    expect(starts[2]).toBeGreaterThan(-1);
+    expect(starts[1]).toBeGreaterThan(starts[2]!);
+    expect(starts[0]).toBeGreaterThan(starts[1]!);
+    // Le trajet du script : saut de la branche près de (230, 104), puis la descente le long de x ≈ 280 à 310 avant de repartir vers la sortie, et non une droite de (199, 120) à (660, 357).
+    const head = trail[2]!;
+    const straight = (p: { x: number; y: number }) => Math.abs(p.y - (120 + ((p.x - 199) * (357 - 120)) / (660 - 199)));
+    expect(head.some((p) => p.x >= 275 && p.x <= 315 && p.y >= 190)).toBe(true);
+    expect(Math.max(...head.map(straight))).toBeGreaterThan(40);
+  }, 240_000);
+
   it("« Go » est grisé avant les trois cocons : le clic ne fait rien", async () => {
     const { probe, host, wait, engine } = await start();
     host.click(620, 460);

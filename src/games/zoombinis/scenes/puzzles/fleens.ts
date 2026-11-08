@@ -136,10 +136,13 @@ const SCRS = {
   /** `292a(9)` : le Zoombini éjecté saute de la file au sol (`5999 + pieds`, 6000 à 6004, (68, 140) → (57, 246)) ; son évènement 61 fait partir son cousin. */
   jumpDown: 5999,
   back: 7015,
+  /** Sortie de la file après « go » (`10e0:2c91`) : un cran vers la tête (7020 + pieds, +20 pixels : 7021 à 7025), le plus récent descend de la branche et part à droite (7025 + pieds : 7026 à 7030). */
+  lineForward: 7020,
+  lineExit: 7025,
   intro: 7035,
 } as const;
 /** Événements (octet bas du terminateur − 1, `10e0:227e`). */
-const EVENT = { turn: 0, alert: 4, dash: 5, perched: 6, free: 7, closure: 30, queue: 132, fleeNear: 133, fleeFar: 134, fleeLine: 135, vanish: 137 } as const;
+const EVENT = { turn: 0, alert: 4, dash: 5, perched: 6, free: 7, closure: 30, queue: 132, exitLine: 131, fleeNear: 133, fleeFar: 134, fleeLine: 135, vanish: 137 } as const;
 /** Arrivée de la course du cousin près du repère (`10e0:23a0` : (0x1ad, 0xdf)) et place de la file des cousins (`10e0:24fc` : (0xd6, 0xcf)) ; sortie à gauche (−56, 241). */
 const DASH_END: Point = { x: 429, y: 223 };
 const COUSIN_LINE: Point = { x: 214, y: 207 };
@@ -334,6 +337,8 @@ class FleensRun implements FleensProbe {
   introPlaying = false;
   closureStarted = false;
   leaving = false;
+  /** Sorties de la file en cours ou à venir (`[9702]`) : l'écran suivant les attend. */
+  private exiting = 0;
 
   private readonly party: Zoombini[];
   private readonly pendingTrials: Trial[] = [];
@@ -766,8 +771,56 @@ class FleensRun implements FleensProbe {
     if (!canGo(this.state) || this.leaving) return true;
     this.leaving = true;
     this.saveAll();
-    this.kit.pressGo();
+    this.kit.pressGo({ depart: () => this.depart(), hold: () => this.exiting > 0 });
     return true;
+  }
+
+  /**
+   * Départ après « go ». Les Zoombinis de la file des essais (sur la branche) sortent par leurs `SCRS` (`10e0:2c91`) ; les autres partent à pied vers la sortie
+   * (`1168:2982`). L'original n'a ni `NODE` ni `PATH` ici (`FLEENS.MHK`) : c'est ce script, et lui seul, qui les fait descendre de l'arbre.
+   */
+  private depart(): void {
+    // Hors de la marche droite de `departSaved` : ils sont déjà pris par leur script de sortie.
+    for (const member of this.queue) if (!member.snoid.destroyed) member.walking = true;
+    this.exiting = this.queue.filter((m) => !m.snoid.destroyed).length;
+    this.kit.departSaved(EXIT_POINT.x, EXIT_POINT.y, EXIT_STEP);
+    this.exitLine();
+  }
+
+  /** `10e0:2c91` : le plus récent de la file (en tête de branche) descend (`SCRS` 7025 + pieds) ; son événement 131 (`2d63`) fait avancer les autres. */
+  private exitLine(): void {
+    let head = this.queue.pop();
+    while (head?.snoid.destroyed) head = this.queue.pop();
+    if (!head) return;
+    const { snoid } = head;
+    snoid.onEvent = (n) => {
+      if (n !== EVENT.exitLine) return;
+      snoid.onEvent = undefined;
+      this.advanceExit();
+    };
+    snoid.onEnd = () => {
+      snoid.onEnd = undefined;
+      snoid.destroy();
+      this.exiting -= 1;
+    };
+    // Le script part de la position courante (le point de la tête de branche) et finit hors écran à droite, en (657, 357).
+    snoid.play(SCRS.lineExit + snoid.traits.feet, FeatureFlag.stopAtEnd, { kind: "normal" });
+  }
+
+  /** Événement 131 : ceux qui restent avancent d'un cran vers la tête (`SCRS` 7020 + pieds), puis le nouveau premier descend à son tour. */
+  private advanceExit(): void {
+    const rest = this.queue.filter((m) => !m.snoid.destroyed);
+    rest.forEach((member, k) => {
+      const { snoid } = member;
+      const at = { x: snoid.position.x + LINE_STEP, y: snoid.position.y };
+      snoid.onEvent = undefined;
+      snoid.onEnd = () => {
+        snoid.onEnd = undefined;
+        if (k === rest.length - 1) this.exitLine();
+        else snoid.idle();
+      };
+      snoid.play(SCRS.lineForward + snoid.traits.feet, FeatureFlag.stopAtEnd, { kind: "normal", at });
+    });
   }
 
   /**

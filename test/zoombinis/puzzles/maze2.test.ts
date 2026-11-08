@@ -20,6 +20,7 @@ import {
   launchMaze2,
   maze2CellPosition,
   maze2Idle,
+  maze2LaunchPosition,
   maze2Level,
   maze2MemberState,
   maze2Outcome,
@@ -408,6 +409,11 @@ describe.skipIf(!original.has)("cartes de MAZE2.MHK (fichiers originaux)", () =>
     expect(maze2CellPosition(positions, 6, 6)).toEqual({ x: 328, y: 203 });
     expect(maze2CellPosition(positions, 12, 10)).toEqual({ x: 617, y: 280 });
     expect(maze2ZoombiniPosition(positions, 6, 6)).toEqual({ x: 332, y: 165 });
+    // Au lancer (`1118:2dad`), décalage propre à la direction de la rampe : 0 `(8, −33)`, 1 et 2 `(4, −38)`, 3 `(4, −33)`.
+    expect(maze2LaunchPosition(positions, 6, 6, 0)).toEqual({ x: 336, y: 170 });
+    expect(maze2LaunchPosition(positions, 6, 6, 1)).toEqual({ x: 332, y: 165 });
+    expect(maze2LaunchPosition(positions, 6, 6, 2)).toEqual({ x: 332, y: 165 });
+    expect(maze2LaunchPosition(positions, 6, 6, 3)).toEqual({ x: 332, y: 170 });
     for (const [r, c] of MAZE2_EXITS.flat()) expect(maze2CellPosition(positions, r, c).x).toBeGreaterThan(0);
     for (const ramp of MAZE2_RAMPS) {
       expect(maze2CellPosition(positions, ramp.start.row, ramp.start.col).x, `rampe ${ramp.number}`).toBeGreaterThan(0);

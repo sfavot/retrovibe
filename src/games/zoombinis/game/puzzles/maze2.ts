@@ -34,6 +34,16 @@ export const MAZE2_MAP_BASE = 16600;
 export const MAZE2_MAP_COUNT = 10;
 /** Un Zoombini est dessiné à la position de sa case plus ce décalage (`1100:0b69`). */
 export const MAZE2_SPRITE_OFFSET = { x: 4, y: -38 } as const;
+/**
+ * Au lancer, la bulle et le premier pas (ou le bond) partent de la case de départ avec un décalage propre à la direction de la rampe (`1118:2dad`) :
+ * direction 0 `(8, −33)`, 1 et 2 `(4, −38)`, 3 `(4, −33)`. Les pas suivants reprennent `MAZE2_SPRITE_OFFSET` (`1100:0b69`).
+ */
+export const MAZE2_LAUNCH_OFFSETS: readonly { readonly x: number; readonly y: number }[] = [
+  { x: 8, y: -33 },
+  { x: 4, y: -38 },
+  { x: 4, y: -38 },
+  { x: 4, y: -33 },
+];
 /** Zoombinis dans la liste en vol au plus (`1118:2285` : refus si `[890e] ≥ 10`) ; un atterrissage ou un rejet les en retire (`1118:3263`, `1118:3784`). */
 export const MAZE2_MAX_FLIGHTS = 10;
 
@@ -198,6 +208,13 @@ export function maze2CellPosition(positions: ArrayLike<number>, row: number, col
 export function maze2ZoombiniPosition(positions: ArrayLike<number>, row: number, col: number): { x: number; y: number } {
   const p = maze2CellPosition(positions, row, col);
   return { x: p.x + MAZE2_SPRITE_OFFSET.x, y: p.y + MAZE2_SPRITE_OFFSET.y };
+}
+
+/** Position écran d'un Zoombini au lancer, sur la case de départ de sa rampe (`1118:2dad`, `MAZE2_LAUNCH_OFFSETS`). */
+export function maze2LaunchPosition(positions: ArrayLike<number>, row: number, col: number, dir: number): { x: number; y: number } {
+  const p = maze2CellPosition(positions, row, col);
+  const offset = MAZE2_LAUNCH_OFFSETS[dir] ?? MAZE2_SPRITE_OFFSET;
+  return { x: p.x + offset.x, y: p.y + offset.y };
 }
 
 export type Maze2Generator = "67d3" | "6b4d" | "6f02" | "7532" | "7acf";

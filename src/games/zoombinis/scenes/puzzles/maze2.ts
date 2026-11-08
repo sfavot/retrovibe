@@ -30,8 +30,11 @@
  *  - temps : la simulation avance toutes les 6 ticks et seulement quand quelque chose bouge ; un lancer est pris à l'image suivante (au plus 5 ticks après le dépôt) ;
  *  - le glisser-déposer n'est pas limité au rectangle de la falaise du Zoombini (le kit a une seule zone de transport) : un dépôt sur une rampe d'une autre falaise est refusé
  *    (retour sur sa place) ; il n'y a donc pas de différence de résultat, seulement de geste ;
- *  - la bulle est une feature `relative` posée par rapport aux pieds du Zoombini (décalage **probable**, calé sur les dimensions des images) ; sa position exacte dans l'original
- *    dépend de `1100:0b69` / `11a8:1f5c` (rattachement non porté) ;
+ *  - bulle et effets : posés comme l'original (`relative` sur la position du Zoombini, rappel d'image `1118:3dac` / `1118:3e25` et ancres `REGS 17000` / `17001`), mais
+ *    la bulle n'est pas rattachée au Zoombini par le groupe de synchronisation `11a8:1f5c` (sans effet visible : ils changent de script ensemble) ; la bulle n'éclate
+ *    pas sur un tourbillon (`SCRB 10030`, `1100:1301`) et l'atterrissage ne crée pas `SCRB 10041` (`1118:1fb4`) ; le Zoombini rejeté par un tourbillon reste sur la
+ *    position de la case (l'original le décale de `(17, 5)` pour `SCRS 14006`) ;
+ *  - au doigt (extension tactile du kit), la flèche d'une rampe (`SCRB 7000 + z − 1`) sous le doigt la désigne aussi ; à la souris, la règle de l'original seule ;
  *  - calques de falaise (`SCRB 8000` à `8013`) : tous posés devant les objets en vol, derrière les Zoombinis posés ; l'ordre dynamique `[894a]` / `[895a]` / `[895c]` n'est pas porté ;
  *  - la rampe joue son script entier ; le Zoombini passe devant le canon (pas de réordonnancement des calques de la rampe) ;
  *  - les Zoombinis qui reviennent marchent en ligne droite (pas de terrain `tBMP 100` : dans les épreuves l'original ne s'en sert qu'au dépôt) ;
@@ -46,7 +49,7 @@ import type { Shape } from "../../../../data/mohawk/shap";
 import { screenInfo } from "../../data/archives";
 import type { Point } from "../../data/zoombini";
 import { DIALOG } from "../../engine/dialog";
-import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type Features } from "../../engine/features";
+import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeatureImageHook, type Features } from "../../engine/features";
 import { ZOOMBINIS_GAME } from "../../engine/game";
 import { regs, scrs } from "../../engine/resources";
 import type { Scene, SceneContext } from "../../engine/scene";
@@ -63,6 +66,7 @@ import {
   launchMaze2,
   maze2CellPosition,
   maze2Idle,
+  maze2LaunchPosition,
   maze2Outcome,
   maze2ZoombiniPosition,
   newMaze2Rotation,
@@ -111,10 +115,16 @@ const QUEUE_SIZE = 20;
 /** Profondeurs : cases, marques, plaques, machines à bulles, calques de falaise, rampes, objets en vol (Zoombini puis bulle), effets, caches de rampe ; les Zoombinis posés sont à `1 + y / 1000`. */
 const DEPTH = { cells: 0.1, marks: 0.12, plates: 0.13, machines: 0.2, layers: 0.3, ramps: 0.5, flight: 0.6, bubble: 0.61, effects: 0.62, fronts: 0.7 } as const;
 
-/** Décalage du coin haut-gauche de la bulle (première image des scripts `SCRB 10000…`) par rapport aux pieds du Zoombini (calé sur les images de 52 × 67) ; **probable**. */
-const BUBBLE_OFFSET = { x: -26, y: -52 } as const;
-/** Tourbillon `SCRB 10031` : coin haut-gauche (image de 52 × 55) par rapport au centre de la case ; **probable**. */
-const WHIRL_OFFSET = { x: -26, y: -27 } as const;
+/** Ancres X et Y des images de `tBMP 10000` (`REGS 17000` → `[8896]`, `17001` → `[889a]`, indexées par le numéro d'image ; le groupe 3 n'a pas de `REGS` automatiques). */
+const BUBBLE_ANCHORS = 17000;
+/**
+ * Rappel d'image (`+0x14`) des bulles et des effets, posés `relative` sur la position du Zoombini : la première partie de chaque image est recalée sur
+ * son ancre, `x − ancreX[w]`, `y + hauteur − ancreY[w]` ; hauteur 35 pour `1118:3dac` (bulle, tourbillon, éclaboussures), 25 pour `1118:3e25` (gerbe
+ * d'atterrissage jouée par la bulle, `1118:1fb4`).
+ */
+const LIFT = { bubble: 35, spray: 25 } as const;
+/** Tourbillon (`1100:1301`) : le Zoombini rejeté et l'objet `SCRB 10031` sont posés sur la case visée plus `(3, −38)`. */
+const WHIRL_OFFSET = { x: 3, y: -38 } as const;
 
 /** `SCRS` : poses de rampe `14999 + 5 × classe + pieds`, canon `14000 + classe`, bond `15080` / `15085 + pieds`, pas `15015`, collision `15035`, attente `15055`, danse `15090 + pieds`. */
 const SCRS = {
@@ -162,6 +172,8 @@ interface RampView {
   front: Feature | null;
   /** Plaque (`SCRB 7014 + z − 1`) : s'allume quand un Zoombini porté survole la rampe. */
   plate: Feature;
+  /** Marque (`SCRB 7000 + z − 1`, la flèche dessinée devant la rampe). */
+  mark: Feature;
 }
 
 /** Un lancer demandé (dépôt accepté) puis en cours : la simulation le prend à la prochaine image. */
@@ -200,6 +212,8 @@ export interface Maze2Probe {
   readonly landDances: number;
   /** Copie du monde (pour un robot ou un contrôle). */
   snapshot(): Maze2World;
+  /** Bulle du Zoombini `index` pendant son vol (`null` hors vol). */
+  bubbleOf(index: number): Feature | null;
 }
 
 export type Maze2Scene = Scene & { readonly probe: Maze2Probe | null };
@@ -234,6 +248,8 @@ class Maze2Run implements Maze2Probe {
   private readonly shapes: readonly Shape[];
   private readonly anchorX: Int16Array;
   private readonly anchorY: Int16Array;
+  private readonly bubbleAnchorX: Int16Array;
+  private readonly bubbleAnchorY: Int16Array;
   /** Compteurs d'animation des cases (tourbillon, attente, bouton enfoncé), échéances (ticks) et direction affichée. */
   private readonly frames: number[];
   private readonly due: number[];
@@ -273,6 +289,8 @@ class Maze2Run implements Maze2Probe {
     this.shapes = archive.tbmpImages(CELL_SHEET);
     this.anchorX = regs(archive, CELL_ANCHORS);
     this.anchorY = regs(archive, CELL_ANCHORS + 1);
+    this.bubbleAnchorX = regs(archive, BUBBLE_ANCHORS);
+    this.bubbleAnchorY = regs(archive, BUBBLE_ANCHORS + 1);
     const cells = this.world.cells;
     this.frames = cells.map(() => 0);
     this.due = cells.map((cell) => ctx.clock.ticks + cell.delay);
@@ -317,13 +335,14 @@ class Maze2Run implements Maze2Probe {
     // Marques, plaques (qui s'allument quand un Zoombini survole la rampe), rampes et caches des rampes actives (script de rampe et son cache `+ 1` à la position de la plaque).
     for (const number of this.world.ramps) {
       const ramp = MAZE2_RAMPS[number - 1]!;
-      f.create({ script: SCRB.mark + number - 1, delay: IMAGE_TICKS, depth: DEPTH.marks, flags: still });
+      const mark = f.create({ script: SCRB.mark + number - 1, delay: IMAGE_TICKS, depth: DEPTH.marks, flags: still });
       const plate = f.create({ script: SCRB.plate + number - 1, delay: IMAGE_TICKS, depth: DEPTH.plates, flags: stillBit });
       const object = f.create({ script: ramp.script, delay: IMAGE_TICKS, depth: DEPTH.ramps, position: ramp.plaque, flags: still | F.relative });
       const front = ramp.script === 9000 ? null : f.create({ script: ramp.script + 1, delay: IMAGE_TICKS, depth: DEPTH.fronts, position: ramp.plaque, flags: stillBit | F.relative });
-      const target = createTarget(ramp.drop, number);
+      // Souris : la règle de l'original (point de dépôt à ±15 px des pieds). Au doigt, la flèche de la rampe sous le doigt la désigne aussi (extension tactile du kit).
+      const target = createTarget(ramp.drop, number, () => mark.rect);
       this.rampTargets.push(target);
-      this.rampViews.push({ ramp, target, object, front, plate });
+      this.rampViews.push({ ramp, target, object, front, plate, mark });
     }
 
     const buttons = sheetButtonImages(archive.tbmpImages(BUTTONS_SHEET));
@@ -381,6 +400,10 @@ class Maze2Run implements Maze2Probe {
 
   snapshot(): Maze2World {
     return cloneMaze2(this.world);
+  }
+
+  bubbleOf(index: number): Feature | null {
+    return this.views.get(index + 1)?.bubble ?? null;
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -666,17 +689,30 @@ class Maze2Run implements Maze2Probe {
     }
   }
 
-  /** Bulle du Zoombini : feature `relative` dont le coin haut-gauche suit ses pieds ; rejoue le script de pas à chaque case. */
-  private placeBubble(view: FlightView, feet: Point, script: number): void {
+  /** Rappel d'image `1118:3dac` / `1118:3e25` : la première partie est recalée sur son ancre (`REGS 17000` / `17001`) et descendue de `lift`. */
+  private anchored(lift: number): FeatureImageHook {
+    return (_feature, parts) => {
+      const first = parts[0];
+      if (!first) return;
+      first.x -= this.bubbleAnchorX[first.w] ?? 0;
+      first.y += lift - (this.bubbleAnchorY[first.w] ?? 0);
+    };
+  }
+
+  /**
+   * Bulle du Zoombini (`1118:2dad`, `1100:0b69`) : feature `relative` (`0x4908000`) posée sur la position du Zoombini, rappel d'image `1118:3dac` ;
+   * rejoue le script de pas à chaque case.
+   */
+  private placeBubble(view: FlightView, at: Point, script: number): void {
     const f = this.features;
-    const at = { x: feet.x + BUBBLE_OFFSET.x, y: feet.y + BUBBLE_OFFSET.y };
     if (!view.bubble) {
       view.bubble = f.create({
         script,
         delay: IMAGE_TICKS,
         depth: DEPTH.bubble,
-        position: at,
+        position: { ...at },
         flags: FeatureFlag.flag4000000 | FeatureFlag.relative | FeatureFlag.stopAtEnd | FeatureFlag.active | FeatureFlag.firstImage,
+        onImage: this.anchored(LIFT.bubble),
       });
       return;
     }
@@ -690,15 +726,16 @@ class Maze2Run implements Maze2Probe {
     view.bubble = null;
   }
 
-  /** Effet à usage unique (éclaboussure, tourbillon, gerbe) : détruit à la fin de son script. */
-  private effect(view: FlightView, script: number, at: Point): void {
+  /** Effet à usage unique (éclaboussure, tourbillon, gerbe) posé sur la position d'un Zoombini, recalé comme la bulle (`lift`) : détruit à la fin de son script. */
+  private effect(view: FlightView, script: number, at: Point, lift: number = LIFT.bubble): void {
     const f = this.features;
     const effect = f.create({
       script,
       delay: IMAGE_TICKS,
       depth: DEPTH.effects,
-      position: at,
+      position: { ...at },
       flags: FeatureFlag.flag4000000 | FeatureFlag.relative | FeatureFlag.stopAtEnd | FeatureFlag.active | FeatureFlag.firstImage,
+      onImage: this.anchored(lift),
       onEvent: (_image, n) => {
         if (n !== FEATURE_END) return;
         view.effects.splice(view.effects.indexOf(effect), 1);
@@ -711,7 +748,8 @@ class Maze2Run implements Maze2Probe {
   /** Un pas de case, ou le bond de lancement des rampes de direction 1 et 3 (`1100:0b69`, `1118:2dad`). */
   private startSegment(view: FlightView, flight: Maze2Flight): void {
     const { snoid } = view.member;
-    const feet = this.pos(flight.row, flight.col);
+    // Le premier segment part de la case de départ avec le décalage du lancer (`1118:2dad`), les suivants avec celui des cases (`1100:0b69`).
+    const feet = flight.steps === 1 ? maze2LaunchPosition(this.positions, flight.row, flight.col, flight.dir) : this.pos(flight.row, flight.col);
     // Effet de la case quittée : un bouton actionné à l'entrée (`1100:102a`, son 5103, image enfoncée) ; un aiguillage tournant joue 5101 / 5102 (voir `syncCells`).
     const last = view.lastTarget;
     if (last && last.row === flight.row && last.col === flight.col) this.cellEntered(flight.row, flight.col);
@@ -757,7 +795,7 @@ class Maze2Run implements Maze2Probe {
       snoid.play(SCRS.whirlReject, FeatureFlag.stopAtEnd, { kind: "reject" });
       view.at = feet;
       const whirl = maze2CellPosition(this.positions, flight.targetRow, flight.targetCol);
-      this.effect(view, SCRB.whirl, { x: whirl.x + WHIRL_OFFSET.x, y: whirl.y + WHIRL_OFFSET.y });
+      this.effect(view, SCRB.whirl, { x: whirl.x + WHIRL_OFFSET.x, y: whirl.y + WHIRL_OFFSET.y }, LIFT.bubble);
       return;
     }
     // Collision : les deux Zoombinis se heurtent à mi-chemin de la case visée.
@@ -768,7 +806,7 @@ class Maze2Run implements Maze2Probe {
     snoid.play(SCRS.clash + 5 * flight.dir + (snoid.traits.feet - 1), FeatureFlag.stopAtEnd, { kind: "normal" });
     view.at = mid;
     const zone = this.splashZone(flight);
-    this.effect(view, SCRB.splash + 3 * flight.dir + zone, { x: mid.x + BUBBLE_OFFSET.x, y: mid.y + BUBBLE_OFFSET.y });
+    this.effect(view, SCRB.splash + 3 * flight.dir + zone, mid, LIFT.bubble);
     // 6 images de gerbe, puis `SCRS 14004` (`SCRB 10012…`, événement `0x3d`).
     this.scheduled.push({
       at: now + 6,
@@ -799,7 +837,7 @@ class Maze2Run implements Maze2Probe {
     snoid.setPosition(feet);
     snoid.play(SCRS.land + snoid.traits.feet, FeatureFlag.stopAtEnd, { kind: "normal" });
     view.at = feet;
-    this.effect(view, SCRB.spray, { x: feet.x + BUBBLE_OFFSET.x, y: feet.y + BUBBLE_OFFSET.y });
+    this.effect(view, SCRB.spray, feet, LIFT.spray);
     const member = w.members[view.id - 1]!;
     if (member.saved) view.member.zoombini.present = true;
     this.scheduled.push({

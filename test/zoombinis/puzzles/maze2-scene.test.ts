@@ -292,6 +292,114 @@ describe.skipIf(!original.has)("gouffre des véhibules : écran (écran 18, MAZE
     await wait(6);
   });
 
+  /** Premier niveau (0 à 3) dont une rampe active de la falaise 0 vérifie `wanted`. */
+  async function startWithRamp(wanted: (ramp: (typeof MAZE2_RAMPS)[number]) => boolean, options: { size?: number } = {}) {
+    for (let level = 0; level <= 3; level++) {
+      const t = await start({ level, size: options.size });
+      const ramp = t.probe().world.ramps.find((n) => MAZE2_RAMPS[n - 1]!.cliff === 0 && wanted(MAZE2_RAMPS[n - 1]!));
+      if (ramp !== undefined) return { ...t, ramp };
+    }
+    throw new Error("aucune rampe de la falaise 0 ne convient");
+  }
+
+  it("bug 34 : la bulle (SCRB 10000…, rappel 1118:3dac et ancres REGS 17000 / 17001) enveloppe le Zoombini en vol jusqu'aux pieds, pour les 5 types de pieds", async () => {
+    const { probe, wait } = await start({ level: 0, size: 8 });
+    const ramps = probe().world.ramps.filter((n) => MAZE2_RAMPS[n - 1]!.cliff === 0);
+    const feetSeen = new Set<number>();
+    const outside: string[] = [];
+    const steps = new Set<number>();
+    for (let index = 0, ticks = 0; (index < 5 || probe().launches > 0) && ticks < 6000; ticks += 3) {
+      if (index < 5 && ramps.some((ramp) => probe().launch(index, ramp))) index++;
+      await wait(3);
+      for (const member of probe().kit.members) {
+        const bubble = probe().bubbleOf(member.index);
+        const id = member.snoid.scriptId;
+        // Scripts de pas `15015 + 5 × direction + pieds − 1` sous une bulle de pas `10000 + direction`.
+        if (!bubble?.rect || !member.snoid.feature.rect || id < 15015 || id > 15034 || bubble.scriptId > 10003) continue;
+        feetSeen.add(member.snoid.traits.feet);
+        steps.add(id);
+        const z = member.snoid.feature.rect;
+        const b = bubble.rect;
+        if (z.bottom > b.bottom || z.top < b.top || z.left < b.left || z.right > b.right)
+          outside.push(`pieds ${member.snoid.traits.feet}, SCRS ${id} [${z.left},${z.top},${z.right},${z.bottom}] hors de la bulle ${bubble.scriptId} [${b.left},${b.top},${b.right},${b.bottom}]`);
+      }
+    }
+    expect(feetSeen).toEqual(new Set([1, 2, 3, 4, 5]));
+    expect(steps.size).toBeGreaterThan(5);
+    expect(outside).toEqual([]);
+  }, 60_000);
+
+  it("bug 34 : au bond de lancement, la bulle naît sur la bulle que dessine le cache de la rampe (SCRB 9002 / 9004, image 29) : une seule bulle", async () => {
+    const { probe, wait, features, ramp } = await startWithRamp((r) => r.script !== 9000);
+    const script = MAZE2_RAMPS[ramp - 1]!.script;
+    const front = features.features.find((f) => f.scriptId === script + 1)!;
+    expect(probe().launch(0, ramp)).toBe(true);
+    let cache: { left: number; top: number } | null = null;
+    for (let ticks = 0; ticks < 600 && !probe().bubbleOf(0)?.rect; ticks++) {
+      await wait(1);
+      // Image 29 du cache : la bulle qui sort du canon (`tBMP 9000` image 216, 52 × 67).
+      if (front.image === 29 && front.rect) cache = { left: front.rect.left, top: front.rect.top };
+    }
+    const bubble = probe().bubbleOf(0)!;
+    expect(bubble.scriptId).toBe(MAZE2_RAMPS[ramp - 1]!.dir === 1 ? 10042 : 10043);
+    expect(cache).not.toBeNull();
+    expect(Math.abs(bubble.rect!.left - cache!.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(bubble.rect!.top - cache!.top)).toBeLessThanOrEqual(1);
+  }, 60_000);
+
+  it("bug 34 : au doigt, lâcher le Zoombini sur la flèche de la rampe (SCRB 7000 + z − 1) le lance ; à la souris, le même geste suit la règle de l'original (±15 px des pieds) et il rentre", async () => {
+    for (const mode of ["souris", "doigt"] as const) {
+      const { probe, host, wait, grab, features, rampPoint } = await start({ level: 0 });
+      (host as unknown as { pointerIsTouch: boolean }).pointerIsTouch = mode === "doigt";
+      const ramp = probe().world.ramps[0]!;
+      const mark = features.features.find((f) => f.scriptId === 7000 + ramp - 1)!.rect!;
+      const member = probe().kit.members[0]!;
+      const home = { ...member.snoid.position };
+      const point = grab(0)!;
+      const at = { x: point.x - member.snoid.position.x, y: point.y - member.snoid.position.y };
+      const finger = { x: Math.floor((mark.left + mark.right) / 2), y: Math.floor((mark.top + mark.bottom) / 2) };
+      // Les pieds du Zoombini porté sont hors du carré de ±15 px du point de dépôt (`DS:9706`) : la flèche est sous ce point.
+      expect(Math.max(Math.abs(finger.x - at.x - rampPoint(ramp).x), Math.abs(finger.y - at.y - rampPoint(ramp).y))).toBeGreaterThan(15);
+      host.input.moveMouse(point.x, point.y);
+      host.input.mouseDown("left");
+      await wait(4);
+      host.input.moveMouse(finger.x, finger.y);
+      await wait(8);
+      host.input.mouseUp("left");
+      await wait(6);
+      if (mode === "doigt") {
+        expect(probe().launches).toBe(1);
+        expect(member.snoid.position).toEqual(rampPoint(ramp));
+      } else {
+        expect(probe().launches).toBe(0);
+        expect(member.snoid.position).toEqual(home);
+      }
+    }
+  });
+
+  it("bug 34 : au doigt, toucher un Zoombini puis toucher la flèche d'une rampe l'y lance", async () => {
+    const { probe, host, wait, grab, features, rampPoint } = await start({ level: 0 });
+    (host as unknown as { pointerIsTouch: boolean }).pointerIsTouch = true;
+    const ramp = probe().world.ramps[0]!;
+    const mark = features.features.find((f) => f.scriptId === 7000 + ramp - 1)!.rect!;
+    const member = probe().kit.members[0]!;
+    const point = grab(0)!;
+    host.input.moveMouse(point.x, point.y);
+    host.input.mouseDown("left");
+    await wait(4);
+    host.input.mouseUp("left");
+    await wait(4);
+    expect(probe().launches).toBe(0);
+    host.input.moveMouse(mark.left + 1, mark.bottom - 2);
+    await wait(4);
+    host.input.mouseDown("left");
+    await wait(2);
+    host.input.mouseUp("left");
+    await wait(6);
+    expect(probe().launches).toBe(1);
+    expect(member.snoid.position).toEqual(rampPoint(ramp));
+  });
+
   it("un lancer suit les cases jusqu'à la sortie 3 : bulle, pas de case, atterrissage, retour à pied sur la falaise 3, « go » actif", async () => {
     const { probe, until, seen, queued, settled } = await start({ level: 0 });
     const found = findLaunch(probe(), (w, id) => w.members[id - 1]!.saved);

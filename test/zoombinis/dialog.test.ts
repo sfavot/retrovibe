@@ -121,6 +121,23 @@ describe.skipIf(!original.has)("boîte de dialogue de Zoombinis", () => {
     expect(dialogs.message).toBeNull();
   });
 
+  it("menu : toucher le libellé d'une ligne déclenche son bouton (ajout du port)", async () => {
+    const env = await startDialogs();
+    const { dialogs, zb, engine } = env;
+    dialogs.openMenu(engine.ctx);
+    await env.run(100);
+    // Libellé de la ligne 5 (« Dialogues & effets »), loin à droite du bouton rouge.
+    await click(env, [400, 230]);
+    expect(zb.game.options.effects).toBe(false);
+    // Libellé de la ligne 6 (« Musique de fond »).
+    await click(env, [400, 252]);
+    expect(zb.game.options.music).toBe(false);
+    // Hors des lignes : rien.
+    await click(env, [400, 200]);
+    expect(zb.game.options.effects).toBe(false);
+    expect(dialogs.modes).toEqual([1]);
+  });
+
   it("nouvelle partie : confirmation adaptée à l'état, puis partie neuve et retour à la carte", async () => {
     const env = await startDialogs();
     const { dialogs, zb, engine, str } = env;

@@ -279,7 +279,23 @@ class MenuLayer extends ButtonLayer {
   }
 
   hit(x: number, y: number): number | null {
-    return this.hitButtons(x, y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    return this.hitButtons(x, y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) ?? this.hitRow(x, y);
+  }
+
+  /**
+   * Ajout du port (le petit bouton rouge est dur à toucher au doigt) : toute la ligne, du bouton à la fin du libellé, vaut le bouton ;
+   * l'original ne répond qu'à l'image du bouton.
+   */
+  private hitRow(x: number, y: number): number | null {
+    for (const button of this.buttons) {
+      if (button.id > 8) continue;
+      const top = AREA.menuRowTops[button.id - 1]!;
+      const left = Math.min(button.area.x, AREA.menuRowLeft);
+      const rowTop = Math.min(button.area.y, top);
+      const bottom = Math.max(button.area.y + button.area.h, top + AREA.menuRowHeight);
+      if (contains(rect(left, rowTop, AREA.menuRowRight, bottom), x, y)) return button.id;
+    }
+    return null;
   }
 
   /** `true` quand l'option de la ligne est coupée (∅) : ligne 5 = voix et effets, 6 = musique, 7 = souris aimantée, 8 = transitions. */

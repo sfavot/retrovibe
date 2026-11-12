@@ -178,6 +178,17 @@ describe.skipIf(!hasOriginalFiles)("gestionnaires d'objet (famille 1)", () => {
     expect(s.say("eteindre la torche")).toEqual(["V018"]);
   });
 
+  it("bois : prendre crée une torche neuve (Ego 8, Fig 8)", () => {
+    // `245d:000e` : le bois (`Num 17`) est une réserve de torches ; la torche créée est neuve et éteinte
+    // (`Ego 8`) et doit porter l'image correspondante (`Fig 8`), pas le défaut `Fig 0` (torche allumée consumée).
+    s.put(17, { pickable: 0 });
+    s.hero.ground = 0x41; // sol 65 : la pile de bois
+    expect(s.say("prendre du bois")).toEqual(["V015"]);
+    const torch = s.hero.contents.find((o) => o.num === 12);
+    expect(torch).toBeDefined();
+    expect([torch!.ego, torch!.fig]).toEqual([8, 8]);
+  });
+
   it("feu mort : allumer V011 ; éteindre un feu vivant V019", () => {
     const fire = s.put(18, { ego: 0, pickable: 0 });
     expect(s.say("allumer le feu")).toEqual(["V011"]);

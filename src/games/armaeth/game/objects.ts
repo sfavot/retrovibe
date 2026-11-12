@@ -242,7 +242,9 @@ function takeTorchFromPile(ctx: HandlerContext): number {
   const walker = hero(ctx);
   if (walker.ground !== GROUND.woodPile) return tooFar(ctx, wood, 3);
   if (contentWeight(walker) + 5 > walker.capacity) return refuse(ctx, 4, 21);
-  spawn(ctx, 12, walker, { ego: 8 });
+  // `Ego 8` (torche neuve et éteinte) et `Fig 8` : sans `Fig`, l'objet neuf garde l'image par défaut (`Fig 0`, torche allumée
+  // presque consumée) — `spawn` ne copie pas le modèle quand aucun objet `Num 12` n'existe encore dans le monde.
+  spawn(ctx, 12, walker, { ego: 8, fig: 8 });
   sayDone(ctx);
   return HANDLED;
 }

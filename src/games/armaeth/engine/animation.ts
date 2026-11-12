@@ -210,8 +210,9 @@ function loadAniStep(obj: GameObject, sprites: SpriteSource, ani: AniTable, id: 
  * Démarre une animation scénarisée (`16f5:0132`, certain) : partenaires liés par `Bag`, `Anm` = id, `Nbr` = nombre de pas,
  * vitesses, état (`Gst`, `Mob`, `Ego`, `Fig 0`), premier pas, ressource `ANM` chargée. Les trajets de l'objet sont annulés par
  * l'appelant (mover). Rend le son à jouer, le cas échéant.
- * hypothèse (characters.md §1.3) : mot 2 de l'enregistrement = identifiant du son, mot 3 = numéro ; lecture en boucle
- * (arguments `7, 0, 7` de `gm_sound_play`) arrêtée à la fin de l'animation.
+ * Son (`16f5:0295`, relu dans le désassemblage) : `gm_sound_play(mot 3, classe = mot 1, mot 2)` — le **mot 3** est
+ * l'identifiant de la banque, le **mot 2** le numéro ; lecture en boucle (arguments `7, 0, 7`) arrêtée à la fin de
+ * l'animation (`16f5:02a2`).
  */
 export function startScriptedAnimation(obj: GameObject, sprites: SpriteSource, ani: AniTable, params: ScriptedAnimation): AnimationEvent[] {
   const record = aniRecord(ani, params.id);
@@ -230,8 +231,9 @@ export function startScriptedAnimation(obj: GameObject, sprites: SpriteSource, a
   loadAniStep(obj, sprites, ani, params.id, 0);
   loadObjectSprite(obj, sprites);
   const events: AnimationEvent[] = [];
-  if (record.kind !== NO_SOUND_CLASS && (record.unknown2 !== 0 || record.unknown3 !== 0) && params.audible) {
-    events.push({ type: "sound", soundClass: String.fromCharCode(record.kind), id: record.unknown2, number: record.unknown3, loop: true });
+  if (record.kind !== NO_SOUND_CLASS && record.unknown2 !== 0 && params.audible) {
+    // `16f5:0295` : `gm_sound_play(AX = mot 3, DL = mot 1, BX = mot 2)` — id de banque = mot 3, numéro = mot 2
+    events.push({ type: "sound", soundClass: String.fromCharCode(record.kind), id: record.unknown3, number: record.unknown2, loop: true });
   }
   return events;
 }

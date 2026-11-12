@@ -50,7 +50,7 @@ Classes de message utilisées : `G` (accidents, combats, morts), `V` (réponses 
 
 ### 1.3 Animations scénarisées (`ANM`, `A1FANI.SYS`)
 
-`A1FANI.SYS` : 47 animations. Enregistrement de 12 octets lu par `16f5:00ec` (recherche par id) : mot 0 id ; mot 1 **classe de son** (`0x41` = `A` si un son est joué, `0x20` sinon) ; mots 2 et 3 : numéros du son (sinon 0) ; mot 4 nombre de pas ; mot 5 indice du premier pas. Chaque pas est un mot : **octet haut = `Fig`** (séquence d'images), **octet bas = nombre de boucles** de cette séquence (`Tim`). Confirmé sur les 47 enregistrements (ex. ANM 2 : `0/1 1/2 2/1 3/4`).
+`A1FANI.SYS` : 47 animations. Enregistrement de 12 octets lu par `16f5:00ec` (recherche par id) : mot 0 id ; mot 1 **classe de son** (`0x41` = `A` si un son est joué, `0x20` sinon) ; mot 2 **numéro du son**, mot 3 **identifiant de banque** (relu dans `16f5:0295` : `gm_sound_play(mot 3, classe, mot 2)`, sinon 0) ; mot 4 nombre de pas ; mot 5 indice du premier pas. Chaque pas est un mot : **octet haut = `Fig`** (séquence d'images), **octet bas = nombre de boucles** de cette séquence (`Tim`). Confirmé sur les 47 enregistrements (ex. ANM 2 : `0/1 1/2 2/1 3/4`).
 
 `16f5:0132` (certain) : annule les trajets (`30d9:0114`) ; `Bag` +0x3A de chaque objet reçoit la `Ser` de l'autre (lien de partenaires, 0 sans partenaire) ; décharge la ressource sprite ; `Anm` +0x30 = id ; `Nbr` +0x36 = nombre de pas ; `Hor`/`Ver`/`Prf` = arguments ; `1a37:003a(Gst, Mob, Ego, Fig 0)` ; charge le premier pas (`16f5:038c` : `Tim` = octet bas, `Fig` = octet haut) ; affiche le message demandé (mode 1 : `209c:000c`, 2 : `209c:0092`, autre : direct) ; si le mot de son est non nul et l'objet dans la salle chargée : `gm_sound_play(…, 7, 0, 7)`.
 
@@ -377,7 +377,7 @@ Retour **0 = accepté**, **7 = refusé** (certain : `179d:0004` pose `Err = 2` s
 | 5 | 3 / 24 | frelons (`Sol 37`, `Inv = 0`) | `2405:0000` variante 0 + `G24` : dépouille ; le héros n'est pas détruit ici (la dépouille le remplace) |
 | 6 | 11 / 71 | arrachage des ronces (`Ego 7`) | `G20` et retour à la marche |
 | 12 | 2 / 300 | KO long après le vol de Prytwen | `G108` (« vous reprenez vos esprits ») et retour à la marche |
-| 17 | 1 / 1 | arrivée de téléportation | retour à la marche sans message |
+| 17 | 1 / 1 | arrivée de téléportation ; **résurrection** (`2594:043a`, F4 « continuer ») | retour à la marche sans message |
 | 18 | 1 / 1 | départ de téléportation (formule `Erin`, § 9.4) | `Inf = 6`, `+0x66` = salle de destination `+0x38` ; **lance l'animation 17** ; si la salle chargée est la destination : `placer(mode 9)` (position aléatoire), sinon `186d:000c` (changement de salle) |
 | 19 | 1 / 1 | atterrissage dans l'eau (§ 4.2.5) | `Inv` restauré depuis `+0x27` ; `+0x38 > 20` : `G35`, mort, contenu détruit ; sinon `G34` et marche |
 | 32 | 1 / 1 | boulet de lave (geyser, `V376`) | `2405:0000` variante 1 + `G40` : dépouille |

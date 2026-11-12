@@ -84,6 +84,7 @@ export const contextAnimations: NpcAnimations = createAnimations((ctx) => ({ spr
 function playEvents(ctx: BehaviorContext, events: AnimationEvent[]): void {
   for (const event of events) {
     if (event.type === "sound") ctx.sound.play(event.id, event.soundClass, event.number, event.loop);
+    else if (event.type === "soundStop") ctx.sound.resumeMusic();
   }
 }
 

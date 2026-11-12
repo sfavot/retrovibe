@@ -146,7 +146,7 @@ describe("animStep : cas synthétiques", () => {
   });
 });
 
-/** Table ANI synthétique : animation 5 = deux pas (Fig 1 x 2 boucles, Fig 2 x 1), son de classe A (7, 27). */
+/** Table ANI synthétique : animation 5 = deux pas (Fig 1 x 2 boucles, Fig 2 x 1), son de classe A (id 27, numéro 7). */
 function fakeAni(): AniTable {
   const words = Uint16Array.of((1 << 8) | 2, (2 << 8) | 1);
   return {
@@ -165,7 +165,7 @@ describe("animations scénarisées", () => {
     const { state, obj } = newObject();
     const partner = state.createObject({ typ: 2, num: 8 });
     const events = startScriptedAnimation(obj, sprites, fakeAni(), { id: 5, gst: 7, mob: 1, ego: 6, hor: 0, ver: 1, prf: 0, partner, audible: true });
-    expect(events).toEqual([{ type: "sound", soundClass: "A", id: 7, number: 27, loop: true }]);
+    expect(events).toEqual([{ type: "sound", soundClass: "A", id: 27, number: 7, loop: true }]);
     expect(obj).toMatchObject({ animId: 5, gst: 7, mob: 1, ego: 6, speedY: 1, fig: 1 });
     expect(rawU16(obj, RAW_OFFSET.tim)).toBe(2);
     expect(rawU16(obj, RAW_OFFSET.nbr)).toBe(2);

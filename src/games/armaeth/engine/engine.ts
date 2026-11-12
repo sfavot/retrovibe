@@ -1422,6 +1422,7 @@ export class ArmaethEngine implements TokenHostEngine {
         stop: () => engine.sequencer.stop(),
         stopEffect: (cls, num) => engine.sequencer.stopEffect(cls, num),
         selectTrack: (cls, number, priority, loop = false) => engine.sequencer.selectTrack(cls, number, priority, loop),
+        resumeMusic: () => engine.sequencer.resumeMusic(),
       },
       events: { operate: (target, event, op, value, procedure) => engine.operateEvent(target, event, op, value, procedure) },
       score: {

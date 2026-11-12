@@ -518,6 +518,8 @@ const classChar = (cls: string | number): string => (typeof cls === "number" ? S
 export class Sequencer {
   readonly driver: SongDriver;
   private current: CurrentSound | null = null;
+  /** Dernière musique de fond (classe `M`) : rejouée quand un jingle transitoire s'achève (`2f86:0008`, « reprise »). */
+  private music: CurrentSound | null = null;
   /** Dernier effet demandé (`52d4`..`52dc`) : sa priorité reste en vigueur jusqu'à `stopEffect` ou un nouveau morceau. */
   private effect: EffectRequest | null = null;
   /** Effet bouclé mis de côté par un nouvel effet (`52e2`..`52e8`), relancé par `stopEffect`. */
@@ -535,6 +537,27 @@ export class Sequencer {
   /** Appeler 50 fois par seconde. */
   tick(): void {
     this.driver.tick();
+    // un jingle transitoire (non bouclé, hors musique) qui vient de s'achever rend la main à la musique (`2f86:0008`)
+    const cur = this.current;
+    if (cur && cur.playing && cur.cls !== "M" && !cur.loop && !this.driver.isMusicActive()) {
+      cur.playing = false;
+      this.resumeMusic();
+    }
+  }
+
+  /**
+   * Reprise de la musique (`2f86:0008`) : arrête le son transitoire en cours (jingle, son d'animation) et rejoue la
+   * dernière musique de fond. Sans musique mémorisée, se contente d'arrêter le transitoire.
+   */
+  resumeMusic(): void {
+    const music = this.music;
+    if (!music) {
+      if (this.current && this.current.cls !== "M") this.stop();
+      return;
+    }
+    const cur = this.current;
+    if (cur === music && cur.playing) return; // la musique joue déjà
+    this.play(music.id, music.cls, music.num, { loop: music.loop });
   }
 
   /** Volume maître (`2fec:0027`, commande `0x800`) : atténuation minimale 0 à 63, 0 = plein volume (hypothèse : valeur initiale du jeu). */
@@ -561,7 +584,9 @@ export class Sequencer {
     this.endEffect();
     this.saved = null;
 
-    this.current = { id, cls: c, num, bank, loop: options.loop === true, playing: false };
+    const next: CurrentSound = { id, cls: c, num, bank, loop: options.loop === true, playing: false };
+    this.current = next;
+    if (c === "M") this.music = next; // la musique de fond à reprendre après un jingle
     this.driver.loadSong(bankData(this.mix, bank));
     if (!this.muted) {
       this.driver.command(track.tempo, CMD_TEMPO, track.voiceMask);
@@ -622,11 +647,12 @@ export class Sequencer {
     if (cur) cur.playing = false;
   }
 
-  /** Arrête la musique et l'effet, et oublie l'effet mis de côté (`2fe0:0099`). */
+  /** Arrête la musique et l'effet, et oublie l'effet mis de côté et la musique mémorisée (`2fe0:0099`). */
   stopAll(): void {
     this.stop();
     this.endEffect();
     this.saved = null;
+    this.music = null;
   }
 
   /**

@@ -258,6 +258,7 @@ function tickAnimation(h: H): number {
     return id;
   }
   const r = tickScriptedAnimation(o, h.sprites, h.ani, o.room !== null && o.room === h.ctx.room);
+  for (const e of r.events) if (e.type === "soundStop") h.ctx.sound.resumeMusic();
   return r.finished;
 }
 
@@ -1030,7 +1031,7 @@ function noteClimbedEntry(state: WorldState, entry: { room: GameRoom | null; fro
 /**
  * Commande `continuer` : partie terminée -> `S49` ; héros présent -> `S46` (déjà dans la salle) ou `S47` (le jeu rejoint sa salle) ;
  * sinon le héros est recréé au centre de la fenêtre avec `S24` (`screens.md` E13), dans la salle chargée, ou dans celle d'où il était
- * monté s'il y était entré en grimpant (`climbedEntries`).
+ * monté s'il y était entré en grimpant (`climbedEntries`), puis apparaît par l'animation 17 (`2594:0004`, son `A8`).
  */
 export function continueGame(ctx: BehaviorContext, services: HeroServices = {}): ContinueResult {
   const state: WorldState = ctx.state;
@@ -1060,8 +1061,11 @@ export function continueGame(ctx: BehaviorContext, services: HeroServices = {}):
   loadObjectSprite(hero, services.sprites ?? (ctx as HeroContext).sprites ?? NO_SPRITES);
   state.setHero(hero);
   if (room !== ctx.room) ctx.rooms.want(room);
-  state.moveEnabled = true; // hypothèse : `4b50` repasse à 7 (le héros peut être recréé après une mort animée)
   ctx.messages.say("S", 24);
+  // `2594:043a` : le héros recréé apparaît (animation 17, son `A8`) ; `4b50` (`moveEnabled`) repasse à 7 à la fin de l'animation.
+  // S'il renaît dans une autre salle que la salle chargée (cas « grimpé », `climbedEntries`), le terrain de la salle chargée n'est
+  // pas le sien : on laisse le rechargement le placer, sans animation.
+  if (room === ctx.room) startHeroAnimation(hero, ctx, 17, {}, services);
   hero.err = 0;
   return "created";
 }

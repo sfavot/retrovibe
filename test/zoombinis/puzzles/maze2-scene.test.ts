@@ -21,7 +21,7 @@ import {
 } from "../../../src/games/zoombinis/game/puzzles/maze2";
 import { nextScreen } from "../../../src/games/zoombinis/game/route";
 import { makeZoombini, type GameState, type Session, type Zoombini } from "../../../src/games/zoombinis/game/state";
-import { CLIFF_PLACES, IMAGE_TICKS, createMaze2Scene, type Maze2Probe, type Maze2Scene } from "../../../src/games/zoombinis/scenes/puzzles/maze2";
+import { CLIFF_BOUNDS, CLIFF_PLACES, IMAGE_TICKS, createMaze2Scene, type Maze2Probe, type Maze2Scene } from "../../../src/games/zoombinis/scenes/puzzles/maze2";
 import { HELP_KEY } from "../../../src/games/zoombinis/scenes/puzzle-kit";
 import { originalFiles } from "../../support/original";
 import { runFor, TestHost } from "../engine-test-host";
@@ -244,6 +244,47 @@ describe.skipIf(!original.has)("gouffre des véhibules : écran (écran 18, MAZE
     scene.leave(engine.ctx);
     scene.enter(engine.ctx);
     expect(scene.probe!.world.mapIndex).toBe(0);
+  });
+
+  it("le point de dépôt de chaque rampe est dans le rectangle de sa falaise (S14:13d8), et ces rectangles ne se recoupent pas", () => {
+    for (const ramp of MAZE2_RAMPS) {
+      const r = CLIFF_BOUNDS[ramp.cliff]!;
+      expect(ramp.drop.x >= r.left && ramp.drop.x <= r.right && ramp.drop.y >= r.top && ramp.drop.y <= r.bottom, `rampe ${ramp.number}`).toBe(true);
+    }
+    for (const a of [0, 1, 2, 3]) {
+      for (const b of [0, 1, 2, 3]) {
+        if (a >= b) continue;
+        const [p, q] = [CLIFF_BOUNDS[a]!, CLIFF_BOUNDS[b]!];
+        expect(p.left <= q.right && q.left <= p.right && p.top <= q.bottom && q.top <= p.bottom, `falaises ${a} et ${b}`).toBe(false);
+      }
+    }
+  });
+
+  it("le glisser est borné au rectangle de la falaise du Zoombini : une rampe d'une autre falaise est hors d'atteinte, il retourne à sa place", async () => {
+    const { probe, drag, wait, host } = await start({ level: 3 });
+    const far = probe().world.ramps.find((number) => MAZE2_RAMPS[number - 1]!.cliff !== 0);
+    expect(far, "une rampe active d'une autre falaise existe").toBeDefined();
+    const member = probe().kit.members[0]!;
+    const place = { ...member.snoid.position };
+    const bounds = CLIFF_BOUNDS[0]!;
+    // Pendant le glisser, les pieds restent dans le rectangle de la falaise 0.
+    const drop = MAZE2_RAMPS[far! - 1]!.drop;
+    await drag(0, drop);
+    expect(member.snoid.position).toEqual(place);
+    expect(probe().launches).toBe(0);
+    // Pris puis tiré vers cette rampe : retenu au bord du rectangle.
+    const point = probe().kit.members[0]!.snoid.feature.rect!;
+    host.input.moveMouse(Math.floor((point.left + point.right) / 2), Math.floor((point.top + point.bottom) / 2));
+    host.input.mouseDown("left");
+    await wait(4);
+    expect(probe().kit.carrying === member).toBe(true);
+    host.input.moveMouse(drop.x + 40, drop.y);
+    await wait(4);
+    const at = member.snoid.position;
+    expect(at.x >= bounds.left && at.x <= bounds.right && at.y >= bounds.top && at.y <= bounds.bottom).toBe(true);
+    host.input.mouseUp("left");
+    await wait(6);
+    expect(member.snoid.position).toEqual(place);
   });
 
   it("glisser un Zoombini sur une rampe : la rampe est occupée, il part ; un second dépôt sur la même rampe retourne à sa place ; hors rampe aussi", async () => {

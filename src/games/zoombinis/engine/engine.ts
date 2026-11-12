@@ -11,7 +11,7 @@ export interface EngineOptions {
   onError?: (error: unknown, screenId: ScreenId) => void;
 }
 
-type ZoombinisExt = Pick<ZoombinisContext, "prefs">;
+type ZoombinisExt = Pick<ZoombinisContext, "host" | "prefs">;
 
 /**
  * Moteur de Zoombinis : le moteur Mohawk commun avec les préférences dans le contexte, le logo (écran 0, engine.md §1.1) pour
@@ -23,7 +23,8 @@ export class ZoombinisEngine extends Engine<ScreenId, ZoombinisExt, CursorKind> 
     const common: MohawkEngineOptions<ScreenId, ZoombinisExt, CursorKind> = {
       ...options,
       start: ScreenId.logo,
-      extend: (): ZoombinisExt => ({ prefs: defaultPrefs() }),
+      // Le contexte commun type `host` en `MohawkHost` : on le réaffirme sous son type de jeu (même objet, `Object.assign` du moteur).
+      extend: (): ZoombinisExt => ({ host, prefs: defaultPrefs() }),
       quitOnCtrlQ: false,
       busyCursor: "busy",
       defaultCursor: "system",

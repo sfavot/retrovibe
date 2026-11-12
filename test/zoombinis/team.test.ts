@@ -8,9 +8,11 @@ import {
   campExitAllowed,
   campLeave,
   collectGroup,
+  compactReserve,
   depositToReserve,
   findShelfEntry,
   groupComplete,
+  insertFrontColumn,
   isAvailable,
   isGameOver,
   pickRandomType,
@@ -176,6 +178,53 @@ describe("présentoir des camps (10b0:1ac9, 17b1, 1217)", () => {
     full.count = 619;
     expect(depositToReserve(full, party(5, 700))).toBe(false);
     expect(full.entries[2]).not.toBeNull();
+  });
+
+  it("10b0:17df : insère une colonne vide en tête seulement si la première est occupée et la dernière libre", () => {
+    const empty = newGame().camp1;
+    expect(insertFrontColumn(empty)).toBe(false);
+    const reserve = newGame().camp1;
+    depositToReserve(reserve, party(7));
+    const second = reserve.entries[6]!;
+    expect(insertFrontColumn(reserve)).toBe(true);
+    expect(reserve.entries.slice(0, 5).every((e) => e === null)).toBe(true);
+    expect(reserve.entries[11]).toBe(second);
+    expect(reserveEnd(reserve)).toBe(12);
+    // première colonne vide : rien à faire ; dernière colonne occupée : plus de place
+    expect(insertFrontColumn(reserve)).toBe(false);
+    const full = newGame().camp1;
+    full.entries[0] = reserve.entries[5]!;
+    full.entries[620] = reserve.entries[6]!;
+    expect(insertFrontColumn(full)).toBe(false);
+    expect(full.entries[0]).not.toBeNull();
+  });
+
+  it("10b0:18cc : supprime les colonnes vides en tête (au-delà d'une) et recule le défilement", () => {
+    const reserve = newGame().camp1;
+    depositToReserve(reserve, party(3));
+    const first = reserve.entries[0]!;
+    // deux colonnes vides en tête (10 entrées) : une est supprimée, l'autre reste
+    for (let i = 2; i >= 0; i -= 1) {
+      reserve.entries[10 + i] = reserve.entries[i]!;
+      reserve.entries[i] = null;
+    }
+    reserve.scroll = 4;
+    compactReserve(reserve);
+    expect(reserve.entries[5]).toBe(first);
+    expect(reserve.entries[10]).toBeNull();
+    expect(reserve.scroll).toBe(3);
+    // une seule colonne vide : inchangé
+    const one = newGame().camp1;
+    depositToReserve(one, party(3));
+    for (let i = 2; i >= 0; i -= 1) {
+      one.entries[i + 5] = one.entries[i]!;
+      one.entries[i] = null;
+    }
+    one.scroll = 2;
+    compactReserve(one);
+    expect(one.entries[5]).not.toBeNull();
+    expect(one.entries[0]).toBeNull();
+    expect(one.scroll).toBe(2);
   });
 
   it("prendre et reposer", () => {

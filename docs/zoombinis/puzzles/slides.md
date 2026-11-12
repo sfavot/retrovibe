@@ -379,7 +379,7 @@ Donc, avant toute pose : orange = les `n` emplacements libres, rouge (ou bleu) =
 | 8504 | le nombre de pierres montées **augmente** de 1 à 4 | | sûr |
 | 8505 | idem, augmente de 5 ou plus | | sûr |
 
-Avant de rejouer 8500/8501/8504/8505, `1170:4f98` arrête le même son s'il est déjà en cours (`1028:0c0a`) pour éviter l'empilement (seulement si les voix et effets sont activés, `DS:a43a`). **Sûr.**
+Avant de rejouer 8500/8501/8504/8505, `1170:4f98` arrête le même son s'il est la voix en cours (`DS:a402 == id`, `1028:0c0a`), puis remet `DS:a402` à 0 ; le son est remis en file dans tous les cas pour éviter l'empilement (seulement si les voix et effets sont activés, `DS:a43a`). **Sûr.**
 
 Sons communs (`ZOOMBINI.MHK`) : 997 à l'entrée (`0ee7(0, 997)`, **hypothèse** : ambiance) ; 996 à la fin de la montée et attendu à la sortie ; 999 sur le bouton retour ; voix `20078` (`DS:a2c4`, introduction) et `20055…20063` (tirée par `1150:2f9e` quand tout le groupe est relié). Voix de Zoombini des `SCRS` : terminateurs `0xffc9…0xffd9` / `212` / `214` des scripts 13001-13005 et 14003, traduits par `11a8:32b2` + `1168:575b` ([../engine.md](../engine.md) §3.7).
 
@@ -449,7 +449,7 @@ Port : `src/games/zoombinis/scenes/puzzles/slides.ts` (`createSlidesScene(): Sli
 - **Mise à jour au dépôt, pas à la prise** : tant que le Zoombini est porté, son emplacement reste occupé et les pierres restent montées ; `place` / `remove` et le recalcul ont lieu au relâchement (`08f5` : libération de l'ancien emplacement dans la boucle `1…9c7a`, puis `26b4` / `3dc0` et `4f98`).
 - **Hit-test du rejet** (`4ddd`) : sur les 117 pierres, y compris les cases vides, `x ≤ px ≤ x + 45` et `y − 22 ≤ py ≤ y` (`px, py` = pieds au relâchement), première pierre dans l'ordre ; étincelles `SCRB` 8000 + k (`k` = 0 si la case > 88, 1 si ≥ 36, sinon 2) en position relative `(x + 19, y + 24)` (la première partie du script est un point en bas à droite : l'explosion tombe en `(x, y − 15)`) ; `509f` est appelé **avant** `4ddd`, seulement si le Zoombini a bougé.
 - **« go » (code 2)** n'est gardé que par `DS:9b64` (actif) et `DS:9d74` (pas déjà cliqué) : il part même pendant un rejet (le code 3, plateau, est gardé par `9702`, `9c70`, `9d66`, `9c72` et `9d8a`).
-- **Palette** : `1170:2312` lit les 236 entrées dès l'indice 10 et fait tourner les entrées 20 à 22 du tableau, soit les **couleurs 30, 31, 32** : chaque entrée prend la couleur de la précédente (sens −1) ; un cran dès que plus de 6 ticks se sont écoulés (7). `1150:2b6f` (appelé en même temps) affiche un message de l'original (« psychedelic ZB Zone ») avec l'heure : **non porté** (texte).
+- **Palette** : `1170:2312` lit les 236 entrées dès l'indice 10 et fait tourner les entrées 20 à 22 du tableau, soit les **couleurs 30, 31, 32** : chaque entrée prend la couleur de la précédente (sens −1) ; un cran dès que plus de 6 ticks se sont écoulés (7). `1150:2b6f` (appelé en même temps) affiche un message de l'original (« psychedelic ZB Zone ») avec l'heure : **non porté**, par décision (affichage de débogage, sans intérêt pour le joueur).
 - **Sortie** : `1168:2982(45, 0, y, x)` : `x = 800`, `y = 200` aux niveaux 2 et 3 ; `x = 1280`, `y = 240` aux niveaux 0 et 1 (ordre des arguments de la signature `2982(écart, ?, y, x)` du kit). L'écran suivant est demandé au **premier arrivé** (`9704 > 0`) quand le son 996 est fini ; les autres marchent encore (ils sont sauvés, le moteur les range).
 
 **Lectures probables du port**
@@ -462,8 +462,8 @@ Port : `src/games/zoombinis/scenes/puzzles/slides.ts` (`createSlidesScene(): Sli
 - **Danse** : tirage avec remise (jusqu'à 20 essais), `SCRS` 13000 + valeur du pied (attribut 3), arrêt après autant de danses que de membres ou au clic.
 
 **Écarts du port**
-- **Son** : `4f98` arrête le même son s'il joue déjà (`1028:0c0a`) ; `ZoombinisSound` ne sait arrêter qu'ensemble : un son de bilan déjà en file ou en lecture n'est pas remis en file (8502 si).
+- **Son** : `4f98` arrête (`1028:0c0a`) le son de bilan s'il est la voix en cours (`DS:a402`, effets activés) puis remet `DS:a402` à 0 ; le port fait de même avec `ZoombinisSound.stopSound` et `resetCurrentEffect`. Aucun écart.
 - **Voix d'introduction** `20078` : seulement rejouée par F1 (le kit ne la joue pas à l'entrée ; son déclencheur d'origine, le compteur de dialogue `S+0x36`, n'est pas porté).
-- Pas de `tBMP` 100 (terrain) ; le clavier de mise au point (`s o v l e`) est porté en mode de test (§4.2) ; le Zoombini posé est déposé d'un coup (le kit), l'original le fait marcher jusqu'à 15 pixels.
+- Pas de `tBMP` 100 (terrain) ; le clavier de mise au point (`s o v l e`) est porté en mode de test (§4.2) ; le Zoombini posé est déposé d'un coup, comme dans l'original (état 4) ; les 15 pixels sont la tolérance de prise `DS:9706`.
 - Le kit n'enregistre pas le groupe pendant la sortie (`left` vrai après « go »), comme pour les autres épreuves.
 - Aucun texte visible écrit par le port.

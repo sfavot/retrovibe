@@ -81,8 +81,9 @@ import {
   TOWN_END_GAME_DECOR_BURST,
 } from "../game/team";
 import { closeScreen, openScreen } from "./screen-kit";
-import { CARRY_DELAY, CARRY_DEPTH, CARRY_SCRIPT_BASE, HIDDEN_CURSOR, SCREEN_BOUNDS, SNAP_IDLE_VARIANT } from "./puzzle-kit";
+import { SNAP_IDLE_VARIANT } from "./puzzle-kit";
 import { createSnoid, screenScripts, type Snoid } from "./snoid";
+import { CARRY_DEPTH, SCREEN_BOUNDS, SnoidCarry, faceDirection, poseCarried } from "./snoid-carry";
 import { dialogChoice } from "./xfer";
 
 const ARCHIVE = "TOWN.MHK";
@@ -294,15 +295,8 @@ interface Resident {
 /** Habitant porté par le pointeur (`1168:1742` + `1168:58c7`, voir l'en-tête). */
 interface Carry {
   resident: Resident;
-  /** Pieds à la prise, écart pointeur / pieds à la prise, abscisse du pointeur au tour précédent. */
-  origin: Point;
-  grab: Point;
-  lastX: number;
-  /** Transport collé (`DS:9b40`) et bouton tenu depuis la prise (`DS:9b3e`). */
-  sticky: boolean;
-  held: boolean;
-  startedAt: number;
-  hidden: boolean;
+  /** Protocole du transport (`snoid-carry.ts`, partagé avec le kit des épreuves). */
+  protocol: SnoidCarry;
   /** Profondeur rendue au dépôt. */
   depth: number;
 }
@@ -794,52 +788,23 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
   function pickResident(resident: Resident, x: number, y: number): void {
     const { snoid } = resident;
     const at = snoid.position;
-    const hidden = ctx.prefs.hideCursorWhileCarrying;
     carry = {
       resident,
-      origin: { x: at.x, y: at.y },
-      grab: { x: x - at.x, y: y - at.y },
-      lastX: x,
-      sticky: ctx.prefs.magneticMouse,
-      held: true,
-      startedAt: now(),
-      hidden,
+      protocol: new SnoidCarry(ctx, { origin: at, grab: { x: x - at.x, y: y - at.y }, pointerX: x }),
       depth: snoid.feature.depth,
     };
     // Devant tout, délai 3, animation de transport `145 + pieds` (état 5).
     features.restack(snoid.feature, CARRY_DEPTH);
-    snoid.delay = CARRY_DELAY;
-    snoid.play(CARRY_SCRIPT_BASE + snoid.traits.feet);
-    ctx.setCursor(hidden ? HIDDEN_CURSOR : "system");
+    poseCarried(snoid);
   }
 
   /** Un tour de `1168:1742` : l'habitant suit le pointeur (borné à l'écran, tourné du côté où il va) ; `1168:58c7` décide de la fin. */
   function updateCarry(pressed: boolean): void {
     const current = carry!;
-    const { input } = ctx;
-    const x = Math.max(SCREEN_BOUNDS.left, Math.min(SCREEN_BOUNDS.right, input.mouseX - current.grab.x));
-    const y = Math.max(SCREEN_BOUNDS.top, Math.min(SCREEN_BOUNDS.bottom, input.mouseY - current.grab.y));
-    if (input.mouseX < current.lastX) current.resident.snoid.setFacing(1);
-    else if (input.mouseX > current.lastX) current.resident.snoid.setFacing(0);
-    current.lastX = input.mouseX;
-    current.resident.snoid.setPosition({ x, y });
-    let down = input.isButtonDown("left");
-    let done = false;
-    if (!current.sticky) {
-      if (!down) {
-        if (game.options.autoMagnet && now() - current.startedAt < game.unknown02) {
-          current.sticky = true;
-          current.held = false;
-        } else {
-          done = true;
-        }
-      }
-    } else {
-      if (pressed) down = true;
-      if (current.held && !down) current.held = false;
-      if (!current.held && down) done = true;
-    }
-    if (done) dropResident({ x, y });
+    const { position, direction, done } = current.protocol.step(SCREEN_BOUNDS, pressed);
+    faceDirection(current.resident.snoid, direction);
+    current.resident.snoid.setPosition(position);
+    if (done) dropResident(position);
   }
 
   /**
@@ -850,7 +815,7 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
   function dropResident(at: Point): void {
     const current = carry!;
     carry = null;
-    if (current.hidden) ctx.setCursor("system");
+    current.protocol.release();
     const { snoid } = current.resident;
     features.restack(snoid.feature, current.depth);
     snoid.delay = 6;
@@ -859,7 +824,7 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
     } else {
       snoid.idleVariant = SNAP_IDLE_VARIANT;
       snoid.setFacing(0);
-      snoid.moveTo(current.origin);
+      snoid.moveTo(current.protocol.origin);
     }
     snoid.idle();
   }
@@ -948,7 +913,7 @@ function start(ctx: SceneContext, archive: Archive, chatter: NoRepeatPool, optio
         game.group.flagB = true;
       }
       left = true;
-      if (carry?.hidden) leaveCtx.setCursor("system");
+      carry?.protocol.release();
       carry = null;
       closeScreen(leaveCtx);
     },

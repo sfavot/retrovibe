@@ -56,7 +56,7 @@ import { createPuzzleKit, createTarget, sheetButtonImages, type DropInfo, type D
 import { closeScreen, openScreen } from "../screen-kit";
 import { screenScripts } from "../snoid";
 import { dialogChoice } from "../xfer";
-import type { Point } from "../../data/zoombini";
+import { scriptAnchorOffset, type Point } from "../../data/zoombini";
 
 const SCREEN = 13;
 
@@ -211,15 +211,7 @@ class Niziboom {
   private offset(id: number, at: Point | undefined): Point {
     const script = this.scripts(id);
     if (!script) throw new Error(`Niziboom : SCRS ${id} introuvable`);
-    const images = script.images;
-    if (at) {
-      const reference = [...images].reverse().find((image) => (image.cells[0]?.w ?? 0) > 0) ?? images[0];
-      const first = reference?.cells[0];
-      return first ? { x: at.x - first.x, y: at.y - first.y } : { x: 0, y: 0 };
-    }
-    const first = images[0]?.cells[0];
-    const from = this.position ?? this.home;
-    return first ? { x: from.x - first.x, y: from.y - first.y } : { x: 0, y: 0 };
+    return scriptAnchorOffset(script.images, at ?? this.position, at !== undefined);
   }
 
   /** Fin d'un script posé avec `origin` : dernière première case (`1168:4741`). */

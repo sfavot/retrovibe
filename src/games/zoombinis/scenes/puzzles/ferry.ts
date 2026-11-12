@@ -82,7 +82,7 @@ import {
   type PointerInfo,
   type PuzzleKit,
 } from "../puzzle-kit";
-import { closeScreen, openScreen } from "../screen-kit";
+import { closeScreen, createDebugOverlay, openScreen } from "../screen-kit";
 import { screenScripts } from "../snoid";
 import { dialogChoice } from "../xfer";
 
@@ -704,16 +704,10 @@ function start(ctx: SceneContext, archive: Archive, probe?: (probe: FerryProbe) 
       return rect ? { x: Math.trunc((rect.left + rect.right) / 2), y: Math.trunc((rect.top + rect.bottom) / 2) } : { x: seat.x + SEAT_WIDTH / 2, y: seat.y + SEAT_HEIGHT / 2 };
     });
     if (!graphOverlay) {
-      graphOverlay = features.create({
-        script: 0,
-        delay: 0,
-        depth: 100,
-        flags: FeatureFlag.overlay,
-        onAfterDraw: (_feature, screen) => {
-          raft.seats.forEach((seat, i) => {
-            for (const j of seat.neighbors) if (j > i) drawLine(screen, centers[i]!, centers[j]!, GRAPH_COLOR);
-          });
-        },
+      graphOverlay = createDebugOverlay(features, (screen) => {
+        raft.seats.forEach((seat, i) => {
+          for (const j of seat.neighbors) if (j > i) drawLine(screen, centers[i]!, centers[j]!, GRAPH_COLOR);
+        });
       });
     }
     features.compose();

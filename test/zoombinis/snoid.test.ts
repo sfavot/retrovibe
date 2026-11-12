@@ -11,7 +11,7 @@ import {
   type SnoidAnchors,
 } from "../../src/games/zoombinis/data/zoombini";
 import { createZoombinisEngine, type ZoombinisEngine } from "../../src/games/zoombinis/engine/engine";
-import { FEATURES, FeatureFlag } from "../../src/games/zoombinis/engine/features";
+import { FEATURES, FeatureFlag, type Feature } from "../../src/games/zoombinis/engine/features";
 import { node, path } from "../../src/games/zoombinis/engine/resources";
 import type { Scene, SceneContext } from "../../src/games/zoombinis/engine/scene";
 import { ScreenId } from "../../src/games/zoombinis/engine/scene";
@@ -377,6 +377,29 @@ describe.skipIf(!original.has)("Zoombinis à l'écran (snoid)", () => {
       expect(snoid.position).toEqual({ x: 120, y: 200 });
       expect(snoid.scriptId).toBe(147);
       expect(snoid.feature.image).toBe(image);
+    });
+
+    it("attache une feature qui suit le Zoombini (setPosition, moveTo, marche) jusqu'au détachement", async () => {
+      let snoid!: Snoid;
+      let follower!: Feature;
+      const { host, engine } = await start((ctx) => {
+        snoid = createSnoid(ctx, traits, { position: { x: 300, y: 400 } });
+        follower = ctx.services.get(FEATURES).create({ script: 0, delay: 0, flags: FeatureFlag.relative, position: { x: 0, y: 0 } });
+      });
+      snoid.attach(follower);
+      expect(follower.position).toEqual({ x: 300, y: 400 });
+      snoid.setPosition({ x: 120, y: 200 });
+      expect(follower.position).toEqual({ x: 120, y: 200 });
+      snoid.moveTo({ x: 50, y: 60 });
+      expect(follower.position).toEqual({ x: 50, y: 60 });
+      snoid.walkTo({ x: 200, y: 60 });
+      await runFor(engine, host, 6 * TICK);
+      expect(snoid.position.x).toBeGreaterThan(50);
+      expect(follower.position).toEqual(snoid.position);
+      snoid.detach(follower);
+      const kept = { ...follower.position };
+      snoid.setPosition({ x: 10, y: 10 });
+      expect(follower.position).toEqual(kept);
     });
   });
 });

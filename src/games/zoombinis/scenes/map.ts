@@ -221,10 +221,7 @@ export function createMapScene(): Scene {
 
   /** Rejoue l'image d'un objet : son rappel d'image recalcule ses parties (`11a8:1b89`, `+0x2d = 1`). */
   function refresh(feature: Feature): void {
-    feature.replacing = true;
-    feature.active = true;
-    feature.next = 0;
-    features.invalidate();
+    features.pose(feature);
   }
 
   /** `1110:14bc` : marques des lieux actifs, mise en valeur du lieu survolé. */

@@ -152,6 +152,52 @@ describe("features : lecteur de scripts (scripts synthétiques)", () => {
     expect(pixelAt(h, 20, 20)).toBe(9);
   });
 
+  it("pose : relit l'image 0 du script, aussitôt, puis la feature s'arrête (stopAtEnd) sans avoir avancé", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    const f = h.spawn([{ cells: [[2, 0, 0]] }, { cells: [[3, 0, 0]] }], { delay: 5, flags: FeatureFlag.stopAtEnd });
+    h.tick();
+    h.tick();
+    expect(f.image).toBe(0);
+    f.next = 1000; // échéance lointaine : la pose doit la ramener à 0
+    h.features.pose(f);
+    expect(f.replacing).toBe(true);
+    expect(f.active).toBe(true);
+    expect(f.next).toBe(0);
+    h.tick();
+    expect(f.replacing).toBe(false);
+    expect(f.image).toBe(0);
+    expect(pixelAt(h, 0, 0)).toBe(2);
+  });
+
+  it("pose : un id non nul devient le script de la feature, 0 garde le courant, et la scène est recomposée", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    const one = script([{ cells: [[2, 0, 0]] }]);
+    const two = script([{ cells: [[5, 0, 0]] }]);
+    const f = h.features.create({ delay: 1, script: 1, source: (id) => ({ script: id === 1 ? one : two }) });
+    h.tick();
+    expect(pixelAt(h, 0, 0)).toBe(2);
+    h.features.pose(f, 2);
+    expect(f.scriptId).toBe(2);
+    h.tick();
+    expect(pixelAt(h, 0, 0)).toBe(5);
+    h.features.pose(f);
+    expect(f.scriptId).toBe(2);
+  });
+
+  it("resume : relance une feature arrêtée sans changer de script", () => {
+    const h = new Harness();
+    h.features.setGroup(0, sheet());
+    const f = h.spawn([{ cells: [[2, 0, 0]] }, { cells: [[3, 0, 0]] }], { flags: FeatureFlag.stopEachImage });
+    h.tick();
+    h.tick();
+    expect(f.active).toBe(false);
+    h.features.resume(f);
+    expect(f.active).toBe(true);
+    expect(f.scriptId).toBe(1);
+  });
+
   it("dessine par profondeur croissante et, à égalité, par ordre de création", () => {
     const h = new Harness();
     h.features.setGroup(0, sheet());

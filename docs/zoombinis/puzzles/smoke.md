@@ -531,7 +531,7 @@ Fichiers : `src/games/zoombinis/scenes/puzzles/smoke.ts` (`createSmokeScene()`, 
 8. **Au doigt** (bug 30) : toucher un Zoombini puis le wagonnet (le doigt sur l'image du wagonnet vide 11032 ou de la zone 11001), toucher une silhouette puis le cristal, toucher un cristal puis une case : protocole commun du kit (`TAP_SLOP`, `DropTarget.area`) ; la souris est inchangée.
 
 **Écarts du port** :
-1. Dépôt des Zoombinis : cibles ponctuelles du kit (wagonnet et 20 places, carré de prise 35) au lieu de la zone rectangulaire `DS:21d4` et des 5 colonnes d'accrochage (`DS:21e4`).
+1. Dépôt des Zoombinis : le wagonnet est une cible ponctuelle (43, 258) au carré de prise de ±15 dans l'original (`DS:9706` jamais touché par `1158`) ; le port prend 35. `DS:21d4` est le terrain d'attente (accrochage de y aux 5 valeurs `DS:21e4`), représenté par les 20 places d'attente du kit.
 2. Transport des silhouettes et des cristaux par `kit.carryObject` : relâcher dépose, ou, avec la souris aimantée (**vrai dans une partie neuve**, fidèle), le glissé prend et le clic suivant dépose ; la case visée est celle où se trouve le pointeur (l'original suit l'objet). Un cristal repris puis lâché hors des cases retourne à son étagère (retiré de la chaîne), comme dans l'original.
 3. « go » est sans effet pendant un tour (l'original le prend toujours) ; au départ seuls les trois premiers wagonnets et les trois premiers sauvés partent, depuis leur place (la plupart du temps ce ne sont pas les mêmes wagonnets que ceux des sauvés : l'original aussi, par `[9330]` / `[9358]`).
 4. Surbrillance des emplacements (11006 / 11007) et dalle verte (11076) : jouées une fois (8 et 5 images) au début du transport au lieu d'être tenues ; arrêtées au lâcher.

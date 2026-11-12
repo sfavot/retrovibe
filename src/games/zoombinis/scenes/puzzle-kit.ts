@@ -11,8 +11,8 @@
  *     plus `yOffset`) et leurs départs sont échelonnés, du côté de la place la plus à droite vers la plus à gauche, d'un délai de départ
  *     puis d'un écart (`1168:274e(départ, écart)`, 30 et 45 ticks pour la plupart des écrans, 0 et 45 aux gorges ; fleens 200).
  *     `walking` est `DS:9702` (Zoombinis encore en marche), `arrived` est `DS:9704` (arrivés).
- *  2. **Glisser-déposer** (`1168:1742` et `1168:58c7`) : `pick` à l'appui sur un Zoombini immobile, puis le Zoombini suit le pointeur (pris par
- *     l'endroit où on l'a saisi, retenu dans `bounds`), tourné du côté où il va, en profondeur maximale, délai de 3 ticks et animation de
+ *  2. **Glisser-déposer** (`1168:1742` et `1168:58c7`, boucle partagée avec Zoombiniville : `snoid-carry.ts`) : `pick` à l'appui sur un Zoombini immobile, puis le Zoombini suit le pointeur (pris par
+ *     l'endroit où on l'a saisi, retenu dans `bounds`, qui peut être une fonction du Zoombini), tourné du côté où il va, en profondeur maximale, délai de 3 ticks et animation de
  *     transport `145 + pieds` (état 5). La fin du transport suit `1168:58c7` : relâcher le bouton dépose ; avec « souris aimantée » le
  *     transport est collé (relâcher ne dépose pas, le clic suivant dépose) ; avec « auto-aimantation » un appui plus court que
  *     `GameState.unknown02` (`[a438]`, 0 par défaut donc jamais) devient collé. `hideCursorWhileCarrying` masque le curseur pendant le transport.
@@ -54,14 +54,13 @@ import { DIALOG, confirmLeaveToMap } from "../engine/dialog";
 import { FEATURES, FeatureFlag, type Feature } from "../engine/features";
 import { ZOOMBINIS_GAME } from "../engine/game";
 import { screenKeyCode } from "../engine/shortcuts";
-import type { CursorKind, Host } from "../engine/host";
 import type { SceneContext } from "../engine/scene";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../engine/services";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { currentLevel, exitPuzzle, leaveMap, nextScreen } from "../game/route";
 import { testMode, type GameDate, type Zoombini } from "../game/state";
 import type { Point, WalkMap } from "../data/zoombini";
 import { createSnoid, type Snoid, type SnoidOptions } from "./snoid";
+import { CARRY_DEPTH, SCREEN_BOUNDS, SnoidCarry, faceDirection, poseCarried } from "./snoid-carry";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Constantes de l'original
@@ -86,17 +85,11 @@ export const HELP_KEY = "F1";
 export const WALK_IN_X = -50;
 /** Demi-côté du carré de prise des cibles, `DS:9706` (`1168:0034` : 15 ; propre à chaque épreuve ensuite : 55 aux gorges, 100 aux nizibooms…). */
 export const DEFAULT_RADIUS = 15;
-/** Délai entre deux images d'un Zoombini transporté (`+0x28 = 3`). */
-export const CARRY_DELAY = 3;
-/** Profondeur d'un Zoombini transporté (l'original le met devant tout : id `0xfffd`). */
-export const CARRY_DEPTH = 1000;
 /**
  * Profondeur par défaut des images des boutons : devant tout le décor et les Zoombinis (les boutons de l'original portent `0x1000` et passent devant tout),
  * derrière un objet porté (`CARRY_DEPTH`). Une profondeur de 0 les cachait derrière un avant-plan (cristal : `SCRB` 11077, bug 33).
  */
 export const BUTTONS_DEPTH = 100;
-/** Script d'animation de transport : `145 + pieds` (état 5, `146…150`). */
-export const CARRY_SCRIPT_BASE = 145;
 /** Variante d'attente posée par l'état 4 quand le Zoombini est « téléporté » sur sa destination. */
 export const SNAP_IDLE_VARIANT = 1;
 
@@ -109,15 +102,6 @@ export interface Rect {
 }
 export const BUTTON_MAP: Readonly<Rect> = { left: 600, top: 403, right: 639, bottom: 440 };
 export const BUTTON_GO: Readonly<Rect> = { left: 600, top: 441, right: 639, bottom: 478 };
-
-/** Zone où un Zoombini transporté peut aller (`DS:6092` par défaut dans l'original) : l'écran entier. */
-export const SCREEN_BOUNDS: Readonly<Rect> = { left: 0, top: 0, right: SCREEN_WIDTH - 1, bottom: SCREEN_HEIGHT - 1 };
-
-/** Écart (pixels de l'écran) en deçà duquel un doigt relâché n'a pas glissé : c'est un toucher (prise en main, `updateCarry`). */
-export const TAP_SLOP = 4;
-
-/** Curseur masqué pendant le transport (`11e8:77bc`) : `hidden` de `CursorKind`, associé à `none` par l'hôte du navigateur. */
-export const HIDDEN_CURSOR: CursorKind = "hidden";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Musique
@@ -271,6 +255,28 @@ export interface WalkOptions {
   counted?: boolean;
   /** Reste saisissable pendant la marche (`member.walking` reste faux) ; une prise annule la marche. Défaut faux. */
   pickable?: boolean;
+  /** `NODE` / `PATH` à suivre (`Snoid.walkTo`) ; défaut : ligne droite. */
+  map?: WalkMap;
+}
+
+/** Options de `PuzzleKit.depart`. */
+export interface DepartOptions {
+  /** Écart (ticks) entre deux départs, le premier tout de suite (`1168:2982(écart, …)`). Défaut 45. */
+  step?: number;
+  /** `NODE` / `PATH` à suivre ; défaut : celui du kit (`spec.walkMap`). */
+  map?: WalkMap;
+  /** Appelé à l'arrivée de chacun (après la mise à jour des compteurs). */
+  onArrive?: (member: KitMember) => void;
+}
+
+/** Options de `PuzzleKit.placeMember`. */
+export interface PlaceOptions {
+  /**
+   * Comment le Zoombini rejoint la cible : `"snap"` (défaut) le pose d'un coup, comme l'état 4 de `1168:0ba8` (variante d'attente 1, tourné à droite,
+   * délai 6) ; `"walk"` l'y fait aller à pied, sans compteur (`walk`), la profondeur de la cible lui étant rendue à l'arrivée ; `"none"` ne le déplace pas
+   * (l'épreuve l'anime elle-même : seuls les propriétaires changent).
+   */
+  motion?: "snap" | "walk" | "none";
 }
 
 /** Options de `pressGo`. */
@@ -354,8 +360,11 @@ export interface PuzzleKitSpec {
   targets?: (places: readonly DropTarget[]) => readonly DropTarget[];
   /** Demi-côté du carré de prise (`DS:9706`). */
   radius?: number;
-  /** Zone du transport. */
-  bounds?: Readonly<Rect>;
+  /**
+   * Zone du transport (défaut : l'écran). Une fonction donne la zone de chaque Zoombini au moment de la prise (le rectangle de sa falaise aux
+   * véhibules, `S14:13d8 + 8·falaise`).
+   */
+  bounds?: Readonly<Rect> | ((member: KitMember) => Readonly<Rect>);
   /** Options communes des personnages (`small`, `scripts`, `idleVariant`, `delay`). */
   snoid?: Pick<SnoidOptions, "small" | "scripts" | "idleVariant" | "delay">;
   /** Profondeur d'un Zoombini posé sur le point donné. Défaut : `1 + y / 1000` (le plus bas devant). */
@@ -430,20 +439,11 @@ interface Carry {
   /** Objet porté (un Zoombini est un cas particulier : voir `pick`) et le membre, s'il s'agit d'un Zoombini. */
   spec: ObjectCarrySpec;
   member: KitMember | null;
-  /** Pieds à la prise et cible alors occupée. */
-  origin: Point;
+  /** Protocole du transport (`snoid-carry.ts` : pieds et écart à la prise, souris aimantée, auto-aimantation, toucher, curseur, fin forcée). */
+  protocol: SnoidCarry;
+  /** Cible alors occupée. */
   from: DropTarget | null;
-  /** Écart entre le pointeur et les pieds à la prise (`local_6`, `local_8`). */
-  grab: Point;
-  lastX: number;
-  /** Transport collé (`DS:9b40`) et bouton tenu depuis la prise (`DS:9b3e`). */
-  sticky: boolean;
-  held: boolean;
-  startedAt: number;
-  hidden: boolean;
   hover: DropTarget | null;
-  /** Fin demandée par l'épreuve (`DS:96f4`). */
-  forced: boolean;
   targets: readonly DropTarget[];
   radius: number;
   bounds: Readonly<Rect>;
@@ -465,8 +465,9 @@ export class PuzzleKit {
   private readonly ctx: SceneContext;
   private readonly spec: PuzzleKitSpec;
   private readonly radius: number;
-  private readonly bounds: Readonly<Rect>;
+  /** Arrivées échelonnées (gelées avec le kit) et départs échelonnés (`depart` : poursuivis même quand le kit est suspendu). */
   private readonly scheduled: Scheduled[] = [];
+  private readonly departures: Scheduled[] = [];
   /** Marches lancées par l'épreuve (`walk`), pour les annuler à la prise. */
   private readonly walks = new Map<KitMember, { counted: boolean }>();
   private goOn = false;
@@ -491,7 +492,6 @@ export class PuzzleKit {
     this.ctx = ctx;
     this.spec = spec;
     this.radius = spec.radius ?? DEFAULT_RADIUS;
-    this.bounds = spec.bounds ?? SCREEN_BOUNDS;
     this.introVoice = spec.introVoice ?? 0;
     this.waitingPlaces = spec.places.map((p) => createTarget(p));
     this.targets = [...(spec.targets ? spec.targets(this.waitingPlaces) : this.waitingPlaces)];
@@ -635,7 +635,7 @@ export class PuzzleKit {
         run: () => this.walkInto(member, this.waitingPlaces[member.index]!),
       });
     });
-    this.runDue();
+    this.runDue(this.scheduled);
   }
 
   private walkInto(member: KitMember, place: DropTarget): void {
@@ -674,7 +674,8 @@ export class PuzzleKit {
     this.refreshPressed();
     if (this.dialogOpen) return;
     if (this.halted) {
-      // Gelé : seul le crochet de pointeur reste à l'écoute.
+      // Gelé : seul le crochet de pointeur reste à l'écoute, et les départs lancés par `depart` se poursuivent.
+      this.runDue(this.departures);
       for (const event of this.ctx.input.buttonEvents) {
         this.spec.onPointer?.({ x: event.x, y: event.y, down: event.down, button: event.button });
         if (this.finished) return;
@@ -686,19 +687,20 @@ export class PuzzleKit {
       }
       return;
     }
-    this.runDue();
+    this.runDue(this.scheduled);
+    this.runDue(this.departures);
     if (this.spec.waitAnimations ?? true) for (const member of this.members) if (!member.walking && this.carry?.member !== member) member.snoid.tickWait();
     this.input(this.ctx.input);
     // `1028:0d9e(996)` : on attend la fin du « Go » lui-même, pas le silence (un pas en boucle d'un Zoombini qui part ne doit pas bloquer).
     if (this.departing && this.goEnd === "sound" && this.goSoundQueued && !this.sound.isPlaying(SOUND_GO) && !this.goHold?.()) this.finish("success");
   }
 
-  /** Lance les départs échus (`+0x24 ≤ maintenant`, `1168:0ba8`), le plus ancien d'abord. */
-  private runDue(): void {
+  /** Lance les départs échus de `queue` (`+0x24 ≤ maintenant`, `1168:0ba8`), le plus ancien d'abord. */
+  private runDue(queue: Scheduled[]): void {
     const now = this.ctx.clock.ticks;
-    const due = this.scheduled.filter((entry) => entry.at <= now).sort((a, b) => a.at - b.at);
+    const due = queue.filter((entry) => entry.at <= now).sort((a, b) => a.at - b.at);
     for (const entry of due) {
-      this.scheduled.splice(this.scheduled.indexOf(entry), 1);
+      queue.splice(queue.indexOf(entry), 1);
       entry.run();
     }
   }
@@ -726,7 +728,7 @@ export class PuzzleKit {
       }
       this.click(event.x, event.y);
     }
-    if (this.carry) this.updateCarry(input, pressed);
+    if (this.carry) this.updateCarry(pressed);
   }
 
   private click(x: number, y: number): boolean {
@@ -865,10 +867,9 @@ export class PuzzleKit {
       from,
       targets: this.targets,
       radius: this.radius,
+      bounds: typeof this.spec.bounds === "function" ? this.spec.bounds(member) : this.spec.bounds,
       onMove: (at, direction) => {
-        // Tourné du côté où il va (`+0xf2`).
-        if (direction < 0) member.snoid.setFacing(1);
-        else if (direction > 0) member.snoid.setFacing(0);
+        faceDirection(member.snoid, direction);
         member.snoid.setPosition(at);
       },
       onHover: (target) => this.spec.onHover?.(target, member),
@@ -878,8 +879,7 @@ export class PuzzleKit {
       onReturn: (drop) => this.memberRejected(member, this.dropInfo(member, drop), depth),
     };
     this.beginCarry(spec, member, x);
-    member.snoid.delay = CARRY_DELAY;
-    member.snoid.play(CARRY_SCRIPT_BASE + member.snoid.traits.feet);
+    poseCarried(member.snoid);
     this.spec.onPick?.(member);
     return true;
   }
@@ -900,103 +900,62 @@ export class PuzzleKit {
     const carry = this.carry;
     if (!carry || carry.member) return;
     this.carry = null;
-    if (carry.hidden) this.ctx.setCursor("system");
+    carry.protocol.release();
   }
 
   private beginCarry(spec: ObjectCarrySpec, member: KitMember | null, pointerX: number): void {
-    const { prefs } = this.ctx;
-    const hidden = spec.hideCursor ?? prefs.hideCursorWhileCarrying;
     this.carry = {
       spec,
       member,
-      origin: { ...spec.origin },
+      protocol: new SnoidCarry(this.ctx, { origin: spec.origin, grab: spec.grab, pointerX, hideCursor: spec.hideCursor }),
       from: spec.from ?? null,
-      grab: { x: spec.grab?.x ?? 0, y: spec.grab?.y ?? 0 },
-      lastX: pointerX,
-      sticky: prefs.magneticMouse,
-      held: true,
-      startedAt: this.ctx.clock.ticks,
-      hidden,
       hover: null,
-      forced: false,
       targets: spec.targets ?? [],
       radius: spec.radius ?? this.radius,
-      bounds: spec.bounds ?? this.bounds,
+      bounds: spec.bounds ?? SCREEN_BOUNDS,
     };
     if (spec.feature) {
       this.features.restack(spec.feature, CARRY_DEPTH);
       // Avec l'ordre de dessin dynamique (`Features.setDepthSort`), l'objet porté reste devant tout (extension du port, comme au camp).
       spec.feature.raised = true;
     }
-    if (hidden) this.ctx.setCursor(HIDDEN_CURSOR);
   }
 
   /** Fin de transport demandée par l'épreuve (`DS:96f4 = 1`) : l'objet est déposé là où il est. */
   endCarry(): void {
-    if (this.carry) this.carry.forced = true;
+    this.carry?.protocol.force();
   }
 
-  private updateCarry(input: Input, pressed: boolean): void {
+  private updateCarry(pressed: boolean): void {
     const carry = this.carry!;
-    const x = Math.max(carry.bounds.left, Math.min(carry.bounds.right, input.mouseX - carry.grab.x));
-    const y = Math.max(carry.bounds.top, Math.min(carry.bounds.bottom, input.mouseY - carry.grab.y));
-    const direction = input.mouseX < carry.lastX ? -1 : input.mouseX > carry.lastX ? 1 : 0;
-    carry.lastX = input.mouseX;
-    carry.spec.onMove?.({ x, y }, direction);
-    const finger = this.touchPoint(input);
-    const hover = findIn(carry.targets, carry.radius, { x, y }, carry.member, finger);
+    const { position, direction, finger, done } = carry.protocol.step(carry.bounds, pressed);
+    carry.spec.onMove?.(position, direction);
+    const hover = findIn(carry.targets, carry.radius, position, carry.member, finger);
     if (hover !== carry.hover) {
       if (carry.hover?.highlight) this.features.resetZone(carry.hover.highlight);
       if (hover?.highlight) this.features.playZone(hover.highlight);
       carry.hover = hover;
       carry.spec.onHover?.(hover);
     }
-    // `1168:58c7` : le transport continue tant qu'elle renvoie 1.
-    let down = input.isButtonDown("left");
-    let done = carry.forced;
-    if (!carry.sticky) {
-      if (!down) {
-        const { game } = this.zoombinis;
-        const quick = game.options.autoMagnet && this.ctx.clock.ticks - carry.startedAt < game.unknown02;
-        // Au doigt, un toucher sans glissement prend le Zoombini en main : le toucher suivant le dépose (prise puis toucher de la cible).
-        const tapped = finger !== null && Math.abs(finger.x - carry.origin.x - carry.grab.x) <= TAP_SLOP && Math.abs(finger.y - carry.origin.y - carry.grab.y) <= TAP_SLOP;
-        if (quick || tapped) {
-          carry.sticky = true;
-          carry.held = false;
-        } else {
-          done = true;
-        }
-      }
-    } else {
-      if (pressed) down = true;
-      if (carry.held && !down) carry.held = false;
-      if (!carry.held && down) done = true;
-    }
-    if (done) this.drop(carry, { x, y }, finger);
-  }
-
-  /** Point du doigt quand le dernier appui vient d'un doigt (`Host.pointerIsTouch`), sinon null (souris : la règle de l'original seule). */
-  private touchPoint(input: Input): Point | null {
-    return (this.ctx.host as Host).pointerIsTouch ? { x: input.mouseX, y: input.mouseY } : null;
+    if (done) this.drop(carry, position, finger);
   }
 
   private drop(carry: Carry, position: Point, finger: Point | null = null): void {
     const { spec } = carry;
     const target = findIn(carry.targets, carry.radius, position, carry.member, finger);
-    const info: ObjectDrop = { target, from: carry.from, position, origin: carry.origin };
+    const info: ObjectDrop = { target, from: carry.from, position, origin: carry.protocol.origin };
     // `1168:1742` : au lâcher, la zone survolée revient au repos.
     if (carry.hover?.highlight) this.features.resetZone(carry.hover.highlight);
     carry.hover = null;
     // La décision se prend le transport déjà fini (`kit.carrying` est nul pour l'épreuve), sauf si elle garde l'objet en main.
     this.carry = null;
     const verdict = spec.decide ? spec.decide(info) : target !== null && target !== carry.from;
-    if (verdict === "keep" && !carry.forced) {
+    if (verdict === "keep" && !carry.protocol.forced) {
       this.carry = carry;
-      carry.sticky = true;
-      carry.held = false;
+      carry.protocol.keep();
       return;
     }
-    if (carry.hidden) this.ctx.setCursor("system");
+    carry.protocol.release();
     if (spec.feature) spec.feature.raised = false;
     if (verdict === true) spec.onDrop?.(info);
     else spec.onReturn?.(info);
@@ -1008,14 +967,30 @@ export class PuzzleKit {
 
   /** Dépôt accepté d'un Zoombini : posé d'un coup sur la cible, qui devient la sienne. */
   private memberDropped(member: KitMember, info: DropInfo): void {
-    const target = info.target!;
-    const where = { x: target.x, y: target.y };
-    this.snap(member, where);
-    this.features.restack(member.snoid.feature, this.depthAt(where));
+    this.placeMember(member, info.target!);
+    this.spec.onDrop?.(info);
+  }
+
+  /**
+   * Met `member` sur la cible `target` (liste A ou place d'attente) : il quitte les places qu'il occupait, la cible devient la sienne (et sa place d'attente
+   * si elle en est une), et il la rejoint selon `options.motion` (posé d'un coup par défaut, comme le fait un dépôt accepté). Une marche en cours est
+   * abandonnée. L'épreuve règle ensuite elle-même la pose (variante d'attente, sens) si la cible l'exige.
+   */
+  placeMember(member: KitMember, target: DropTarget, options: PlaceOptions = {}): void {
+    const motion = options.motion ?? "snap";
+    this.cancelWalk(member);
+    for (const place of [...this.targets, ...this.waitingPlaces]) if (place.owner === member) place.owner = null;
     target.owner = member;
     member.target = target;
     if (this.waitingPlaces.includes(target)) member.waiting = target;
-    this.spec.onDrop?.(info);
+    const where = { x: target.x, y: target.y };
+    if (motion === "none") return;
+    if (motion === "walk") {
+      this.walk(member, where, () => this.features.restack(member.snoid.feature, this.depthAt(where)), { counted: false });
+      return;
+    }
+    this.snap(member, where);
+    this.features.restack(member.snoid.feature, this.depthAt(where));
   }
 
   /** Dépôt non accepté d'un Zoombini : l'épreuve peut l'envoyer ailleurs (`onDropOutside`), sinon il retourne d'un coup à sa place d'origine. */
@@ -1087,7 +1062,7 @@ export class PuzzleKit {
       }
       onArrive?.(member);
     };
-    member.snoid.walkTo(dest);
+    member.snoid.walkTo(dest, options.map);
   }
 
   /** Abandonne la marche lancée par `walk` de `member`, s'il y en a une : plus de rappel d'arrivée, compteurs rendus. */
@@ -1123,26 +1098,31 @@ export class PuzzleKit {
   departSaved(x: number, y: number, step = 45): void {
     this.walking = 0;
     this.arrived = 0;
-    const now = this.ctx.clock.ticks;
     const leaving = this.members.filter((m) => m.zoombini.present && m.snoid.resting && !m.walking && !m.snoid.destroyed);
-    const order = sortedByX(leaving.map((m) => ({ member: m, x: m.snoid.position.x })));
+    this.depart(leaving, { x, y }, { step });
+  }
+
+  /**
+   * Départ échelonné de `members`, de là où ils sont, vers `dest` (états 10 puis 7 de `1168:0ba8` : `1168:2982` en est le cas des sauvés, `1120:1abd` celui
+   * d'un seul Zoombini). Le plus à droite part d'abord, un toutes les `step` ticks, le premier tout de suite ; chacun est « en marche » dès qu'il attend son
+   * tour (ni pris ni déposé), compte dans `walking` à son départ puis dans `arrived` à son arrivée. Les départs se poursuivent quand le kit est suspendu
+   * (`pressGo({ end: "depart" })`) : l'épreuve qui mène seule sa sortie n'a pas à refaire la planification. Ne remet pas les compteurs à zéro.
+   */
+  depart(members: readonly KitMember[], dest: Point, options: DepartOptions = {}): void {
+    const step = options.step ?? 45;
+    const map = options.map ?? this.spec.walkMap;
+    const now = this.ctx.clock.ticks;
+    const order = sortedByX(members.map((m) => ({ member: m, x: m.snoid.position.x })));
     order.reverse().forEach(({ member }, k) => {
+      this.cancelWalk(member);
       member.walking = true;
-      this.scheduled.push({
+      this.departures.push({
         at: now + k * step,
         member,
-        run: () => {
-          this.walking += 1;
-          member.snoid.onArrive = () => {
-            member.walking = false;
-            if (this.walking > 0) this.walking -= 1;
-            this.arrived += 1;
-          };
-          member.snoid.walkTo({ x, y }, this.spec.walkMap);
-        },
+        run: () => this.walk(member, dest, options.onArrive, { map }),
       });
     });
-    this.runDue();
+    this.runDue(this.departures);
   }
 
   /** Bouton carte : son 999, puis l'avertissement « ce groupe sera perdu » ; accepté, l'épreuve est abandonnée (retour à la carte). */
@@ -1310,11 +1290,12 @@ export class PuzzleKit {
     if (carry) {
       this.carry = null;
       if (carry.hover?.highlight) this.features.resetZone(carry.hover.highlight);
-      if (carry.hidden) this.ctx.setCursor("system");
+      carry.protocol.release();
       if (carry.spec.feature) carry.spec.feature.raised = false;
       if (carry.member && carry.from) carry.from.owner = carry.member;
     }
     this.scheduled.length = 0;
+    this.departures.length = 0;
   }
 
   /** Les features des personnages (pour les tests et les épreuves qui les redessinent). */
@@ -1323,9 +1304,8 @@ export class PuzzleKit {
   }
 }
 
-/** Première cible libre (ou à `own`) de `targets` dans le carré de demi-côté `radius` autour de `point` (`1168:1742`). */
 /**
- * Cible libre prise au dépôt (`1168:1742`) : la première dont l'ancre est dans le carré de prise autour de `point`. Au doigt (`finger`),
+ * Cible libre prise au dépôt (`1168:1742`) : la première dont l'ancre est dans le carré de prise de demi-côté `radius` autour de `point`. Au doigt (`finger`),
  * à défaut, la première dont l'image (`area`) contient le doigt : sous le doigt, le joueur ne voit pas le Zoombini porté et vise
  * l'image de la cible, alors que l'ancre est la position du Zoombini posé (extension tactile, sans effet à la souris).
  */

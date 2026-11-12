@@ -241,16 +241,13 @@ class SlidesRun implements SlidesProbe {
   private lastCycle = 0;
   /** `DS:9c7e` : avancement de la saisie de la séquence du mode de test (0 à 5, remis à 0 à l'entrée). */
   private cheat = 0;
-  private departures: { at: number; member: KitMember }[] = [];
-  private departed = 0;
-  private arrivedCount = 0;
   private pauseUntil = 0;
   private riseEnded = false;
   private finished = false;
 
   constructor(
     private readonly ctx: SceneContext,
-    private readonly archive: Archive,
+    archive: Archive,
   ) {
     const zoombinis = ctx.services.get(ZOOMBINIS_GAME);
     const { game, session } = zoombinis;
@@ -288,6 +285,8 @@ class SlidesRun implements SlidesProbe {
       targets: () => this.slots,
       introVoice: HELP_VOICE,
       snoid: { scripts: screenScripts(archive) },
+      // `NODE` / `PATH` 1000 ne sont chargés qu'au niveau 3 (`1168:2a5c`) : la marche de sortie suit alors ce chemin.
+      walkMap: this.level === 3 ? { nodes: node(archive, 1000), paths: [path(archive, 1000)[0]!] } : undefined,
       buttons: {
         map: { images: buttons.map, hold: 2 },
         go: { images: buttons.go, hold: 2, onPress: () => this.pressGo() },
@@ -431,8 +430,15 @@ class SlidesRun implements SlidesProbe {
     this.ev = evaluate(this.play);
     const sound = this.ctx.services.get(ZOOMBINIS_SOUND);
     const id = feedbackSound(before, this.ev);
-    // `1170:4f98` arrête le même son s'il est déjà en cours : le moteur ne sait pas arrêter un son précis, il n'est pas empilé (écart).
-    if (id !== null && (id === FEEDBACK_SOUND.shuffle || !sound.isPlaying(id))) sound.queue(id);
+    if (id !== null) {
+      // `1170:4f98` : si les effets sont activés (`DS:a43a`) et que ce son est le dernier démarré (`DS:a402`), il est arrêté (`1028:0c0a`) puis
+      // `DS:a402 = 0` ; le son est ensuite remis en file dans tous les cas. Le 8502 (changement de place sans effet) n'est jamais arrêté.
+      if (id !== FEEDBACK_SOUND.shuffle && sound.effectsEnabled && sound.currentEffect === id) {
+        sound.stopSound(id);
+        sound.resetCurrentEffect();
+      }
+      sound.queue(id);
+    }
     this.kit.goEnabled = this.ev.goEnabled;
     this.syncStones();
     if (this.ev.victory && !before.victory) {
@@ -497,12 +503,7 @@ class SlidesRun implements SlidesProbe {
 
   /** Renvoie `member` à pied sur une position d'attente libre (marche du kit non comptée), qui devient la sienne (après un rejet). */
   private sendToWaiting(member: KitMember): void {
-    const j = this.freeWaiting();
-    const spot = this.kit.waitingPlaces[j]!;
-    member.target = spot;
-    member.waiting = spot;
-    spot.owner = member;
-    this.kit.walk(member, { x: spot.x, y: spot.y }, () => this.features.restack(member.snoid.feature, 1 + spot.y / 1000), { counted: false });
+    this.kit.placeMember(member, this.kit.waitingPlaces[this.freeWaiting()]!, { motion: "walk" });
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -701,38 +702,13 @@ class SlidesRun implements SlidesProbe {
       if (now < this.pauseUntil) return;
       this.stage = "walking";
       this.kit.playGoSound();
-      this.scheduleDepartures(now);
+      // `1168:2982(45, 0, y, x)` : les sauvés (marqués au « go ») partent un à un, le plus à droite d'abord, le premier tout de suite.
+      const far = this.level >= 2 ? { x: 800, y: 200 } : { x: 1280, y: 240 };
+      this.kit.departSaved(far.x, far.y, EXIT_STEP);
       return;
     }
     if (this.stage !== "walking") return;
-    for (const entry of [...this.departures]) {
-      if (entry.at > now) continue;
-      this.departures.splice(this.departures.indexOf(entry), 1);
-      this.depart(entry.member);
-    }
-    if (this.arrivedCount > 0 && !this.kit.isPlaying(996)) this.complete();
-  }
-
-  /** `1168:2982(45, …)` : les sauvés partent un à un, le plus à droite d'abord, le premier tout de suite. */
-  private scheduleDepartures(now: number): void {
-    const saved = (this.result?.saved ?? []).map((i) => this.kit.members[i]!).filter((m) => !m.snoid.destroyed);
-    saved.sort((a, b) => b.snoid.position.x - a.snoid.position.x);
-    this.departures = saved.map((member, k) => ({ at: now + k * EXIT_STEP, member }));
-  }
-
-  private depart(member: KitMember): void {
-    this.departed += 1;
-    const { snoid } = member;
-    snoid.onEnd = undefined;
-    snoid.onEvent = undefined;
-    snoid.onArrive = () => {
-      snoid.onArrive = undefined;
-      this.arrivedCount += 1;
-    };
-    const far = this.level >= 2 ? { x: 800, y: 200 } : { x: 1280, y: 240 };
-    // `NODE` / `PATH` 1000 ne sont chargés qu'au niveau 3 (`1168:2a5c`) : la marche suit alors ce chemin.
-    const map = this.level === 3 ? { nodes: node(this.archive, 1000), paths: [path(this.archive, 1000)[0]!] } : undefined;
-    snoid.walkTo(far, map);
+    if (this.kit.arrived > 0 && !this.kit.isPlaying(996)) this.complete();
   }
 
   // ------------------------------------------------------------------------------------------------------------------------
@@ -790,12 +766,7 @@ class SlidesRun implements SlidesProbe {
         if (!wanted.has(displaced)) this.sendToWaiting(other);
       }
       release(member);
-      this.kit.cancelWalk(member);
-      member.snoid.moveTo({ x: spot.x, y: spot.y });
-      member.snoid.idle();
-      this.features.restack(member.snoid.feature, 1 + spot.y / 1000);
-      spot.owner = member;
-      member.target = spot;
+      this.kit.placeMember(member, spot);
       place(this.play, m, k);
     });
     this.apply();

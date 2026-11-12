@@ -350,10 +350,8 @@ class CavesRun implements CavesProbe {
       return;
     }
     // Replacé : la dalle lâchée est libérée, la dalle valable est à lui (`27a6`, `170f`).
-    const right = this.targets[placement.slot]!;
-    target!.owner = null;
-    right.owner = member;
-    member.target = right;
+    // Il saute lui-même vers l'ancre de la dalle valable (`SCRS` 12005) : seuls les propriétaires changent.
+    this.kit.placeMember(member, this.targets[placement.slot]!, { motion: "none" });
     this.locked = true;
     this.busy = true;
     this.rejection = { member, placement, phase: 0, next: false, flips: [] };
@@ -442,11 +440,7 @@ class CavesRun implements CavesProbe {
     for (const move of moves) this.targets[move.from]!.owner = null;
     for (const move of moves) {
       const member = this.kit.members[move.member]!;
-      const target = this.targets[move.to]!;
-      target.owner = member;
-      member.target = target;
-      member.snoid.moveTo({ x: target.x, y: target.y });
-      this.features.restack(member.snoid.feature, 1 + target.y / 1000);
+      this.kit.placeMember(member, this.targets[move.to]!);
       this.applyPose(member, move.to);
     }
     this.features.invalidate();
@@ -465,15 +459,7 @@ class CavesRun implements CavesProbe {
     const standing = this.kit.members.filter((m) => this.state.slotOf[m.index] === 0);
     for (const target of this.targets) if (target) target.owner = null;
     clearSlots(this.state);
-    standing.forEach((member, i) => {
-      const place = this.kit.waitingPlaces[i]!;
-      for (const p of this.kit.waitingPlaces) if (p.owner === member) p.owner = null;
-      place.owner = member;
-      member.waiting = place;
-      member.target = place;
-      member.snoid.moveTo({ x: place.x, y: place.y });
-      this.features.restack(member.snoid.feature, 1 + place.y / 1000);
-    });
+    standing.forEach((member, i) => this.kit.placeMember(member, this.kit.waitingPlaces[i]!));
     // Les posés restent où ils sont (leur drapeau `0x4008001` ne change pas), mais n'occupent plus leur dalle.
     for (const member of this.kit.members) if (!standing.includes(member)) member.target = null;
     this.kit.goEnabled = false;

@@ -540,6 +540,23 @@ export class Features {
   }
 
   /**
+   * Pose statique : la feature (re)calcule ses parties à la prochaine échéance, qui est aussitôt (`+0x2d = 1`, `+0xc8 = 0` : `11a8:1b89`), sans son ni changement
+   * d'image à jouer. `id` (0 = le script courant) devient le script de la feature ; le script lui-même n'est résolu qu'à cette échéance, comme pour `setScript`.
+   */
+  pose(feature: Feature, id = 0): void {
+    if (id !== 0) feature.scriptId = id;
+    feature.replacing = true;
+    feature.active = true;
+    feature.next = 0;
+    this.dirty = true;
+  }
+
+  /** Relance la lecture d'une feature arrêtée, sans changer de script ni d'image (elle reprend à la prochaine échéance). */
+  resume(feature: Feature): void {
+    feature.active = true;
+  }
+
+  /**
    * Accès aléatoire (`11a8:216f`) : la prochaine échéance (aussitôt) lit l'image `n`, bornée comme l'original (négatif = depuis la fin).
    * L'original ne fait que calculer la position de lecture ; l'appelant règle `+0xc8` et `+0xca` lui-même. Comme `11a0:033a` avance
    * avant de lire, l'image courante devient `n − 1` (donc −1 pour l'image 0) jusqu'à cette lecture. Sans effet en lecture aléatoire,

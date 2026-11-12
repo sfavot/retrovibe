@@ -224,7 +224,7 @@ export function pizzaStateOf(scene: Scene): PizzaState | null {
   return STATES.get(scene)?.() ?? null;
 }
 
-/** Scène de l'épreuve de la hutte à pizza (écran 9). À enregistrer à la place de l'épreuve provisoire : `engine.register(ScreenId.pizza, createPizzaScene)`. */
+/** Scène de l'épreuve de la hutte à pizza (écran 9). */
 export function createPizzaScene(): Scene {
   const name = screenInfo(ScreenId.pizza)?.archive;
   if (!name) throw new Error("createPizzaScene : pas d'archive pour l'écran 9");

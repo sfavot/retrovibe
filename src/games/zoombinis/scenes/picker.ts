@@ -50,8 +50,7 @@ import { ZOOMBINIS_SOUND } from "../engine/sound";
 import { TextFlags, ZOOMBINIS_TEXT } from "../engine/text";
 import { addZoombini, groupComplete, isAvailable, pickerEnter, pickerLeave, pickRandomType, remainingToCreate, removeZoombini } from "../game/team";
 import { STATE_BYTES, testMode, ZOOMBINI_TYPES, type Zoombini } from "../game/state";
-import type { Host } from "../engine/host";
-import { CARRY_DELAY, CARRY_DEPTH, CARRY_SCRIPT_BASE, TAP_SLOP } from "./puzzle-kit";
+import { CARRY_DELAY, CARRY_DEPTH, CARRY_SCRIPT_BASE, TAP_SLOP } from "./snoid-carry";
 import { closeScreen, openScreen } from "./screen-kit";
 import { createSnoid, type Snoid } from "./snoid";
 
@@ -756,7 +755,7 @@ function start(ctx: SceneContext, archive: Archive, map: PickerMap) {
 
   /** Un tour de `1168:1742` : le Zoombini suit la souris tant que le bouton est tenu ; l'entrée de la grotte s'allume quand il est assez près. */
   /** Le dernier appui vient d'un doigt (`Host.pointerIsTouch`). */
-  const touch = (): boolean => (ctx.host as Host).pointerIsTouch === true;
+  const touch = (): boolean => ctx.host.pointerIsTouch === true;
 
   /**
    * Survol de la zone de retrait : son point dans le carré de tolérance autour du Zoombini porté (`1168:1742`) ; au doigt (extension tactile, comme le kit au bac,

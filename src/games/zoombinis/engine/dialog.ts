@@ -25,7 +25,6 @@ import type { GameState } from "../game/state";
 import type { ZoombinisContext } from "./context";
 import type { ZoombinisEngine } from "./engine";
 import { FEATURES } from "./features";
-import type { Host } from "./host";
 import { ZOOMBINIS_GAME } from "./game";
 import { scrb } from "./resources";
 import { defineService } from "./scene";
@@ -757,7 +756,7 @@ export class Dialogs {
    * au dessus. Les touches physiques passent par `handleKey`, le champ ne relaie que ce qui n'en vient pas (pas de double saisie).
    */
   private syncTextInput(): void {
-    const port = (this.env.ctx.host as Host).textInput;
+    const port = this.env.ctx.host.textInput;
     if (!port) return;
     const top = this.layers[this.layers.length - 1];
     const wanted = top instanceof ListLayer && top.mode === 3;

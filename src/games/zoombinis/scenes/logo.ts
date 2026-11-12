@@ -10,7 +10,7 @@
  */
 import { isModifierOnlyKey } from "../../../engine/mohawk/input";
 import { ZOOMBINIS_GAME } from "../engine/game";
-import type { Host, VideoPlayback } from "../engine/host";
+import type { VideoPlayback } from "../engine/host";
 import type { Scene, SceneContext } from "../engine/scene";
 import { ScreenId } from "../engine/scene";
 import { GRAPHICS } from "../engine/services";
@@ -48,7 +48,7 @@ export function createLogoScene(): Scene {
       // Fond noir sous la vidéo (et seul affichage si le film n'est pas lu).
       ctx.services.get(GRAPHICS).screen.pixels.fill(0);
       ctx.requestPresent();
-      const host = ctx.host as Host;
+      const host = ctx.host;
       if (!filmStarted && host.playVideo) {
         filmStarted = true;
         film = host.playVideo(LOGO_FILE);

@@ -22,7 +22,8 @@
  *
  * ## Écarts avec l'original (voir aussi `docs/zoombinis/puzzles/smoke.md` §11)
  *
- *  - dépôt d'un Zoombini : cibles ponctuelles du kit (wagonnet de gauche et 20 places d'attente, carré de prise 35) au lieu de la zone rectangulaire et des 5 colonnes d'accrochage ;
+ *  - dépôt d'un Zoombini : le wagonnet de gauche est une cible ponctuelle comme dans l'original (43, 258), mais au carré de prise 35 au lieu de ±15 ; le terrain d'attente
+ *    `DS:21d4` (accrochage de y aux 5 valeurs `DS:21e4`) est représenté par les 20 places d'attente du kit ;
  *  - niveaux 3-4 : l'enchaînement des arrivées (`SCRB` 11033 à 11035, événements 30 à 38) est reconstruit : le premier du groupe et le suivant arrivent à l'entrée (11033 puis 11034),
  *    après chaque tour le suivant monte sur la plate-forme (11035, `SCRS` 12040) et le nouveau suivant arrive (11034) ; niveau 4, la nouvelle paire arrive après le second testé ;
  *    **probable**. Le levier ne se tire pas avant l'arrivée du premier (l'original l'arme dès l'entrée) ;
@@ -553,11 +554,8 @@ class SmokeRun implements SmokeProbe {
    */
   private still(feature: Feature, id: number, bit = false): void {
     feature.onEvent = undefined;
-    feature.scriptId = id;
-    feature.replacing = true;
-    feature.active = true;
+    this.features.pose(feature, id);
     feature.flags = (feature.flags & ~(F.playOnly | F.still)) | (bit ? F.playOnly : F.still) | F.noReplay | F.stopAtEnd;
-    this.features.invalidate();
   }
 
   // ------------------------------------------------------------------------------------------------------------------------

@@ -71,7 +71,7 @@ import {
 } from "../../game/puzzles/bridge";
 import type { Zoombini } from "../../game/state";
 import { createPuzzleKit, createTarget, sheetButtonImages, type DropInfo, type DropTarget, type KitMember, type PuzzleKit } from "../puzzle-kit";
-import { closeScreen, openScreen } from "../screen-kit";
+import { closeScreen, createDebugOverlay, openScreen } from "../screen-kit";
 import { screenScripts, snoidAssets } from "../snoid";
 import { dialogChoice } from "../xfer";
 
@@ -586,21 +586,15 @@ class BridgeRun implements BridgeProbe {
     this.debugConditions = rule.conditions;
     if (!this.debugOverlay) {
       const sheet = snoidAssets(this.ctx).sheets[3000];
-      this.debugOverlay = this.features.create({
-        script: 0,
-        delay: 0,
-        depth: 100,
-        flags: FeatureFlag.overlay,
-        onAfterDraw: (_feature, screen) => {
-          this.debugConditions.forEach((condition, i) => {
-            const base = TABLES_LARGE[(["hair", "eyes", "nose", "feet"] as const)[condition.attr - 1]!][condition.value];
-            if (base === undefined) return;
-            // `1168:5e91` : image `2 × base + 1` (1-based), ancre `REGS` retranchée de la position (250 + 30 × i, 20).
-            const index = snoidImageIndex(base + 1);
-            const shape = sheet.images[index - 1];
-            if (shape) drawShape(screen, shape, DEBUG_ICON_X + DEBUG_ICON_STEP * i - (sheet.anchors?.x[index] ?? 0), DEBUG_ICON_Y - (sheet.anchors?.y[index] ?? 0), 8);
-          });
-        },
+      this.debugOverlay = createDebugOverlay(this.features, (screen) => {
+        this.debugConditions.forEach((condition, i) => {
+          const base = TABLES_LARGE[(["hair", "eyes", "nose", "feet"] as const)[condition.attr - 1]!][condition.value];
+          if (base === undefined) return;
+          // `1168:5e91` : image `2 × base + 1` (1-based), ancre `REGS` retranchée de la position (250 + 30 × i, 20).
+          const index = snoidImageIndex(base + 1);
+          const shape = sheet.images[index - 1];
+          if (shape) drawShape(screen, shape, DEBUG_ICON_X + DEBUG_ICON_STEP * i - (sheet.anchors?.x[index] ?? 0), DEBUG_ICON_Y - (sheet.anchors?.y[index] ?? 0), 8);
+        });
       });
     }
     // Recomposition immédiate (`11a8:04b9` de l'original), puis le texte par-dessus : la ligne d'état n'est pas un objet et part à la recomposition suivante.

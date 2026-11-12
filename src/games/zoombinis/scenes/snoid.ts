@@ -233,6 +233,8 @@ export class Snoid {
   private waitCounter: number;
   /** Prochaine échéance de l'état 0 (`+0x24`), en ticks du moteur. */
   private waitDue = 0;
+  /** Features rattachées (`attach`) : leur position suit celle du Zoombini. */
+  private readonly attached: Feature[] = [];
   private readonly assets: SnoidAssets;
   private readonly scripts: SnoidScriptSource | undefined;
   private readonly ctx: SceneContext;
@@ -400,12 +402,37 @@ export class Snoid {
    */
   setPosition(position: Point): void {
     this.pos = { ...position };
+    this.followAttached();
+  }
+
+  /**
+   * Rattache `feature` au Zoombini (`11a8:1f5c`) : sa position (`relative`) est celle des pieds du Zoombini, tout de suite et à chaque déplacement (`setPosition`,
+   * `moveTo`, marche). L'original met les deux objets dans un groupe de synchronisation (`+0xde`), que `Features` ne porte pas : le port ne reproduit que le suivi
+   * de position. La feature reste à son propriétaire (il la détruit, et la `detach` avant) ; `destroy()` du Zoombini ne la détruit pas.
+   */
+  attach(feature: Feature): void {
+    if (!this.attached.includes(feature)) this.attached.push(feature);
+    this.followAttached();
+  }
+
+  /** Détache une feature rattachée par `attach` (elle garde sa dernière position). */
+  detach(feature: Feature): void {
+    const i = this.attached.indexOf(feature);
+    if (i >= 0) this.attached.splice(i, 1);
+  }
+
+  private followAttached(): void {
+    for (const feature of this.attached) {
+      feature.position.x = this.pos.x;
+      feature.position.y = this.pos.y;
+    }
   }
 
   /** Pose le Zoombini ailleurs (annule une marche) et redessine le script courant. */
   moveTo(position: Point): void {
     this.walk = undefined;
     this.pos = { ...position };
+    this.followAttached();
     this.reload();
   }
 
@@ -437,6 +464,7 @@ export class Snoid {
     if (this.destroyed) return;
     this.destroyed = true;
     this.walk = undefined;
+    this.attached.length = 0;
     this.ctx.services.get(FEATURES).destroy(this.feature);
   }
 
@@ -494,6 +522,7 @@ export class Snoid {
       const next = tickWalk(this.map, walk);
       this.walk = next;
       this.pos = { ...next.position };
+      this.followAttached();
       this.dir = next.facing;
       arrived = next.arrived;
       reload = next.scriptChanged;

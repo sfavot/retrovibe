@@ -264,7 +264,7 @@ Aucun. La branche « dalle valable » de `10c8:130f` ne contient aucun appel à 
 - **Rayon de prise des dalles** : 15 (`DS:9706` par défaut, l'épreuve ne le règle pas) ; **probable** : l'original utilise peut-être le polygone de la région 3.
 - **Ordre de dessin** : le retournement est joué par une feature propre (profondeur 0,5) au-dessus de la dalle, qui est masquée pendant l'animation (la première et la dernière image du script sont la dalle au repos) ; le remplissage est dessiné **au-dessus** des dalles (l'original le crée avant elles) ; ordre des Zoombinis arrivés par ordonnée.
 - **Poussière et rattachement** : la poussière est une feature indépendante ; les objets d'accroche des dalles (script 6000, rappels `10c8:18c7` / `18d3`, `11a8:2a0a`) et `11a8:1f5c` ne sont pas portés.
-- **Pose juste** : le Zoombini est posé d'un coup sur l'ancre (état 4 du kit) puis joue son pas sur place ; la marche de l'original sur la distance de dépôt (au plus 15 pixels) n'est pas portée.
+- **Pose juste** : le Zoombini est posé d'un coup sur l'ancre (`kit.placeMember`, état 4), comme dans l'original (`1168:11b4`, vérifié dans les octets : la position devient la destination) ; les « 15 pixels » sont la tolérance de prise `DS:9706`. Le pas sur place est le script `SCRS` 12999 + pieds.
 - **Danse de victoire** : tirage sans remise par `NoRepeatPool` (l'original : `1098:0098` avec le masque `[7238]` et `DS:[2i]`, dont l'indexation est ambiguë) ; **probable**.
 - **Éclat du niveau 1** non porté ; l'attente de la fin du son 996 avant la sortie est portée (`caves.ts`, `leave`). Touches du mode de test : portées, sauf l'incrustation `10c8:2d1c` (§2.7).
 - **Aucun texte** : les consignes sont des voix de l'original ; aucune copy à valider.

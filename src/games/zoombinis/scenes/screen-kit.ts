@@ -7,7 +7,7 @@ import { drawShape } from "../../../engine/mohawk/graphics/blit";
 import { Surface } from "../../../engine/mohawk/graphics/surface";
 import type { Archive } from "../../../engine/mohawk/resources";
 import { BACKGROUND_ID } from "../data/archives";
-import { FEATURES } from "../engine/features";
+import { FEATURES, FeatureFlag, type Feature, type Features } from "../engine/features";
 import type { SceneContext } from "../engine/scene";
 import { GRAPHICS, SCREEN_HEIGHT, SCREEN_WIDTH } from "../engine/services";
 import { ZOOMBINIS_SOUND } from "../engine/sound";
@@ -50,4 +50,13 @@ export function closeScreen(ctx: SceneContext): void {
   sound.stopEffects();
   sound.setScreenArchive(null);
   ctx.setCursor("system");
+}
+
+/**
+ * Calque de test (touches du mode de test qui, dans l'original, dessinent directement sur l'écran : icônes de règle aux gorges `A`, graphe du bac `A`) : feature sans
+ * script, `overlay` à la profondeur 100, qui peint par `paint` à chaque recomposition, devant tout jusqu'à la sortie de l'écran (écart : l'original ne l'efface pas non plus,
+ * mais un décor qui passe dessus l'efface).
+ */
+export function createDebugOverlay(features: Features, paint: (screen: Surface) => void): Feature {
+  return features.create({ script: 0, delay: 0, depth: 100, flags: FeatureFlag.overlay, onAfterDraw: (_feature, screen) => paint(screen) });
 }

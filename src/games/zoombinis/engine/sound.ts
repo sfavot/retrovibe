@@ -317,6 +317,23 @@ export class ZoombinisSound {
     this.player.tick();
   }
 
+  /**
+   * `1028:0c0a(SND, id)` : arrête les lectures numériques de l'id `id` (celles qui jouent, pas les ids encore en file). Ne touche pas à `DS:a402` :
+   * l'appelant le remet à 0 (`resetCurrentEffect`), comme `1170:4f98`.
+   */
+  stopSound(id: number): void {
+    for (const [handle, played] of [...this.waves]) {
+      if (played !== id) continue;
+      this.audio.stopWave(handle);
+      this.waves.delete(handle);
+    }
+  }
+
+  /** `DS:a402 = 0` : plus de « voix en cours » (écrit par `1170:4f98` après `1028:0c0a`). */
+  resetCurrentEffect(): void {
+    this.current = 0;
+  }
+
   /** Coupe tous les effets et voix et vide leur file (la musique continue). */
   stopEffects(): void {
     this.effects.length = 0;

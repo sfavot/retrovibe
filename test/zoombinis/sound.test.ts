@@ -264,6 +264,24 @@ describe("ZoombinisSound : isPlaying(id)", () => {
     expect(sound.isPlaying(150)).toBe(false);
   });
 
+  it("stopSound(id) (`1028:0c0a`) arrête les lectures de cet id seulement, sans toucher à la file ni à l'id courant", () => {
+    const { sink, sound } = setup();
+    sound.queue(150);
+    sound.tick();
+    expect(sound.currentEffect).toBe(150);
+    sound.stopSound(999);
+    expect(sound.isPlaying(150)).toBe(true);
+    sound.queue(905);
+    sound.stopSound(150);
+    expect(sink.played[0]!.stopped).toBe(true);
+    expect(sound.isPlaying(150)).toBe(false);
+    // 905 est toujours en file : `0c0a` ne regarde que les lectures en cours.
+    expect(sound.isPlaying(905)).toBe(true);
+    expect(sound.currentEffect).toBe(150);
+    sound.resetCurrentEffect();
+    expect(sound.currentEffect).toBe(0);
+  });
+
   it("musique : en file, en cours (seulement la dernière), arrêtée ; l'id 0 jamais", () => {
     const { sound } = setup();
     expect(sound.isPlaying(30000)).toBe(false);

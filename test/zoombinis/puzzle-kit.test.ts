@@ -16,11 +16,9 @@ import { makeZoombini, newGame, type GameState, type Session, type Zoombini } fr
 import {
   BUTTON_GO,
   BUTTON_MAP,
-  CARRY_DEPTH,
   createPuzzleKit,
   createTarget,
   HELP_KEY,
-  HIDDEN_CURSOR,
   sheetButtonImages,
   PUZZLE_MUSIC,
   puzzleMusicId,
@@ -38,10 +36,26 @@ import {
   type PuzzleKit,
   type PuzzleKitSpec,
 } from "../../src/games/zoombinis/scenes/puzzle-kit";
-import { BACKGROUNDS } from "../../src/games/zoombinis/scenes/puzzle-stub";
+import { CARRY_DEPTH, HIDDEN_CURSOR } from "../../src/games/zoombinis/scenes/snoid-carry";
 import { closeScreen, openScreen } from "../../src/games/zoombinis/scenes/screen-kit";
 import { originalFiles } from "../support/original";
 import { FRAME_MS, runFor, TestHost } from "./engine-test-host";
+
+/** Id de la palette `SHPL` et du fond `tBMP` 640 × 480 de chaque archive d'épreuve (le premier couple de même id). */
+const BACKGROUNDS: Readonly<Record<number, number>> = {
+  7: 1000, // BRIDGE
+  8: 300, // TUNNELS
+  9: 5000, // PIZZA
+  10: 1300, // FERRY
+  11: 5000, // LILLY
+  12: 5000, // SLIDES
+  13: 300, // FLEENS
+  14: 5000, // HOTEL
+  15: 5000, // NET
+  16: 5000, // CAVES
+  17: 5000, // SMOKE
+  18: 5000, // MAZE2
+};
 
 // Les écrans simulent des centaines de ticks : 20 s de marge pour une machine chargée.
 vi.setConfig({ testTimeout: 20_000 });
@@ -363,6 +377,30 @@ describe.skipIf(!original.has)("kit des épreuves (H0)", () => {
       expect(kit().members[0]!.snoid.position).toEqual({ x: 500, y: 470 });
       host.input.mouseUp("left");
       await tickOnce();
+    });
+
+    it("la zone de transport peut être propre à chaque Zoombini (fonction du membre, lue à la prise)", async () => {
+      const zones = [
+        { left: 100, top: 300, right: 500, bottom: 470 },
+        { left: 20, top: 40, right: 120, bottom: 90 },
+      ];
+      const { host, kit, tickOnce, ticks } = await start({ size: 6, setup: hold(), spec: { bounds: (member) => zones[member.index]! } });
+      for (const index of [0, 1]) {
+        const grab = grabPoint(kit(), index);
+        host.input.moveMouse(grab.x, grab.y);
+        host.input.mouseDown("left");
+        await tickOnce();
+        expect(kit().carrying === kit().members[index]).toBe(true);
+        host.input.moveMouse(0, 0);
+        await ticks(2);
+        expect(kit().members[index]!.snoid.position).toEqual({ x: zones[index]!.left, y: zones[index]!.top });
+        host.input.moveMouse(639, 479);
+        await ticks(2);
+        expect(kit().members[index]!.snoid.position).toEqual({ x: zones[index]!.right, y: zones[index]!.bottom });
+        host.input.mouseUp("left");
+        await tickOnce();
+        expect(kit().carrying).toBeNull();
+      }
     });
 
     it("le curseur système reste affiché quand l'option « curseur masqué » est coupée", async () => {
@@ -1026,6 +1064,82 @@ describe.skipIf(!original.has)("kit des épreuves (H0)", () => {
         expect(first).not.toHaveBeenCalled();
         expect(second).toHaveBeenCalledTimes(1);
         expect([kit.walking, kit.arrived]).toEqual([0, 1]);
+      });
+    });
+
+    describe("pose directe d'un membre (placeMember)", () => {
+      it("par défaut posé d'un coup (état 4) : la cible est à lui, il quitte la précédente, et sa marche en cours est abandonnée", async () => {
+        const h = await start({ size: 4, setup: standing() });
+        const kit = h.kit();
+        const member = kit.members[0]!;
+        const before = member.target!;
+        const target = kit.waitingPlaces[kit.waitingPlaces.length - 1]!;
+        kit.walk(member, { x: before.x + 80, y: before.y });
+        kit.placeMember(member, target);
+        expect(before.owner).toBeNull();
+        expect([target.owner, member.target, member.waiting]).toEqual([member, target, target]);
+        expect(member.snoid.position).toEqual({ x: target.x, y: target.y });
+        expect(member.walking).toBe(false);
+        expect(kit.walking).toBe(0);
+        expect(member.snoid.feature.depth).toBeCloseTo(1 + target.y / 1000);
+      });
+
+      it("motion « walk » : propriétaires changés tout de suite, marche non comptée, profondeur de la cible à l'arrivée", async () => {
+        const h = await start({ size: 4, setup: standing() });
+        const kit = h.kit();
+        const member = kit.members[0]!;
+        const target = kit.waitingPlaces[kit.waitingPlaces.length - 1]!;
+        kit.placeMember(member, target, { motion: "walk" });
+        expect(target.owner).toBe(member);
+        expect([member.walking, kit.walking]).toEqual([true, 0]);
+        for (let i = 0; i < 600 && member.walking; i++) await h.tickOnce();
+        expect(member.snoid.position).toEqual({ x: target.x, y: target.y });
+        expect([kit.walking, kit.arrived]).toEqual([0, 0]);
+        expect(member.snoid.feature.depth).toBeCloseTo(1 + target.y / 1000);
+      });
+
+      it("motion « none » : seuls les propriétaires changent", async () => {
+        const h = await start({ size: 4, setup: standing() });
+        const kit = h.kit();
+        const member = kit.members[0]!;
+        const at = { ...member.snoid.position };
+        const before = member.target!;
+        const target = kit.waitingPlaces[kit.waitingPlaces.length - 1]!;
+        kit.placeMember(member, target, { motion: "none" });
+        expect([before.owner, target.owner, member.target]).toEqual([null, member, target]);
+        expect(member.snoid.position).toEqual(at);
+      });
+    });
+
+    describe("départs (depart)", () => {
+      it("de places variables, le plus à droite d'abord, un toutes les `step` ticks, comptés ; l'arrivée prévient l'épreuve", async () => {
+        const h = await start({ size: 4, setup: standing() });
+        const kit = h.kit();
+        const [a, b] = [kit.members[0]!, kit.members[1]!];
+        const left = a.snoid.position.x < b.snoid.position.x ? a : b;
+        const right = left === a ? b : a;
+        const arrive = vi.fn();
+        const dest = { x: 400, y: 300 };
+        kit.depart([left, right], dest, { step: 20, onArrive: arrive });
+        expect([right.walking, left.walking, kit.walking]).toEqual([true, true, 1]);
+        await h.ticks(19);
+        expect(kit.walking).toBe(1);
+        await h.ticks(2);
+        expect(kit.walking).toBe(2);
+        for (let i = 0; i < 800 && (left.walking || right.walking); i++) await h.tickOnce();
+        expect(arrive.mock.calls.map(([m]) => m)).toEqual([right, left]);
+        expect([kit.walking, kit.arrived]).toEqual([0, 2]);
+      });
+
+      it("se poursuit quand le kit est suspendu (la sortie menée par l'épreuve)", async () => {
+        const h = await start({ size: 4, setup: standing() });
+        const kit = h.kit();
+        const [a, b] = [kit.members[0]!, kit.members[1]!];
+        kit.suspend();
+        kit.depart([a, b], { x: 400, y: 300 }, { step: 10 });
+        for (let i = 0; i < 800 && (a.walking || b.walking); i++) await h.tickOnce();
+        expect([a.snoid.position, b.snoid.position]).toEqual([{ x: 400, y: 300 }, { x: 400, y: 300 }]);
+        expect(kit.arrived).toBe(2);
       });
     });
 

@@ -355,7 +355,7 @@ Un lot ne part que si le précédent est vert. Une tâche « règles » qui lais
   - une partie en aventure de bout en bout par les deux chemins, jusqu'à Zoombiniville ;
   - Mathémagique revérifié ;
   - écran de présentation contrôlé sur mobile ;
-  - l'épreuve provisoire et `scenes/demo.ts` supprimés une fois inutiles.
+  - l'épreuve provisoire et `scenes/demo.ts` supprimés une fois inutiles (fait).
 
 ### Copy à valider (vague H)
 

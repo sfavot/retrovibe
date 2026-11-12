@@ -31,7 +31,7 @@
  *  - le glisser-déposer n'est pas limité au rectangle de la falaise du Zoombini (le kit a une seule zone de transport) : un dépôt sur une rampe d'une autre falaise est refusé
  *    (retour sur sa place) ; il n'y a donc pas de différence de résultat, seulement de geste ;
  *  - bulle et effets : posés comme l'original (`relative` sur la position du Zoombini, rappel d'image `1118:3dac` / `1118:3e25` et ancres `REGS 17000` / `17001`), mais
- *    la bulle n'est pas rattachée au Zoombini par le groupe de synchronisation `11a8:1f5c` (sans effet visible : ils changent de script ensemble) ; la bulle n'éclate
+ *    la bulle est rattachée au Zoombini (`Snoid.attach`, `11a8:1f5c`) pour la position seulement, sans le groupe de synchronisation des images ; la bulle n'éclate
  *    pas sur un tourbillon (`SCRB 10030`, `1100:1301`) et l'atterrissage ne crée pas `SCRB 10041` (`1118:1fb4`) ; le Zoombini rejeté par un tourbillon reste sur la
  *    position de la case (l'original le décale de `(17, 5)` pour `SCRS 14006`) ;
  *  - au doigt (extension tactile du kit), la flèche d'une rampe (`SCRB 7000 + z − 1`) sous le doigt la désigne aussi ; à la souris, la règle de l'original seule ;
@@ -79,7 +79,7 @@ import {
   type Maze2World,
 } from "../../game/puzzles/maze2";
 import type { Session, Zoombini } from "../../game/state";
-import { createPuzzleKit, createTarget, sheetButtonImages, type DropInfo, type DropTarget, type KitMember, type PuzzleKit } from "../puzzle-kit";
+import { createPuzzleKit, createTarget, sheetButtonImages, type DropInfo, type DropTarget, type KitMember, type PuzzleKit, type Rect } from "../puzzle-kit";
 import { closeScreen, openScreen } from "../screen-kit";
 import { screenScripts } from "../snoid";
 
@@ -108,6 +108,16 @@ export const CLIFF_PLACES: readonly (readonly Point[])[] = [
   [[633, 311], [613, 311], [590, 336], [571, 340], [551, 345], [632, 297], [612, 297], [589, 321], [570, 325], [550, 330], [629, 281], [609, 281], [588, 307], [569, 311], [549, 316], [589, 291], [566, 296], [546, 300], [634, 336], [614, 336]],
   [[621, 18], [624, 40], [624, 64], [625, 84], [594, 20], [598, 40], [593, 60], [594, 75], [594, 90], [556, 32], [560, 50], [555, 72], [563, 94], [511, 42], [515, 60], [521, 80], [529, 100], [476, 67], [484, 89], [594, 104]],
 ].map((places) => places.map(([x, y]) => ({ x: x!, y: y! })));
+/**
+ * Rectangle de dépôt de chaque falaise (`S14:13d8 + 8·falaise`, mots `gauche, haut, droite, bas`, relus dans l'exécutable) : `1118:2285` le donne à `1168:1742`,
+ * qui borne le glisser du Zoombini à la falaise où il se trouve (`+0x76`).
+ */
+export const CLIFF_BOUNDS: readonly Readonly<Rect>[] = [
+  { left: 0, top: 250, right: 300, bottom: 479 },
+  { left: 0, top: 0, right: 200, bottom: 175 },
+  { left: 450, top: 230, right: 639, bottom: 400 },
+  { left: 400, top: 0, right: 639, bottom: 200 },
+];
 /** `DS:8920 = 0x10` : les 16 premières places de la falaise 0 sont celles de l'équipe, la file des arrivées commence à la 17e. */
 const QUEUE_START = [16, 0, 0, 0] as const;
 const QUEUE_SIZE = 20;
@@ -355,7 +365,8 @@ class Maze2Run implements Maze2Probe {
       snoid: { scripts: screenScripts(archive) },
       buttons: { map: { images: buttons.map }, go: { images: buttons.go, onPress: () => this.pressGo() } },
       canPick: (member) => this.canPick(member),
-      decide: (drop) => this.decide(drop),
+      // Le glisser est limité au rectangle de la falaise du Zoombini (`1118:2285` → `1168:1742(0, S14:13d8 + 8·falaise, …)`) : une rampe d'une autre falaise est hors d'atteinte.
+      bounds: (member) => CLIFF_BOUNDS[this.world.members[member.index]!.cliff]!,
       onHover: (target) => this.hovered(target),
       onDrop: (drop) => this.dropped(drop),
     });
@@ -484,16 +495,7 @@ class Maze2Run implements Maze2Probe {
     return true;
   }
 
-  /** Dépôt sur une rampe libre de la falaise du Zoombini (le dépôt sur une rampe occupée est hors cible : `findTarget` ne prend que les cibles libres). */
-  private decide(drop: DropInfo): boolean {
-    const number = drop.target?.tag;
-    if (typeof number !== "number") return false;
-    const ramp = MAZE2_RAMPS[number - 1]!;
-    const member = this.world.members[drop.member.index]!;
-    return ramp.cliff === member.cliff;
-  }
-
-  /** Lancer : la rampe est occupée (cible), la simulation prend le Zoombini à la prochaine image. */
+  /** Dépôt sur une rampe libre (une rampe occupée est hors cible : `findTarget` ne prend que les cibles libres) : la rampe est occupée, la simulation prend le Zoombini à la prochaine image. */
   private dropped(drop: DropInfo): void {
     this.enqueue(drop.member, MAZE2_RAMPS[(drop.target!.tag as number) - 1]!);
   }
@@ -700,8 +702,8 @@ class Maze2Run implements Maze2Probe {
   }
 
   /**
-   * Bulle du Zoombini (`1118:2dad`, `1100:0b69`) : feature `relative` (`0x4908000`) posée sur la position du Zoombini, rappel d'image `1118:3dac` ;
-   * rejoue le script de pas à chaque case.
+   * Bulle du Zoombini (`1118:2dad`, `1100:0b69`) : feature `relative` (`0x4908000`) rattachée au Zoombini (`Snoid.attach`, `11a8:1f5c`), rappel d'image `1118:3dac` ;
+   * `at` n'est que sa position de création ; elle rejoue le script de pas à chaque case.
    */
   private placeBubble(view: FlightView, at: Point, script: number): void {
     const f = this.features;
@@ -714,15 +716,18 @@ class Maze2Run implements Maze2Probe {
         flags: FeatureFlag.flag4000000 | FeatureFlag.relative | FeatureFlag.stopAtEnd | FeatureFlag.active | FeatureFlag.firstImage,
         onImage: this.anchored(LIFT.bubble),
       });
+      // Rattachée au Zoombini (`11a8:1f5c`) : elle le suit, sa position n'est plus replacée à chaque segment.
+      view.member.snoid.attach(view.bubble);
       return;
     }
-    view.bubble.position.x = at.x;
-    view.bubble.position.y = at.y;
     f.setScript(view.bubble, script);
   }
 
   private dropBubble(view: FlightView): void {
-    if (view.bubble) this.features.destroy(view.bubble);
+    if (view.bubble) {
+      view.member.snoid.detach(view.bubble);
+      this.features.destroy(view.bubble);
+    }
     view.bubble = null;
   }
 

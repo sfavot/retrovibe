@@ -61,16 +61,18 @@ import {
   campGroupReserve,
   campLeave,
   campReserve,
+  compactReserve,
   findShelfEntry,
+  insertFrontColumn,
   putOnShelf,
   reserveEnd,
+  SHELF_ROWS,
   setSlotRect,
   takeFromShelf,
   type Camp,
   type Rect,
 } from "../game/team";
-import type { Host } from "../engine/host";
-import { TAP_SLOP } from "./puzzle-kit";
+import { TAP_SLOP } from "./snoid-carry";
 import { closeScreen, openScreen } from "./screen-kit";
 import { createSnoid, type Snoid } from "./snoid";
 import { dialogChoice } from "./xfer";
@@ -490,7 +492,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
       const state = initial.campDecor[k] ?? 0;
       if (state > 0) {
         features.seek(feature, state);
-        feature.active = true;
+        features.resume(feature);
       }
     }
   }
@@ -691,13 +693,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
   /** `10b0:17df` : la première colonne est occupée et la dernière libre : tout le présentoir recule d'une colonne (une colonne vide apparaît à gauche). */
   function insertFrontPage(): void {
     const r = reserve();
-    if (rows >= 125) return;
-    if (!r.entries.slice(0, 5).some((e) => isOccupied(e))) return;
-    if (r.entries.slice(ZOOMBINI_TYPES - 5).some((e) => isOccupied(e))) return;
-    for (let i = ZOOMBINI_TYPES - 6; i >= 0; i--) {
-      r.entries[i + 5] = r.entries[i] ?? null;
-      r.entries[i] = null;
-    }
+    if (rows >= SHELF_ROWS || !insertFrontColumn(r)) return;
     rows = rowsFor(r);
     setScroll(scroll + 1);
     soundScroll(false);
@@ -787,20 +783,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
 
   /** `10b0:18cc` : à la sortie, les colonnes vides en tête (au-delà d'une) sont supprimées. */
   function compactShelf(): void {
-    const r = reserve();
-    let empty = -5;
-    for (let i = 0; i < ZOOMBINI_TYPES; i++) {
-      if (isOccupied(r.entries[i] ?? null)) break;
-      empty++;
-    }
-    if (empty <= 4) return;
-    const shift = Math.trunc(empty / 5) * 5;
-    if (shift === 0) return;
-    for (let i = shift; i < ZOOMBINI_TYPES; i++) {
-      r.entries[i - shift] = r.entries[i] ?? null;
-      r.entries[i] = null;
-    }
-    r.scroll = Math.max(0, r.scroll - shift / 5);
+    compactReserve(reserve());
   }
 
   function clickExit(index: number): void {
@@ -871,7 +854,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
   }
 
   /** Le dernier appui vient d'un doigt (`Host.pointerIsTouch`). */
-  const touch = (): boolean => (ctx.host as Host).pointerIsTouch === true;
+  const touch = (): boolean => ctx.host.pointerIsTouch === true;
 
   /**
    * `1168:1742` : la première place libre (ou celle qu'il vient de quitter) dont le point est dans le carré de tolérance autour du Zoombini porté ; −1 sinon.
@@ -977,7 +960,7 @@ function start(spec: CampSpec, ctx: SceneContext, archive: Archive) {
     mushrooms.forEach((feature, k) => {
       if (!under(feature, x, y) || !mush) return;
       // L'image suivante, mémorisée dans la partie (`S+0x14 + 2 k`) : `(image + 1) % nombre d'images`.
-      feature.active = true;
+      features.resume(feature);
       game().campDecor[k] = (feature.image + 1) % (feature.last + 1);
       sound.queue(mush.sound + k);
     });

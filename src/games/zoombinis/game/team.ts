@@ -215,6 +215,38 @@ export function shelfScrollAfterDeposit(endBeforeDeposit: number): number {
   return Math.trunc((endBeforeDeposit + 1) / 5) % SHELF_ROWS;
 }
 
+/**
+ * `10b0:17df` : si la première colonne (5 entrées) est occupée et la dernière libre, tout le présentoir recule d'une colonne : une colonne vide
+ * apparaît en tête. Renvoie vrai si la réserve a été décalée (le défilement et le nombre de lignes restent à la charge de l'écran).
+ */
+export function insertFrontColumn(reserve: Reserve): boolean {
+  if (!reserve.entries.slice(0, 5).some((e) => isOccupied(e))) return false;
+  if (reserve.entries.slice(ZOOMBINI_TYPES - 5).some((e) => isOccupied(e))) return false;
+  for (let i = ZOOMBINI_TYPES - 6; i >= 0; i -= 1) {
+    reserve.entries[i + 5] = reserve.entries[i] ?? null;
+    reserve.entries[i] = null;
+  }
+  return true;
+}
+
+/**
+ * `10b0:18cc` (à la sortie du camp) : supprime les colonnes vides en tête, au-delà d'une, par blocs de 5 entrées, et recule le défilement d'autant.
+ */
+export function compactReserve(reserve: Reserve): void {
+  let empty = -5;
+  for (let i = 0; i < ZOOMBINI_TYPES; i += 1) {
+    if (isOccupied(reserve.entries[i] ?? null)) break;
+    empty += 1;
+  }
+  if (empty <= 4) return;
+  const shift = Math.trunc(empty / 5) * 5;
+  for (let i = shift; i < ZOOMBINI_TYPES; i += 1) {
+    reserve.entries[i - shift] = reserve.entries[i] ?? null;
+    reserve.entries[i] = null;
+  }
+  reserve.scroll = Math.max(0, reserve.scroll - shift / 5);
+}
+
 /** Rectangle `[gauche, haut, droite, bas]`. */
 export type Rect = readonly [number, number, number, number];
 

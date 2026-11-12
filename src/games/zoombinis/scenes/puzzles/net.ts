@@ -301,7 +301,7 @@ export function netProbeOf(scene: Scene): NetProbe | null {
   return PROBES.get(scene)?.() ?? null;
 }
 
-/** Scène de l'épreuve de la muraille de signes (écran 15). À enregistrer à la place de l'épreuve provisoire : `engine.register(ScreenId.net, createNetScene)`. */
+/** Scène de l'épreuve de la muraille de signes (écran 15). */
 export function createNetScene(): Scene {
   const name = screenInfo(ScreenId.net)?.archive;
   if (!name) throw new Error("createNetScene : pas d'archive pour l'écran 15");
@@ -817,18 +817,15 @@ export function createNetScene(): Scene {
     member.snoid.onEvent = undefined;
     member.snoid.onEnd = undefined;
     unlockAfterRelease("arrival");
-    kit!.walk(
-      member,
-      point,
-      () => {
+    kit!.depart([member], point, {
+      onArrive: () => {
         statuses[index] = "crossed";
         // `1120:2cae` : « go » devient actif quand le premier Zoombini a rejoint la file d'arrivée.
         if (kit) kit.goEnabled = true;
         const crossedAll = statuses.every((status) => status === "crossed");
         if (crossedAll) kit?.playSuccessVoice();
       },
-      { counted: false },
-    );
+    });
   }
 
   /** `1120:1abd` : le prochain Zoombini monte à la première place libre de la balançoire (la plus à droite d'abord). */
@@ -871,7 +868,7 @@ export function createNetScene(): Scene {
     };
     const at = member.snoid.position;
     if (at.x === NET_SPOT.x && at.y === NET_SPOT.y) hop();
-    else kit.walk(member, NET_SPOT, hop, { counted: false });
+    else kit.depart([member], NET_SPOT, { onArrive: hop });
   }
 
   /** Animation de joie d'un Zoombini qui attend (`SCRS` 13045 + nez, `1120:0554`) : toutes les 30 ticks après un groupe libéré. */

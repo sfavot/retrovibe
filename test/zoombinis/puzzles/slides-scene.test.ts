@@ -279,6 +279,28 @@ describe.skipIf(!original.has)("monte-pierre : écran sur les vrais fichiers (SL
     expect(probe().play.seat[3]).toBe(0);
   }, 30_000);
 
+  it("un son de bilan qui est la voix en cours est arrêté avant d'être remis en file (`1170:4f98` : `1028:0c0a`, puis `DS:a402 = 0`)", async () => {
+    const { probe, seat, wait, queued, sound } = await start();
+    const stopped: number[] = [];
+    const stop = sound.stopSound.bind(sound);
+    sound.stopSound = (id: number) => {
+      stopped.push(id);
+      stop(id);
+    };
+    const { board, play } = probe();
+    const plan = robot(createPlay(board, play.members))!;
+    queued.length = 0;
+    // Deux dépôts de suite qui font monter le même nombre de pierres : le second rejoue le même son de bilan.
+    for (const p of plan.slice(0, 4)) {
+      await seat(p.member, p.slot);
+      await wait(6);
+    }
+    const feedback = queued.filter((id) => id >= 8500);
+    for (const id of stopped) expect(feedback.filter((f) => f === id).length).toBeGreaterThan(1);
+    expect(stopped.length).toBeGreaterThan(0);
+    expect(stopped).not.toContain(8502);
+  });
+
   it("lâché sur l'emplacement qu'il vient de quitter, il y reste sans rien changer", async () => {
     const { probe, seat, wait, queued } = await start();
     await seat(0, 5);

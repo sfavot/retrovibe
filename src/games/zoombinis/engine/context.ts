@@ -1,5 +1,5 @@
 import type { BaseSceneContext } from "../../../engine/mohawk/scene";
-import type { CursorKind } from "./host";
+import type { CursorKind, Host } from "./host";
 import type { ScreenId } from "./scene";
 
 /**
@@ -25,7 +25,11 @@ export function defaultPrefs(): ZoombinisPrefs {
   return { music: true, effects: true, transitions: true, magneticMouse: false, autoMagnet: false, hideCursorWhileCarrying: true };
 }
 
-/** Tout ce qu'un écran de Zoombinis peut utiliser : le contexte commun plus les préférences. */
+/**
+ * Tout ce qu'un écran de Zoombinis peut utiliser : le contexte commun plus l'hôte du jeu (le `MohawkHost` commun ne connaît pas
+ * `playVideo`, `textInput`, `pointerIsTouch`) et les préférences.
+ */
 export type ZoombinisContext = BaseSceneContext<ScreenId, CursorKind> & {
+  readonly host: Host;
   readonly prefs: ZoombinisPrefs;
 };

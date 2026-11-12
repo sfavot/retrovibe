@@ -104,6 +104,7 @@ Les études R montrent un même moteur Mohawk : écrans à handlers Enter / Exit
 éclaircissement, `\0SND` WAVE 8 bits 11 025 Hz, `tMID` + `MIDIMAP.DAT`, générateur `(s >>> 16) % (n + 1)` identique. Le moteur de
 Mathémagique ne dépend du jeu que par quelques constantes (`SceneId`, 576 × 432, roster, Ctrl+Q). Recopier ce code ferait un 4e moteur
 dupliqué (Téléportaschtroumpf, Lost in Time et Mathémagique en ont déjà chacun un) ; on le rend générique et Mathémagique l'utilise.
+Les deux premiers ne sont pas des jeux Mohawk (voir plus bas) : leur moteur n'a que la même structure.
 
 | Module de Mathémagique | Décision | Destination |
 |---|---|---|
@@ -119,7 +120,11 @@ dupliqué (Téléportaschtroumpf, Lost in Time et Mathémagique en ont déjà ch
 | `engine/sound.ts` | **propre au jeu** : Mathémagique a des canaux voix / effet et la préférence « Ambient Sounds » ; Zoombinis a deux files de 32 places, des drapeaux musique / effets et un routage par plage d'id (`engine.md` §6.2) | reste ; Zoombinis écrit le sien |
 | `scr-player.ts`, `gadgets.ts`, `pointer.ts`, `roster.ts`, `graphics/fon.ts`, `text.ts`, `transitions.ts`, `audio/rhythm-rewrite.ts` | **propres à Mathémagique** : Zoombinis a les features `SCRB` / `SCRS`, les régions `REGS`, `.WHO`, et ses transitions sont un écran (`XFER`) | restent |
 
-Hors périmètre : migrer Téléportaschtroumpf et Lost in Time sur ce moteur (d'autres y travaillent en parallèle) ; à proposer ensuite.
+Téléportaschtroumpf et Lost in Time ne passeront pas sur ce moteur (évalué le 2026-11-12) : ce ne sont pas des jeux Mohawk.
+Le Téléportaschtroumpf est un jeu DOS d'Infogrames (mode 13h, formats MCG, HY8, MUX, VOC) et Lost in Time un jeu Coktel Vision
+(moteur Gob : scripts `TOT`, archives `STK` / `ITK`, AdLib, pistes CD). `src/engine/mohawk/` est lié aux formats Mohawk
+(`SHPL`, `STRL`, `tBMP`, `\0SND`, `tMID`, hasard MSVC, MIDI) ; ce qui leur est commun (horloge à pas fixe, `Host`, hasard,
+stockage, son PCM, coque du site) est déjà dans `src/engine/`, `src/audio/` et `src/ui/`, et ils s'en servent.
 
 ### Sous-tâches
 

@@ -176,7 +176,7 @@ Pour un chargement qui ne se règle que sur commande, piloter `engine.frame(...)
 
 ## Dette et points ouverts
 
-- Le moteur est commun à Mathémagique et à Zoombinis (`src/engine/mohawk/`), mais Téléportaschtroumpf et Lost in Time ont encore chacun leur propre copie (`Host`, horloge, scènes, pause sur onglet caché) ; les migrer demanderait de refactorer ces deux jeux (hors périmètre, à proposer ensuite).
+- Le moteur est commun à Mathémagique et à Zoombinis (`src/engine/mohawk/`). Téléportaschtroumpf et Lost in Time gardent le leur : ce ne sont pas des jeux Mohawk (Infogrames DOS et Coktel Vision / Gob), et ce qu'ils partagent avec les autres jeux est déjà dans `src/engine/`, `src/audio/` et `src/ui/` (voir `docs/zoombinis/plan.md`, vague F).
 - Ctrl+V (boîte « À propos ») : pas implémenté ici (il faut le rendu de texte) ; à brancher en vague G/H via `addKeyHandler("after", …)`.
 - Durée réelle du timer du Bowling : voir « Temps ».
 

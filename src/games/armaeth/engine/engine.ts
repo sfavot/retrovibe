@@ -14,7 +14,7 @@ import { type VgaArchive, readCountedArchive, readSceneArchive } from "../data/v
 import { type DeferredEvent, OPPOSITE_EXIT } from "../data/world";
 import { Compositor } from "../render/compositor";
 import { applyLight, isTooDark, lightLevel } from "../render/light";
-import type { Rect } from "../render/surface";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type Rect } from "../render/surface";
 import { drawText } from "../render/text";
 import { encodeCp437 } from "../../../data/cp437";
 import { SpriteLibrary, animStep, currentFrame, loadObjectSprite, setFig } from "./animation";
@@ -200,6 +200,13 @@ const FULL_WINDOW = { x: 0, y: 0, width: 320, height: 200 };
 /** Couleurs (fond, texte, ombre) de `2401:0002` (information) et de `14cf:000c` (score), lues dans les appels. */
 const INFO_COLORS = [0xef, 0xf5, 0xe9] as const;
 const SCORE_COLORS = [0xed, 0xf9, 0xec] as const;
+/**
+ * Fenêtre du titre de chapitre (`21cc:008e`) : `x = 0`, `y = 24`, largeur et hauteur du pilote réduites de 20 et 60 px
+ * (`es:[bx + 0x12] - 0x14`, `es:[bx + 0x14] - 0x3c`), centrée (`centré = 7`).
+ */
+const LEVEL_INTRO_WINDOW = { x: 0, y: 24, width: SCREEN_WIDTH - 20, height: SCREEN_HEIGHT - 60 };
+/** Couleurs (fond, texte, ombre) du titre de chapitre (`21cc:008e`) : vert moyen (229), vert pâle (232), vert foncé (228). */
+const LEVEL_INTRO_COLORS = [0xe5, 0xe8, 0xe4] as const;
 /** Panneau de contenu (`1664:0057`) : cellules 18 x 14 espacées de 4, au plus 96, haut à `y = 26`. */
 const PANEL = { cellWidth: 18, cellHeight: 14, gap: 4, top: 26, maxCells: 96, maxColumns: 12, maxRows: 8, presence: 0x0b, p: 0xb8 };
 /** Entrées de la table des portes `DGROUP:0694` (`217d:0088`) : 3 lignes, colonnes porte, gardien, clé, mot, salle A, salle B. */
@@ -487,6 +494,13 @@ export class ArmaethEngine implements TokenHostEngine {
   /** Message `classe` / `numéro` dans une fenêtre qui attend un clic ou Entrée (`gm_show_message_id`). */
   say(messageClass: string | number, number: number): void {
     this.sayId(messageId(messageClass, number));
+  }
+
+  /** Titre de chapitre (`21cc:008e`) : message sur fond vert dans la fenêtre d'introduction, qui attend un clic ou Entrée. */
+  sayLevelIntro(messageClass: string | number, number: number): void {
+    const id = existingMessageId(this.data.messages, messageId(messageClass, number));
+    const text = this.messageTextById(id);
+    if (text !== undefined) this.openText(text, { window: { ...LEVEL_INTRO_WINDOW }, centered: true, colors: LEVEL_INTRO_COLORS });
   }
 
   /** Sauvegarde le monde (`gm_save_world`) dans l'emplacement de l'hôte. */
@@ -1393,6 +1407,7 @@ export class ArmaethEngine implements TokenHostEngine {
       messages: {
         enqueue: (priority, cls, number) => engine.messages.push(priority, cls, number),
         say: (cls, number) => engine.say(cls, number),
+        sayLevelIntro: (cls, number) => engine.sayLevelIntro(cls, number),
         listObjects: (objects, empty, header, lines) => engine.listObjects(objects, empty, header, lines),
       },
       refreshObject: (obj) => engine.refreshObject(obj),

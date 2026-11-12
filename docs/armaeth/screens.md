@@ -214,6 +214,7 @@ Toute réponse du jeu passe par `gm_draw_text` (`327a:0044`), appelée par `gm_s
 | message courant | 234 | 237 | 236 | `327a:0004` |
 | récit d'intro (`ecr 237 238 234`) | 234 | 238 | 237 | `CM2` |
 | conseils de sortie (`ecr 250 238 221`) | 221 | 238 | 250 | `CM4` |
+| titre de chapitre (`S13`/`S14`, `S101`…, sur fond vert) | 228 | 232 | 229 | `21cc:008e` |
 | F1 aide | 233 | 245 | 239 | `2401:0002` |
 | score F6 (`14cf:000c`) | 236 | 249 | 237 | `14cf:000c` |
 | sauvegarde (`1f29:0006`, mode 1) | 228 | 232 | 229 | `1f29:0006` |

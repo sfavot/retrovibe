@@ -50,6 +50,9 @@ describe.skipIf(!hasOriginalFiles)("événements différés : jeu complet", () =
     for (let i = 0; i < 400 && !engine.windows.active; i++) run(1);
     expect(engine.windows.active).toBe(true);
     expect(engine.windows.text).toBe(text("S", 13));
+    // `21cc:008e` : titre de chapitre sur fond vert, fenêtre dédiée (`y = 24`, largeur 300, hauteur 140).
+    expect(engine.windows.colors).toEqual([0xe5, 0xe8, 0xe4]);
+    expect(engine.windowRect).toMatchObject({ y: 24 });
     expect(engine.missing.has("8:2000")).toBe(false);
   });
 

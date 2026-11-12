@@ -113,7 +113,7 @@ export class TextWindows {
   private layout: WindowLayout | null = null;
   private page = 0;
   private source = "";
-  private colors: TextColors = DEFAULT_TEXT_COLORS;
+  private currentColors: TextColors = DEFAULT_TEXT_COLORS;
 
   constructor(
     private readonly compositor: Compositor,
@@ -131,6 +131,11 @@ export class TextWindows {
     return this.layout ? this.source : null;
   }
 
+  /** Couleurs (fond, texte, ombre) de la fenêtre ouverte, ou `null`. */
+  get colors(): TextColors | null {
+    return this.layout ? this.currentColors : null;
+  }
+
   /** Rectangle de la page affichée. */
   get rect(): Rect | null {
     return this.layout ? this.layout.pages[this.page].rect : null;
@@ -139,7 +144,7 @@ export class TextWindows {
   /** Ouvre la fenêtre et dessine la première page ; une fenêtre déjà ouverte est effacée. */
   open(request: WindowRequest): void {
     this.close();
-    this.colors = request.colors ?? this.defaultColors;
+    this.currentColors = request.colors ?? this.defaultColors;
     this.source = request.text;
     this.layout = layoutWindow(this.font, request);
     this.page = 0;
@@ -172,7 +177,7 @@ export class TextWindows {
 
   private draw(): void {
     const { lines, rect } = this.layout!.pages[this.page];
-    const [background, text, shadow] = this.colors;
+    const [background, text, shadow] = this.currentColors;
     const c = this.compositor;
     // Cinq anneaux d'un pixel (`32e1:0008`) : le deuxième est sauté ; fond uniquement dans le premier.
     const ring = (i: number, color: number, fill: number | null) =>

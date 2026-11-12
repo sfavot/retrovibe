@@ -8,7 +8,7 @@ import { withIcons } from "./icons";
 import { IndexedPresenter } from "./indexed-canvas";
 import { localStorageStore } from "./local-storage";
 import { bindCanvasPointer, bindKeyboard } from "./pointer";
-import { type ChooseResult, type DialogCopy, dialogOverlay, parseVolume, renderLeaveDialog, renderMenuDialog, renderSlotDialog, renderVolumeDialog, volumeKey } from "./point-click-dialogs";
+import { type ChooseResult, type ChoiceDialogOptions, type DialogCopy, dialogOverlay, renderChoiceDialog, parseVolume, renderLeaveDialog, renderMenuDialog, renderSlotDialog, renderVolumeDialog, volumeKey } from "./point-click-dialogs";
 import { syncSkipButton } from "./point-click-touch";
 import { soundPrefKey } from "./sound-prefs";
 import { TickScheduler } from "./tick-scheduler";
@@ -108,6 +108,10 @@ export interface PointClickLoaded {
   /** Toucher du doigt (0) ou appui long (2) en (x, y), hors pause : une réplique à passer, ou un clic. */
   tap(button: 0 | 2, x: number, y: number): void;
   key(event: KeyboardEvent): PointClickKey | undefined;
+  /** Touche relâchée (jeux dont des actions se tiennent enfoncées, comme les combats de Lure) ; vrai si le jeu la prend. */
+  keyUp?(event: KeyboardEvent): boolean;
+  /** Cran de molette sur l'écran, hors pause (-1 vers le haut, 1 vers le bas) ; sans valeur, la molette fait défiler la page. */
+  wheel?(delta: -1 | 1): void;
   /** Jeu à sous-titres réglables : état, et bascule qui renvoie le message à annoncer. Sans valeur, ni entrée de menu ni raccourci. */
   subtitles?: { enabled(): boolean; toggle(): string };
   /** Ce que `window.__<id>` expose en mode `debug`. */
@@ -131,6 +135,12 @@ export interface PointClickLoadContext<TSave> {
   setPercent(fraction: number): void;
   /** Ouvre le menu du jeu (l'hôte l'appelle pour le journal). */
   openMenu(): void;
+  /** Ouvre la fenêtre des emplacements (le jeu qui a son propre menu de sauvegarde l'appelle ; « impossible » est annoncé si `canSave` est faux). */
+  openSave(): void;
+  /** `onCancel` : la fenêtre est fermée sans qu'une partie ait été chargée. */
+  openLoad(onCancel?: () => void): void;
+  /** Question à deux réponses posée par le jeu (fin de partie) ; fermer la fenêtre vaut `cancel`. */
+  openChoice(options: ChoiceDialogOptions): void;
   /** Sortie du jeu (`exit()` du moteur, après la fin) : accueil du site, ou redémarrage sur la page de dev. */
   exit(): void;
   /** Le manifeste du jeu ; absent, illisible ou remplacé par une page d'erreur : le jeu n'est pas installé (`MissingFilesError`). */
@@ -257,6 +267,9 @@ export async function mountPointClickApp<TSave>(
       fetcher: (path) => fetchBytes(options.base, path),
       setPercent,
       openMenu: () => openMenu(),
+      openSave: () => openSave(),
+      openLoad: (onCancel) => openLoad(onCancel),
+      openChoice: (choice) => openChoice(choice),
       exit: leave,
       // Manifeste absent, illisible ou remplacé par une page d'erreur : le jeu n'est pas installé.
       manifest: (fetch) =>
@@ -322,10 +335,11 @@ export async function mountPointClickApp<TSave>(
     applyPause();
     shell.focusCanvas();
   };
-  const openModal = (dialog: HTMLElement): void => {
+  /** `dismiss` : ce que fait un clic sur le fond (fermer la fenêtre par défaut). */
+  const openModal = (dialog: HTMLElement, dismiss: () => void = closeModal): void => {
     if (modal) closeModal();
     modal = dialog;
-    shell.main.append(dialogOverlay(dialog, closeModal));
+    shell.main.append(dialogOverlay(dialog, dismiss));
     applyPause();
   };
 
@@ -348,20 +362,37 @@ export async function mountPointClickApp<TSave>(
       }),
     );
   };
-  const openLoad = (): void => {
+  const openLoad = (onCancel?: () => void): void => {
+    let loadedGame = false;
+    const close = (): void => {
+      closeModal();
+      if (!loadedGame) onCancel?.();
+    };
     openModal(
       renderSlotDialog({
         copy,
         mode: "load",
         summaries: slots.summaries,
-        close: closeModal,
+        close,
         async choose(slot) {
           const result = await slots.load(slot);
-          if (result.ok) say(copy.loadDone);
+          if (result.ok) {
+            loadedGame = true;
+            say(copy.loadDone);
+          }
           return result;
         },
       }),
+      close,
     );
+  };
+  const openChoice = (choice: ChoiceDialogOptions): void => {
+    const then = (run: () => void) => (): void => {
+      closeModal();
+      run();
+    };
+    const cancel = then(choice.cancel);
+    openModal(renderChoiceDialog({ ...choice, choose: (answer) => then(() => choice.choose(answer))(), cancel }), cancel);
   };
   const openVolume = (): void => {
     openModal(
@@ -495,12 +526,28 @@ export async function mountPointClickApp<TSave>(
           }
           return true;
         },
+        keyUp: (event) => loaded?.keyUp?.(event) ?? false,
         // Perdre le focus relâche la souris : sinon un bouton tenu au moment du clic ailleurs resterait enfoncé.
         blur: () => host.input.releaseAll(),
       },
       () => host.unlock(),
     ),
   ];
+
+  // La molette n'agit que pour les jeux qui s'en servent ; les autres laissent la page défiler.
+  if (loaded.wheel) {
+    const wheel = loaded.wheel.bind(loaded);
+    const controller = new AbortController();
+    detach.push(() => controller.abort());
+    shell.canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        if (!isPaused() && event.deltaY !== 0) wheel(event.deltaY < 0 ? -1 : 1);
+      },
+      { passive: false, signal: controller.signal },
+    );
+  }
 
   // --- Boucle --------------------------------------------------------------------------------------------------------------
   const frameUi: PointClickFrameUi = {

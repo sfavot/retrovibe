@@ -212,6 +212,33 @@ export function renderLeaveDialog(copy: DialogCopy, confirm: () => void, cancel:
   return dialog;
 }
 
+/** Question à deux réponses posée par le jeu lui-même (fin de partie : recommencer ou restituer). Échap équivaut à `cancel`. */
+export interface ChoiceDialogOptions {
+  title: string;
+  text: string;
+  /** Réponse proposée en premier (bouton principal). */
+  primary: string;
+  secondary: string;
+  choose(answer: "primary" | "secondary"): void;
+  cancel(): void;
+}
+
+export function renderChoiceDialog(options: ChoiceDialogOptions): HTMLElement {
+  const titleId = "pc-dialog-choice-title";
+  const primary = h("button", { type: "button", class: "primary", onclick: () => options.choose("primary") }, options.primary);
+  const secondary = h("button", { type: "button", class: "secondary", onclick: () => options.choose("secondary") }, options.secondary);
+  const dialog = h(
+    "section",
+    { class: "pc-dialog", role: "alertdialog", "aria-modal": "true", "aria-labelledby": titleId },
+    h("h2", { id: titleId }, options.title),
+    h("p", {}, options.text),
+    h("div", { class: "pc-slot-actions" }, primary, secondary),
+  );
+  closeOnEscape(dialog, options.cancel);
+  queueMicrotask(() => primary.focus());
+  return dialog;
+}
+
 /**
  * Menu du jeu (bouton « Menu » du pied de page et de la barre tactile) : les commandes de l'hôte réunies, utilisables au doigt comme
  * à la souris (les raccourcis clavier font la même chose). `subtitles` : état des sous-titres (sans objet si `toggleSubtitles` manque).

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Lure of the Temptress — ressources</title>
+    <link rel="icon" type="image/svg+xml" href="../../../ui/favicon.svg" />
+    <style>
+      @import "../../../ui/asset-viewer/shell.css";
+
+      /* Règles propres à Lure of the Temptress. */
+      table { border-collapse: collapse; margin: 4px 0 12px; }
+      th, td { text-align: left; padding: 1px 10px 1px 0; vertical-align: top; }
+      th { color: #7f8696; font-weight: normal; }
+      .num { text-align: right; font-variant-numeric: tabular-nums; }
+      .bar label { display: inline-flex; gap: 4px; align-items: center; }
+      .bar output { color: #9aa1b2; }
+      .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
+      .tabs button[aria-pressed="true"] { background: #2d4a7a; }
+      .frames { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+      .frames figure { margin: 0; }
+      .room { position: relative; display: inline-block; }
+      .room canvas { position: absolute; top: 0; left: 0; }
+      .room canvas:first-child { position: static; }
+      tr.row { cursor: pointer; }
+      tr.row:hover, tr.row[aria-selected="true"] { background: #23252c; }
+      ul.tree { list-style: none; margin: 2px 0 6px 6px; padding: 0 0 0 12px; border-left: 1px solid #2a2c33; }
+      ul.tree > li { margin: 4px 0; }
+      pre.hex { margin: 0 0 12px; }
+      a { color: #6aa2ff; }
+      .legend span { padding: 0 6px; }
+      @media (max-width: 800px) {
+        .asset-viewer { grid-template-columns: 1fr; grid-template-rows: 40vh 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./asset-viewer.ts"></script>
+  </body>
+</html>

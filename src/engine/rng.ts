@@ -79,6 +79,68 @@ export class Lcg {
   }
 }
 
+/**
+ * Réécriture de `Common::RandomSource` de ScummVM (`common/random.cpp`, GPL v3+, © équipe ScummVM) : xorshift 32 bits
+ * (13, 21, 11) puis multiplication par `0xDEADBF03`. Les moteurs de ScummVM (Lure, BASS…) tirent tous là-dedans ;
+ * avec la même graine (`--random-seed`), le portage et ScummVM suivent la même suite, ce qui permet de comparer image par image.
+ *
+ * Toutes les opérations sont en 32 bits non signés (`Math.imul`, `>>> 0`).
+ */
+export class ScummvmRandom {
+  private value = 1;
+
+  constructor(seed = 1) {
+    this.seed(seed);
+  }
+
+  /** Remplace l'état ; la graine 0 devient 1 (l'état 0 est un point fixe du xorshift), comme `setSeed`. */
+  seed(seed: number): void {
+    this.value = seed >>> 0 || 1;
+  }
+
+  /** État interne (32 bits non signé) : `seed(state)` reprend la suite exactement là (sauvegarde de partie). */
+  get state(): number {
+    return this.value;
+  }
+
+  private scramble(): void {
+    let s = this.value;
+    s = (s ^ (s >>> 13)) >>> 0;
+    s = (s ^ (s << 21)) >>> 0;
+    s = (s ^ (s >>> 11)) >>> 0;
+    this.value = s;
+  }
+
+  /** `getRandomNumber(max)` : entier dans [0, max] (`max` 32 bits non signé ; `0xffffffff` renvoie le produit brut). */
+  number(max: number): number {
+    this.scramble();
+    const product = Math.imul(this.value, 0xdeadbf03) >>> 0;
+    const m = max >>> 0;
+    return m === 0xffffffff ? product : product % (m + 1);
+  }
+
+  /** `getRandomBit()` : 0 ou 1 (bit de poids faible de l'état, sans multiplication). */
+  bit(): number {
+    this.scramble();
+    return this.value & 1;
+  }
+
+  /** `getRandomNumberRng(min, max)` : entier dans [min, max]. */
+  range(min: number, max: number): number {
+    return (this.number((max - min) >>> 0) + min) >>> 0;
+  }
+
+  /** `getRandomNumberRngSigned(min, max)` : entier signé dans [min, max]. */
+  rangeSigned(min: number, max: number): number {
+    return (this.number((max - min) >>> 0) + min) | 0;
+  }
+}
+
+/** Générateur de ScummVM pour une graine donnée (M1, `docs/lure/plan.md`). */
+export function scummvmRandom(seed = 1): ScummvmRandom {
+  return new ScummvmRandom(seed);
+}
+
 /** Graine aléatoire 31 bits, pour les parties non reproductibles. */
 export function randomSeed(): number {
   return (Math.random() * 0x7fffffff) | 0;

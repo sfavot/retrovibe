@@ -16,6 +16,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | L'Odyssée des Zoombinis (Broderbund / TERC, 1996) | en préparation (données et études faites, moteur à venir) |
 | Drascula: The Vampire Strikes Back (Alcachofa Soft, 1996) | jouable (en cours de validation) |
 | Flight of the Amazon Queen (Interactive Binary Illusions, 1995) | jouable (en cours de validation) |
+| Lure of the Temptress (Revolution Software, 1992) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -258,6 +259,27 @@ Au démarrage, le navigateur charge les données (14 Mo : banques de sprites, di
 
 `docs/fotaq/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`), moteur (`engine.md`), rendu (`graphics.md`), son (`audio.md`), dialogues (`talk.md`), cinématiques (`cutaway.md`) et logique codée en dur (`specials.md`). Les tests sont dans `test/fotaq/` (`full-game.test.ts` joue l'aventure du début à la fin).
 
+## Lure of the Temptress
+
+*Lure of the Temptress* (Revolution Software, 1992), version française sur disquettes (VGA) préparée par ScummVM : aventure en pointer-et-cliquer où Diermot, héros malgré lui rescapé du massacre des cavaliers du Roi par les Skorls, doit déjouer la révolte de l'apprentie sorcière Séléna à Turnvale (menus surgissants d'actions, barre de menus du jeu, personnages qui vivent leur vie, combats, musique AdLib). Le moteur est réécrit en TypeScript d'après le moteur `lure` de ScummVM (GPL v3+), lu pour comprendre et non transposé ligne à ligne. Le jeu est jouable de l'introduction au générique de fin, en cours de validation : souris, clavier (touches de ScummVM : Échap, O / N, flèches et Entrée dans les menus, flèches et pavé numérique pour les combats ; F1 ou F5 ouvre le menu du site, F10 sauvegarde, F7 charge, F9 volume) et doigt (toucher = clic gauche, appui long = clic droit), dix emplacements de sauvegarde.
+
+### Fichiers de données
+
+`scripts/lure-extract.sh` prépare `original/lure/` à partir de l'archive `archives/lure-fr-1.1.zip` et de `archives/lure.dat` (non versionnées) : les quatre disques `DISK1.VGA` à `DISK4.VGA`, `LURE-FR.DAT` (le bloc français du `lure.dat` de ScummVM, version 1.32), `LICENSE-LURE.txt` (à conserver) et `MANUEL.pdf` (manuel français, lié depuis l'aide), puis l'inventaire `docs/lure/files.md`. `npx vite-node scripts/lure-cover.mts` génère `COVER.png` (une rue du village, composée par le moteur) et régénère `files.json`.
+Au démarrage, le navigateur charge les données d'un coup (2,7 Mo) ; la musique AdLib (MIDI) est dans les disques, jouée par l'émulateur OPL2 commun.
+
+### Architecture
+
+- `src/games/lure/data/` — lecteurs : conteneurs « heywow » des disques et de `LURE-FR.DAT`, tables du jeu, textes, polices, images, animations, sons.
+- `src/games/lure/engine/` — le moteur sans tête (`LureEngine`, un `tick()` de 80 ms ; séquences en générateurs), les quatre systèmes de script, la marche et la recherche de chemin, les verbes, les dialogues, les combats (`fights/`), les séquences plein écran (`sequences/`) et les sauvegardes (`save.ts`).
+- `src/games/lure/render/` — composition de l'image 320×200 indexée (pièce par calques, sprites, barre de menus, menus surgissants, bulles, curseur), palettes et fondus.
+- `src/games/lure/audio/` — gestionnaire de sons, pilote AdLib multi-sources, lecteur SMF (module commun d'émulation `src/audio/`).
+- `src/games/lure/ui/` — l'hôte du navigateur (`browser-host.ts`, `loop.ts`, `preload.ts`), la page du jeu (`app.ts`), les touches, l'écran titre et la page d'aide ; les fenêtres de sauvegarde, de volume et de menu, l'écran titre et l'aide sont les composants communs de `src/ui/` (`point-click-*.ts`, partagés avec Drascula et Flight of the Amazon Queen) ; `ui/dev.html` lance le jeu seul (`window.__lure`), `ui/asset-viewer.html` est la visionneuse des ressources et `ui/render-dev.html` un banc d'essai du rendu (`?room=10`).
+
+### Documentation
+
+`docs/lure/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`), moteur (`engine.md`), rendu (`graphics.md`), son (`audio.md`) et dialogues (`talk.md`). Les tests sont dans `test/lure/`.
+
 ## Code commun aux jeux
 
 - `src/data/` — lecture binaire (`reader.ts`), page de code 437, Mac OS Roman (`mac-roman.ts`), archives et ressources du moteur Mohawk de Broderbund partagées par Mathémagique et Zoombinis (`mohawk/`), liste des fichiers d'un jeu (`game-files.ts`), fichiers RIFF WAVE (`riff-wave.ts`), vidéos Smacker (`smacker.ts`).
@@ -287,4 +309,4 @@ Référence : [WebFun](https://codeberg.org/cyco/WebFun) (MIT), réimplémentati
 
 Le code est sous [GPL v3 ou ultérieure](LICENSE) : les moteurs de Lost in Time et de Drascula sont portés de [ScummVM](https://www.scummvm.org/) (GPL v3+),
 y compris l'émulateur OPL (MAME, `src/audio/opl2.ts`) utilisé pour la musique AdLib de Lost in Time et d'Armaeth. Les fichiers des jeux de `original/` ne sont pas couverts
-par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives). Les données de Flight of the Amazon Queen sont © John Passfield et Steven Stamatiadis, redistribuées selon la licence de `original/fotaq/README-FOTAQ.txt` (à conserver ; ce portage en est une version modifiée : données extraites de `queen.1c`, voix converties en MP3).
+par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives). Les données de Flight of the Amazon Queen sont © John Passfield et Steven Stamatiadis, redistribuées selon la licence de `original/fotaq/README-FOTAQ.txt` (à conserver ; ce portage en est une version modifiée : données extraites de `queen.1c`, voix converties en MP3). Les données de Lure of the Temptress sont © Revolution Software Ltd, redistribuées selon la licence de `original/lure/LICENSE-LURE.txt` (à conserver ; ce portage en est une version modifiée : moteur réécrit, données lues telles quelles) ; `original/lure/LURE-FR.DAT` est le bloc français du fichier `lure.dat` distribué par ScummVM (généré depuis `LURE.EXE` par son outil `create_lure`) : des données du jeu, sous la licence de Revolution Software.

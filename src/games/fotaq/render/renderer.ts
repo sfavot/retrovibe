@@ -29,6 +29,7 @@ import { drawText } from "./font";
 import { fadingDisabled } from "./palette";
 import { BankCache, type Image, type Surface, blitMasked, blitOpaque, drawBob, fillRect, overpackFrame } from "./sprites";
 import type { FrameRef } from "../engine/bobs";
+import { toInt16, toUint16 } from "../engine/state";
 
 /** Boîtes de découpe des bobs sans boîte propre : l'écran de jeu et l'écran entier (`_gameScreenBox`, `_fullScreenBox`). */
 const GAME_BOX: Box = { x1: 0, y1: 0, x2: SCREEN_W - 1, y2: ROOM_ZONE_HEIGHT - 1 };
@@ -159,15 +160,17 @@ export class Renderer {
       const ref = frames.frame(bob.frameNum);
       const frame = ref ? this.resolve(banks, ref) : undefined;
       if (!ref || !frame) continue;
+      // Calcul en `uint16` comme ScummVM, position finale lue en `int16` (`drawBob`) : un ancrage de 32 768 ou plus (images de
+      // x4b.SAM, x7b.SAM) vaut un ancrage négatif à l'échelle 100.
       let xh = frame.hotspotX;
       let yh = frame.hotspotY;
-      if (ref.bank === CONTROL_BANK && (ARROW_FRAMES as readonly number[]).includes(bob.frameNum)) yh += ARROW_HOTSPOT_SHIFT;
-      if (bob.xflip) xh = frame.width - xh;
+      if (ref.bank === CONTROL_BANK && (ARROW_FRAMES as readonly number[]).includes(bob.frameNum)) yh = toUint16(yh + ARROW_HOTSPOT_SHIFT);
+      if (bob.xflip) xh = toUint16(frame.width - xh);
       if (bob.scale !== 100) {
         xh = Math.trunc((xh * bob.scale) / 100);
         yh = Math.trunc((yh * bob.scale) / 100);
       }
-      drawBob(display.screen, frame, bob.xflip, bob.scale, bob.box ?? defaultBox, bob.x - xh - scroll, bob.y - yh);
+      drawBob(display.screen, frame, bob.xflip, bob.scale, bob.box ?? defaultBox, toInt16(bob.x - xh - scroll), toInt16(bob.y - yh));
     }
   }
 

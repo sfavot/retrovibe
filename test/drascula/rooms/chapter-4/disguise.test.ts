@@ -106,6 +106,28 @@ describe.skipIf(!hasOriginalFiles)("chapitre 4 : le déguisement en Drascula", (
       expect(fromPlain).toBe(0);
     });
 
+    it("le fondu au noir part exactement de la dernière image de i30 : Igor debout, son sous-titre et le héros déguisé restent à l'écran", () => {
+      const w = ready();
+      w.takeItem(Item.Wig);
+      const at = heroPoint(w);
+      w.player.click(at.x, at.y);
+      w.until(() => w.host.sounds.includes("i30.als"));
+      const gfx = w.engine.gfx;
+      const fullPalette = gfx.palette.shown.slice();
+      // Dernière image composée tant que la réplique est affichée (ce que `screenSurface` de ScummVM garde ; le curseur n'en fait
+      // pas partie, c'est un calque du système).
+      w.engine.cursorVisible = false;
+      let last = new Uint8Array(0);
+      w.until(() => {
+        if (w.engine.subtitle === null) return true;
+        last = repaint(w).screen.pixels.slice();
+        return false;
+      });
+      expect(last.length).toBeGreaterThan(0);
+      w.until(() => gfx.palette.shown.some((v, i) => v !== fullPalette[i]));
+      expect(repaint(w).screen.pixels).toEqual(last);
+    });
+
     it("Échap saute la métamorphose, la suite est la même", () => {
       const w = ready();
       w.takeItem(Item.Cape);

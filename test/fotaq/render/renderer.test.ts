@@ -295,6 +295,26 @@ describe.skipIf(!hasOriginalFiles)("rendu : Joe (échelle, miroir, position)", (
     expect(same).toBeGreaterThan(40 * 30 * 0.2);
   });
 
+  it("un point d'ancrage de 32 768 ou plus est négatif (calcul en 16 bits de ScummVM) : la baignoire de Sparky (x4b.SAM) s'affiche", () => {
+    // Image 20 de x4b.SAM : 88 x 110, ancrage (65 496, 65 504), soit (-40, -32) ; CDINT la pose en (49, 0) dans la pièce 118.
+    const sparky = parseBank(readOriginal("X4B.SAM")).frame(20);
+    expect([sparky.hotspotX, sparky.hotspotY]).toEqual([65_496, 65_504]);
+    const { left, top, right, bottom } = joeDiff(1, (e) => {
+      e.bobs.frames.load("x4b.SAM", 8);
+      e.bobs.frames.unpack(20, 100, 8);
+      const bob = e.bobs.bob(0);
+      bob.frameNum = 100;
+      bob.scale = 100;
+      bob.xflip = false;
+      bob.curPos(49, 0);
+    });
+    expect(left).toBeGreaterThanOrEqual(89);
+    expect(right).toBeLessThanOrEqual(89 + 88 - 1);
+    expect(top).toBeGreaterThanOrEqual(32);
+    expect(bottom).toBeLessThanOrEqual(32 + 110 - 1);
+    expect(right - left).toBeGreaterThan(60);
+  });
+
   it("l'ordre de dessin suit l'ordonnée des pieds : le plus bas est devant", () => {
     const e = enter(1);
     e.bobs.bob(0).active = true;

@@ -41,6 +41,8 @@ export interface Speaker {
   subtitle: Subtitle | null;
   /** Tête qui parle en cours : la vue et le tirage du tour ; `null` hors réplique. */
   head: { view: TalkView; roll: Roll } | null;
+  /** Ce que la dernière réplique affichait à son dernier tour (sous-titre, tête), gardé après sa fin : voir `DrasculaEngine.holdScreen`. */
+  lastSpeech: { subtitle: Subtitle | null; head: { view: TalkView; roll: Roll } | null } | null;
   /** Hasard du jeu (tirage des visages). */
   readonly rng: { inclusive(max: number): number };
 }
@@ -108,6 +110,7 @@ export function* speak(speaker: Speaker, line: TalkLine): Sequence<boolean> {
     );
     finished = true;
   } finally {
+    speaker.lastSpeech = { subtitle: speaker.subtitle, head: speaker.head };
     speaker.subtitle = null;
     speaker.head = null;
     if (!finished) speaker.stopSound();

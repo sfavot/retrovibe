@@ -133,7 +133,8 @@ export function drawBob(screen: Surface, frame: Image, xflip: boolean, scale: nu
  */
 export function overpackFrame<T extends Image>(base: T, over: T): T {
   if (base.width < over.width || base.height < over.height) return over;
-  const pixels = base.pixels.slice();
+  // Copie explicite : sous Node, les pixels d'une banque sont une vue d'un Buffer, dont `slice` partage la mémoire avec le fichier.
+  const pixels = new Uint8Array(base.pixels);
   pixels.set(over.pixels.subarray(0, over.width * over.height));
   return { ...base, pixels };
 }

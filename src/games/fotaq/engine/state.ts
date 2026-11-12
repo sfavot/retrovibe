@@ -304,3 +304,8 @@ export function cloneState(state: GameState): GameState {
 export function toInt16(value: number): number {
   return (value << 16) >> 16;
 }
+
+/** Entier 16 bits non signé (les `uint16` de ScummVM). */
+export function toUint16(value: number): number {
+  return value & 0xffff;
+}

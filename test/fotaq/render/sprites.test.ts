@@ -118,6 +118,15 @@ describe("surimpression d'une image (BankManager::overpack)", () => {
     expect(base.pixels[0]).toBe(1);
   });
 
+  it("l'image de base n'est pas touchée non plus quand ses pixels sont une vue d'un Buffer (fichiers lus par Node : `slice` partage la mémoire)", () => {
+    // Les banques analysées gardent une vue du fichier ; sous Node, le fichier est un Buffer, dont `slice` ne copie pas.
+    const file = Buffer.from(Array.from({ length: 12 }, (_, i) => 1 + i));
+    const base = { width: 4, height: 3, pixels: file.subarray(0, 12), hotspotX: 0, hotspotY: 0 };
+    const over = { width: 4, height: 1, pixels: Uint8Array.from([90, 91, 92, 93]), hotspotX: 0, hotspotY: 0 };
+    expect(Array.from(overpackFrame(base, over).pixels.subarray(0, 5))).toEqual([90, 91, 92, 93, 5]);
+    expect(Array.from(file.subarray(0, 5))).toEqual([1, 2, 3, 4, 5]);
+  });
+
   it("une source plus large ou plus haute que la destination la remplace (`unpack`)", () => {
     const base = { ...ramp(4, 3), hotspotX: 0, hotspotY: 0 };
     const wide = { ...ramp(6, 2), hotspotX: 3, hotspotY: 3 };

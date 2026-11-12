@@ -95,6 +95,8 @@ export class DrasculaEngine implements Speaker {
   subtitlesEnabled = true;
   /** Tête qui parle pendant une réplique (`Speaker.talk`) : la vue de `render/heads.ts` et le tirage du tour. */
   head: { view: TalkView; roll: Roll } | null = null;
+  /** Sous-titre et tête de la dernière réplique, gardés après sa fin pour `holdScreen` (`Speaker.lastSpeech`). */
+  lastSpeech: Speaker["lastSpeech"] = null;
   /** Choix de dialogue affichés (`converse`). */
   choices: ChoiceMenu | null = null;
   /** Les personnages qui parlent (`talkers.ts`) et les dialogues (`dialogs.ts`). */
@@ -200,6 +202,29 @@ export class DrasculaEngine implements Speaker {
   }
 
   /**
+   * Garde à l'écran la dernière image de la dernière réplique (sous-titre, personnage qui parle et héros compris), comme le
+   * `screenSurface` de ScummVM que `talk_*` laisse tel quel quand elle ne se termine pas par `updateRoom` (`talk_igor` de face au
+   * chapitre 4, par exemple). L'image est celle que la réplique affichait à son dernier tour ; la séquence peut alors changer les
+   * feuilles et l'état sans qu'elle bouge (un fondu au noir part de cette image). À appeler juste après la réplique ; `updateRoom`
+   * ou `enterRoom` rend la main à la pièce.
+   */
+  holdScreen(): void {
+    const gfx = this.gfx;
+    gfx.compose({
+      state: this.state,
+      mouseX: this.mouseX,
+      mouseY: this.mouseY,
+      subtitle: this.subtitlesEnabled ? (this.lastSpeech?.subtitle ?? null) : null,
+      main: false,
+      cursorVisible: false,
+      talk: this.lastSpeech?.head ?? null,
+      choices: null,
+    });
+    gfx.canvas.load(gfx.screen.pixels);
+    gfx.owner = "canvas";
+  }
+
+  /**
    * Lance une séquence quand la boucle principale a la main (outils de développement, tests, écrans) ; lève si une séquence est
    * déjà en cours.
    */
@@ -251,6 +276,7 @@ export class DrasculaEngine implements Speaker {
     this.pendingChapter = null;
     this.subtitle = null;
     this.head = null;
+    this.lastSpeech = null;
     this.choices = null;
     this.listenForClicks = false;
     this.cursorVisible = true;
@@ -348,6 +374,7 @@ export class DrasculaEngine implements Speaker {
     // `endChapter` de ScummVM : son coupé, écran vidé et noir, fondu de la musique (une séquence), musique arrêtée.
     this.subtitle = null;
     this.head = null;
+    this.lastSpeech = null;
     this.choices = null;
     this.listenForClicks = false;
     this.host.stopSound();

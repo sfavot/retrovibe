@@ -3,7 +3,7 @@ import { placeIgor } from "../../../render/actors";
 import { HALF_PAL } from "../../../render/palette";
 import { IgorType } from "../../../render/heads";
 import type { DrasculaEngine } from "../../loop";
-import { freezeRoom, toggleDoor } from "../../room-kit";
+import { toggleDoor } from "../../room-kit";
 import { type Sequence } from "../../../../../engine/sequence";
 import { delay, pause } from "../../cadence";
 import { Track, Verb } from "../../state";
@@ -105,10 +105,11 @@ export function* disguise(g: DrasculaEngine): Sequence {
   s.igor.y = 65;
   yield* g.talkers.igor(29, IgorType.Front);
   yield* g.talkers.igor(30, IgorType.Front);
-  // Dans ScummVM, `fadeToBlack` ne change que la palette : l'écran garde la dernière image de la réplique, avec le héros déguisé,
-  // alors que `front` et `back` sont déjà rechargées. Ici l'image est recomposée à chaque rendu : on fige donc celle de la pièce
-  // (le painter de la pièce 26 lit `back`, que `loadPic(99)` remplace) jusqu'au retour de la main à la pièce par `exitRoom`.
-  freezeRoom(g);
+  // Dans ScummVM, `fadeToBlack` ne change que la palette : `talk_igor` de face ne finit pas par `updateRoom`, l'écran garde donc la
+  // dernière image de la réplique (Igor, son sous-titre, le héros déguisé), alors que `front` et `back` sont déjà rechargées. Ici
+  // l'image est recomposée à chaque rendu : on garde celle de la réplique (le painter de la pièce 26 lit `back`, que `loadPic(99)`
+  // remplace) jusqu'au retour de la main à la pièce par `exitRoom`.
+  g.holdScreen();
   gfx.loadPic(96, gfx.front);
   gfx.loadPic(99, gfx.back);
   hero.visible = true;

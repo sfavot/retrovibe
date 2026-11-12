@@ -303,16 +303,14 @@ describe.skipIf(!hasOriginalFiles || ABANDONED_SEEDS.has(SEED))("solution compl�
       () => p.roomId === 102,
     );
 
-    // le puits : la margelle (cases 40) puis la corde ; en `Dep 4` le héros est posé sur la zone de la corde, il faut rappuyer sur `=`
-    // (la première pression est effacée par l'entrée en escalade, `Ver 0`)
+    // le puits : la margelle (cases 40) puis la corde ; un seul `=` descend désormais (écart du portage : l'original posait `Ver` à 0
+    // à l'entrée en escalade sur ces sols neutres et il fallait rappuyer)
     for (const [x, yy] of [[90, 100], [90, 90], [88, 80], [80, 85], [100, 85], [90, 70]]) {
       if (p.hero.ground === 40) break;
       p.walkTo(x, yy, 800);
       p.run(20);
     }
     expect(p.hero.ground).toBe(40);
-    p.vertical("=");
-    p.run(20);
     p.vertical("=");
     // la niche est à mi-puits (Y 34 à 48 sous la poterne, salle 212)
     expect(p.until(() => p.roomId === 212 && p.hero.y >= 38, 600)).toBe(true);
@@ -448,8 +446,6 @@ describe.skipIf(!hasOriginalFiles || ABANDONED_SEEDS.has(SEED))("solution compl�
           p.walkTo(x, yy, 800);
           p.run(20);
         }
-        p.vertical("=");
-        p.run(20);
         p.vertical("="); // la corde : on descend sans s'arrêter, le puits est vide (la salle 313 est le fond)
         if (!p.until(() => p.roomId === 313 && p.hero.ego === 0, 1500)) throw new RobotSetback(`salle ${p.roomId}`);
         p.run(20);

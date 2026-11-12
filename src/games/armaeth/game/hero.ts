@@ -519,10 +519,14 @@ function enterClimb(h: H): number {
   const o = h.obj;
   const entry = climbEntry(o.ground);
   if (!entry) return enterWalk(h);
+  const wanted = o.speedY; // direction demandée (verbe ou touches), lue avant que `prelude` / `halt` ne l'effacent
   prelude(h);
   halt(o);
   setState(h, { mob: 2, ego: EGO.climb, dep: entry.dep, fig: entry.fig, flag: 2 });
-  o.speedY = entry.v; // hypothèse : la direction verticale de la table est la valeur de `Ver`
+  // Écart du portage : les sols 7..10 imposent la montée (`v = -1`), 23..26 la descente (`v = +1`) ; les sols neutres 40..43
+  // (corde du puits) gardent la direction demandée au lieu de `Ver = 0`, pour partir dès la première commande (l'original
+  // posait `Ver` à 0 sur ces sols et il fallait retaper pour monter ou descendre).
+  o.speedY = entry.v !== 0 ? entry.v : wanted;
   // `25ea:0008` : puis placement sur les zones (le héros est en `Dep 2` ou `4`) : bornes P 8 et Y `Hau / 2` dans le sens de la table
   // (sauf cases 40 à 43, sens 0), sinon placement libre. C'est lui qui pose le héros sur la corde ou l'échelle (zone) depuis la
   // margelle d'un puits ; sans lui `Dep 4` ne trouve aucune zone sous les pieds et le héros « perd prise » aussitôt.

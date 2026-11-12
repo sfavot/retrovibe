@@ -301,10 +301,12 @@ export const grimper: VerbHandler = {
     const hero = ctx.hero;
     if (!hero) return 0;
     if (LADDER_GROUND.some(([from, to]) => hero.ground >= from && hero.ground <= to)) {
-      ctx.state.writeField(hero, VER_OFFSET, 1, 1);
+      // Écart du portage (objects.md §3.9 : l'original posait `Ver = +1` quel que soit le verbe, comme simple déclencheur,
+      // puis l'entrée en escalade fixait le sens d'après le sol) : `grimper` / `monter` montent, `descendre` descend. Sur les
+      // sols neutres 40..43 (corde du puits), cela permet de partir dès la première commande au lieu de devoir la retaper.
+      ctx.state.writeField(hero, VER_OFFSET, 1, ctx.verb === VERB.down ? 1 : -1);
       return OK;
     }
-    // hypothèse (objects.md §3.9) : sens vertical (+1 descend) à confirmer à l'écran
     if (hero.dep === 2 || hero.dep === 4) {
       ctx.state.writeField(hero, VER_OFFSET, 1, ctx.verb === VERB.down ? 1 : -1);
       return OK;

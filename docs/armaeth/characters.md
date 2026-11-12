@@ -249,6 +249,8 @@ Valeurs de retour : 7 = objet encore vivant, tic fini ; 0 = l'objet a été dét
   - fin de tic : si `Sol` ∈ 11..14 avec `Ver = +1`, ou `Sol` ∈ 19..22 avec `Ver = -1` : le héros est arrivé en haut/bas de l'échelle : retour à la marche (`246c:0240` avec `AL = 7`) ; sinon `Err = 0`.
   Confiance : certain pour les tables, probable pour l'interprétation (échelle, escalier, arbre).
 
+  **Écarts du portage** (décision 2026-11-12, à conserver) : (1) le verbe `grimper`/`monter`/`descendre` pose `Ver` d'après le verbe (`-1` monter, `+1` descendre) au lieu du `+1` indifférencié de `3332:0004`, et sur les sols neutres 40..43 l'entrée garde cette direction au lieu de poser `Ver = 0` : on part dès la première commande, là où l'original demandait de retaper ; (2) pendant l'escalade (`Dep` 2/4), les flèches pilotent `Hor`/`Ver` (gauche/droite le long de la paroi, haut/bas monter/descendre) au lieu de `Hor`/`Prf` : les flèches haut/bas ne font plus « perdre prise » et une flèche horizontale n'arrête plus la montée (le contraire de la note « probable » d'`interface.md` § 7).
+
 #### 4.2.3 `Ego 3` : glissade, roulades (`26ab:000a`)
 
 - **Entrée** (`AL` = `Fig` 8 ou 9, message `G1` ou `G2`) : `2683:023e`, `4b50 = 0`, `1a37:007f(Gst 7, Mob 2, Ego 3, Dep 0, Fig = AL)`, `Yc` (+0x72) = `Y` courant, message. `gm_sound_select_track(7)` à chaque tic.

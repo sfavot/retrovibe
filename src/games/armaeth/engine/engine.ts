@@ -965,10 +965,21 @@ export class ArmaethEngine implements TokenHostEngine {
     this.resetMotion(hero);
     this.state!.selected = null;
     if (vector) {
-      // rappuyer sur la direction courante arrête le héros (sauf flèche tenue : elle ne fait que partir)
-      if (mode === "start" || wasX !== vector[0] || wasP !== vector[1]) {
-        hero.speedX = vector[0];
-        hero.speedP = vector[1];
+      if (hero.dep === 2 || hero.dep === 4) {
+        // Pendant l'escalade (déplacement lié aux zones), les flèches pilotent le héros sur la paroi : gauche/droite
+        // le long de la surface (`Hor`), haut/bas montent/descendent (`Ver`). Écart du portage : dans l'original les
+        // flèches gardaient leur sens de marche (`Hor`/`Prf`) — haut/bas changeaient la profondeur et faisaient
+        // « perdre prise ».
+        const vx = vector[0];
+        const vy = vector[1];
+        if (vx !== 0) hero.speedX = mode === "start" || wasX !== vx ? vx : 0;
+        if (vy !== 0) hero.speedY = mode === "start" || wasY !== vy ? vy : 0;
+      } else {
+        // rappuyer sur la direction courante arrête le héros (sauf flèche tenue : elle ne fait que partir)
+        if (mode === "start" || wasX !== vector[0] || wasP !== vector[1]) {
+          hero.speedX = vector[0];
+          hero.speedP = vector[1];
+        }
       }
     } else {
       const v = dir === "climb" ? -1 : 1;
@@ -983,8 +994,18 @@ export class ArmaethEngine implements TokenHostEngine {
   private releaseHeroKey(key: NavKey): void {
     const hero = this.state?.hero;
     const vector = key === "insert" ? undefined : HERO_KEY_VECTORS[key];
-    if (!hero || !vector || hero.speedX !== vector[0] || hero.speedP !== vector[1]) return;
-    this.resetMotion(hero);
+    if (!hero || !vector) return;
+    if (hero.dep === 2 || hero.dep === 4) {
+      // pendant l'escalade, les flèches pilotent (Hor, Ver) : on n'arrête que l'axe relâché
+      const vx = vector[0];
+      const vy = vector[1];
+      if (vx !== 0 && hero.speedX === vx) hero.speedX = 0;
+      if (vy !== 0 && hero.speedY === vy) hero.speedY = 0;
+    } else if (hero.speedX !== vector[0] || hero.speedP !== vector[1]) {
+      return;
+    } else {
+      this.resetMotion(hero);
+    }
   }
 
   private functionKey(command: string): void {

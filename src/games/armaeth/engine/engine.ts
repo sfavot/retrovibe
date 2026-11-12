@@ -1933,9 +1933,10 @@ export class ArmaethEngine implements TokenHostEngine {
     c.drawFrameRect(INPUT_BOX, INPUT_COLORS.frame, INPUT_COLORS.background);
     c.drawFrameRect({ x: INPUT_BOX.x + 1, y: INPUT_BOX.y + 1, width: INPUT_BOX.width - 2, height: INPUT_BOX.height - 2 }, INPUT_COLORS.inner, null);
     const blink = caret && Math.floor(this.caret++ / CARET_BLINK) % 2 === 0;
+    // Texte jaune (238, comme le cadre extérieur) avec une ombre noire (221, comme le cadre intérieur).
     drawText(c.screen, this.data.font, INPUT_BOX.x + 3, INPUT_BOX.y + 2, encodeCp437(text + (blink ? "_" : "")), {
-      color: INPUT_COLORS.inner,
-      shadow: INPUT_COLORS.frame,
+      color: INPUT_COLORS.frame,
+      shadow: INPUT_COLORS.inner,
     });
   }
 

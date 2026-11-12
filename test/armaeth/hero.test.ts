@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { MessageTable, messageId } from "../../src/games/armaeth/data/text";
 import { parseAni } from "../../src/games/armaeth/data/tables";
 import { ArmaethEngine } from "../../src/games/armaeth/engine/engine";
+import { groundHeight } from "../../src/games/armaeth/engine/ground";
 import type { BehaviorContext } from "../../src/games/armaeth/engine/handlers";
 import { type GameObject, setRawU16 } from "../../src/games/armaeth/engine/state";
 import { HERO_ANIMATIONS, acceptsGround, continueGame, registerCorpse, registerHero } from "../../src/games/armaeth/game/hero";
@@ -79,6 +80,30 @@ describe.skipIf(!hasOriginalFiles)("héros complet (fichiers du jeu)", () => {
     s.run(20);
     expect(hero.ego).toBe(0);
     expect(s.engine.missing.has("2:1")).toBe(false);
+  });
+
+  it("au pied d'un mur, le héros au clavier s'arrête au lieu de marcher sur place", () => {
+    const t = new Session();
+    t.skipIntro();
+    const hero = t.hero;
+    const terrain = t.engine.currentTerrain!;
+    // Salle 1, plan 0, rangée 3 (P 28) : mur en colonne 11 (X 44..47), sol en colonne 12 (X 48..51). Le héros (largeur 20) part en X 60.
+    hero.plane = 0;
+    hero.p = 28;
+    hero.x = 60;
+    hero.y = groundHeight(terrain.grid, 0, 60, 28);
+    hero.ground = 2;
+    hero.speedX = 0;
+    hero.speedP = 0;
+    hero.err = 0;
+    t.host.key({ type: "nav", key: "left" });
+    t.run(60);
+    expect([hero.speedX, hero.speedP]).toEqual([0, 0]); // le héros s'est arrêté
+    expect(hero.x).toBeGreaterThanOrEqual(48); // sans traverser le mur (X 44..47)
+    const stopped = hero.x;
+    t.run(40);
+    expect(hero.x).toBe(stopped); // plus aucun mouvement
+    expect(hero.ego).toBe(0);
   });
 
   it("bottes : le trajet du clic est suivi jusqu'à l'arrivée", () => {

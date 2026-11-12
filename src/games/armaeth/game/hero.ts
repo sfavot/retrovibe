@@ -29,6 +29,12 @@ export const EGO = { walk: 0, swim: 1, climb: 2, slide: 3, fall: 4, ko: 5, anima
 
 /** `Err` lus par le héros (`characters.md` § 3.1). */
 const ERR = {
+  /** `1` : obstacle plein (case de type 1) couvrant les pieds, ou bord d'une salle non chargée. */
+  wall: 1,
+  /** `4` : masque de profondeur (sprite contre un élément d'avant-plan de même `P`). */
+  depthMask: 4,
+  /** `6` : marche plus haute que `dpY` (impossible à gravir). */
+  stepTooHigh: 6,
   contact: 8,
   exit: 0x0b,
   vanished: 0x0e,
@@ -547,6 +553,17 @@ function walkTick(h: H): number {
       case 3:
       case 5:
         if (!o.path.defined) return enterFall(h, 8, o.ego === 0 ? 6 : 12);
+        return gated(h);
+      // Au pied d'un obstacle (mur, avant-plan, marche trop haute), le héros au clavier s'arrête au lieu de marcher sur place ;
+      // en trajet, le suivi (`30d9:0006`) contourne ou recalcule, comme dans l'original.
+      case ERR.wall:
+      case ERR.depthMask:
+      case ERR.stepTooHigh:
+        if (!o.path.defined) {
+          halt(o);
+          o.err = 0;
+          return UPDATE_OK;
+        }
         return gated(h);
       case 7:
       case 0x0c:

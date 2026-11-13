@@ -266,6 +266,32 @@ describe.skipIf(!hasOriginalFiles)("moteur : démarrage et écran de jeu (fichie
     expect(e.modal).toBe(false);
   });
 
+  it("saisie : à 40 caractères, ni le texte ni le curseur ne sortent de la boîte (1e22:0008)", () => {
+    const e = s.engine;
+    s.host.type("p");
+    s.run(2);
+    const empty = s.host.lastFrame!.pixels.slice();
+    // Le caractère le plus large de la police, 39 fois : la ligne la plus longue possible.
+    const font = parseGph(readOriginal("A1FGPH.SYS"));
+    let widest = "x";
+    for (let code = 0x21; code < 0x7f; code++) if (font.glyph(code).width > font.glyph(widest.charCodeAt(0)).width) widest = String.fromCharCode(code);
+    s.host.type(widest.repeat(39));
+    s.run(2);
+    expect(e.inputLine.text).toHaveLength(40);
+    const full = s.host.lastFrame!.pixels;
+    // Boîte (38,168)-(281,178), intérieur du double cadre (40,170)-(279,176) : tout le reste de la bande doit rester intact.
+    const changed: string[] = [];
+    for (let y = 166; y <= 180; y++)
+      for (let x = 30; x <= 290; x++) {
+        const inside = x >= 40 && x <= 279 && y >= 170 && y <= 176;
+        if (!inside && full[y * 320 + x] !== empty[y * 320 + x]) changed.push(`${x},${y}`);
+      }
+    expect(changed).toEqual([]);
+    s.host.type("\x1b");
+    s.run(3);
+    expect(e.inputLine.open).toBe(false);
+  });
+
   it("un mot inconnu affiche S015 et garde la phrase dans la ligne", () => {
     const e = s.engine;
     s.host.type("zorglub\r");

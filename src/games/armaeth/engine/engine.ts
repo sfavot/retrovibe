@@ -1186,7 +1186,7 @@ export class ArmaethEngine implements TokenHostEngine {
   /**
    * `1664:0057` : grille de cellules 18 x 14 (+ 4) du contenu de l'objet sélectionné : `lignes = ceil(n / 12)` (au plus 8),
    * `colonnes = ceil(n / lignes)` (au plus 12), centrée, haut à `y = 26` ; objet au centre de sa cellule, pied 3 pixels au-dessus
-   * du bas, `P = 0xB8`, `Xyp = 11` ; au-delà des cellules `Xyp = 0`. Un conteneur vide est désélectionné (`1664:0004(0, 0)`).
+   * du bas, `P = 0xD0` (`PANEL.p`), `Xyp = 11` ; au-delà des cellules `Xyp = 0`. Un conteneur vide est désélectionné (`1664:0004(0, 0)`).
    * Rend la géométrie du panneau, ou `null`.
    */
   private layoutPanel(): { rect: Rect; columns: number; rows: number } | null {
@@ -1974,9 +1974,8 @@ export class ArmaethEngine implements TokenHostEngine {
     c.drawFrameRect({ x: INPUT_BOX.x + 1, y: INPUT_BOX.y + 1, width: INPUT_BOX.width - 2, height: INPUT_BOX.height - 2 }, INPUT_COLORS.inner, null);
     const blink = caret && Math.floor(this.caret++ / CARET_BLINK) % 2 === 0;
     // Texte jaune (238, comme le cadre extérieur) avec une ombre noire (221, comme le cadre intérieur).
-    // Interlettre de 1 px (écart volontaire : l'original n'en ajoute pas, `vga_draw_text`).
+    // Pas d'interlettre, comme l'original (`vga_draw_text`) : la boîte est dimensionnée pour 40 cellules de 5 px.
     drawText(c.screen, this.data.font, INPUT_BOX.x + 3, INPUT_BOX.y + 2, encodeCp437(text + (blink ? "_" : "")), {
-      spacing: 1,
       color: INPUT_COLORS.frame,
       shadow: INPUT_COLORS.inner,
     });

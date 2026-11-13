@@ -269,8 +269,9 @@ export class Compositor {
   }
 
   /**
-   * `1664:0057` : sauvegarde le fond du rectangle du panneau de contenu, pour le restituer quand il se ferme ou change
-   * (`undoAll` le fait en remettant ces pixels). À appeler avant de dessiner la grille dans la page.
+   * `1664:0057` : sauvegarde le fond du rectangle du panneau de contenu, pour le restituer quand il se ferme ou quand la
+   * composition statique est refaite (`undoAll` remet ces pixels) ; le moteur ne la refait que si la signature
+   * `{objets statiques, rectangle du panneau}` change. À appeler avant de dessiner la grille dans la page.
    */
   beginPanel(rect: Rect): void {
     this.undo.push({

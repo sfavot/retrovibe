@@ -80,4 +80,19 @@ describe.skipIf(!hasOriginalFiles)("résurrection après une mort dans l'arbre",
     expect(state.hero).toBe(hero);
     expect(hero.ego).toBe(0);
   });
+
+  it("mort pendant une animation tenue (moveEnabled faux) : le héros recréé sans animation 17 reprend la main", () => {
+    const p = climbToTreetop();
+    const state = p.state;
+    state.deleteObject(p.hero);
+    state.setHero(null);
+    p.run(2);
+    state.moveEnabled = false; // la mort est survenue pendant une animation qui tenait la main (`4b50 = 0`)
+
+    p.engine.continueGame();
+    p.drain();
+    p.run(30);
+    expect(state.hero?.room?.id).toBe(9);
+    expect(state.moveEnabled).toBe(true);
+  });
 });

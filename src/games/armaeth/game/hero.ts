@@ -1085,8 +1085,10 @@ export function continueGame(ctx: BehaviorContext, services: HeroServices = {}):
   ctx.messages.say("S", 24);
   // `2594:043a` : le héros recréé apparaît (animation 17, son `A8`) ; `4b50` (`moveEnabled`) repasse à 7 à la fin de l'animation.
   // S'il renaît dans une autre salle que la salle chargée (cas « grimpé », `climbedEntries`), le terrain de la salle chargée n'est
-  // pas le sien : on laisse le rechargement le placer, sans animation.
+  // pas le sien : on laisse le rechargement le placer, sans animation. Écart au jeu original : sans l'animation 17, rien ne rend la
+  // main au joueur (`4b50 = 7`) ; si la mort a eu lieu pendant une animation tenue (`4b50 = 0`), on la rend ici.
   if (room === ctx.room) startHeroAnimation(hero, ctx, 17, {}, services);
+  else state.moveEnabled = true;
   hero.err = 0;
   return "created";
 }

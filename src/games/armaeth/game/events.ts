@@ -32,9 +32,9 @@ export const LEVEL_INTRO_MESSAGES: readonly (readonly number[])[] = [
   [301, 302, 303, 304],
 ];
 
-/** `21cc:008e` : l'événement `100 + niveau` affiche les messages du niveau, l'un après l'autre. */
+/** `21cc:008e` : l'événement `100 + niveau` affiche les messages du niveau, l'un après l'autre, sur fond vert. */
 const levelIntro: EventHandler = (ctx, entry) => {
-  for (const number of LEVEL_INTRO_MESSAGES[entry.event - 100] ?? []) ctx.messages.say("S", number);
+  for (const number of LEVEL_INTRO_MESSAGES[entry.event - 100] ?? []) ctx.messages.sayLevelIntro("S", number);
 };
 
 // --- 103 : grille du cachot ----------------------------------------------------------------------------------------------

@@ -66,6 +66,8 @@ export interface HandlerMessages {
   enqueue(priority: number, cls: string | number, number: number): void;
   /** Affiche tout de suite, dans une fenêtre qui attend un clic ou Entrée. */
   say(cls: string | number, number: number): void;
+  /** `21cc:008e` : titre de chapitre, sur fond vert dans la fenêtre d'introduction (couleurs et fenêtre dédiées). */
+  sayLevelIntro(cls: string | number, number: number): void;
   /**
    * `21ad:000a(vide, en-tête, séparateur, liste)` : fenêtre « en-tête (`V<header>`) puis le nom `O<Num>` de chaque objet non caché
    * (`Inv = 0`) qui n'est pas le héros » ; liste vide : message `V<empty>`. `lines` (séparateur 7) : un nom par ligne, sinon à la suite

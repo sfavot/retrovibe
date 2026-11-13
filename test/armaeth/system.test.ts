@@ -289,7 +289,7 @@ describe.skipIf(!hasOriginalFiles)("bottes : clic droit et panneau de contenu", 
     expect(s.engine.walkToExit(s.state.hero!, 99999, false)).toBe(false);
   });
 
-  it("panneau de contenu : grille 18 x 14, au plus 12 colonnes, objets posés (Xyp 11, P 0xB8), désélection à la marche", () => {
+  it("panneau de contenu : grille 18 x 14, au plus 12 colonnes, objets posés (Xyp 11, P 0xD0), désélection à la marche", () => {
     const s = new Session().skipIntro();
     const chest = s.state.createObject({ typ: 2, num: 21, canContain: 7 });
     s.state.moveToRoom(chest, s.state.loadedRoom!);
@@ -304,7 +304,7 @@ describe.skipIf(!hasOriginalFiles)("bottes : clic droit et panneau de contenu", 
     const ys = new Set(placed.map((o) => o.y));
     expect(xs.size).toBe(7);
     expect(ys.size).toBe(2);
-    expect(placed.every((o) => o.p === 0xb8)).toBe(true);
+    expect(placed.every((o) => o.p === 0xd0)).toBe(true);
     expect(Math.min(...ys)).toBe(26 + 2 + 18 - 1 - 3);
     s.state.selected = null;
     s.run(2);

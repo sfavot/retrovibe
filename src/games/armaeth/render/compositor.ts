@@ -268,6 +268,40 @@ export class Compositor {
     }
   }
 
+  /**
+   * `1664:0057` : sauvegarde le fond du rectangle du panneau de contenu, pour le restituer quand il se ferme ou change
+   * (`undoAll` le fait en remettant ces pixels). À appeler avant de dessiner la grille dans la page.
+   */
+  beginPanel(rect: Rect): void {
+    this.undo.push({
+      rect,
+      pixels: this.page.readRect(rect),
+      priority: readPlane(this.page.priority, rect),
+      dynamic: false,
+    });
+    this.dirty.add(rect);
+  }
+
+  /**
+   * Comme `drawFrameRect`, mais dans la page d'arrière-plan, avec une priorité : le panneau de contenu se compose avec
+   * les sprites (les pixels transparents d'un sprite laissent voir la page, pas l'écran).
+   */
+  drawFrameRectToPage(rect: Rect, border: number, fill: number | null, priority: number): void {
+    const { x, y, width, height } = rect;
+    if (width <= 0 || height <= 0) return;
+    const page = this.page;
+    page.fillRect({ x, y, width, height: 1 }, border, priority);
+    if (height === 1) return;
+    page.fillRect({ x, y: y + height - 1, width, height: 1 }, border, priority);
+    for (let row = y + 1; row < y + height - 1; row++) {
+      page.fillRect({ x, y: row, width: 1, height: 1 }, border, priority);
+      if (width < 2) continue;
+      if (fill !== null && width > 2)
+        page.fillRect({ x: x + 1, y: row, width: width - 2, height: 1 }, fill, priority);
+      page.fillRect({ x: x + width - 1, y: row, width: 1, height: 1 }, border, priority);
+    }
+  }
+
   private pop(): void {
     const record = this.undo.pop();
     if (!record) return;

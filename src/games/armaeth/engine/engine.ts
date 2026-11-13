@@ -201,7 +201,7 @@ const FULL_WINDOW = { x: 0, y: 0, width: 320, height: 200 };
 const INFO_COLORS = [0xef, 0xf5, 0xe9] as const;
 const SCORE_COLORS = [0xed, 0xf9, 0xec] as const;
 /** Panneau de contenu (`1664:0057`) : cellules 18 x 14 espacées de 4, au plus 96, haut à `y = 26`. */
-const PANEL = { cellWidth: 18, cellHeight: 14, gap: 4, top: 26, maxCells: 96, maxColumns: 12, maxRows: 8, presence: 0x0b, p: 0xb8 };
+const PANEL = { cellWidth: 18, cellHeight: 14, gap: 4, top: 26, maxCells: 96, maxColumns: 12, maxRows: 8, presence: 0x0b, p: 0xd0, grid: 0xc7 };
 /** Entrées de la table des portes `DGROUP:0694` (`217d:0088`) : 3 lignes, colonnes porte, gardien, clé, mot, salle A, salle B. */
 const DOOR_TABLE = 0x694;
 interface DoorRow {
@@ -1194,16 +1194,18 @@ export class ArmaethEngine implements TokenHostEngine {
     const [outer, inner, cellOuter, cellInner, fill] = this.panelColors;
     const c = this.compositor;
     const { rect } = panel;
-    c.drawFrameRect({ x: rect.x + 2, y: rect.y + 2, width: rect.width - 3, height: rect.height - 3 }, fill, fill);
-    c.drawFrameRect(rect, outer, null);
-    c.drawFrameRect({ x: rect.x + 1, y: rect.y + 1, width: rect.width - 2, height: rect.height - 2 }, inner, null);
+    c.beginPanel(rect);
+    const prio = PANEL.grid;
+    c.drawFrameRectToPage({ x: rect.x + 2, y: rect.y + 2, width: rect.width - 3, height: rect.height - 3 }, fill, fill, prio);
+    c.drawFrameRectToPage(rect, outer, null, prio);
+    c.drawFrameRectToPage({ x: rect.x + 1, y: rect.y + 1, width: rect.width - 2, height: rect.height - 2 }, inner, null, prio);
     const pitchX = PANEL.cellWidth + PANEL.gap;
     const pitchY = PANEL.cellHeight + PANEL.gap;
     for (let r = 0; r < panel.rows; r++) {
       for (let col = 0; col < panel.columns; col++) {
         const cell = { x: rect.x + 2 + pitchX * col, y: rect.y + 2 + pitchY * r, width: pitchX, height: pitchY };
-        c.drawFrameRect(cell, cellOuter, null);
-        c.drawFrameRect({ x: cell.x + 1, y: cell.y + 1, width: cell.width - 2, height: cell.height - 2 }, cellInner, null);
+        c.drawFrameRectToPage(cell, cellOuter, null, prio);
+        c.drawFrameRectToPage({ x: cell.x + 1, y: cell.y + 1, width: cell.width - 2, height: cell.height - 2 }, cellInner, null, prio);
       }
     }
   }
@@ -1856,13 +1858,14 @@ export class ArmaethEngine implements TokenHostEngine {
   private compose(state: WorldState): void {
     const c = this.compositor;
     const statics = drawList(state, "static").filter((d) => !this.isCursorObject(d.serial));
-    const signature = JSON.stringify(statics);
+    const panel = this.panel;
+    const signature = JSON.stringify({ statics, panel: panel ? panel.rect : null });
     if (signature !== this.staticSignature) {
       c.undoAll();
       applyDrawCommands(c, statics, this.sprites, this.origin);
+      if (panel) this.drawPanel(panel);
       this.staticSignature = signature;
     }
-    if (this.panel) this.drawPanel(this.panel);
     applyDrawCommands(
       c,
       drawList(state, "dynamic").filter((d) => !this.isCursorObject(d.serial)),

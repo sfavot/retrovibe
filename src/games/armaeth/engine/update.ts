@@ -209,9 +209,11 @@ export type DrawPass = "dynamic" | "static" | "all";
 
 /**
  * Liste de dessin (`engine.md` § 6.4). Dynamique (chaque image) : contenu de l'objet sélectionné, objets d'interface, contenu
- * du héros, décors, objets de la salle. Statique (`redessinStatique`, dans le fond) : contenu de la sélection, décors, objets
- * de la salle, contenu du héros, objets d'interface. `all` = le statique puis le dynamique. Seuls les objets de `Xyp != 0` et dont
- * l'image est choisie sont dessinés, ceux de `Mob == 0` dans la passe statique et les autres dans la dynamique.
+ * du héros, décors, objets de la salle. Statique (`redessinStatique`, dans le fond) : décors, objets de la salle, contenu du
+ * héros, objets d'interface. `all` = le statique puis le dynamique. Seuls les objets de `Xyp != 0` et dont l'image est choisie
+ * sont dessinés, ceux de `Mob == 0` dans la passe statique et les autres dans la dynamique — à l'exception du contenu de
+ * l'objet sélectionné, toujours dessiné dans la passe dynamique pour rester au-dessus de la grille du panneau (`1664:0057`),
+ * composée dans la page à une priorité inférieure.
  */
 export function drawList(state: WorldState, pass: DrawPass = "all"): DrawCommand[] {
   const out: DrawCommand[] = [];
@@ -221,9 +223,9 @@ export function drawList(state: WorldState, pass: DrawPass = "all"): DrawCommand
   const decors = room?.listB ?? [];
   const objects = room?.listA ?? [];
   const interfaces = state.interfaceObjects;
-  const add = (list: readonly GameObject[], dynamic: boolean, relative: boolean) => {
+  const add = (list: readonly GameObject[], dynamic: boolean, relative: boolean, force = false) => {
     for (const obj of list) {
-      if (obj.presence === 0 || obj.anim.frame < 0 || (obj.mob !== 0) !== dynamic) continue;
+      if (obj.presence === 0 || obj.anim.frame < 0 || (!force && (obj.mob !== 0) !== dynamic)) continue;
       const resource = spriteKeyOf(obj);
       if (!resource) continue;
       out.push({
@@ -241,14 +243,13 @@ export function drawList(state: WorldState, pass: DrawPass = "all"): DrawCommand
     }
   };
   if (pass !== "dynamic") {
-    add(selected, false, false);
     add(decors, false, true);
     add(objects, false, true);
     add(inventory, false, false);
     add(interfaces, false, false);
   }
   if (pass !== "static") {
-    add(selected, true, false);
+    add(selected, true, false, true);
     add(interfaces, true, false);
     add(inventory, true, false);
     add(decors, true, true);

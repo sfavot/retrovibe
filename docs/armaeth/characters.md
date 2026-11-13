@@ -139,6 +139,8 @@ Gestionnaires de **verbes** par personnage (tables 1 « objet direct » et 5 « 
 | 0x16 | conflit de position (mouvement `Dep 2/4` sans zone) | **fatal** `E11` sauf si `Ego == 4` | – |
 | 0x17 | échec de recherche de position | `placer(5)` ; en cas d'échec **fatal** `E11` sauf si `Ego == 4` | – |
 
+**Écart du port (héros)** : au clavier (sans trajet), `Err` 1 (obstacle), 4 (avant-plan) et 6 (marche trop haute) **arrêtent** le héros (`2273:0190` : `Hor`/`Ver`/`Prf` remis à 0) au lieu de le laisser marcher sur place contre l'obstacle (`hero.ts` `walkTick` ; l'original fait « suite normale » et garde `Hor`/`Prf`). En trajet, le suivi (`30d9:0006`) contourne ou recalcule comme dans l'original.
+
 Aiguillage des PNJ (tableau de 20 mots lus en tête de `28b1:0000`, `2a44:000c`, `26da:000e`, `2cdf:0004`, `2774:0004`, `2dd9:0006` ; identique partout, **certain**) : `Err` 8 et 9 -> réaction de contact ; 11 -> `186d:000c` (0 : relire `Err` ; 1 : `return 7` ; autre : suite) ; 12, 14, 15, 19 -> `Def = 0` ; tout le reste -> suite. Un `Err` non traité **bloque le mouvement** de l'objet au tic suivant (`179d:0004` retourne dès qu'`Err != 0`) ; chaque `Fct` doit donc le remettre à 0 en fin de tic (c'est le `Err = 0` final de chaque module).
 
 **Chute dans le vide** (héros, `Err 3` ou `5`, aucun trajet actif) : entrée dans l'état `Ego 4` (§ 4.2.5) avec `Fig 8` et le message `G6` si `Ego == 0` ou `G12` sinon (`246c:02cf`).

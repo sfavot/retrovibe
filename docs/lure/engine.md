@@ -65,7 +65,9 @@ Porté en G2 (`pathfinder.ts`, `movement.ts`, `paused-list.ts`, `exits.ts`, `han
   pas et la reprend après (`setOccupied`), une sortie franchie est prise (`checkRoomChange`).
 - **Joueur** (`playerAnimHandler`) et **PNJ** (`standardCharacterAnimHandler`) ne réagissent pas pareil à un chemin introuvable : le
   joueur s'écarte au hasard puis reprend sa destination (`tempDest`), puis attend (`CHARMODE_PLAYER_WAIT`) ; un PNJ empile l'emploi du
-  temps « retour » (`RETURN_SUPPORT_ID` `0x400`) au-dessus d'une action factice (`blockedFlag`), puis renonce (`BS_FINAL`). Une porte
+  temps « retour » (`RETURN_SUPPORT_ID` `0x400`) au-dessus d'une action factice (`blockedFlag`), puis renonce (`BS_FINAL`). Dans les
+  données, `0x400` est une **marche au hasard dans la pièce** (`NPC_SET_RAND_DEST`, puis `0x401` `NPC_RESET_PAUSED_LIST`) ; c'est aussi
+  l'emploi du temps d'index 0, que prend un PNJ dont le point d'arrivée dans la pièce voisine est occupé (`characterChangeRoom`). Une porte
   visée qui se referme arrête la marche.
 - **Personnages qui se heurtent** (`PausedCharacterList`) : celui qui marche note « j'attends untel » pour 15 images, part au hasard pour
   s'écarter, l'autre s'arrête (`pauseCtr`) et peut exécuter son script de heurt (`scriptHotspotId`, `tickScriptOffset`) ; la boucle

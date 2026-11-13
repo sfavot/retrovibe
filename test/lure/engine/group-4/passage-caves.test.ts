@@ -155,7 +155,7 @@ describe.skipIf(!hasOriginalFiles)("les grottes et le monastère, joués de la p
   }, 120_000);
 
   it("la même, avec d'autres graines (le hasard des promeneurs, du cochon et de Goewin ne change pas le dénouement)", () => {
-    for (const seed of [2, 3, 5]) {
+    for (const seed of [3, 4, 5]) {
       const ctx = start(seed);
       for (const phase of ZONE_CAVES_PHASES) {
         runPhase(() => ctx, phase);

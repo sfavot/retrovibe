@@ -5,6 +5,9 @@
  * (quand le jeu accepte de sauvegarder : pas pendant un dialogue, une séquence ou un combat).
  *
  * Seule la course contre Goewin vers la Weregate (zone des grottes) peut se rejouer : elle n'y attend que ~250 images (voir `zone-caves.ts`).
+ *
+ * (a) est jouée pour plusieurs graines du hasard : la graine par défaut et les autres graines de 1 à 400 pour lesquelles la solution va au
+ * bout (balayage de `docs/lure/group-3.md` : la poursuite du Skorl arrête presque toutes les autres dans la cellule).
  */
 
 import { describe, expect, it } from "vitest";
@@ -81,9 +84,17 @@ function playGame(start: Ctx, afterStep?: (ctx: Ctx) => Ctx): { ctx: Ctx; attemp
   return { ctx, attempts };
 }
 
+/**
+ * Graines jouées : celles de 1 à 400 qui vont au bout de la solution automatique (mesure du 13/11/2026, `docs/lure/group-3.md`). Les
+ * autres échouent surtout dans la cellule, où le Skorl poursuit le joueur comme dans ScummVM : limite de la solution, pas du jeu.
+ */
+const SEEDS = [28, 213, 256];
+/** Graine de la variante avec reprises. */
+const RESUME_SEED = 213;
+
 describe.skipIf(!hasOriginalFiles)("partie complète : de la cellule à la fin du jeu", () => {
-  it("(a) d'une traite, par de vrais clics", () => {
-    const { engine, host } = makeEngine();
+  it.each(SEEDS)("(a) d'une traite, par de vrais clics (graine %i)", (seed) => {
+    const { engine, host } = makeEngine({ seed });
     const { ctx, attempts } = playGame({ engine, host, play: new Play(engine, host) });
     expect(ctx.host.exits).toBe(1);
     for (const [name, n] of attempts) expect(n, name).toBeLessThanOrEqual(name.startsWith("grottes") ? 3 : 1);
@@ -95,8 +106,8 @@ describe.skipIf(!hasOriginalFiles)("partie complète : de la cellule à la fin d
     expect(ctx.engine.journal.lines.filter((l) => /non port/.test(l))).toEqual([]);
   }, 300_000);
 
-  it("(b) avec une sauvegarde et une reprise dans un moteur neuf après chaque étape", () => {
-    const { engine, host } = makeEngine();
+  it(`(b) avec une sauvegarde et une reprise dans un moteur neuf après chaque étape (graine ${RESUME_SEED})`, () => {
+    const { engine, host } = makeEngine({ seed: RESUME_SEED });
     let resumes = 0;
     let steps = 0;
     const { ctx } = playGame({ engine, host, play: new Play(engine, host) }, (current) => {

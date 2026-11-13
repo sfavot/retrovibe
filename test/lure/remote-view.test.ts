@@ -1,8 +1,8 @@
 /**
- * Vue à distance prolongée, jouée par de vrais clics (`solution/runner.ts`) : la partie, de la cellule à la fenêtre de la boutique d'Ewan
+ * Vue à distance prolongée, jouée par de vrais clics (`solution/runner.ts`) : du départ des grottes (`setupCavesStart`) à la fenêtre de la boutique d'Ewan
  * (« Regarde par » `0x754C`, pièce 19), puis plusieurs minutes de vue jusqu'à la conversation du Skorl, et le clic qui ramène le joueur.
- * Au retour, la pièce 19 rattrape le temps écoulé (`Room::setRoomNumber`, 220 ticks) avec Ratpouch, suiveur, oisif dans la pièce ; graine
- * 256 : un villageois le heurte pendant ce rattrapage.
+ * Au retour, la pièce 19 rattrape le temps écoulé (`Room::setRoomNumber`, plus de 180 ticks) avec Ratpouch, suiveur, oisif dans la pièce ; graine
+ * 1 : un villageois le heurte pendant ce rattrapage.
  * Dans ScummVM, un personnage heurté pendant ce rattrapage y reste figé et Ratpouch empile des actions jusqu'à l'arrêt « too many
  * actions » (c'était l'échec de la partie complète, graine 1, avant l'écart) ; le portage décompte les attentes pendant le rattrapage (écart,
  * `docs/lure/engine.md` § 10) : le joueur peut regarder aussi longtemps qu'il veut.
@@ -11,18 +11,16 @@ import { describe, expect, it } from "vitest";
 import { HotspotId } from "../../src/games/lure/engine/ids";
 import { hasOriginalFiles, makeEngine } from "./engine/test-host";
 import { Play, type Step } from "./solution/runner";
-import { ZONE_CAVES_PHASES } from "./solution/zone-caves";
-import { ZONE_CELL_STEPS } from "./solution/zone-cell";
-import { VILLAGE_FROM_SQUARE } from "./solution/zone-village";
+import { setupCavesStart, ZONE_CAVES_PHASES } from "./solution/zone-caves";
 
 describe.skipIf(!hasOriginalFiles)("vue à distance prolongée avec Ratpouch oisif", () => {
   it("le retour rattrape plusieurs minutes, Ratpouch heurté pendant le rattrapage n'empile pas d'actions", () => {
-    const { engine, host } = makeEngine({ seed: 256 });
+    const { engine, host } = makeEngine({ seed: 1 });
+    engine.tick();
+    setupCavesStart(engine);
     const play = new Play(engine, host);
     const caves = ZONE_CAVES_PHASES.findIndex((p) => p.name === "la conversation du Skorl et d'Ewan");
     const phases: { steps: readonly Step[]; retry?: { until: (e: typeof engine) => boolean; max: number } }[] = [
-      { steps: ZONE_CELL_STEPS },
-      { steps: VILLAGE_FROM_SQUARE },
       ...ZONE_CAVES_PHASES.slice(0, caves + 1),
     ];
     for (const phase of phases) {

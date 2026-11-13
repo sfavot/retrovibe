@@ -68,6 +68,40 @@ Aucun fichier du socle de production n'est modifié (`game.ts`, `verbs.ts`, `hot
 - `test/lure/engine/engine.test.ts` : le catalogue des méthodes n'a plus de souches (tous les groupes portés), `jailorAnimHandler` n'est plus une souche, « Prends la torche » va jusqu'au feu au lieu d'attendre la souche ;
 - `test/lure/engine/movement.test.ts` (« trajets entre toutes les sorties ») : le Skorl de la cellule est mis hors jeu comme les autres PNJ du test (toutes portes ouvertes, il prenait la sortie des briques).
 
+## Poursuite du Skorl après le feu (vague K, comportement d'origine, prouvé au banc)
+
+Ce qui arrête presque toutes les graines de la partie complète dans la cellule (3 graines sur 400 vont au bout : 1, 213, 301 ; 395
+s'arrêtent dans la cellule, voir `group-3.md`).
+
+- **Mécanisme (données)** : après avoir éteint le feu, le Skorl tourne dans la cellule (emploi du temps `0x1000` : cri, champ 11 = 1,
+  marches au hasard, deux répliques, retour à la porte `0x2711`). L'entrée `0x1012` exécute la séquence `0x1D31` : si le joueur n'est pas
+  dans la pièce 1 (`checkRoomNumber`) et que la porte de la cellule est ouverte (champ 9 = 0), `setSupportData(Skorl, 3)` lui donne
+  l'emploi du temps `0x1400` ; sinon la boucle reprend (`0x1014` → `0x1004`), soit ≈ 250 à 300 images après le feu. `0x1400` : pièce 2
+  (`SET_ROOM_AND_OFFSET`), puis sans fin `0x1401` (séquence `0x1E42` : `moveCharacterToPlayer`, l'action passe dans la pièce du joueur),
+  `0x1402` (`npcWalkingCheck` du joueur : s'il est dans la pièce, marche jusqu'à **l'endroit où il est au départ du trajet** ; sinon
+  `npcRoomChange` vers sa pièce), `0x1403` → `0x1401`. Le contact (`jailorAnimHandler`, champ 11 non nul) est la capture.
+- **Deux conduites du moteur qui comptent pour l'esquive** (code identique à ScummVM) : un PNJ dont la recherche de chemin n'aboutit pas
+  prend l'emploi du temps « retour » `0x400`, qui est en fait **une destination au hasard dans sa pièce** (`NPC_SET_RAND_DEST`, puis `0x401`
+  `NPC_RESET_PAUSED_LIST`) ; un PNJ dont le point d'arrivée dans la pièce voisine est occupé n'entre pas (`characterChangeRoom`, emploi du
+  temps d'index 0 = `0x400` : il part au hasard, puis réessaie). Le joueur dont le chemin n'aboutit pas, avec un `blockedState` non nul
+  hérité d'un heurt, fait un pas au hasard ou s'arrête (`playerAnimHandler`, mêmes conditions que ScummVM).
+- **Banc** (scénario `bench/scenarios/l-trace-skorl.txt`, hors dépôt, `SEED=2 trace.sh … 3e8,3ea`) : `enter 2`, joueur posé en (213, 96),
+  `setfield 11 1`, `script 48 3 3eah` (`setNewSupportData` : l'emploi du temps d'index 3, `0x1400`, comme `0x1D31`), dans les deux
+  moteurs. ScummVM et le portage : le Skorl repart vers le joueur (destination (213, 140) dans les deux), le touche et la capture
+  redémarre la partie (pièce 1), puis il reprend sa ronde ; seule la phase diffère (durée du fondu de `enter`). Une partie jouée au banc
+  (torche, embrasure, pièces 2, 3, 4) montre aussi le Skorl quitter la cellule, traverser 2 et 3 et prendre le joueur resté dans la 4.
+  Piège du banc : `enter 2` ou `enter 3` moins de ~6 s après Échap fait lever ScummVM (« Invalid sound index », sons pas encore chargés) ;
+  attendre 6 s.
+- **Esquive essayée dans le joueur, non retenue** : un « guetteur » qui prévoit la route du Skorl (ses tronçons `pathFinder.list`, puis
+  des trajets vers le joueur calculés par la recherche de chemin du moteur, l'entrée par le point d'arrivée d'une pièce voisine) et choisit
+  où aller (y aller tout de suite, attendre qu'il passe, contourner par l'autre ligne du sol, attendre le moment d'agir). La prévision est
+  juste dans une pièce (expérience à état posé : à quelques pixels près sur 40 images), mais la solution jouée n'aboutit que pour 0 ou 1
+  graine sur 40, pas mieux que les points fixes : les actions qu'on ne peut pas interrompre (« Donne » au prisonnier : ~50 images de marche
+  et ~35 de dialogue ; « Dis à Ratpouch » : ~50), Ratpouch et le Skorl qui bouchent la pièce 2 (le joueur bloqué fait un pas au hasard), les
+  marches au hasard du Skorl bloqué, et une pièce 2 de 40 pixels de haut où il rattrape le joueur en moins de 70 images où qu'il soit.
+  Pistes : une esquive qui enchaîne plusieurs pièces (l'attirer dans la salle de torture, une impasse, et revenir), ou un ordre des
+  actions qui laisse au joueur le temps de tenir une entrée (point d'arrivée occupé : il ne peut pas entrer).
+
 ## Points ouverts
 
 - Trois tests du socle échouent à cause de **Goewin (3EF)**, pas du groupe L2 : « les 45 pièces se chargent » (`engine.test.ts`), « les 45 pièces » (`rooms.test.ts`), « trajets entre toutes les sorties » (`movement.test.ts`) : `hotspot 3ef : image 22 hors de l'animation (5)` (marche d'un personnage à 5 images ; gestionnaire de Goewin, L4).

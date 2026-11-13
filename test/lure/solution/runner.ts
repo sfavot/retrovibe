@@ -205,7 +205,7 @@ export class Play {
 
   /**
    * Le joueur est sur le point d'arrivée d'un personnage qui vient d'une pièce voisine vers la sienne (l'action en tête de sa pile a lieu
-   * dans la pièce du joueur) : arrivé sur lui, il ne pourrait pas entrer (`checkForIntersectingCharacter`, comme ScummVM).
+   * dans la pièce du joueur) : comparé aux pieds du joueur (`y + heightCopy`) ; arrivé sur lui, il ne pourrait pas entrer (`checkForIntersectingCharacter`, comme ScummVM).
    */
   private onArrivalPoint(): boolean {
     const player = this.engine.world.requireActiveHotspot(HotspotId.PLAYER);
@@ -213,7 +213,7 @@ export class Play {
       if (h.hotspotId === HotspotId.PLAYER || h.hotspotId >= HotspotId.START_EXIT || h.roomNumber === this.room) return false;
       if (h.currentActions.isEmpty() || h.currentActions.top().roomNumber !== this.room) return false;
       const exit = this.engine.data.rooms.find((r) => r.roomNumber === h.roomNumber)?.exits.find((e) => e.roomNumber === this.room);
-      return exit !== undefined && Math.abs(player.x - exit.x) < 40 && Math.abs(player.y - exit.y) < 24;
+      return exit !== undefined && Math.abs(player.x - exit.x) < 40 && Math.abs(player.y + player.heightCopy - exit.y) < 24;
     });
   }
 
@@ -284,10 +284,10 @@ export class Play {
       }
       return pts;
     });
-    // Les points d'arrivée dans cette pièce (données des sorties des pièces voisines : coin haut gauche du personnage qui arrive).
+    // Les points d'arrivée dans cette pièce (données des sorties des pièces voisines : y est celui des pieds du personnage qui arrive).
     const arrivals = this.engine.data.rooms
       .flatMap((r) => r.exits.filter((e) => e.roomNumber === this.room && r.roomNumber !== this.room))
-      .map((e) => ({ x: e.x + 16, y: e.y + 48 }));
+      .map((e) => ({ x: e.x + 16, y: e.y }));
     const clear = (x: number, y: number): boolean =>
       lanes.every((pts) => pts.every((q, i) => Math.abs(q.x - x) > (i === 0 ? 56 : 40) || Math.abs(q.y - y) > (i === 0 ? 28 : 20))) &&
       arrivals.every((q) => Math.abs(q.x - x) > 48 || Math.abs(q.y - y) > 24) &&

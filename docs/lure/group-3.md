@@ -121,5 +121,33 @@ Un seul joueur (`Play`) pour les quatre zones, fusion de `runner.ts` (L3), `cell
 
 ### Points ouverts
 
-- **La cellule n'est réussie que pour quelques graines** (1, 28 et une poignée sur 300) : après le feu, le Skorl poursuit le joueur de pièce en pièce (emploi du temps `0x1400` : pièce du joueur, destination au hasard, recommence) et le toucher, c'est être pris ; la solution croise le Skorl dans le couloir de la salle de garde (sol de 32 pixels de haut) à des points fixes. Une esquive réactive (lignes de sol, attente dans la salle de torture) a été essayée et abandonnée : pas assez fiable. Pas de comparaison au banc.
-- **Autres graines de la partie complète** : 28 s'arrête au village : après « Luthern à la forge », le joueur reste sur le point d'arrivée de la pièce 28 (133, 96, venu de la 18) ; le clic vers (220, 150) et `giveWay` ne l'en sortent pas (cause non établie ; voisin du cas « pièce 28 » d'`engine.md` § 10) et Luthern, qui veut entrer depuis la 18, attend 4000 images (`checkForIntersectingCharacter`) ; 256 s'arrête au château (« salle à grille » : trois essais sans que le treuil soit actionné pendant les 5 s où Minnow tient le levier). Non traités (avec l'écart de l'avance rapide, les tirages changent : 213 va maintenant au bout et 256 s'arrête au même endroit du château).
+- **Mesure (vague K, suite, 13/11/2026, après la correction des points d'arrivée ci-dessous)** : partie complète d'une traite, graines
+  1 à 400 : **3 vont au bout (28, 213, 256)** ; 395 s'arrêtent dans la cellule (pris par le Skorl), 1 dans la grotte d'entrée, 1 au
+  levier et treuil du château. La graine 1 (par défaut) perd désormais la course de la Weregate (voir graine 28). `full-game.test.ts` joue
+  (a) pour les graines 28, 213 et 256, (b) pour la graine 213. Avant la correction : 3/400 aussi (1, 213, 301).
+- **La cellule** : la poursuite du Skorl est le comportement d'origine (prouvé au banc, mécanisme et essai d'esquive : `group-2.md`,
+  « Poursuite du Skorl après le feu »). Non résolu.
+- **La suite de la partie, sans la cellule** (début de village posé par `startVillage`, puis village, grottes, château ; graines 1 à 100) :
+  35 vont au bout. Échecs : « se cacher en bas de la pièce 46 » (pris, 12), « grotte d'entrée » (8 + 3), « Luthern à la forge » (10),
+  porte C des crânes (4), sortie vers 38 au retour des grottes (4), levier et treuil (4), laboratoire (3), divers (≤ 2 chacun). Une graine
+  qui franchit la cellule a donc environ une chance sur trois d'aller au bout.
+- **Graine 28, « Luthern à la forge » : cause établie, deux défauts du joueur de test (pas du moteur).** Arrivé de la 18 en (133, 96), sur
+  le point d'arrivée de Luthern (sortie 18 → 28 : arrivée (129, 144), pieds), avec un `blockedState` de 2 hérité de heurts en route. (1)
+  L'étape `walk [220, 150]` de `luthernAtForge` vise un point dans un mur de la grille de la pièce 28 (chemin partiel) : le joueur bloqué
+  ne fait alors que s'arrêter (`playerAnimHandler` : `blockedState` final, `CHARMODE_PLAYER_WAIT` ; mêmes conditions dans ScummVM, lignes
+  155-165 de `hotspots.cpp`). (2) `giveWay` ne l'en sort pas : `onArrivalPoint` compare le haut du joueur (`player.y`) aux pieds de
+  l'arrivée (`exit.y`), et la liste des arrivées de `giveWay` place les pieds 48 pixels trop bas (`e.y + 48` au lieu de `e.y` ;
+  `characterChangeRoom` pose le joueur en `(x, y - 48)`) : le joueur n'est jamais vu sur un point d'arrivée. Luthern, qui veut entrer depuis
+  la 18, part au hasard et réessaie pendant 4 000 images. **Correction appliquée (13/11/2026)** : corriger (2) (deux lignes de `runner.ts`)
+  fait aller la graine 28 au bout et fait passer la suite de la partie de 35 à 48 sur 100 (« Luthern à la forge » : 10 → 0), mais change le
+  déroulé de la graine par défaut, qui perd alors la course de la Weregate (le joueur clique la sortie pendant que Goewin est dans
+  l'embrasure, chemin partiel, pas au hasard, la porte se referme : « Tout est perdu »), d'où le choix des graines de `full-game.test.ts`.
+  L'attente « Goewin a passé la Weregate » sauve cette course mais déplace l'échec de la graine 1 au levier du château : non retenue.
+- **Graine 256, « salle à grille : levier et treuil » : cause établie (solution, comportement d'origine).** Le levier ne reste tiré que
+  5 s (champ 65, ~63 images). Après « Dis à Minnow : Tire le levier », la solution écarte le joueur en (200, 175) ; Minnow, au levier en
+  (137, 120), barre le chemin direct vers le treuil (161, 88). Graine 256 : au levier tiré, le joueur est en (229, 136) ; il part vers le
+  treuil, bute sur Minnow, fait des pas de côté (chemin bloqué, `blockedState`) et tourne autour de lui ; 64 images plus tard le levier est
+  relâché et il n'est toujours pas au treuil (trois essais identiques). Même chose pour la graine 301 quand le déroulé change (65 images,
+  levier relâché 3 images trop tôt). Avec la correction de la graine 28, le déroulé change et la 256 va au bout ; le défaut reste pour ~8
+  graines sur 100 (suite de la partie sans la cellule). Essais : revenir au treuil (« Regarde ») après l'ordre, ou attendre que Minnow, qui suit, soit arrivé près du
+  treuil avant de lui parler : pas mieux (8/100) ou pire (27/100). Non résolu.

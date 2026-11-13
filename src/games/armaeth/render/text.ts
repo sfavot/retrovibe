@@ -2,7 +2,7 @@ import type { GphFont } from "../data/font";
 import type { Surface } from "./surface";
 
 export interface TextStyle {
-  /** Espacement ajouté à la largeur de chaque glyphe (1 pour les messages, 0 pour la ligne de saisie). */
+  /** Espacement ajouté à la largeur de chaque glyphe (1 pour les messages et la ligne de saisie ; 0 sinon). */
   spacing?: number;
   /** Couleur de l'encre. */
   color: number;

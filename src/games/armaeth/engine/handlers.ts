@@ -86,6 +86,8 @@ export interface HandlerSound {
   stopEffect(cls?: string | number, num?: number): void;
   /** `gm_sound_select_track` : même appel que `effect`. */
   selectTrack(cls: string | number, number: number, priority: number, loop?: boolean): number;
+  /** `2f86:0008` (« reprise ») : arrête le son transitoire (jingle, son d'animation) et rejoue la musique de la salle. */
+  resumeMusic(): void;
 }
 
 export interface HandlerEvents {

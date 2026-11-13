@@ -53,10 +53,11 @@ export function parseDef(bytes: Uint8Array): DefTable {
 export interface AniRecord {
   /** Mot 0 : numéro d'animation (1 à 47, égal à l'id de la ressource `ANM`). */
   id: number;
-  /** Mot 1 : 32 ou 65 (sens inconnu ; 32 -> mots 2 et 3 nuls). */
+  /** Mot 1 : 32 (`0x20`, aucun son) ou 65 (`0x41` = `A`, un son est joué). */
   kind: number;
-  /** Mot 2 et mot 3 : croissent de 1 en 1 d'un enregistrement à l'autre (rôle inconnu). */
+  /** Mot 2 : numéro du son (`gm_sound_play(…, classe = mot 1, numéro = mot 2)`), 0 = aucun (`16f5:0295`). */
   unknown2: number;
+  /** Mot 3 : identifiant de la banque du son (`gm_sound_play(id = mot 3, …)`). */
   unknown3: number;
   /** Mot 4 : nombre de pas ; copié dans `Nbr` (+0x36) de l'objet. */
   steps: number;

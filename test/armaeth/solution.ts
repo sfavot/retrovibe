@@ -205,6 +205,8 @@ export function bottle(p: Robot): number[] {
         p.run(5);
         p.drain();
         p.need(!!p.state.hero && p.roomId === 105, "pas de résurrection");
+        // l'apparition du héros (animation 17, 45 images) le tient en `Ego 6` : on attend le retour à la marche
+        p.until(() => p.state.hero!.ego === 0, 600);
         armoire();
         // Prytwen, qui ne s'occupe plus du héros, finit par quitter son antre (une décision sur quatre, `28b1:0703`) : on attend qu'il
         // sorte, hors de l'antre on pourra le combattre

@@ -226,20 +226,18 @@ describe.skipIf(!hasOriginalFiles)("héros complet (fichiers du jeu)", () => {
     t.click();
     t.run(2);
 
-    // `continuer` (F4) : S46/S47 si le héros existe, sinon recréation avec S24
+    // `continuer` (F4) : S46/S47 si le héros existe, sinon recréation avec S24 puis apparition (animation 17)
     expect(continueGame(t.ctx, { sprites: t.engine.sprites, limits: () => t.engine.currentTerrain!.limits })).toBe("created");
     const back = t.engine.state!.hero!;
     expect(back.num).toBe(1);
-    const limits = t.engine.currentTerrain!.limits;
-    expect([back.x, back.p, back.presence]).toEqual([Math.trunc(limits.xMax / 2), Math.trunc(limits.pMax / 2), 1]);
-    expect(back).toMatchObject({ gst: 7, mob: 2, ego: 0, weight: 800, capacity: 500 });
+    expect(back).toMatchObject({ gst: 7, mob: 1, ego: 6, animId: 17, weight: 800, capacity: 500 });
+    expect(back.room).toBe(t.engine.state!.loadedRoom);
     t.engine.tick();
     expect(t.engine.windows.text).toBe(messages().messages(messageId("S", 24)));
     t.click();
-    t.run(20);
-    expect(back.presence).toBe(2); // posé par le déplacement
-    expect(back.room).toBe(t.engine.state!.loadedRoom);
-    expect(back.ego).toBe(0);
+    t.until(() => back.ego === 0); // l'animation 17 (45 images) terminée : retour à la marche
+    expect(back.presence).toBe(2); // posé par l'animation puis la marche
+    expect(back.animId).toBe(0);
     // un deuxième `continuer` avec le héros présent n'en crée pas un autre
     expect(continueGame(t.ctx)).toBe("present");
     expect(t.engine.state!.objects.filter((o) => o.num === 1)).toHaveLength(1);

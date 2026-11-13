@@ -651,6 +651,32 @@ describe("Sequencer : play et selectTrack", () => {
     seq.setMasterVolume(-3);
     expect(seq.driver.masterVolume).toBe(0);
   });
+
+  it("reprise (`2f86:0008`) : un jingle non bouclé laisse la place à la musique de la salle", () => {
+    // deux banques : la musique M1 (bouclée) et le jingle E4 (non bouclé)
+    const musicBank = buildBank({ tempo: 1, patterns: [[0xa0, 0xc0, 0x8b, 0x24]], tracks: { 0: [0] }, instruments: [INSTRUMENT_0] });
+    const jingleBank = buildBank({ tempo: 1, patterns: [[0xa0, 0xc0, 0x80, 0x24]], tracks: { 0: [0] }, instruments: [INSTRUMENT_0] });
+    const track = (key: number): MixTrack => ({ key, tempo: 1, volume: 0, voiceMask: 1, speakerTrack: 0xff, padding: 0 });
+    const mix: Mix = {
+      musicBufferSize: musicBank.length,
+      effectBufferSize: jingleBank.length,
+      tracks: [track(mixKey("M", 1)), track(mixKey("E", 4))],
+      banks: [
+        { id: 1, key: mixKey("M", 1), effectKeys: Array(16).fill(0), size: musicBank.length, offset: 0 },
+        { id: 14, key: mixKey("E", 4), effectKeys: Array(16).fill(0), size: jingleBank.length, offset: musicBank.length },
+      ],
+      data: Uint8Array.from([...musicBank, ...jingleBank]),
+    };
+    const seq = new Sequencer(mix, new OplRecorder());
+    expect(seq.play(1, "M", 1, { loop: true })).toBe(true);
+    seq.tick();
+    expect(seq.play(14, "E", 4)).toBe(true); // le jingle remplace la musique
+    seq.tick();
+    for (let t = 0; t < 60 && !seq.isMusicPlaying(); t++) seq.tick(); // la fin du jingle relance la musique
+    expect(seq.isMusicPlaying()).toBe(true);
+    for (let t = 0; t < 200; t++) seq.tick(); // bouclée : elle ne s'arrête plus
+    expect(seq.isMusicPlaying()).toBe(true);
+  });
 });
 
 // ---- fichiers du jeu ----

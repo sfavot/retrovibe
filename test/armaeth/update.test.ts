@@ -273,10 +273,10 @@ describe("drawList", () => {
     for (const o of [hero, bag, sel, chest, cursor, decor, absent]) o.anim.frame = 1;
     hero.anim.mirror = 1;
     const dyn = drawList(p.state, "dynamic").map((c) => c.serial);
-    // sélection (aucune dynamique), interface, inventaire, décors (aucun dynamique), objets
-    expect(dyn).toEqual([cursor.serial, bag.serial, hero.serial]);
+    // sélection (toujours dynamique), interface, inventaire, décors (aucun dynamique), objets
+    expect(dyn).toEqual([sel.serial, cursor.serial, bag.serial, hero.serial]);
     const stat = drawList(p.state, "static").map((c) => c.serial);
-    expect(stat).toEqual([sel.serial, decor.serial, chest.serial]);
+    expect(stat).toEqual([decor.serial, chest.serial]);
     const all = drawList(p.state);
     expect(all).toHaveLength(6);
     const heroCommand = all.find((c) => c.serial === hero.serial)!;

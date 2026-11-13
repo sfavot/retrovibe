@@ -201,9 +201,12 @@ describe.skipIf(!hasOriginalFiles)("verbes (famille 0)", () => {
     expect(s.say("lire la clef")).toEqual(["V098"]);
   });
 
-  it("monter : échelle (Sol 7..10) → Ver = +1 ; ailleurs V044", () => {
+  it("monter / descendre : échelle (Sol 7..10) → Ver = -1 / +1 (écart : l'original posait +1) ; ailleurs V044", () => {
     s.hero.ground = 8;
     expect(s.say("monter")).toEqual([]);
+    expect(s.hero.speedY).toBe(-1);
+    s.hero.ground = 8;
+    expect(s.say("descendre")).toEqual([]);
     expect(s.hero.speedY).toBe(1);
     s.hero.ground = 1;
     s.hero.dep = 0;

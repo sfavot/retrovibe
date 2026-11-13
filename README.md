@@ -7,16 +7,16 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 
 | Jeu | État |
 | --- | --- |
-| Indiana Jones and his Desktop Adventures | jouable |
-| Lost in Time (Coktel Vision, 1993) | jouable (en cours de validation) |
-| Le Téléportaschtroumpf (Infogrames Multimedia, 1995) | jouable (en cours de validation) |
-| Math Workshop / Mathémagique (Broderbund, 1994) | jouable (en cours de validation) |
-| Armaeth (Grandslam Video, 1994) | jouable (en cours de validation) |
-| SWIV 3D (SCi, 1997) | jouable (en cours de validation) |
-| L'Odyssée des Zoombinis (Broderbund / TERC, 1996) | en préparation (données et études faites, moteur à venir) |
-| Drascula: The Vampire Strikes Back (Alcachofa Soft, 1996) | jouable (en cours de validation) |
-| Flight of the Amazon Queen (Interactive Binary Illusions, 1995) | jouable (en cours de validation) |
-| Lure of the Temptress (Revolution Software, 1992) | jouable (en cours de validation) |
+| [Indiana Jones and his Desktop Adventures](https://sfavot.github.io/retrovibe/#/indy) | jouable |
+| [Lost in Time (Coktel Vision, 1993)](https://sfavot.github.io/retrovibe/#/lost-in-time) | jouable (en cours de validation) |
+| [Le Téléportaschtroumpf (Infogrames Multimedia, 1995)](https://sfavot.github.io/retrovibe/#/teleportaschtroumpf) | jouable (en cours de validation) |
+| [Math Workshop / Mathémagique (Broderbund, 1994)](https://sfavot.github.io/retrovibe/#/mathemagique) | jouable (en cours de validation) |
+| [Armaeth (Grandslam Video, 1994)](https://sfavot.github.io/retrovibe/#/armaeth) | jouable (en cours de validation) |
+| [SWIV 3D (SCi, 1997)](https://sfavot.github.io/retrovibe/#/swiv3d) | jouable (en cours de validation) |
+| [L'Odyssée des Zoombinis (Broderbund / TERC, 1996)](https://sfavot.github.io/retrovibe/#/zoombinis) | en préparation (données et études faites, moteur à venir) |
+| [Drascula: The Vampire Strikes Back (Alcachofa Soft, 1996)](https://sfavot.github.io/retrovibe/#/drascula) | jouable (en cours de validation) |
+| [Flight of the Amazon Queen (Interactive Binary Illusions, 1995)](https://sfavot.github.io/retrovibe/#/fotaq) | jouable (en cours de validation) |
+| [Lure of the Temptress (Revolution Software, 1992)](https://sfavot.github.io/retrovibe/#/lure) | jouable (en cours de validation) |
 
 ## Déploiement
 

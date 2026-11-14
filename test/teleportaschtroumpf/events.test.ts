@@ -375,6 +375,26 @@ describe.skipIf(!hasOriginalFiles)("puits aux vœux S13", () => {
     expect(host.audio.effects.length).toBe(after); // même case : pas de nouveau bip
   }, 180_000);
 
+  it("un clic dans la case qu'on vient de toucher est retenu pendant le bip, puis rendu une seule fois (`2daf:05d6`)", async () => {
+    const game = openWell("ingredient");
+    const { scene, host, engine, outcomes } = await inPick(game, true);
+    host.audio.stopEffect();
+    host.loaded.length = 0;
+    host.input.mouseMove(centre(2).x, centre(2).y);
+    host.input.mouseDown(0);
+    await advance(engine, host, 60);
+    host.input.mouseUp(0);
+    expect(scene.hovered).toBe(2);
+    expect(engine.ctx.voice.effectPlaying).toBe(true);
+    expect(scene.stage).toBe("pick");
+    expect(host.loaded.some((f) => /S13C0\d\dT\.VOC/i.test(f))).toBe(false);
+    await advanceUntil(engine, host, () => scene.stage !== "pick", 5_000);
+    expect(engine.ctx.voice.effectPlaying).toBe(false);
+    expect(scene.stage).toBe("outro");
+    await advanceUntil(engine, host, () => outcomes.length > 0, 60_000);
+    expect(outcomes).toEqual([{ kind: "well", ingredient: 2, destination: null }]);
+  }, 120_000);
+
   it("36 s sans choix : rien n'est donné", async () => {
     const game = openWell("ingredient");
     const { host, engine, outcomes } = await inPick(game);

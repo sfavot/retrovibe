@@ -1,6 +1,7 @@
 import type { Hy8 } from "../../data/hy8";
 import type { Voc } from "../../data/voc";
 import { TICKS_PER_SECOND } from "../../engine/clock";
+import { EffectWait } from "../../engine/effect-wait";
 import { voiceName } from "../../engine/paths";
 import type { Scene, SceneContext } from "../../engine/scene";
 import { VideoScene } from "../../engine/video";
@@ -78,6 +79,8 @@ export class WellScene implements Scene {
   /** Dernière case annoncée par le bip (`DS:7C6A`) : elle ne change pas en quittant les cases. */
   private beeped: number | null = null;
   private hinted = false;
+  /** Attente de fin de bruitage en fin d'itération (`2daf:05d6..05ea`), avant le test de sortie. */
+  private readonly effectWait = new EffectWait<"choice" | "timeout">();
   private mapResult: number | null = null;
   private videoStarted = false;
   private outcome: MinigameOutcome = { kind: "well", ingredient: null, destination: null };
@@ -208,9 +211,24 @@ export class WellScene implements Scene {
     this.slot = null;
     this.beeped = null;
     this.hinted = false;
+    this.effectWait.reset();
   }
 
+  /**
+   * Une itération de la boucle de choix (`2daf:022a..05ea`). Comme l'original, la sortie (choix `DS:7C75`, délai `DS:7C74`) est
+   * décidée en cours d'itération, puis `while (348d:0b42(1, 0)) 1764:018a` (`2daf:05d6..05ea`) attend la fin du bip de case avant
+   * de la prendre en compte : `EffectWait` la retient, et les appuis pendant le bip sont perdus.
+   */
   private pick(ctx: SceneContext): void {
+    const exit = this.effectWait.step(ctx, () => this.pickIteration(ctx));
+    if (exit === "choice") this.say(ctx, 7 + SPOKEN_OFFSET[this.slot!], "s13c");
+    else if (exit === "timeout") {
+      ctx.voice.stop();
+      this.say(ctx, 0x18 + ctx.rng.below(2));
+    }
+  }
+
+  private pickIteration(ctx: SceneContext): "choice" | "timeout" | null {
     const input = ctx.input;
     // Les flèches déplacent le curseur comme le clavier de l'original émule la souris (`3134:03bb`) ; le puits n'écrit pas le pas
     // (`DS:3FD0`) : 4 px par tick tant qu'un mini-jeu à pointeur libre n'a pas posé 2 px (`Input.keyPointerShift`).
@@ -229,11 +247,10 @@ export class WellScene implements Scene {
         // Déjà possédé : « tu l'as déjà », on continue.
         ctx.voice.stop();
         this.say(ctx, 0x10 + ctx.rng.below(5), "s13c", "pickVoice");
-        return;
+        return null;
       }
       this.outcome = { kind: "well", ingredient: this.slot, destination: null };
-      this.say(ctx, 7 + SPOKEN_OFFSET[this.slot], "s13c");
-      return;
+      return "choice";
     }
 
     const seconds = Math.floor((ctx.clock.ticks - this.pickStart) / TICKS_PER_SECOND);
@@ -242,13 +259,10 @@ export class WellScene implements Scene {
       if (ctx.rng.below(3) === 0) {
         ctx.voice.stop();
         this.say(ctx, 0x15 + ctx.rng.below(2) * 2, "s13b", "pickVoice");
-        return;
+        return null;
       }
     }
-    if (seconds >= TIMEOUT_SECONDS) {
-      ctx.voice.stop();
-      this.say(ctx, 0x18 + ctx.rng.below(2));
-    }
+    return seconds >= TIMEOUT_SECONDS ? "timeout" : null;
   }
 
   private pointer(ctx: SceneContext): { x: number; y: number } {

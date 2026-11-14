@@ -129,7 +129,8 @@ a.button:hover {
 /* ------------------------------------------------------------------ accueil */
 
 .home {
-  max-width: 44rem;
+  /* 4 colonnes de 18rem max sur grand écran */
+  max-width: 80rem;
   margin: 0 auto;
   padding: 56px 16px;
 }

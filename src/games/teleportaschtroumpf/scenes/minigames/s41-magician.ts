@@ -1,6 +1,7 @@
 import type { Hy8 } from "../../data/hy8";
 import { parsePal, type Mcg } from "../../data/mcg";
 import type { Voc } from "../../data/voc";
+import { EffectWait } from "../../engine/effect-wait";
 import { Menu, paletteAreas, paletteHighlight } from "../../engine/menu";
 import { voiceName } from "../../engine/paths";
 import type { Scene, SceneContext } from "../../engine/scene";
@@ -134,7 +135,7 @@ export class MagicianScene implements Scene {
     highlight: paletteHighlight(QUESTION_PALETTE_ENTRY, HOVER_COLOR),
     areas: paletteAreas(QUESTION_PALETTE_ENTRY, 2),
     changeSound: "s07a001b.voc",
-    // Attente de fin de bruitage de l'original : `2143:0659..066d` (question).
+    // Attente de fin de bruitage de l'original : `2143:0a5e..0a72` (question, `2143:08a1`).
     waitEffectEnd: true,
   });
   private readonly confirmMenu = new Menu({
@@ -144,7 +145,7 @@ export class MagicianScene implements Scene {
     highlight: paletteHighlight(CONFIRM_PALETTE_ENTRY, HOVER_COLOR),
     areas: paletteAreas(CONFIRM_PALETTE_ENTRY, 2),
     changeSound: "s07a001b.voc",
-    // Attente de fin de bruitage de l'original : `2143:0a5e..0a72` (confirmation).
+    // Attente de fin de bruitage de l'original : `2143:0860..0874` (confirmation, `2143:070c`).
     waitEffectEnd: true,
   });
   private branchKind: MagicianBranch = "closed";
@@ -176,6 +177,8 @@ export class MagicianScene implements Scene {
   private chosenZone: number | null = null;
   private answeredYes: boolean | null = null;
   private confirmed: boolean | null = null;
+  /** Attente de fin de bruitage de l'écran de choix (`2143:0659..066d`) ; la question et la confirmation l'ont dans leur `Menu`. */
+  private readonly choiceWait = new EffectWait<number>();
   private readonly hushing = new SoundHush();
   private done = false;
 
@@ -500,6 +503,7 @@ export class MagicianScene implements Scene {
     this.previousZone = -1;
     this.counts = Array.from({ length: INGREDIENT_COUNT }, () => 0);
     this.chosenZone = null;
+    this.choiceWait.reset();
     this.shown = "choice";
     this.phase = "choice";
   }
@@ -510,8 +514,18 @@ export class MagicianScene implements Scene {
     return Math.floor(elapsed) > this.game.state.durationSeconds;
   }
 
-  /** Une itération de `2143:0259..0678` : survol, bip d'entrée de zone, clic, temps de partie. */
+  /**
+   * Une itération de `2143:0259..0678` : lecture (survol, bip d'entrée de zone, clic, temps de partie), puis attente de la fin du
+   * bruitage (`while (348d:0b42(1, 0)) 1764:018a`, `2143:0659..066d`) avant le test de sortie : un choix n'est rendu qu'une fois le
+   * bip fini, et les mouvements du curseur pendant le bip sont perdus.
+   */
   private updateChoice(ctx: SceneContext): void {
+    const choice = this.choiceWait.step(ctx, () => this.readChoice(ctx));
+    if (choice !== null) this.choose(ctx, choice);
+  }
+
+  /** Lecture des entrées d'une itération du choix : renvoie le choix fait (ou `CHOICE_TIME_UP`), `null` sinon. */
+  private readChoice(ctx: SceneContext): number | null {
     this.pointer.update(ctx);
     this.position = this.pointer.position(ctx);
     this.zone = zoneAt(this.position.x, this.position.y);
@@ -527,7 +541,7 @@ export class MagicianScene implements Scene {
       else this.refuse(ctx, this.zone);
     }
     if (this.gameTimeUp(ctx)) choice = CHOICE_TIME_UP;
-    if (choice !== null) this.choose(ctx, choice);
+    return choice;
   }
 
   /** Ingrédient déjà possédé : une voix (la première fois `s41v010`/`011`, ensuite `012`/`013`). */

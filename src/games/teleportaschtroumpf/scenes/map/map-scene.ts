@@ -2,6 +2,7 @@ import type { Hy8 } from "../../data/hy8";
 import type { Mcg } from "../../data/mcg";
 import type { Voc } from "../../data/voc";
 import { TICKS_PER_SECOND } from "../../engine/clock";
+import { EffectWait } from "../../engine/effect-wait";
 import { SWIPE_MIN, type Input } from "../../engine/input";
 import { insideArea, type MenuArea } from "../../engine/menu";
 import { voiceName } from "../../engine/paths";
@@ -70,6 +71,10 @@ export class MapScene implements Scene {
   private drag: { y: number; scroll: number; moved: boolean } | null = null;
   /** Le dernier glissement a fait défiler la carte en direct : son geste au relâchement ne la refait pas défiler. */
   private dragged = false;
+  /** Attente de fin de bruitage de la fin de chaque itération (`1a3c:0bee`) : une sortie n'est rendue qu'une fois le bip fini. */
+  private readonly wait = new EffectWait<number>();
+  /** Sortie décidée par l'itération en cours (lieu `k`) ; `read` la rend, l'attente de fin de bruitage la retient au besoin. */
+  private leaving: number | null = null;
 
   constructor(
     private readonly request: MapRequest,
@@ -149,6 +154,8 @@ export class MapScene implements Scene {
     this.start = ctx.clock.ticks;
     this.drag = null;
     this.dragged = false;
+    this.leaving = null;
+    this.wait.reset();
   }
 
   private placeSelection(): void {
@@ -165,13 +172,24 @@ export class MapScene implements Scene {
       if (this.line!.update(ctx, this.skippable && skip)) this.phase = "browse";
       return;
     }
+    // Fin de l'itération : `while (348d:0b42(1, 0)) 1764:018a` (`1a3c:0bee`, avant le test de sortie `DS:63EC` / `63EE`) : tant
+    // que le bip du changement de lieu sonne, ni touche ni sortie (Espace, doigt, délai du puits) ne sont prises en compte.
+    const k = this.wait.step(ctx, () => this.read(ctx));
+    if (k !== null) this.finish(ctx, k);
+  }
+
+  /** Une itération de lecture des entrées (sans l'attente de fin de bruitage) : renvoie le lieu `k` de la sortie, `null` sinon. */
+  private read(ctx: SceneContext): number | null {
+    const { input } = ctx;
+    this.leaving = null;
     if (this.request.mode === "consult") this.scrollView(ctx);
     else this.moveMarker(ctx);
-    if (this.request.mode === "wish" && this.timers(ctx)) return;
-    if (this.touch(ctx)) return;
+    if (this.request.mode === "wish" && this.timers(ctx)) return this.leaving;
+    if (this.touch(ctx)) return this.leaving;
     // Le doigt qui se pose envoie aussi « valider » : ignoré, son geste décide (`touch`).
-    if (input.validateNotTouch) this.finish(ctx, this.k);
+    if (input.validateNotTouch) this.leaving = this.k;
     else if (this.request.mode === "free" && input.justPressed("cancel")) this.help(ctx);
+    return this.leaving;
   }
 
   /**
@@ -191,14 +209,14 @@ export class MapScene implements Scene {
     if (!gesture || gesture.kind === "swipe") return false;
     if (this.request.mode === "consult") {
       if (gesture.kind !== "tap" || !insideArea(BACK_BUTTON, gesture.x, gesture.y)) return false;
-      this.finish(ctx, K_BACK);
+      this.leaving = K_BACK;
       return true;
     }
     const k = this.locationAt(gesture.x, gesture.y);
     if (k === null) return false;
     if (gesture.kind === "tap") {
       this.mark(k);
-      this.finish(ctx, k);
+      this.leaving = k;
       return true;
     }
     if (this.request.mode !== "free") return false;
@@ -269,7 +287,7 @@ export class MapScene implements Scene {
       }
     }
     if (seconds >= TIMEOUT_SECONDS) {
-      this.finish(ctx, K_BACK);
+      this.leaving = K_BACK;
       return true;
     }
     return false;

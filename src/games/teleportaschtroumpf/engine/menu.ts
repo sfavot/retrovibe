@@ -1,6 +1,7 @@
 import type { Hy8 } from "../data/hy8";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../data/mcg";
 import type { Voc } from "../data/voc";
+import { EffectWait } from "./effect-wait";
 import type { SceneContext } from "./scene";
 import { boundsOf, placeSprite } from "./sprites";
 
@@ -173,12 +174,8 @@ export class Menu {
   /** Dernière position de survol traitée : la souris immobile ne reprend pas la sélection changée au clavier. */
   private hoverX = -1;
   private hoverY = -1;
-  /**
-   * Attente de fin de bruitage (`while (348d:0b42(1, 0)) 1764:018a`, fin de chaque itération de la boucle d'origine) : tant
-   * qu'elle dure, les entrées ne sont pas lues et l'événement de l'itération (`held`) reste en suspens.
-   */
-  private settling = false;
-  private held: MenuEvent | null = null;
+  /** Attente de fin de bruitage de la fin de chaque itération (`engine/effect-wait.ts`), si `waitEffectEnd`. */
+  private readonly wait = new EffectWait<MenuEvent>();
 
   constructor(private readonly options: MenuOptions) {
     this.current = options.initial ?? 0;
@@ -208,8 +205,7 @@ export class Menu {
     this.options.highlight?.select?.(ctx, this.current);
     this.areas = this.options.areas?.(ctx) ?? [];
     this.hoverX = this.hoverY = -1;
-    this.settling = false;
-    this.held = null;
+    this.wait.reset();
   }
 
   /** Entrée dont la zone contient (x, y), ou `null` (aucune zone, ou menu sans zones). */
@@ -235,18 +231,7 @@ export class Menu {
    */
   update(ctx: SceneContext): MenuEvent | null {
     if (!this.options.waitEffectEnd) return this.read(ctx);
-    if (this.settling) {
-      if (ctx.voice.effectPlaying) return null;
-      this.settling = false;
-      const held = this.held;
-      this.held = null;
-      if (held) return held;
-    }
-    const event = this.read(ctx);
-    if (!ctx.voice.effectPlaying) return event;
-    this.settling = true;
-    this.held = event;
-    return null;
+    return this.wait.step(ctx, () => this.read(ctx));
   }
 
   /** Une itération de lecture des entrées (sans l'attente de fin de bruitage). */

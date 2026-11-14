@@ -197,6 +197,7 @@ describe.skipIf(!hasOriginalFiles)("carte S02 : sélection (mode libre et puits)
     await t.press("Enter");
     expect(plays()).toBe(start);
     await t.press("ArrowUp"); // lieu 2 = scène 23
+    await advance(t.engine, t.host, 400); // le bip (0,26 s) doit finir : les appuis pendant sa durée sont perdus (`1a3c:0bee`)
     const afterBeep = plays();
     await t.press("Enter");
     expect(plays()).toBe(afterBeep + 1);
@@ -265,6 +266,7 @@ describe.skipIf(!hasOriginalFiles)("mode libre « Schtroumpf »", () => {
     const free = createFreeModeScene(() => undefined) as FreeModeScene;
     const t = await launch(free, { audio: true });
     await t.press("ArrowUp"); // lieu 2 = scène 23
+    await advance(t.engine, t.host, 400); // fin du bip (`1a3c:0bee`)
     await t.press("Space");
     expect(launched.list).toEqual([]);
     await t.idle();

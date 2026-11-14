@@ -12,6 +12,7 @@
 
 import { CompactField as F } from "../data/compact-fields";
 import type { Compacts } from "./compacts";
+import type { BassInput } from "./host";
 import { Cpt, LOGIC_NAMES, OPCODE_NAMES, OPCODE_PARAMS, Var } from "./ids";
 import type { LogicTrace } from "./logic";
 import { MCODES } from "./mcodes/index";
@@ -20,6 +21,11 @@ import type { ScriptVars } from "./vars";
 /** Ce que le moteur appelle en plus des points de `LogicTrace`. */
 export interface EngineTrace extends LogicTrace {
   cycle?(n: number, vars: ScriptVars, compacts: Compacts): void;
+  /**
+   * Entrée appliquée au début du tour `n` (avant `mouseEngine`, comme les événements que `SkyEngine::delay` transmet à la fin du tour
+   * précédent) : permet de rejouer la même partie dans le banc (`SKY_INPUT`). Les entrées jetées pendant un effet bloquant n'y passent pas.
+   */
+  input?(n: number, event: BassInput): void;
 }
 
 /** Enregistre les lignes de trace (ou les passe à `sink`). */

@@ -365,6 +365,7 @@ export class BassEngine {
   private applyInput(): void {
     const locked = (): boolean => (this.system.systemFlags & SF.MOUSE_LOCKED) !== 0;
     for (const event of this.input) {
+      this.trace?.input?.(this.cycleCount + 1, event);
       switch (event.type) {
         case "move":
           if (!locked()) this.mouse.moved(event.x, event.y);

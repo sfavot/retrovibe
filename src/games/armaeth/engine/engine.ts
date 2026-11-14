@@ -149,6 +149,8 @@ const INPUT_BOX: Rect = { x: 38, y: 168, width: 244, height: 11 };
 const INPUT_COLORS = { frame: 0xee, inner: 0xdd, background: 0xfa };
 /** Pas du clignotement du curseur de saisie, en images : 35 images = 0,5 s à 70 Hz (le pas d'origine est une boucle d'attente de 3000 tours, non mesurée). */
 const CARET_BLINK = 35;
+/** `_` (`DGROUP:4e0a`). */
+const CARET_CODE = 0x5f;
 /** Indicateur `+0x43` du héros : le trajet bloqué a déjà été recalculé une fois (`2363:01ea`, remis à 0 par un clic ou `2363:0154`). */
 const HERO_RETRY = 0x43;
 /** `Ser` (+0x7A) de la cible poursuivie : posé par la marche « trop loin » (`2363:0154` -> `22ef:0000`, `AX != 0`). */
@@ -1974,11 +1976,15 @@ export class ArmaethEngine implements TokenHostEngine {
     c.drawFrameRect({ x: INPUT_BOX.x + 1, y: INPUT_BOX.y + 1, width: INPUT_BOX.width - 2, height: INPUT_BOX.height - 2 }, INPUT_COLORS.inner, null);
     const blink = caret && Math.floor(this.caret++ / CARET_BLINK) % 2 === 0;
     // Texte jaune (238, comme le cadre extérieur) avec une ombre noire (221, comme le cadre intérieur).
-    // Pas d'interlettre, comme l'original (`vga_draw_text`) : la boîte est dimensionnée pour 40 cellules de 5 px.
-    drawText(c.screen, this.data.font, INPUT_BOX.x + 3, INPUT_BOX.y + 2, encodeCp437(text + (blink ? "_" : "")), {
-      color: INPUT_COLORS.frame,
-      shadow: INPUT_COLORS.inner,
-    });
+    // Interlettre de 1 px, comme l'original (capture DOSBox) : la boîte fait 40 × (cellule 5 + 1) + 4 = 244 px.
+    const style = { spacing: 1, color: INPUT_COLORS.frame, shadow: INPUT_COLORS.inner };
+    const font = this.data.font;
+    const end = drawText(c.screen, font, INPUT_BOX.x + 3, INPUT_BOX.y + 2, encodeCp437(text), style);
+    if (!blink) return;
+    // Sur une ligne pleine, le curseur n'a plus de place dans le cadre : il n'est pas dessiné (écart du portage).
+    const caretX = text.length === 0 ? end : end + style.spacing;
+    const inner = INPUT_BOX.x + INPUT_BOX.width - 2;
+    if (caretX + font.glyph(CARET_CODE).width <= inner) drawText(c.screen, font, caretX, INPUT_BOX.y + 2, "_", style);
   }
 
   private restoreInputBox(): void {

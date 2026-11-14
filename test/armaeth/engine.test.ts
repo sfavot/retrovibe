@@ -266,6 +266,23 @@ describe.skipIf(!hasOriginalFiles)("moteur : démarrage et écran de jeu (fichie
     expect(e.modal).toBe(false);
   });
 
+  it("saisie : interlettre de 1 px, comme l'original (capture DOSBox)", () => {
+    const e = s.engine;
+    s.host.type("grimper");
+    s.run(2);
+    snapshot(s.host, "saisie-grimper", 4);
+    expect(e.inputLine.text).toBe("grimper");
+    // Encre jaune (238) la plus à droite dans l'intérieur de la boîte : fin du curseur `_`, texte à partir de x = 41.
+    const { pixels } = s.host.lastFrame!;
+    let right = 0;
+    for (let y = 170; y <= 176; y++) for (let x = 40; x <= 279; x++) if (pixels[y * 320 + x] === 0xee) right = Math.max(right, x);
+    const font = parseGph(readOriginal("A1FGPH.SYS"));
+    expect(right).toBe(41 + font.measure(new TextEncoder().encode("grimper_"), 1) - 1);
+    s.host.type("\x1b");
+    s.run(3);
+    expect(e.inputLine.open).toBe(false);
+  });
+
   it("saisie : à 40 caractères, ni le texte ni le curseur ne sortent de la boîte (1e22:0008)", () => {
     const e = s.engine;
     s.host.type("p");
@@ -278,6 +295,7 @@ describe.skipIf(!hasOriginalFiles)("moteur : démarrage et écran de jeu (fichie
     s.host.type(widest.repeat(39));
     s.run(2);
     expect(e.inputLine.text).toHaveLength(40);
+    snapshot(s.host, "saisie-pleine", 4);
     const full = s.host.lastFrame!.pixels;
     // Boîte (38,168)-(281,178), intérieur du double cadre (40,170)-(279,176) : tout le reste de la bande doit rester intact.
     const changed: string[] = [];

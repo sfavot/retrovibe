@@ -5,7 +5,7 @@
 - Validé : bloquant 10 (continuité 2 -> 3) corrigé par `Game.relaunchForPart`, vérifié en jeu réel ; transition 3 -> 4 et chargements croisés OK.
 - Constats restants : 3 mineurs (11, 12, 13), 3 cosmétiques/UX (14, 15, 16), tous conformes au script ou corrigés (voir passe 5).
 - Vérifié par le code en passe 6 : jokers (compteur, disponibilité par scène, sauvegarde) et fin de partie / « Rejouer » (voir « Passe 6 »).
-- À vérifier : écoute audio réelle, minuterie exacte du pont, tenailles sur le râtelier (taquet), performances sur machine lente, test sur vrai téléphone.
+- À vérifier : écoute audio réelle, minuterie exacte du pont, tenailles sur le râtelier (taquet), performances sur machine lente, test sur vrai téléphone, jokers des scènes `EMAM1102`, `EMAM1105` et `EMAM1108` (partie 3 : `MENU.TOT@20799` ne lit que les deux derniers chiffres, donc ces scènes pourraient accorder les jokers des scènes 02, 05 et 08 de la partie 2 ; le port suit le script, à confirmer en jeu).
 
 **Progression atteinte** : navire complet (cale, pont, porte du marin, cinématique), arrivée au manoir (chapitre 2) : portail (batterie, pipette/acide, pomme, cheval, mot, cadenas), jardin, entrée du manoir (bûche, portrait), caveau (portrait posé, plaque 1812-1840 résolue avec 28, monte-charge arrivé, bouton « hors d'usage » comme prévu), façade nord du phare (vinaigre, fléchette sur le tonneau, tonneau en main, soupirail découvert). Arrêt volontaire là à la passe 2 (environ un tiers du jeu, pas de blocage) ; la suite et la fin du jeu sont aux passes 3 à 5 plus bas.
 

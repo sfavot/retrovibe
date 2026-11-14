@@ -371,7 +371,7 @@ Retour **0 = accepté**, **7 = refusé** (certain : `179d:0004` pose `Err = 2` s
 
 ### 6.2 Animations de mort et de sort du héros (`2594:0004`)
 
-À l'**appel d'une animation** (`AX != 0`) : `Inv` est remis à 0 pour les ids 3, 4, 17, 18, 19 (après sauvegarde de l'ancienne valeur dans `+0x27` pour 19), 33, 34, 42 ; `219b:006c` (redessin statique), `2f9b:0375(0x4A)` ; `16f5:0132` avec `Gst 7`, `Mob 1`, **`Ego 6`**, `Ver 1`, `Hor = -1` pour l'id 6 (0 sinon), message en mode 2 ; `4b50 = 0`. À chaque tic (`AX = 0`) : `16f5:02a2` ; à la fin, `4b50 = 7` et aiguillage sur l'id terminé (table `2594:0276`, indexée `id - 2`) :
+À l'**appel d'une animation** (`AX != 0`) : `Inv` est remis à 0 pour les ids 3, 4, 17, 18, 19 (après sauvegarde de l'ancienne valeur dans `+0x27` pour 19), 33, 34, 42 ; `219b:006c` (redessin statique), `2f9b:0375(0x4A)` ; `16f5:0132` avec `Gst 7`, **`Ego 6`**, `Ver 1` ; `Mob 1` et `Hor 0` en général, mais **`Mob 2` et `Hor = -1` pour l'id 6** (arrachage des ronces : le héros se déplace vers la gauche, relu dans `2594:0014..001f`), message en mode 2 ; `4b50 = 0`. À chaque tic (`AX = 0`) : `16f5:02a2` ; à la fin, `4b50 = 7` et aiguillage sur l'id terminé (table `2594:0276`, indexée `id - 2`) :
 
 | id | pas / boucles | Déclenché par | Conséquence à la fin (certain) |
 |---:|---|---|---|

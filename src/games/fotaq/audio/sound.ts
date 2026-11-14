@@ -1,6 +1,5 @@
 import { SONGS, SFX_NAMES, TUNES } from "./tables";
-import type { SampleChannel } from "./channel";
-import { soundFileName } from "./voices";
+import type { SampleChannel } from "../../../audio/sample-channel";
 
 /**
  * Logique de son de *Flight of the Amazon Queen* : `Sound` et `PCSound` (`engines/queen/sound.cpp`, `sound.h`, ScummVM, GPL v3
@@ -16,6 +15,14 @@ import { soundFileName } from "./voices";
  * Écarts : les bascules « effets », « voix » et « musique » du journal (`toggleSfx`…) sont des propriétés ; la version Amiga, la
  * démo et les listes de la démo ne sont pas portées ; un numéro hors des tables est ignoré (ScummVM lit hors de ses tableaux).
  */
+
+/**
+ * Nom de fichier d'un son (`PCSound::playSound`, `engines/queen/sound.cpp`, lu) : les espaces du nom calculé par le moteur deviennent des
+ * `0` ; la casse est relevée (fichiers `voices/<NOM>.mp3` en majuscules, `files.json` insensible à la casse).
+ */
+export function soundFileName(base: string): string {
+  return base.replaceAll(" ", "0").toUpperCase();
+}
 
 /** La musique, vue de la logique de son (`QueenMusic`). */
 export interface MusicControl {

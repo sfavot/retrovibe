@@ -11,7 +11,7 @@ Vague A. Référence de comportement : `sound.cpp`, `music.cpp`, `midiadlib.cpp`
 | `audio/music.ts` | `QueenMusic` : file de 14 morceaux, listes (`_tune`), boucles, aléatoire, fin de piste, volume, séquenceur à 250 Hz | `MidiMusic` |
 | `audio/tables.ts` | `SONGS` (`_song`), `TUNES` (`_tune`), `SFX_NAMES` (`_sfxName`), `JUNGLE_LIST` ; données transcrites avec provenance | `musicdata.cpp` |
 | `audio/sound.ts` | `QueenSound` : `playSong`, `playSfx`, `playSpeech`, bascules son / voix / musique, `lastOverride` | `Sound`, `PCSound` |
-| `audio/voices.ts`, `audio/channel.ts` | `VoiceBank` (chargement, décodage, cache à limite de mémoire, `preload`), `SampleChannel` (une voie, un son à la fois) | `PCSound::playSound` |
+| `src/audio/voice-bank.ts`, `src/audio/sample-channel.ts` (communs, partagés avec BASS) | `VoiceBank` (chargement, décodage, cache à limite de mémoire, `preload`), `SampleChannel` (une voie, un son à la fois) ; FOTAQ normalise ses noms par `soundFileName` (`audio/sound.ts`) | `PCSound::playSound` |
 | `audio/audio.ts` | `FotaqAudio` : assemble le tout pour l'hôte ; `createSoundPrefs` (`retrovibe:fotaq:sound`) | — |
 | `audio/web-music.ts` | `createWebMusicOutput()` : `WebOpl` à 250 ticks par seconde (à part pour que les tests n'importent pas le worklet) | — |
 | `scripts/fotaq/render-music.mts` | rendu WAV hors ligne d'un morceau, par le même pilote et le même émulateur | — |

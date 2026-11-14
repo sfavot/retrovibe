@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SampleChannel } from "../../../src/games/fotaq/audio/channel";
+import type { SampleChannel } from "../../../src/audio/sample-channel";
 import { QueenSound, type MusicControl } from "../../../src/games/fotaq/audio/sound";
 
 class FakeMusic implements MusicControl {

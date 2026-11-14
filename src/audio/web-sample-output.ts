@@ -33,6 +33,13 @@ export interface PlayOptions {
   loop?: boolean;
   /** Nombre total de passes (1 par défaut) ; `Infinity` : en boucle. Ignoré si `loop` est vrai. */
   passes?: number;
+  /** Gain de cette voix, de 0 à 1 (1 par défaut : aucun nœud de gain ajouté), en plus du gain général. */
+  volume?: number;
+  /**
+   * Boucle sur la fin de l'échantillon : après une première lecture complète, rejoue en boucle `[loopStart, fin[` jusqu'à `stop()`
+   * (position en échantillons de `sample.data`). Prioritaire sur `loop` et `passes`. Hors de `[0, longueur[`, ignoré.
+   */
+  loopStart?: number;
 }
 
 /** Lecture d'un échantillon. */
@@ -62,6 +69,8 @@ class Voice implements SampleVoice {
   source: AudioBufferSourceNode | null = null;
   /** Gain du fondu, créé à l'arrêt progressif. */
   fade: GainNode | null = null;
+  /** Gain propre à la voix (`PlayOptions.volume`), s'il diffère de 1. */
+  gain: GainNode | null = null;
 
   constructor(
     private readonly output: WebSampleOutput,
@@ -199,7 +208,9 @@ export class WebSampleOutput {
   /** Joue un échantillon (en plus de ceux en cours : le remplacement d'une voix est l'affaire de l'appelant). */
   play(sample: Sample, options: PlayOptions = {}): SampleVoice {
     const duration = sample.data.length / Math.max(MIN_BUFFER_RATE, sample.rate);
-    const passes = options.loop ? Infinity : Math.max(1, options.passes ?? 1);
+    const tail = options.loopStart;
+    const hasTail = tail !== undefined && Number.isFinite(tail) && tail >= 0 && tail < sample.data.length;
+    const passes = hasTail || options.loop ? Infinity : Math.max(1, options.passes ?? 1);
     const loop = passes === Infinity;
     const voice = new Voice(this, duration, loop, this.clockNow() + duration * passes * 1000);
     if (sample.data.length === 0) {
@@ -213,9 +224,21 @@ export class WebSampleOutput {
       const source = ctx.createBufferSource();
       source.buffer = this.buffer(ctx, sample);
       source.loop = passes > 1;
-      source.connect(this.master);
+      if (hasTail) {
+        source.loopStart = tail / source.buffer.sampleRate;
+        source.loopEnd = source.buffer.duration;
+      }
+      const volume = options.volume === undefined ? 1 : Math.min(1, Math.max(0, options.volume));
+      if (volume !== 1) {
+        const gain = ctx.createGain();
+        gain.gain.value = volume;
+        gain.connect(this.master);
+        source.connect(gain);
+        voice.gain = gain;
+      } else source.connect(this.master);
       source.onended = () => {
         source.disconnect();
+        voice.gain?.disconnect();
         voice.fade?.disconnect();
         if (voice.source === source) voice.source = null;
       };
@@ -240,6 +263,7 @@ export class WebSampleOutput {
       // déjà arrêtée
     }
     source.disconnect();
+    voice.gain?.disconnect();
     voice.fade?.disconnect();
   }
 
@@ -255,8 +279,9 @@ export class WebSampleOutput {
     const end = ctx.currentTime + seconds;
     fade.gain.setValueAtTime(fade.gain.value, ctx.currentTime);
     fade.gain.linearRampToValueAtTime(0, end);
-    source.disconnect();
-    source.connect(fade);
+    const tail = voice.gain ?? source;
+    tail.disconnect();
+    tail.connect(fade);
     fade.connect(this.master);
     source.stop(end);
     voice.fade = fade;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { SampleChannel, type SamplePlayer } from "../../../src/games/fotaq/audio/channel";
-import { LOAD_TIMEOUT_MS, VoiceBank, soundFileName, type SoundFiles } from "../../../src/games/fotaq/audio/voices";
-import type { Sample, SampleVoice } from "../../../src/audio/web-sample-output";
+import { SampleChannel, type SamplePlayer } from "../../src/audio/sample-channel";
+import { LOAD_TIMEOUT_MS, VoiceBank, type SoundFiles } from "../../src/audio/voice-bank";
+import type { PlayOptions, Sample, SampleVoice } from "../../src/audio/web-sample-output";
 
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 12; i++) await Promise.resolve();
@@ -49,13 +49,6 @@ function setup(names: Record<string, number>, options: { failDecode?: Set<string
   return { bank, loads, decodes, player, started, voices, advance: (ms: number) => (clock += ms) };
 }
 
-describe("soundFileName", () => {
-  it("remplace les espaces par des zéros et met en majuscules (PCSound::playSound)", () => {
-    expect(soundFileName("02 1P2 1")).toBe("0201P201");
-    expect(soundFileName("116Bssss")).toBe("116BSSSS");
-  });
-});
-
 describe("VoiceBank", () => {
   it("décode une fois, garde en cache, peek ne lance rien", async () => {
     const { bank, loads } = setup({ A: 100 });
@@ -82,7 +75,7 @@ describe("VoiceBank", () => {
 
   it("preload charge sans doublon, ignore les absents et compte les prêts", async () => {
     const { bank, loads } = setup({ A: 5, B: 6, C: 7 });
-    expect(await bank.preload(["a", "B", "B", "ABSENT", "C"])).toBe(3);
+    expect(await bank.preload(["A", "B", "B", "ABSENT", "C"])).toBe(3);
     expect(loads.sort()).toEqual(["A", "B", "C"]);
     expect(bank.peek("C")).toBeDefined();
   });
@@ -160,5 +153,23 @@ describe("SampleChannel", () => {
     channel.stop();
     await flush();
     expect(channel.active).toBe(false);
+  });
+});
+
+describe("clés de fichier numériques", () => {
+  it("la banque et la voie acceptent des numéros (0 compris) et transmettent les options de lecture", async () => {
+    const loads: number[] = [];
+    const files: SoundFiles<number> = { has: (k) => k < 3, load: async (k) => (loads.push(k), Uint8Array.of(4, 0, 0)) };
+    const bank = new VoiceBank<number>(files, { decode: async () => ({ data: new Float32Array(4), rate: 1000 }) });
+    expect(await bank.preload([0, 1, 1, 7])).toBe(2);
+    expect(loads.sort()).toEqual([0, 1]);
+    const played: (PlayOptions | undefined)[] = [];
+    const channel = new SampleChannel<number>(bank, {
+      clockNow: () => 0,
+      play: (_sample, options) => (played.push(options), { playing: true, duration: 1, stop() {} }),
+    });
+    expect(channel.play(0, { volume: 0.5 })).toBe(true);
+    expect(channel.play(9)).toBe(false);
+    expect(played).toEqual([{ volume: 0.5 }]);
   });
 });

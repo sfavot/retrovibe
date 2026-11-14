@@ -1,12 +1,12 @@
 import type { OplSink } from "../../../audio/opl-stream";
+import { SampleChannel } from "../../../audio/sample-channel";
+import { VoiceBank, type SoundFiles } from "../../../audio/voice-bank";
 import { WebSampleOutput } from "../../../audio/web-sample-output";
 import type { HostStorage } from "../../../engine/storage";
 import { SoundPrefs, type Muteable } from "../../../ui/sound-prefs";
 import { readAdLibBank } from "../data/music";
-import { SampleChannel } from "./channel";
 import { QueenMusic } from "./music";
-import { QueenSound } from "./sound";
-import { VoiceBank, type SoundFiles } from "./voices";
+import { QueenSound, soundFileName } from "./sound";
 
 /**
  * Son de *Flight of the Amazon Queen* côté hôte : musique AdLib (`music.ts`, pilote `adlib-driver.ts`, sortie OPL2 en worklet),
@@ -113,12 +113,12 @@ export class FotaqAudio implements Muteable {
 
   /** Une voix de ce nom existe (liste de fichiers, synchrone). */
   hasSpeech(base: string): boolean {
-    return this.voices.has(base.replaceAll(" ", "0").toUpperCase());
+    return this.voices.has(soundFileName(base));
   }
 
   /** Précharge des voix ou des effets (noms de fichiers) ; rend le nombre de sons prêts. */
   preload(names: Iterable<string>): Promise<number> {
-    return this.voices.preload(names);
+    return this.voices.preload([...names].map(soundFileName));
   }
 
   /** La musique tourne (un morceau est en cours). */

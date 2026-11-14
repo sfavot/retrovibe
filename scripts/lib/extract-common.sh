@@ -38,3 +38,21 @@ ec_publier() {
   rm -rf "$2"
   mv "$1" "$2"
 }
+
+# ec_encoder_voix <entrée> <ext> <sortie> [débit] [option d'entrée ffmpeg]... : encode chaque <entrée>/*.<ext> en
+# <sortie>/<nom sans extension>.mp3, avec les options des voix du site (FOTAQ, BASS) : MP3 mono 22 050 Hz CBR
+# (24k par défaut), métadonnées retirées, -fflags +bitexact, sans filtre (durée conservée, ni padding ni coupe).
+# Les options d'entrée sont celles de ffmpeg avant -i, pour un PCM brut par exemple : -f u8 -ar 11025 -ac 1.
+# ffmpeg ne lit que des fichiers locaux (-protocol_whitelist file). Fournit : ec_nb_voix (nombre de fichiers encodés).
+ec_encoder_voix() {
+  local entree="$1" ext="$2" sortie="$3" debit="${4:-24k}" f nom
+  shift $(($# < 4 ? $# : 4))
+  mkdir -p "$sortie"
+  ec_nb_voix=0
+  for f in "$entree"/*."$ext"; do
+    nom="$(basename "$f" ".$ext")"
+    ffmpeg -hide_banner -loglevel error -nostdin -y -protocol_whitelist file "$@" -i "$f" -vn -map_metadata -1 \
+      -c:a libmp3lame -b:a "$debit" -ar 22050 -ac 1 -write_xing 1 -fflags +bitexact "$sortie/$nom.mp3"
+    ec_nb_voix=$((ec_nb_voix + 1))
+  done
+}

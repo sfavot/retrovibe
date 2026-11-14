@@ -1,46 +1,46 @@
-import type { SampleVoice, Sample } from "../../../audio/web-sample-output";
-import { LOAD_TIMEOUT_MS, type VoiceBank } from "./voices";
+import { LOAD_TIMEOUT_MS, type SoundKey, type VoiceBank } from "./voice-bank";
+import type { PlayOptions, Sample, SampleVoice } from "./web-sample-output";
 
 /** Ce que la voie demande à la sortie audio : jouer un échantillon, et l'horloge du jeu. */
 export interface SamplePlayer {
-  play(sample: Sample): SampleVoice;
+  play(sample: Sample, options?: PlayOptions): SampleVoice;
   clockNow(): number;
 }
 
 /**
  * Une voie sonore (la voix, ou l'effet) : un seul son à la fois, le suivant remplace le précédent (`stopHandle` de ScummVM pour
- * un effet ; pour une voix, ScummVM attend la fin de la précédente, ici la nouvelle la remplace comme à Drascula : le moteur
- * attend la fin de ses répliques de lui-même).
+ * un effet ; pour une voix, ScummVM attend la fin de la précédente, ici la nouvelle la remplace : le moteur attend la fin de ses
+ * répliques de lui-même).
  *
  * Un son en cours de chargement est « actif » (jusqu'à `LOAD_TIMEOUT_MS` ou à son échec), puis pendant sa durée sur l'horloge du
- * jeu : le temps du jeu ne dépend ni du décodage ni du son réel (voir `voices.ts`).
+ * jeu : le temps du jeu ne dépend ni du décodage ni du son réel (voir `voice-bank.ts`).
  */
-export class SampleChannel {
+export class SampleChannel<K extends SoundKey = string> {
   private voice: SampleVoice | null = null;
   private serial = 0;
   /** Date (horloge du jeu) de la demande d'un son encore en chargement, sinon `null`. */
   private waitingSince: number | null = null;
 
   constructor(
-    private readonly bank: VoiceBank,
+    private readonly bank: VoiceBank<K>,
     private readonly output: SamplePlayer,
   ) {}
 
-  /** Lance le son `name` (nom de fichier) ; faux si le fichier n'existe pas. */
-  play(name: string): boolean {
+  /** Lance le son `key` ; faux si le fichier n'existe pas. */
+  play(key: K, options?: PlayOptions): boolean {
     this.stop();
-    if (!this.bank.has(name)) return false;
-    const cached = this.bank.peek(name);
+    if (!this.bank.has(key)) return false;
+    const cached = this.bank.peek(key);
     if (cached) {
-      this.voice = this.output.play(cached);
+      this.voice = this.output.play(cached, options);
       return true;
     }
     const mine = ++this.serial;
     this.waitingSince = this.output.clockNow();
-    void this.bank.sample(name).then((sample) => {
+    void this.bank.sample(key).then((sample) => {
       if (mine !== this.serial) return;
       this.waitingSince = null;
-      if (sample) this.voice = this.output.play(sample);
+      if (sample) this.voice = this.output.play(sample, options);
     });
     return true;
   }

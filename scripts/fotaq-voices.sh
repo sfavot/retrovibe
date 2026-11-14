@@ -29,13 +29,8 @@ queen="$(find "$tmp/zip" -iname 'queen.1c' -type f | head -1)"
 [ -n "$queen" ] || { echo "queen.1c absent de $archive" >&2; exit 1; }
 py voix "$queen" "$tmp/sb"
 
-nb=0
-for sb in "$tmp"/sb/*.SB; do
-  nom="$(basename "$sb" .SB)"
-  ffmpeg -hide_banner -loglevel error -nostdin -y -protocol_whitelist file -i "$sb" -vn -map_metadata -1 \
-    -c:a libmp3lame -b:a "$debit" -ar 22050 -ac 1 -write_xing 1 -fflags +bitexact "$tmp/mp3/$nom.mp3"
-  nb=$((nb + 1))
-done
+ec_encoder_voix "$tmp/sb" SB "$tmp/mp3" "$debit"
+nb="$ec_nb_voix"
 [ "$nb" -eq 6751 ] || { echo "6751 voix attendues, $nb converties" >&2; exit 1; }
 
 mkdir -p "$sortie"

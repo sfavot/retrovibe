@@ -235,3 +235,61 @@ describe("WebSampleOutput", () => {
     await expect(output.decode(new Uint8Array(3))).rejects.toThrow();
   });
 });
+
+describe("WebSampleOutput : volume par voix et boucle sur la fin (M3)", () => {
+  it("sans volume, aucun gain n'est ajouté (comportement inchangé) ; avec volume, un gain par voix", async () => {
+    const { ctx, output } = setup();
+    output.unlock();
+    await flush();
+    output.play(SECOND);
+    expect(ctx.gains).toHaveLength(1); // le gain général seul
+    output.play(SECOND, { volume: 0.25 });
+    expect(ctx.gains).toHaveLength(2);
+    expect(ctx.gains[1].gain.value).toBe(0.25);
+    output.play(SECOND, { volume: 7 }); // borné à 1 : pas de gain ajouté
+    expect(ctx.gains).toHaveLength(2);
+  });
+
+  it("un volume de 1 n'ajoute pas de gain", async () => {
+    const { ctx, output } = setup();
+    output.unlock();
+    await flush();
+    output.play(SECOND, { volume: 1 });
+    expect(ctx.gains).toHaveLength(1);
+  });
+
+  it("loopStart : lecture complète puis boucle de [loopStart, fin[, jusqu'à stop()", async () => {
+    const { clock, ctx, output } = setup();
+    output.unlock();
+    await flush();
+    const voice = output.play(SECOND, { loopStart: 6000 });
+    const source = ctx.sources[0] as unknown as { loop: boolean; loopStart: number; loopEnd: number; startArgs: number[] };
+    expect(source.loop).toBe(true);
+    expect(source.loopStart).toBe(0.75);
+    expect(source.loopEnd).toBe(1);
+    expect(source.startArgs).toEqual([]);
+    clock.advance(60_000);
+    expect(voice.playing).toBe(true);
+    voice.stop();
+    expect(voice.playing).toBe(false);
+  });
+
+  it("loopStart hors de l'échantillon est ignoré (lecture simple)", async () => {
+    const { clock, ctx, output } = setup();
+    output.unlock();
+    await flush();
+    const voice = output.play(SECOND, { loopStart: 8000 });
+    expect((ctx.sources[0] as unknown as { loop: boolean }).loop).toBe(false);
+    clock.advance(1000);
+    expect(voice.playing).toBe(false);
+  });
+
+  it("l'arrêt progressif d'une voix à gain passe par son gain", async () => {
+    const { ctx, output } = setup();
+    output.unlock();
+    await flush();
+    const voice = output.play(SECOND, { volume: 0.5 });
+    voice.stop(0.5);
+    expect(ctx.gains[2].ramps).toEqual([{ value: 0, at: 0.5 }]);
+  });
+});

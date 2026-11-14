@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FotaqAudio, createSoundPrefs, type MusicOutput } from "../../../src/games/fotaq/audio/audio";
-import type { SoundFiles } from "../../../src/games/fotaq/audio/voices";
+import type { SoundFiles } from "../../../src/audio/voice-bank";
 import { FakeAudioContext } from "../../support/fake-audio-context";
 import { ManualClock } from "../../support/fake-host";
 import { hasOriginalFiles, readOriginal } from "../helpers";

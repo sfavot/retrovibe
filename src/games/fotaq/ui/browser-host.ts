@@ -1,7 +1,7 @@
 import type { HostStorage } from "../../../engine/storage";
 import type { Fetcher, FileStore } from "../../../ui/file-store";
 import type { FotaqAudio } from "../audio/audio";
-import type { SoundFiles } from "../audio/voices";
+import type { SoundFiles } from "../../../audio/voice-bank";
 import { type GameFiles, voiceFile } from "../data/files";
 import type { FotaqHost, FotaqInput } from "../engine/host";
 import { InputQueue } from "./input";

@@ -1,0 +1,36 @@
+# BASS : panneau de controle (F5) apres Echap
+move 160 100
+wait 1500
+key ESC
+wait 3000
+key F5
+wait 1500
+shot panel-a
+move 90 145
+wait 600
+shot panel-exit
+move 125 115
+wait 600
+shot panel-fx
+move 125 135
+wait 600
+shot panel-text
+click 125 135
+wait 800
+shot panel-text1
+click 125 135
+wait 800
+shot panel-text2
+click 125 115
+wait 800
+shot panel-fxoff
+click 125 95
+wait 1000
+shot panel-restart
+move 95 95
+wait 600
+shot panel-yes
+click 175 95
+wait 800
+shot panel-no
+quit

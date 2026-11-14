@@ -1,0 +1,142 @@
+/**
+ * Table des 115 mcodes, dans l'ordre de ScummVM (`Logic::setupMcodeTable`, engines/sky/logic.cpp ; noms de `mcodes[]`, debug.cpp ;
+ * GPL v3 ou ultérieure). Un script appelle le mcode `n` par `call_mcode` (`n * 4` dans le code).
+ *
+ * Le détail de l'état de chaque mcode (`done`, `service`, `text`, `stub`) est dans `docs/bass/engine.md` § 13.
+ */
+
+import * as C from "./compacts";
+import * as G from "./game";
+import * as M from "./mouse";
+import * as S from "./screen";
+import * as T from "./text";
+import type { McodeEntry, McodeFn, McodeStatus } from "./types";
+
+export type { McodeEntry, McodeFn, McodeStatus } from "./types";
+
+const entry = (name: string, fn: McodeFn, status: McodeStatus): McodeEntry => ({ name, fn, status });
+
+export const MCODES: readonly McodeEntry[] = [
+  entry("fn_cache_chip", S.fnCacheChip, "service"),
+  entry("fn_cache_fast", S.fnCacheFast, "done"),
+  entry("fn_draw_screen", S.fnDrawScreen, "service"),
+  entry("fn_ar", C.fnAr, "done"),
+  entry("fn_ar_animate", C.fnArAnimate, "done"),
+  entry("fn_idle", C.fnIdle, "done"),
+  entry("fn_interact", C.fnInteract, "done"),
+  entry("fn_start_sub", C.fnStartSub, "done"),
+  entry("fn_they_start_sub", C.fnTheyStartSub, "done"),
+  entry("fn_assign_base", C.fnAssignBase, "done"),
+  entry("fn_disk_mouse", M.fnDiskMouse, "done"),
+  entry("fn_normal_mouse", M.fnNormalMouse, "done"),
+  entry("fn_blank_mouse", M.fnBlankMouse, "done"),
+  entry("fn_cross_mouse", M.fnCrossMouse, "done"),
+  entry("fn_cursor_right", M.fnCursorRight, "done"),
+  entry("fn_cursor_left", M.fnCursorLeft, "done"),
+  entry("fn_cursor_down", M.fnCursorDown, "done"),
+  entry("fn_open_hand", M.fnOpenHand, "done"),
+  entry("fn_close_hand", M.fnCloseHand, "done"),
+  entry("fn_get_to", C.fnGetTo, "done"),
+  entry("fn_set_to_stand", C.fnSetToStand, "done"),
+  entry("fn_turn_to", C.fnTurnTo, "done"),
+  entry("fn_arrived", C.fnArrived, "done"),
+  entry("fn_leaving", C.fnLeaving, "done"),
+  entry("fn_set_alternate", C.fnSetAlternate, "done"),
+  entry("fn_alt_set_alternate", C.fnAltSetAlternate, "done"),
+  entry("fn_kill_id", C.fnKillId, "done"),
+  entry("fn_no_human", M.fnNoHuman, "done"),
+  entry("fn_add_human", M.fnAddHuman, "done"),
+  entry("fn_add_buttons", M.fnAddButtons, "done"),
+  entry("fn_no_buttons", M.fnNoButtons, "done"),
+  entry("fn_set_stop", M.fnSetStop, "done"),
+  entry("fn_clear_stop", M.fnClearStop, "done"),
+  entry("fn_pointer_text", T.fnPointerText, "done"),
+  entry("fn_quit", C.fnQuit, "done"),
+  entry("fn_speak_me", T.fnSpeakMe, "done"),
+  entry("fn_speak_me_dir", T.fnSpeakMeDir, "done"),
+  entry("fn_speak_wait", T.fnSpeakWait, "done"),
+  entry("fn_speak_wait_dir", T.fnSpeakWaitDir, "done"),
+  entry("fn_chooser", T.fnChooser, "done"),
+  entry("fn_highlight", T.fnHighlight, "done"),
+  entry("fn_text_kill", T.fnTextKill, "done"),
+  entry("fn_stop_mode", C.fnStopMode, "done"),
+  entry("fn_we_wait", C.fnWeWait, "done"),
+  entry("fn_send_sync", C.fnSendSync, "done"),
+  entry("fn_send_fast_sync", C.fnSendFastSync, "done"),
+  entry("fn_send_request", C.fnSendRequest, "done"),
+  entry("fn_clear_request", C.fnClearRequest, "done"),
+  entry("fn_check_request", C.fnCheckRequest, "done"),
+  entry("fn_start_menu", M.fnStartMenu, "done"),
+  entry("fn_unhighlight", M.fnUnhighlight, "done"),
+  entry("fn_face_id", C.fnFaceId, "done"),
+  entry("fn_foreground", S.fnForeground, "done"),
+  entry("fn_background", S.fnBackground, "done"),
+  entry("fn_new_background", S.fnNewBackground, "done"),
+  entry("fn_sort", S.fnSort, "done"),
+  entry("fn_no_sprite_engine", S.fnNoSpriteEngine, "done"),
+  entry("fn_no_sprites_a6", S.fnNoSpritesA6, "done"),
+  entry("fn_reset_id", C.fnResetId, "done"),
+  entry("fn_toggle_grid", C.fnToggleGrid, "done"),
+  entry("fn_pause", C.fnPause, "done"),
+  entry("fn_run_anim_mod", C.fnRunAnimMod, "done"),
+  entry("fn_simple_mod", C.fnSimpleMod, "done"),
+  entry("fn_run_frames", C.fnRunFrames, "done"),
+  entry("fn_await_sync", C.fnAwaitSync, "done"),
+  entry("fn_inc_mega_set", C.fnIncMegaSet, "done"),
+  entry("fn_dec_mega_set", C.fnDecMegaSet, "done"),
+  entry("fn_set_mega_set", C.fnSetMegaSet, "done"),
+  entry("fn_move_items", C.fnMoveItems, "done"),
+  entry("fn_new_list", T.fnNewList, "done"),
+  entry("fn_ask_this", T.fnAskThis, "done"),
+  entry("fn_random", C.fnRandom, "done"),
+  entry("fn_person_here", C.fnPersonHere, "done"),
+  entry("fn_toggle_mouse", M.fnToggleMouse, "done"),
+  entry("fn_mouse_on", M.fnMouseOn, "done"),
+  entry("fn_mouse_off", M.fnMouseOff, "done"),
+  entry("fn_fetch_x", C.fnFetchX, "done"),
+  entry("fn_fetch_y", C.fnFetchY, "done"),
+  entry("fn_test_list", C.fnTestList, "done"),
+  entry("fn_fetch_place", C.fnFetchPlace, "done"),
+  entry("fn_custom_joey", C.fnCustomJoey, "done"),
+  entry("fn_set_palette", S.fnSetPalette, "service"),
+  entry("fn_text_module", T.fnTextModule, "done"),
+  entry("fn_change_name", C.fnChangeName, "done"),
+  entry("fn_mini_load", S.fnMiniLoad, "done"),
+  entry("fn_flush_buffers", S.fnFlushBuffers, "done"),
+  entry("fn_flush_chip", S.fnFlushChip, "done"),
+  entry("fn_save_coods", M.fnSaveCoods, "done"),
+  entry("fn_plot_grid", C.fnPlotGrid, "done"),
+  entry("fn_remove_grid", C.fnRemoveGrid, "done"),
+  entry("fn_eyeball", C.fnEyeball, "done"),
+  entry("fn_cursor_up", M.fnCursorUp, "done"),
+  entry("fn_leave_section", G.fnLeaveSection, "done"),
+  entry("fn_enter_section", G.fnEnterSection, "service"),
+  entry("fn_restore_game", G.fnRestoreGame, "stub"),
+  entry("fn_restart_game", G.fnRestartGame, "done"),
+  entry("fn_new_swing_seq", S.fnNewSwingSeq, "service"),
+  entry("fn_wait_swing_end", S.fnWaitSwingEnd, "service"),
+  entry("fn_skip_intro_code", C.fnSkipIntroCode, "done"),
+  entry("fn_blank_screen", S.fnBlankScreen, "service"),
+  entry("fn_print_credit", T.fnPrintCredit, "done"),
+  entry("fn_look_at", T.fnLookAt, "done"),
+  entry("fn_linc_text_module", T.fnLincTextModule, "done"),
+  entry("fn_text_kill2", T.fnTextKill2, "done"),
+  entry("fn_set_font", T.fnSetFont, "done"),
+  entry("fn_start_fx", G.fnStartFx, "service"),
+  entry("fn_stop_fx", G.fnStopFx, "service"),
+  entry("fn_start_music", G.fnStartMusic, "service"),
+  entry("fn_stop_music", G.fnStopMusic, "service"),
+  entry("fn_fade_down", S.fnFadeDown, "service"),
+  entry("fn_fade_up", S.fnFadeUp, "service"),
+  entry("fn_quit_to_dos", G.fnQuitToDos, "done"),
+  entry("fn_pause_fx", G.fnPauseFx, "service"),
+  entry("fn_un_pause_fx", G.fnUnPauseFx, "service"),
+  entry("fn_printf", C.fnPrintf, "done"),
+];
+
+if (MCODES.length !== 115) throw new Error(`table des mcodes : ${MCODES.length} entrées au lieu de 115`);
+
+/** Rang d'un mcode d'après son nom (`fn_draw_screen`…), -1 si inconnu. */
+export function mcodeNumber(name: string): number {
+  return MCODES.findIndex((m) => m.name === name);
+}

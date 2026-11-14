@@ -17,6 +17,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | [Drascula: The Vampire Strikes Back (Alcachofa Soft, 1996)](https://sfavot.github.io/retrovibe/#/drascula) | jouable (en cours de validation) |
 | [Flight of the Amazon Queen (Interactive Binary Illusions, 1995)](https://sfavot.github.io/retrovibe/#/fotaq) | jouable (en cours de validation) |
 | [Lure of the Temptress (Revolution Software, 1992)](https://sfavot.github.io/retrovibe/#/lure) | jouable (en cours de validation) |
+| [Beneath a Steel Sky (Revolution Software, 1994)](https://sfavot.github.io/retrovibe/#/bass) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -280,6 +281,27 @@ Au démarrage, le navigateur charge les données d'un coup (2,7 Mo) ; la musique
 
 `docs/lure/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`), moteur (`engine.md`), rendu (`graphics.md`), son (`audio.md`) et dialogues (`talk.md`). Les tests sont dans `test/lure/`.
 
+## Beneath a Steel Sky
+
+*Beneath a Steel Sky* (Revolution Software, 1994), version CD 1.2 (v0.0372) préparée par ScummVM et diffusée librement par Revolution : aventure de science-fiction en pointer-et-cliquer où Robert Foster, enlevé dans l'Outback, s'échappe d'Union City avec Joey, la carte de robot qu'il a lui-même construite (deux boutons de souris, inventaire en haut de l'écran, choix de dialogue, panneau de contrôle d'origine, musique AdLib, effets échantillonnés, voix anglaises de 1 h 56 sous-titrées en français). Le moteur est réécrit en TypeScript d'après le moteur `sky` de ScummVM (GPL v3+), lu pour comprendre et non transposé ligne à ligne. Souris, clavier (touches de ScummVM : F5 panneau de contrôle, Échap, point pour passer une réplique, P pause ; F1 menu du site, F10 volume de la musique) et doigt (toucher = clic gauche, appui long = clic droit, toucher le haut de l'écran = inventaire), dix emplacements de sauvegarde. « Sauvegarder » et « Restituer » du panneau ouvrent les fenêtres communes du site ; texte seul, voix seule ou les deux, vitesse et volume se règlent dans le panneau et sont mémorisés.
+
+### Fichiers de données
+
+`scripts/bass-extract.sh` prépare `original/bass/` à partir de l'archive `archives/bass-cd-1.2.zip` (non versionnée) : `sky.dsk` et `sky.dnr` reconstruits sans les voix (13,3 Mo, mêmes fichiers et mêmes octets, index recalculé), `sky.cpt` tel quel, les 3 491 voix converties en MP3 (`voices/<id>.mp3`, 21 Mo, mono 22 050 Hz, 24 kb/s), `README-BASS.txt` (la licence de Revolution Software, à conserver intacte), puis l'inventaire `docs/bass/files.md`. `npx vite-node scripts/bass-cover.mts` génère `COVER.png` (le premier décor du jeu, composé par le moteur) et régénère `files.json`.
+Au démarrage, le navigateur charge `sky.dsk`, `sky.dnr` et `sky.cpt` d'un coup (13,7 Mo) ; chaque voix est lue à la demande au début de la réplique (MP3 décodé par le navigateur).
+
+### Architecture
+
+- `src/games/bass/data/` — lecteurs : décompression RNC, index et conteneur `sky.dsk`, compacts de `sky.cpt`, textes (Huffman), polices, sprites, grilles, séquences, musique et effets, tables générées depuis ScummVM.
+- `src/games/bass/engine/` — le moteur sans tête (`BassEngine`, un `tick()` de 20 ms qui lance un tour de jeu tous les `gameSpeed` ms ; séquences en générateurs), compacts et variables, les 16 logiques, l'interpréteur de scripts et les mcodes, la marche (`route/`), la souris, les textes, l'introduction du CD (`sequences/`), le panneau de contrôle d'origine (`control/`) et les sauvegardes (`save.ts`).
+- `src/games/bass/render/` — composition de l'image 320×200 indexée (décor, sprites triés, texte, palettes, fondus, défilement), curseur dessiné par-dessus.
+- `src/games/bass/audio/` — pilote AdLib propre (`adlib-music.ts`, sur l'émulateur OPL2 commun `src/audio/`), effets échantillonnés, voix MP3 (banque de voix commune avec Flight of the Amazon Queen).
+- `src/games/bass/ui/` — l'hôte du navigateur (`browser-host.ts`, `input.ts`, `loop.ts`, `preload.ts`), la page du jeu (`app.ts`), les touches, les réglages mémorisés, les sauvegardes, l'écran titre et la page d'aide ; les fenêtres de sauvegarde, de volume et de menu, l'écran titre et l'aide sont les composants communs de `src/ui/` (`point-click-*.ts`) ; `ui/dev.html` lance le jeu seul (`window.__bass`).
+
+### Documentation
+
+`docs/bass/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`), moteur (`engine.md`), rendu (`graphics.md`) et son (`audio.md`). Les tests sont dans `test/bass/`.
+
 ## Code commun aux jeux
 
 - `src/data/` — lecture binaire (`reader.ts`), page de code 437, Mac OS Roman (`mac-roman.ts`), archives et ressources du moteur Mohawk de Broderbund partagées par Mathémagique et Zoombinis (`mohawk/`), liste des fichiers d'un jeu (`game-files.ts`), fichiers RIFF WAVE (`riff-wave.ts`), vidéos Smacker (`smacker.ts`).
@@ -309,4 +331,4 @@ Référence : [WebFun](https://codeberg.org/cyco/WebFun) (MIT), réimplémentati
 
 Le code est sous [GPL v3 ou ultérieure](LICENSE) : les moteurs de Lost in Time et de Drascula sont portés de [ScummVM](https://www.scummvm.org/) (GPL v3+),
 y compris l'émulateur OPL (MAME, `src/audio/opl2.ts`) utilisé pour la musique AdLib de Lost in Time et d'Armaeth. Les fichiers des jeux de `original/` ne sont pas couverts
-par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives). Les données de Flight of the Amazon Queen sont © John Passfield et Steven Stamatiadis, redistribuées selon la licence de `original/fotaq/README-FOTAQ.txt` (à conserver ; ce portage en est une version modifiée : données extraites de `queen.1c`, voix converties en MP3). Les données de Lure of the Temptress sont © Revolution Software Ltd, redistribuées selon la licence de `original/lure/LICENSE-LURE.txt` (à conserver ; ce portage en est une version modifiée : moteur réécrit, données lues telles quelles) ; `original/lure/LURE-FR.DAT` est le bloc français du fichier `lure.dat` distribué par ScummVM (généré depuis `LURE.EXE` par son outil `create_lure`) : des données du jeu, sous la licence de Revolution Software.
+par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives). Les données de Flight of the Amazon Queen sont © John Passfield et Steven Stamatiadis, redistribuées selon la licence de `original/fotaq/README-FOTAQ.txt` (à conserver ; ce portage en est une version modifiée : données extraites de `queen.1c`, voix converties en MP3). Les données de Lure of the Temptress sont © Revolution Software Ltd, redistribuées selon la licence de `original/lure/LICENSE-LURE.txt` (à conserver ; ce portage en est une version modifiée : moteur réécrit, données lues telles quelles) ; `original/lure/LURE-FR.DAT` est le bloc français du fichier `lure.dat` distribué par ScummVM (généré depuis `LURE.EXE` par son outil `create_lure`) : des données du jeu, sous la licence de Revolution Software. Les données de Beneath a Steel Sky sont © Revolution Software Ltd, redistribuées selon la licence de `original/bass/README-BASS.txt` (à conserver ; ce portage en est une version modifiée : voix converties en MP3, `sky.dsk` et `sky.dnr` reconstruits sans les voix, moteur réécrit d'après celui de ScummVM).

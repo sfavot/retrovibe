@@ -1,0 +1,1341 @@
+# Trace du banc ScummVM (moteur sky, CD v0.0372, fr, --random-seed=1), lignes CY et MC de patch/sky-trace.patch.
+# Scénario b-start.txt : move 160 100, Échap, puis move 200 150 et clic gauche en 200,150 (traité au début du tour 120) : Foster marche.
+CY 1 scr=0 fo=1,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 1 id=3 fn_clear_stop 0 0 0
+MC 1 id=3 fn_skip_intro_code 0 0 0
+MC 1 id=3 fn_add_human 0 0 0
+MC 1 id=3 fn_idle 0 0 0
+MC 1 id=3 fn_quit 0 0 0
+MC 1 id=4111 fn_quit 0 0 0
+MC 1 id=4110 fn_quit 0 0 0
+MC 1 id=4102 fn_run_anim_mod 4216 30 0
+MC 1 id=4303 fn_run_anim_mod 4304 0 0
+MC 1 id=4305 fn_run_anim_mod 4306 0 0
+MC 1 id=4307 fn_run_anim_mod 4308 0 0
+MC 1 id=4309 fn_run_anim_mod 4310 0 0
+MC 1 id=4311 fn_run_anim_mod 4312 0 0
+MC 1 id=4313 fn_run_anim_mod 4314 0 0
+MC 1 id=4321 fn_run_anim_mod 4322 0 0
+MC 1 id=4149 fn_await_sync 0 0 0
+MC 1 id=23 fn_normal_mouse 0 0 0
+CY 2 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 2 id=4111 fn_quit 0 0 0
+MC 2 id=4110 fn_quit 0 0 0
+CY 3 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 3 id=4111 fn_quit 0 0 0
+MC 3 id=4110 fn_quit 0 0 0
+CY 4 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 4 id=4111 fn_quit 0 0 0
+MC 4 id=4110 fn_quit 0 0 0
+MC 4 id=4102 fn_run_anim_mod 4216 30 0
+MC 4 id=4303 fn_run_anim_mod 4304 1 0
+CY 5 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 5 id=4111 fn_quit 0 0 0
+MC 5 id=4110 fn_quit 0 0 0
+MC 5 id=4100 fn_pause 15 0 0
+MC 5 id=4305 fn_run_anim_mod 4306 1 0
+MC 5 id=4311 fn_run_anim_mod 4312 1 0
+CY 6 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 6 id=4111 fn_quit 0 0 0
+MC 6 id=4110 fn_quit 0 0 0
+MC 6 id=4307 fn_run_anim_mod 4308 1 0
+MC 6 id=4309 fn_run_anim_mod 4310 1 0
+MC 6 id=4313 fn_run_anim_mod 4314 1 0
+CY 7 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 7 id=4111 fn_quit 0 0 0
+MC 7 id=4110 fn_quit 0 0 0
+MC 7 id=4102 fn_run_anim_mod 4216 30 0
+MC 7 id=4303 fn_run_anim_mod 4304 1 0
+CY 8 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 8 id=4111 fn_quit 0 0 0
+MC 8 id=4110 fn_quit 0 0 0
+CY 9 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 9 id=4111 fn_quit 0 0 0
+MC 9 id=4110 fn_quit 0 0 0
+MC 9 id=4305 fn_run_anim_mod 4306 1 0
+MC 9 id=4311 fn_run_anim_mod 4312 1 0
+CY 10 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 10 id=4111 fn_quit 0 0 0
+MC 10 id=4110 fn_quit 0 0 0
+MC 10 id=4102 fn_run_anim_mod 4216 30 0
+MC 10 id=4303 fn_run_anim_mod 4304 1 0
+CY 11 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 11 id=4111 fn_quit 0 0 0
+MC 11 id=4110 fn_quit 0 0 0
+MC 11 id=4307 fn_run_anim_mod 4308 1 0
+MC 11 id=4309 fn_run_anim_mod 4310 1 0
+MC 11 id=4313 fn_run_anim_mod 4314 1 0
+CY 12 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 12 id=4111 fn_quit 0 0 0
+MC 12 id=4110 fn_quit 0 0 0
+CY 13 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 13 id=4111 fn_quit 0 0 0
+MC 13 id=4110 fn_quit 0 0 0
+MC 13 id=4102 fn_run_anim_mod 4216 30 0
+MC 13 id=4303 fn_run_anim_mod 4304 1 0
+MC 13 id=4305 fn_run_anim_mod 4306 1 0
+MC 13 id=4311 fn_run_anim_mod 4312 1 0
+CY 14 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 14 id=4111 fn_quit 0 0 0
+MC 14 id=4110 fn_quit 0 0 0
+CY 15 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 15 id=4111 fn_quit 0 0 0
+MC 15 id=4110 fn_quit 0 0 0
+CY 16 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 16 id=4111 fn_quit 0 0 0
+MC 16 id=4110 fn_quit 0 0 0
+MC 16 id=4102 fn_run_anim_mod 4216 30 0
+MC 16 id=4303 fn_run_anim_mod 4304 1 0
+MC 16 id=4307 fn_run_anim_mod 4308 1 0
+MC 16 id=4309 fn_run_anim_mod 4310 1 0
+MC 16 id=4313 fn_run_anim_mod 4314 1 0
+CY 17 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 17 id=4111 fn_quit 0 0 0
+MC 17 id=4110 fn_quit 0 0 0
+MC 17 id=4305 fn_run_anim_mod 4306 1 0
+MC 17 id=4311 fn_run_anim_mod 4312 1 0
+CY 18 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 18 id=4111 fn_quit 0 0 0
+MC 18 id=4110 fn_quit 0 0 0
+CY 19 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 19 id=4111 fn_quit 0 0 0
+MC 19 id=4110 fn_quit 0 0 0
+MC 19 id=4102 fn_run_anim_mod 4216 30 0
+MC 19 id=4303 fn_run_anim_mod 4304 1 0
+CY 20 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 20 id=4111 fn_quit 0 0 0
+MC 20 id=4110 fn_quit 0 0 0
+MC 20 id=4100 fn_simple_mod 4213 27 0
+CY 21 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 21 id=4111 fn_quit 0 0 0
+MC 21 id=4110 fn_quit 0 0 0
+MC 21 id=4305 fn_run_anim_mod 4306 1 0
+MC 21 id=4307 fn_run_anim_mod 4308 1 0
+MC 21 id=4309 fn_run_anim_mod 4310 1 0
+MC 21 id=4311 fn_run_anim_mod 4312 1 0
+MC 21 id=4313 fn_run_anim_mod 4314 1 0
+MC 21 id=4321 fn_run_anim_mod 4322 1 0
+CY 22 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 22 id=4111 fn_quit 0 0 0
+MC 22 id=4110 fn_quit 0 0 0
+MC 22 id=4102 fn_run_anim_mod 4216 30 0
+MC 22 id=4303 fn_run_anim_mod 4304 1 0
+CY 23 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 23 id=4111 fn_quit 0 0 0
+MC 23 id=4110 fn_quit 0 0 0
+CY 24 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 24 id=4111 fn_quit 0 0 0
+MC 24 id=4110 fn_quit 0 0 0
+CY 25 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 25 id=4111 fn_quit 0 0 0
+MC 25 id=4110 fn_quit 0 0 0
+MC 25 id=4102 fn_run_anim_mod 4216 30 0
+MC 25 id=4303 fn_run_anim_mod 4304 1 0
+MC 25 id=4305 fn_run_anim_mod 4306 1 0
+MC 25 id=4311 fn_run_anim_mod 4312 1 0
+CY 26 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 26 id=4111 fn_quit 0 0 0
+MC 26 id=4110 fn_quit 0 0 0
+MC 26 id=4307 fn_run_anim_mod 4308 1 0
+MC 26 id=4309 fn_run_anim_mod 4310 1 0
+MC 26 id=4313 fn_run_anim_mod 4314 1 0
+CY 27 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 27 id=4111 fn_quit 0 0 0
+MC 27 id=4110 fn_quit 0 0 0
+CY 28 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 28 id=4111 fn_quit 0 0 0
+MC 28 id=4110 fn_quit 0 0 0
+MC 28 id=4102 fn_run_anim_mod 4216 30 0
+MC 28 id=4303 fn_run_anim_mod 4304 1 0
+CY 29 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 29 id=4111 fn_quit 0 0 0
+MC 29 id=4110 fn_quit 0 0 0
+MC 29 id=4305 fn_run_anim_mod 4306 1 0
+MC 29 id=4311 fn_run_anim_mod 4312 1 0
+CY 30 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 30 id=4111 fn_quit 0 0 0
+MC 30 id=4110 fn_quit 0 0 0
+CY 31 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 31 id=4111 fn_quit 0 0 0
+MC 31 id=4110 fn_quit 0 0 0
+MC 31 id=4100 fn_pause 5 0 0
+MC 31 id=4102 fn_run_anim_mod 4216 30 0
+MC 31 id=4303 fn_run_anim_mod 4304 1 0
+MC 31 id=4307 fn_run_anim_mod 4308 1 0
+MC 31 id=4309 fn_run_anim_mod 4310 1 0
+MC 31 id=4313 fn_run_anim_mod 4314 1 0
+CY 32 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 32 id=4111 fn_quit 0 0 0
+MC 32 id=4110 fn_quit 0 0 0
+CY 33 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 33 id=4111 fn_quit 0 0 0
+MC 33 id=4110 fn_quit 0 0 0
+MC 33 id=4305 fn_run_anim_mod 4306 1 0
+MC 33 id=4311 fn_run_anim_mod 4312 1 0
+CY 34 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 34 id=4111 fn_quit 0 0 0
+MC 34 id=4110 fn_quit 0 0 0
+MC 34 id=4102 fn_run_anim_mod 4216 30 0
+MC 34 id=4303 fn_run_anim_mod 4304 1 0
+CY 35 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 35 id=4111 fn_quit 0 0 0
+MC 35 id=4110 fn_quit 0 0 0
+CY 36 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 36 id=4111 fn_quit 0 0 0
+MC 36 id=4110 fn_quit 0 0 0
+MC 36 id=4100 fn_simple_mod 4212 26 0
+MC 36 id=4307 fn_run_anim_mod 4308 1 0
+MC 36 id=4309 fn_run_anim_mod 4310 1 0
+MC 36 id=4313 fn_run_anim_mod 4314 1 0
+CY 37 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 37 id=4111 fn_quit 0 0 0
+MC 37 id=4110 fn_quit 0 0 0
+MC 37 id=4102 fn_run_anim_mod 4216 30 0
+MC 37 id=4303 fn_run_anim_mod 4304 1 0
+MC 37 id=4305 fn_run_anim_mod 4306 1 0
+MC 37 id=4311 fn_run_anim_mod 4312 1 0
+CY 38 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 38 id=4111 fn_quit 0 0 0
+MC 38 id=4110 fn_quit 0 0 0
+CY 39 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 39 id=4111 fn_quit 0 0 0
+MC 39 id=4110 fn_quit 0 0 0
+CY 40 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 40 id=4111 fn_quit 0 0 0
+MC 40 id=4110 fn_quit 0 0 0
+MC 40 id=4102 fn_run_anim_mod 4216 30 0
+MC 40 id=4303 fn_run_anim_mod 4304 1 0
+CY 41 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 41 id=4111 fn_quit 0 0 0
+MC 41 id=4110 fn_quit 0 0 0
+MC 41 id=4305 fn_run_anim_mod 4306 1 0
+MC 41 id=4307 fn_run_anim_mod 4308 1 0
+MC 41 id=4309 fn_run_anim_mod 4310 1 0
+MC 41 id=4311 fn_run_anim_mod 4312 1 0
+MC 41 id=4313 fn_run_anim_mod 4314 1 0
+MC 41 id=4321 fn_run_anim_mod 4322 1 0
+CY 42 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 42 id=4111 fn_quit 0 0 0
+MC 42 id=4110 fn_quit 0 0 0
+CY 43 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 43 id=4111 fn_quit 0 0 0
+MC 43 id=4110 fn_quit 0 0 0
+MC 43 id=4102 fn_run_anim_mod 4216 30 0
+MC 43 id=4303 fn_run_anim_mod 4304 1 0
+CY 44 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 44 id=4111 fn_quit 0 0 0
+MC 44 id=4110 fn_quit 0 0 0
+CY 45 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 45 id=4111 fn_quit 0 0 0
+MC 45 id=4110 fn_quit 0 0 0
+MC 45 id=4305 fn_run_anim_mod 4306 1 0
+MC 45 id=4311 fn_run_anim_mod 4312 1 0
+CY 46 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 46 id=4111 fn_quit 0 0 0
+MC 46 id=4110 fn_quit 0 0 0
+MC 46 id=4102 fn_run_anim_mod 4216 30 0
+MC 46 id=4303 fn_run_anim_mod 4304 1 0
+MC 46 id=4307 fn_run_anim_mod 4308 1 0
+MC 46 id=4309 fn_run_anim_mod 4310 1 0
+MC 46 id=4313 fn_run_anim_mod 4314 1 0
+CY 47 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 47 id=4111 fn_quit 0 0 0
+MC 47 id=4110 fn_quit 0 0 0
+CY 48 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 48 id=4111 fn_quit 0 0 0
+MC 48 id=4110 fn_quit 0 0 0
+CY 49 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 49 id=4111 fn_quit 0 0 0
+MC 49 id=4110 fn_quit 0 0 0
+MC 49 id=4102 fn_run_anim_mod 4216 30 0
+MC 49 id=4303 fn_run_anim_mod 4304 1 0
+MC 49 id=4305 fn_run_anim_mod 4306 1 0
+MC 49 id=4311 fn_run_anim_mod 4312 1 0
+CY 50 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 50 id=4111 fn_quit 0 0 0
+MC 50 id=4110 fn_quit 0 0 0
+CY 51 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 51 id=4111 fn_quit 0 0 0
+MC 51 id=4110 fn_quit 0 0 0
+MC 51 id=4307 fn_run_anim_mod 4308 1 0
+MC 51 id=4309 fn_run_anim_mod 4310 1 0
+MC 51 id=4313 fn_run_anim_mod 4314 1 0
+CY 52 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 52 id=4111 fn_quit 0 0 0
+MC 52 id=4110 fn_quit 0 0 0
+MC 52 id=4102 fn_run_anim_mod 4216 30 0
+MC 52 id=4303 fn_run_anim_mod 4304 1 0
+CY 53 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 53 id=4111 fn_quit 0 0 0
+MC 53 id=4110 fn_quit 0 0 0
+MC 53 id=4305 fn_run_anim_mod 4306 1 0
+MC 53 id=4311 fn_run_anim_mod 4312 1 0
+CY 54 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 54 id=4111 fn_quit 0 0 0
+MC 54 id=4110 fn_quit 0 0 0
+CY 55 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 55 id=4111 fn_quit 0 0 0
+MC 55 id=4110 fn_quit 0 0 0
+MC 55 id=4102 fn_run_anim_mod 4216 30 0
+MC 55 id=4303 fn_run_anim_mod 4304 1 0
+CY 56 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 56 id=4111 fn_quit 0 0 0
+MC 56 id=4110 fn_quit 0 0 0
+MC 56 id=4307 fn_run_anim_mod 4308 1 0
+MC 56 id=4309 fn_run_anim_mod 4310 1 0
+MC 56 id=4313 fn_run_anim_mod 4314 1 0
+CY 57 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 57 id=4111 fn_quit 0 0 0
+MC 57 id=4110 fn_quit 0 0 0
+MC 57 id=4305 fn_run_anim_mod 4306 1 0
+MC 57 id=4311 fn_run_anim_mod 4312 1 0
+CY 58 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 58 id=4111 fn_quit 0 0 0
+MC 58 id=4110 fn_quit 0 0 0
+MC 58 id=4102 fn_run_anim_mod 4216 30 0
+MC 58 id=4303 fn_run_anim_mod 4304 1 0
+CY 59 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 59 id=4111 fn_quit 0 0 0
+MC 59 id=4110 fn_quit 0 0 0
+CY 60 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 60 id=4111 fn_quit 0 0 0
+MC 60 id=4110 fn_quit 0 0 0
+CY 61 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 61 id=4111 fn_quit 0 0 0
+MC 61 id=4110 fn_quit 0 0 0
+MC 61 id=4102 fn_run_anim_mod 4216 30 0
+MC 61 id=4303 fn_run_anim_mod 4304 1 0
+MC 61 id=4305 fn_run_anim_mod 4306 1 0
+MC 61 id=4307 fn_run_anim_mod 4308 1 0
+MC 61 id=4309 fn_run_anim_mod 4310 1 0
+MC 61 id=4311 fn_run_anim_mod 4312 1 0
+MC 61 id=4313 fn_run_anim_mod 4314 1 0
+MC 61 id=4321 fn_run_anim_mod 4322 1 0
+CY 62 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 62 id=4111 fn_quit 0 0 0
+MC 62 id=4110 fn_quit 0 0 0
+CY 63 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 63 id=4111 fn_quit 0 0 0
+MC 63 id=4110 fn_quit 0 0 0
+CY 64 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 64 id=4111 fn_quit 0 0 0
+MC 64 id=4110 fn_quit 0 0 0
+MC 64 id=4102 fn_run_anim_mod 4216 30 0
+MC 64 id=4303 fn_run_anim_mod 4304 1 0
+CY 65 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 65 id=4111 fn_quit 0 0 0
+MC 65 id=4110 fn_quit 0 0 0
+MC 65 id=4305 fn_run_anim_mod 4306 1 0
+MC 65 id=4311 fn_run_anim_mod 4312 1 0
+CY 66 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 66 id=4111 fn_quit 0 0 0
+MC 66 id=4110 fn_quit 0 0 0
+MC 66 id=4307 fn_run_anim_mod 4308 1 0
+MC 66 id=4309 fn_run_anim_mod 4310 1 0
+MC 66 id=4313 fn_run_anim_mod 4314 1 0
+CY 67 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 67 id=4111 fn_quit 0 0 0
+MC 67 id=4110 fn_quit 0 0 0
+MC 67 id=4102 fn_run_anim_mod 4216 30 0
+MC 67 id=4303 fn_run_anim_mod 4304 1 0
+CY 68 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 68 id=4111 fn_quit 0 0 0
+MC 68 id=4110 fn_quit 0 0 0
+CY 69 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 69 id=4111 fn_quit 0 0 0
+MC 69 id=4110 fn_quit 0 0 0
+MC 69 id=4305 fn_run_anim_mod 4306 1 0
+MC 69 id=4311 fn_run_anim_mod 4312 1 0
+CY 70 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 70 id=4111 fn_quit 0 0 0
+MC 70 id=4110 fn_quit 0 0 0
+MC 70 id=4100 fn_pause 20 0 0
+MC 70 id=4102 fn_run_anim_mod 4216 30 0
+MC 70 id=4303 fn_run_anim_mod 4304 1 0
+CY 71 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 71 id=4111 fn_quit 0 0 0
+MC 71 id=4110 fn_quit 0 0 0
+MC 71 id=4307 fn_run_anim_mod 4308 1 0
+MC 71 id=4309 fn_run_anim_mod 4310 1 0
+MC 71 id=4313 fn_run_anim_mod 4314 1 0
+CY 72 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 72 id=4111 fn_quit 0 0 0
+MC 72 id=4110 fn_quit 0 0 0
+CY 73 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 73 id=4111 fn_quit 0 0 0
+MC 73 id=4110 fn_quit 0 0 0
+MC 73 id=4102 fn_run_anim_mod 4216 30 0
+MC 73 id=4303 fn_run_anim_mod 4304 1 0
+MC 73 id=4305 fn_run_anim_mod 4306 1 0
+MC 73 id=4311 fn_run_anim_mod 4312 1 0
+CY 74 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 74 id=4111 fn_quit 0 0 0
+MC 74 id=4110 fn_quit 0 0 0
+CY 75 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 75 id=4111 fn_quit 0 0 0
+MC 75 id=4110 fn_quit 0 0 0
+CY 76 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 76 id=4111 fn_quit 0 0 0
+MC 76 id=4110 fn_quit 0 0 0
+MC 76 id=4102 fn_run_anim_mod 4216 30 0
+MC 76 id=4303 fn_run_anim_mod 4304 1 0
+MC 76 id=4307 fn_run_anim_mod 4308 1 0
+MC 76 id=4309 fn_run_anim_mod 4310 1 0
+MC 76 id=4313 fn_run_anim_mod 4314 1 0
+CY 77 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 77 id=4111 fn_quit 0 0 0
+MC 77 id=4110 fn_quit 0 0 0
+MC 77 id=4305 fn_run_anim_mod 4306 1 0
+MC 77 id=4311 fn_run_anim_mod 4312 1 0
+CY 78 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 78 id=4111 fn_quit 0 0 0
+MC 78 id=4110 fn_quit 0 0 0
+CY 79 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 79 id=4111 fn_quit 0 0 0
+MC 79 id=4110 fn_quit 0 0 0
+MC 79 id=4102 fn_run_anim_mod 4216 30 0
+MC 79 id=4303 fn_run_anim_mod 4304 1 0
+CY 80 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 80 id=4111 fn_quit 0 0 0
+MC 80 id=4110 fn_quit 0 0 0
+CY 81 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 81 id=4111 fn_quit 0 0 0
+MC 81 id=4110 fn_quit 0 0 0
+MC 81 id=4305 fn_run_anim_mod 4306 1 0
+MC 81 id=4307 fn_run_anim_mod 4308 1 0
+MC 81 id=4309 fn_run_anim_mod 4310 1 0
+MC 81 id=4311 fn_run_anim_mod 4312 1 0
+MC 81 id=4313 fn_run_anim_mod 4314 1 0
+MC 81 id=4321 fn_run_anim_mod 4322 1 0
+CY 82 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 82 id=4111 fn_quit 0 0 0
+MC 82 id=4110 fn_quit 0 0 0
+MC 82 id=4102 fn_run_anim_mod 4216 30 0
+MC 82 id=4303 fn_run_anim_mod 4304 1 0
+CY 83 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 83 id=4111 fn_quit 0 0 0
+MC 83 id=4110 fn_quit 0 0 0
+CY 84 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 84 id=4111 fn_quit 0 0 0
+MC 84 id=4110 fn_quit 0 0 0
+CY 85 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 85 id=4111 fn_quit 0 0 0
+MC 85 id=4110 fn_quit 0 0 0
+MC 85 id=4102 fn_run_anim_mod 4216 30 0
+MC 85 id=4303 fn_run_anim_mod 4304 1 0
+MC 85 id=4305 fn_run_anim_mod 4306 1 0
+MC 85 id=4311 fn_run_anim_mod 4312 1 0
+CY 86 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 86 id=4111 fn_quit 0 0 0
+MC 86 id=4110 fn_quit 0 0 0
+MC 86 id=4307 fn_run_anim_mod 4308 1 0
+MC 86 id=4309 fn_run_anim_mod 4310 1 0
+MC 86 id=4313 fn_run_anim_mod 4314 1 0
+CY 87 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 87 id=4111 fn_quit 0 0 0
+MC 87 id=4110 fn_quit 0 0 0
+CY 88 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 88 id=4111 fn_quit 0 0 0
+MC 88 id=4110 fn_quit 0 0 0
+MC 88 id=4102 fn_run_anim_mod 4216 30 0
+MC 88 id=4303 fn_run_anim_mod 4304 1 0
+CY 89 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 89 id=4111 fn_quit 0 0 0
+MC 89 id=4110 fn_quit 0 0 0
+MC 89 id=4305 fn_run_anim_mod 4306 1 0
+MC 89 id=4311 fn_run_anim_mod 4312 1 0
+CY 90 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 90 id=4111 fn_quit 0 0 0
+MC 90 id=4110 fn_quit 0 0 0
+MC 90 id=4100 fn_simple_mod 4213 27 0
+CY 91 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 91 id=4111 fn_quit 0 0 0
+MC 91 id=4110 fn_quit 0 0 0
+MC 91 id=4102 fn_run_anim_mod 4216 30 0
+MC 91 id=4303 fn_run_anim_mod 4304 1 0
+MC 91 id=4307 fn_run_anim_mod 4308 1 0
+MC 91 id=4309 fn_run_anim_mod 4310 1 0
+MC 91 id=4313 fn_run_anim_mod 4314 1 0
+CY 92 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 92 id=4111 fn_quit 0 0 0
+MC 92 id=4110 fn_quit 0 0 0
+CY 93 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 93 id=4111 fn_quit 0 0 0
+MC 93 id=4110 fn_quit 0 0 0
+MC 93 id=4305 fn_run_anim_mod 4306 1 0
+MC 93 id=4311 fn_run_anim_mod 4312 1 0
+CY 94 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 94 id=4111 fn_quit 0 0 0
+MC 94 id=4110 fn_quit 0 0 0
+MC 94 id=4102 fn_run_anim_mod 4216 30 0
+MC 94 id=4303 fn_run_anim_mod 4304 1 0
+CY 95 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 95 id=4111 fn_quit 0 0 0
+MC 95 id=4110 fn_quit 0 0 0
+CY 96 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 96 id=4111 fn_quit 0 0 0
+MC 96 id=4110 fn_quit 0 0 0
+MC 96 id=4307 fn_run_anim_mod 4308 1 0
+MC 96 id=4309 fn_run_anim_mod 4310 1 0
+MC 96 id=4313 fn_run_anim_mod 4314 1 0
+CY 97 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 97 id=4111 fn_quit 0 0 0
+MC 97 id=4110 fn_quit 0 0 0
+MC 97 id=4102 fn_run_anim_mod 4216 30 0
+MC 97 id=4303 fn_run_anim_mod 4304 1 0
+MC 97 id=4305 fn_run_anim_mod 4306 1 0
+MC 97 id=4311 fn_run_anim_mod 4312 1 0
+CY 98 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 98 id=4111 fn_quit 0 0 0
+MC 98 id=4110 fn_quit 0 0 0
+CY 99 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 99 id=4111 fn_quit 0 0 0
+MC 99 id=4110 fn_quit 0 0 0
+CY 100 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 100 id=4111 fn_quit 0 0 0
+MC 100 id=4110 fn_quit 0 0 0
+MC 100 id=4102 fn_run_anim_mod 4216 30 0
+MC 100 id=4303 fn_run_anim_mod 4304 1 0
+CY 101 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 101 id=4111 fn_quit 0 0 0
+MC 101 id=4110 fn_quit 0 0 0
+MC 101 id=4100 fn_pause 5 0 0
+MC 101 id=4305 fn_run_anim_mod 4306 1 0
+MC 101 id=4307 fn_run_anim_mod 4308 1 0
+MC 101 id=4309 fn_run_anim_mod 4310 1 0
+MC 101 id=4311 fn_run_anim_mod 4312 1 0
+MC 101 id=4313 fn_run_anim_mod 4314 1 0
+MC 101 id=4321 fn_run_anim_mod 4322 1 0
+CY 102 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 102 id=4111 fn_quit 0 0 0
+MC 102 id=4110 fn_quit 0 0 0
+CY 103 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 103 id=4111 fn_quit 0 0 0
+MC 103 id=4110 fn_quit 0 0 0
+MC 103 id=4102 fn_run_anim_mod 4216 30 0
+MC 103 id=4303 fn_run_anim_mod 4304 1 0
+CY 104 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 104 id=4111 fn_quit 0 0 0
+MC 104 id=4110 fn_quit 0 0 0
+CY 105 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 105 id=4111 fn_quit 0 0 0
+MC 105 id=4110 fn_quit 0 0 0
+MC 105 id=4305 fn_run_anim_mod 4306 1 0
+MC 105 id=4311 fn_run_anim_mod 4312 1 0
+CY 106 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 106 id=4111 fn_quit 0 0 0
+MC 106 id=4110 fn_quit 0 0 0
+MC 106 id=4100 fn_simple_mod 4212 26 0
+MC 106 id=4102 fn_run_anim_mod 4216 30 0
+MC 106 id=4303 fn_run_anim_mod 4304 1 0
+MC 106 id=4307 fn_run_anim_mod 4308 1 0
+MC 106 id=4309 fn_run_anim_mod 4310 1 0
+MC 106 id=4313 fn_run_anim_mod 4314 1 0
+CY 107 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 107 id=4111 fn_quit 0 0 0
+MC 107 id=4110 fn_quit 0 0 0
+CY 108 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 108 id=4111 fn_quit 0 0 0
+MC 108 id=4110 fn_quit 0 0 0
+CY 109 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 109 id=4111 fn_quit 0 0 0
+MC 109 id=4110 fn_quit 0 0 0
+MC 109 id=4102 fn_run_anim_mod 4216 30 0
+MC 109 id=4303 fn_run_anim_mod 4304 1 0
+MC 109 id=4305 fn_run_anim_mod 4306 1 0
+MC 109 id=4311 fn_run_anim_mod 4312 1 0
+CY 110 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 110 id=4111 fn_quit 0 0 0
+MC 110 id=4110 fn_quit 0 0 0
+CY 111 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 111 id=4111 fn_quit 0 0 0
+MC 111 id=4110 fn_quit 0 0 0
+MC 111 id=4307 fn_run_anim_mod 4308 1 0
+MC 111 id=4309 fn_run_anim_mod 4310 1 0
+MC 111 id=4313 fn_run_anim_mod 4314 1 0
+CY 112 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 112 id=4111 fn_quit 0 0 0
+MC 112 id=4110 fn_quit 0 0 0
+MC 112 id=4102 fn_run_anim_mod 4216 30 0
+MC 112 id=4303 fn_run_anim_mod 4304 1 0
+CY 113 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 113 id=4111 fn_quit 0 0 0
+MC 113 id=4110 fn_quit 0 0 0
+MC 113 id=4305 fn_run_anim_mod 4306 1 0
+MC 113 id=4311 fn_run_anim_mod 4312 1 0
+CY 114 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 114 id=4111 fn_quit 0 0 0
+MC 114 id=4110 fn_quit 0 0 0
+CY 115 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 115 id=4111 fn_quit 0 0 0
+MC 115 id=4110 fn_quit 0 0 0
+MC 115 id=4102 fn_run_anim_mod 4216 30 0
+MC 115 id=4303 fn_run_anim_mod 4304 1 0
+CY 116 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 116 id=4111 fn_quit 0 0 0
+MC 116 id=4110 fn_quit 0 0 0
+MC 116 id=4307 fn_run_anim_mod 4308 1 0
+MC 116 id=4309 fn_run_anim_mod 4310 1 0
+MC 116 id=4313 fn_run_anim_mod 4314 1 0
+CY 117 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 117 id=4111 fn_quit 0 0 0
+MC 117 id=4110 fn_quit 0 0 0
+MC 117 id=4305 fn_run_anim_mod 4306 1 0
+MC 117 id=4311 fn_run_anim_mod 4312 1 0
+CY 118 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 118 id=4111 fn_quit 0 0 0
+MC 118 id=4110 fn_quit 0 0 0
+MC 118 id=4102 fn_run_anim_mod 4216 30 0
+MC 118 id=4303 fn_run_anim_mod 4304 1 0
+CY 119 scr=0 fo=0,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 119 id=4111 fn_quit 0 0 0
+MC 119 id=4110 fn_quit 0 0 0
+MC 119 id=23 fn_save_coods 0 2 0
+MC 119 id=23 fn_assign_base 3 1 0
+CY 120 scr=0 fo=1,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 120 id=3 fn_get_to 67 2 0
+MC 120 id=3 fn_ar 184 208 0
+MC 120 id=4111 fn_quit 0 0 0
+MC 120 id=4110 fn_quit 0 0 0
+CY 121 scr=0 fo=2,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 121 id=3 fn_leaving 0 0 0
+MC 121 id=3 fn_ar_animate 0 0 0
+MC 121 id=4111 fn_quit 0 0 0
+MC 121 id=4110 fn_quit 0 0 0
+MC 121 id=4102 fn_run_anim_mod 4216 30 0
+MC 121 id=4303 fn_run_anim_mod 4304 1 0
+MC 121 id=4305 fn_run_anim_mod 4306 1 0
+MC 121 id=4307 fn_run_anim_mod 4308 1 0
+MC 121 id=4309 fn_run_anim_mod 4310 1 0
+MC 121 id=4311 fn_run_anim_mod 4312 1 0
+MC 121 id=4313 fn_run_anim_mod 4314 1 0
+MC 121 id=4321 fn_run_anim_mod 4322 1 0
+CY 122 scr=0 fo=3,492,288,216,812,0 jo=1,0,320,304,11084,2
+MC 122 id=4111 fn_quit 0 0 0
+MC 122 id=4110 fn_quit 0 0 0
+CY 123 scr=0 fo=3,492,288,214,768,0 jo=1,0,320,304,11084,2
+MC 123 id=4111 fn_quit 0 0 0
+MC 123 id=4110 fn_quit 0 0 0
+CY 124 scr=0 fo=3,492,288,212,769,0 jo=1,0,320,304,11084,2
+MC 124 id=4111 fn_quit 0 0 0
+MC 124 id=4110 fn_quit 0 0 0
+MC 124 id=4102 fn_run_anim_mod 4216 30 0
+MC 124 id=4303 fn_run_anim_mod 4304 1 0
+CY 125 scr=0 fo=3,492,288,210,770,0 jo=1,0,320,304,11084,2
+MC 125 id=4111 fn_quit 0 0 0
+MC 125 id=4110 fn_quit 0 0 0
+MC 125 id=4305 fn_run_anim_mod 4306 1 0
+MC 125 id=4311 fn_run_anim_mod 4312 1 0
+CY 126 scr=0 fo=3,492,288,208,771,0 jo=1,0,320,304,11084,2
+MC 126 id=4111 fn_quit 0 0 0
+MC 126 id=4110 fn_quit 0 0 0
+MC 126 id=4307 fn_run_anim_mod 4308 1 0
+MC 126 id=4309 fn_run_anim_mod 4310 1 0
+MC 126 id=4313 fn_run_anim_mod 4314 1 0
+CY 127 scr=0 fo=3,492,288,208,811,0 jo=1,0,320,304,11084,2
+MC 127 id=4111 fn_quit 0 0 0
+MC 127 id=4110 fn_quit 0 0 0
+MC 127 id=4102 fn_run_anim_mod 4216 30 0
+MC 127 id=4303 fn_run_anim_mod 4304 1 0
+CY 128 scr=0 fo=3,492,284,208,788,0 jo=1,0,320,304,11084,2
+MC 128 id=4111 fn_quit 0 0 0
+MC 128 id=4110 fn_quit 0 0 0
+CY 129 scr=0 fo=3,492,280,208,789,0 jo=1,0,320,304,11084,2
+MC 129 id=4111 fn_quit 0 0 0
+MC 129 id=4110 fn_quit 0 0 0
+MC 129 id=4305 fn_run_anim_mod 4306 1 0
+MC 129 id=4311 fn_run_anim_mod 4312 1 0
+CY 130 scr=0 fo=3,492,276,208,790,0 jo=1,0,320,304,11084,2
+MC 130 id=4111 fn_quit 0 0 0
+MC 130 id=4110 fn_quit 0 0 0
+MC 130 id=4102 fn_run_anim_mod 4216 30 0
+MC 130 id=4303 fn_run_anim_mod 4304 1 0
+CY 131 scr=0 fo=3,492,272,208,791,0 jo=1,0,320,304,11084,2
+MC 131 id=4111 fn_quit 0 0 0
+MC 131 id=4110 fn_quit 0 0 0
+MC 131 id=4307 fn_run_anim_mod 4308 1 0
+MC 131 id=4309 fn_run_anim_mod 4310 1 0
+MC 131 id=4313 fn_run_anim_mod 4314 1 0
+CY 132 scr=0 fo=3,492,268,208,792,0 jo=1,0,320,304,11084,2
+MC 132 id=4111 fn_quit 0 0 0
+MC 132 id=4110 fn_quit 0 0 0
+CY 133 scr=0 fo=3,492,264,208,793,0 jo=1,0,320,304,11084,2
+MC 133 id=4111 fn_quit 0 0 0
+MC 133 id=4110 fn_quit 0 0 0
+MC 133 id=4102 fn_run_anim_mod 4216 30 0
+MC 133 id=4303 fn_run_anim_mod 4304 1 0
+MC 133 id=4305 fn_run_anim_mod 4306 1 0
+MC 133 id=4311 fn_run_anim_mod 4312 1 0
+CY 134 scr=0 fo=3,492,260,208,794,0 jo=1,0,320,304,11084,2
+MC 134 id=4111 fn_quit 0 0 0
+MC 134 id=4110 fn_quit 0 0 0
+CY 135 scr=0 fo=3,492,256,208,795,0 jo=1,0,320,304,11084,2
+MC 135 id=4111 fn_quit 0 0 0
+MC 135 id=4110 fn_quit 0 0 0
+CY 136 scr=0 fo=3,492,252,208,796,0 jo=1,0,320,304,11084,2
+MC 136 id=4111 fn_quit 0 0 0
+MC 136 id=4110 fn_quit 0 0 0
+MC 136 id=4102 fn_run_anim_mod 4216 30 0
+MC 136 id=4303 fn_run_anim_mod 4304 1 0
+MC 136 id=4307 fn_run_anim_mod 4308 1 0
+MC 136 id=4309 fn_run_anim_mod 4310 1 0
+MC 136 id=4313 fn_run_anim_mod 4314 1 0
+CY 137 scr=0 fo=3,492,248,208,797,0 jo=1,0,320,304,11084,2
+MC 137 id=4111 fn_quit 0 0 0
+MC 137 id=4110 fn_quit 0 0 0
+MC 137 id=4305 fn_run_anim_mod 4306 1 0
+MC 137 id=4311 fn_run_anim_mod 4312 1 0
+CY 138 scr=0 fo=3,492,244,208,788,0 jo=1,0,320,304,11084,2
+MC 138 id=4111 fn_quit 0 0 0
+MC 138 id=4110 fn_quit 0 0 0
+CY 139 scr=0 fo=3,492,240,208,789,0 jo=1,0,320,304,11084,2
+MC 139 id=4111 fn_quit 0 0 0
+MC 139 id=4110 fn_quit 0 0 0
+MC 139 id=4102 fn_run_anim_mod 4216 30 0
+MC 139 id=4303 fn_run_anim_mod 4304 1 0
+CY 140 scr=0 fo=3,492,236,208,790,0 jo=1,0,320,304,11084,2
+MC 140 id=4111 fn_quit 0 0 0
+MC 140 id=4110 fn_quit 0 0 0
+MC 140 id=4100 fn_pause 15 0 0
+CY 141 scr=0 fo=3,492,232,208,791,0 jo=1,0,320,304,11084,2
+MC 141 id=4111 fn_quit 0 0 0
+MC 141 id=4110 fn_quit 0 0 0
+MC 141 id=4305 fn_run_anim_mod 4306 1 0
+MC 141 id=4307 fn_run_anim_mod 4308 1 0
+MC 141 id=4309 fn_run_anim_mod 4310 1 0
+MC 141 id=4311 fn_run_anim_mod 4312 1 0
+MC 141 id=4313 fn_run_anim_mod 4314 1 0
+MC 141 id=4321 fn_run_anim_mod 4322 1 0
+CY 142 scr=0 fo=3,492,228,208,792,0 jo=1,0,320,304,11084,2
+MC 142 id=4111 fn_quit 0 0 0
+MC 142 id=4110 fn_quit 0 0 0
+MC 142 id=4102 fn_run_anim_mod 4216 30 0
+MC 142 id=4303 fn_run_anim_mod 4304 1 0
+CY 143 scr=0 fo=3,492,224,208,793,0 jo=1,0,320,304,11084,2
+MC 143 id=4111 fn_quit 0 0 0
+MC 143 id=4110 fn_quit 0 0 0
+CY 144 scr=0 fo=3,492,220,208,794,0 jo=1,0,320,304,11084,2
+MC 144 id=4111 fn_quit 0 0 0
+MC 144 id=4110 fn_quit 0 0 0
+CY 145 scr=0 fo=3,492,216,208,795,0 jo=1,0,320,304,11084,2
+MC 145 id=4111 fn_quit 0 0 0
+MC 145 id=4110 fn_quit 0 0 0
+MC 145 id=4102 fn_run_anim_mod 4216 30 0
+MC 145 id=4303 fn_run_anim_mod 4304 1 0
+MC 145 id=4305 fn_run_anim_mod 4306 1 0
+MC 145 id=4311 fn_run_anim_mod 4312 1 0
+CY 146 scr=0 fo=3,492,212,208,796,0 jo=1,0,320,304,11084,2
+MC 146 id=4111 fn_quit 0 0 0
+MC 146 id=4110 fn_quit 0 0 0
+MC 146 id=4307 fn_run_anim_mod 4308 1 0
+MC 146 id=4309 fn_run_anim_mod 4310 1 0
+MC 146 id=4313 fn_run_anim_mod 4314 1 0
+CY 147 scr=0 fo=3,492,208,208,797,0 jo=1,0,320,304,11084,2
+MC 147 id=4111 fn_quit 0 0 0
+MC 147 id=4110 fn_quit 0 0 0
+CY 148 scr=0 fo=3,492,204,208,788,0 jo=1,0,320,304,11084,2
+MC 148 id=4111 fn_quit 0 0 0
+MC 148 id=4110 fn_quit 0 0 0
+MC 148 id=4102 fn_run_anim_mod 4216 30 0
+MC 148 id=4303 fn_run_anim_mod 4304 1 0
+CY 149 scr=0 fo=3,492,200,208,789,0 jo=1,0,320,304,11084,2
+MC 149 id=4111 fn_quit 0 0 0
+MC 149 id=4110 fn_quit 0 0 0
+MC 149 id=4305 fn_run_anim_mod 4306 1 0
+MC 149 id=4311 fn_run_anim_mod 4312 1 0
+CY 150 scr=0 fo=3,492,196,208,790,0 jo=1,0,320,304,11084,2
+MC 150 id=4111 fn_quit 0 0 0
+MC 150 id=4110 fn_quit 0 0 0
+CY 151 scr=0 fo=3,492,192,208,791,0 jo=1,0,320,304,11084,2
+MC 151 id=4111 fn_quit 0 0 0
+MC 151 id=4110 fn_quit 0 0 0
+MC 151 id=4102 fn_run_anim_mod 4216 30 0
+MC 151 id=4303 fn_run_anim_mod 4304 1 0
+MC 151 id=4307 fn_run_anim_mod 4308 1 0
+MC 151 id=4309 fn_run_anim_mod 4310 1 0
+MC 151 id=4313 fn_run_anim_mod 4314 1 0
+CY 152 scr=0 fo=3,492,188,208,792,0 jo=1,0,320,304,11084,2
+MC 152 id=4111 fn_quit 0 0 0
+MC 152 id=4110 fn_quit 0 0 0
+CY 153 scr=0 fo=3,492,184,208,793,0 jo=1,0,320,304,11084,2
+MC 153 id=3 fn_turn_to 0 0 0
+MC 153 id=4111 fn_quit 0 0 0
+MC 153 id=4110 fn_quit 0 0 0
+MC 153 id=4305 fn_run_anim_mod 4306 1 0
+MC 153 id=4311 fn_run_anim_mod 4312 1 0
+CY 154 scr=0 fo=7,492,184,208,811,0 jo=1,0,320,304,11084,2
+MC 154 id=3 fn_set_to_stand 0 0 0
+MC 154 id=4111 fn_quit 0 0 0
+MC 154 id=4110 fn_quit 0 0 0
+MC 154 id=4102 fn_run_anim_mod 4216 30 0
+MC 154 id=4303 fn_run_anim_mod 4304 1 0
+CY 155 scr=0 fo=16,492,184,208,812,0 jo=1,0,320,304,11084,2
+MC 155 id=3 fn_get_to 67 2 0
+MC 155 id=3 fn_leaving 0 0 0
+MC 155 id=3 fn_foreground 3 0 0
+MC 155 id=3 fn_no_human 0 0 0
+MC 155 id=3 fn_toggle_grid 0 0 0
+MC 155 id=3 fn_start_music 4 2 0
+MC 155 id=3 fn_run_anim_mod 4188 2 0
+MC 155 id=4111 fn_quit 0 0 0
+MC 155 id=4110 fn_quit 0 0 0
+MC 155 id=4100 fn_simple_mod 4214 28 0
+CY 156 scr=0 fo=6,362,173,159,4544,0 jo=1,0,320,304,11084,2
+MC 156 id=4111 fn_quit 0 0 0
+MC 156 id=4110 fn_quit 0 0 0
+MC 156 id=4307 fn_run_anim_mod 4308 1 0
+MC 156 id=4309 fn_run_anim_mod 4310 1 0
+MC 156 id=4313 fn_run_anim_mod 4314 1 0
+CY 157 scr=0 fo=6,362,174,161,4545,0 jo=1,0,320,304,11084,2
+MC 157 id=4111 fn_quit 0 0 0
+MC 157 id=4110 fn_quit 0 0 0
+MC 157 id=4102 fn_run_anim_mod 4216 30 0
+MC 157 id=4303 fn_run_anim_mod 4304 1 0
+MC 157 id=4305 fn_run_anim_mod 4306 1 0
+MC 157 id=4311 fn_run_anim_mod 4312 1 0
+CY 158 scr=0 fo=6,362,174,164,4546,0 jo=1,0,320,304,11084,2
+MC 158 id=4111 fn_quit 0 0 0
+MC 158 id=4110 fn_quit 0 0 0
+CY 159 scr=0 fo=6,362,175,167,4547,0 jo=1,0,320,304,11084,2
+MC 159 id=4111 fn_quit 0 0 0
+MC 159 id=4110 fn_quit 0 0 0
+CY 160 scr=0 fo=6,362,176,169,4548,0 jo=1,0,320,304,11084,2
+MC 160 id=4111 fn_quit 0 0 0
+MC 160 id=4110 fn_quit 0 0 0
+MC 160 id=4102 fn_run_anim_mod 4216 30 0
+MC 160 id=4303 fn_run_anim_mod 4304 1 0
+CY 161 scr=0 fo=6,362,177,170,4549,0 jo=1,0,320,304,11084,2
+MC 161 id=4111 fn_quit 0 0 0
+MC 161 id=4110 fn_quit 0 0 0
+MC 161 id=4305 fn_run_anim_mod 4306 1 0
+MC 161 id=4307 fn_run_anim_mod 4308 1 0
+MC 161 id=4309 fn_run_anim_mod 4310 1 0
+MC 161 id=4311 fn_run_anim_mod 4312 1 0
+MC 161 id=4313 fn_run_anim_mod 4314 1 0
+MC 161 id=4321 fn_run_anim_mod 4322 1 0
+CY 162 scr=0 fo=6,362,177,172,4550,0 jo=1,0,320,304,11084,2
+MC 162 id=4111 fn_quit 0 0 0
+MC 162 id=4110 fn_quit 0 0 0
+CY 163 scr=0 fo=6,362,178,175,4551,0 jo=1,0,320,304,11084,2
+MC 163 id=4111 fn_quit 0 0 0
+MC 163 id=4110 fn_quit 0 0 0
+MC 163 id=4102 fn_run_anim_mod 4216 30 0
+MC 163 id=4303 fn_run_anim_mod 4304 1 0
+CY 164 scr=0 fo=6,362,179,177,4552,0 jo=1,0,320,304,11084,2
+MC 164 id=4111 fn_quit 0 0 0
+MC 164 id=4110 fn_quit 0 0 0
+CY 165 scr=0 fo=6,362,179,179,4553,0 jo=1,0,320,304,11084,2
+MC 165 id=4111 fn_quit 0 0 0
+MC 165 id=4110 fn_quit 0 0 0
+MC 165 id=4305 fn_run_anim_mod 4306 1 0
+MC 165 id=4311 fn_run_anim_mod 4312 1 0
+CY 166 scr=0 fo=6,362,180,180,4554,0 jo=1,0,320,304,11084,2
+MC 166 id=4111 fn_quit 0 0 0
+MC 166 id=4110 fn_quit 0 0 0
+MC 166 id=4102 fn_run_anim_mod 4216 30 0
+MC 166 id=4303 fn_run_anim_mod 4304 1 0
+MC 166 id=4307 fn_run_anim_mod 4308 1 0
+MC 166 id=4309 fn_run_anim_mod 4310 1 0
+MC 166 id=4313 fn_run_anim_mod 4314 1 0
+CY 167 scr=0 fo=6,362,181,181,4555,0 jo=1,0,320,304,11084,2
+MC 167 id=4111 fn_quit 0 0 0
+MC 167 id=4110 fn_quit 0 0 0
+CY 168 scr=0 fo=6,362,181,184,4556,0 jo=1,0,320,304,11084,2
+MC 168 id=4111 fn_quit 0 0 0
+MC 168 id=4110 fn_quit 0 0 0
+CY 169 scr=0 fo=6,362,182,186,4557,0 jo=1,0,320,304,11084,2
+MC 169 id=4111 fn_quit 0 0 0
+MC 169 id=4110 fn_quit 0 0 0
+MC 169 id=4102 fn_run_anim_mod 4216 30 0
+MC 169 id=4303 fn_run_anim_mod 4304 1 0
+MC 169 id=4305 fn_run_anim_mod 4306 1 0
+MC 169 id=4311 fn_run_anim_mod 4312 1 0
+CY 170 scr=0 fo=6,362,182,188,4558,0 jo=1,0,320,304,11084,2
+MC 170 id=4111 fn_quit 0 0 0
+MC 170 id=4110 fn_quit 0 0 0
+CY 171 scr=0 fo=6,362,183,188,4559,0 jo=1,0,320,304,11084,2
+MC 171 id=4111 fn_quit 0 0 0
+MC 171 id=4110 fn_quit 0 0 0
+MC 171 id=4307 fn_run_anim_mod 4308 1 0
+MC 171 id=4309 fn_run_anim_mod 4310 1 0
+MC 171 id=4313 fn_run_anim_mod 4314 1 0
+CY 172 scr=0 fo=6,362,184,190,4560,0 jo=1,0,320,304,11084,2
+MC 172 id=4111 fn_quit 0 0 0
+MC 172 id=4110 fn_quit 0 0 0
+MC 172 id=4102 fn_run_anim_mod 4216 30 0
+MC 172 id=4303 fn_run_anim_mod 4304 1 0
+CY 173 scr=0 fo=6,362,183,193,4561,0 jo=1,0,320,304,11084,2
+MC 173 id=4111 fn_quit 0 0 0
+MC 173 id=4110 fn_quit 0 0 0
+MC 173 id=4100 fn_pause 15 0 0
+MC 173 id=4305 fn_run_anim_mod 4306 1 0
+MC 173 id=4311 fn_run_anim_mod 4312 1 0
+CY 174 scr=0 fo=6,362,184,194,4562,0 jo=1,0,320,304,11084,2
+MC 174 id=4111 fn_quit 0 0 0
+MC 174 id=4110 fn_quit 0 0 0
+CY 175 scr=0 fo=6,362,184,196,4563,0 jo=1,0,320,304,11084,2
+MC 175 id=4111 fn_quit 0 0 0
+MC 175 id=4110 fn_quit 0 0 0
+MC 175 id=4102 fn_run_anim_mod 4216 30 0
+MC 175 id=4303 fn_run_anim_mod 4304 1 0
+CY 176 scr=0 fo=6,362,185,196,4564,0 jo=1,0,320,304,11084,2
+MC 176 id=4111 fn_quit 0 0 0
+MC 176 id=4110 fn_quit 0 0 0
+MC 176 id=4307 fn_run_anim_mod 4308 1 0
+MC 176 id=4309 fn_run_anim_mod 4310 1 0
+MC 176 id=4313 fn_run_anim_mod 4314 1 0
+CY 177 scr=0 fo=6,362,185,198,4565,0 jo=1,0,320,304,11084,2
+MC 177 id=4111 fn_quit 0 0 0
+MC 177 id=4110 fn_quit 0 0 0
+MC 177 id=4305 fn_run_anim_mod 4306 1 0
+MC 177 id=4311 fn_run_anim_mod 4312 1 0
+CY 178 scr=0 fo=6,362,191,200,4566,0 jo=1,0,320,304,11084,2
+MC 178 id=4111 fn_quit 0 0 0
+MC 178 id=4110 fn_quit 0 0 0
+MC 178 id=4102 fn_run_anim_mod 4216 30 0
+MC 178 id=4303 fn_run_anim_mod 4304 1 0
+CY 179 scr=0 fo=6,362,192,202,4567,0 jo=1,0,320,304,11084,2
+MC 179 id=4111 fn_quit 0 0 0
+MC 179 id=4110 fn_quit 0 0 0
+CY 180 scr=0 fo=6,362,193,203,4568,0 jo=1,0,320,304,11084,2
+MC 180 id=4111 fn_quit 0 0 0
+MC 180 id=4110 fn_quit 0 0 0
+CY 181 scr=0 fo=6,362,193,204,4569,0 jo=1,0,320,304,11084,2
+MC 181 id=4111 fn_quit 0 0 0
+MC 181 id=4110 fn_quit 0 0 0
+MC 181 id=4102 fn_run_anim_mod 4216 30 0
+MC 181 id=4303 fn_run_anim_mod 4304 1 0
+MC 181 id=4305 fn_run_anim_mod 4306 1 0
+MC 181 id=4307 fn_run_anim_mod 4308 1 0
+MC 181 id=4309 fn_run_anim_mod 4310 1 0
+MC 181 id=4311 fn_run_anim_mod 4312 1 0
+MC 181 id=4313 fn_run_anim_mod 4314 1 0
+MC 181 id=4321 fn_run_anim_mod 4322 1 0
+CY 182 scr=0 fo=6,362,194,205,4570,0 jo=1,0,320,304,11084,2
+MC 182 id=4111 fn_quit 0 0 0
+MC 182 id=4110 fn_quit 0 0 0
+CY 183 scr=0 fo=6,362,198,216,4571,0 jo=1,0,320,304,11084,2
+MC 183 id=4111 fn_quit 0 0 0
+MC 183 id=4110 fn_quit 0 0 0
+CY 184 scr=0 fo=6,362,198,216,4572,0 jo=1,0,320,304,11084,2
+MC 184 id=4111 fn_quit 0 0 0
+MC 184 id=4110 fn_quit 0 0 0
+MC 184 id=4102 fn_run_anim_mod 4216 30 0
+MC 184 id=4303 fn_run_anim_mod 4304 1 0
+CY 185 scr=0 fo=6,362,198,216,4573,0 jo=1,0,320,304,11084,2
+MC 185 id=4111 fn_quit 0 0 0
+MC 185 id=4110 fn_quit 0 0 0
+MC 185 id=4305 fn_run_anim_mod 4306 1 0
+MC 185 id=4311 fn_run_anim_mod 4312 1 0
+CY 186 scr=0 fo=6,362,198,216,4574,0 jo=1,0,320,304,11084,2
+MC 186 id=4111 fn_quit 0 0 0
+MC 186 id=4110 fn_quit 0 0 0
+MC 186 id=4307 fn_run_anim_mod 4308 1 0
+MC 186 id=4309 fn_run_anim_mod 4310 1 0
+MC 186 id=4313 fn_run_anim_mod 4314 1 0
+CY 187 scr=0 fo=6,362,198,216,4575,0 jo=1,0,320,304,11084,2
+MC 187 id=4111 fn_quit 0 0 0
+MC 187 id=4110 fn_quit 0 0 0
+MC 187 id=4102 fn_run_anim_mod 4216 30 0
+MC 187 id=4303 fn_run_anim_mod 4304 1 0
+CY 188 scr=0 fo=6,362,198,216,4576,0 jo=1,0,320,304,11084,2
+MC 188 id=4111 fn_quit 0 0 0
+MC 188 id=4110 fn_quit 0 0 0
+MC 188 id=4100 fn_simple_mod 4213 27 0
+CY 189 scr=0 fo=6,362,198,216,4577,0 jo=1,0,320,304,11084,2
+MC 189 id=4111 fn_quit 0 0 0
+MC 189 id=4110 fn_quit 0 0 0
+MC 189 id=4305 fn_run_anim_mod 4306 1 0
+MC 189 id=4311 fn_run_anim_mod 4312 1 0
+CY 190 scr=0 fo=6,362,198,216,4578,0 jo=1,0,320,304,11084,2
+MC 190 id=4111 fn_quit 0 0 0
+MC 190 id=4110 fn_quit 0 0 0
+MC 190 id=4102 fn_run_anim_mod 4216 30 0
+MC 190 id=4303 fn_run_anim_mod 4304 1 0
+CY 191 scr=0 fo=6,362,198,216,4579,0 jo=1,0,320,304,11084,2
+MC 191 id=4111 fn_quit 0 0 0
+MC 191 id=4110 fn_quit 0 0 0
+MC 191 id=4307 fn_run_anim_mod 4308 1 0
+MC 191 id=4309 fn_run_anim_mod 4310 1 0
+MC 191 id=4313 fn_run_anim_mod 4314 1 0
+CY 192 scr=0 fo=6,362,198,217,4580,0 jo=1,0,320,304,11084,2
+MC 192 id=4111 fn_quit 0 0 0
+MC 192 id=4110 fn_quit 0 0 0
+CY 193 scr=0 fo=6,362,199,220,4581,0 jo=1,0,320,304,11084,2
+MC 193 id=4111 fn_quit 0 0 0
+MC 193 id=4110 fn_quit 0 0 0
+MC 193 id=4102 fn_run_anim_mod 4216 30 0
+MC 193 id=4303 fn_run_anim_mod 4304 1 0
+MC 193 id=4305 fn_run_anim_mod 4306 1 0
+MC 193 id=4311 fn_run_anim_mod 4312 1 0
+CY 194 scr=0 fo=6,362,199,222,4582,0 jo=1,0,320,304,11084,2
+MC 194 id=4111 fn_quit 0 0 0
+MC 194 id=4110 fn_quit 0 0 0
+CY 195 scr=0 fo=6,362,199,222,4583,0 jo=1,0,320,304,11084,2
+MC 195 id=4111 fn_quit 0 0 0
+MC 195 id=4110 fn_quit 0 0 0
+CY 196 scr=0 fo=6,362,199,222,4584,0 jo=1,0,320,304,11084,2
+MC 196 id=4111 fn_quit 0 0 0
+MC 196 id=4110 fn_quit 0 0 0
+MC 196 id=4102 fn_run_anim_mod 4216 30 0
+MC 196 id=4303 fn_run_anim_mod 4304 1 0
+MC 196 id=4307 fn_run_anim_mod 4308 1 0
+MC 196 id=4309 fn_run_anim_mod 4310 1 0
+MC 196 id=4313 fn_run_anim_mod 4314 1 0
+CY 197 scr=0 fo=6,362,199,223,4585,0 jo=1,0,320,304,11084,2
+MC 197 id=4111 fn_quit 0 0 0
+MC 197 id=4110 fn_quit 0 0 0
+MC 197 id=4305 fn_run_anim_mod 4306 1 0
+MC 197 id=4311 fn_run_anim_mod 4312 1 0
+CY 198 scr=0 fo=6,362,202,228,4586,0 jo=1,0,320,304,11084,2
+MC 198 id=4111 fn_quit 0 0 0
+MC 198 id=4110 fn_quit 0 0 0
+CY 199 scr=0 fo=6,362,202,228,4587,0 jo=1,0,320,304,11084,2
+MC 199 id=4111 fn_quit 0 0 0
+MC 199 id=4110 fn_quit 0 0 0
+MC 199 id=4100 fn_pause 5 0 0
+MC 199 id=4102 fn_run_anim_mod 4216 30 0
+MC 199 id=4303 fn_run_anim_mod 4304 1 0
+CY 200 scr=0 fo=6,362,202,228,4588,0 jo=1,0,320,304,11084,2
+MC 200 id=4111 fn_quit 0 0 0
+MC 200 id=4110 fn_quit 0 0 0
+CY 201 scr=0 fo=6,362,202,228,4589,0 jo=1,0,320,304,11084,2
+MC 201 id=4111 fn_quit 0 0 0
+MC 201 id=4110 fn_quit 0 0 0
+MC 201 id=4305 fn_run_anim_mod 4306 1 0
+MC 201 id=4307 fn_run_anim_mod 4308 1 0
+MC 201 id=4309 fn_run_anim_mod 4310 1 0
+MC 201 id=4311 fn_run_anim_mod 4312 1 0
+MC 201 id=4313 fn_run_anim_mod 4314 1 0
+MC 201 id=4321 fn_run_anim_mod 4322 1 0
+CY 202 scr=0 fo=6,362,202,228,4590,0 jo=1,0,320,304,11084,2
+MC 202 id=4111 fn_quit 0 0 0
+MC 202 id=4110 fn_quit 0 0 0
+MC 202 id=4102 fn_run_anim_mod 4216 30 0
+MC 202 id=4303 fn_run_anim_mod 4304 1 0
+CY 203 scr=0 fo=6,362,202,229,4591,0 jo=1,0,320,304,11084,2
+MC 203 id=4111 fn_quit 0 0 0
+MC 203 id=4110 fn_quit 0 0 0
+CY 204 scr=0 fo=6,362,204,232,4592,0 jo=1,0,320,304,11084,2
+MC 204 id=4111 fn_quit 0 0 0
+MC 204 id=4110 fn_quit 0 0 0
+MC 204 id=4100 fn_simple_mod 4212 26 0
+CY 205 scr=0 fo=6,362,204,232,4593,0 jo=1,0,320,304,11084,2
+MC 205 id=4111 fn_quit 0 0 0
+MC 205 id=4110 fn_quit 0 0 0
+MC 205 id=4102 fn_run_anim_mod 4216 30 0
+MC 205 id=4303 fn_run_anim_mod 4304 1 0
+MC 205 id=4305 fn_run_anim_mod 4306 1 0
+MC 205 id=4311 fn_run_anim_mod 4312 1 0
+CY 206 scr=0 fo=6,362,204,232,4594,0 jo=1,0,320,304,11084,2
+MC 206 id=4111 fn_quit 0 0 0
+MC 206 id=4110 fn_quit 0 0 0
+MC 206 id=4307 fn_run_anim_mod 4308 1 0
+MC 206 id=4309 fn_run_anim_mod 4310 1 0
+MC 206 id=4313 fn_run_anim_mod 4314 1 0
+CY 207 scr=0 fo=6,362,204,232,4595,0 jo=1,0,320,304,11084,2
+MC 207 id=4111 fn_quit 0 0 0
+MC 207 id=4110 fn_quit 0 0 0
+CY 208 scr=0 fo=6,362,204,233,4596,0 jo=1,0,320,304,11084,2
+MC 208 id=4111 fn_quit 0 0 0
+MC 208 id=4110 fn_quit 0 0 0
+MC 208 id=4102 fn_run_anim_mod 4216 30 0
+MC 208 id=4303 fn_run_anim_mod 4304 1 0
+CY 209 scr=0 fo=6,362,204,234,4597,0 jo=1,0,320,304,11084,2
+MC 209 id=4111 fn_quit 0 0 0
+MC 209 id=4110 fn_quit 0 0 0
+MC 209 id=4305 fn_run_anim_mod 4306 1 0
+MC 209 id=4311 fn_run_anim_mod 4312 1 0
+CY 210 scr=0 fo=6,362,206,240,4598,0 jo=1,0,320,304,11084,2
+MC 210 id=4111 fn_quit 0 0 0
+MC 210 id=4110 fn_quit 0 0 0
+CY 211 scr=0 fo=6,362,206,240,4599,0 jo=1,0,320,304,11084,2
+MC 211 id=4111 fn_quit 0 0 0
+MC 211 id=4110 fn_quit 0 0 0
+MC 211 id=4102 fn_run_anim_mod 4216 30 0
+MC 211 id=4303 fn_run_anim_mod 4304 1 0
+MC 211 id=4307 fn_run_anim_mod 4308 1 0
+MC 211 id=4309 fn_run_anim_mod 4310 1 0
+MC 211 id=4313 fn_run_anim_mod 4314 1 0
+CY 212 scr=0 fo=6,362,206,240,4600,0 jo=1,0,320,304,11084,2
+MC 212 id=4111 fn_quit 0 0 0
+MC 212 id=4110 fn_quit 0 0 0
+CY 213 scr=0 fo=6,362,206,240,4601,0 jo=1,0,320,304,11084,2
+MC 213 id=4111 fn_quit 0 0 0
+MC 213 id=4110 fn_quit 0 0 0
+MC 213 id=4305 fn_run_anim_mod 4306 1 0
+MC 213 id=4311 fn_run_anim_mod 4312 1 0
+CY 214 scr=0 fo=6,362,206,240,4602,0 jo=1,0,320,304,11084,2
+MC 214 id=4111 fn_quit 0 0 0
+MC 214 id=4110 fn_quit 0 0 0
+MC 214 id=4102 fn_run_anim_mod 4216 30 0
+MC 214 id=4303 fn_run_anim_mod 4304 1 0
+CY 215 scr=0 fo=6,362,206,240,4603,0 jo=1,0,320,304,11084,2
+MC 215 id=4111 fn_quit 0 0 0
+MC 215 id=4110 fn_quit 0 0 0
+CY 216 scr=0 fo=6,362,207,235,4604,0 jo=1,0,320,304,11084,2
+MC 216 id=4111 fn_quit 0 0 0
+MC 216 id=4110 fn_quit 0 0 0
+MC 216 id=4307 fn_run_anim_mod 4308 1 0
+MC 216 id=4309 fn_run_anim_mod 4310 1 0
+MC 216 id=4313 fn_run_anim_mod 4314 1 0
+CY 217 scr=0 fo=6,362,209,235,4605,0 jo=1,0,320,304,11084,2
+MC 217 id=4111 fn_quit 0 0 0
+MC 217 id=4110 fn_quit 0 0 0
+MC 217 id=4102 fn_run_anim_mod 4216 30 0
+MC 217 id=4303 fn_run_anim_mod 4304 1 0
+MC 217 id=4305 fn_run_anim_mod 4306 1 0
+MC 217 id=4311 fn_run_anim_mod 4312 1 0
+CY 218 scr=0 fo=6,362,211,246,4606,0 jo=1,0,320,304,11084,2
+MC 218 id=4111 fn_quit 0 0 0
+MC 218 id=4110 fn_quit 0 0 0
+CY 219 scr=0 fo=6,362,212,240,4607,0 jo=1,0,320,304,11084,2
+MC 219 id=3 fn_assign_base 4100 4104 0
+MC 219 id=3 fn_send_sync 4149 1 0
+MC 219 id=4111 fn_quit 0 0 0
+MC 219 id=4110 fn_quit 0 0 0
+MC 219 id=4100 fn_run_anim_mod 4215 29 0
+MC 219 id=4149 fn_pause 8 0 0
+CY 220 scr=0 fo=1,362,212,240,4607,0 jo=1,0,320,304,11084,2
+MC 220 id=3 fn_run_anim_mod 4208 22 0
+MC 220 id=4111 fn_quit 0 0 0
+MC 220 id=4110 fn_quit 0 0 0
+MC 220 id=4102 fn_run_anim_mod 4216 30 0
+MC 220 id=4303 fn_run_anim_mod 4304 1 0
+CY 221 scr=0 fo=6,362,213,240,6592,0 jo=1,0,320,304,11084,2
+MC 221 id=4111 fn_quit 0 0 0
+MC 221 id=4110 fn_quit 0 0 0
+MC 221 id=4305 fn_run_anim_mod 4306 1 0
+MC 221 id=4307 fn_run_anim_mod 4308 1 0
+MC 221 id=4309 fn_run_anim_mod 4310 1 0
+MC 221 id=4311 fn_run_anim_mod 4312 1 0
+MC 221 id=4313 fn_run_anim_mod 4314 1 0
+MC 221 id=4321 fn_run_anim_mod 4322 1 0
+CY 222 scr=0 fo=6,362,218,240,6593,0 jo=1,0,320,304,11084,2
+MC 222 id=4111 fn_quit 0 0 0
+MC 222 id=4110 fn_quit 0 0 0
+CY 223 scr=0 fo=6,362,221,240,6594,0 jo=1,0,320,304,11084,2
+MC 223 id=4111 fn_quit 0 0 0
+MC 223 id=4110 fn_quit 0 0 0
+MC 223 id=4102 fn_run_anim_mod 4216 30 0
+MC 223 id=4303 fn_run_anim_mod 4304 1 0
+CY 224 scr=0 fo=6,362,221,240,6595,0 jo=1,0,320,304,11084,2
+MC 224 id=4111 fn_quit 0 0 0
+MC 224 id=4110 fn_quit 0 0 0
+CY 225 scr=0 fo=6,362,223,246,6596,0 jo=1,0,320,304,11084,2
+MC 225 id=4111 fn_quit 0 0 0
+MC 225 id=4110 fn_quit 0 0 0
+MC 225 id=4305 fn_run_anim_mod 4306 1 0
+MC 225 id=4311 fn_run_anim_mod 4312 1 0
+CY 226 scr=0 fo=6,362,225,246,6597,0 jo=1,0,320,304,11084,2
+MC 226 id=4111 fn_quit 0 0 0
+MC 226 id=4110 fn_quit 0 0 0
+MC 226 id=4102 fn_run_anim_mod 4216 30 0
+MC 226 id=4303 fn_run_anim_mod 4304 1 0
+MC 226 id=4307 fn_run_anim_mod 4308 1 0
+MC 226 id=4309 fn_run_anim_mod 4310 1 0
+MC 226 id=4313 fn_run_anim_mod 4314 1 0
+CY 227 scr=0 fo=6,362,231,240,6598,0 jo=1,0,320,304,11084,2
+MC 227 id=4111 fn_quit 0 0 0
+MC 227 id=4110 fn_quit 0 0 0
+MC 227 id=4149 fn_foreground 4149 0 0
+MC 227 id=4149 fn_start_fx 287 2 0
+MC 227 id=4149 fn_run_anim_mod 4279 93 0
+CY 228 scr=0 fo=6,362,234,240,6599,0 jo=1,0,320,304,11084,2
+MC 228 id=4111 fn_quit 0 0 0
+MC 228 id=4110 fn_quit 0 0 0
+CY 229 scr=0 fo=6,362,222,240,6600,0 jo=1,0,320,304,11084,2
+MC 229 id=4111 fn_quit 0 0 0
+MC 229 id=4110 fn_quit 0 0 0
+MC 229 id=4102 fn_run_anim_mod 4216 30 0
+MC 229 id=4303 fn_run_anim_mod 4304 1 0
+MC 229 id=4305 fn_run_anim_mod 4306 1 0
+MC 229 id=4311 fn_run_anim_mod 4312 1 0
+CY 230 scr=0 fo=6,362,219,240,6601,0 jo=1,0,320,304,11084,2
+MC 230 id=4111 fn_quit 0 0 0
+MC 230 id=4110 fn_quit 0 0 0
+CY 231 scr=0 fo=6,362,212,246,6602,0 jo=1,0,320,304,11084,2
+MC 231 id=4111 fn_quit 0 0 0
+MC 231 id=4110 fn_quit 0 0 0
+MC 231 id=4307 fn_run_anim_mod 4308 1 0
+MC 231 id=4309 fn_run_anim_mod 4310 1 0
+MC 231 id=4313 fn_run_anim_mod 4314 1 0
+MC 231 id=4149 fn_kill_id 4149 0 0
+MC 231 id=4149 fn_quit 0 0 0
+CY 232 scr=0 fo=6,362,210,248,6603,0 jo=1,0,320,304,11084,2
+MC 232 id=4111 fn_quit 0 0 0
+MC 232 id=4110 fn_quit 0 0 0
+MC 232 id=4102 fn_run_anim_mod 4216 30 0
+MC 232 id=4303 fn_run_anim_mod 4304 1 0
+CY 233 scr=0 fo=6,362,205,254,6604,0 jo=1,0,320,304,11084,2
+MC 233 id=4111 fn_quit 0 0 0
+MC 233 id=4110 fn_quit 0 0 0
+MC 233 id=4305 fn_run_anim_mod 4306 1 0
+MC 233 id=4311 fn_run_anim_mod 4312 1 0
+CY 234 scr=0 fo=6,362,204,265,6605,0 jo=1,0,320,304,11084,2
+MC 234 id=4111 fn_quit 0 0 0
+MC 234 id=4110 fn_quit 0 0 0
+CY 235 scr=0 fo=6,362,205,270,6606,0 jo=1,0,320,304,11084,2
+MC 235 id=4111 fn_quit 0 0 0
+MC 235 id=4110 fn_quit 0 0 0
+MC 235 id=4102 fn_run_anim_mod 4216 30 0
+MC 235 id=4303 fn_run_anim_mod 4304 1 0
+CY 236 scr=0 fo=6,362,202,284,6607,0 jo=1,0,320,304,11084,2
+MC 236 id=4111 fn_quit 0 0 0
+MC 236 id=4110 fn_quit 0 0 0
+MC 236 id=4100 fn_idle 0 0 0
+MC 236 id=4100 fn_quit 0 0 0
+MC 236 id=4307 fn_run_anim_mod 4308 1 0
+MC 236 id=4309 fn_run_anim_mod 4310 1 0
+MC 236 id=4313 fn_run_anim_mod 4314 1 0
+CY 237 scr=0 fo=6,362,201,290,6608,0 jo=1,0,320,304,11084,2
+MC 237 id=4111 fn_quit 0 0 0
+MC 237 id=4110 fn_quit 0 0 0
+MC 237 id=4305 fn_run_anim_mod 4306 1 0
+MC 237 id=4311 fn_run_anim_mod 4312 1 0
+CY 238 scr=0 fo=6,362,195,295,6609,0 jo=1,0,320,304,11084,2
+MC 238 id=4111 fn_quit 0 0 0
+MC 238 id=4110 fn_quit 0 0 0
+MC 238 id=4102 fn_run_anim_mod 4216 30 0
+MC 238 id=4303 fn_run_anim_mod 4304 1 0
+CY 239 scr=0 fo=6,362,194,297,6610,0 jo=1,0,320,304,11084,2
+MC 239 id=4111 fn_quit 0 0 0
+MC 239 id=4110 fn_quit 0 0 0
+CY 240 scr=0 fo=6,362,191,307,6611,0 jo=1,0,320,304,11084,2
+MC 240 id=4111 fn_quit 0 0 0
+MC 240 id=4110 fn_quit 0 0 0
+CY 241 scr=0 fo=6,362,190,306,6612,0 jo=1,0,320,304,11084,2
+MC 241 id=4111 fn_quit 0 0 0
+MC 241 id=4110 fn_quit 0 0 0
+MC 241 id=4102 fn_run_anim_mod 4216 30 0
+MC 241 id=4303 fn_run_anim_mod 4304 1 0
+MC 241 id=4305 fn_run_anim_mod 4306 1 0
+MC 241 id=4307 fn_run_anim_mod 4308 1 0
+MC 241 id=4309 fn_run_anim_mod 4310 1 0
+MC 241 id=4311 fn_run_anim_mod 4312 1 0
+MC 241 id=4313 fn_run_anim_mod 4314 1 0
+MC 241 id=4321 fn_run_anim_mod 4322 1 0
+CY 242 scr=0 fo=6,362,188,310,6613,0 jo=1,0,320,304,11084,2
+MC 242 id=4111 fn_quit 0 0 0
+MC 242 id=4110 fn_quit 0 0 0
+CY 243 scr=0 fo=6,362,184,316,6614,0 jo=1,0,320,304,11084,2
+MC 243 id=4111 fn_quit 0 0 0
+MC 243 id=4110 fn_quit 0 0 0
+CY 244 scr=0 fo=6,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 244 id=3 fn_pause 10 0 0
+MC 244 id=4111 fn_quit 0 0 0
+MC 244 id=4110 fn_quit 0 0 0
+MC 244 id=4102 fn_run_anim_mod 4216 30 0
+MC 244 id=4303 fn_run_anim_mod 4304 1 0
+CY 245 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 245 id=4111 fn_quit 0 0 0
+MC 245 id=4110 fn_quit 0 0 0
+MC 245 id=4305 fn_run_anim_mod 4306 1 0
+MC 245 id=4311 fn_run_anim_mod 4312 1 0
+CY 246 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 246 id=4111 fn_quit 0 0 0
+MC 246 id=4110 fn_quit 0 0 0
+MC 246 id=4307 fn_run_anim_mod 4308 1 0
+MC 246 id=4309 fn_run_anim_mod 4310 1 0
+MC 246 id=4313 fn_run_anim_mod 4314 1 0
+CY 247 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 247 id=4111 fn_quit 0 0 0
+MC 247 id=4110 fn_quit 0 0 0
+MC 247 id=4102 fn_run_anim_mod 4216 30 0
+MC 247 id=4303 fn_run_anim_mod 4304 1 0
+CY 248 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 248 id=4111 fn_quit 0 0 0
+MC 248 id=4110 fn_quit 0 0 0
+CY 249 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 249 id=4111 fn_quit 0 0 0
+MC 249 id=4110 fn_quit 0 0 0
+MC 249 id=4305 fn_run_anim_mod 4306 1 0
+MC 249 id=4311 fn_run_anim_mod 4312 1 0
+CY 250 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 250 id=4111 fn_quit 0 0 0
+MC 250 id=4110 fn_quit 0 0 0
+MC 250 id=4102 fn_run_anim_mod 4216 30 0
+MC 250 id=4303 fn_run_anim_mod 4304 1 0
+CY 251 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 251 id=4111 fn_quit 0 0 0
+MC 251 id=4110 fn_quit 0 0 0
+MC 251 id=4307 fn_run_anim_mod 4308 1 0
+MC 251 id=4309 fn_run_anim_mod 4310 1 0
+MC 251 id=4313 fn_run_anim_mod 4314 1 0
+CY 252 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 252 id=4111 fn_quit 0 0 0
+MC 252 id=4110 fn_quit 0 0 0
+CY 253 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 253 id=4111 fn_quit 0 0 0
+MC 253 id=4110 fn_quit 0 0 0
+MC 253 id=4102 fn_run_anim_mod 4216 30 0
+MC 253 id=4303 fn_run_anim_mod 4304 1 0
+MC 253 id=4305 fn_run_anim_mod 4306 1 0
+MC 253 id=4311 fn_run_anim_mod 4312 1 0
+CY 254 scr=0 fo=14,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 254 id=3 fn_set_alternate 59 0 0
+MC 254 id=4111 fn_quit 0 0 0
+MC 254 id=4110 fn_quit 0 0 0
+CY 255 scr=0 fo=5,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 255 id=3 fn_no_human 0 0 0
+MC 255 id=3 fn_move_items 1 102 0
+MC 255 id=3 fn_disk_mouse 0 0 0
+MC 255 id=3 fn_cache_fast 0 0 0
+MC 255 id=3 fn_cache_chip 158 0 0
+MC 255 id=3 fn_normal_mouse 0 0 0
+MC 255 id=3 fn_start_music 1 0 0
+MC 255 id=3 fn_draw_screen 159 0 0
+MC 255 id=3 fn_add_human 0 0 0
+MC 255 id=3 fn_quit 0 0 0
+MC 255 id=4111 fn_quit 0 0 0
+MC 255 id=4110 fn_quit 0 0 0
+MC 255 id=23 fn_normal_mouse 0 0 0
+CY 256 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 256 id=3 fn_quit 0 1 0
+MC 256 id=162 fn_await_sync 0 0 0
+MC 256 id=164 fn_await_sync 0 0 0
+MC 256 id=175 fn_await_sync 0 0 0
+CY 257 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 257 id=3 fn_quit 0 1 0
+CY 258 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 258 id=3 fn_quit 0 1 0
+CY 259 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 259 id=3 fn_quit 0 1 0
+CY 260 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 260 id=3 fn_quit 0 1 0
+CY 261 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 261 id=3 fn_quit 0 1 0
+CY 262 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 262 id=3 fn_quit 0 1 0
+CY 263 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 263 id=3 fn_quit 0 1 0
+CY 264 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 264 id=3 fn_quit 0 1 0
+CY 265 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 265 id=3 fn_quit 0 1 0
+CY 266 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 266 id=3 fn_quit 0 1 0
+CY 267 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 267 id=3 fn_quit 0 1 0
+CY 268 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 268 id=3 fn_quit 0 1 0
+CY 269 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 269 id=3 fn_quit 0 1 0
+CY 270 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 270 id=3 fn_quit 0 1 0
+CY 271 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 271 id=3 fn_quit 0 1 0
+CY 272 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 272 id=3 fn_quit 0 1 0
+CY 273 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 273 id=3 fn_quit 0 1 0
+CY 274 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 274 id=3 fn_quit 0 1 0
+CY 275 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 275 id=3 fn_quit 0 1 0
+CY 276 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 276 id=3 fn_quit 0 1 0
+CY 277 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 277 id=3 fn_quit 0 1 0
+CY 278 scr=102 fo=1,362,183,318,6615,0 jo=1,0,320,304,11084,2
+MC 278 id=3 fn_quit 0 1 0

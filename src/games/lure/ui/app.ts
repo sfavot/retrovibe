@@ -110,6 +110,8 @@ const lure: PointClickGame<SaveData> = {
       skip: () => host.input.action("escape"),
       // Toucher = clic gauche, appui long = clic droit : les menus surgissants et la barre de menus se règlent d'un clic gauche.
       tap: (button, x, y) => host.input.tap(button, x, y),
+      // Combat : le moteur lit le bouton tenu (marcher, garder une parade). Un toucher, relâché aussitôt, ne suffit pas à gagner.
+      touchHolds: () => engine.fights.isFighting,
       key(event) {
         const action = keyAction(event);
         if (!action) return undefined;

@@ -20,7 +20,7 @@ export const copy = {
   controlsTitle: "Commandes",
   controls: [
     "Souris : clic gauche pour marcher ou franchir une sortie, clic droit sur un objet ou un personnage pour ouvrir la liste de ses actions, puis clic gauche sur l'une d'elles. La barre de menus du jeu s'ouvre quand le curseur touche le haut de l'écran.",
-    "Écran tactile : toucher = clic gauche, appui long = clic droit. Le bouton « Passer » saute l'introduction et les scènes.",
+    "Écran tactile : toucher = clic gauche, appui long = clic droit. En combat, le doigt posé tient le clic gauche : le garder posé pour marcher ou parer, le relever et le reposer pour frapper de nouveau. Le bouton « Passer » saute l'introduction et les scènes.",
     "Clavier (touches de ScummVM) : F5 sauvegarde, F7 restitue, F9 recommence, Échap saute l'introduction ou demande à quitter, O et N répondent aux questions, flèches haut et bas puis Entrée choisissent dans un menu. F1 ouvre le menu du site, F10 règle le volume. Combats : flèches gauche et droite, pavé numérique 7, 4, 1, 9, 6, 3.",
     "Espace met le jeu en pause, et le reprend.",
   ],
@@ -118,7 +118,7 @@ export const copy = {
     "Diermot, un héros malgré lui, a réchappé du massacre des cavaliers du Roi par les Skorls, des monstres mercenaires alliés à la révolte de l'apprentie sorcière Séléna, près de Turnvale. Il se réveille enfermé dans une cellule : à lui de s'évader et de comprendre ce qui se trame. Le jeu se joue entièrement à la souris : l'écran montre la pièce, la ligne d'état en bas décrit ce que le curseur survole.",
     "Un clic gauche fait marcher Diermot vers l'endroit visé ou lui fait franchir une sortie. Un clic droit sur un objet ou un personnage ouvre la liste des actions possibles (regarder, prendre, ouvrir, parler, donner…) : un clic gauche sur l'une d'elles la lance. Les objets de l'inventaire se choisissent de la même façon.",
     "La barre de menus du jeu apparaît quand le curseur touche le haut de l'écran (au doigt, en touchant le haut de l'écran) : sauvegarder, restituer, recommencer, quitter, vitesse du texte, son et crédits. Une question « Vous êtes sûr (o/n) ? » se règle d'un clic gauche (oui) ou d'un clic droit (non), ou avec les touches O et N.",
-    "Pendant un combat, la position du curseur par rapport à Diermot choisit le coup ; le clic gauche frappe fort, le clic droit plus légèrement. Au clavier : flèches gauche et droite pour avancer ou reculer, et le pavé numérique pour les coups (7, 4, 1 : haut, milieu, bas, curseur à gauche ; 9, 6, 3 : haut, milieu, bas, curseur à droite).",
+    "Pendant un combat, la position du curseur par rapport à Diermot choisit le coup ; le clic gauche frappe fort, le clic droit plus légèrement. Au clavier : flèches gauche et droite pour avancer ou reculer, et le pavé numérique pour les coups (7, 4, 1 : haut, milieu, bas, curseur à gauche ; 9, 6, 3 : haut, milieu, bas, curseur à droite). Au doigt : le doigt posé vaut un clic gauche tenu. Posé à gauche ou à droite de Diermot, il le fait marcher tant qu'il reste posé ; posé sur Diermot, en haut, au milieu ou en bas, il frappe ou pare à cette hauteur. Il n'y a pas de clic droit au doigt pendant un combat.",
     "L'introduction dure environ quatre minutes ; Échap (ou le bouton « Passer » au doigt) la saute. Le manuel d'origine, en français, détaille les actions, les lieux et les personnages.",
   ],
   helpKeysTitle: "Raccourcis clavier",

@@ -7,6 +7,7 @@ import { FightsManager } from "../../../src/games/lure/engine/fights/index";
 import type { LureEngine } from "../../../src/games/lure/engine/game";
 import { Cursor, GameState, HotspotFlag, HotspotId, TickProc } from "../../../src/games/lure/engine/ids";
 import { canSave, captureSave, restoreSave } from "../../../src/games/lure/engine/save";
+import { InputQueue } from "../../../src/games/lure/ui/input";
 import { Driver, type TestHost, hasOriginalFiles, makeEngine } from "./test-host";
 
 const PIG = HotspotId.PIG;
@@ -177,6 +178,58 @@ describe.skipIf(!hasOriginalFiles)("combats", () => {
     host.push({ type: "actionEnd", action: "fightMoveRight" });
     driver.ticks(1);
     expect(rec.fwmove_number).toBe(0); // curseur à gauche, aucun bouton
+  });
+
+  /**
+   * Combat du cochon joué au doigt par la file du navigateur (`InputQueue`), en réagissant aux coups toutes les trois images (240 ms) comme
+   * `fight` de `solution/runner.ts`, au seul bouton gauche. `hold` : le doigt reste posé (bouton tenu), relevé et reposé pour un
+   * nouveau coup ; sinon un toucher bref (bouton relâché une image plus tard). Rend vrai si la hache est gagnée. Sur les graines 1 à
+   * 30, le doigt tenu gagne 30 fois à ce rythme et encore 15 fois en réagissant toutes les six images ; le toucher bref, jamais.
+   */
+  function touchFight(seed: number, hold: boolean): boolean {
+    const { engine, host, fights } = startFight(6, seed);
+    const queue = new InputQueue();
+    const player = engine.world.requireActiveHotspot(HotspotId.PLAYER);
+    const tick = () => {
+      host.push(...queue.drain());
+      engine.tick();
+    };
+    let finger: string | null = null;
+    for (let t = 0; t < 5000 && fights.isFighting; t++) {
+      if (engine.busy) {
+        if (finger !== null) queue.up(0, 160, 100);
+        finger = null;
+        queue.tap(0, 160, 100);
+        tick();
+        tick();
+      } else if (t % 3 === 0) {
+        const me = fights.record(HotspotId.PLAYER);
+        const pig = fights.record(PIG);
+        const near = Math.abs(me.fwtrue_x - pig.fwtrue_x);
+        const seq = pig.fwseq_no;
+        const guard = pig.fwblocking;
+        let height = [guard !== 1 && guard !== 4, guard !== 5 && guard !== 2, true].indexOf(true);
+        if (near <= 40 && (seq === 7 || seq === 10)) height = 0;
+        else if (near <= 40 && (seq === 6 || seq === 8 || seq === 11)) height = 1;
+        else if (near > 32) height = -1; // marcher vers lui
+        const x = height < 0 ? 20 : me.fwtrue_x + 20;
+        const y = height < 0 ? 120 : [player.y - 4, player.y + 20, player.y + 45][height]!;
+        if (!hold) queue.tap(0, x, y);
+        else if (finger !== `${height}` || (height >= 0 && me.fwseq_ad === 0)) {
+          if (finger !== null) queue.up(0, x, y);
+          queue.down(0, x, y);
+          finger = `${height}`;
+        }
+      }
+      tick();
+    }
+    return engine.world.requireHotspot(0x2738).roomNumber === HotspotId.PLAYER;
+  }
+
+  it("au doigt : le doigt posé (bouton tenu) gagne le combat, un toucher bref ne suffit pas", () => {
+    const seeds = [1, 2, 3, 4, 5, 6];
+    expect(seeds.filter((seed) => touchFight(seed, true))).toEqual(seeds);
+    expect(seeds.filter((seed) => touchFight(seed, false))).toEqual([]);
   });
 
   it("méthodes 15 et 17 et gestionnaires 38 et 39 ne sont plus des souches", () => {

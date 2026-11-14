@@ -43,6 +43,9 @@ export interface PointClickCopy extends DialogCopy, Required<Pick<GameShellCopy,
   loadingFiles(percent: number): string;
   skip: string;
   skipLabel: string;
+  /** Bouton « Inventaire » de la barre tactile (jeux qui ont `PointClickLoaded.inventory`). */
+  inventory?: string;
+  inventoryLabel?: string;
   menuLabel: string;
   /** Bouton de l'aide ouverte par-dessus le jeu. */
   helpResume: string;
@@ -105,8 +108,12 @@ export interface PointClickLoaded {
   };
   /** Bouton « Passer » de la barre tactile. */
   skip(): void;
+  /** Bouton « Inventaire » de la barre tactile : absent, le bouton n'existe pas ; `canOpen` le grise (introduction, panneau, choix…). */
+  inventory?: { canOpen(): boolean; open(): void };
   /** Toucher du doigt (0) ou appui long (2) en (x, y), hors pause : une réplique à passer, ou un clic. */
   tap(button: 0 | 2, x: number, y: number): void;
+  /** Vrai quand un doigt posé doit tenir le bouton gauche au lieu de faire un toucher (les combats de Lure) ; absent : jamais. */
+  touchHolds?(): boolean;
   key(event: KeyboardEvent): PointClickKey | undefined;
   /** Touche relâchée (jeux dont des actions se tiennent enfoncées, comme les combats de Lure) ; vrai si le jeu la prend. */
   keyUp?(event: KeyboardEvent): boolean;
@@ -225,10 +232,20 @@ export async function mountPointClickApp<TSave>(
   skipButton.setAttribute("aria-disabled", "true");
   const pauseButton = touchButton(copy.pause, copy.pauseLabel, () => togglePause());
   const menuButton = touchButton(copy.menu, copy.menuLabel, () => openMenu());
+  // Seulement pour les jeux qui l'offrent (`PointClickLoaded.inventory`) ; grisé tant que le jeu ne peut pas l'ouvrir.
+  const inventoryButton = copy.inventory
+    ? touchButton(copy.inventory, copy.inventoryLabel ?? copy.inventory, () => {
+        if (!isPaused() && loaded?.inventory?.canOpen()) loaded.inventory.open();
+      })
+    : undefined;
+  if (inventoryButton) {
+    inventoryButton.disabled = true;
+    inventoryButton.setAttribute("aria-disabled", "true");
+  }
   const touchBar = h(
     "div",
     { class: "touch-bar pc-touch-bar" },
-    h("div", { class: "pc-touch-group" }, menuButton, skipButton),
+    h("div", { class: "pc-touch-group" }, menuButton, skipButton, ...(inventoryButton ? [inventoryButton] : [])),
     h("div", { class: "pc-touch-group" }, pauseButton),
   );
   const shell = mountGameShell({
@@ -482,7 +499,8 @@ export async function mountPointClickApp<TSave>(
       shell.canvas,
       { width: game.width, height: game.height },
       {
-        // Souris et stylet : boutons du jeu (gauche / droit). Doigt : `tap` (toucher = clic gauche, appui long = clic droit).
+        // Souris et stylet : boutons du jeu (gauche / droit). Doigt : `tap` (toucher = clic gauche, appui long = clic droit), ou
+        // bouton gauche tenu tant que le doigt reste posé quand le jeu le demande (`touchHolds`).
         move: (x, y) => {
           pointerX = x;
           pointerY = y;
@@ -493,6 +511,8 @@ export async function mountPointClickApp<TSave>(
         tap: (button) => {
           if (!isPaused()) loaded?.tap(button, pointerX, pointerY);
         },
+        touchHolds: () => !isPaused() && (loaded?.touchHolds?.() ?? false),
+        touchHold: (down, x, y) => (down ? host.input.down(0, x, y) : host.input.up(0, x, y)),
       },
       { onGesture: () => host.unlock() },
     ),
@@ -582,6 +602,7 @@ export async function mountPointClickApp<TSave>(
       for (let ticks = scheduler.due(now); ticks > 0; ticks--) engine.tick();
       engine.render();
       syncSkipButton(skipButton, engine.canSkip);
+      if (inventoryButton) syncSkipButton(inventoryButton, loaded?.inventory?.canOpen() ?? false);
       loaded?.afterTicks?.(frameUi);
     },
   });

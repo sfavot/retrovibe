@@ -77,4 +77,32 @@ describe("TouchPress", () => {
     press.up(3, 20, 20);
     expect(log.at(-1)).toBe("click 0");
   });
+
+  it("geste tenu : le doigt tient le bouton tant qu'il est posé, sans clic ni appui long", () => {
+    const { timers, advance, pending } = fakeTimers();
+    const log: string[] = [];
+    let holds = true;
+    const press = new TouchPress(
+      { move: (x, y) => log.push(`move ${x},${y}`), click: (b) => log.push(`click ${b}`), holds: () => holds, hold: (down) => log.push(down ? "down" : "up") },
+      timers,
+    );
+    press.down(1, 50, 60);
+    expect(log).toEqual(["move 50,60", "down"]);
+    expect(pending.size).toBe(0);
+    advance(LONG_PRESS_MS * 2);
+    press.move(1, 90, 60);
+    holds = false; // le mode est fixé quand le doigt se pose : il vaut jusqu'au relâchement
+    press.up(1, 95, 60);
+    expect(log).toEqual(["move 50,60", "down", "move 90,60", "move 95,60", "up"]);
+    // geste annulé : le bouton est relâché
+    holds = true;
+    press.down(2, 10, 10);
+    press.cancel(2);
+    expect(log.slice(-3)).toEqual(["move 10,10", "down", "up"]);
+    // hors geste tenu, le doigt refait un toucher
+    holds = false;
+    press.down(3, 20, 20);
+    press.up(3, 20, 20);
+    expect(log.slice(-3)).toEqual(["move 20,20", "move 20,20", "click 0"]);
+  });
 });

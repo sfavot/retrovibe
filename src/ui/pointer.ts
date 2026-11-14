@@ -98,6 +98,10 @@ export interface TouchPressActions {
   move(x: number, y: number): void;
   /** Clic court : 0 au relâchement d'un toucher ou d'un glissement, 2 après un appui long. */
   click(button: 0 | 2): void;
+  /** Lu quand le doigt se pose : vrai si ce geste tient le bouton gauche (`hold`) au lieu de faire un clic. Absent : jamais. */
+  holds?(): boolean;
+  /** Geste tenu : le bouton gauche est enfoncé (`true`, après le `move` du doigt qui se pose) ou relâché (`false`). */
+  hold?(down: boolean): void;
 }
 
 /**
@@ -105,10 +109,14 @@ export interface TouchPressActions {
  * (le relâchement ne fait alors plus rien), glissement = le curseur suit puis clic gauche au relâchement.
  * Aucun bouton n'est tenu pendant l'appui : le jeu voit d'abord la position (survol), puis le clic.
  * Un seul doigt est suivi, les autres sont ignorés.
+ *
+ * Geste tenu (`holds()` vrai quand le doigt se pose) : le doigt tient le bouton gauche tant qu'il reste posé, comme une souris, et
+ * le curseur le suit ; ni clic au relâchement, ni appui long. Pour les moments où le jeu lit un bouton tenu (un combat).
  */
 export class TouchPress {
   private pointer: number | null = null;
   private longPressed = false;
+  private holding = false;
   private readonly press: LongPress;
 
   constructor(
@@ -125,8 +133,10 @@ export class TouchPress {
     if (this.pointer !== null) return;
     this.pointer = id;
     this.longPressed = false;
+    this.holding = this.actions.holds?.() ?? false;
     this.actions.move(x, y);
-    this.press.start(x, y);
+    if (this.holding) this.actions.hold?.(true);
+    else this.press.start(x, y);
   }
 
   move(id: number, x: number, y: number): void {
@@ -140,19 +150,24 @@ export class TouchPress {
     if (id !== this.pointer) return;
     this.move(id, x, y);
     const longPressed = this.longPressed;
-    this.end();
-    if (!longPressed) this.actions.click(0);
+    const holding = this.end();
+    if (!holding && !longPressed) this.actions.click(0);
   }
 
-  /** Geste interrompu par le navigateur (pointercancel) : aucun clic. */
+  /** Geste interrompu par le navigateur (pointercancel) : aucun clic ; un bouton tenu est relâché. */
   cancel(id: number): void {
     if (id === this.pointer) this.end();
   }
 
-  private end(): void {
+  /** Fin du geste : relâche le bouton d'un geste tenu, et rend vrai si c'en était un. */
+  private end(): boolean {
+    const holding = this.holding;
     this.press.stop();
     this.pointer = null;
     this.longPressed = false;
+    this.holding = false;
+    if (holding) this.actions.hold?.(false);
+    return holding;
   }
 }
 
@@ -170,6 +185,13 @@ export interface CanvasPointerHandlers {
    * (0 : toucher, 2 : appui long).
    */
   tap?(button: 0 | 2): void;
+  /**
+   * Mode `tap` : lu quand un doigt se pose ; vrai si ce doigt doit tenir le bouton gauche (`touchHold`) au lieu de faire un toucher
+   * ou un appui long.
+   */
+  touchHolds?(): boolean;
+  /** Le doigt qui tient le bouton gauche (`touchHolds`) l'enfonce (`true`) ou le relâche (`false`) en (x, y) ; `move` suit le doigt entre les deux. */
+  touchHold?(down: boolean, x: number, y: number): void;
   /** Un doigt reste en place `LONG_PRESS_MS` (hors mode `tap`) : position logique de départ. Le doigt garde par ailleurs son `down` / `up`. */
   longPress?(x: number, y: number): void;
 }
@@ -203,15 +225,21 @@ export function bindCanvasPointer(
   };
   const gesturesOnly = handlers.tap !== undefined;
   const isTouch = (event: PointerEvent): boolean => event.pointerType === "touch";
+  /** Dernière position logique donnée par `emitMove` : celle du doigt qui tient le bouton. */
+  let last = { x: 0, y: 0 };
   const emitMove = (clientX: number, clientY: number, event: PointerEvent | null): void => {
     const at = locate(clientX, clientY);
-    if (at) handlers.move?.(at.x, at.y, event);
+    if (!at) return;
+    last = at;
+    handlers.move?.(at.x, at.y, event);
   };
   const touch = gesturesOnly
     ? new TouchPress(
         {
           move: (x, y) => emitMove(x, y, null),
           click: (button) => handlers.tap?.(button),
+          holds: () => handlers.touchHolds?.() ?? false,
+          hold: (down) => handlers.touchHold?.(down, last.x, last.y),
         },
         options.timers,
       )

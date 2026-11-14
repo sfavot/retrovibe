@@ -3,12 +3,12 @@ import { createSoundPrefs } from "../audio/audio";
 import { copy } from "../copy";
 import { createBassEngine } from "../create";
 import { type BassEngine, TICK_MS } from "../engine/game";
-import { SF } from "../engine/ids";
+import { INVENTORY_TRIGGER, SF } from "../engine/ids";
 import type { SaveData } from "../engine/save";
 import { CursorOverlay } from "../render/cursor";
 import { BrowserHost } from "./browser-host";
 import { renderHelp } from "./help";
-import { INVENTORY_BAR_HEIGHT, SCREEN_HEIGHT, SCREEN_WIDTH, tapKind } from "./input";
+import { INVENTORY_BAR_HEIGHT, SCREEN_HEIGHT, SCREEN_WIDTH, canOpenInventory, tapKind } from "./input";
 import { keyAction } from "./keys";
 import { BassLoop } from "./loop";
 import { createVoiceFiles, fetchBassFiles, loadBassData } from "./preload";
@@ -143,6 +143,21 @@ const bass: PointClickGame<SaveData> = {
       },
       // « Passer » : l'introduction, sinon la réplique en cours (la touche point).
       skip: () => host.input.action(loop.introRunning ? "skip" : "skipLine"),
+      // « Inventaire » : comme un toucher dans la bande du haut (pointeur sur la ligne 0 ; la barre reste ouverte jusqu'au toucher suivant
+      // ailleurs). Pas pendant l'introduction, un choix de dialogue, le panneau ou un pointeur verrouillé.
+      inventory: {
+        canOpen: () =>
+          canOpenInventory({
+            introRunning: loop.introRunning,
+            choosing: loop.choosing,
+            frozen: engine.control.frozen,
+            locked: (engine.system.systemFlags & SF.MOUSE_LOCKED) !== 0,
+          }),
+        open() {
+          barOpen = true;
+          host.input.openInventory(SCREEN_WIDTH / 2);
+        },
+      },
       tap(button, x, y) {
         if (loop.introRunning) {
           // Un toucher passe l'introduction, comme un clic de souris.
@@ -151,11 +166,14 @@ const bass: PointClickGame<SaveData> = {
         }
         const flags = engine.system.systemFlags;
         const nearBar = engine.pointer.y < INVENTORY_BAR_HEIGHT;
+        const zone = engine.mouse.zoneAt(x, y);
         const kind = tapKind(button, y, {
           barOpen: barOpen && nearBar,
           choosing: loop.choosing,
           frozen: engine.control.frozen,
           locked: (flags & SF.MOUSE_LOCKED) !== 0,
+          // La zone de 320 x 1 du haut de l'écran n'est que le déclencheur de la barre : ce n'est pas une zone « sous le doigt ».
+          zoneUnder: zone !== null && zone !== INVENTORY_TRIGGER,
         });
         if (kind === "bar") {
           barOpen = true;

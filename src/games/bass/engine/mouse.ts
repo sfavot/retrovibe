@@ -94,8 +94,12 @@ export class Mouse {
     this.button = 0;
   }
 
-  /** `pointerEngine` : première zone active sous le pointeur dans la liste de souris ; scripts `mouseOn` / `mouseOff`. */
-  private pointerEngine(xPos: number, yPos: number): void {
+  /**
+   * Première zone active de la liste de souris sous (`xPos`, `yPos`) (coordonnées de la machine, `TOP_LEFT` compris) : celle que
+   * `pointerEngine` retient. Active = même écran que le jeu et bit 16 de `status` ; la boucle suit les chaînages (`0xffff`) de la liste.
+   * Numéro de compact, ou 0 s'il n'y en a pas. Ne change rien à l'état du jeu.
+   */
+  private hitTest(xPos: number, yPos: number): number {
     const { vars, compacts } = this.host;
     let listNum = vars[Var.MOUSE_LIST_NO]!;
     let list: Uint16Array;
@@ -114,17 +118,35 @@ export class Mouse {
           const top = item[CompactField.ycood]! + relY;
           if (left > xPos || left + item[CompactField.mouseSizeX]! < xPos) continue;
           if (top > yPos || top + item[CompactField.mouseSizeY]! < yPos) continue;
-          // Zone touchée.
-          if (vars[Var.SPECIAL_ITEM] === itemNum) return;
-          vars[Var.SPECIAL_ITEM] = itemNum;
-          if (vars[Var.GET_OFF]) this.host.mouseScript(vars[Var.GET_OFF]!, itemNum);
-          vars[Var.GET_OFF] = item[CompactField.mouseOff]!;
-          if (item[CompactField.mouseOn]) this.host.mouseScript(item[CompactField.mouseOn]!, itemNum);
-          return;
+          return itemNum;
         }
       }
       if (list[pos] === 0xffff) listNum = list[pos + 1]!;
     } while (list[pos] !== 0);
+    return 0;
+  }
+
+  /**
+   * Zone active sous un point de l'écran de jeu (`x` 0 à 319, `y` 0 à 199), sans rien changer : numéro de compact, ou `null`.
+   * Même recherche que `pointerEngine` ; l'hôte s'en sert pour savoir si un toucher agira sur une zone (`ui/input.ts`, `tapKind`).
+   */
+  zoneAt(x: number, y: number): number | null {
+    return this.hitTest(x + TOP_LEFT_X, y + TOP_LEFT_Y) || null;
+  }
+
+  /** `pointerEngine` : première zone active sous le pointeur dans la liste de souris ; scripts `mouseOn` / `mouseOff`. */
+  private pointerEngine(xPos: number, yPos: number): void {
+    const { vars } = this.host;
+    const itemNum = this.hitTest(xPos, yPos);
+    if (itemNum) {
+      const item = this.host.compacts.require(itemNum);
+      if (vars[Var.SPECIAL_ITEM] === itemNum) return;
+      vars[Var.SPECIAL_ITEM] = itemNum;
+      if (vars[Var.GET_OFF]) this.host.mouseScript(vars[Var.GET_OFF]!, itemNum);
+      vars[Var.GET_OFF] = item[CompactField.mouseOff]!;
+      if (item[CompactField.mouseOn]) this.host.mouseScript(item[CompactField.mouseOn]!, itemNum);
+      return;
+    }
     if (vars[Var.SPECIAL_ITEM] !== 0) {
       vars[Var.SPECIAL_ITEM] = 0;
       const getOff = vars[Var.GET_OFF]!;

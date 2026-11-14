@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type BassInput, MouseButton } from "../../../src/games/bass/engine/host";
-import { INVENTORY_BAR_HEIGHT, INVENTORY_TAP_LINES, InputQueue, SETTLE_TICKS, type TapContext, tapKind } from "../../../src/games/bass/ui/input";
+import { INVENTORY_BAR_HEIGHT, INVENTORY_TAP_LINES, InputQueue, SETTLE_TICKS, type TapContext, canOpenInventory, tapKind } from "../../../src/games/bass/ui/input";
 
 /** Tout ce que le moteur lira au fil des ticks suivants (un `drain` par tick de 20 ms). */
 function flush(queue: InputQueue, ticks = SETTLE_TICKS + 2): BassInput[] {
@@ -145,7 +145,7 @@ describe("InputQueue : doigt et clavier", () => {
 });
 
 describe("tapKind : toucher dans la bande du haut", () => {
-  const open: TapContext = { barOpen: false, choosing: false, frozen: false, locked: false };
+  const open: TapContext = { barOpen: false, choosing: false, frozen: false, locked: false, zoneUnder: false };
 
   it("un toucher court dans les 12 premières lignes ouvre la barre sans cliquer", () => {
     expect(tapKind(0, 0, open)).toBe("bar");
@@ -167,5 +167,42 @@ describe("tapKind : toucher dans la bande du haut", () => {
     expect(tapKind(0, 3, { ...open, choosing: true })).toBe("click");
     expect(tapKind(0, 3, { ...open, frozen: true })).toBe("click");
     expect(tapKind(0, 3, { ...open, locked: true })).toBe("click");
+  });
+});
+
+describe("tapKind : zone du jeu sous le doigt", () => {
+  const open: TapContext = { barOpen: false, choosing: false, frozen: false, locked: false, zoneUnder: false };
+
+  it("dans la bande du haut, une zone sous le doigt (sortie, objet) : le toucher agit dessus", () => {
+    expect(tapKind(0, 5, { ...open, zoneUnder: true })).toBe("click");
+    expect(tapKind(0, INVENTORY_TAP_LINES - 1, { ...open, zoneUnder: true })).toBe("click");
+  });
+
+  it("dans la bande du haut, sans zone : la barre s'ouvre toujours", () => {
+    expect(tapKind(0, 5, { ...open, zoneUnder: false })).toBe("bar");
+  });
+
+  it("le reste ne change pas : en dessous de la bande, appui long, barre ouverte", () => {
+    expect(tapKind(0, 40, { ...open, zoneUnder: true })).toBe("click");
+    expect(tapKind(2, 5, { ...open, zoneUnder: true })).toBe("click");
+    expect(tapKind(0, 5, { ...open, barOpen: true, zoneUnder: true })).toBe("click");
+  });
+});
+
+describe("canOpenInventory : bouton « Inventaire »", () => {
+  const idle = { introRunning: false, choosing: false, frozen: false, locked: false };
+
+  it("actif en jeu", () => {
+    expect(canOpenInventory(idle)).toBe(true);
+  });
+
+  it("inactif pendant l'introduction, un choix de dialogue, le panneau ou la pause, un pointeur verrouillé", () => {
+    for (const key of ["introRunning", "choosing", "frozen", "locked"] as const) expect(canOpenInventory({ ...idle, [key]: true })).toBe(false);
+  });
+
+  it("ouvre la barre comme un toucher du haut : pointeur sur la ligne 0, sans clic", () => {
+    const queue = new InputQueue();
+    queue.openInventory(160);
+    expect(flush(queue)).toEqual([{ type: "move", x: 160, y: 0 }]);
   });
 });

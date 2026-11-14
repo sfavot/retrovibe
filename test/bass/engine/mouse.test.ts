@@ -44,6 +44,34 @@ function syntheticMouse() {
   return { mouse: new Mouse(host), vars, calls, host, cpts };
 }
 
+describe("Mouse.zoneAt : zone sous un point, sans rien changer", () => {
+  it("la première zone active de la liste sous le point, comme pointerEngine ; null hors de toute zone", () => {
+    const { mouse } = syntheticMouse();
+    expect(mouse.zoneAt(20, 10)).toBe(1); // dans les deux zones : la première de la liste
+    expect(mouse.zoneAt(50, 10)).toBe(2); // seulement dans la grande
+    expect(mouse.zoneAt(0, 0)).toBeNull();
+    expect(mouse.zoneAt(319, 199)).toBeNull();
+  });
+
+  it("ignore une zone inactive (bit 16 de status absent) ou d'un autre écran", () => {
+    const { mouse, cpts, vars } = syntheticMouse();
+    cpts.get(1)![F.status] = 0;
+    expect(mouse.zoneAt(20, 10)).toBe(2);
+    cpts.get(2)![F.screen] = 8;
+    expect(mouse.zoneAt(20, 10)).toBeNull();
+    vars[Var.SCREEN] = 8;
+    expect(mouse.zoneAt(20, 10)).toBe(2);
+  });
+
+  it("ne touche ni la zone survolée, ni les scripts mouseOn / mouseOff", () => {
+    const { mouse, vars, calls } = syntheticMouse();
+    mouse.zoneAt(20, 10);
+    expect(vars[Var.SPECIAL_ITEM]).toBe(0);
+    expect(vars[Var.GET_OFF]).toBe(0);
+    expect(calls).toEqual([]);
+  });
+});
+
 describe("Mouse : zones, survol et clics (compacts synthétiques)", () => {
   it("la première zone active de la liste sous le pointeur gagne ; mouseOn à l'entrée, mouseOff de la précédente à la sortie", () => {
     const { mouse, vars, calls } = syntheticMouse();

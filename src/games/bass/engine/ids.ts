@@ -213,6 +213,9 @@ export const S91 = 5824;
 export const F_MODULE_0 = 60400;
 export const MODULE_COUNT = 16;
 
+/** Compact de 320 x 1 tout en haut de l'écran (y = 0 et 1) : le survoler lance `fnStartMenu` (barre d'inventaire). */
+export const INVENTORY_TRIGGER = 46;
+
 /** Géométrie (skydefs.h). */
 export const TOP_LEFT_X = 128;
 export const TOP_LEFT_Y = 136;

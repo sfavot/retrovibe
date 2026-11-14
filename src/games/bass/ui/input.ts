@@ -163,14 +163,25 @@ export interface TapContext {
   frozen: boolean;
   /** Pointeur verrouillé par le jeu (`SF_MOUSE_LOCKED`) : rien à ouvrir. */
   locked: boolean;
+  /** Une zone du jeu (sortie, objet, personnage) est sous le doigt : le toucher agit dessus au lieu d'ouvrir la barre. */
+  zoneUnder: boolean;
 }
 
 /**
  * Ce qu'un toucher fait à l'écran (`engine.md` § 17) : `bar` (déplacer le pointeur sur la ligne 0, sans clic) pour un toucher court dans
- * la bande du haut quand la barre est fermée, `click` sinon (toucher dans la barre ouverte, toucher ailleurs qui la referme et agit,
+ * la bande du haut quand la barre est fermée et qu'aucune zone du jeu n'est sous le doigt (`zoneUnder` : une sortie en haut de l'écran
+ * se prend d'un toucher), `click` sinon (toucher dans la barre ouverte, toucher ailleurs qui la referme et agit,
  * appui long = clic droit, choix de dialogue, panneau).
  */
 export function tapKind(button: 0 | 2, y: number, context: TapContext): "bar" | "click" {
   if (button !== 0 || y >= INVENTORY_TAP_LINES) return "click";
-  return context.barOpen || context.choosing || context.frozen || context.locked ? "click" : "bar";
+  return context.barOpen || context.choosing || context.frozen || context.locked || context.zoneUnder ? "click" : "bar";
+}
+
+/**
+ * Le bouton « Inventaire » de la barre tactile a un effet : il ouvre la barre comme un toucher du haut, donc ni pendant l'introduction
+ * (un toucher la passe), ni pour un choix de dialogue (première ligne tout en haut), le panneau ou la pause, ni pointeur verrouillé.
+ */
+export function canOpenInventory(state: { introRunning: boolean } & Pick<TapContext, "choosing" | "frozen" | "locked">): boolean {
+  return !state.introRunning && !state.choosing && !state.frozen && !state.locked;
 }

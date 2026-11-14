@@ -24,7 +24,7 @@ export const copy = {
   controlsTitle: "Commandes",
   controls: [
     "Souris : clic gauche pour marcher, regarder ou parler, clic droit pour utiliser un objet ou le prendre en main depuis l'inventaire. L'inventaire s'ouvre quand le curseur touche le haut de l'écran.",
-    "Écran tactile : toucher = clic gauche, appui long = clic droit. Toucher le haut de l'écran ouvre l'inventaire, qui reste ouvert jusqu'au toucher suivant ailleurs. Le bouton « Passer » saute l'introduction ou la réplique en cours.",
+    "Écran tactile : toucher = clic gauche, appui long = clic droit. Le bouton « Inventaire » ouvre l'inventaire (toucher le haut de l'écran aussi, sauf sur une sortie ou un objet), qui reste ouvert jusqu'au toucher suivant ailleurs. Le bouton « Passer » saute l'introduction ou la réplique en cours.",
     "Clavier : F5 ouvre le panneau de contrôle du jeu (volume, vitesse, texte et voix, sauvegarde, recommencer), Échap saute l'introduction ou ferme le panneau, le point saute la réplique en cours, P met le jeu en pause. F1 ouvre le menu du site, F10 règle le volume de la musique.",
     "Les répliques sont parlées en anglais et sous-titrées en français ; le panneau de contrôle propose aussi texte seul ou voix seule.",
     "Version modifiée du jeu : voix converties en MP3, données reconstruites sans les voix, moteur réécrit (détails dans « Aide et crédits »).",
@@ -45,6 +45,8 @@ export const copy = {
   menuLabel: "Menu du site : sauvegarder, charger, volume, pause, aide, écran titre",
   skip: "Passer",
   skipLabel: "Passer l'introduction ou la réplique en cours (Échap ou point)",
+  inventory: "Inventaire",
+  inventoryLabel: "Ouvrir la barre d'inventaire (comme un toucher en haut de l'écran)",
   pause: "Pause",
   pauseLabel: "Mettre le jeu en pause ou le reprendre",
   resume: "Reprendre",

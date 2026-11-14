@@ -73,7 +73,7 @@ const lure: PointClickGame<SaveData> = {
         if (slots.latest()) pendingEnd = answer;
         else answer(true);
       },
-      onExit: ctx.exit,
+      onExit: ctx.toTitle,
       onSaveDialog: (save) => (pendingDialog = save ? "save" : "load"),
     });
     ctx.restoreVolume(host);

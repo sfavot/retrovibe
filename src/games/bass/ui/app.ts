@@ -62,7 +62,7 @@ const bass: PointClickGame<SaveData> = {
 
     const host: BrowserHost = new BrowserHost({
       storage,
-      onExit: ctx.exit,
+      onExit: ctx.toTitle,
       onSaveRequest: () => (pending = "save"),
       onRestoreRequest: () => (pending = "restore"),
       onSettings: (settings) => writeSettings(store, settings),

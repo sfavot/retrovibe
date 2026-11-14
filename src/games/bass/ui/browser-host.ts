@@ -14,7 +14,7 @@ export interface HostAudio {
 export interface BrowserHostOptions {
   /** Sauvegardes : stockage clé / valeur **déjà préfixé** (`prefixedStorage(store, SAVE_PREFIX)`). */
   storage: HostStorage;
-  /** Ce que fait `exit()` (« Quitter » confirmé du panneau, fin du jeu : retour à l'accueil). */
+  /** Ce que fait `exit()` (« Quitter » confirmé du panneau, fin du jeu : retour à l'écran titre du jeu). */
   onExit(): void;
   /** « Sauvegarder » du panneau de contrôle : l'hôte ouvre la fenêtre commune des emplacements puis appelle `GameControl.finishDialog`. */
   onSaveRequest(): void;

@@ -150,6 +150,8 @@ export interface PointClickLoadContext<TSave> {
   openChoice(options: ChoiceDialogOptions): void;
   /** Sortie du jeu (`exit()` du moteur, après la fin) : accueil du site, ou redémarrage sur la page de dev. */
   exit(): void;
+  /** Retour à l'écran titre du jeu, sans confirmation (« Quitter » du jeu, déjà confirmé) : le jeu s'arrête ; sans `options.toTitle`, comme `exit`. */
+  toTitle(): void;
   /** Le manifeste du jeu ; absent, illisible ou remplacé par une page d'erreur : le jeu n'est pas installé (`MissingFilesError`). */
   manifest<F>(fetch: (base: string) => Promise<F>): Promise<F>;
   /** Construit le moteur ; une sauvegarde à reprendre qui ne se rouvre pas donne l'erreur `copy.invalidSave` (le détail va à la console). */
@@ -288,6 +290,7 @@ export async function mountPointClickApp<TSave>(
       openLoad: (onCancel) => openLoad(onCancel),
       openChoice: (choice) => openChoice(choice),
       exit: leave,
+      toTitle: () => showTitle(),
       // Manifeste absent, illisible ou remplacé par une page d'erreur : le jeu n'est pas installé.
       manifest: (fetch) =>
         fetch(options.base).catch((error: unknown) => {
@@ -424,13 +427,17 @@ export async function mountPointClickApp<TSave>(
       ),
     );
   };
-  /** Retour à l'écran titre, après confirmation : le jeu s'arrête et la page est remplacée (`toTitle`). */
+  /** Retour à l'écran titre, sans confirmation : le jeu s'arrête et la page est remplacée (`toTitle`) ; sans lui, sortie du jeu. */
+  function showTitle(): void {
+    if (!options.toTitle) return leave();
+    shell.dispose();
+    options.toTitle();
+  }
+  /** Retour à l'écran titre, après confirmation (entrée « Écran titre » du menu). */
   const goToTitle = (): void => {
     const leaveNow = (): void => {
       closeModal();
-      if (!options.toTitle) return leave();
-      shell.dispose();
-      options.toTitle();
+      showTitle();
     };
     openModal(renderLeaveDialog(copy, leaveNow, closeModal));
   };

@@ -7,7 +7,7 @@ export interface BrowserHostOptions {
   audio: LureAudio;
   /** Sauvegardes : stockage clé / valeur **déjà préfixé** (`prefixedStorage(store, SAVE_PREFIX)`). */
   storage: HostStorage;
-  /** Ce que fait `exit()` (fin de partie, « Quitter » confirmé : retour à l'accueil). */
+  /** Ce que fait `exit()` (fin de partie, « Quitter » confirmé : retour à l'écran titre du jeu). */
   onExit(): void;
   /** « Sauvegarder » ou « Restituer » (barre de menus du jeu) : l'hôte ouvre la fenêtre commune des emplacements. */
   onSaveDialog(save: boolean): void;

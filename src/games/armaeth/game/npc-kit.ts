@@ -18,6 +18,10 @@ import { NUM, OFF, type SpawnFields, type StateChange, approach, canCarry, copyP
 
 // --- animations scénarisées --------------------------------------------------------------------------------------------------
 
+/** ANM 1 : le héros « tenu » par un adversaire pendant un duel (`16f5:0132(hero, ANM 1, Ego 6)` dans `2a44:0ae6` et `28b1:0734`).
+ *  Sprite 1×1 transparent : le héros est invisible, l'animation de l'adversaire montre le combat à sa place. */
+const ANM_HELD = 1;
+
 export interface NpcAnimationStart {
   /** Identifiant `ANI` (1 à 47). */
   id: number;
@@ -500,12 +504,10 @@ export class NpcKit {
 
   // --- héros ------------------------------------------------------------------------------------------------------------------
 
-  /** Le héros devient spectateur d'une animation à deux : `Gst 7`, `Mob 1`, `Ego 6`, le joueur perd la main (`4b50 = 0`). */
+  /** Le héros devient spectateur d'une animation à deux : `16f5:0132(hero, ANM 1, Ego 6)` (`Gst 7`, `Mob 1`), le joueur perd la main (`4b50 = 0`). */
   holdHero(ctx: BehaviorContext, hero: GameObject): void {
-    ctx.motion.reset(hero);
     this.stop(hero);
-    this.setState(ctx, hero, { gst: 7, mob: 1, ego: 6, fig: 0 });
-    hero.speedY = 1;
+    this.startAnimation(ctx, hero, { id: ANM_HELD, ego: 6 });
     if (hero === ctx.hero) ctx.state.moveEnabled = false;
   }
 

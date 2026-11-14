@@ -140,6 +140,7 @@ describe.skipIf(!hasOriginalFiles)("scénarios (monde réel)", () => {
     expect(npc.ego).toBe(1);
     expect(npc.animId).toBe(29);
     expect(hero.ego).toBe(6);
+    expect(hero.animId).toBe(1); // le héros joue l'ANM 1 (1×1 transparent) : invisible pendant le duel
     const expected = new Lcg(rig.engine.rng.state, msvcRand);
     const r = expected.mod(4);
     const before = state().score;
@@ -179,6 +180,7 @@ describe.skipIf(!hasOriginalFiles)("scénarios (monde réel)", () => {
     run(npc);
     expect(npc.ego).toBe(1);
     expect(hero.ego).toBe(6);
+    expect(hero.animId).toBe(1); // héros invisible pendant le duel (ANM 1)
     run(npc); // animation finie : d = 0
     expect(state().hero).toBeNull();
     const remains = state().findByNum(NUM.remains)!;

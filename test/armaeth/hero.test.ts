@@ -5,7 +5,7 @@ import { ArmaethEngine } from "../../src/games/armaeth/engine/engine";
 import { groundHeight } from "../../src/games/armaeth/engine/ground";
 import type { BehaviorContext } from "../../src/games/armaeth/engine/handlers";
 import { type GameObject, setRawU16 } from "../../src/games/armaeth/engine/state";
-import { HERO_ANIMATIONS, acceptsGround, continueGame, registerCorpse, registerHero } from "../../src/games/armaeth/game/hero";
+import { HERO_ANIMATIONS, acceptsGround, continueGame, registerCorpse, registerHero, startHeroAnimation } from "../../src/games/armaeth/game/hero";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 import { TestHost } from "./test-host";
 
@@ -241,6 +241,33 @@ describe.skipIf(!hasOriginalFiles)("héros complet (fichiers du jeu)", () => {
     // un deuxième `continuer` avec le héros présent n'en crée pas un autre
     expect(continueGame(t.ctx)).toBe("present");
     expect(t.engine.state!.objects.filter((o) => o.num === 1)).toHaveLength(1);
+  });
+
+  it("animation 6 (arrachage des ronces) : `Mob 2` et `Hor -1`, le héros se déplace vers la gauche ; les autres animations restent `Mob 1`", () => {
+    const t = new Session();
+    t.skipIntro();
+    const hero = t.hero;
+    // terrain plat de la salle 1 (même réglage que le test de marche), pour que le pas vers la gauche aboutisse
+    const terrain = t.engine.currentTerrain!;
+    hero.plane = 0;
+    hero.p = 28;
+    hero.x = 60;
+    hero.y = groundHeight(terrain.grid, 0, 60, 28);
+    hero.ground = 2;
+    hero.speedX = 0;
+    hero.speedP = 0;
+    hero.err = 0;
+    const x0 = hero.x;
+    startHeroAnimation(hero, t.ctx, 6, {});
+    expect(hero.animId).toBe(6);
+    expect(hero.mob).toBe(2); // `2594:0018` : `MOV byte ptr [bp-4], 2`
+    expect(hero.speedX).toBe(-1); // `2594:001c` : `MOV si, 0xffff`
+    t.until(() => hero.ego === 0); // fin de l'animation : retour à la marche
+    expect(hero.x).toBeLessThan(x0);
+    // une animation de mort (id 2) reste `Mob 1`, `Hor 0`
+    startHeroAnimation(hero, t.ctx, 2, {});
+    expect(hero.mob).toBe(1);
+    expect(hero.speedX).toBe(0);
   });
 
   it("frelons (Sol 37, visible) : dépouille variante 0 qui garde l'inventaire ; invisible : rien", () => {

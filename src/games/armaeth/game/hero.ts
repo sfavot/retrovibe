@@ -214,8 +214,9 @@ export interface AnimationRequest {
 }
 
 /**
- * `2594:0004` avec `AX != 0` : démarre l'animation `id` sur le héros (`Gst 7`, `Mob 1`, `Ego 6`, `Ver 1`, `Hor = -1` pour l'id 6),
- * le joueur perd la main. Exportée pour les verbes, la magie et les PNJ.
+ * `2594:0004` avec `AX != 0` : démarre l'animation `id` sur le héros (`Gst 7`, `Ego 6`, `Ver 1`) ; `Mob 1` et `Hor 0` en général,
+ * mais `Mob 2` et `Hor = -1` pour l'id 6 (arrachage des ronces : le héros se déplace vers la gauche pendant l'animation, relu dans
+ * le désassemblage `2594:0014..001f`). Le joueur perd la main. Exportée pour les verbes, la magie et les PNJ.
  */
 export function startHeroAnimation(hero: GameObject, ctx: BehaviorContext, id: number, request: AnimationRequest = {}, services: HeroServices = {}): number {
   return startAnimation(makeH(hero, ctx, services), id, request);
@@ -232,7 +233,7 @@ function startAnimation(h: H, id: number, request: AnimationRequest = {}): numbe
     const events = startScriptedAnimation(o, h.sprites, h.ani, {
       id,
       gst: 7,
-      mob: 1,
+      mob: id === 6 ? 2 : 1,
       ego: EGO.animation,
       hor: id === 6 ? -1 : 0,
       ver: 1,
@@ -244,8 +245,9 @@ function startAnimation(h: H, id: number, request: AnimationRequest = {}): numbe
   } else {
     o.animId = id;
     o.gst = 7;
-    o.mob = 1;
+    o.mob = id === 6 ? 2 : 1;
     o.ego = EGO.animation;
+    o.speedX = id === 6 ? -1 : 0;
     o.speedY = 1;
     pendingWithoutTable.set(o, id);
   }

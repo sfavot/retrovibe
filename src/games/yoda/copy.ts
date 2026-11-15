@@ -63,6 +63,7 @@ export const copy = {
   found: (name: string) => `Trouvé : ${name}`,
   winTitle: "Mission accomplie !",
   score: (n: number) => `Force Factor : ${n}`,
+  bestScore: (n: number) => `Meilleur Force Factor : ${n}`,
   keepPlaying: "Continuer à explorer",
   loseTitle: "Luke n'a pas survécu…",
   tryAgain: "Rejouer cette mission",

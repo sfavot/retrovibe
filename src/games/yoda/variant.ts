@@ -2,7 +2,7 @@ import { HotspotType, Layer, PuzzleType, TileFlag } from "../../engine/desktop-a
 import { type Game, MAX_HEALTH } from "../../engine/desktop-adventures/game";
 import type { Point } from "../../engine/desktop-adventures/geometry";
 import type { DesktopVariant } from "../../engine/desktop-adventures/variant";
-import { CharacterIds, DAGOBAH_CELLS, TileIds } from "./ids";
+import { CharacterIds, DAGOBAH_CELLS, TileIds, ZoneIds } from "./ids";
 import { moveYodaMonster, yodaMonsterTile } from "./monster-moves";
 import { YODA_OPCODES } from "./opcodes";
 import { forceFactor } from "./score";
@@ -145,12 +145,14 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
     sounds: {
       push: YodaSounds.Push,
       hurt: YodaSounds.Hurt,
+      // Les portes de Yoda jouent leur son dans leurs scripts (doorelec, doorpnum…) : aucun son en dur.
       door: -1,
       noGo: YodaSounds.NoGo,
-      teleport: -1,
+      // Déduits des noms de fichiers (non vérifiés dans YODESK.EXE) : TRANSPRT.WAV et, comme Indy, EEP.WAV.
+      teleport: YodaSounds.Transporter,
       defeat: YodaSounds.TryAgain,
       victory: YodaSounds.YouWin,
-      monsterDeath: -1,
+      monsterDeath: YodaSounds.Eep,
     },
     // Sans arme équipée, Luke ne peut pas attaquer.
     defaultWeapon: -1,
@@ -158,8 +160,10 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
     moveMonster: moveYodaMonster,
     monsterTile: yodaMonsterTile,
     briefingOnStart: false,
+    endZones: { win: ZoneIds.Win, lose: ZoneIds.Lose },
     slideOnBlock: true,
     hotspotsBeforeBumpScripts: true,
+    bulletAlongPath: true,
     byVehicleOnRoomChange: true,
 
     /** `consume` de WebFun : seuls les comestibles se consomment ; un soin est refusé à santé pleine. */

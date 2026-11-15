@@ -65,6 +65,7 @@ export function indyAdventure(dawSounds: readonly string[], baseUrl: string, exe
     },
     walkCursorFirstId: 11,
     compassIcons: INDY_COMPASS_ICONS,
+    endPictures: { win: IndyIds.winZone, lose: IndyIds.loseZone },
     progress: indyProgressRules,
     newStory(assets, seed, size, { history, victories }, goal) {
       const story = generateStory(assets, seed, size, { history, victories, goal });

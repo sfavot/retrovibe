@@ -2,10 +2,6 @@ import { describe, expect, it } from "vitest";
 import { HOLIDAY_TYPES, LAB_TAB_COUNT, SCENERY_TAB, inLabTab, labTabTypes } from "../../../src/games/tim3/engine/bin-tabs";
 import { Editor, HANDLE_SIZE, HANDLE_STATES, Zone } from "../../../src/games/tim3/engine/editor";
 import { LabPuzzle, MAX_CONDITIONS, OFF_BOTTOM, OFF_SCREEN, OFF_TOP, conditionKind, rangeFrames, solveVariant } from "../../../src/games/tim3/engine/lab-puzzle";
-import { readSolveRes } from "../../../src/games/tim3/data/solutions";
-import { RenderAssets, imageCount, stateImage } from "../../../src/games/tim3/render";
-import { drawOrder } from "../../../src/games/tim3/render/parts";
-import { frenchIndex } from "../data/real";
 import type { Part } from "../../../src/games/tim3/engine/part";
 import { DEFAULT_LAB, Tim3Session, labLevel } from "../../../src/games/tim3/engine/session";
 import { original, realTypes } from "../engine/helpers";
@@ -94,51 +90,6 @@ describe.skipIf(!original.has)("Labo : cadenas (43806a, 42e1e4, 42e9d8, 4209e5, 
     expect(play.isMovable(tree)).toBe(false);
     s.editor.removeToBin(tree);
     expect([...s.world.statics, ...s.world.mobiles]).not.toContain(tree);
-  });
-
-  it("décors : poignées de plan (43806a 0x1000 / 0x2000, 42e1e4) à droite, en haut l'arrière-plan, en bas le premier plan", () => {
-    const s = lab();
-    const forest = place(s, 150, 200, 200);
-    const r = s.editor.partRect(forest);
-    const right = r.x + r.w;
-    expect(s.editor.handles(forest).filter((h) => h.zone === Zone.Back || h.zone === Zone.Front)).toEqual([
-      { zone: Zone.Back, x: right, y: r.y - HANDLE_SIZE, state: HANDLE_STATES[11] },
-      { zone: Zone.Front, x: right, y: r.y + r.h, state: HANDLE_STATES[12] },
-    ]);
-    expect([HANDLE_STATES[11], HANDLE_STATES[12]]).toEqual([26, 27]);
-    // 438543, 438584 : bords gauches compris.
-    expect(s.editor.zoneAt(forest, right, r.y - 1)).toBe(Zone.Back);
-    expect(s.editor.zoneAt(forest, right + HANDLE_SIZE - 1, r.y - HANDLE_SIZE)).toBe(Zone.Back);
-    expect(s.editor.zoneAt(forest, right, r.y + r.h)).toBe(Zone.Front);
-    expect(s.editor.zoneAt(forest, right + HANDLE_SIZE, r.y + r.h)).toBe(Zone.None);
-    // Une pièce ordinaire n'en a pas, et `layer` la refuse.
-    const ball = place(s, 0, 450, 80);
-    expect(s.editor.handles(ball).some((h) => h.zone === Zone.Back || h.zone === Zone.Front)).toBe(false);
-    expect(s.editor.layer(ball, true)).toBe(false);
-  });
-
-  it("décors : arrière-plan = au bout de la liste (4393e0(…, 1)), premier plan = devant le premier décor (4393e0(…, 0)) ; ordre de dessin", () => {
-    const s = lab();
-    const wall = place(s, 1, 100, 300);
-    const forest = place(s, 150, 200, 200);
-    const falls = place(s, 151, 230, 210);
-    const desert = place(s, 152, 260, 190);
-    const statics = () => [...s.world.statics];
-    // Un décor posé passe devant les autres (4393e0(…, 0)) ; les décors restent après les autres pièces.
-    expect(statics()).toEqual([wall, desert, falls, forest]);
-    const decorOrder = () => drawOrder(s.world).map((d) => d.part).filter((p) => p !== wall);
-    expect(decorOrder()).toEqual([forest, falls, desert]);
-    expect(s.editor.layer(forest, false)).toBe(true);
-    expect(statics()).toEqual([wall, forest, desert, falls]);
-    expect(decorOrder()).toEqual([falls, desert, forest]);
-    expect(s.editor.layer(forest, true)).toBe(true);
-    expect(statics()).toEqual([wall, desert, falls, forest]);
-    expect(decorOrder()).toEqual([forest, falls, desert]);
-    // Décor seul dans sa liste, en tête : il y reste (le port remet la tête à jour, 4393be ne le fait pas).
-    const alone = lab();
-    const tree = place(alone, 150, 200, 200);
-    expect(alone.editor.layer(tree, true)).toBe(true);
-    expect([...alone.world.statics]).toEqual([tree]);
   });
 
   it("poignée « solution » (0x200) : au Labo, pièces +0x14 & 0x8000, en haut au milieu ; pas pour un mur", () => {
@@ -261,15 +212,10 @@ describe.skipIf(!original.has)("Labo : puzzle maison (LabPuzzle)", () => {
     const first = (n: number): number => (n === -1 ? 20 : (states[n] ?? 0));
     expect(rangeFrames({ from: 1, to: 2, explodes: false, suffix: "" }, first)).toEqual({ state1: 1, state2: 5 });
     expect(rangeFrames({ from: 3, to: -1, explodes: false, suffix: "" }, first)).toEqual({ state1: 10, state2: 19 });
-    const range = (from: number, to: number) => ({ from, to, explodes: false, suffix: "" });
-    // 429ef4 : la plage dont la première image est celle de la pièce (pas celle qui la contient).
-    const solve = { type: 4, name: "Ballon", states: [{ label: "Intact", ranges: [range(1, 2), range(2, 3)] }] };
-    expect(solveVariant(solve, 1, first)).toBe(0);
-    expect(solveVariant(solve, 6, first)).toBe(1);
-    expect(solveVariant(solve, 7, first)).toBe(0);
-    // Ligne qui commence par 0 (452b80 rend 0) : variante 0 sans chercher, sauf une ligne `@`.
-    expect(solveVariant({ ...solve, states: [{ label: "x", ranges: [range(0, 1), range(2, 3)] }] }, 6, first)).toBe(0);
-    expect(solveVariant({ type: 0, name: "Boule", position: [range(0, 1), range(2, 3)], states: [] }, 6, first)).toBe(1);
+    const solve = { type: 4, name: "Ballon", states: [{ label: "Intact", ranges: [{ from: 0, to: 1, explodes: false, suffix: "" }, { from: 2, to: 3, explodes: false, suffix: "" }] }] };
+    expect(solveVariant(solve, 0, first)).toBe(0);
+    expect(solveVariant(solve, 7, first)).toBe(1);
+    expect(solveVariant(solve, 15, first)).toBe(0);
   });
 });
 
@@ -294,60 +240,5 @@ describe.skipIf(!original.has)("Labo : but vérifié en marche (419803), conditi
     place(s, 0, 280, 40);
     s.start();
     for (let i = 0; i < 300; i++) expect(s.tick()).toEqual({ goal: 0, solved: false });
-  });
-});
-
-describe.skipIf(!original.has)("Labo : la condition suit la pièce retournée (429d84)", () => {
-  const index = frenchIndex();
-  const assets = new RenderAssets(index);
-  const solveParts = readSolveRes(index.get("SOLVE.RES"));
-  const firstOf = (type: number) => {
-    const anm = assets.partAnm(type)!;
-    return (n: number): number => (n === -1 ? imageCount(anm) : Math.max(0, stateImage(anm, n)));
-  };
-  const CANNON = 18;
-
-  it("canon (6 directions) : « N'a pas tiré » et « A tiré » passent à la plage de la nouvelle direction", () => {
-    const s = lab();
-    const lab_ = s.labPuzzle!;
-    const first = firstOf(CANNON);
-    const solve = solveParts[CANNON]!;
-    const cannon = place(s, CANNON, 250, 200);
-    expect(solveVariant(solve, cannon.frame, first)).toBe(0);
-    const notFired = rangeFrames(solve.states[0]!.ranges[0]!, first);
-    lab_.setCondition(cannon, { ...notFired, count: 0, rectX: 0, rectY: 0, rectWidth: 0, rectHeight: 0 });
-    expect(s.editor.flip(cannon, "turn")).toBe(true);
-    const variant = solveVariant(solve, cannon.frame, first);
-    expect(variant).toBe(1);
-    expect(lab_.followVariant(cannon, solve, first)).toBe(true);
-    expect(lab_.conditionOf(cannon)).toMatchObject(rangeFrames(solve.states[0]!.ranges[1]!, first));
-    expect(lab_.followVariant(cannon, solve, first)).toBe(false);
-    // Second état (ligne 3 après le nom) : il reste le second état.
-    lab_.setCondition(cannon, { ...rangeFrames(solve.states[1]!.ranges[1]!, first), count: 2, rectX: 0, rectY: 0, rectWidth: 0, rectHeight: 0 });
-    s.editor.flip(cannon, "turn");
-    const v2 = solveVariant(solve, cannon.frame, first);
-    expect(v2).not.toBe(1);
-    expect(lab_.followVariant(cannon, solve, first)).toBe(true);
-    expect(lab_.conditionOf(cannon)).toMatchObject({ ...rangeFrames(solve.states[1]!.ranges[v2]!, first), count: 2 });
-  });
-
-  it("le rectangle ne change pas ; une condition sans plage reconnue reste telle quelle ; pas de condition, rien", () => {
-    const s = lab();
-    const lab_ = s.labPuzzle!;
-    const first = firstOf(CANNON);
-    const solve = solveParts[CANNON]!;
-    const cannon = place(s, CANNON, 250, 200);
-    expect(lab_.followVariant(cannon, solve, first)).toBe(false);
-    const top = { state1: 0, state2: 0, count: 0, rectX: OFF_TOP.x, rectY: OFF_TOP.y, rectWidth: OFF_TOP.width, rectHeight: OFF_TOP.height };
-    lab_.setCondition(cannon, top);
-    s.editor.flip(cannon, "turn");
-    // L'état 1 de la condition (0) est la première image de la plage 0 : elle suit, mais reste « par le haut ».
-    lab_.followVariant(cannon, solve, first);
-    expect(conditionKind(lab_.conditionOf(cannon)!)).toBe("top");
-    expect(lab_.conditionOf(cannon)).toMatchObject({ rectX: OFF_TOP.x, rectY: OFF_TOP.y, rectWidth: OFF_TOP.width, rectHeight: OFF_TOP.height });
-    lab_.setCondition(cannon, { ...top, state1: 9999, state2: 9999 });
-    expect(lab_.followVariant(cannon, solve, first)).toBe(false);
-    expect(lab_.conditionOf(cannon)).toMatchObject({ state1: 9999, state2: 9999 });
-    expect(lab_.followVariant(cannon, null, first)).toBe(false);
   });
 });

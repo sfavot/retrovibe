@@ -7,6 +7,8 @@ export interface Progress {
   victories: number;
   /** Yoda : planète de la dernière histoire, exclue du tirage suivant. */
   lastWorld?: number;
+  /** Meilleur score obtenu en gagnant une partie. */
+  bestScore?: number;
 }
 
 export interface ProgressRules {
@@ -33,6 +35,7 @@ export function createProgressStore(key: string, rules: ProgressRules) {
       if (!Array.isArray(data.history) || !data.history.every((id) => isCount(id, 0xffff)) || !isCount(data.victories, rules.maxVictories)) return null;
       const progress: Progress = { history: data.history, victories: data.victories };
       if (isCount(data.lastWorld, 0xffff)) progress.lastWorld = data.lastWorld;
+      if (isCount(data.bestScore, 100_000)) progress.bestScore = data.bestScore;
       return progress;
     } catch {
       return null;
@@ -58,9 +61,12 @@ export function createProgressStore(key: string, rules: ProgressRules) {
       if (lastWorld !== undefined) next.lastWorld = lastWorld;
       save(next);
     },
-    recordVictory(): void {
+    /** Une victoire de plus ; `score` devient le meilleur score s'il le dépasse. */
+    recordVictory(score?: number): void {
       const progress = this.read();
-      save({ ...progress, victories: Math.min(rules.maxVictories, progress.victories + 1) });
+      const next: Progress = { ...progress, victories: Math.min(rules.maxVictories, progress.victories + 1) };
+      if (score !== undefined && score > (progress.bestScore ?? -1)) next.bestScore = score;
+      save(next);
     },
   };
 }

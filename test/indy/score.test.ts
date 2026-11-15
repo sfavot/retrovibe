@@ -150,3 +150,20 @@ describe.skipIf(!hasOriginalFiles)("score d'une partie", () => {
     expect(resumed.score()).toBe(300 + 4 * 85);
   });
 });
+
+describe("meilleur score", () => {
+  it("retient le meilleur score des victoires", () => {
+    const data = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+      removeItem: (k: string) => void data.delete(k),
+    });
+    const store = createProgressStore("test-best", indyProgressRules);
+    store.recordVictory(420);
+    store.recordVictory(300);
+    expect(store.read().bestScore).toBe(420);
+    store.recordVictory(512);
+    expect(store.read()).toMatchObject({ victories: 3, bestScore: 512 });
+  });
+});

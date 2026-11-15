@@ -93,7 +93,7 @@ export class App {
     this.audio = new AudioPlayer(def.sounds);
     this.audio.soundEnabled = this.audioPrefs.readSound();
     this.audio.musicEnabled = this.audioPrefs.readMusic();
-    this.view = new GameView(this.palette, this.audio, copy, def.locator, bitmaps);
+    this.view = new GameView(this.palette, this.audio, copy, def.locator, def.endPictures, bitmaps);
     this.view.onEnded = (kind) => {
       if (kind === "lose") {
         // Même objectif, nouvelle graine ; l'écran titre reste le recours si la génération échoue.
@@ -275,6 +275,8 @@ export class App {
     const start = h("button", { class: saved ? "" : "primary", type: "button" }, this.copy.start);
     const status = h("p", { class: "status-line", role: "status" });
     const manual = h("button", { class: "secondary", type: "button", onclick: () => void this.showManual() }, this.copy.manual);
+    const best = this.progressStore.read().bestScore;
+    const bestLine = best !== undefined ? h("p", { class: "muted best-score" }, this.copy.bestScore(best)) : null;
     const replay = this.progressStore.read().history.length
       ? h("button", { class: "secondary", type: "button" }, this.copy.replayStory)
       : null;
@@ -305,6 +307,7 @@ export class App {
         start,
         replay,
         status,
+        bestLine,
         manual,
         h("ul", { class: "help-list" }, ...this.copy.helpText.map((t) => h("li", {}, t))),
       ),
@@ -373,7 +376,7 @@ export class App {
   /** `record` : la partie compte dans la progression (faux pour une graine imposée en développement). */
   private launch(game: Game, record: boolean): Game {
     this.game = game;
-    if (record) game.addEventListener(GameEvent.Won, () => this.progressStore.recordVictory());
+    if (record) game.addEventListener(GameEvent.Won, () => this.progressStore.recordVictory(game.finalScore ?? undefined));
     // Accès de débogage en développement uniquement (console : __indy.game, __yoda.game).
     if (import.meta.env.DEV) Object.assign(window, { [`__${this.def.key}`]: { game, app: this } });
     this.paused = false;
@@ -448,7 +451,9 @@ export class App {
     game.consumeMapRequest();
     const wasPaused = this.paused;
     this.paused = true;
+    this.audio.play(this.def.mapSounds?.open ?? -1);
     await this.view.showMap();
+    this.audio.play(this.def.mapSounds?.close ?? -1);
     this.paused = wasPaused;
   }
 

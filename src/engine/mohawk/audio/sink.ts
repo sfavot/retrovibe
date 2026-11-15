@@ -6,7 +6,6 @@
  * (soundfont General MIDI) pour le MIDI. Implémentations : `src/ui/mohawk/web-sink.ts` (navigateur) et un faux puits dans
  * l'hôte de test.
  */
-import type { MidiSink } from "../../../audio/midi-sink";
 
 /** Échantillons prêts à jouer, mono, en flottants [-1, 1] (convertis depuis le PCM 8 bits non signé). */
 export interface PcmSound {
@@ -16,6 +15,12 @@ export interface PcmSound {
 
 export type WaveHandle = number;
 
+export interface MidiSink {
+  /** Envoie un message MIDI brut (statut + données, SysEx compris), à jouer à `atMs` (temps de `AudioSink.now`) ou tout de suite. */
+  send(message: Uint8Array, atMs?: number): void;
+  /** Coupe toutes les notes et remet les contrôleurs à zéro sur les 16 canaux. */
+  reset(): void;
+}
 
 export interface AudioSink {
   /** Autorise la sortie (politique d'autoplay) : à appeler depuis un geste de l'utilisateur. */

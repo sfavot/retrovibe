@@ -64,6 +64,7 @@ export const copy = {
   found: (name: string) => `Trouvé : ${name}`,
   winTitle: "Mission accomplie !",
   score: (n: number) => `Indy Quotient : ${n}`,
+  bestScore: (n: number) => `Meilleur Indy Quotient : ${n}`,
   keepPlaying: "Continuer à explorer",
   loseTitle: "Indy n'a pas survécu…",
   tryAgain: "Rejouer cette histoire",

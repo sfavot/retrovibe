@@ -57,6 +57,12 @@ export interface DesktopVariant {
   /** Yoda : cogner un objet déclenche d'abord les points chauds (PNJ, objets), puis les scripts. Indy : l'inverse. */
   readonly hotspotsBeforeBumpScripts?: boolean;
   /**
+   * Yoda (`bullet-move.ts` de WebFun) : le tir d'une arme à projectile (blaster, la Force) parcourt les cases à 1, 2
+   * et 3 du héros ; sur chaque case vide ou objet opaque, les scripts « objet posé » réagissent (interrupteur à
+   * distance), et un objet transparent l'arrête. Indy : le tir s'arrête sur le premier objet et ne réagit que là.
+   */
+  readonly bulletAlongPath?: boolean;
+  /**
    * Yoda : tout changement de pièce (porte, `ChangeZone` d'un script, véhicule) évalue aussi les conditions
    * `EnterByVehicle` dans la zone d'arrivée (`RoomTransitionScene` de WebFun, mode `ByPlane`) : les atterrissages
    * animés des zones en dépendent. Indy : seuls les véhicules le font.
@@ -81,6 +87,8 @@ export interface DesktopVariant {
    * vrai s'il a été pris ; les scripts « objet posé » de la zone s'exécutent ensuite dans tous les cas.
    */
   placeOnPuzzle?(game: Game, tile: number, at: Point): boolean;
+  /** Zones jouées en scène de fin avant la fenêtre de fin (Yoda : 76 et 77). Sans elles, la fenêtre s'affiche directement. */
+  readonly endZones?: { win: number; lose: number };
   /** Coup porté à un monstre ; renvoie vrai si le jeu l'a traité lui-même (Yoda : la Force immobilise). */
   hitMonster?(game: Game, monster: Monster, weapon: Character): boolean;
 }

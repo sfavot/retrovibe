@@ -1,6 +1,6 @@
 /**
  * Fichier MIDI standard (SMF) → liste d'événements triée, avec le temps en millisecondes (table des tempos).
- * Pur (aucun accès au navigateur) ; commun à Mathémagique et Zoombinis (séquenceur `src/audio/midi-sequencer.ts`, script de réduction de la soundfont) et à Flight of the Amazon Queen (pilote AdLib).
+ * Pur (aucun accès au navigateur) ; commun à Mathémagique et Zoombinis (séquenceur `src/engine/mohawk/audio/sequencer.ts`, script de réduction de la soundfont) et à Flight of the Amazon Queen (pilote AdLib).
  * Promu de `src/engine/mohawk/audio/` (évolution M6 de `docs/fotaq/plan.md`).
  *
  * Les jeux n'utilisent que des fichiers de format 0 (une piste), division en ticks par noire ; les formats 1 sont fusionnés

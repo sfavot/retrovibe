@@ -7,7 +7,7 @@
  * 2. met à **vélocité 0** les Note On de chaque emplacement vide (la note existe mais ne sonne pas, les durées restent).
  */
 import type { MarkerEvent, SongEvent } from "../../../audio/smf";
-import type { SongRewrite } from "../../../audio/midi-sequencer";
+import type { SongRewrite } from "../../../engine/mohawk/audio/sequencer";
 
 const CUE_META_TYPE = 0x07;
 

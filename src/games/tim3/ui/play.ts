@@ -7,8 +7,8 @@
  * deux clics). Au doigt, la pièce tenue est dessinée au-dessus du doigt (`TOUCH_LIFT`), un appui sur une pièce posée la
  * sélectionne (ses poignées s'affichent) et un appui long dans le bac donne le nom et la description de la pièce.
  *
- * Labo : cadenas et poignée « solution » des pièces (`Zone.Lock`, `Zone.Solution`), plans des décors (`Zone.Back`, `Zone.Front`),
- * mains des indices du puzzle maison avec leurs poignées (41ffd0 : effacer en haut à gauche, tourner en bas à gauche, modifier en bas à droite ; un appui sur la main la déplace,
+ * Labo : cadenas et poignée « solution » des pièces (`Zone.Lock`, `Zone.Solution`), mains des indices du puzzle maison avec leurs
+ * poignées (41ffd0 : effacer en haut à gauche, tourner en bas à gauche, modifier en bas à droite ; un appui sur la main la déplace,
  * 42057e), pose d'une nouvelle main (42057e après « Nouveau »), tracé d'un rectangle (« Endroit précis » de `SOLVE.ITF`), barre du but
  * à écrire (414fc1), onglets du bac (`engine/bin-tabs.ts`, `drawBinTabs`).
  *
@@ -85,8 +85,6 @@ export type PlayEvent =
   | { type: "stop" }
   | { type: "info"; partType: number; anchor: Rect }
   | { type: "program"; part: Part }
-  /** Une pièce posée a été retournée (42e8bb, 42e8fa, 42e939 : sa condition de réussite suit, 429d84). */
-  | { type: "flipped"; part: Part }
   | { type: "tip"; partType: number; anchor: Rect }
   | { type: "toolbarTip"; button: ShownButton }
   | { type: "tipEnd" }
@@ -431,8 +429,6 @@ export class PlayScreen {
       case Zone.Turn:
       case Zone.Lock:
       case Zone.Solution:
-      case Zone.Back:
-      case Zone.Front:
         return "pointer";
       default:
         return "default";
@@ -577,11 +573,7 @@ export class PlayScreen {
       case Zone.FlipX:
       case Zone.FlipY:
       case Zone.Turn:
-        if (ed.flip(part, zone === Zone.FlipX ? "x" : zone === Zone.FlipY ? "y" : "turn")) this.emit({ type: "flipped", part });
-        return;
-      case Zone.Back:
-      case Zone.Front:
-        ed.layer(part, zone === Zone.Back);
+        ed.flip(part, zone === Zone.FlipX ? "x" : zone === Zone.FlipY ? "y" : "turn");
         return;
       case Zone.WidthLeft:
       case Zone.WidthRight:

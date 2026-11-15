@@ -67,7 +67,12 @@ describe.skipIf(!hasOriginalFiles || !process.env.PLAY)("parties jouées par un 
     const seeds = Number(process.env.PLAY_SEEDS ?? 10);
     for (let seed = 1; seed <= seeds; seed++) {
       const story = generateStory(assets, seed * 7, WorldSize.Small);
+      // Hasard du jeu (monstres, dés des scripts) tiré de la graine : parties reproductibles.
+      const random = Math.random;
+      let state = seed * 7919;
+      Math.random = () => ((state = (Math.imul(state, 1103515245) + 12345) >>> 0) / 2 ** 32);
       const game = new Game(indyVariant, assets, story, silentPresenter, { difficulty: 1 });
+      Math.random = random;
       const bot = new IndyBot(game);
       await drive(game, game.start(IndyIds.townZone, { x: 11, y: 5 }));
       // Le robot ne fouille pas la maison de la ville : on lui remet le fouet qu'il y trouverait.

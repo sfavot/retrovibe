@@ -825,6 +825,24 @@ a.button:hover {
   font-weight: 700;
 }
 
+/* Scène de fin dans la vue (Yoda) : la zone reste visible, seul le bouton se pose en bas ; le score s'écrit dans le cadre dessiné. */
+.ending.scene {
+  background: none;
+  justify-content: flex-end;
+  padding-bottom: 6%;
+}
+
+.scene-score {
+  position: absolute;
+  left: calc(201 / 288 * 100%);
+  top: calc(239 / 288 * 100%);
+  transform: translate(-50%, -80%);
+  margin: 0;
+  font-weight: 700;
+  font-size: calc(var(--stage, 576px) / 288 * 10);
+  color: #fff;
+}
+
 .ending-picture {
   width: 50%;
   aspect-ratio: 1;

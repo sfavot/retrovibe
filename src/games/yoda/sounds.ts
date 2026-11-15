@@ -29,6 +29,8 @@ export const YodaSounds = {
   XWingOut: 39,
   R2D2a: 42,
   R2D2b: 43,
+  /** TRANSPRT.WAV : téléporteur. */
+  Transporter: 49,
   ArmForce: 52,
   // Musiques (WAV)
   Cantina: 55,

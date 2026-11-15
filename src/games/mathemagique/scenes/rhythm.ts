@@ -23,7 +23,7 @@ import type { Archive } from "../../../engine/mohawk/resources";
 import { SCR_FLAG, type AnimationHandle, type ScrStartOptions } from "../engine/scr-player";
 import { SceneId, type Scene, type SceneContext } from "../engine/scene";
 import type { MathServices, SceneArchive } from "../engine/services";
-import { parsePrograms, type ProgramEntry } from "../../../audio/midi-sequencer";
+import { parsePrograms, type ProgramEntry } from "../../../engine/mohawk/audio/sequencer";
 import { parseSong, type Song } from "../../../audio/smf";
 import type { Shape } from "../../../data/mohawk/shap";
 import { PolyHelper, createScrPolyPorts, openPolyArchive, rosterIntroFlag, type PolyPorts } from "../game/poly";

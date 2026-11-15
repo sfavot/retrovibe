@@ -23,8 +23,7 @@
  */
 import { createMonoBuffer } from "../../audio/pcm";
 import { WebGmSynth } from "../../audio/web-gm-synth";
-import type { MidiSink } from "../../audio/midi-sink";
-import type { AudioSink, PcmSound, WaveHandle } from "../../engine/mohawk/audio/sink";
+import type { AudioSink, MidiSink, PcmSound, WaveHandle } from "../../engine/mohawk/audio/sink";
 
 /** Soundfont réduite, servie par `publicDir` (`original/mathemagique/`). */
 export const SOUNDFONT_URL = `${import.meta.env.BASE_URL}mathemagique/mathemagique-gm.sf2`;

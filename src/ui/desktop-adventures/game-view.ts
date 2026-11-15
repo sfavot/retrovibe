@@ -38,6 +38,8 @@ export class GameView implements Presenter {
     private readonly audio: AudioPlayer,
     private readonly copy: DesktopCopy,
     private readonly locator: LocatorTiles,
+    /** Image de la fenêtre de fin (Indy : zones 208 / 209). Sans elle, la fin se joue dans la vue (scène de fin, Yoda). */
+    private readonly endPictures: { win: number; lose: number } | undefined,
     bitmaps: Map<string, Bitmap> = new Map(),
   ) {
     this.canvas = h("canvas", { class: "screen", width: VIEW_PIXELS, height: VIEW_PIXELS, "aria-label": this.copy.gameView });
@@ -268,17 +270,26 @@ export class GameView implements Presenter {
   ended(kind: "win" | "lose", score: number): Promise<void> {
     const game = this.game;
     if (!game) return Promise.resolve();
-    const zone = game.assets.zone(kind === "win" ? 208 : 209);
-    const picture = renderZonePicture(game, zone.id, this.palette.current);
+    const ends = this.endPictures;
     const button = h("button", { class: "primary", type: "button" }, kind === "win" ? this.copy.keepPlaying : this.copy.tryAgain);
-    const panel = h(
-      "div",
-      { class: `ending ${kind}`, role: "dialog", "aria-modal": "true", tabindex: "-1" },
-      picture,
-      h("h2", {}, kind === "win" ? this.copy.winTitle : this.copy.loseTitle),
-      kind === "win" ? h("p", { class: "score" }, this.copy.score(score)) : null,
-      button,
-    );
+    const title = h("h2", {}, kind === "win" ? this.copy.winTitle : this.copy.loseTitle);
+    const panel = ends
+      ? h(
+          "div",
+          { class: `ending ${kind}`, role: "dialog", "aria-modal": "true", tabindex: "-1" },
+          renderZonePicture(game, kind === "win" ? ends.win : ends.lose, this.palette.current),
+          title,
+          kind === "win" ? h("p", { class: "score" }, this.copy.score(score)) : null,
+          button,
+        )
+      : // Scène de fin dans la vue (Yoda) : la zone de fin reste visible ; le score s'écrit dans son cadre, comme l'original
+        // (`WinScene` de WebFun : texte centré en (201, 239) de la vue de 288 pixels). Le titre ne sert qu'aux lecteurs d'écran.
+        h(
+          "div",
+          { class: `ending scene ${kind}`, role: "dialog", "aria-modal": "true", tabindex: "-1", "aria-label": title.textContent ?? "" },
+          kind === "win" ? h("p", { class: "scene-score", "aria-label": this.copy.score(score) }, String(score)) : null,
+          button,
+        );
     const done = this.modal(panel, false);
     button.addEventListener("click", () => this.dismissModal?.());
     queueMicrotask(() => button.focus());

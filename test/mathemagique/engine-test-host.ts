@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { MidiSink } from "../../src/audio/midi-sink";
-import type { AudioSink, PcmSound, WaveHandle } from "../../src/engine/mohawk/audio/sink";
+import type { AudioSink, MidiSink, PcmSound, WaveHandle } from "../../src/engine/mohawk/audio/sink";
 import { GameFiles, type GameFileEntry } from "../../src/games/mathemagique/data/files";
 import type { MathEngine } from "../../src/games/mathemagique/engine/engine";
 import type { Frame } from "../../src/engine/mohawk/graphics/frame";

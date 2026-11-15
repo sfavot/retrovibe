@@ -55,6 +55,8 @@ export interface DesktopCopy {
   found(name: string): string;
   winTitle: string;
   score(n: number): string;
+  /** Meilleur score retenu, affiché sur l'écran titre. */
+  bestScore(n: number): string;
   keepPlaying: string;
   loseTitle: string;
   tryAgain: string;
@@ -121,7 +123,11 @@ export interface DesktopAdventure {
   readonly theme: number;
   /** Touche (KeyboardEvent.code) qui ouvre la carte. */
   readonly mapKey: string;
+  /** Sons d'ouverture et de fermeture de la carte (Yoda : LOCATOR.WAV, MAPCLS.WAV), facultatifs. */
+  readonly mapSounds?: { open: number; close: number };
   readonly locator: LocatorTiles;
+  /** Zones dont l'image illustre la fenêtre de fin (Indy). Sans elles, la scène de fin se joue dans la vue (`DesktopVariant.endZones`). */
+  readonly endPictures?: { win: number; lose: number };
   /** Icônes de la boussole dans l'exécutable : flèche éteinte puis allumée, par direction. */
   readonly compassIcons: Record<"up" | "down" | "left" | "right", { off: number; on: number }>;
   /** Curseur CURSOR de la flèche ←, première des huit flèches de marche à la souris. */

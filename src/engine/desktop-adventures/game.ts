@@ -1,4 +1,4 @@
-import { type Character, FrameEntry, HotspotType, Layer } from "./data/types";
+import { type Character, FrameEntry, HotspotType, Layer, TileFlag } from "./data/types";
 import type { Assets } from "./assets";
 import { DIRECTION_VECTORS, Direction, type Point, directionOf, samePoint } from "./geometry";
 import { killMonster, moveMonsters, placeMonsters } from "./monsters";
@@ -11,6 +11,8 @@ import { type Monster, type ZoneSnapshot, ZoneState, isAlive, restoreZone, snaps
 export const MAX_HEALTH = 300;
 /** Distance maximale d'un projectile du héros (cases). */
 const BULLET_RANGE = 4;
+/** Portée d'un tir qui parcourt son chemin (`bulletAlongPath`) : cases à 1, 2 et 3 du héros (`_actionFrames` 0 à 2 de WebFun). */
+const PATH_BULLET_RANGE = 3;
 
 export type Transition = { type: "room" } | { type: "sector"; dx: number; dy: number } | { type: "none" };
 
@@ -85,6 +87,8 @@ export class Game extends EventTarget {
   readonly overlays: Array<{ x: number; y: number; tile: number }> = [];
   readonly input: InputState = { move: { x: 0, y: 0 }, drag: false };
   gameWon = false;
+  /** Score de la victoire, fixé au moment où la partie est gagnée (null avant). */
+  finalScore: number | null = null;
   over = false;
   tick = 0;
   zone!: ZoneState;
@@ -645,15 +649,43 @@ export class Game extends EventTarget {
   private async lose(): Promise<void> {
     this.over = true;
     this.playSound(this.variant.sounds.defeat);
+    const lose = this.variant.endZones?.lose;
+    if (lose !== undefined) await this.playEndZone(lose);
     await this.presenter.ended("lose", 0);
   }
 
   private async win(): Promise<void> {
     if (this.gameWon) return;
     this.gameWon = true;
+    // Calculé une fois (le score de Yoda contient un tirage) : l'interface le lit à l'événement Won.
+    this.finalScore = this.score();
     this.emit(GameEvent.Won);
     this.playSound(this.variant.sounds.victory);
-    await this.presenter.ended("win", this.score());
+    const win = this.variant.endZones?.win;
+    const restore = win !== undefined ? await this.playEndZone(win) : null;
+    await this.presenter.ended("win", this.finalScore);
+    restore?.();
+  }
+
+  /**
+   * Scène de fin (Yoda : `WinScene` / `LoseScene` de WebFun) : la zone de victoire ou de défaite s'affiche, héros caché, et ses
+   * scripts d'entrée se jouent (le X-Wing qui passe). Renvoie de quoi revenir là où était le héros.
+   */
+  private async playEndZone(zoneId: number): Promise<() => void> {
+    const previous = { zone: this.zone, x: this.hero.x, y: this.hero.y, visible: this.hero.visible };
+    this.hero.visible = false;
+    this.overlays.length = 0;
+    this.zone = this.zoneState(zoneId);
+    this.emit(GameEvent.Zone);
+    await runScripts(this.scriptHost(), Mode.JustEntered, this.zone.zone.actions);
+    // La scène de fin ne mène nulle part : un changement de zone qu'elle demanderait est ignoré.
+    this.pendingZone = null;
+    return () => {
+      this.zone = previous.zone;
+      Object.assign(this.hero, { x: previous.x, y: previous.y, visible: previous.visible });
+      this.overlays.length = 0;
+      this.emit(GameEvent.Zone);
+    };
   }
 
   /** Tous les sons passent ici, entendus ou non : le jeu peut en tenir compte (voir `DesktopVariant.onSound`). */
@@ -699,9 +731,23 @@ export class Game extends EventTarget {
         this.attack = null;
         return false;
       }
-      if (!zone.inBounds(next.x, next.y) || attack.frame > BULLET_RANGE) {
+      if (!zone.inBounds(next.x, next.y) || attack.frame > (this.variant.bulletAlongPath ? PATH_BULLET_RANGE : BULLET_RANGE)) {
         this.attack = null;
         return false;
+      }
+      if (this.variant.bulletAlongPath) {
+        // Yoda (`bullet-move.ts` de WebFun) : un objet transparent (sprite) arrête le tir ; une case vide ou un objet
+        // opaque (mur, machine) le laisse passer, après avoir donné aux scripts « objet posé » l'occasion de réagir.
+        const tile = zone.getTile(next.x, next.y, Layer.Object);
+        if (tile !== -1 && this.assets.hasFlag(tile, TileFlag.Transparent)) {
+          this.attack = null;
+          return false;
+        }
+        attack.bullet = next;
+        const before = this.zone;
+        const changed = await this.weaponPlaced(attack.weapon, next);
+        if (changed || this.zone !== before) this.attack = null;
+        return changed;
       }
       if (zone.getTile(next.x, next.y, Layer.Object) !== -1) {
         this.attack = null;

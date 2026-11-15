@@ -28,6 +28,8 @@ export function yodaAdventure(dtaSounds: readonly string[], baseUrl: string, str
     theme: YodaSounds.Opening,
     // Touche du localisateur de l'original (`mapKey` de WebFun).
     mapKey: "KeyL",
+    // Déduits des noms de fichiers (non vérifiés dans YODESK.EXE).
+    mapSounds: { open: YodaSounds.Locator, close: YodaSounds.MapClose },
     // Tuiles du localisateur (`locator-tile.ts` de WebFun).
     locator: {
       unvisited: 835,

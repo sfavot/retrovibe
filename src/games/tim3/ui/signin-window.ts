@@ -10,16 +10,10 @@
  * - SI_UP, SI_DOWN (25005, 25006) : une rangée de défilement (426806, 42682f), cachées tant que tout tient (42641e, 426cce).
  * - SI_DONE (25007, « Terminé », Entrée et Échap : 4263eb) : `done` (426877) ; la fenêtre reste ouverte, l'appelant la ferme.
  * - SI_HELP (25010) : le manuel Windows (4169c8(0xb)) ; le port ouvre l'aide du site, comme les autres « ? » des fenêtres.
- * - Titre (25004, libellé 21145 en `SYS12.PFT`, relief 2, centré, contrôle de 85 × 27) : 421c91 le pose par 45301c, mots entiers,
- *   lignes de la hauteur de la police (20 pixels, `head` du PFT, échelle 1) tant qu'elles tiennent dans les 27 pixels, donc une seule.
- *   L'anglais « SIGN-IN » (63 pixels) y tient ; le français « ENTREZ VOTRE NOM » (170 pixels) non, et le jeu n'en dessine que
- *   « ENTREZ ». **Écart voulu** (`withReadableHeading`) : le port élargit le contrôle, de la gauche du champ du nom jusqu'à l'image
- *   de la plume, pour que le titre tienne sur sa ligne ; la police, le relief et la règle de mise en page restent ceux du jeu.
  */
 import { readItf, type Itf } from "../data/itf";
 import type { RenderAssets } from "../render/assets";
-import { ITF_DEFAULT_FONT, layoutItf } from "../render/itf-draw";
-import { measureText } from "../render/text";
+import { ITF_DEFAULT_FONT } from "../render/itf-draw";
 import { ScrollList, type ListRow, type ListStyle } from "../render/itf-list";
 import { PLAYER_NAME_MAX, cleanPlayerName, sameName } from "../engine/players";
 import { copy } from "../copy";
@@ -52,23 +46,6 @@ export interface SignInOptions {
   help(): void;
   /** Son du clic sur une rangée. */
   click?(): void;
-}
-
-/**
- * Titre lisible (écart voulu, voir l'en-tête) : si le titre ne tient pas sur une ligne dans son contrôle, celui-ci s'étend de la gauche
- * du champ du nom jusqu'à l'image de la plume, à la même hauteur ; inchangé si le titre tient déjà ou ne tiendrait pas non plus.
- */
-export function withReadableHeading(assets: RenderAssets, itf: Itf): Itf {
-  const heading = itf.controls.find((c) => c.id === SIGNIN.heading);
-  const name = itf.controls.find((c) => c.id === SIGNIN.name);
-  const picture = itf.controls.find((c) => c.id === SIGNIN.picture);
-  const font = assets.font(ITF_DEFAULT_FONT);
-  if (!heading || !name || !picture || !font) return itf;
-  const text = layoutItf(assets, itf).items.find((i) => i.id === SIGNIN.heading)?.text ?? "";
-  const width = measureText(font, text);
-  const room = picture.x - name.x;
-  if (width <= heading.width || width > room) return itf;
-  return { ...itf, controls: itf.controls.map((c) => (c.id === SIGNIN.heading ? { ...c, x: name.x, width: room } : c)) };
 }
 
 export function signInWindow(assets: RenderAssets, itf: Itf, o: SignInOptions): { itf: Itf; options: ItfWindowOptions; typed(): string; selected(): number | null } {
@@ -160,6 +137,6 @@ export function signInWindow(assets: RenderAssets, itf: Itf, o: SignInOptions): 
 }
 
 export function openSignInWindow(host: ItfHost, o: SignInOptions & { onClose?(): void }): ItfWindowHandle {
-  const w = signInWindow(host.assets, withReadableHeading(host.assets, readItf(host.assets.index.get("SIGNIN.ITF"))), o);
+  const w = signInWindow(host.assets, readItf(host.assets.index.get("SIGNIN.ITF")), o);
   return openItfWindow(host, w.itf, { ...w.options, ...(o.onClose ? { onClose: o.onClose } : {}) });
 }

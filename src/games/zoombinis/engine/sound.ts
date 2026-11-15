@@ -32,7 +32,7 @@ import { isMidi, parseMidi } from "../../../data/mohawk/midi";
 import { MohawkArchive, TAG_SND } from "../../../data/mohawk/mohawk";
 import { isWave, parseWave } from "../../../data/mohawk/wave";
 import { loadPcm } from "../../../engine/mohawk/audio/pcm";
-import { MidiPlayer, parsePrograms, parseSysx, type ProgramEntry } from "../../../audio/midi-sequencer";
+import { MidiPlayer, parsePrograms, parseSysx, type ProgramEntry } from "../../../engine/mohawk/audio/sequencer";
 import type { AudioSink, WaveHandle } from "../../../engine/mohawk/audio/sink";
 import { parseSong, type Song } from "../../../audio/smf";
 import { defineService } from "../../../engine/mohawk/scene";

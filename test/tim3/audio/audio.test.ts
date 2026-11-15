@@ -204,6 +204,45 @@ describe("WebTim3Audio", () => {
     expect(audio.mouth().viseme).toBe(0);
   });
 
+  it("interrupteur général du jeu (4115e6(10000, ·)) : coupé, tout s'arrête et rien ne part ; rallumé, la musique demandée repart", async () => {
+    const { audio, ctx, midi } = rig();
+    expect(audio.soundEnabled).toBe(true);
+    audio.unlock();
+    audio.enterPuzzle(1000);
+    audio.update();
+    audio.playEffect(3200);
+    audio.playVoice(goalVoice(3));
+    await flush();
+    expect(midi.some((m) => m[0] === 0x90)).toBe(true);
+    audio.soundEnabled = false;
+    expect(audio.activeEffects).toBe(0);
+    expect(audio.voiceActive).toBe(false);
+    expect(audio.playEffect(3200)).toBe(false);
+    expect(audio.playVoice(goalVoice(3))).toBe(false);
+    // Le morceau demandé est retenu, sans jouer, même changé.
+    audio.enterPuzzle(1001);
+    audio.resumeMusic();
+    midi.length = 0;
+    audio.update();
+    expect(audio.musicNumber).toBe(1001);
+    expect(midi.some((m) => m[0] === 0x90)).toBe(false);
+    // Indépendant du bouton « Son » du site : le gain général n'a pas bougé.
+    expect(ctx.gains[0].gain.value).toBe(1);
+    audio.soundEnabled = true;
+    audio.update();
+    expect(midi.some((m) => m[0] === 0x90)).toBe(true);
+    expect(audio.playEffect(3200)).toBe(true);
+  });
+
+  it("interrupteur général coupé avant la première musique : le synthétiseur naît silencieux", () => {
+    const { audio, midi } = rig();
+    audio.soundEnabled = false;
+    audio.enterPuzzle(1000);
+    audio.update();
+    expect(audio.musicNumber).toBe(1000);
+    expect(midi.some((m) => m[0] === 0x90)).toBe(false);
+  });
+
   it("muet du site : gain général à 0 sans rien arrêter ; onglet masqué : contexte suspendu", () => {
     const { audio, ctx, clock } = rig();
     audio.unlock();

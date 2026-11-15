@@ -287,7 +287,7 @@ describe.skipIf(!original.has)("mode aide", () => {
     let picking = false;
     const open = vi.fn();
     const pick = vi.fn();
-    const menu = new MainMenuScreen(assets, readItf(index.get("MAINMENU.ITF")), { title: "Menu", describe: () => undefined }, undefined, {
+    const menu = new MainMenuScreen(assets, readItf(index.get("MAINMENU.ITF")), { title: "Menu", describe: () => undefined }, {
       open,
       picking: () => picking,
       pick,

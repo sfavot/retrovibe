@@ -24,7 +24,6 @@
  */
 import type { Itf } from "../data/itf";
 import type { RenderAssets } from "../render/assets";
-import type { FrameSound } from "../render/front";
 import { ITF_DEFAULT_FONT, drawTextBox } from "../render/itf-draw";
 import type { Surface } from "../render/surface";
 import type { ItfScreen, ItfWindow, ItfWindowOptions } from "./itf-window";
@@ -56,7 +55,7 @@ const ACTIONS: Readonly<Record<number, MainMenuAction>> = {
   [MAIN_MENU.help]: "help",
 };
 
-/** Modes animés au survol. */
+/** Les six modes (textes de la bande `MM_TEXT`, noms du calque). */
 const MODES: readonly number[] = [MAIN_MENU.play, MAIN_MENU.lab, MAIN_MENU.duel, MAIN_MENU.manual, MAIN_MENU.signIn, MAIN_MENU.tutorial];
 
 /** Texte de `DESCRIPT.RES` d'un bouton du menu : identifiant du contrôle + 100 (423410). */
@@ -102,7 +101,6 @@ export class MainMenuScreen implements ItfScreen<MainMenuAction> {
     assets: RenderAssets,
     readonly itf: Itf,
     private readonly strings: MainMenuTexts,
-    onSound?: (sound: FrameSound) => void,
     private readonly help?: MainMenuHelp,
   ) {
     // Noms du calque : le texte du mode (contrôle + 100) ; les autres boutons gardent leur infobulle.
@@ -117,7 +115,6 @@ export class MainMenuScreen implements ItfScreen<MainMenuAction> {
       // 450d44 : Échap choisit Quitter (drapeau 0x20), qui pose la question 31113.
       cancelId: MAIN_MENU.quit,
       labels,
-      hoverAnimate: { ids: MODES, ...(onSound ? { sound: onSound } : {}) },
       status: (win) => (help?.picking() ? help.prompt : this.bandText(win)),
       ...(help ? { helpMode: { active: () => help.picking(), pick: (ids: number[]) => help.pick(ids), cancel: () => help.cancel() } } : {}),
       decorate: (surface, win) => this.drawBand(surface, win, assets),

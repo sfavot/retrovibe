@@ -11,8 +11,8 @@
  * - Le synthétiseur se charge en tâche de fond : un morceau demandé avant qu'il soit prêt démarre dès qu'il l'est.
  */
 import { parseHmi, type HmiSong } from "../../../audio/hmi";
-import { MidiPlayer } from "../../../engine/mohawk/audio/sequencer";
-import type { MidiSink } from "../../../engine/mohawk/audio/sink";
+import { MidiPlayer } from "../../../audio/midi-sequencer";
+import type { MidiSink } from "../../../audio/midi-sink";
 import { isMusicNumber, musicFileName } from "./ids";
 
 /** Ce que la musique demande au synthétiseur : `WebGmSynth` y répond tel quel. */

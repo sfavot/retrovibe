@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { MemoryStorage, prefixedStorage, type HostStorage } from "../../../src/engine/storage";
-import { GUEST_ID, MAX_PLAYERS, PLAYERS_KEY, PLAYER_NAME_MAX, PlayerRegistry, cleanPlayerName, migratePlayers, playerKeys, signInDecision } from "../../../src/games/tim3/engine/players";
+import {
+  DEFAULT_DISPLAY,
+  DEFAULT_PLAYER_PREFS,
+  DEFAULT_PLAYER_SOUND,
+  DISPLAY,
+  GUEST_ID,
+  MAX_PLAYERS,
+  PLAYERS_KEY,
+  PLAYER_NAME_MAX,
+  PlayerRegistry,
+  cleanPlayerName,
+  migratePlayerSound,
+  migratePlayers,
+  playerKeys,
+  readPlayerPrefs,
+  readPlayerSound,
+  signInDecision,
+} from "../../../src/games/tim3/engine/players";
 import { HomeProgress, Progress } from "../../../src/games/tim3/engine/session";
 
 /** Le stockage du jeu tel que `app.ts` le voit (`tim3:`). */
@@ -29,7 +46,7 @@ describe("joueurs : migration de la progression d'avant l'inscription", () => {
     expect([...raw.data.keys()].sort()).toEqual(
       [
         "retrovibe:tim3:voices",
-        "tim3:music",
+        "tim3:p0:music",
         "tim3:p0:edit:TLEV3",
         "tim3:p0:edit:lab",
         "tim3:p0:homeSolved",
@@ -85,7 +102,198 @@ describe("joueurs : migration de la progression d'avant l'inscription", () => {
     expect(keys.slice(0, 3)).toEqual(["solved", "last", "homeSolved"]);
     expect(keys).toContain("edit:TLEV1");
     expect(keys).toContain("edit:lab");
-    expect(keys).not.toContain("music");
+    expect(keys).toContain("music");
+    expect(keys).toContain("volume");
+    expect(keys).toEqual(expect.arrayContaining(["display", "soundOn", "solveAdvanced"]));
+    expect(keys).not.toContain("effects");
+  });
+});
+
+describe("joueurs : réglages de son du fichier de partie (42c6d0, 42c8cb : octets +0x50 volume, +0x51 musique)", () => {
+  it("partie neuve (42cf85) : musique en marche, volume 15 ; valeurs illisibles : celles d'une partie neuve", () => {
+    const { tim3 } = store();
+    const players = new PlayerRegistry(tim3, "Hôte");
+    expect(players.sound()).toEqual(DEFAULT_PLAYER_SOUND);
+    players.storage().set("volume", "abc");
+    expect(players.sound().volume).toBe(15);
+    players.storage().set("volume", "99");
+    expect(players.sound().volume).toBe(15);
+    players.storage().set("volume", "-4");
+    expect(players.sound().volume).toBe(0);
+  });
+
+  it("chaque joueur garde sa musique et son volume ; changer de joueur rend les siens", () => {
+    const { raw, tim3 } = store();
+    const players = new PlayerRegistry(tim3, "Hôte");
+    expect(players.setSound({ music: false, volume: 5 })).toBe(true);
+    const r = players.create("Alice");
+    if (r.status !== "created") throw new Error(r.status);
+    players.select(r.player.id);
+    expect(players.sound()).toEqual({ music: true, volume: 15 });
+    players.setSound({ volume: 8 });
+    expect(players.sound()).toEqual({ music: true, volume: 8 });
+    players.select(GUEST_ID);
+    expect(players.sound()).toEqual({ music: false, volume: 5 });
+    expect(raw.get("tim3:p0:music")).toBe("0");
+    expect(raw.get("tim3:p0:volume")).toBe("5");
+    expect(raw.get("tim3:p1:volume")).toBe("8");
+    // Rouvert (rechargement de la page) : l'invité au lancement, avec ses réglages.
+    expect(new PlayerRegistry(tim3, "Hôte").sound()).toEqual({ music: false, volume: 5 });
+  });
+
+  it("un numéro réutilisé repart des réglages d'une partie neuve", () => {
+    const { raw, tim3 } = store();
+    const players = new PlayerRegistry(tim3, "Hôte");
+    raw.set("tim3:p1:music", "0");
+    raw.set("tim3:p1:volume", "3");
+    const r = players.create("Bob");
+    expect(r.status).toBe("created");
+    expect(players.sound(1)).toEqual(DEFAULT_PLAYER_SOUND);
+  });
+
+  it("migration : la musique et le volume communs deviennent ceux de l'invité et des joueurs déjà inscrits, sans perte", () => {
+    const { raw, tim3 } = store();
+    // Un site déjà passé par l'inscription : registre avec Alice (1) et Chloé (3), réglages encore communs.
+    raw.set("tim3:players", JSON.stringify({ version: 1, players: [{ id: 1, name: "Alice" }, { id: 3, name: "Chloé" }] }));
+    raw.set("tim3:music", "0");
+    raw.set("tim3:volume", "10");
+    raw.set("tim3:effects", "0");
+    raw.set("retrovibe:tim3:voices", "0");
+    raw.set("retrovibe:tim3:sound", "0");
+    raw.set("tim3:p3:volume", "3");
+    const players = new PlayerRegistry(tim3, "Hôte");
+    expect(players.sound()).toEqual({ music: false, volume: 10 });
+    expect(players.sound(1)).toEqual({ music: false, volume: 10 });
+    // Un réglage déjà propre au joueur n'est pas écrasé.
+    expect(players.sound(3)).toEqual({ music: false, volume: 3 });
+    expect(raw.get("tim3:music")).toBeNull();
+    expect(raw.get("tim3:volume")).toBeNull();
+    // Restent communs : l'interrupteur des effets, les voix et le bouton « Son » du site.
+    expect(raw.get("tim3:effects")).toBe("0");
+    expect(raw.get("retrovibe:tim3:voices")).toBe("0");
+    expect(raw.get("retrovibe:tim3:sound")).toBe("0");
+    // Une seule fois.
+    expect(migratePlayerSound(tim3, [1, 3])).toBe(false);
+    players.select(1);
+    players.setSound({ volume: 13 });
+    expect(new PlayerRegistry(tim3, "Hôte").sound(1).volume).toBe(13);
+  });
+
+  it("migration d'avant l'inscription : la musique et le volume suivent la progression vers l'invité", () => {
+    const { raw, tim3 } = store();
+    raw.set("tim3:solved", "TLEV1");
+    raw.set("tim3:volume", "5");
+    const players = new PlayerRegistry(tim3, "Hôte");
+    expect(players.sound()).toEqual({ music: true, volume: 5 });
+    expect(raw.get("tim3:volume")).toBeNull();
+  });
+
+  it("migration interrompue (écriture refusée) : rien n'est effacé, elle reprend ensuite", () => {
+    const raw = new MemoryStorage();
+    raw.set("tim3:players", JSON.stringify({ version: 1, players: [] }));
+    raw.set("tim3:music", "0");
+    let refuse = true;
+    const flaky: HostStorage = { get: (k) => raw.get(k), set: (k, v) => !refuse && raw.set(k, v), remove: (k) => raw.remove(k) };
+    const tim3 = prefixedStorage(flaky, "tim3:");
+    expect(migratePlayerSound(tim3, [])).toBe(false);
+    expect(raw.get("tim3:music")).toBe("0");
+    refuse = false;
+    expect(new PlayerRegistry(tim3, "Hôte").sound().music).toBe(false);
+    expect(raw.get("tim3:music")).toBeNull();
+    expect(readPlayerSound(prefixedStorage(raw, "tim3:p0:")).music).toBe(false);
+  });
+});
+
+describe("joueurs : préférences du fichier de partie (+0x154 affichage, +0x52 son, +0x150 mode avancé de SOLVE.ITF)", () => {
+  it("partie neuve (42cf85, 42d012) : affichage 7 (animations, décors, fonds, icônes d'info), son en marche, SOLVE.ITF normal", () => {
+    expect(DEFAULT_DISPLAY).toBe(7);
+    expect(DEFAULT_PLAYER_PREFS).toEqual({ display: 7, soundOn: true, solveAdvanced: false });
+    const { tim3 } = store();
+    expect(new PlayerRegistry(tim3, "Hôte").prefs()).toEqual(DEFAULT_PLAYER_PREFS);
+  });
+
+  it("valeurs illisibles : celles d'une partie neuve ; le mot d'affichage est gardé tel quel (bits inconnus compris)", () => {
+    const { raw, tim3 } = store();
+    const players = new PlayerRegistry(tim3, "Hôte");
+    for (const bad of ["abc", "-1", "1.5", "70000", ""]) {
+      raw.set("tim3:p0:display", bad);
+      expect(players.prefs().display, bad).toBe(DEFAULT_DISPLAY);
+    }
+    raw.set("tim3:p0:display", String(0x113));
+    expect(players.prefs().display).toBe(0x113);
+    raw.set("tim3:p0:soundOn", "oui");
+    raw.set("tim3:p0:solveAdvanced", "oui");
+    expect(players.prefs()).toMatchObject({ soundOn: true, solveAdvanced: false });
+  });
+
+  it("chaque joueur garde les siennes ; changer de joueur rend celles du nouveau ; rechargement : celles de l'invité", () => {
+    const { raw, tim3 } = store();
+    const players = new PlayerRegistry(tim3, "Hôte");
+    expect(players.setPrefs({ display: DISPLAY.ambient | DISPLAY.noInfo, soundOn: false })).toBe(true);
+    const r = players.create("Alice");
+    if (r.status !== "created") throw new Error(r.status);
+    players.select(r.player.id);
+    expect(players.prefs()).toEqual(DEFAULT_PLAYER_PREFS);
+    players.setPrefs({ solveAdvanced: true });
+    expect(players.prefs()).toEqual({ ...DEFAULT_PLAYER_PREFS, solveAdvanced: true });
+    players.select(GUEST_ID);
+    expect(players.prefs()).toEqual({ display: 0x11, soundOn: false, solveAdvanced: false });
+    expect(raw.get("tim3:p0:display")).toBe("17");
+    expect(raw.get("tim3:p0:soundOn")).toBe("0");
+    expect(raw.get("tim3:p1:solveAdvanced")).toBe("1");
+    expect(new PlayerRegistry(tim3, "Hôte").prefs()).toEqual({ display: 0x11, soundOn: false, solveAdvanced: false });
+  });
+
+  it("écriture refusée : `setPrefs` rend faux (l'interface montre alors 31173), rien n'est écrit", () => {
+    const raw = new MemoryStorage();
+    let refuse = false;
+    const flaky: HostStorage = { get: (k) => raw.get(k), set: (k, v) => !refuse && raw.set(k, v), remove: (k) => raw.remove(k) };
+    const players = new PlayerRegistry(prefixedStorage(flaky, "tim3:"), "Hôte");
+    refuse = true;
+    expect(players.setPrefs({ display: 1 })).toBe(false);
+    expect(players.setPrefs({ soundOn: false, solveAdvanced: true })).toBe(false);
+    expect(players.prefs()).toEqual(DEFAULT_PLAYER_PREFS);
+    refuse = false;
+    expect(players.setPrefs({ display: 1 })).toBe(true);
+  });
+
+  it("un numéro réutilisé repart des préférences d'une partie neuve", () => {
+    const { raw, tim3 } = store();
+    const players = new PlayerRegistry(tim3, "Hôte");
+    raw.set("tim3:p1:display", "0");
+    raw.set("tim3:p1:soundOn", "0");
+    raw.set("tim3:p1:solveAdvanced", "1");
+    expect(players.create("Bob").status).toBe("created");
+    expect(players.prefs(1)).toEqual(DEFAULT_PLAYER_PREFS);
+  });
+
+  it("migration : les joueurs d'avant ces préférences lisent celles d'une partie neuve, sans rien perdre ni écrire", () => {
+    const { raw, tim3 } = store();
+    raw.set("tim3:players", JSON.stringify({ version: 1, players: [{ id: 1, name: "Alice" }, { id: 4, name: "Denis" }] }));
+    const before: Record<string, string> = {
+      "tim3:p0:solved": "TLEV1",
+      "tim3:p0:music": "0",
+      "tim3:p1:volume": "5",
+      "tim3:p1:last": "TLEV3",
+      "tim3:p4:edit:lab": LAB_MACHINE,
+      "tim3:effects": "0",
+      "retrovibe:tim3:sound": "0",
+      "retrovibe:tim3:voices": "0",
+    };
+    for (const [k, v] of Object.entries(before)) raw.set(k, v);
+    const players = new PlayerRegistry(tim3, "Hôte");
+    for (const id of [GUEST_ID, 1, 4]) expect(players.prefs(id)).toEqual(DEFAULT_PLAYER_PREFS);
+    // Lire ne crée aucune clé ; toutes les autres sont intactes.
+    for (const id of [0, 1, 4]) for (const k of ["display", "soundOn", "solveAdvanced"]) expect(raw.get(`tim3:p${id}:${k}`)).toBeNull();
+    for (const [k, v] of Object.entries(before)) expect(raw.get(k), k).toBe(v);
+    expect(players.sound()).toEqual({ music: false, volume: 15 });
+    expect(new Progress(players.storage()).isSolved("TLEV1")).toBe(true);
+    // Une préférence écrite ensuite ne touche qu'elle.
+    players.select(4);
+    players.setPrefs({ display: DISPLAY.scenery });
+    expect(raw.get("tim3:p4:display")).toBe("2");
+    expect(raw.get("tim3:p4:edit:lab")).toBe(LAB_MACHINE);
+    expect(readPlayerPrefs(prefixedStorage(raw, "tim3:p4:"))).toEqual({ ...DEFAULT_PLAYER_PREFS, display: DISPLAY.scenery });
   });
 });
 

@@ -7,6 +7,10 @@
  *   horloge de la musique comprise (elle est celle du contexte).
  * - **Le temps du jeu ne dépend pas du son** : voix et effets durent sur l'horloge de l'hôte, que le contexte existe ou non, soit bloqué par
  *   l'autoplay ou coupé.
+ * - **Réglages superposés** : le bouton « Son » du site (`setMuted`, commun à tous les joueurs) coupe la sortie ; dessous, l'interrupteur
+ *   général du jeu (`soundEnabled`, case « Effets Sonores On » de `USERPREF.ITF`), la musique (`playMusic` n'est appelé que si elle est en
+ *   marche) et `volume` sont ceux du joueur courant, `effectsEnabled` et `voicesEnabled` des préférences communes. Un son n'est entendu que
+ *   si le site a le son ET si ses réglages le laissent passer ; le volume (0 à 15) ne s'applique qu'à la musique et aux effets.
  * - L'hôte appelle `unlock()` au premier geste, `update()` à chaque image, `suspend()` / `resume()` selon la visibilité.
  */
 import { VoiceBank, type SoundFiles } from "../../../audio/voice-bank";
@@ -51,6 +55,11 @@ export interface Tim3Audio {
   effectsEnabled: boolean;
   /** Volume de la guitare, 0 à 15 (`[0x47796c]`) : musique et effets, pas les voix (411674(1001 / 3001, v), gain v / 15). */
   volume: number;
+  /**
+   * Interrupteur général du jeu (4115e6(10000, ·), `[0x47c094]`) : chaque départ de son le vérifie avant celui de sa classe (4111b7, 4112f5,
+   * 41171e). Coupé, tout s'arrête (41151e(10000) : musique, effets, voix) et rien ne part ; le morceau demandé est gardé (`resumeMusic`).
+   */
+  soundEnabled: boolean;
   /** Entrée dans un puzzle ou le Labo : coupe voix et effets, lance la musique du niveau (`LevInfo.music`). */
   enterPuzzle(music: number): void;
   /** Coupe tout (sortie vers les menus). */
@@ -85,6 +94,8 @@ export class WebTim3Audio implements Tim3Audio {
   private musicGain: GainNode | null = null;
   private level = 15;
   effectsEnabled = true;
+  /** Interrupteur général du jeu (`soundEnabled`). */
+  private master = true;
   private port: (GmPort & { load(): Promise<void>; close(): void }) | null = null;
   /** La voix en cours a arrêté la musique ; `resumeAtEnd` : la relancer quand elle se tait. */
   private voiceSilence: { resumeAtEnd: boolean } | null = null;
@@ -131,7 +142,7 @@ export class WebTim3Audio implements Tim3Audio {
     const port = create(ctx, gain, onReady);
     this.port = port;
     this.music = new Tim3Music(this.options.resources, port);
-    if (this.voiceSilence) this.music.silence();
+    if (this.voiceSilence || !this.master) this.music.silence();
     void port.load();
     return this.music;
   }
@@ -156,7 +167,7 @@ export class WebTim3Audio implements Tim3Audio {
 
   resumeMusic(): void {
     this.voiceSilence = null;
-    this.music?.resume();
+    if (this.master) this.music?.resume();
   }
 
   get musicNumber(): number {
@@ -166,7 +177,7 @@ export class WebTim3Audio implements Tim3Audio {
   // --- effets ------------------------------------------------------------------------------------------------------------
 
   playEffect(id: number, priority = 1, flags = 0): boolean {
-    if (!this.effectsEnabled) return false;
+    if (!this.master || !this.effectsEnabled) return false;
     return this.effects.play(id, priority, flags);
   }
 
@@ -196,7 +207,7 @@ export class WebTim3Audio implements Tim3Audio {
   // --- voix --------------------------------------------------------------------------------------------------------------
 
   playVoice(ref: VoiceRef, resumeAtEnd = true): boolean {
-    if (!this.voices.play(ref)) return false;
+    if (!this.master || !this.voices.play(ref)) return false;
     // 424684 : 41177b(1000, 1), la musique s'arrête pendant la voix (le jeu ne baisse pas le volume : il coupe).
     this.music?.silence();
     this.voiceSilence = { resumeAtEnd };
@@ -229,7 +240,7 @@ export class WebTim3Audio implements Tim3Audio {
     this.voices.stop();
     this.effects.stopAll();
     this.voiceSilence = null;
-    this.music?.resume();
+    if (this.master) this.music?.resume();
     this.playMusic(music);
   }
 
@@ -237,8 +248,30 @@ export class WebTim3Audio implements Tim3Audio {
     this.voices.stop();
     this.effects.stopAll();
     this.voiceSilence = null;
-    this.music?.resume();
+    if (this.master) this.music?.resume();
     this.stopMusic();
+  }
+
+  get soundEnabled(): boolean {
+    return this.master;
+  }
+
+  /**
+   * 4115e6(10000, état) : coupé, 41151e arrête musique, effets et voix ; pendant la coupure, un morceau demandé est seulement retenu.
+   * Rallumé, le morceau demandé repart du début (comme le `PlaySound(music, 0, 1)` qui suit la fermeture d'une fenêtre ; supposé : le jeu
+   * attend la prochaine demande).
+   */
+  set soundEnabled(on: boolean) {
+    if (on === this.master) return;
+    this.master = on;
+    if (on) {
+      this.music?.resume();
+      return;
+    }
+    this.voices.stop();
+    this.effects.stopAll();
+    this.voiceSilence = null;
+    this.music?.silence();
   }
 
   /** Préférence « Son » du site (`SoundPrefs`) : coupe tout sans arrêter ni décaler quoi que ce soit. */

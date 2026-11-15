@@ -28,13 +28,15 @@ S'ajouteront ensuite `files.md` (généré par l'extraction), `graphics.md`, `au
   - `TIMWIN.EXE` cartographié : table des types de pièces, pas de simulation, virgule fixe 1/512, aucun flottant, aucun hasard.
 - **Verdict : faisable.** Le jeu est plus gros que BASS par son cœur, car on réécrit ~26 000 instructions de simulation, et plus simple en données (presque pas de compression, pas de scripts).
 - Seuls `docs/tim3/plan.md`, `formats.md` et `engine.md` ont été créés ; aucun code.
-- **15/11/2026** : vagues X, P (banc Unicorn, format v2), D, V, A (commun + jeu), Φ1, Φ2 et R faites ; **les 206 niveaux complets donnent des traces identiques au banc sur 600 pas** (`traces.test.ts`, 633/633). En cours : U. Rien commité.
+- **15/11/2026** : vagues X, P (banc Unicorn, format v2), D, V, A (commun + jeu), Φ1, Φ2 et R faites ; **les 206 niveaux complets donnent des traces identiques au banc sur 600 pas** (`traces.test.ts`, 633/633). Puis U, S, J, K et la vague F (interface fidèle), commitées et mises en ligne le même jour.
 - **Vague F** : l'aide du professeur est portée (`HELP.ITF`, mode aide de l'écran et du menu principal, professeur animé et
   synchronisé sur sa voix, aussi dans `BINSOLVE`) : `ui.md` § Aide du professeur.
 - **Outils du Labo** (éléments différés, faits le 15/11/2026) : cadenas (`HTLOCK`, cadenas de chaque pièce), levier d'essai (mode 8),
   éditeur d'indices, but écrit dans la barre, conditions de réussite (`SOLVE.ITF`), onglets du bac (décors 110 à 280 compris), puzzles
   maison jouables depuis le bac « Puzzles Personnels » avec leur progression ; sauvegardes en version 2 avec migration de la version 1 :
-  `ui.md` § Outils du Labo. Écarts : poignées des décors, mesure du délai en marche, voix de l'éditeur d'indices.
+  `ui.md` § Outils du Labo. Écarts : mesure du délai en marche ; bugs de l'original non reproduits (429d84, voix de l'éditeur
+  d'indices).
+- **État au soir du 15/11/2026** : toutes les vagues et tous les éléments différés sont faits et en ligne (commits `4e7980a4` à `ab785c32`). Les 156 puzzles solo se résolvent par l'éditeur (151 au pas du banc) ; duel, Labo complet, puzzles maison, inscription et visite guidée portés. Non portés : les démonstrations « Exercice » (`TOUR<n>.REC` absents du CD). Le séquenceur MIDI est promu dans `src/audio/midi-sequencer.ts` (avec `midi-sink.ts`). Restent à vérifier sur appareil : toucher iPad (menu « ≡ », saisie des noms, visite guidée), migration d'une progression existante, écoute des musiques.
 - **Inscription et visite guidée** (15/11/2026, les deux derniers modes grisés) : registre des joueurs (`SIGNIN.ITF`, invité « Hôte » au
   lancement, 100 joueurs inscrits au plus, progression et aires gardées de chacun, migration de la progression d'avant vers l'invité) ;
   visite guidée du Labo (mode 6, chaussure et « Exercice » : le professeur fait construire un puzzle maison pas à pas dans `HELP.ITF`,

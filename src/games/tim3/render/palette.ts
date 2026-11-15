@@ -21,6 +21,26 @@ export function mapColor(color: number): number {
   return c >= 0 && c <= 255 ? c : -1;
 }
 
+/**
+ * `GetNearestPaletteIndex` de Windows sur la palette du jeu (`rgba` : octets R, G, B, A × 256) : l'index de la couleur la plus proche
+ * (somme des carrés des écarts), le premier à égalité.
+ */
+export function nearestColor(rgba: Uint8Array, r: number, g: number, b: number): number {
+  let best = 0;
+  let bestDistance = Infinity;
+  for (let i = 0; i < 256; i++) {
+    const dr = rgba[i * 4]! - r;
+    const dg = rgba[i * 4 + 1]! - g;
+    const db = rgba[i * 4 + 2]! - b;
+    const d = dr * dr + dg * dg + db * db;
+    if (d < bestDistance) {
+      best = i;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
 /** Palette RGBA (octets R, G, B, A × 256, comme `readPalette`) → 256 pixels `Uint32` dans l'ordre mémoire RGBA d'un `ImageData`. */
 export function paletteLut(rgba: Uint8Array): Uint32Array {
   const lut = new Uint32Array(256);

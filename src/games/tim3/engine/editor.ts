@@ -19,12 +19,14 @@
  *   de l'aire qu'on peut toucher (43013e, 4301cb) ; au bout du temps, la pièce tenue est posée ou rendue (4301f5, `dropHeld`).
  * - Labo (modes 1 et 6) : cadenas d'une pièce (43806a bits 0x10 / 0x400, poignée de 42e1e4, 42e9d8 : +0x14 ^= 0x40, la
  *   télécommande et ses explosifs ensemble), poignée « solution » des pièces +0x14 & 0x8000 (bit 0x200, 42ea99 → `SOLVE.ITF`),
- *   « Verrouiller / Déverrouiller » toutes les pièces (4209e5, 420afc), décors posés et repris (bac à onglets, `bin-tabs.ts`).
+ *   « Verrouiller / Déverrouiller » toutes les pièces (4209e5, 420afc), décors posés et repris (bac à onglets, `bin-tabs.ts`),
+ *   mis à l'arrière-plan ou au premier plan de leur liste (bits 0x1000 / 0x2000, 42ead8 / 42eb25 : `layer`).
  *
  * Le noyau (`World`) garde privées les opérations de bac de l'exe (42f978, 4395ba, 43909c, 4390ff, 438fe3) : l'éditeur
  * les atteint par `core()` (API manquante signalée, voir `docs/tim3/plan.md`, vague U).
  */
 import { labTabTypes } from "./bin-tabs";
+import { DISPLAY } from "./display";
 import type { EditGuard } from "./duel";
 import { insertSorted } from "./lists";
 import { updateGeometry } from "./move";
@@ -59,6 +61,10 @@ export const Zone = {
   /** Solution (Labo) : 0x0E de 43840d, 42ea99 → 426d1c (`SOLVE.ITF`). */
   Solution: 0xe,
   Turn: 0xf,
+  /** Décor à l'arrière-plan (Labo) : 0x10 de 43840d, 42ead8. */
+  Back: 0x10,
+  /** Décor au premier plan (Labo) : 0x11 de 43840d, 42eb25. */
+  Front: 0x11,
 } as const;
 export type ZoneId = (typeof Zone)[keyof typeof Zone];
 
@@ -76,12 +82,16 @@ const Z = {
   SOLUTION: 0x200,
   UNLOCK: 0x400,
   PROGRAM_LOW: 0x800,
+  BACK: 0x1000,
+  FRONT: 0x2000,
 } as const;
 
 /** +0x14 : décor (scenery), pièce verrouillée, pièce qui peut entrer dans la solution d'un puzzle maison (43806a). */
 const SCENERY = 0x1000;
 const LOCKED = 0x40;
 const IN_SOLUTION = 0x8000;
+/** +0x14 : décor de fond (aplat, bloc de couleur), montré par l'option « fond » (41776c, 437a40). */
+const BACKGROUND = 0x80;
 
 /** Poignée dessinée par 42e1e4 : rectangle 36 × 36 et état de `HANDLES.ANM` (table 0x473310). */
 export interface Handle {
@@ -200,7 +210,8 @@ export class Editor {
    * (0x47201c, types 0 à 280, décors compris), filtré par l'onglet. `date` : pièces des fêtes (43b06c).
    */
   static labTypes(world: World, tab = 0, date: Date | null = null): number[] {
-    return labTabTypes(world.types, tab, { date }).filter((t) => world.types.anims[t]);
+    // 41776c : les décors de fond (+0x14 & 0x80) ne sont proposés que si l'option « fond » du joueur (`[0x481034]` & 4) est active.
+    return labTabTypes(world.types, tab, { date, background: (world.animFlags & DISPLAY.background) !== 0 }).filter((t) => world.types.anims[t]);
   }
 
   /**
@@ -226,6 +237,8 @@ export class Editor {
     let bestArea = Infinity;
     for (const p of this.world.staticThenMobile()) {
       if (p.flags14 & SCENERY && !this.lab) continue;
+      // Décor qu'on ne voit pas (42da44 : décors éteints ; 437a40 : fond éteint) : il ne se prend pas.
+      if (p.flags14 & SCENERY && !this.sceneryShown(p)) continue;
       if (filter === 1 && !(p.flags10 & 4)) continue;
       if (filter === 2 && !(p.flags10 & 1)) continue;
       const r = this.partRect(p);
@@ -240,6 +253,12 @@ export class Editor {
       }
     }
     return best;
+  }
+
+  /** Décor dessiné selon les préférences d'affichage du joueur : décors (`[0x481034]` & 2), et pour un fond (+0x14 & 0x80), l'option 4. */
+  private sceneryShown(p: Part): boolean {
+    const flags = this.world.animFlags;
+    return (flags & DISPLAY.scenery) !== 0 && (!(p.flags14 & BACKGROUND) || (flags & DISPLAY.background) !== 0);
   }
 
   /** 438319 : rectangle d'une pièce (position, taille de la forme) ; corde et courroie : boîte de leurs extrémités. */
@@ -285,13 +304,16 @@ export class Editor {
    * 43806a : zones offertes par une pièce posée. Labo, hors décor : cadenas fermé (0x400, pièce verrouillée) ou ouvert (0x10).
    * Infos sauf décor. Pièce verrouillée : rien d'autre. Sinon : retirer et déplacer ; puis, sauf corde, câble et courroie :
    * largeur (+0x10 & 0x80), hauteur (+0x10 & 0x100), retourner (+0x0C & 0x400 / 0x200, seulement si la pièce retournée ne
-   * chevauche rien), programmer (+0x14 & 0x400), et au Labo la solution (+0x14 & 0x8000). Les poignées 0x1000 / 0x2000 des
-   * décors (premier plan, arrière-plan : 42ead8, 42eb25) ne sont pas portées.
+   * chevauche rien), programmer (+0x14 & 0x400), et au Labo la solution (+0x14 & 0x8000). Un décor n'a ni cadenas ni infos,
+   * mais ses deux poignées de plan (0x1000 arrière-plan, 0x2000 premier plan : 4380b3, dans tous les modes ; hors du Labo, un
+   * décor ne se sélectionne pas, `partAt`).
    */
   zoneMask(p: Part): number {
     let mask = 0;
     if (this.lab && !(p.flags14 & SCENERY)) mask |= p.flags14 & LOCKED ? Z.UNLOCK : Z.LOCK;
-    if (!(p.flags14 & SCENERY)) mask |= Z.INFO;
+    // 4380a7 : pas de poignée d'information si le joueur a éteint « Icônes d'Info » (`[0x481034]` & 0x10).
+    if (!(p.flags14 & SCENERY)) mask |= this.world.animFlags & DISPLAY.noInfo ? 0 : Z.INFO;
+    else mask |= Z.BACK | Z.FRONT;
     if (!this.isMovable(p)) return mask;
     mask |= Z.REMOVE | Z.BODY;
     if (isRope(p) || isBelt(p)) return mask;
@@ -333,6 +355,9 @@ export class Editor {
     const bottom = r.y + r.h;
     const out: Handle[] = [];
     if (mask & Z.REMOVE) out.push({ zone: Zone.Remove, x: left, y: top, state: HANDLE_STATES[7] });
+    // 42e356 : les deux poignées de plan d'un décor, à droite (en haut l'arrière-plan, en bas le premier plan).
+    if (mask & Z.BACK) out.push({ zone: Zone.Back, x: right, y: top, state: HANDLE_STATES[11] });
+    if (mask & Z.FRONT) out.push({ zone: Zone.Front, x: right, y: bottom, state: HANDLE_STATES[12] });
     if (mask & Z.SOLUTION) out.push({ zone: Zone.Solution, x: midX, y: top, state: HANDLE_STATES[10] });
     if (mask & Z.WIDTH) {
       out.push({ zone: Zone.WidthLeft, x: left, y: midY, state: HANDLE_STATES[0] });
@@ -377,6 +402,10 @@ export class Editor {
     const inTop = y >= r.y - HANDLE_SIZE && y < r.y;
     const inBottom = y > bottom && y < bottom + HANDLE_SIZE;
     if (mask & Z.REMOVE && inLeft && inTop) return Zone.Remove;
+    // 438543, 438584 : poignées de plan (bords droits compris, contrairement aux autres poignées de droite).
+    const inPlaneColumn = x >= right && x < right + HANDLE_SIZE;
+    if (mask & Z.BACK && inPlaneColumn && inTop) return Zone.Back;
+    if (mask & Z.FRONT && inPlaneColumn && y >= bottom && y < bottom + HANDLE_SIZE) return Zone.Front;
     if (mask & Z.WIDTH) {
       if (inLeft && y >= cy - band && y < cy + band) return Zone.WidthLeft;
       if (inRight && y >= cy - band && y < cy + band) return Zone.WidthRight;
@@ -703,6 +732,27 @@ export class Editor {
       this.stow(p);
     }
     for (const p of [...this.world.staticThenMobile()]) if (this.isMovable(p)) this.stow(p);
+  }
+
+  // ------------------------------------------------------------------ plans des décors (Labo)
+
+  /**
+   * 42ead8 / 42eb25 : poignée de plan d'un décor. Le décor quitte sa liste (4393be) puis y revient (4393e0 dans les fixes si
+   * +0x0C & 0x4000, sinon les mobiles) : `back` avec l'argument 1, tout au bout, après les autres décors ; sinon avec 0, devant le
+   * premier décor. Le dessin parcourt les listes à rebours (42d5a8, `drawOrder`) : le bout de la liste passe derrière les autres
+   * décors d'un même plan, la tête devant. Rend faux pour une pièce qui n'est pas un décor posé.
+   * La tête de liste suit le décor retiré : 4393e0 donne pour précédent à la première pièce l'adresse de la globale de tête (439566),
+   * que 4393be met à jour comme un maillon (`PartList.remove`).
+   */
+  layer(p: Part, back: boolean): boolean {
+    if (!(p.flags14 & SCENERY) || !(this.zoneMask(p) & (back ? Z.BACK : Z.FRONT))) return false;
+    const w = this.world;
+    if (p.flags0C & F0C.IN_STATIC) w.statics.remove(p);
+    else if (p.flags0C & F0C.IN_MOBILE) w.mobiles.remove(p);
+    else return false;
+    insertSorted(p.flags0C & 0x4000 ? w.statics : w.mobiles, p, w.types, back);
+    w.redraw(p, 2);
+    return true;
   }
 
   // ------------------------------------------------------------------ cadenas (Labo)

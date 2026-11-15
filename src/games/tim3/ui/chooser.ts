@@ -212,7 +212,6 @@ export class BinScreen implements ItfScreen<BinResult> {
     readonly itf: Itf,
     heading: string,
     category: number,
-    onSound?: (sound: FrameSound) => void,
   ) {
     this.options = {
       title: heading,
@@ -220,7 +219,6 @@ export class BinScreen implements ItfScreen<BinResult> {
       defaultId: BIN_OF_CATEGORY[category] ?? DOSBIN.cancel,
       cancelId: DOSBIN.cancel,
       greyedActive: true,
-      hoverAnimate: { ids: BIN_OF_CATEGORY, ...(onSound ? { sound: onSound } : {}) },
     };
   }
 

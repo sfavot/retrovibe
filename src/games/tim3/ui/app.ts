@@ -44,11 +44,11 @@ import { interfaceText, loadTexts, parseIdTable, parseLines, type GameTexts } fr
 import { ResourceIndex } from "../data/volume";
 import { readSoundEffect } from "../data/wave";
 import { Editor } from "../engine/editor";
-import { TAB_TEXT } from "../engine/bin-tabs";
+import { SCENERY_TAB, TAB_TEXT } from "../engine/bin-tabs";
 import { GOAL_MAX } from "../engine/lab-puzzle";
 import type { Part } from "../engine/part";
 import { parseProgramRows, type ProgramRow } from "../engine/program";
-import { PlayerRegistry, signInDecision } from "../engine/players";
+import { DISPLAY, PlayerRegistry, signInDecision, type PlayerPrefs } from "../engine/players";
 import { WALK_LEAVE_TEXT, Walkthrough, walkFacts, type WalkEffect } from "../engine/walkthrough";
 import {
   EditStore,
@@ -92,6 +92,7 @@ import { openInfoWindow } from "./info-window";
 import { openLoadSaveWindow, openMachineListWindow, type LoadSaveChoice } from "./machines-window";
 import { confirmDialog, genericDialog, messageDialog, solvedDialog } from "./menus";
 import { openMusicboxWindow } from "./musicbox-window";
+import { USERPREF_UNSAVED_TEXT as PREFS_UNSAVED_TEXT, openUserPrefWindow } from "./userpref-window";
 import { openProgramWindow } from "./program-window";
 import { PlayScreen, type HelpTarget, type PlayEvent, type ShownButton, type ToolbarButton } from "./play";
 import { TOOLBAR_NAMES, TOOLBAR_TEXT, toolbarDecision, type ToolbarAction } from "./toolbar";
@@ -146,15 +147,15 @@ const DUEL_TEXT = {
 /** Un pas de l'horloge du tour au plus par image (un onglet longtemps en arrière-plan ne vide pas le tour d'un coup). */
 const DUEL_MAX_STEP_MS = 250;
 const VOLUMES = ["RESOURCE.MAP", "RESOURCE.001", "RESOURCE.002", "FRENCH.DAT"] as const;
-/** Musique de l'option « Musique » (préférence mémorisée, activée par défaut). */
 /** `SYSTEM.RES` : nom de l'invité, « Hôte » (`TIM.SAV`, 42d03d). */
 const SYSTEM_GUEST_LINE = 3;
 /** `INTRFACE.RES` de l'inscription (426877) : nom inconnu (31174, Oui / Non), ni nom ni rangée (31175). */
 const SIGNIN_TEXT = { newPlayer: 31174, noName: 31175 } as const;
-const MUSIC_KEY = "music";
-/** Guitare : effets activés, volume de 0 à 15 (préférences mémorisées ; le jeu les garde par 42c8cb). */
+/**
+ * Guitare : interrupteur des effets, préférence commune à tous les joueurs (le jeu ne le garde pas dans le fichier de partie). La
+ * musique et le volume sont ceux du joueur courant (`PlayerRegistry.sound`).
+ */
 const EFFECTS_KEY = "effects";
-const VOLUME_KEY = "volume";
 
 /** Écran plein du parcours d'entrée : l'intro, ou le fond noir derrière le menu principal, les crédits et le choix du puzzle. */
 type Front = { kind: "intro"; player: IntroPlayer } | { kind: "backdrop" };
@@ -260,10 +261,24 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const slots = labSaveSlots(storage);
   const puzzles = puzzleList();
   const duelPuzzles = duelPuzzleList();
-  let musicOn = storage.get(MUSIC_KEY) !== "0";
+  /** Musique en marche (4115e6(1000, ·)) : réglage du joueur courant. */
+  let musicOn = true;
   sound.effectsEnabled = storage.get(EFFECTS_KEY) !== "0";
-  const storedVolume = Number(storage.get(VOLUME_KEY) ?? "15");
-  sound.volume = Number.isFinite(storedVolume) ? storedVolume : 15;
+  /**
+   * Préférences du joueur courant (`USERPREF.ITF`, `SOLVE.ITF`) : affichage (`[0x481034]`, posé sur le monde de chaque session :
+   * `applyDisplay`), interrupteur général du son, mode avancé de `SOLVE.ITF`.
+   */
+  let prefs: PlayerPrefs = players.prefs();
+  /** Réglages de son et préférences du joueur courant, à son chargement (42c6d0 : 4115e6(10000 / 1000, ·), 411674(1001 / 3001, volume)). */
+  const applyPlayerSound = (): void => {
+    const s = players.sound();
+    prefs = players.prefs();
+    musicOn = s.music;
+    sound.volume = s.volume;
+    sound.soundEnabled = prefs.soundOn;
+    if (!musicOn) sound.stopMusic();
+  };
+  applyPlayerSound();
   /** Effet choisi dans la guitare (gardé d'une ouverture à l'autre, `[0x47f980]`). */
   let effectChoice = 0;
 
@@ -278,9 +293,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let labTest: LabMachine | null = null;
   /** 31143 n'est montré qu'à la première entrée en essai (`[0x481004]`). */
   let testIntroShown = false;
-  /** Onglet du bac au Labo (`[0x471f90]`), mode avancé de `SOLVE.ITF` (`[0x472f98]`), gardés pendant la partie. */
+  /** Onglet du bac au Labo (`[0x471f90]`), gardé pendant la partie (le mode avancé de `SOLVE.ITF` est une préférence du joueur). */
   let labTab = 0;
-  let solveAdvanced = false;
   /** Puzzle maison ouvert : emplacement et date de sa sauvegarde (progression). */
   let home: { slot: number; savedAt: number } | null = null;
   /** Pièce dont `SOLVE.ITF` attend un rectangle (« Position »). */
@@ -332,8 +346,15 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
   };
 
+  /** Préférences d'affichage du joueur (`[0x481034]`, globale du jeu) sur le monde de la session (`World.animFlags`). */
+  const applyDisplay = (): void => {
+    const live = session as Tim3Session | undefined;
+    if (live) live.world.animFlags = prefs.display;
+  };
+
   const playScreen = (level: Level, goal: string, hints: string[]): void => {
     goalEditor?.close();
+    applyDisplay();
     screen = new PlayScreen(session, assets, level, { goal, hints, parts: texts.parts }, toolbar, onEvent);
     screen.solved = home ? homeProgress.isSolved(home.slot, home.savedAt) : current !== null && progress.isSolved(current.name);
     screen.test = labTest !== null;
@@ -464,6 +485,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   /** Palette du Labo : une pièce de chaque type de l'onglet (417264), pièces des fêtes le jour venu (43b06c). */
   const fillLabBin = (): void => {
     if (!session.lab) return;
+    applyDisplay();
     session.editor.stockLab(Editor.labTypes(session.world, labTab, new Date()));
   };
 
@@ -536,6 +558,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     let slot = target && "slot" in target ? target.slot : null;
     const at = target && "at" in target ? target.at : null;
     let choice: HintEditorChoice = "done";
+    // Pas de voix (41f62e au Labo : voix d'un indice du dernier puzzle joué, bug de l'original non reproduit, `ui.md`).
     pauseFor(
       openHintEditorWindow(itfHost(), {
         text: slot !== null ? (lab.hints[slot]?.text ?? "") : at ? "" : null,
@@ -595,6 +618,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     return (state: number): number => (!anm ? 0 : state === -1 ? imageCount(anm) : Math.max(0, stateImage(anm, state)));
   };
 
+  /** 429d84 : la pièce a été retournée ou programmée, sa condition de réussite (Labo) suit sa variante. */
+  const followVariant = (part: Part): void => {
+    session.labPuzzle?.followVariant(part, solveParts[part.type] ?? null, stateFirst(part.type));
+  };
+
   /** Poignée « solution » (42ea99 → 426d1c) : `SOLVE.ITF` pour la pièce (une télécommande : ses explosifs). */
   const openSolve = (target: Part): void => {
     const lab = session.labPuzzle;
@@ -613,13 +641,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         condition: existing && { state1: existing.state1, state2: existing.state2, count: existing.count, rectX: existing.rectX, rectY: existing.rectY, rectWidth: existing.rectWidth, rectHeight: existing.rectHeight },
         others: lab.conditions.filter((c) => c.part !== part).length,
         delay: lab.delay,
-        advanced: solveAdvanced,
+        advanced: prefs.solveAdvanced,
         set: (value) => lab.setCondition(part, value),
         setDelay: (d) => {
           lab.delay = d;
         },
         setAdvanced: (a) => {
-          solveAdvanced = a;
+          if (!savePrefs({ solveAdvanced: a })) void messageDialog(itfHost(), gameText(PREFS_UNSAVED_TEXT));
         },
         message: (text) => void messageDialog(itfHost(), text),
         drawPosition: () => {
@@ -1048,8 +1076,15 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         break;
       case "tab":
         labTab = e.tab;
+        // 4187b5 : l'onglet des décors rallume leur affichage (préférence du joueur).
+        if (labTab === SCENERY_TAB && !(prefs.display & DISPLAY.scenery) && !setDisplay(prefs.display | DISPLAY.scenery)) {
+          pauseFor(messageDialog(itfHost(), gameText(PREFS_UNSAVED_TEXT), resume));
+        }
         fillLabBin();
         announce(copy.binTab(gameText(TAB_TEXT + e.tab)));
+        break;
+      case "flipped":
+        followVariant(e.part);
         break;
       case "program":
         openProgram(e.part);
@@ -1091,7 +1126,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
 
   // ------------------------------------------------------------------ inscription (SIGNIN.ITF, docs/tim3/ui.md § Inscription)
 
-  /** Change de joueur : l'aire en cours reste à l'ancien, la progression devient celle du nouveau. */
+  /** Change de joueur : l'aire en cours reste à l'ancien ; la progression, le son et les préférences deviennent ceux du nouveau. */
   const switchPlayer = (id: number): void => {
     persistEdit();
     if (!players.select(id)) return;
@@ -1099,6 +1134,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     progress = new Progress(store);
     homeProgress = new HomeProgress(store);
     edits = new EditStore(store);
+    applyPlayerSound();
+    applyDisplay();
     detached = true;
     const player = players.byId(id);
     if (player) announce(copy.playerChanged(players.nameOf(player)));
@@ -1371,7 +1408,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         title: texts.parts.find((p) => p.id === part.type)?.name ?? copy.partInfoTitle,
         program,
         changed: () => sound.playEffect(SOUND_PLACE),
-        onClose: resume,
+        onClose: () => {
+          // 424a82 : l'image de la pièce a pu changer, sa condition de réussite suit (429d84).
+          followVariant(part);
+          resume();
+        },
       }),
     );
   };
@@ -1408,7 +1449,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   // ------------------------------------------------------------------ fenêtres
 
   /** Où les fenêtres `.ITF` se dessinent : par-dessus le canvas du jeu. */
-  const itfHost = (): ItfHost => ({ main: shell.main, canvas: shell.canvas, assets, descriptions, playEffect: (id) => sound.playEffect(id) });
+  const itfHost = (): ItfHost => ({ main: shell.main, canvas: shell.canvas, assets, descriptions, playEffect: (id, priority, flags) => sound.playEffect(id, priority, flags) });
 
   const pauseFor = (handle: ItfWindowHandle): void => {
     dialog?.close();
@@ -1518,7 +1559,6 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       assets,
       readItf(index.get("MAINMENU.ITF")),
       { title: copy.mainMenu, describe: (id) => descriptions.get(id) },
-      effect,
       {
         open: () => menuHelp(HELP_INTRO),
         picking: () => menuPicking,
@@ -1554,7 +1594,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       case "help":
         return openHelp(openMainMenu);
       case "options":
-        return openOptions(openMainMenu);
+        return openPreferences(openMainMenu);
       case "quit":
         return quit();
       case null:
@@ -1666,7 +1706,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   /** « Autres Puzzles » : les bacs (`DOSBIN`), puis la liste de la catégorie choisie (41ae39). */
   const showBins = (list: PuzzleListScreen): void =>
     showScreen(
-      new BinScreen(readItf(index.get("DOSBIN.ITF")), copy.binsTitle, list.category, effect),
+      new BinScreen(readItf(index.get("DOSBIN.ITF")), copy.binsTitle, list.category),
       (r) => {
         switch (r?.kind) {
           case "category":
@@ -1693,7 +1733,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       },
     );
 
-  /** Guitare (MUSICBOX.ITF, 4234ec) : musique, effets, volume, voix du professeur ; depuis le menu principal aussi (`after`). */
+  /** Guitare (MUSICBOX.ITF, 4234ec), depuis la barre d'outils : musique, effets, volume, voix du professeur. */
   const openOptions = (after?: () => void): void => {
     // Depuis le menu principal de départ, aucun puzzle n'est ouvert : musique du titre.
     const live = session as Tim3Session | undefined;
@@ -1710,7 +1750,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         stopEffect: (id) => sound.stopEffect(id),
         setMusicOn: (on) => {
           musicOn = on;
-          storage.set(MUSIC_KEY, on ? "1" : "0");
+          players.setSound({ music: on });
           if (!on) sound.stopMusic();
         },
         setEffectsOn: (on) => {
@@ -1720,7 +1760,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         },
         setVolume: (v) => {
           sound.volume = v;
-          storage.set(VOLUME_KEY, String(v));
+          players.setSound({ volume: v });
         },
         setVoices: (on) => {
           sound.voicesEnabled = on;
@@ -1736,6 +1776,66 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         onClose: () => {
           resume();
           after?.();
+        },
+      }),
+    );
+  };
+
+  /** Garde des préférences du joueur courant (42c8cb) ; elles valent pour la séance même si l'écriture échoue (faux). */
+  const savePrefs = (next: Partial<PlayerPrefs>): boolean => {
+    prefs = { ...prefs, ...next };
+    return players.setPrefs(next);
+  };
+
+  /** Préférences d'affichage du joueur courant : gardées (42c8cb) et posées sur le monde en cours ; faux si l'écriture a échoué. */
+  const setDisplay = (display: number): boolean => {
+    const saved = savePrefs({ display });
+    applyDisplay();
+    return saved;
+  };
+
+  /**
+   * Préférences du joueur (`USERPREF.ITF`, 42aa60), depuis « Options » du menu principal (4230dd). À la fermeture, comme après
+   * « Configurer > Préférences » (4167ae → 418818) : décors éteints, le bac du Labo quitte l'onglet des décors.
+   */
+  const openPreferences = (after?: () => void): void => {
+    let help = false;
+    /** Une écriture a échoué : 31173 en fermant (le jeu écrit le fichier du joueur à la fermeture, 42aaa1). */
+    let unsaved = false;
+    pauseFor(
+      openUserPrefWindow(itfHost(), {
+        initial: { display: prefs.display, soundOn: prefs.soundOn },
+        setDisplay: (display) => {
+          if (!setDisplay(display)) unsaved = true;
+        },
+        setSound: (on) => {
+          if (!savePrefs({ soundOn: on })) unsaved = true;
+          sound.soundEnabled = on;
+        },
+        help: () => {
+          help = true;
+        },
+        onClose: () => {
+          resume();
+          if (!(prefs.display & DISPLAY.scenery) && labTab === SCENERY_TAB) {
+            labTab = 0;
+            const live = session as Tim3Session | undefined;
+            if (live) {
+              screen.binTab = labTab;
+              fillLabBin();
+            }
+          }
+          const next = (): void => {
+            if (help) return openHelp(() => openPreferences(after));
+            after?.();
+          };
+          if (!unsaved) return next();
+          pauseFor(
+            messageDialog(itfHost(), gameText(PREFS_UNSAVED_TEXT), () => {
+              resume();
+              next();
+            }),
+          );
         },
       }),
     );

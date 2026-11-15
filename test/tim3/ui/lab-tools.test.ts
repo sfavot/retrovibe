@@ -77,6 +77,15 @@ describe.skipIf(!original.has)("outils du Labo : fenêtres et écran", () => {
       expect(calls.choose).toEqual([]);
     });
 
+    it("pas de voix au Labo (41f62e, bug de l'original non reproduit) : le professeur s'anime, un clic sur lui ne fait rien", () => {
+      for (const t of ["Un indice", null]) {
+        const { w } = editor({ text: t, count: 1 });
+        expect(w.options.animate).toEqual([HINT.professor]);
+        expect(w.options.zones).toBeUndefined();
+        expect(w.options.choose(HINT.professor)).toBe(true);
+      }
+    });
+
     it("écrire un indice : un EDIT blanc sur bleu ; vide, 31263 ; sinon il est gardé ; Échap le garde aussi", () => {
       const { w, calls, m } = editor({ text: "", count: 1 });
       const input = inputsOf(w.options)[0]!;
@@ -209,6 +218,29 @@ describe.skipIf(!original.has)("outils du Labo : fenêtres et écran", () => {
       screen.pointerUp(x, y);
     };
     const handle = (s: Tim3Session, p: Part, zone: number) => s.editor.handles(p).find((h) => h.zone === zone)!;
+
+    it("décor : poignées de plan (42ead8, 42eb25) ; une pièce retournée le signale (sa condition suit, 429d84)", () => {
+      const { s, screen, events } = make();
+      const forest = place(s, 150, 200, 200);
+      const falls = place(s, 151, 230, 210);
+      expect([...s.world.statics]).toEqual([falls, forest]);
+      screen.focus = forest;
+      const front = handle(s, forest, Zone.Front);
+      screen.pointerMove(PLAYFIELD.x + front.x + 10, PLAYFIELD.y + front.y + 10, false);
+      expect(screen.cursor()).toBe("pointer");
+      tap(screen, PLAYFIELD.x + front.x + 10, PLAYFIELD.y + front.y + 10);
+      expect([...s.world.statics]).toEqual([forest, falls]);
+      screen.focus = forest;
+      const back = handle(s, forest, Zone.Back);
+      tap(screen, PLAYFIELD.x + back.x + 10, PLAYFIELD.y + back.y + 10);
+      expect([...s.world.statics]).toEqual([falls, forest]);
+      const cannon = place(s, 18, 400, 100);
+      screen.focus = cannon;
+      const turn = handle(s, cannon, Zone.Turn);
+      events.length = 0;
+      tap(screen, PLAYFIELD.x + turn.x + 10, PLAYFIELD.y + turn.y + 10);
+      expect(events).toContainEqual({ type: "flipped", part: cannon });
+    });
 
     it("cadenas d'une pièce et poignée « solution » ; la barre du but s'écrit ; le but du puzzle remplace la consigne", () => {
       const { s, screen, events } = make();

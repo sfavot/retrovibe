@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Surface as S, type Surface, drawPart } from "../../../src/games/tim3/render";
+import { colorBlockColor } from "../../../src/games/tim3/render/parts";
+import { mapColor } from "../../../src/games/tim3/render/palette";
 import { FakeAssets, WORLD, anm, bitmapCmd, frame, image, part, rows } from "./support";
 import type { World } from "../../../src/games/tim3/engine/world";
 
@@ -203,5 +205,81 @@ describe("faisceau des lasers (43cd22)", () => {
     };
     expect([at(0x5b, 1), at(0x5c, 1), at(0x5d, 1)]).toEqual([27, 25, 24]);
     expect([1, 2, 3, 4, 5, 6, 7].map((f) => at(0x5f, f))).toEqual([24, 25, 26, 27, 16, 29, 30]);
+  });
+});
+
+describe("dessins propres : ensemble de couleurs 127 (44827f), loupe 30 (441a0a), message d'ordinateur 136 (448424)", () => {
+  /** Palette de test : couleur i = (i, 2i mod 256, 0), sauf 200 = (100, 100, 100). */
+  const palette = new Uint8Array(256 * 4);
+  for (let i = 0; i < 256; i++) palette.set([i, (2 * i) & 0xff, 0, 255], i * 4);
+  palette.set([100, 100, 100, 255], 200 * 4);
+  class PaletteAssets extends FakeAssets {
+    override gamePalette(): Uint8Array {
+      return palette;
+    }
+  }
+  const assets = new PaletteAssets({ frames: [image([[7]])] }, new Map([[30, anm(1, 1, [frame(0, 0, 1, 1, [bitmapCmd(0)])])], [136, anm(1, 1, [frame(0, 0, 1, 1, [bitmapCmd(0)])])]]));
+
+  it("couleur : 5 si +0xFC est nul ; quartet bas seul : couleur logique ; deux quartets : la plus proche de leur moyenne", () => {
+    expect(colorBlockColor(palette, 0)).toBe(mapColor(5));
+    expect(colorBlockColor(palette, 3)).toBe(18);
+    // a = 1 (16), b = 3 (18) : moyenne (17, 34, 0) = couleur 17.
+    expect(colorBlockColor(palette, 0x31)).toBe(17);
+  });
+
+  it("rectangle plein de la taille de la pièce, sans image ; rien sans l'option « fond » (448345)", () => {
+    const p = part(127, 1, 1, 3, 2);
+    p.fFC = 2;
+    const s = new S(5, 4);
+    draw(s, assets, p);
+    const filled = [...s.pixels.keys()].filter((i) => s.pixels[i] === 17).map((i) => [i % 5, Math.trunc(i / 5)]);
+    expect(filled).toEqual([[1, 1], [2, 1], [3, 1], [1, 2], [2, 2], [3, 2]]);
+    const off = new S(5, 4);
+    draw(off, assets, p, 4, { animFlags: 3 } as World);
+    expect([...off.pixels].every((v) => v === 0)).toBe(true);
+  });
+
+  it("loupe : en marche, un triangle de couleur 14 de la lentille au point de mise à feu de la cible", () => {
+    const glass = part(30, 0, 0, 24, 20);
+    const target = part(0, 40, 30, 4, 4);
+    target.ropeAnchor[8] = 2;
+    target.ropeAnchor[9] = 1;
+    glass.links[4] = target;
+    const idle = new S(60, 40);
+    draw(idle, assets, glass, 4, { animFlags: 7, running: false } as World);
+    expect([...idle.pixels].filter((v) => v === mapColor(14))).toHaveLength(0);
+    const s = new S(60, 40);
+    draw(s, assets, glass, 4, { animFlags: 7, running: true } as World);
+    const yellow = mapColor(14);
+    // Base sur x = 18 (y 6 à 16), pointe en (42, 31).
+    expect(s.pixels[10 * 60 + 18]).toBe(yellow);
+    expect(s.pixels[31 * 60 + 42]).toBe(yellow);
+    expect(s.pixels[2 * 60 + 18]).toBe(0);
+    // Retournée : la base passe à x − 1.
+    glass.flags10 = 0x10;
+    glass.px = 10;
+    const f = new S(60, 40);
+    draw(f, assets, glass, 4, { animFlags: 7, running: true } as World);
+    expect(f.pixels[10 * 60 + 9]).toBe(yellow);
+  });
+
+  it("message d'ordinateur : le caractère +0xFC seulement allumé (+0x24)", () => {
+    const font = { kind: "pft", height: 2, baseline: 2, firstChar: 0x41, glyphs: [{ width: 2, height: 2, pixels: Uint8Array.from([1, 1, 1, 1]) }] };
+    class FontAssets extends PaletteAssets {
+      override font(): never {
+        return font as never;
+      }
+    }
+    const fa = new FontAssets({ frames: [image([[7]])] }, new Map([[136, anm(1, 1, [frame(0, 0, 1, 1, [bitmapCmd(0)])])]]));
+    const pc = part(136, 0, 4, 1, 1);
+    pc.fFC = 0x41;
+    const dark = new S(30, 10);
+    draw(dark, fa, pc);
+    expect(dark.pixels[6 * 30 + 17]).toBe(0);
+    pc.f24 = 1;
+    const lit = new S(30, 10);
+    draw(lit, fa, pc);
+    // Centré sur (18, 7) : coin en (17, 6).
+    expect([lit.pixels[6 * 30 + 17], lit.pixels[7 * 30 + 18]]).toEqual([mapColor(0x14), mapColor(0x14)]);
   });
 });

@@ -87,23 +87,24 @@ describe.skipIf(!original.has)("menu principal sur les données d'origine (MAINM
     expect(act(m.escape())).toBe("quit");
   });
 
-  it("clic : appui puis relâché sur le même bouton ; Exercice lance la visite guidée", () => {
+  it("modes (genre 2, 44ee50) : ils agissent dès l'appui ; Exercice lance la visite guidée ; Quitter agit au relâché", () => {
     const m = make();
-    const p = center(m, MAIN_MENU.lab);
-    m.pointerDown(p.x, p.y);
-    expect(act(m.pointerUp(p.x, p.y))).toBe("lab");
-    const d = center(m, MAIN_MENU.duel);
-    m.pointerDown(d.x, d.y);
-    expect(act(m.pointerUp(d.x, d.y))).toBe("duel");
-    const t = center(m, MAIN_MENU.tutorial);
-    m.pointerDown(t.x, t.y);
-    expect(act(m.pointerUp(t.x, t.y))).toBe("walkthrough");
-    const i = center(m, MAIN_MENU.signIn);
-    m.pointerDown(i.x, i.y);
-    expect(act(m.pointerUp(i.x, i.y))).toBe("signIn");
-    m.pointerDown(p.x, p.y);
-    expect(act(m.pointerUp(10, 10))).toBeUndefined();
+    /** Appui sur un mode : le choix est en attente dès l'appui, le relâché ne fait rien de plus. */
+    const press = (id: number) => {
+      const p = center(m, id);
+      m.pointerDown(p.x, p.y);
+      const chosen = m.drain();
+      expect(m.pointerUp(10, 10)).toBeNull();
+      return chosen.map((c) => mainMenuAction(c));
+    };
+    expect(press(MAIN_MENU.lab)).toEqual(["lab"]);
+    expect(press(MAIN_MENU.duel)).toEqual(["duel"]);
+    expect(press(MAIN_MENU.tutorial)).toEqual(["walkthrough"]);
+    expect(press(MAIN_MENU.signIn)).toEqual(["signIn"]);
     const q = center(m, MAIN_MENU.quit);
+    m.pointerDown(q.x, q.y);
+    expect(m.drain()).toEqual([]);
+    expect(act(m.pointerUp(10, 10))).toBeUndefined();
     m.pointerDown(q.x, q.y);
     expect(act(m.pointerUp(q.x, q.y))).toBe("quit");
   });

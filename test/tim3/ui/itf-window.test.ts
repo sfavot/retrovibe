@@ -107,4 +107,45 @@ describe.skipIf(!original.has)("fenêtre ITF sans DOM (ItfWindow)", () => {
     expect(passes).toBe(2);
     expect(m.drain()).toEqual([]);
   });
+
+  it("bouton de genre 2 (44ee50, appelé à chaque passe) : images 1 … n − 1 en boucle sous le pointeur, image 0 en partant ; il agit dès l'appui", () => {
+    const m = new ItfWindow(assets, readItf(index.get("LOADSAVE.ITF")), { title: "" });
+    const id = 14007;
+    const item = m.item(id)!;
+    expect(item.kind).toBe(2);
+    const n = item.frameCount!;
+    expect(n).toBeGreaterThan(2);
+    const frame = () => m.state().frames?.[id];
+    m.pointerMove(item.x + 3, item.y + 3);
+    const seen: (number | undefined)[] = [];
+    for (let i = 0; i < n; i++) {
+      m.pass();
+      seen.push(frame());
+    }
+    // La première passe montre l'image 1 ; après n − 1, retour à 1 (l'image 0 n'est que celle du repos).
+    expect(seen).toEqual([...Array.from({ length: n - 1 }, (_, i) => i + 1), 1]);
+    m.pointerMove(5, 5);
+    expect(m.pass().redraw).toBe(true);
+    expect(frame()).toBeUndefined();
+    expect(m.pass().redraw).toBe(false);
+    // Appui : choisi tout de suite (sans attendre le relâché), sans état enfoncé.
+    expect(m.pointerDown(item.x + 3, item.y + 3)).toBe(false);
+    expect(m.state().pressed).toBeNull();
+    expect(m.drain()).toEqual([id]);
+    expect(m.pointerUp(item.x + 3, item.y + 3)).toBeNull();
+  });
+
+  it("bouton de genre 2 : les sons des images atteintes passent par takeSounds (avec priorité et drapeaux)", () => {
+    const index2 = frenchIndex();
+    const m = new ItfWindow(new RenderAssets(index2), readItf(index2.get("MAINMENU.ITF")), { title: "" });
+    const item = m.item(16011)!;
+    m.pointerMove(item.x + 3, item.y + 3);
+    const sounds = [];
+    for (let i = 0; i < item.frameCount! * 2; i++) {
+      m.pass();
+      sounds.push(...m.takeSounds());
+    }
+    expect(sounds.length).toBeGreaterThan(0);
+    for (const s of sounds) expect(s).toMatchObject({ id: expect.any(Number), priority: expect.any(Number), flags: expect.any(Number) });
+  });
 });

@@ -49,6 +49,11 @@ export const copy = {
   effectNext: "Effet suivant",
   voices: "Voix du professeur (en anglais) : marche/arrêt",
 
+  // Préférences du joueur (USERPREF.ITF) : les libellés des cases viennent du jeu ; ici, les flèches de la langue (cachée, une seule).
+  languagePrevious: "Langue précédente",
+  languageNext: "Langue suivante",
+  languageStatus: "Langue du jeu : français, la seule de cette version.",
+
   // Labo.
   labTitle: "Labo du Professeur Tim",
   labGoal: "Labo : construisez votre machine, puis lancez-la. Cliquez ici pour écrire le but de votre puzzle.",

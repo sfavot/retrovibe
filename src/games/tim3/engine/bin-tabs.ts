@@ -14,7 +14,8 @@
  * - Puis, tous onglets : les pièces des fêtes 32, 33, 34 et 65 ne sont proposées que le jour de leur fête (43b06c : 31 octobre, 14 février,
  *   25 décembre, 17 mars), ou toujours avec une option de mise au point (`[0x4815a8]`, 4168ec).
  *
- * Le port ne lit pas les préférences du joueur (`USERPREF.ITF`, non porté) : l'option « fond » est supposée active.
+ * L'option « fond » est une préférence du joueur (`USERPREF.ITF`, `World.animFlags` & 4) que l'appelant passe (`background`) ; sans valeur,
+ * elle est active (`Editor.labTypes` la lit dans `World.animFlags`).
  */
 import { BIN_ORDER } from "../data/tables/bin-order";
 import type { TypeTable } from "./types";
@@ -45,7 +46,7 @@ export const HOLIDAY_TYPES: ReadonlyMap<number, { month: number; day: number }> 
 export interface LabTabOptions {
   /** Date du jour (pièces des fêtes) ; `null` : aucune pièce de fête. */
   date?: Date | null;
-  /** Option « fond » (`[0x481034]` & 4) : décors de `flags14` & 0x80 (supposée active, voir l'en-tête). */
+  /** Option « fond » (`[0x481034]` & 4) : décors de `flags14` & 0x80 (active par défaut, voir l'en-tête). */
   background?: boolean;
 }
 

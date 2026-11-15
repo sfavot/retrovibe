@@ -24,11 +24,12 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 | `ui/toolbar.ts` | Barre du haut sans DOM : `toolbarStates` (boutons montrés, enfoncés, grisés selon le mode, 418b78), `toolbarDecision` (clic et confirmation, 418ded), `interfaceText` (texte de `INTRFACE.RES` par identifiant). |
 | `ui/play.ts` | `PlayScreen` : pointeur et clavier → éditeur et session ; image 640×480 (aire, bac, poignées, pièce tenue, lien élastique, indice). |
 | `ui/menus.ts` | Fenêtres GENERIC (`genericWindow`, `genericDialog`, `confirmDialog`, `messageDialog`) et PUZZSOLV (`solvedWindow`, `solvedDialog`). |
-| `ui/itf-window.ts` | **Hôte unique des fenêtres `.ITF`** (D7), fenêtres surgissantes comme écrans pleins du parcours d'entrée : canvas transparent de 640×480 posé sur celui du jeu (dessin `render/itf-draw.ts`), calque d'éléments transparents aux rectangles, dans l'ordre de lecture (positions en % : suit l'échelle) : `<button>` (boutons, flèches, interrupteurs avec `aria-pressed`, zones de l'appelant ; grisés `disabled`, ou `aria-disabled` et « (non disponible) » avec `greyedActive`), `role="slider"` (réglettes), `role="listbox"` (liste `ScrollList`), `<input>` (saisie DR_TITLE) ; `role="dialog"` titré, textes et état (`role="status"`) en `tim3-sr`. `ItfWindow` (sans DOM, testé) : appui / glisser / relâché, survol et focus (bouton actif : la dernière des deux actions), flèches animées et répétées (44ee9d), réglettes (425a46, 41cf20), liste, passes de 50 ms (`pass`, `tick`), survol animé (`hoverAnimate`), dessin propre (`decorate`), animation à cadence propre (`frame`), Échap, éléments du calque et leurs noms (`controls`). `choose` rend `true` pour garder la fenêtre ouverte ; `ItfScreen` + `screenOptions` : écran qui rend un résultat. |
+| `ui/itf-window.ts` | **Hôte unique des fenêtres `.ITF`** (D7), fenêtres surgissantes comme écrans pleins du parcours d'entrée : canvas transparent de 640×480 posé sur celui du jeu (dessin `render/itf-draw.ts`), calque d'éléments transparents aux rectangles, dans l'ordre de lecture (positions en % : suit l'échelle) : `<button>` (boutons, flèches, interrupteurs avec `aria-pressed`, zones de l'appelant ; grisés `disabled`, ou `aria-disabled` et « (non disponible) » avec `greyedActive`), `role="slider"` (réglettes), `role="listbox"` (liste `ScrollList`), `<input>` (saisie DR_TITLE) ; `role="dialog"` titré, textes et état (`role="status"`) en `tim3-sr`. `ItfWindow` (sans DOM, testé) : appui / glisser / relâché, survol et focus (bouton actif : la dernière des deux actions), flèches animées et répétées (44ee9d), réglettes (425a46, 41cf20), liste, passes de 50 ms (`pass`, `tick`), survol animé des boutons de genre 2 (44ee50, sons par `takeSounds`), dessin propre (`decorate`), animation à cadence propre (`frame`), Échap, éléments du calque et leurs noms (`controls`). `choose` rend `true` pour garder la fenêtre ouverte ; `ItfScreen` + `screenOptions` : écran qui rend un résultat. |
 | `ui/info-window.ts` | Description d'une pièce (`INFO.ITF`, 420c14). |
 | `ui/program-window.ts` | « Programmer » (`PROG<type>.ITF`, 425147), sur `engine/program.ts`. |
 | `ui/globe-window.ts` | Globe (`GRAVITY.ITF`, 41cbdc). |
 | `ui/musicbox-window.ts` | Guitare (`MUSICBOX.ITF`, 4234ec), plus la bande « Voix du professeur » du site. |
+| `ui/userpref-window.ts` | Préférences du joueur (`USERPREF.ITF`, 42aa60) : affichage, interrupteur général du son, langue. |
 | `ui/binsolve-window.ts` | Fin de catégorie (`BINSOLVE.ITF`, 419c9c), par-dessus PUZZSOLV. |
 | `ui/hint-window.ts` | Un indice (`HINT.ITF`, 41f3dc) ; au Labo, l'éditeur d'indices (`hintEditorWindow`). |
 | `ui/lock-window.ts` | Cadenas du Labo (`HTLOCK.ITF`, 420810). |
@@ -134,7 +135,7 @@ puis 423313 → 426b53 et le menu principal ; Exercice : 42332c (mode 6, Labo vi
 - Duel : la fenêtre des deux joueurs (§ Deux joueurs). Inscription, Exercice : § Inscription, § Visite guidée ; Manuel
   ouvre l'aide du site ; Aide (4169c8(10) : rubrique du manuel Windows `TIMHELP.EXE`) ouvre l'aide du professeur par-dessus le menu
   (§ Aide du professeur) ; Quitter pose toujours la question 31113, puis revient à l'accueil du site (sur la page de dev : le jeu
-  repart). Options : la guitare (`MUSICBOX`). Bande `MM_TEXT` : seuls les six modes ont un texte « contrôle + 100 » ; pour Aide,
+  repart). Options : les préférences du joueur (§ Préférences du joueur ; le port l'ouvrait à tort sur la guitare). Bande `MM_TEXT` : seuls les six modes ont un texte « contrôle + 100 » ; pour Aide,
   Options, Quitter et hors des boutons, elle est vide (4233a3 ne trouve rien, 423473 ne dessine rien). Le focus du clavier tient lieu
   de survol : la bande suit la dernière des deux actions.
 - `DOSBIN` : Deux joueurs actif (en Jeu, un puzzle HH se joue seul, comme dans l'exe : sans BINSOLVE, 4261a7 ; « Puzzle Suivant » : le HH
@@ -147,8 +148,9 @@ puis 423313 → 426b53 et le menu principal ; Exercice : 42332c (mode 6, Labo vi
   (44ee9d), une rangée à la fin de leur animation, répétée bouton tenu.
 - `PUZZDISP` s'ouvre aussi à « Puzzle Suivant » de PUZZSOLV et à la pièce de puzzle depuis le Labo (419bc3, 419c46 l'appellent après
   un chargement ; supposé). La voix du but part à l'ouverture du puzzle, pas 18 tours après.
-- Animation des images au survol (menu principal, bacs) : une image par passe de 50 ms, du bouton actif (4506f4 n'a pas été suivi
-  jusqu'au bout) ; tour des crédits supposé de 48 ms (cadence de la fenêtre modale non lue), soit 1 pixel par tour.
+- Modes du menu principal et bacs : boutons de genre 2 (44ee50, `graphics.md` § Fenêtres `.ITF`) : sous le pointeur, une image par passe
+  de 50 ms en boucle sur 1 … n − 1, image 0 en partant ; ils agissent dès l'appui, comme dans le jeu ; le focus du clavier tient lieu
+  de pointeur. Tour des crédits supposé de 48 ms (cadence de la fenêtre modale non lue), soit 1 pixel par tour.
 - Pas de bouton « Puzzles » sous l'écran : le choix passe par la disquette, comme dans le jeu. « Menu principal » sous l'écran tient
   lieu du menu Windows « Zones ».
 - Hôte : le même que celui des fenêtres (`openItfWindow`) ; les boutons à texte y font aussi le son 0xE1B à l'appui (421f5a).
@@ -186,7 +188,8 @@ Rendus de contrôle (PNG) faits hors dépôt ; adresses et formules dans les en-
 - **MUSICBOX** (4234ec, 423587, 423999), dans tous les modes et au menu principal : musique de `MUSIC.RES` (▲ précédente, ▼ suivante,
   en boucle, morceaux du CD 1007, 1005, 1014, 1015 sautés), départ 5 passes après le choix ; effets de `SOUND.RES` (joués au choix,
   rejoués par MB_SOUND) ; interrupteurs musique et effets (image 0 = marche) ; volume 0 à 15 par paliers {0, 3, 5, 8, 10, 13, 15}
-  sur la musique et les effets, pas les voix (`Tim3Audio.volume`, `effectsEnabled`, préférences `tim3:effects`, `tim3:volume`).
+  sur la musique et les effets, pas les voix (`Tim3Audio.volume`, `effectsEnabled`) ; musique et volume sont ceux du joueur courant
+  (`tim3:p<n>:music`, `volume`, § Inscription), l'interrupteur des effets est commun (`tim3:effects`).
   Au Labo, le morceau choisi devient celui du Labo. **Ajout du site** : une bande sous le volume, « Voix du professeur », avec le
   même interrupteur (état 14 de `BUTTONS.ANM`) et un cadre de style 3 comme les trois autres ; la fenêtre grandit de 62 pixels.
   Écart : le jeu montre l'interrupteur des effets toujours sur « marche » à l'ouverture (4115e6(0, −1)), le port l'état réel.
@@ -311,6 +314,20 @@ modifiable (blanc sur bleu, 254 caractères, 41f787) ; texte vide : 31263 ; l'in
 « Effacer » / « Annuler », 41f867), tourner en bas à gauche (420289 : 0 → 1 → 3 → 2 → 0), modifier en bas à droite (l'EDIT) ; un appui sur
 la main la déplace (42057e). Les indices sont gardés avec la machine (8 emplacements du LEV).
 
+Voix de l'éditeur : ouvert par la barre (41f668), aucune (`[0x47294c]` = 0, le professeur ne rejoue rien, 41f926) ; ouvert pour une
+main (modifier, ou après la pose d'une nouvelle main, 41f5b5), le jeu prend la voix de l'indice du même emplacement **du dernier puzzle
+joué** (41f62e : emplacement × 500 + 5500 + `[0x481600]`, sauf après un puzzle maison, `[0x481918]` = 6), sans rapport avec l'indice
+écrit. **Bug de l'original, non reproduit** : 41f62e est le chemin des indices en Jeu, suivi aussi au Labo avec des globales restées du
+dernier puzzle joué. Le port n'a aucune voix dans l'éditeur ; le professeur s'anime, un clic sur lui ne fait rien.
+
+**Plans des décors** (`Editor.layer`). Un décor (+0x14 & 0x1000) n'a ni cadenas ni infos, mais deux poignées de plan (43806a : bits
+0x1000 / 0x2000, dans tous les modes ; hors du Labo un décor ne se sélectionne pas) à droite de la pièce (42e1e4) : en haut, l'arrière-plan
+(état 26 de `HANDLES.ANM`, la montagne passe derrière l'arbre ; zone 0x10 de 43840d, 42ead8) ; en bas, le premier plan (état 27, le cactus
+passe devant le rocher ; zone 0x11, 42eb25). Un appui retire le décor de sa liste (4393be) et l'y remet (4393e0 : fixes si +0x0C & 0x4000,
+sinon mobiles) : arrière-plan avec l'argument 1, au bout de la liste, après les autres décors ; premier plan avec 0, devant le premier décor
+(comme un décor qu'on vient de poser). Le dessin (42d2e6, 42d54a, 42d5a8) parcourt les listes à rebours : la fin de la liste passe derrière,
+la tête devant. Pas de son.
+
 **But et titre.** Au Labo, la barre du but est un EDIT (414fc1 : `[0x4811e8]`, 399 caractères, retours à la ligne retirés) : dans le
 port, un appui sur la barre y pose une zone de texte (`ui/goal-editor.ts`), fermée par Entrée, Échap ou un clic ailleurs ; vide, la barre
 montre la consigne du site. Le titre est le nom donné à la sauvegarde (`DR_TITLE`, « Titre: »).
@@ -323,6 +340,12 @@ Haut (−500, −2000, 1640, 2000), Par le Bas (−500, 400, 1640, 3000), De l'�
 pièce, 429ef4) ; Avancé / Normal (31082 / 31083) montre la rangée du bas : Nombre (EDIT de 2 chiffres ; sans condition, 31090), Retarde
 (délai du puzzle, EDIT de 4 chiffres ; sans aucune condition, 31088), Position (31138, un rectangle tracé dans l'aire, puis la fenêtre
 revient). 8 conditions au plus (31089). Le ballon : « Intact » donne les images 0 à 0, « Éclaté » 1 à 5, la plage des puzzles du jeu.
+Variante de la pièce (429ef4) : le rang de la plage de la première ligne (`@`, sinon le premier état) dont la première image est l'image de
+la pièce (+0x18) ; 0 si aucune, ou si la ligne ne commence pas par un nombre non nul (sauf `@`). Quand on retourne la pièce (42e8bb,
+42e8fa, 42e939) ou la programme (424a82), sa condition suit (429d84) : la plage dont la première image est l'état 1 de la condition est
+cherchée rang par rang dans la première ligne puis dans celle du second état ; trouvée, la condition prend la plage de la nouvelle variante
+dans la même ligne (le canon tourné d'un quart garde « N'a pas tiré », dans sa nouvelle direction). Le rectangle (par le haut, par le bas,
+hors de l'écran, position) ne change pas.
 
 **Onglets du bac** (`engine/bin-tabs.ts`, `drawBinTabs`). La fenêtre de bac Windows porte au Labo 14 onglets de 30 px dans sa barre de
 titre (4184e0, 4186c5 : `WPARTBIN.BMP`) ; leurs filtres (417264) : sans décor, décors (types 110 à 147 et 150 à 280, qui n'étaient pas
@@ -338,14 +361,17 @@ son auteur (les pièces du bac sans le bit 0x100, `solutionSession`).
 Écarts du port :
 - Onglets : le panneau du bac du port (80 px, `PARTSBIN`) ne loge pas 14 onglets de 30 px. Un bouton à la place de `PB_CONTROL` montre
   l'icône de l'onglet en cours ; un appui ouvre les 14 onglets en deux colonnes dans la liste du bac. L'option « fond » des préférences
-  du joueur (`USERPREF.ITF`, non porté) est supposée active : tous les décors sont proposés.
-- Poignées des décors (premier plan, arrière-plan : 43806a bits 0x1000 / 0x2000, 42ead8, 42eb25) : non portées ; un décor se déplace et
-  se retire comme une pièce.
+  du joueur (§ Préférences du joueur) filtre les fonds (`Editor.labTypes`).
 - « Retarde » : le jeu propose de lancer la machine et de cliquer quand la vérification doit commencer (31087, 427b19) ; le port pose 31
-  pas (une seconde), à corriger dans le champ. La variante d'une pièce (429ef4) est lue en partie : la plage de la ligne `@`, sinon du
-  premier état, qui contient l'image de la pièce ; le jeu remet aussi la condition à jour quand on retourne ou programme la pièce (429d84),
-  pas le port.
-- Professeur de l'éditeur d'indices : pas de voix (le jeu y joue celle d'un indice du dernier puzzle joué, `[0x481600]`).
+  pas (une seconde), à corriger dans le champ.
+- **Bug de l'original, non reproduit** : condition qui suit la pièce (429d84). Sans plage reconnue, le jeu reprend la ligne
+  `[0x47ff98]` (1 ou 3) laissée par le dernier choix de `SOLVE.ITF` ou le dernier suivi réussi, jamais remise à zéro (429e90) : la
+  condition prend la plage de cette ligne dans la nouvelle variante, un état sans rapport avec celui choisi. Le port la laisse telle quelle.
+- **Bug de l'original, non reproduit** : la voix de l'éditeur d'indices au Labo (41f5b5, 41f62e ; ci-dessus). Pas de voix dans
+  l'éditeur du port.
+- Plans des décors : pas d'écart. 4393be ne touche pas la globale de tête, mais 4393e0 donne pour précédent à la première pièce
+  l'adresse de cette globale (439566 : `[pièce + 4] = esi`, `esi` = tête au premier tour) ; 4393be l'écrit alors comme un maillon
+  (`[précédent] = suivant`), la tête suit. Le port fait de même (`PartList.remove`).
 - Une condition dont la pièce est retirée au Labo disparaît ; une main sans texte n'est pas créée.
 
 ## Deux joueurs (mode 2, lu dans TIMWIN.EXE)
@@ -412,7 +438,12 @@ seul) : non vérifiée, le port garde 46 px.
 (« Hôte »), puis `tim01.sav` à `tim100.sav` (42d0b8 : premier numéro libre, 100 joueurs inscrits au plus). Un fichier (42c6d0 lit,
 42c8cb écrit, en-tête `SYSTEM.RES` ligne 2 et somme de contrôle) garde le nom (20 octets), un second texte de 20 octets (rôle non lu), le puzzle en cours
 (`[0x481600]`), le puzzle en cours de chaque catégorie (7 mots : 0, 40, 66, 96, 127, 156, 206 au départ, 42c664), un octet par puzzle
-(bit 0 : résolu), effets, musique et voix (octets 0x50 à 0x52), préférences (`[0x481034]`, 42a082). `SIGNIN.RES` n'est que la liste des
+(bit 0 : résolu), trois octets de son, le mode avancé de `SOLVE.ITF` (+0x150, `[0x472f98]`, 42a082 / 42a075) et les préférences
+d'affichage de `USERPREF.ITF` (+0x154, `[0x481034]`). **Son** : +0x50 = volume 0 à 15 (écrit depuis 411674(1001, −1), relu par
+411674(1001, v), 411674(3001, v) et `[0x47796c]` : musique et effets), +0x51 = musique (4115e6(1000, ·)), +0x52 = interrupteur général
+(4115e6(10000, ·) : `[0x47c094]`, que chaque départ de son vérifie avant celui de sa classe, 4111b7 ; c'est la case « Effets Sonores »
+de `USERPREF.ITF`, 42aeee). L'interrupteur des effets de la guitare (4115e6(3001, ·), classe 3) **n'est pas** dans le fichier : il vaut
+pour la séance ; le jeu n'a pas d'interrupteur des voix. Partie neuve (42cf85) : volume 15, musique et son en marche. `SIGNIN.RES` n'est que la liste des
 noms, refaite à chaque ouverture de l'écran (42668d : nom lu dans chaque `TIM*.SAV`) et effacée en quittant (43b90d). **Au lancement,
 l'invité** (43b5cc : 42c6d0(0) → `TIM.SAV`) : le dernier joueur n'est pas retenu. **Pas d'effacement** de joueur.
 
@@ -428,20 +459,84 @@ le manuel Windows (4169c8(0xb)). Depuis la barre : 31401 d'abord (§ Barre d'out
 
 **Port** (`engine/players.ts`, `ui/signin-window.ts`) : registre `tim3:players` (`{ version: 1, players: [{ id, name }] }`, invité
 implicite d'identifiant 0, joueurs 1 à 100) ; par joueur, sous `tim3:p<n>:` : `solved`, `last`, `homeSolved`, `edit:<puzzle>`,
-`edit:lab`. Changer de joueur garde d'abord l'aire en cours pour l'ancien, puis rien n'est écrit pour le nouveau tant qu'un mode n'est
+`edit:lab`, le son de son fichier : `music` (`"0"` / `"1"`) et `volume` (0 à 15) (`PlayerRegistry.sound`, `setSound`), et ses
+préférences : `display` (mot de +0x154), `soundOn` (+0x52), `solveAdvanced` (+0x150) (`PlayerRegistry.prefs`, `setPrefs`) ; absents =
+partie neuve. Changer de joueur applique aussitôt sa musique (arrêtée si coupée), son volume, son interrupteur général et ses préférences
+d'affichage ; la guitare écrit musique et volume, `USERPREF.ITF` l'affichage et l'interrupteur, `SOLVE.ITF` son mode, pour le joueur
+courant. Changer de joueur garde d'abord l'aire en cours pour l'ancien, puis rien n'est écrit pour le nouveau tant qu'un mode n'est
 pas rouvert. Registre illisible : l'invité seul, jamais d'exception. **Migration** (`migratePlayers`, une fois, sans registre) : les
-clés d'avant l'inscription (`tim3:solved`, `last`, `homeSolved`, `edit:*`) deviennent celles de l'invité, chargé au lancement : copie
-(sans écraser une copie déjà faite), registre, puis effacement ; interrompue, elle reprend à l'ouverture suivante.
+clés d'avant l'inscription (`tim3:solved`, `last`, `homeSolved`, `edit:*`, `music`, `volume`) deviennent celles de l'invité, chargé au
+lancement : copie (sans écraser une copie déjà faite), registre, puis effacement ; interrompue, elle reprend à l'ouverture suivante.
+**Migration du son** (`migratePlayerSound`, à chaque ouverture tant que `tim3:music` ou `tim3:volume` existent) : ces réglages communs
+deviennent ceux de l'invité **et de chaque joueur déjà inscrit** qui n'a pas les siens (ils s'appliquaient à tous : personne ne perd
+son réglage), puis les clés communes sont effacées ; écriture refusée : rien n'est effacé, reprise ensuite. **Préférences** : elles
+n'existaient pas avant (le mode avancé de `SOLVE.ITF` ne durait que la séance) ; un joueur qui n'en a pas lit celles d'une partie neuve
+(affichage 7, son en marche, mode normal), sans qu'aucune clé soit écrite ni touchée.
+
+**Son du site et son du joueur** : le bouton « Son » du site (`SoundPrefs`, `retrovibe:tim3:sound`) reste une préférence du site, commune
+à tous les joueurs ; il coupe la sortie (gain général) sans rien arrêter ni changer aux réglages du jeu. Dessous, la musique et le volume
+sont ceux du joueur courant, l'interrupteur des effets (`tim3:effects`) et les voix du professeur (`retrovibe:tim3:voices`) des
+préférences communes. L'interrupteur général du jeu (+0x52, case « Effets Sonores On » de `USERPREF.ITF`, `Tim3Audio.soundEnabled`)
+est celui du joueur courant : coupé, il arrête musique, effets et voix et n'en laisse partir aucun (le jeu vérifie à chaque départ, 4112f5),
+les voix du professeur se taisent (texte seul) ; rallumé, la musique demandée repart. Les deux se superposent sans se toucher : le bouton
+du site est un muet de la sortie (rien n'est arrêté, il vaut pour tous les joueurs et toutes les pages), l'interrupteur du jeu une
+règle de la partie (gardée avec le joueur, comme dans son fichier). Un son n'est entendu que si le site a le son **et** si l'interrupteur
+général **et** son propre réglage le laissent passer ; le volume ne touche que musique et effets.
 
 Écarts :
-- Restent communs à tous les joueurs : les machines du Labo (`slot01` … `slot10`, comme les fichiers de puzzles du jeu), la musique,
-  les effets, le volume et la voix (préférences du site) ; le jeu garde son, musique et voix dans chaque partie.
-- Le second texte de 20 octets, les puzzles en cours de chaque catégorie et les préférences d'affichage ne sont pas portés (le port retient un
-  seul dernier puzzle, `last`, et `currentPuzzle` en déduit le puzzle en cours).
+- Restent communs à tous les joueurs : les machines du Labo (`slot01` … `slot10`, comme les fichiers de puzzles du jeu),
+  l'interrupteur des effets (le jeu ne le garde pas non plus) et la voix (ajout du site).
+- Le second texte de 20 octets et les puzzles en cours de chaque catégorie ne sont pas portés (le port retient un seul dernier puzzle,
+  `last`, et `currentPuzzle` en déduit le puzzle en cours).
 - Pas de vérification d'écriture (31207) : un stockage plein ou bloqué donne un message du site à l'inscription.
 - « ? » ouvre l'aide du site, puis l'écran revient. Cent joueurs inscrits : message du site (le jeu écraserait la partie courante).
-- `ENTREZ VOTRE NOM` (texte 21145, contrôle de 85 pixels) ne tient pas sur une ligne : seul « ENTREZ » est dessiné, comme le dessine
-  le moteur des `.ITF` (à comparer au jeu).
+- Titre (25004, texte 21145, `SYS12.PFT` en relief, centré, contrôle de 85 × 27) : le jeu le pose par 45301c (mots entiers, lignes de
+  20 pixels, hauteur du `head` du PFT à l'échelle 1, tant qu'elles tiennent dans 27 pixels : une seule). L'anglais « SIGN-IN » (63
+  pixels) tient ; le français « ENTREZ VOTRE NOM » (170 pixels) non, et le jeu français n'affiche que « ENTREZ ». **Écart voulu**
+  (`withReadableHeading`) : le port élargit le contrôle de la gauche de SI_NAME jusqu'à la plume (176 pixels), le titre entier tient sur
+  sa ligne ; police, relief et mise en page restent ceux du jeu.
+
+## Préférences du joueur (`USERPREF.ITF`, lu dans TIMWIN.EXE)
+
+**Entrée** : « Options » du menu principal (4230dd → 42aa60) ; dans le jeu Windows aussi « Configurer > Préférences » (commande 103 de
+`TIM2MENU`, 41675f), menu que le port n'a pas (« Menu principal » sous l'écran, puis « Options »).
+
+**Fenêtre** (42aa60, procédure 42ab98, choix 42ae4a ; `ui/userpref-window.ts`) : cinq cases (genre 3, `SOLVE.ANM` : image 0 éteinte,
+dernière allumée, 44f02c) et leur libellé de l'ITF, « ? », « Terminé » (Entrée et Échap, 450d44), deux flèches. À l'ouverture (42abd6),
+les cases montrent le mot `[0x481034]` et l'interrupteur général (4115e6(10000, −1)).
+
+| Case | Bit de `[0x481034]` | Effet dans le jeu |
+| --- | --- | --- |
+| « Animation Ambiante » (UP_AMBIENT_SEL, 42aea8) | 1 | animations décoratives des pièces (flammes, moteurs, chat, convoyeurs… : `World.animFlags` & 1 dans leurs routines, 43bd8a et suivantes) ; éteintes, ces pièces gardent une ou deux images. Les routines tirent alors moins de nombres au hasard : comme dans le jeu, une machine peut finir autrement. |
+| « Affichage des Éléments du Décor » (UP_SCENERY_SEL, 42aeb3) | 2 | décors (+0x14 & 0x1000) dessinés (42da44 : `render/parts.ts`) ; l'éteindre éteint aussi les fonds (42aec8) et, au Labo, le bac quitte l'onglet des décors (4167ae → 418818). Choisir cet onglet la rallume (4187b5). |
+| « Décor On » (UP_BG_SEL, 42aee3) | 4 | fonds : aplats (43e74b) et bloc de couleur 127 (448345) dessinés ; au bac des décors, ceux de +0x14 & 0x80 proposés (41776c) et pris dans l'aire (437a40). |
+| « Icônes d'Info On » (UP_INFO_SEL, 42af2e) | 0x10, **inversé** (levé = case éteinte) | poignée d'information (loupe) autour des pièces (4380a7). |
+| « Effets Sonores On » (UP_SOUND_SEL, 42aeee) | — | interrupteur général du son (+0x52, `[0x47c094]`) : coupé, 41151e arrête musique, effets et voix ; aucun son ne part (4111b7, 4112f5, 41171e). |
+
+Langue : UP_LANGUAGE est caché (45064c, drapeau 8) ; ▲ ▼ (42af51, 42afa2) parcourent en boucle les langues des paquets `*.DAT` présents
+(42b453 écrit `LANGUAGE.RES`) et la langue choisie est chargée en fermant (42aaa7 → 42b348, puis menus et titres refaits). « ? » :
+4169c8(9), le manuel Windows. En fermant, le jeu écrit le fichier du joueur (42aaa1 → 42c8cb). Valeurs d'une partie neuve (42cf85) :
+`[0x481034]` = 7 sur une machine rapide (mesure `[0x477954]` > 40), 6 sur une moyenne (> 20), 0 sur une lente ; son en marche ;
+mode normal de `SOLVE.ITF`.
+
+**Port** : préférences du joueur courant (`PlayerRegistry.prefs`, § Inscription), écrites à chaque bascule ; `World.animFlags` de chaque
+session les reçoit (`applyDisplay`, à chaque écran de jeu et avant de remplir le bac du Labo) ; l'interrupteur général est
+`Tim3Audio.soundEnabled` (§ Inscription, son du site et son du joueur). Valeur d'une partie neuve : 7 (machine rapide). Le mode avancé
+de `SOLVE.ITF` (+0x150) est gardé de même pour le joueur.
+
+Écarts :
+- Une seule langue (D4) : les flèches restent, sans effet ; l'état annoncé aux lecteurs d'écran le dit.
+- « ? » : l'aide du site, puis la fenêtre revient. Chaque bascule est gardée aussitôt (le jeu écrit en fermant : même résultat).
+- Titre (29012, contrôle de 185 × 26) : comme pour `SIGNIN.ITF`, le jeu n'écrit que les mots qui tiennent sur une ligne, « Préférences
+  des » ; **écart voulu** (`withReadableTitle`) : le contrôle s'étend de la gauche des cases jusqu'à l'ordinateur.
+- Rallumer le son relance aussitôt la musique demandée (supposé ; le jeu attend la prochaine demande, `PlaySound(music, 0, 1)`).
+- Éditeur (`engine/editor.ts`) : poignée d'information selon le bit 0x10 (`zoneMask`, 4380a7), filtre « fond » du bac
+  (`Editor.labTypes`, 41776c), décors cachés et fonds éteints qui ne se prennent pas (`partAt`). Le jeu ne filtre la prise par le bit 4
+  que dans l'onglet des décors (437a40 avec `[0x47794c]`) ; le port, qui n'a pas cet état, l'applique toujours (un fond éteint est
+  invisible).
+- Écriture refusée par le stockage : GENERIC 31173 (« Nous ne pouvons pas sauvegarder vos préférences… », `INTRFACE.RES`) en fermant
+  la fenêtre, et aussitôt pour `SOLVE.ITF` ou l'onglet des décors ; les préférences valent pour la séance. Aucun appel de TIMWIN.EXE ne
+  cite 31173 (42c8cb échoue en silence) : le texte est du jeu, le déclencheur du port.
 
 ## Visite guidée du Labo (mode 6, lu dans TIMWIN.EXE)
 
@@ -504,7 +599,7 @@ chronomètre, manches, choix du puzzle, un match complet au meilleur des 3 joué
 rechargement, données corrompues, emplacement plein, nom vide, quinze solutions reprises et résolues au même pas), et
 `professor.test.ts` (professeur, fenêtre d'aide, mode aide), `players.test.ts` (registre, migration, « Terminé » de l'inscription),
 `walkthrough.test.ts` (visite guidée : textes et boutons, puis la visite entière jouée par l'éditeur jusqu'au puzzle maison sauvegardé
-et rejoué), `test/tim3/ui/signin-walkthrough.test.ts` (fenêtres `SIGNIN` et de la visite), `test/tim3/data/help.test.ts` (`HELP.RES`), `solution.test.ts` (ampoule : solution du concepteur posée, `TIM3_SOLUTION_ALL=1` pour les 156 : toutes résolues, HLEV9 17 pas avant le banc), `program.test.ts` et `replay.test.ts`, qui rejoue quinze solutions du concepteur **par l'API de l'éditeur** (`replay.ts` : prendre au bac, retourner,
+et rejoué), `test/tim3/ui/signin-walkthrough.test.ts` (fenêtres `SIGNIN` et de la visite), `test/tim3/ui/userpref-window.test.ts` (préférences du joueur), `test/tim3/data/help.test.ts` (`HELP.RES`), `solution.test.ts` (ampoule : solution du concepteur posée, `TIM3_SOLUTION_ALL=1` pour les 156 : toutes résolues, HLEV9 17 pas avant le banc), `program.test.ts` et `replay.test.ts`, qui rejoue quinze solutions du concepteur **par l'API de l'éditeur** (`replay.ts` : prendre au bac, retourner,
 étirer, tourner, poser, tendre courroies et cordes, brancher, programmer) puis vérifie la victoire au pas du banc + 30.
 `TIM3_REPLAY_ALL=1 TIM3_REPLAY_REPORT=<fichier>` les rejoue toutes (1,5 s) : **156 / 156 résolues**, 151 au pas du banc ;
 HLEV6, 7, 9, 10 et 17 finissent de 1 à 15 pas à côté, parce que les pièces posées à la main entrent dans les listes une à

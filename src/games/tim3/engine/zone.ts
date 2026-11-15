@@ -122,12 +122,6 @@ export function wakeInBeam(world: World, p: Part, x0: number, x1: number, y0: nu
 // ---------------------------------------------------------------------------------------------------------------------
 // Création de pièces en cours de pas (432d00, 432d78, 432c1c, 439830), première version écrite par le groupe `pyro`.
 
-/** 4393be : retire une pièce de sa liste sans mettre à jour la tête (l'exe ne le fait pas : voir 432d00). */
-function unlinkRaw(p: Part): void {
-  if (p.prev) p.prev.next = p.next;
-  if (p.next) p.next.prev = p.prev;
-}
-
 /** Remise à zéro des 0x10C octets (pièce recyclée par 432d00, gardée par identité). */
 function clearPart(p: Part): void {
   Object.assign(p, new Part());
@@ -169,8 +163,8 @@ export function newPart(world: World, type: number): Part | null {
  * liste des mobiles, sinon en prend une neuve (432d78). La pièce est marquée « créée » (+0x0C |= 0x10) ; elle n'est
  * dans aucune liste : l'appelant l'insère (4393e0).
  *
- * L'exe la décroche avec 4393be, qui ne met pas à jour la tête de liste : si la pièce recyclée est la tête des mobiles,
- * la liste reste pointée sur elle. On reproduit ce comportement (et on le note).
+ * L'exe la décroche avec 4393be (`PartList.remove`) : la tête de liste suit, car 4393e0 donne pour précédent à la première
+ * pièce l'adresse de la globale de tête elle-même (439566), que 4393be met alors à jour comme un maillon.
  */
 export function recyclePart(world: World, type: number): Part | null {
   let p: Part | null = null;
@@ -181,8 +175,7 @@ export function recyclePart(world: World, type: number): Part | null {
     }
   }
   if (p) {
-    if (world.mobiles.head === p) world.note(`432d00 : pièce recyclée en tête des mobiles (type ${type})`);
-    unlinkRaw(p);
+    world.mobiles.remove(p);
     clearPart(p);
     if (!initPart(world, p, type)) {
       p.flags10 |= F10.GONE;

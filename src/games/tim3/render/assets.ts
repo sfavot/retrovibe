@@ -16,6 +16,7 @@ export class RenderAssets {
   private icons: BitmapFrame[] | undefined;
   private lut: Uint32Array | undefined;
   private fade: Uint8Array | undefined;
+  private palette: Uint8Array | undefined;
 
   constructor(readonly index: ResourceIndex) {}
 
@@ -74,6 +75,11 @@ export class RenderAssets {
   /** Couleurs atténuées de la palette du jeu (boutons grisés), voir `fadeTable`. */
   fadeTable(): Uint8Array {
     return (this.fade ??= fadeTable(readPalette(this.index.get(GAME_PALETTE))));
+  }
+
+  /** Palette du jeu : octets R, G, B, A × 256 (`readPalette`). */
+  gamePalette(): Uint8Array {
+    return (this.palette ??= readPalette(this.index.get(GAME_PALETTE)));
   }
 
   /** Table de 256 couleurs RGBA de la palette du jeu. */

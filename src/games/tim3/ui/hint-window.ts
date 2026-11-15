@@ -15,8 +15,11 @@
  * - Nouveau (41fcdc) : 8 indices déjà, GENERIC 31265 ; sinon la fenêtre se ferme et une main suit le pointeur jusqu'à un appui (42057e),
  *   puis la fenêtre revient pour écrire le nouvel indice (41f3dc, `[0x47ea6c]` = 2). Montrer / Cacher (41fb4e, 41f9c7) : toutes les mains
  *   (4204cf, 420536), puis la fenêtre se ferme.
- * - Le professeur (21106, `HINTPROF.ANM` état 32) s'anime à chaque passe (4207a4) ; au Labo, il n'a pas de voix à rejouer (le jeu y lit
- *   celle d'un indice du dernier puzzle joué, `[0x481600]` : sans rapport avec le puzzle maison, non reprise).
+ * - Le professeur (21106, `HINTPROF.ANM` état 32) s'anime à chaque passe (4207a4) ; au Labo, il n'a pas de voix et un clic sur lui
+ *   ne fait rien. **Bug de l'original, non reproduit** : ouverte pour une main (41f5b5), la fenêtre du jeu prend la voix de l'indice du
+ *   même emplacement **du dernier puzzle joué** (41f62e : emplacement × 500 + 5500 + `[0x481600]`, aucune après un puzzle maison,
+ *   `[0x481918]` = 6), sans rapport avec l'indice écrit : 41f62e est le chemin des indices en Jeu, suivi aussi au Labo avec des
+ *   globales restées du dernier puzzle joué.
  * - Aide (HT_HELP, 41ffaa) : `TIMHELP.EXE` dans le jeu, l'aide du site ici.
  */
 import { readItf, type Itf } from "../data/itf";
@@ -134,6 +137,7 @@ export function hintEditorWindow(assets: RenderAssets, itf: Itf, o: HintEditorOp
     choose: (id) => {
       switch (id) {
         case HINT.professor:
+          // Pas de voix au Labo (bug de 41f62e non reproduit) : le clic ne rejoue rien.
           return true;
         case HINT.help:
           choose("help");

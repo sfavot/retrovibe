@@ -15,7 +15,7 @@ Vague A, partie propre au jeu (`src/games/tim3/audio/`, tests `test/tim3/audio/`
 
 Un seul contexte audio et un seul gain général (`WebSampleOutput`) : le synthétiseur (`WebGmSynth`, soundfont `${BASE_URL}mathemagique/mathemagique-gm.sf2`, **sans copie**) s'y branche par `connection()`. Donc `setMuted` (préférence « Son » du site, `SoundPrefs`) coupe musique, effets et voix, et `suspend()` / `resume()` figent tout, horloge de la musique comprise. Le temps du jeu ne dépend jamais du son (voix et effets durent sur l'horloge de l'hôte).
 
-`TrackPlayer` (cité dans le brief) lit des fichiers audio par un `HTMLAudioElement` : il ne sert pas pour du MIDI. La musique utilise le séquenceur commun `MidiPlayer` de `src/engine/mohawk/audio/sequencer.ts` (pur, déjà utilisé par Mathémagique et Zoombinis). **Dette** : ce séquenceur est générique mais vit sous `engine/mohawk/` ; à promouvoir dans `src/audio/` (évolution à décider, non faite ici).
+`TrackPlayer` (cité dans le brief) lit des fichiers audio par un `HTMLAudioElement` : il ne sert pas pour du MIDI. La musique utilise le séquenceur commun `MidiPlayer` de `src/audio/midi-sequencer.ts` (pur, commun avec Mathémagique et Zoombinis), qui écrit dans une `MidiSink` (`src/audio/midi-sink.ts`).
 
 ### Interface proposée (`Tim3Audio`, dans `audio.ts`)
 
@@ -94,6 +94,8 @@ Points à trancher en vague R/U : (1) le jeu rejoue la commande à chaque dessin
 - `playVoice` rend **faux si les voix sont désactivées ou si le fichier manque** : l'interface affiche alors le texte seul (le but et les indices restent toujours en français). Une voix lente à charger est « active » au plus 5 s (`LOAD_TIMEOUT_MS`).
 - Une seule voix à la fois (la nouvelle remplace l'ancienne). L'interface appelle `enterPuzzle` (ou `stopVoice`) au changement de puzzle.
 - Préférence « voix activées » : `retrovibe:tim3:voices`, activée par défaut (`SoundPrefs` avec clé propre) ; la désactiver coupe la voix en cours. Distincte du muet du site.
+- **Réglages et joueurs** (`ui.md` § Inscription) : la musique (en marche ou non), le volume et l'interrupteur général du son sont ceux du joueur courant (`tim3:p<n>:music`, `volume`, `soundOn`, comme les octets +0x51, +0x50 et +0x52 du fichier de partie), appliqués au changement de joueur ; l'interrupteur des effets et les voix sont communs. Le bouton « Son » du site (`retrovibe:tim3:sound`) coupe la sortie par-dessus, pour tous les joueurs : entendu = son du site **et** interrupteur général **et** réglage du joueur ou commun.
+- **Interrupteur général** (`soundEnabled`, case « Effets Sonores On » de `USERPREF.ITF`, 4115e6(10000, ·)) : chaque départ de son le vérifie avant celui de sa classe (4111b7, 4112f5, 41171e). Coupé : musique, effets et voix s'arrêtent (41151e(10000)), `playEffect` et `playVoice` rendent faux (texte seul), un morceau demandé est seulement retenu. Rallumé : le morceau demandé repart du début (supposé : le jeu attend la prochaine demande). Contrairement au muet du site, il arrête les sons et vaut pour le joueur.
 - Identifiants d'origine (pour mémoire, `4247c0`) : le jeu désigne les voix par `4000 + 500 × archive + entrée` (PROFESOR 4000, HELP 4500, GOALS 5000, HINT1 à 8 ensuite), l'id 6000 (`0x1770`) est la voix en cours, lue par flux.
 
 ## Synchro labiale (établie par le code, à valider à l'œil)
@@ -119,6 +121,7 @@ u32 142 ; u16 initial (lu et ignoré) ; { u16 instant ; i16 valeur }* ; u16 0xFF
 | Voix qui en remplace une autre dans la même image | la musique ne repart pas entre les deux (départ différé au `tick()` suivant) |
 | Voix coupée au changement de puzzle | `enterPuzzle`, `stopVoice`, `stopAll` |
 | « Sans son » | `setMuted(true)` : gain général à 0, rien n'est arrêté ni décalé |
+| Interrupteur général coupé (`USERPREF.ITF`) | `soundEnabled = false` : tout s'arrête, rien ne part, le morceau demandé est retenu |
 | Onglet masqué | `suspend()` / `resume()` : contexte figé, voix et musique ne vieillissent pas |
 | Voix absente / voix désactivées | `playVoice` faux, pas d'attente |
 | Soundfont pas encore chargée | la musique démarre dès que le synthétiseur est prêt |

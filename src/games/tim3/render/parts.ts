@@ -10,8 +10,17 @@
  *   0x20 = Y) ; le décalage de retournement part de la taille de la forme et de l'image 0.
  * - **Pièces étirables** (42dcec : murs, pentes, tuyaux…) : bord gauche, motif répété, bord droit (pièce plus large que haute)
  *   ou bord haut, motif, bord bas (sinon), en tuiles de la taille de l'image 0 ; le nombre de tuiles est `largeur / tuile`.
- * - **Aplats** (43e74b : types 121 à 124, 127, 203, 205, 271, 280) : l'image 0 répétée sur la zone, alignée sur une grille de
- *   la taille de l'image, si l'option 4 est active.
+ * - **Aplats** (43e74b : types 121 à 124, 203, 205, 271, 280) : l'image 0 répétée sur la zone, alignée sur une grille de
+ *   la taille de l'image, si l'option 4 (fonds) est active.
+ * - **Ensemble de couleurs** (127, 44827f) : pas d'image ; un rectangle plein de la taille de la pièce, si l'option 4 est active.
+ *   Couleur : +0xFC (5 si nul, valeur que le jeu écrit alors dans la pièce ; le port ne la modifie pas en dessinant), quartet bas
+ *   `a`, quartet haut `b` : sans `b`, la couleur logique `a` ; sinon la couleur de la palette la plus proche (`GetNearestPaletteIndex`)
+ *   de la moyenne des couleurs `a` + 15 et `b` + 15 de la palette (467389, moitié de chaque somme).
+ * - **Loupe** (30, 441a0a) : la pièce, puis, la machine en marche (`[0x4815b0]` = 0x2000) et une pièce mise au point (+0xA0), un
+ *   triangle plein de couleur logique 14 (457bf4) de la lentille, (x + 18, y + 6) et (x + 18, y + 16), ou (x − 1, …) retournée,
+ *   jusqu'au point de mise à feu de la cible (+0xB8, +0xB9 ajoutés à sa position).
+ * - **Message d'ordinateur** (136, 448424) : la pièce, puis, allumée (+0x24), le caractère +0xFC (« A » à la création, 448380) en
+ *   couleur logique 0x14, centré sur (x + 18, y + 3) (largeur et hauteur de la police divisées par deux) ; police : `COMPUTER_FONTS`.
  * - **Seaux** (11, 17, 108) : image normale à l'arrière, image du devant au plan 2.
  * - **Avant au plan 0** (types aux plans 4 et 0, le slot 6 choisit l'image selon le plan) :
  *   - boîtes 71 (445ce0) : image courante au plan 4 et image + 5 (l'avant : verre, cadre, osier, grille) au plan 0, ce qui
@@ -23,14 +32,14 @@
  *   faisceau : ligne de Bresenham (4570c8) d'un point du tampon (+0x90) au suivant, sur les +0xFC tronçons posés par la passe
  *   43d013 ; le dernier s'arrête au point d'impact (+0x54, +0x58) sauf si +0x54 = −0x1000 (faisceau jusqu'au bout). Couleur
  *   logique (43cdfd → 413388) : 12 pour 91, 10 pour 92, 9 pour 93 ; pour 95, table 0x477d64 indexée par les faisceaux reçus.
- * - Pas portés (dessinés comme des pièces ordinaires ou omis) : détails des types 30, 127, 136.
  */
 import type { Anm } from "../data/anm";
 import type { Part } from "../engine/part";
 import type { World } from "../engine/world";
 import { FLIP_X, FLIP_Y, drawAnmImage, imageFrame, stateStart } from "./anm-draw";
 import type { RenderAssets } from "./assets";
-import { mapColor } from "./palette";
+import { mapColor, nearestColor } from "./palette";
+import { drawText, measureText } from "./text";
 import { drawBelt, drawRope } from "./ropes";
 import type { Surface } from "./surface";
 
@@ -40,6 +49,18 @@ export const LAYER_COUNT = 9;
 const STRETCHED = new Set([1, 46, 48, 56, 60, 82, 83, 84, 85, 97, 118, 125]);
 /** Types dessinés par 43e74b (aplats). */
 const AREA = new Set([121, 122, 123, 124, 203, 205, 271, 280]);
+/** Types à dessin propre : loupe (441a0a), ensemble de couleurs (44827f), message d'ordinateur (448424). */
+const MAGNIFIER = 30;
+const COLOR_BLOCK = 127;
+const COMPUTER = 136;
+/**
+ * 4483a4 charge `RMN1_18.PFT`, absente des volumes et du disque du jeu : la poignée reste nulle, 456d10(0) ne change rien, et le
+ * caractère s'écrit dans la police courante du contexte de dessin (la dernière choisie). Supposé : celle de la barre du but.
+ */
+const COMPUTER_FONTS = ["RMN1_18.PFT", "GOALFONT.PFT"] as const;
+/** Options d'affichage du joueur (`World.animFlags`, `engine/display.ts`). */
+const SCENERY = 0x2;
+const BACKGROUND = 0x4;
 const BUCKETS: Record<number, number> = { 11: 1, 17: 1, 108: 0x5a };
 /** 43cdfd : couleur logique du faisceau des lasers 91, 92, 93. */
 const BEAM_COLORS: Record<number, number> = { 0x5b: 12, 0x5c: 10, 0x5d: 9 };
@@ -84,7 +105,8 @@ export function drawParts(surface: Surface, assets: RenderAssets, world: World, 
 
 /** 42da3e : dessine une pièce pour un plan. */
 export function drawPart(surface: Surface, assets: RenderAssets, world: World, p: Part, layer: number, view: { x: number; y: number }): void {
-  if (!(world.animFlags & 2) && p.flags14 & 0x1000) return;
+  if (!(world.animFlags & SCENERY) && p.flags14 & 0x1000) return;
+  if (p.type === COLOR_BLOCK) return drawColorBlock(surface, assets, world, p, view);
   const anm = assets.partAnm(p.type);
   if (p.type === 8) return drawBelt(surface, p, view);
   if (p.type === 10 || p.type === 76) return drawRope(surface, assets, p, view);
@@ -94,6 +116,70 @@ export function drawPart(surface: Surface, assets: RenderAssets, world: World, p
   if (AREA.has(p.type)) return drawArea(surface, assets, world, anm, p, view);
   const frame = layerFrame(anm, p, layer);
   if (frame !== null) drawOrdinary(surface, assets, anm, p, frame, view);
+  if (p.type === MAGNIFIER) drawFocus(surface, world, p, view);
+  else if (p.type === COMPUTER) drawComputerText(surface, assets, p, view);
+}
+
+/** 44827f : couleur de l'ensemble de couleurs (index de palette). */
+export function colorBlockColor(palette: Uint8Array, value: number): number {
+  const v = value === 0 ? 5 : value;
+  const a = v & 0xf;
+  const b = (v & 0xf0) >> 4;
+  if (b === 0) return mapColor(a);
+  const channel = (k: number): number => (palette[(a + 15) * 4 + k]! + palette[(b + 15) * 4 + k]!) >> 1;
+  return mapColor(nearestColor(palette, channel(0), channel(1), channel(2)));
+}
+
+/** 44827f : rectangle plein de la taille de la pièce (448345 : seulement avec l'option « fond »). */
+function drawColorBlock(surface: Surface, assets: RenderAssets, world: World, p: Part, view: { x: number; y: number }): void {
+  if (!(world.animFlags & BACKGROUND)) return;
+  const color = colorBlockColor(assets.gamePalette(), p.fFC);
+  if (color >= 0) surface.fillRect(p.px - view.x, p.py - view.y, p.frameW, p.frameH, color);
+}
+
+/** 441a0a : faisceau de la loupe vers la pièce mise au point, machine en marche. */
+function drawFocus(surface: Surface, world: World, p: Part, view: { x: number; y: number }): void {
+  const target = p.links[4];
+  if (!target || !world.running) return;
+  const tipX = target.px + target.ropeAnchor[8]! - view.x;
+  const tipY = target.py + target.ropeAnchor[9]! - view.y;
+  const x = (p.flags10 & 0x10 ? p.px - 1 : p.px + 0x12) - view.x;
+  fillTriangle(surface, [x, tipX, x], [p.py + 6 - view.y, tipY, p.py + 0x10 - view.y], mapColor(14));
+}
+
+/** 448424 : le caractère du message d'ordinateur allumé, centré sur (x + 18, y + 3). */
+function drawComputerText(surface: Surface, assets: RenderAssets, p: Part, view: { x: number; y: number }): void {
+  if (!p.f24) return;
+  const font = COMPUTER_FONTS.map((name) => assets.font(name)).find((f) => f !== null) ?? null;
+  if (!font) return;
+  const text = String.fromCharCode(p.fFC & 0xff);
+  const x = p.px + 0x12 - (measureText(font, text) >> 1) - view.x;
+  const y = p.py + 3 - (font.height >> 1) - view.y;
+  drawText(surface, font, text, x, y, mapColor(0x14));
+}
+
+/** Polygone plein (457bf4) : balayage par lignes, centres des pixels. */
+export function fillTriangle(surface: Surface, xs: readonly number[], ys: readonly number[], color: number): void {
+  const top = Math.min(...ys);
+  const bottom = Math.max(...ys);
+  for (let y = top; y <= bottom; y++) {
+    let left = Infinity;
+    let right = -Infinity;
+    for (let i = 0; i < 3; i++) {
+      const j = (i + 1) % 3;
+      const [x0, y0, x1, y1] = [xs[i]!, ys[i]!, xs[j]!, ys[j]!];
+      if (y < Math.min(y0, y1) || y > Math.max(y0, y1)) continue;
+      if (y0 === y1) {
+        left = Math.min(left, x0, x1);
+        right = Math.max(right, x0, x1);
+        continue;
+      }
+      const x = x0 + ((y - y0) * (x1 - x0)) / (y1 - y0);
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+    }
+    if (left <= right) for (let x = Math.round(left); x <= Math.round(right); x++) surface.plot(x, y, color);
+  }
 }
 
 /** Lasers 91, 92, 93 et mélangeur 95 : types dont le slot 6 est 43cd22. */
@@ -217,7 +303,7 @@ function drawStretched(surface: Surface, assets: RenderAssets, anm: Anm, p: Part
 
 /** 43e74b : aplat, l'image 0 répétée sur la zone de la pièce, alignée sur une grille de la taille de l'image. */
 function drawArea(surface: Surface, assets: RenderAssets, world: World, anm: Anm, p: Part, view: { x: number; y: number }): void {
-  if (!(world.animFlags & 4)) return;
+  if (!(world.animFlags & BACKGROUND)) return;
   const f = imageFrame(anm, 0);
   if (!f || f.width <= 0 || f.height <= 0) return;
   const old = surface.clip;

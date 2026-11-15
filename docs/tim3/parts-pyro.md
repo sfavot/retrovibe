@@ -37,7 +37,7 @@ Slot 3 (édition) : porté mais pas tracé (éditeur, vague U) ; les appels d'af
 ## Besoins de noyau (à `mechanics`)
 
 1. **Création et destruction de pièces en cours de pas** : 432d00, 432d78, 432c1c, 439830 (copie) vivent dans `pyro/kernel.ts` (`recyclePart`, `newPart`, `insertCreated`, `clonePart`), et en double dans d'autres groupes (`creatures/kernel.ts`, `electric/zone.ts`). À regrouper dans le noyau. Points d'exactitude :
-   - 4393be (décrochage de la pièce recyclée) ne met pas à jour la tête de liste : si la pièce recyclée est la tête des mobiles, l'exe corrompt la liste ; on reproduit et on le note (`World.note`), jamais rencontré ;
+   - 4393be (décrochage de la pièce recyclée) n'écrit pas la globale de tête, mais la tête suit quand même : 4393e0 donne pour précédent à la première pièce l'adresse de cette globale (439566), que 4393be écrit comme un maillon. Le port reproduisait à tort une liste corrompue ; `recyclePart` retire maintenant la pièce par `PartList.remove` (jamais rencontré dans les traces) ;
    - **pool de 150 pièces** (0x481000, 432a78) : l'exe ne crée plus rien quand il est vide ; `newPart` ne compte pas (aucun scénario n'en approche).
 2. **Recherches de voisins et feu** (434cc4, 434eff, 4350e6, 43beb8, 434ec6) : exportées par `pyro` (`nearby`, `flame`) ; d'autres groupes ont leurs copies, à regrouper.
 3. **43712c** (angle entre centres) n'est pas exportée de `bounce.ts` : copie locale `centreAngle` dans `kernel.ts`, à remplacer par l'export.

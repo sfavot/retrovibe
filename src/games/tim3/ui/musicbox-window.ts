@@ -13,6 +13,9 @@
  *   le nombre de paliers atteints (423e18). Musique et effets, pas les voix.
  * - Labo : la musique choisie devient celle du Labo (`[0x477950]`, Labo modifié) ; en Jeu, elle dure jusqu'au prochain puzzle.
  * - MB_HELP (`TIMHELP.EXE` 4169c8(7)) : non porté, grisé.
+ * - Réglages gardés : la musique (interrupteur 15003) et le volume sont ceux du joueur courant (fichier de partie, 42c8cb : octets +0x51
+ *   et +0x50 ; `PlayerRegistry.sound`) ; l'interrupteur des effets (15009) et la voix sont communs à tous les joueurs (le jeu ne garde
+ *   pas le premier dans le fichier, la seconde est un ajout du site). L'appelant les range (`set*`).
  * - **Ajout du site** : une bande « Voix du professeur » sous le volume (cadre de style 3, interrupteur de l'état 14 comme ceux de la
  *   musique et du son, libellé en `SYS12.PFT`) ; le cadre de la fenêtre grandit d'autant.
  */

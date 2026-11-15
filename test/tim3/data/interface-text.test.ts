@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { interfaceText, parseLines } from "../../../src/games/tim3/data/text";
 import { TOOLBAR_TEXT } from "../../../src/games/tim3/ui/toolbar";
+import { USERPREF_TITLE, USERPREF_UNSAVED_TEXT } from "../../../src/games/tim3/ui/userpref-window";
 import { frenchIndex, original } from "./real";
 
 describe("textes de INTRFACE.RES par identifiant", () => {
@@ -21,6 +22,12 @@ describe("textes de INTRFACE.RES par identifiant", () => {
     expect(interfaceText(lines, 31341)).toBe("Friction");
     expect(interfaceText(lines, 31342)).toMatch(/^Vous ne pouvez pas choisir cette boîte/);
     expect(interfaceText(lines, 31343)).toMatch(/^Vous ne pouvez pas choisir ce ballon/);
+  });
+
+  it.skipIf(!original.has)("préférences du joueur : titre et message d'écriture refusée", () => {
+    const lines = parseLines(frenchIndex().get("INTRFACE.RES"));
+    expect(interfaceText(lines, USERPREF_TITLE)).toBe("Préférences du joueur");
+    expect(interfaceText(lines, USERPREF_UNSAVED_TEXT)).toBe("Nous ne pouvons pas sauvegarder vos préférences. Assurez-vous que vous avez accès à ce répertoire.");
   });
 
   it.skipIf(!original.has)("titres 21xxx et libellés 31xxx de PUZZSOLV et GENERIC", () => {

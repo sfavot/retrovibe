@@ -175,7 +175,7 @@ Le **banc ScummVM** reste hors dépôt, dans le scratchpad de cette session (`cr
 | **I** intro, protection, fin | Cadence de l'intro, contournement de `XX2` (D3), rustines D8, crédits. | Trace identique au banc patché ; fin jouée en test. | Intro passable, crédits lisibles. | C, F, R |
 | **S** menu joueur et sauvegardes | `processMenu` en séquence, D5, refus. | Aller-retour de sauvegarde : trace identique après rechargement. | 10 emplacements, chargement dans toute pièce. | C, F |
 | **J** intégration | `GameDefinition`, registre, `copy.ts`, aide, touches, barre tactile (D4, M3), préchargement, couverture, README (licence, D1). | Navigateur : souris, toucher, responsive, focus, états de chargement et d'erreur. | Jeu lancé depuis l'accueil. | R, A, S |
-| **K** validation | Partie complète en test (`test/croisiere/full-game.test.ts`, solution jouée par un `Driver`, d'un trait puis avec reprises de sauvegarde, `CROISIERE_FULL_GAME=0` pour la sauter), comparée au banc tour par tour (hachage des variables). | Partie entière identique au banc. | Générique atteint. | tout |
+| **K** validation | Partie complète en test (`test/croisiere/full-game.test.ts`, solution jouée par un `Driver`, d'un trait puis avec reprises de sauvegarde, lancée par `CROISIERE_FULL_GAME=1`), comparée au banc tour par tour (hachage des variables). | Partie entière identique au banc. | Générique atteint. | tout |
 
 **Parallélisme** : P, X et U d'abord, en parallèle ; D ensuite (R1 dès que les modèles sont lus). Puis C, et après C les groupes F1 à F4, E, R2 et A en parallèle, sur des fichiers distincts. I et S viennent ensuite, puis J et K. Jamais deux agents sur les mêmes fichiers. Rien dans `src/engine/delphine/` sans prévenir la session Voyageurs.
 

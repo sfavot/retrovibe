@@ -8,8 +8,8 @@
  *
  * Résultat (banc du 15 novembre 2026) : les 672 444 lignes `FR`/`VH`/`SC` des 224 148 tours sont identiques, image comprise à chaque tour.
  *
- * Les entrées sont rejouées sans le joueur (`Driver`) : le test ne dépend pas de la solution, seulement du moteur. `CROISIERE_FULL_GAME=0`
- * le passe.
+ * Les entrées sont rejouées sans le joueur (`Driver`) : le test ne dépend pas de la solution, seulement du moteur. Seule partie complète de
+ * la suite par défaut (environ 50 s) ; `CROISIERE_FULL_GAME=0` la passe, `CROISIERE_FULL_GAME=1` ajoute celles de `full-game.test.ts`.
  */
 
 import { createHash } from "node:crypto";

@@ -27,7 +27,11 @@ export interface CroisiereRenderer {
 export class NullRenderer implements CroisiereRenderer {}
 
 export interface CroisiereSound {
-  loadMusic(name: string): void;
+  /**
+   * Charge un morceau (`PCSoundFxPlayer::load`). Si un fondu est en cours, l'attend par pas de 50 ms avec `wait`, qui doit faire avancer
+   * l'horloge du moteur (donc la cadence des tours) et rappeler `elapse` : le moteur passe `(ms) => state.delay(ms)`.
+   */
+  loadMusic(name: string, wait: (ms: number) => void): void;
   playMusic(): void;
   stopMusic(): void;
   removeMusic(): void;

@@ -15,7 +15,6 @@
  */
 import { NUM_FILE_ENTRIES, ScriptType } from "../ids";
 import { readCString, readI16, strlcpy, strToUpper, writeI16 } from "../memory";
-import { bindSoundClock } from "../sound-service";
 import type { EngineState } from "../state";
 import { type NativeGroup } from "./types";
 
@@ -73,9 +72,8 @@ export const F4_SYSTEM: NativeGroup = {
     args: 1,
     impl(e) {
       const p = e.vm.popPtr();
-      // l'attente du fondu en cours (`load`) doit faire avancer l'horloge du moteur
-      bindSoundClock(e.sound, (ms) => e.delay(ms));
-      e.sound.loadMusic(strToUpper(strlcpy(p ? readCString(p) : "", 33)));
+      // l'attente du fondu en cours (`load`) fait avancer l'horloge du moteur
+      e.sound.loadMusic(strToUpper(strlcpy(p ? readCString(p) : "", 33)), (ms) => e.delay(ms));
       return 0;
     },
   },

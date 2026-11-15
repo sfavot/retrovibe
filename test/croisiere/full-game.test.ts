@@ -8,7 +8,9 @@
  * fin : accusation de Désiré, explication (fond `DGF1.PI1`, overlay `DESIRE`), épilogues (`FIN`), générique (`FIN01`, jusqu'au fond
  * `F14.PI1` du « The End »), puis l'overlay `GEN`.
  *
- * Durée (vitest) : (a) environ 1 min 30 (≈ 225 000 tours), (b) davantage. `CROISIERE_FULL_GAME=0` les passe toutes les deux.
+ * Durée (vitest) : environ 1 min chacun (≈ 225 000 tours). Hors de la suite par défaut, qui garde la comparaison au banc ScummVM
+ * (`solution/scummvm-replay.test.ts`, mêmes entrées) : `CROISIERE_FULL_GAME=1` les lance, à faire quand la solution, le joueur
+ * (`solution/driver.ts`) ou les sauvegardes changent.
  */
 
 import { describe, expect, it } from "vitest";
@@ -18,7 +20,7 @@ import { Driver } from "./solution/driver";
 import { makeEngine, resumeInFreshEngine } from "./solution/engine";
 import { PHASES } from "./solution/walkthrough";
 
-const enabled = hasOriginalFiles && process.env.CROISIERE_FULL_GAME !== "0";
+const enabled = hasOriginalFiles && process.env.CROISIERE_FULL_GAME === "1";
 
 interface Played {
   driver: Driver;

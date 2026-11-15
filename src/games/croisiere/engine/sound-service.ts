@@ -6,9 +6,8 @@
  * tous les multiples franchis, d'un coup. Ici `elapse(ms)` (appelé par `EngineState.delay`) fait pareil : la phase est « multiples de
  * 20 ms depuis 0 », première échéance à 20 ms, sans rattrapage avant.
  *
- * Attente de `PCSoundFxPlayer::load` (`while (fondu en cours) delayMillis(50)`) : exacte, par `bindClock` qui donne l'accès à
- * `EngineState.delay` (l'attente doit aussi faire avancer l'horloge du moteur, donc la cadence des tours). Sans horloge liée (usage hors
- * moteur), l'attente n'avance que l'horloge du son.
+ * Attente de `PCSoundFxPlayer::load` (`while (fondu en cours) delayMillis(50)`) : exacte, par l'attente que le moteur passe à `loadMusic`
+ * (`EngineState.delay`, qui fait aussi avancer l'horloge du moteur, donc la cadence des tours, et rappelle `elapse`).
  *
  * Référence : `engines/cruise/sound.cpp` de ScummVM (GPL v3+, release 2026.4.0) ; lu puis réécrit.
  */
@@ -22,25 +21,14 @@ export const OPL_TICK_MS = 20;
 /** `delayMillis(50)` de l'attente de `load`. */
 const FADE_WAIT_MS = 50;
 
-/** Son lié à une horloge : le moteur y branche `EngineState.delay`. */
-export interface ClockBound {
-  bindClock(delay: (ms: number) => void): void;
-}
-
-export class SoundService implements CroisiereSound, ClockBound {
+export class SoundService implements CroisiereSound {
   readonly facade: SoundFacade;
   private clockMs = 0;
-  private delay: ((ms: number) => void) | null = null;
   private fading = false;
   private tickCount = 0;
 
   constructor(sink: OplSink, loadFile: SoundFileLoader, musicVolume?: number, sfxVolume?: number) {
     this.facade = new SoundFacade(sink, loadFile, musicVolume, sfxVolume);
-  }
-
-  /** Branche l'horloge du moteur (`(ms) => state.delay(ms)`), qui rappelle `elapse`. */
-  bindClock(delay: (ms: number) => void): void {
-    this.delay = delay;
   }
 
   /** Ticks de 50 Hz joués depuis le début. */
@@ -63,11 +51,8 @@ export class SoundService implements CroisiereSound, ClockBound {
     return this.fading;
   }
 
-  loadMusic(name: string): void {
-    while (this.isFading()) {
-      if (this.delay) this.delay(FADE_WAIT_MS);
-      else this.elapse(FADE_WAIT_MS);
-    }
+  loadMusic(name: string, wait: (ms: number) => void): void {
+    while (this.isFading()) wait(FADE_WAIT_MS);
     this.facade.loadSong(name);
   }
 
@@ -133,9 +118,4 @@ export class SoundService implements CroisiereSound, ClockBound {
     this.fading = false;
     this.facade.restoreState(state);
   }
-}
-
-/** Branche l'horloge du moteur sur un son qui la demande (appelé par les natives de chargement de morceau). */
-export function bindSoundClock(sound: CroisiereSound, delay: (ms: number) => void): void {
-  (sound as Partial<ClockBound>).bindClock?.(delay);
 }

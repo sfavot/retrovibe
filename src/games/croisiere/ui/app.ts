@@ -5,7 +5,7 @@ import type { CroisiereHost } from "../engine/host";
 import { CroisiereEngine } from "../engine/main-loop";
 import type { GameFiles } from "../engine/overlays";
 import { canSave, captureSave, describeSave, parseSave, restoreSave } from "../engine/save";
-import { SoundService, bindSoundClock } from "../engine/sound-service";
+import { SoundService } from "../engine/sound-service";
 import { BrowserHost, SCREEN_HEIGHT, SCREEN_WIDTH } from "./browser-host";
 import { renderHelp } from "./help";
 import { keyAction } from "./keys";
@@ -20,12 +20,10 @@ export type AppOptions = PointClickAppOptions<SlotData>;
 /** Pas rattrapés au plus en une image d'écran (320 ms) : au-delà (onglet gelé), le temps perdu est abandonné. */
 export const MAX_CATCH_UP_TICKS = 32;
 
-/** Moteur neuf sur les fichiers du jeu, avec le rendu et le son de la page ; l'horloge du son est celle de ce moteur. */
+/** Moteur neuf sur les fichiers du jeu, avec le rendu et le son de la page. */
 function createEngine(files: GameFiles, host: CroisiereHost, frames: FrameQueue, sound: SoundService): CroisiereEngine {
   const seed = 1 + Math.floor(Math.random() * 0x7ffffffe);
-  const engine = new CroisiereEngine(host, { files, seed, renderer: frames, sound });
-  bindSoundClock(sound, (ms) => engine.state.delay(ms));
-  return engine;
+  return new CroisiereEngine(host, { files, seed, renderer: frames, sound });
 }
 
 /** Ce qu'un emplacement reçoit de la partie en cours ; `null` si le jeu refuse la sauvegarde (introduction, scène, fin). */

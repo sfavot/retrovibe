@@ -30,15 +30,15 @@ describe.skipIf(!hasOriginalFiles)("SoundService : morceaux du jeu", () => {
     expect(musics.length).toBeGreaterThan(1);
     const sound = new SoundService(nullSink, loadFile);
     const e = new EngineState({ files, sound });
-    sound.bindClock((ms) => e.delay(ms));
-    sound.loadMusic(musics[0]!);
+    const wait = (ms: number) => e.delay(ms);
+    sound.loadMusic(musics[0]!, wait);
     sound.playMusic();
     expect(sound.isPlaying()).toBe(true);
     e.delay(20);
     sound.fadeSong();
     expect(sound.songPlayed()).toBe(false);
     const start = e.virtualTime;
-    sound.loadMusic(musics[1]!);
+    sound.loadMusic(musics[1]!, wait);
     // fondu : 50 pas de 1 ligne ; le lecteur n'avance que tous les (eventsDelay + 1) ticks, l'attente est un multiple de 50 ms
     expect((e.virtualTime - start) % 50).toBe(0);
     expect(e.virtualTime - start).toBeGreaterThanOrEqual(50);
@@ -48,7 +48,7 @@ describe.skipIf(!hasOriginalFiles)("SoundService : morceaux du jeu", () => {
 
   it("SongPlayed devient vrai à la fin du fondu", () => {
     const sound = new SoundService(nullSink, loadFile);
-    sound.loadMusic(musics[0]!);
+    sound.loadMusic(musics[0]!, (ms) => sound.elapse(ms));
     sound.playMusic();
     sound.fadeSong();
     let ms = 0;

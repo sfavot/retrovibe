@@ -18,7 +18,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | [Flight of the Amazon Queen (Interactive Binary Illusions, 1995)](https://sfavot.github.io/retrovibe/#/fotaq) | jouable (en cours de validation) |
 | [Lure of the Temptress (Revolution Software, 1992)](https://sfavot.github.io/retrovibe/#/lure) | jouable (en cours de validation) |
 | [Beneath a Steel Sky (Revolution Software, 1994)](https://sfavot.github.io/retrovibe/#/bass) | jouable (en cours de validation) |
-| [Croisière pour un cadavre (Delphine Software International, 1991)](https://sfavot.github.io/retrovibe/#/croisiere) | jouable (en cours de validation) |
+| [Croisière pour un cadavre (Delphine Software International, 1991)](https://sfavot.github.io/retrovibe/#/croisiere) | jouable |
 | [Les Voyageurs du temps (Delphine Software, 1989)](https://sfavot.github.io/retrovibe/#/voyageurs) | jouable (en cours de validation) |
 
 ## Déploiement

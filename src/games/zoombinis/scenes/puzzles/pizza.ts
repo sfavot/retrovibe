@@ -125,12 +125,12 @@ const DELAY = 6;
 const STATIC = FeatureFlag.noReplay | FeatureFlag.stopAtEnd | FeatureFlag.active;
 const PLAYING = FeatureFlag.stopAtEnd | FeatureFlag.active;
 /**
- * Profondeurs : le décor, le four, les boutons, la table, les trolls, la pizza servie, les assiettes ; les Zoombinis du kit sont à 1 + y / 1000.
+ * Profondeurs : le décor, le four, les boutons, la table, les trolls, les assiettes, les Zoombinis du kit (1 + y / 1000, moins de 1,5), la pizza servie.
  * Ordre de dessin de l'original (`1130:54c8`, `3799`, `11a8:2a0a`, de l'arrière vers l'avant) : Shyler derrière Willa derrière Arno (chaque troll est inséré derrière le
  * précédent, qui est devant lui), et la pizza servie devant tout (`2a0a(pizza, 1, table)` la place devant la table, donc devant les trolls dont l'image porte parfois
- * un morceau de table : `SCRB` 8020, 8021, 9026, 9027, 10030, 10031).
+ * un morceau de table : `SCRB` 8020, 8021, 9026, 9027, 10030, 10031) ; elle reste aussi devant le livreur, qui la porte sur la tête.
  */
-const DEPTH = { oven: 0, preview: 0.1, buttons: 0.2, table: 0.3, trolls: [0.42, 0.4, 0.41] as const, flight: 0.45, plates: 0.5, deliverer: 1 } as const;
+const DEPTH = { oven: 0, preview: 0.1, buttons: 0.2, table: 0.3, trolls: [0.42, 0.4, 0.41] as const, plates: 0.5, flight: 2 } as const;
 
 /** Rectangles de prise des ingrédients, par niveau et indice `k` (régions 4 à 11 de `1130:1803`, §4.2). `null` : pas de bouton à ce niveau. */
 export const PIZZA_INGREDIENT_REGIONS: readonly (readonly (Rect | null)[])[] = [

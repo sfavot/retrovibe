@@ -379,6 +379,23 @@ describe.skipIf(!original.has)("boîte de dialogue de Zoombinis", () => {
     }
   });
 
+  it("refuse d'ouvrir le menu sur le logo (écran 0), où rien ne l'afficherait, et l'ouvre sur la carte", async () => {
+    const env = await startDialogs();
+    const { dialogs, engine, zb } = env;
+    zb.session.screen = ScreenId.logo;
+    dialogs.openMenu(engine.ctx);
+    await env.run(100);
+    expect(dialogs.isOpen).toBe(false);
+    env.press("Slash", "/");
+    await env.run(100);
+    expect(dialogs.isOpen).toBe(false);
+
+    zb.session.screen = ScreenId.map;
+    dialogs.openMenu(engine.ctx);
+    await env.run(100);
+    expect(dialogs.modes).toEqual([1]);
+  });
+
   it("crédits : cadre et défilement de STRL 2020, un clic les ferme sans fermer le menu", async () => {
     const env = await startDialogs();
     const { dialogs, host, engine } = env;

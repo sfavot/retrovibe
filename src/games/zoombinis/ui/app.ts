@@ -91,17 +91,23 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   if (options.debug) (window as unknown as { __zb: unknown }).__zb = { engine, host, services };
 
   shell.start({
-    // Écran tactile : l'original n'ouvre son menu (enregistrer, charger) qu'au clavier (`/`, `1198:05b3`, hors de la carte). Le bouton
-    // « Menu » de la barre ouvre le menu du shell, dont une entrée fait le même effet que la touche (`openMenu` refuse les écrans sans menu).
-    menuEntries: () => [
-      {
-        label: copy.gameMenu,
-        onPress: () => {
-          engine.ctx.services.get(DIALOG).openMenu(engine.ctx);
-          shell.focusCanvas();
+    // Écran tactile : l'original n'ouvre son menu (enregistrer, charger) qu'au clavier (`/`, `1198:05b3`). Le bouton « Menu » de la barre
+    // ouvre le menu du shell, dont une entrée fait le même effet que la touche. `openMenu` refuse le logo du départ et les changements
+    // d'écran : l'entrée n'est proposée que quand il peut s'ouvrir (écrans de la partie, hors chargement).
+    menuEntries: () => {
+      const dialogs = engine.ctx.services.get(DIALOG);
+      const { scenes } = engine.ctx;
+      if (!dialogs.inGameScreen() || scenes.current === undefined || scenes.isLoading || scenes.pending !== null) return [];
+      return [
+        {
+          label: copy.gameMenu,
+          onPress: () => {
+            dialogs.openMenu(engine.ctx);
+            shell.focusCanvas();
+          },
         },
-      },
-    ],
+      ];
+    },
     // Onglet masqué : le jeu s'arrête (horloge et son) et repart au même point au retour.
     onPause: (hidden) => engine.setPaused(hidden),
     sound: { prefs: new SoundPrefs(createLocalStorageStore(), host.audio, GAME_ID), storageKey: soundPrefKey(GAME_ID), unlock: () => host.audio.unlock() },

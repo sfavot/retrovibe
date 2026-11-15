@@ -781,8 +781,9 @@ export class Dialogs {
     }
   }
 
+  /** Ouvre le menu (`11a0:1737(1)`) ; refusé hors des écrans 1 à 18 : sur le logo, aucune couche ne s'affiche et elle avalerait les entrées. */
   openMenu(ctx: ZoombinisContext): void {
-    if (!this.available(ctx) || this.has(1)) return;
+    if (!this.inGameScreen() || !this.available(ctx) || this.has(1)) return;
     this.push(ctx, new MenuLayer(this.env));
   }
 

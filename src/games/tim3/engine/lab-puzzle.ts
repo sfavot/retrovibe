@@ -70,16 +70,23 @@ export function rangeFrames(range: SolveRange, first: StateFirst): { state1: num
 }
 
 /**
- * 429ef4 (lu en partie) : variante d'une pièce, c'est-à-dire le rang de la plage qui contient son image dans la ligne `@`, sinon dans le
- * premier état (le ballon a 4 couleurs, chacune avec ses plages). 0 si aucune.
+ * Les deux lignes de plages que lisent 429d84 et la fenêtre (lignes 1 et 3 après le nom) : la ligne `@`, sinon le premier état ; puis le
+ * second état. Une pièce à ligne `@` n'a pas d'état : sa « ligne 3 » est dans le bloc suivant de `SOLVE.RES` (non suivi : vide).
+ */
+function rangeLines(solve: SolvePart): [readonly SolveRange[], readonly SolveRange[]] {
+  if (solve.position) return [solve.position, []];
+  return [solve.states[0]?.ranges ?? [], solve.states[1]?.ranges ?? []];
+}
+
+/**
+ * 429ef4 : variante d'une pièce (`[0x472f94]`), le rang de la plage de la première ligne (`@`, sinon le premier état) dont la première
+ * image (44b2c0 de `from`) est l'image de la pièce (+0x18) : le ballon a 4 couleurs, le canon 6 directions, chacune avec ses plages.
+ * 0 si aucune, et aussi si la ligne ne commence pas par un nombre non nul (pièce sans état, ou plage `0,…`), sauf une ligne `@`.
  */
 export function solveVariant(solve: SolvePart, frame: number, first: StateFirst): number {
-  const ranges = solve.position ?? solve.states[0]?.ranges ?? [];
-  const i = ranges.findIndex((r) => {
-    const f = rangeFrames(r, first);
-    return frame >= f.state1 && frame <= f.state2;
-  });
-  return Math.max(0, i);
+  const [ranges] = rangeLines(solve);
+  if (!solve.position && (ranges[0]?.from ?? 0) === 0) return 0;
+  return Math.max(0, ranges.findIndex((r) => first(r.from) === frame));
 }
 
 /** Hint vide (emplacement libre). */
@@ -135,6 +142,33 @@ export class LabPuzzle {
     }
     if (this.conditions.length >= MAX_CONDITIONS) return false;
     this.conditions.push({ ...value, part });
+    return true;
+  }
+
+  /**
+   * 429d84 : la pièce a changé d'image (retournée : 42e8bb, 42e8fa, 42e939 ; programmée : 424a82), sa condition d'état suit sa variante.
+   * La nouvelle variante vient de 429ef4 ; puis, rang par rang de la première ligne, on cherche la plage dont la première image est
+   * l'état 1 de la condition, dans la première ligne puis dans la ligne du second état. Trouvée : l'état 1 et l'état 2 deviennent la plage
+   * de la nouvelle variante dans cette ligne (429cb8). Seuls les deux premiers états sont suivis ; le rectangle (par le haut, par le
+   * bas, hors de l'écran, position) ne change pas. Rend vrai si la condition a changé.
+   * Écart : sans plage trouvée, l'exe reprend la ligne `[0x47ff98]` laissée par le dernier choix de `SOLVE.ITF` (variable jamais remise
+   * à zéro ici) ; le port ne change rien.
+   */
+  followVariant(part: Part, solve: SolvePart | null, first: StateFirst): boolean {
+    const c = this.conditionOf(part);
+    if (!c || !solve) return false;
+    const variant = solveVariant(solve, part.frame, first);
+    const lines = rangeLines(solve);
+    let line: readonly SolveRange[] | null = null;
+    for (let k = 0; k < lines[0].length && !line; k++) {
+      line = lines.find((l) => l[k] !== undefined && first(l[k]!.from) === c.state1) ?? null;
+    }
+    const range = line?.[variant];
+    if (!range) return false;
+    const f = rangeFrames(range, first);
+    if (f.state1 === c.state1 && f.state2 === c.state2) return false;
+    c.state1 = f.state1;
+    c.state2 = f.state2;
     return true;
   }
 

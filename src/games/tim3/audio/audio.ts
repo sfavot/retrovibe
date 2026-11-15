@@ -7,6 +7,10 @@
  *   horloge de la musique comprise (elle est celle du contexte).
  * - **Le temps du jeu ne dépend pas du son** : voix et effets durent sur l'horloge de l'hôte, que le contexte existe ou non, soit bloqué par
  *   l'autoplay ou coupé.
+ * - **Réglages superposés** : le bouton « Son » du site (`setMuted`, commun à tous les joueurs) coupe la sortie ; dessous, la musique
+ *   (`playMusic` n'est appelé que si elle est en marche) et `volume` sont ceux du joueur courant, `effectsEnabled` et `voicesEnabled`
+ *   des préférences communes. Un son n'est entendu que si le site a le son ET si son réglage le laisse passer ; le volume (0 à 15) ne
+ *   s'applique qu'à la musique et aux effets.
  * - L'hôte appelle `unlock()` au premier geste, `update()` à chaque image, `suspend()` / `resume()` selon la visibilité.
  */
 import { VoiceBank, type SoundFiles } from "../../../audio/voice-bank";

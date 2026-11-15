@@ -3,10 +3,12 @@ import { readItf } from "../../../src/games/tim3/data/itf";
 import { parseLines } from "../../../src/games/tim3/data/text";
 import { WALK_NAME_LINE, WALK_STEP, Walkthrough, type WalkEffect, type WalkFacts } from "../../../src/games/tim3/engine/walkthrough";
 import { RenderAssets } from "../../../src/games/tim3/render";
+import { layoutItf } from "../../../src/games/tim3/render/itf-draw";
+import { measureText } from "../../../src/games/tim3/render/text";
 import { listGeometry } from "../../../src/games/tim3/render/itf-list";
 import { HELP_ITF, walkthroughWindow } from "../../../src/games/tim3/ui/help-window";
 import { ItfWindow } from "../../../src/games/tim3/ui/itf-window";
-import { SIGNIN, SIGNIN_LIST_STYLE, signInWindow } from "../../../src/games/tim3/ui/signin-window";
+import { SIGNIN, SIGNIN_LIST_STYLE, signInWindow, withReadableHeading } from "../../../src/games/tim3/ui/signin-window";
 import { frenchIndex, original } from "../data/real";
 import { fakeAudio } from "./professor-support";
 
@@ -63,6 +65,25 @@ describe.skipIf(!original.has)("écran d'inscription (SIGNIN.ITF, 426362)", () =
     const top = many.w.options.list!.view.top;
     expect(many.w.options.choose(SIGNIN.up)).toBe(true);
     expect(many.w.options.list!.view.top).toBe(top - 1);
+  });
+
+  it("titre : le jeu n'en pose qu'une ligne de 20 pixels dans 85 × 27 (« ENTREZ ») ; le port élargit le contrôle pour « ENTREZ VOTRE NOM »", () => {
+    const heading = (i: typeof itf) => layoutItf(assets, i).items.find((it) => it.id === SIGNIN.heading)!;
+    const before = heading(itf);
+    expect(before).toMatchObject({ width: 85, height: 27, text: "ENTREZ VOTRE NOM", more: true });
+    expect(before.lines).toEqual({ visible: 1, total: 3 });
+    const wide = withReadableHeading(assets, itf);
+    const after = heading(wide);
+    expect(after.more).toBe(false);
+    expect(after.lines).toEqual({ visible: 1, total: 1 });
+    // Même hauteur, de la gauche du champ du nom jusqu'à la plume, sans la chevaucher.
+    const name = itf.controls.find((c) => c.id === SIGNIN.name)!;
+    const picture = itf.controls.find((c) => c.id === SIGNIN.picture)!;
+    expect(after).toMatchObject({ y: before.y, height: 27, x: name.x, width: picture.x - name.x });
+    expect(measureText(assets.font("SYS12.PFT")!, after.text)).toBeLessThanOrEqual(after.width);
+    // Rien d'autre ne bouge ; un titre qui tient déjà n'est pas touché.
+    expect(wide.controls.filter((c) => c.id !== SIGNIN.heading)).toEqual(itf.controls.filter((c) => c.id !== SIGNIN.heading));
+    expect(withReadableHeading(assets, wide)).toBe(wide);
   });
 
   it("« ? » ferme l'écran pour l'aide", () => {

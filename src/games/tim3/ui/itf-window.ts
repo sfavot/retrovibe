@@ -20,8 +20,13 @@
  * - **Champs** (`input`, un ou plusieurs) : `<input>` transparent posé sur un contrôle dont le texte est dessiné par la fenêtre ; ou
  *   (`edit`) un vrai champ visible, sur plusieurs lignes au besoin, comme les contrôles EDIT Win32 que le jeu pose dans ses fenêtres
  *   (texte d'un indice 41f787, valeurs de `SOLVE.ITF` 426f92 : blanc sur bleu).
+ * - **Boutons à image enfoncés** (genre 1, 44ede8) : tant que le pointeur reste sur le bouton saisi, son image avance d'une par passe
+ *   jusqu'à la dernière de l'état, où elle reste ; hors du bouton ou relâché, image 0. Un bouton de 3 images (« ? », MB_MUSIC,
+ *   MM_HELP…) montre donc 1 puis 2.
  * - **Survol animé** (`hoverAnimate`, menu principal, bacs) : le bouton survolé (ou qui a le focus) montre les images de son état,
- *   une par passe (422c0f → 4506f4 → 44f0a8), avec leurs sons.
+ *   une par passe, avec leurs sons. Ce n'est pas 44f0a8 : ce rappel est celui des décors (genre 0, table 0x47016c) ; 4506f4 ne
+ *   l'appelle que pour un décor sous le pointeur au moment d'un appui (`[0x490084]` & 6) ou marqué « animé à chaque passe » (drapeau
+ *   1 de +0x34, 45064c), et il avance alors l'image du décor d'un cran, en boucle (`animate`) ; les boutons ont 44edbc.
  * - **Grisés activables** (`greyedActive`, écrans du parcours d'entrée) : un bouton grisé s'enfonce et agit (l'appelant répond
  *   « non disponible », comme la barre d'outils) ; le calque le marque `aria-disabled` et ajoute « (non disponible) » à son nom.
  *   Sans cette option, un bouton grisé ne s'enfonce pas et son élément est `disabled`.
@@ -207,6 +212,10 @@ export class ItfWindow {
   focused: number | null = null;
   /** Dernier des deux à avoir changé : il décide du bouton « actif » (texte du menu, survol animé). */
   private lastInput: "pointer" | "focus" = "focus";
+  /** Image du bouton à image saisi (genre 1, 44ede8) : 0 hors du bouton. */
+  private pressFrame = 0;
+  /** Sons des images atteintes par un bouton enfoncé (commandes `sound` de l'ANM, jouées quand l'image est dessinée) : `takeSounds`. */
+  private readonly sounds: FrameSound[] = [];
   /** Flèche saisie (44ee9d) : image courante, bouton encore tenu. */
   private arrow: { id: number; count: number; down: boolean } | null = null;
   /** Réglette saisie : décalage du pointeur dans le bouton, position du bouton (glisser continu). */
@@ -260,6 +269,7 @@ export class ItfWindow {
     for (const [id, f] of this.frames) frames[id] = f;
     // Pendant l'appui, le bouton survolé montre son image enfoncée.
     if (this.hover && this.hover.frame > 0 && this.pressed !== this.hover.id) frames[this.hover.id] = this.hover.frame;
+    if (this.pressed !== null && this.over && this.pressFrame > 0 && base.frames?.[this.pressed] === undefined) frames[this.pressed] = this.pressFrame;
     const moved: Record<number, { x?: number; y?: number; width?: number; height?: number }> = { ...base.moved };
     for (const s of this.options.sliders ?? []) moved[s.knob] = { ...moved[s.knob], ...this.knobPosition(s) };
     const list = this.options.list;
@@ -416,6 +426,9 @@ export class ItfWindow {
     const hit = this.hit(x, y);
     this.pressed = hit?.enabled ? hit.id : null;
     this.over = this.pressed !== null;
+    // 44ede8 : la première passe a lieu à l'appui (image 1).
+    this.pressFrame = 0;
+    if (this.over && this.pressAnimated(hit)) this.setPressFrame(1);
     if (hit?.enabled && hit.kind === ARROW_KIND && (hit.frameCount ?? 0) > 1) {
       // 44ee9d : la première passe a lieu à l'appui.
       this.arrow = { id: hit.id, count: hit.frameCount!, down: true };
@@ -474,6 +487,7 @@ export class ItfWindow {
     const id = this.pressed;
     this.pressed = null;
     this.over = false;
+    this.pressFrame = 0;
     if (id === null) return null;
     return this.hit(x, y)?.id === id ? id : null;
   }
@@ -481,6 +495,7 @@ export class ItfWindow {
   pointerCancel(): void {
     this.pressed = null;
     this.over = false;
+    this.pressFrame = 0;
     this.drag = null;
     if (this.arrow) {
       this.frames.delete(this.arrow.id);
@@ -540,12 +555,43 @@ export class ItfWindow {
       else this.frames.set(a.id, f);
       redraw = true;
     }
+    if (this.pressPass()) redraw = true;
     if (this.hoverPass()) redraw = true;
     if (this.options.tick?.()) redraw = true;
     return { redraw, fire };
   }
 
-  /** Survol animé (4506f4 → 44f0a8) : image suivante de l'état du bouton actif, retour à la première à la fin ; vrai pour redessiner. */
+  /** Bouton à image du genre 1 qui a plusieurs images (44ede8 les fait défiler à l'appui). */
+  private pressAnimated(item: { kind: number; frameCount?: number } | null | undefined): boolean {
+    return item?.kind === 1 && (item.frameCount ?? 0) > 1;
+  }
+
+  /** 44ede8 : bouton saisi sous le pointeur, image suivante jusqu'à la dernière ; ailleurs, image 0. Vrai pour redessiner. */
+  private pressPass(): boolean {
+    if (this.pressed === null) return false;
+    const item = this.item(this.pressed);
+    if (!this.pressAnimated(item)) return false;
+    const next = this.over ? Math.min(this.pressFrame + 1, item!.frameCount! - 1) : 0;
+    if (next === this.pressFrame) return false;
+    this.setPressFrame(next);
+    return true;
+  }
+
+  /** Nouvelle image du bouton enfoncé ; ses sons sont mis de côté pour l'hôte. */
+  private setPressFrame(frame: number): void {
+    this.pressFrame = frame;
+    const anm = frame > 0 && this.itf.anm ? this.assets.anm(this.itf.anm) : null;
+    const value = this.pressed !== null ? this.control(this.pressed)?.value : undefined;
+    const first = anm && value !== undefined ? imageOfState(anm, value) : -1;
+    if (anm && first >= 0) this.sounds.push(...frameSounds(anm, first + frame));
+  }
+
+  /** Sons à jouer (images de bouton atteintes), retirés. */
+  takeSounds(): FrameSound[] {
+    return this.sounds.splice(0);
+  }
+
+  /** Survol animé : image suivante de l'état du bouton actif, retour à la première à la fin ; vrai pour redessiner. */
   private hoverPass(): boolean {
     const o = this.options.hoverAnimate;
     if (!o) return false;
@@ -842,6 +888,7 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
 
   const timer = window.setInterval(() => {
     const t = model.tick(now());
+    for (const s of model.takeSounds()) host.playEffect?.(s.id);
     if (t.redraw) draw();
     for (const id of t.fire) pick(id);
     if (!closed) updateStatus();
@@ -888,6 +935,7 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
     model.pointerDown(p.x, p.y, now());
     const pressed = model.pressed !== null ? model.item(model.pressed) : null;
     if (pressed && pressed.kind !== 0 && pressed.frameCount === undefined) host.playEffect?.(TEXT_BUTTON_SOUND);
+    for (const s of model.takeSounds()) host.playEffect?.(s.id);
     refresh();
     flush();
   });

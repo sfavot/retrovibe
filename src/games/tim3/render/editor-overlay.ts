@@ -16,7 +16,7 @@ import { mapColor } from "./palette";
 import { drawPart, layersOf } from "./parts";
 import { ropeLine } from "./ropes";
 import { BIN_CLIP, BIN_PANEL, PLAYFIELD, drawBinSlots, type BinLayout, type BinSlot } from "./screen";
-import type { Surface } from "./surface";
+import { Surface } from "./surface";
 
 /** `PB_LEFT` / `PB_RIGHT` (flèches de défilement, 22 × 24) et `PB_PLAY` (34 × 33, Démarrer / Arrêter). */
 export const BIN_LEFT = { x: 565, y: 336 + BIN_PANEL.y, width: 22, height: 24 } as const;
@@ -59,9 +59,10 @@ export interface BinOverlay {
 }
 
 /**
- * Liste du bac (remplace celle de `drawBin`), flèches et bouton de marche. Flèche allumée (états 5 et 6 de
- * `PARTSBIN.ANM`) quand la fenêtre peut défiler de ce côté (choix du port : la barre de défilement de l'original n'est
- * jamais grisée, elle disparaît quand tout tient, `SetScrollRange` 0 … 0).
+ * Liste du bac (remplace celle de `drawBin`), flèches et bouton de marche. Flèches : image 0 des états 5 et 6 de `PARTSBIN.ANM`
+ * (images 10 et 13 ; 11-12 et 14-15 sont la flèche enfoncée). L'ANM n'a pas d'image « inactive », et l'original ne s'en sert pas
+ * (TIMWIN défile par une barre Windows jamais grisée, cachée quand tout tient, `SetScrollRange` 0 … 0) : une flèche qui ne peut pas
+ * défiler de son côté est atténuée par `fadeTable`, comme les boutons grisés de la barre (choix du port).
  */
 export function drawBinOverlay(surface: Surface, assets: RenderAssets, overlay: BinOverlay): void {
   const panel = assets.anm("PARTSBIN.ANM");
@@ -78,8 +79,22 @@ export function drawBinOverlay(surface: Surface, assets: RenderAssets, overlay: 
     const { scroll, maxScroll } = overlay.layout;
     const left = stateImage(panel, STATE_LEFT);
     const right = stateImage(panel, STATE_RIGHT);
-    if (left >= 0 && scroll > 0) drawAnmImage(surface, assets, panel, left, 0, BIN_PANEL.y);
-    if (right >= 0 && scroll < maxScroll) drawAnmImage(surface, assets, panel, right, 0, BIN_PANEL.y);
+    const leftFrame = left >= 0 ? imageFrame(panel, left) : null;
+    const rightFrame = right >= 0 ? imageFrame(panel, right) : null;
+    const arrow = (image: number, frame: typeof leftFrame, active: boolean): void => {
+      if (!frame) return;
+      if (active) {
+        drawAnmImage(surface, assets, panel, image, 0, BIN_PANEL.y);
+        return;
+      }
+      // Seuls les pixels de la flèche sont atténués (le fond du panneau autour reste tel quel).
+      const arrowOnly = new Surface(frame.width, frame.height);
+      drawAnmImage(arrowOnly, assets, panel, image, -frame.x, -frame.y);
+      arrowOnly.remap(0, 0, frame.width, frame.height, assets.fadeTable());
+      surface.blit(arrowOnly, frame.x, frame.y + BIN_PANEL.y);
+    };
+    arrow(left, leftFrame, scroll > 0);
+    arrow(right, rightFrame, scroll < maxScroll);
   }
   drawBinSlots(surface, assets, overlay.layout, overlay.hover);
 }

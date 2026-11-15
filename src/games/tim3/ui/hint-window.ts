@@ -15,8 +15,11 @@
  * - Nouveau (41fcdc) : 8 indices déjà, GENERIC 31265 ; sinon la fenêtre se ferme et une main suit le pointeur jusqu'à un appui (42057e),
  *   puis la fenêtre revient pour écrire le nouvel indice (41f3dc, `[0x47ea6c]` = 2). Montrer / Cacher (41fb4e, 41f9c7) : toutes les mains
  *   (4204cf, 420536), puis la fenêtre se ferme.
- * - Le professeur (21106, `HINTPROF.ANM` état 32) s'anime à chaque passe (4207a4) ; au Labo, il n'a pas de voix à rejouer (le jeu y lit
- *   celle d'un indice du dernier puzzle joué, `[0x481600]` : sans rapport avec le puzzle maison, non reprise).
+ * - Le professeur (21106, `HINTPROF.ANM` état 32) s'anime à chaque passe (4207a4). Ouverte par la barre (41f668), la fenêtre n'a pas de
+ *   voix (`[0x47294c]` = 0 : le professeur ne rejoue rien, 41f926). Ouverte pour une main (41f5b5, `[0x47ea70]`), elle a la voix de
+ *   l'indice du même emplacement **du dernier puzzle joué** (41f62e : emplacement × 500 + 5500 + `[0x481600]`), sauf si c'était un
+ *   puzzle maison (`[0x481918]` = 6) : jouée à l'ouverture (14 messages plus tard, 424684), rejouée par un clic sur le professeur
+ *   (`labHintVoice`). Elle n'a aucun rapport avec l'indice écrit : c'est ce que fait le jeu.
  * - Aide (HT_HELP, 41ffaa) : `TIMHELP.EXE` dans le jeu, l'aide du site ici.
  */
 import { readItf, type Itf } from "../data/itf";
@@ -24,6 +27,8 @@ import type { RenderAssets } from "../render/assets";
 import { itfText } from "../render/itf-draw";
 import { copy } from "../copy";
 import { HINT_TEXT_MAX } from "../engine/lab-puzzle";
+import { HOME_CATEGORY, type PuzzleRef } from "../engine/session";
+import { hintVoice, type VoiceRef } from "../audio";
 import { openItfWindow, type ItfWindowHandle, type ItfWindowOptions, type ItfHost } from "./itf-window";
 
 export const HINT = { help: 21114, view: 21113, create: 21112, editDone: 21108, text: 21107, professor: 21106, done: 21105 } as const;
@@ -86,6 +91,18 @@ export interface HintEditorOptions {
   message(text: string): void;
   /** Le choix qui ferme la fenêtre. */
   choose(choice: HintEditorChoice): void;
+  /** Rejoue la voix (clic sur le professeur) ; absent : la fenêtre n'a pas de voix (41f926 ne fait rien). */
+  replay?(): void;
+}
+
+/**
+ * 41f62e : voix de l'éditeur ouvert pour la main de l'emplacement `slot` (0 à 7) : l'indice `slot + 1` du dernier puzzle joué
+ * (`[0x481600]`), `null` sans puzzle joué, après un puzzle maison (`[0x481918]` = 6) ou pour le huitième emplacement (pas de
+ * `HINT8.VOC`).
+ */
+export function labHintVoice(slot: number, last: PuzzleRef | null): VoiceRef | null {
+  if (!last || last.category === HOME_CATEGORY || last.index < 0) return null;
+  return hintVoice(slot + 1, last.index);
 }
 
 /**
@@ -117,6 +134,7 @@ export function hintEditorWindow(assets: RenderAssets, itf: Itf, o: HintEditorOp
     defaultId: o.count > 0 || editing ? HINT.view : HINT.create,
     ...(editing ? {} : { cancelId: HINT.editDone }),
     animate: [HINT.professor],
+    ...(o.replay ? { zones: professorZone(itf) } : {}),
     ...(editing
       ? {
           input: {
@@ -134,6 +152,7 @@ export function hintEditorWindow(assets: RenderAssets, itf: Itf, o: HintEditorOp
     choose: (id) => {
       switch (id) {
         case HINT.professor:
+          o.replay?.();
           return true;
         case HINT.help:
           choose("help");

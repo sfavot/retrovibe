@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { AudioSink, MidiSink, PcmSound, WaveHandle } from "../../src/engine/mohawk/audio/sink";
+import type { MidiSink } from "../../src/audio/midi-sink";
+import type { AudioSink, PcmSound, WaveHandle } from "../../src/engine/mohawk/audio/sink";
 import type { Frame } from "../../src/engine/mohawk/graphics/frame";
 import type { HostFontSpec, HostText, HostTextMetrics, TextMask } from "../../src/engine/mohawk/host";
 import { Input, type MouseButton } from "../../src/engine/mohawk/input";

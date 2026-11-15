@@ -84,7 +84,7 @@ import { openBinsolveWindow } from "./binsolve-window";
 import { openGlobeWindow } from "./globe-window";
 import { openHelpWindow, openWalkthroughWindow } from "./help-window";
 import { openSignInWindow } from "./signin-window";
-import { HINT_TEXT, openHintEditorWindow, openHintWindow, type HintEditorChoice } from "./hint-window";
+import { HINT_TEXT, labHintVoice, openHintEditorWindow, openHintWindow, type HintEditorChoice } from "./hint-window";
 import { openGoalEditor } from "./goal-editor";
 import { LOCK_TEXT, openLockWindow } from "./lock-window";
 import { SOLVE_TEXT, drawPartPreview, openSolveWindow } from "./solve-window";
@@ -146,15 +146,15 @@ const DUEL_TEXT = {
 /** Un pas de l'horloge du tour au plus par image (un onglet longtemps en arrière-plan ne vide pas le tour d'un coup). */
 const DUEL_MAX_STEP_MS = 250;
 const VOLUMES = ["RESOURCE.MAP", "RESOURCE.001", "RESOURCE.002", "FRENCH.DAT"] as const;
-/** Musique de l'option « Musique » (préférence mémorisée, activée par défaut). */
 /** `SYSTEM.RES` : nom de l'invité, « Hôte » (`TIM.SAV`, 42d03d). */
 const SYSTEM_GUEST_LINE = 3;
 /** `INTRFACE.RES` de l'inscription (426877) : nom inconnu (31174, Oui / Non), ni nom ni rangée (31175). */
 const SIGNIN_TEXT = { newPlayer: 31174, noName: 31175 } as const;
-const MUSIC_KEY = "music";
-/** Guitare : effets activés, volume de 0 à 15 (préférences mémorisées ; le jeu les garde par 42c8cb). */
+/**
+ * Guitare : interrupteur des effets, préférence commune à tous les joueurs (le jeu ne le garde pas dans le fichier de partie). La
+ * musique et le volume sont ceux du joueur courant (`PlayerRegistry.sound`).
+ */
 const EFFECTS_KEY = "effects";
-const VOLUME_KEY = "volume";
 
 /** Écran plein du parcours d'entrée : l'intro, ou le fond noir derrière le menu principal, les crédits et le choix du puzzle. */
 type Front = { kind: "intro"; player: IntroPlayer } | { kind: "backdrop" };
@@ -260,10 +260,17 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const slots = labSaveSlots(storage);
   const puzzles = puzzleList();
   const duelPuzzles = duelPuzzleList();
-  let musicOn = storage.get(MUSIC_KEY) !== "0";
+  /** Musique en marche (4115e6(1000, ·)) : réglage du joueur courant. */
+  let musicOn = true;
   sound.effectsEnabled = storage.get(EFFECTS_KEY) !== "0";
-  const storedVolume = Number(storage.get(VOLUME_KEY) ?? "15");
-  sound.volume = Number.isFinite(storedVolume) ? storedVolume : 15;
+  /** Réglages de son du joueur courant, à son chargement (42c6d0 : 4115e6(1000, musique), 411674(1001 / 3001, volume)). */
+  const applyPlayerSound = (): void => {
+    const s = players.sound();
+    musicOn = s.music;
+    sound.volume = s.volume;
+    if (!musicOn) sound.stopMusic();
+  };
+  applyPlayerSound();
   /** Effet choisi dans la guitare (gardé d'une ouverture à l'autre, `[0x47f980]`). */
   let effectChoice = 0;
 
@@ -536,6 +543,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     let slot = target && "slot" in target ? target.slot : null;
     const at = target && "at" in target ? target.at : null;
     let choice: HintEditorChoice = "done";
+    // 41f62e : pour une main (posée, ou la nouvelle à son futur emplacement), la voix de l'indice du même emplacement du dernier puzzle joué.
+    const voiceSlot = slot ?? (at ? lab.hints.findIndex((h) => h.text === "") : -1);
+    const voice = voiceSlot >= 0 ? labHintVoice(voiceSlot, puzzles.find((p) => p.name === progress.last) ?? null) : null;
+    const play = (): void => {
+      sound.stopVoice();
+      if (voice) sound.playVoice(voice);
+    };
+    if (voice) play();
     pauseFor(
       openHintEditorWindow(itfHost(), {
         text: slot !== null ? (lab.hints[slot]?.text ?? "") : at ? "" : null,
@@ -548,7 +563,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         choose: (c) => {
           choice = c;
         },
+        ...(voice ? { replay: play } : {}),
         onClose: () => {
+          if (voice) sound.stopVoice();
           resume();
           switch (choice) {
             case "create":
@@ -593,6 +610,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const stateFirst = (type: number) => {
     const anm = assets.partAnm(type);
     return (state: number): number => (!anm ? 0 : state === -1 ? imageCount(anm) : Math.max(0, stateImage(anm, state)));
+  };
+
+  /** 429d84 : la pièce a été retournée ou programmée, sa condition de réussite (Labo) suit sa variante. */
+  const followVariant = (part: Part): void => {
+    session.labPuzzle?.followVariant(part, solveParts[part.type] ?? null, stateFirst(part.type));
   };
 
   /** Poignée « solution » (42ea99 → 426d1c) : `SOLVE.ITF` pour la pièce (une télécommande : ses explosifs). */
@@ -1051,6 +1073,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         fillLabBin();
         announce(copy.binTab(gameText(TAB_TEXT + e.tab)));
         break;
+      case "flipped":
+        followVariant(e.part);
+        break;
       case "program":
         openProgram(e.part);
         break;
@@ -1091,7 +1116,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
 
   // ------------------------------------------------------------------ inscription (SIGNIN.ITF, docs/tim3/ui.md § Inscription)
 
-  /** Change de joueur : l'aire en cours reste à l'ancien, la progression devient celle du nouveau. */
+  /** Change de joueur : l'aire en cours reste à l'ancien, la progression et le son (musique, volume) deviennent ceux du nouveau. */
   const switchPlayer = (id: number): void => {
     persistEdit();
     if (!players.select(id)) return;
@@ -1099,6 +1124,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     progress = new Progress(store);
     homeProgress = new HomeProgress(store);
     edits = new EditStore(store);
+    applyPlayerSound();
     detached = true;
     const player = players.byId(id);
     if (player) announce(copy.playerChanged(players.nameOf(player)));
@@ -1371,7 +1397,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         title: texts.parts.find((p) => p.id === part.type)?.name ?? copy.partInfoTitle,
         program,
         changed: () => sound.playEffect(SOUND_PLACE),
-        onClose: resume,
+        onClose: () => {
+          // 424a82 : l'image de la pièce a pu changer, sa condition de réussite suit (429d84).
+          followVariant(part);
+          resume();
+        },
       }),
     );
   };
@@ -1710,7 +1740,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         stopEffect: (id) => sound.stopEffect(id),
         setMusicOn: (on) => {
           musicOn = on;
-          storage.set(MUSIC_KEY, on ? "1" : "0");
+          players.setSound({ music: on });
           if (!on) sound.stopMusic();
         },
         setEffectsOn: (on) => {
@@ -1720,7 +1750,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         },
         setVolume: (v) => {
           sound.volume = v;
-          storage.set(VOLUME_KEY, String(v));
+          players.setSound({ volume: v });
         },
         setVoices: (on) => {
           sound.voicesEnabled = on;

@@ -1,7 +1,7 @@
 # Math Workshop : audio (WAVE, MIDI, soundfont)
 
 Tâche F3 du [plan](plan.md). Références sur l'original : [engine.md](engine.md) §6, [screens/rhythm.md](screens/rhythm.md) §2.3, §2.4 et §3, [formats.md](formats.md).
-Code : `src/engine/mohawk/audio/` (partagé avec Zoombinis : `sink.ts`, `pcm.ts`, `sequencer.ts`, `programs.ts` ; l'analyseur `smf.ts` est dans `src/audio/smf.ts`, commun aussi à Flight of the Amazon Queen), `src/ui/mohawk/web-sink.ts` (navigateur, partagé) et `src/games/mathemagique/audio/rhythm-rewrite.ts` (propre au jeu). Tests : `test/mathemagique/audio-engine.test.ts`.
+Code : `src/engine/mohawk/audio/` (partagé avec Zoombinis : `sink.ts`, `pcm.ts`, `programs.ts`) et `src/audio/` (séquenceur `midi-sequencer.ts` et sortie `midi-sink.ts`, communs aussi à The Incredible Machine 3 ; analyseur `smf.ts`, commun aussi à Flight of the Amazon Queen), `src/ui/mohawk/web-sink.ts` (navigateur, partagé) et `src/games/mathemagique/audio/rhythm-rewrite.ts` (propre au jeu). Tests : `test/mathemagique/audio-engine.test.ts`.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ Code : `src/engine/mohawk/audio/` (partagé avec Zoombinis : `sink.ts`, `pcm.ts`
 | `sink.ts` | contrat `AudioSink` / `MidiSink` / `PcmSound` (fait par le lead) | pur |
 | `pcm.ts` | ressource `WAVE` → `PcmSound` (8 bits non signé → flottants), cache par (archive, id) | pur |
 | `src/audio/smf.ts` | fichier MIDI standard → `Song` (événements triés, temps en ms, table des tempos) | pur |
-| `sequencer.ts` | `MidiPlayer` (lecture, boucle, repères, tempo, réécriture), `parsePrograms` (`Prg#`), `parseSysx` (`MIDIMAP.DAT`) | pur |
+| `src/audio/midi-sequencer.ts` | `MidiPlayer` (lecture, boucle, repères, tempo, réécriture), `parsePrograms` (`Prg#`), `parseSysx` (`MIDIMAP.DAT`) | pur |
 | `rhythm-rewrite.ts` | réécriture du Rhythm Shop : une mesure, notes des emplacements vides à vélocité 0 | pur |
 | `programs.ts` | inventaire des timbres joués (banque / programme / touches), pour la soundfont | pur |
 | `web-sink.ts` | `AudioSink` du navigateur : Web Audio (WAVE) + `spessasynth_lib` (MIDI) | navigateur |

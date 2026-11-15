@@ -154,6 +154,100 @@ describe.skipIf(!original.has)("fenêtres .ITF de la vague F", () => {
     });
   });
 
+  describe("boutons à image enfoncés (genre 1, 44ede8)", () => {
+    const noop = () => undefined;
+    const music = () => {
+      const w = musicboxWindow(assets, itf("MUSICBOX.ITF"), {
+        musicList: texts.music,
+        soundList: texts.sounds,
+        initial: { music: 1000, musicOn: true, effectsOn: true, volume: 15, voicesOn: true, effect: 0 },
+        playMusic: noop,
+        stopMusic: noop,
+        playEffect: noop,
+        stopEffect: noop,
+        setMusicOn: noop,
+        setEffectsOn: noop,
+        setVolume: noop,
+        setVoices: noop,
+        musicChosen: noop,
+        effectChosen: noop,
+      });
+      return model(w);
+    };
+
+    it("MB_MUSIC (3 images) : 1 à l'appui, puis 2 où il reste ; hors du bouton, 0 ; revenu dessus, il repart de 1 ; relâché, 0", () => {
+      const m = music();
+      expect(m.item(MUSICBOX.music)).toMatchObject({ kind: 1, frameCount: 3 });
+      const p = center(m, MUSICBOX.music);
+      m.pointerDown(p.x, p.y);
+      expect(m.state().frames?.[MUSICBOX.music]).toBe(1);
+      expect(m.pass().redraw).toBe(true);
+      expect(m.state().frames?.[MUSICBOX.music]).toBe(2);
+      expect(m.pass().redraw).toBe(false);
+      expect(m.state().frames?.[MUSICBOX.music]).toBe(2);
+      m.pointerMove(5, 5);
+      expect(m.state().pressed).toBeNull();
+      m.pass();
+      expect(m.state().frames?.[MUSICBOX.music]).toBeUndefined();
+      m.pointerMove(p.x, p.y);
+      m.pass();
+      expect(m.state().frames?.[MUSICBOX.music]).toBe(1);
+      expect(m.pointerUp(p.x, p.y)).toBe(MUSICBOX.music);
+      expect(m.state().frames?.[MUSICBOX.music]).toBeUndefined();
+    });
+
+    it("les sons des images atteintes : MB_MUSIC (état 16 : son à l'image 1) le joue une fois à l'appui, et de nouveau en revenant", () => {
+      const m = music();
+      const p = center(m, MUSICBOX.music);
+      m.pointerDown(p.x, p.y);
+      const first = m.takeSounds();
+      expect(first).toHaveLength(1);
+      m.pass();
+      m.pass();
+      expect(m.takeSounds()).toEqual([]);
+      m.pointerMove(5, 5);
+      m.pass();
+      m.pointerMove(p.x, p.y);
+      m.pass();
+      expect(m.takeSounds()).toEqual(first);
+    });
+
+    it("rendus : image 0 relâchée, 1 et 2 enfoncées (mêmes pixels : l'image 1 ne porte que le son en plus)", () => {
+      const m = music();
+      const p = center(m, MUSICBOX.music);
+      const r = m.item(MUSICBOX.music)!;
+      const shot = () => {
+        const s = new Surface(640, 480);
+        m.render(s);
+        const out: number[] = [];
+        for (let y = r.y; y < r.y + r.height; y++) for (let x = r.x; x < r.x + r.width; x++) out.push(s.pixels[y * 640 + x]!);
+        return out.join(",");
+      };
+      const up = shot();
+      m.pointerDown(p.x, p.y);
+      const one = shot();
+      m.pass();
+      const two = shot();
+      expect(one).not.toBe(up);
+      expect(two).toBe(one);
+    });
+
+    it("un bouton d'une seule image et un bouton à texte ne s'animent pas", () => {
+      const m = music();
+      // MB_SOUND : état 17, 2 images (1 à l'appui, la dernière) ; « Terminé » : bouton à texte.
+      const p = center(m, MUSICBOX.sound);
+      m.pointerDown(p.x, p.y);
+      expect(m.state().frames?.[MUSICBOX.sound]).toBe(1);
+      m.pass();
+      expect(m.state().frames?.[MUSICBOX.sound]).toBe(1);
+      m.pointerUp(p.x, p.y);
+      const d = center(m, MUSICBOX.done);
+      m.pointerDown(d.x, d.y);
+      m.pass();
+      expect(m.state().frames?.[MUSICBOX.done]).toBeUndefined();
+    });
+  });
+
   describe("MUSICBOX.ITF", () => {
     const open = () => {
       const calls: string[] = [];

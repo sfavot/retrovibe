@@ -116,6 +116,11 @@ export class Game extends EventTarget {
     return this.world.sectorOf(this.zone.id);
   }
 
+  /** Directions praticables depuis la zone courante (secteur voisin sur la carte du monde) : la boussole du panneau. */
+  get exits(): Record<Direction, boolean> {
+    return this.world.exits(this.zone.id);
+  }
+
   get goalItem(): number {
     return this.assets.puzzle(this.story.goalPuzzle)?.item ?? -1;
   }

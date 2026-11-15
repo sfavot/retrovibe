@@ -43,9 +43,7 @@ export const copy = {
   // Barre tactile et pied de page.
   menu: "Menu",
   menuLabel: "Menu du site : sauvegarder, charger, volume, pause, aide, écran titre",
-  skip: "Passer",
   skipLabel: "Passer l'introduction ou la réplique en cours (Échap ou point)",
-  inventory: "Inventaire",
   inventoryLabel: "Ouvrir la barre d'inventaire (comme un toucher en haut de l'écran)",
   pause: "Pause",
   pauseLabel: "Mettre le jeu en pause ou le reprendre",

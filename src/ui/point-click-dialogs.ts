@@ -239,11 +239,19 @@ export function renderChoiceDialog(options: ChoiceDialogOptions): HTMLElement {
   return dialog;
 }
 
+/** Entrée de plus du menu (actions système du shell sur écran tactile) ; `pressed` en fait une bascule. */
+export interface MenuItem {
+  label: string;
+  title: string;
+  run: () => void;
+  pressed?: boolean;
+}
+
 /**
  * Menu du jeu (bouton « Menu » du pied de page et de la barre tactile) : les commandes de l'hôte réunies, utilisables au doigt comme
  * à la souris (les raccourcis clavier font la même chose). `subtitles` : état des sous-titres (sans objet si `toggleSubtitles` manque).
  */
-export function renderMenuDialog(copy: DialogCopy, actions: MenuActions, subtitles: boolean, paused: boolean): HTMLElement {
+export function renderMenuDialog(copy: DialogCopy, actions: MenuActions, subtitles: boolean, paused: boolean, system: MenuItem[] = []): HTMLElement {
   const titleId = "pc-dialog-menu-title";
   const item = (label: string, title: string, run: () => void, props: Record<string, string | boolean> = {}): HTMLElement =>
     h("li", {}, h("button", { type: "button", title, onclick: run, ...props }, label));
@@ -262,6 +270,9 @@ export function renderMenuDialog(copy: DialogCopy, actions: MenuActions, subtitl
       item(paused ? copy.resume : copy.pause, copy.pauseLabel, actions.togglePause),
       item(copy.helpLink, copy.helpLink, actions.help),
       item(copy.titleScreen, copy.titleScreenTitle, actions.titleScreen),
+      ...system.map((entry) =>
+        item(entry.label, entry.title, entry.run, entry.pressed === undefined ? {} : { class: "toggle", "aria-pressed": String(entry.pressed) }),
+      ),
     ),
     h("button", { type: "button", class: "secondary", onclick: actions.close }, copy.close),
   );

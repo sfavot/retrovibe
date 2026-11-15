@@ -1,9 +1,13 @@
 import type { Palette } from "../data/palette";
 import { TILE_SIZE } from "../data/types";
+import type { Icon } from "../data/resources";
 import { type Game, GameEvent, MAX_HEALTH } from "../engine/game";
+import { Direction } from "../engine/geometry";
 import { tileCanvas } from "../render/zone-renderer";
 import { copy } from "../copy";
 import { h } from "../../../ui/dom";
+import { describeExits, drawCompass } from "./compass";
+import { healthGradient, healthPie } from "./health-pie";
 
 export interface SidebarActions {
   onMap(): void;
@@ -18,10 +22,18 @@ export interface SidebarActions {
   onItemUseOnHero(tile: number): void;
 }
 
-/** Panneau latéral : santé, arme, inventaire et commandes. */
+/**
+ * Panneau latéral, au style de la fenêtre d'origine (gris Windows 3D) : liste d'inventaire (une ligne = case icône + case nom,
+ * lignes vides dessinées jusqu'en bas) puis la rangée boussole | case d'arme | moniteur de santé. Les commandes (`commands`) sont
+ * un bloc à part, posé sous la fenêtre sur ordinateur.
+ */
 export class Sidebar {
+  /** Le panneau d'origine (inventaire, boussole, arme, santé). */
   readonly element: HTMLElement;
-  private readonly healthBar: HTMLElement;
+  /** Boutons de commande, affichés sur ordinateur seulement. */
+  readonly commands: HTMLElement;
+  private readonly compass: HTMLCanvasElement;
+  private readonly compassBox: HTMLElement;
   private readonly healthMeter: HTMLElement;
   private readonly weaponSlot: HTMLElement;
   private readonly list: HTMLElement;
@@ -31,20 +43,26 @@ export class Sidebar {
   readonly mapButton: HTMLButtonElement;
   readonly speedButton: HTMLButtonElement;
   private game: Game | null = null;
+  private blanks: HTMLElement[] = [];
   selected: number | null = null;
 
   constructor(
     private readonly palette: Palette,
+    private readonly icons: Map<number, Icon>,
     private readonly actions: SidebarActions,
   ) {
-    this.healthBar = h("div", { class: "health-fill" });
-    this.healthMeter = h(
-      "div",
-      { class: "health", role: "meter", "aria-label": copy.health, "aria-valuemin": 0, "aria-valuemax": MAX_HEALTH },
-      this.healthBar,
-    );
-    this.weaponSlot = h("div", { class: "weapon-slot" });
+    this.healthMeter = h("div", {
+      class: "health",
+      role: "meter",
+      "aria-label": copy.health,
+      "aria-valuemin": 0,
+      "aria-valuemax": MAX_HEALTH,
+    });
+    this.weaponSlot = h("div", { class: "weapon-slot", role: "img" });
+    this.compass = h("canvas", { class: "compass-canvas", "aria-hidden": "true" });
+    this.compassBox = h("div", { class: "compass", role: "img" }, this.compass);
     this.list = h("ul", { class: "inventory", "aria-label": copy.inventory });
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this.fillBlanks()).observe(this.list);
     this.mapButton = h("button", { type: "button", onclick: () => actions.onMap() }, copy.map);
     this.pauseButton = h("button", { type: "button", onclick: () => actions.onPause() }, copy.pause);
     this.soundButton = h("button", { type: "button", class: "toggle", "aria-pressed": "true", onclick: () => actions.onToggleSound() }, copy.sound);
@@ -53,23 +71,25 @@ export class Sidebar {
     this.element = h(
       "aside",
       { class: "sidebar" },
-      h("section", { class: "status" },
-        h("div", { class: "status-row" }, h("span", { class: "label" }, copy.health), this.healthMeter),
-        h("div", { class: "status-row" }, h("span", { class: "label" }, copy.weapon), this.weaponSlot),
-      ),
-      h("section", { class: "inventory-panel" }, h("h2", { class: "label" }, copy.inventory), this.list),
       h(
-        "nav",
-        { class: "commands" },
-        this.mapButton,
-        this.pauseButton,
-        this.soundButton,
-        this.musicButton,
-        this.speedButton,
-        h("button", { type: "button", onclick: () => actions.onHelp() }, copy.help),
-        h("button", { type: "button", class: "secondary", onclick: () => actions.onNewGame() }, copy.newGame),
+        "div",
+        { class: "retro-panel" },
+        h("div", { class: "inventory-frame" }, this.list),
+        h("div", { class: "status-row" }, this.compassBox, this.weaponSlot, this.healthMeter),
       ),
     );
+    this.commands = h(
+      "nav",
+      { class: "commands desktop-only" },
+      this.mapButton,
+      this.pauseButton,
+      this.soundButton,
+      this.musicButton,
+      this.speedButton,
+      h("button", { type: "button", onclick: () => actions.onHelp() }, copy.help),
+      h("button", { type: "button", class: "secondary", onclick: () => actions.onNewGame() }, copy.newGame),
+    );
+    this.renderCompass();
   }
 
   /** Ajoute une commande après le réglage de vitesse (« Plein écran », qui vise toute la page du jeu). */
@@ -90,27 +110,31 @@ export class Sidebar {
   attach(game: Game): void {
     this.game = game;
     this.selected = null;
-    const refreshAll = () => {
-      this.renderHealth();
-      this.renderWeapon();
-      this.renderInventory();
-    };
     game.addEventListener(GameEvent.Health, () => this.renderHealth());
-    game.addEventListener(GameEvent.Weapon, () => {
-      this.renderWeapon();
-      this.renderInventory();
-    });
+    game.addEventListener(GameEvent.Zone, () => this.renderCompass());
+    game.addEventListener(GameEvent.Weapon, () => this.renderWeapon());
     game.addEventListener(GameEvent.Inventory, () => this.renderInventory());
-    refreshAll();
+    this.renderHealth();
+    // La boussole se dessine à l'événement Zone, émis dès que la partie pose Indy dans sa première zone (la zone n'existe pas encore ici).
+    this.renderWeapon();
+    this.renderInventory();
   }
 
   private renderHealth(): void {
     const game = this.game;
     if (!game) return;
-    const ratio = game.hero.health / MAX_HEALTH;
-    this.healthBar.style.width = `${Math.round(ratio * 100)}%`;
-    this.healthBar.dataset.level = ratio > 0.6 ? "good" : ratio > 0.3 ? "warn" : "bad";
+    this.healthMeter.style.background = healthGradient(healthPie(game.hero.health));
     this.healthMeter.setAttribute("aria-valuenow", String(game.hero.health));
+    this.healthMeter.setAttribute("aria-valuetext", copy.healthPercent(Math.round((100 * game.hero.health) / MAX_HEALTH)));
+  }
+
+  /** Flèches allumées dans les directions où la carte du monde a un secteur voisin ; indicateur seulement. */
+  private renderCompass(): void {
+    const exits = this.game?.exits ?? { [Direction.Up]: false, [Direction.Down]: false, [Direction.Left]: false, [Direction.Right]: false };
+    drawCompass(this.compass, this.icons, exits);
+    const d = copy.directions;
+    const open = describeExits(exits, { [Direction.Up]: d.up, [Direction.Down]: d.down, [Direction.Left]: d.left, [Direction.Right]: d.right }, "");
+    this.compassBox.setAttribute("aria-label", open ? copy.compassOpen(open) : copy.compassClosed);
   }
 
   private renderWeapon(): void {
@@ -119,36 +143,42 @@ export class Sidebar {
     const weapon = game.weapon;
     const tile = weapon ? game.weaponTile(weapon) : -1;
     if (tile < 0) {
-      this.weaponSlot.replaceChildren(h("span", { class: "muted" }, copy.noWeapon));
+      this.weaponSlot.replaceChildren();
+      this.weaponSlot.setAttribute("aria-label", `${copy.weapon} : ${copy.noWeapon}`);
+      this.weaponSlot.removeAttribute("title");
       return;
     }
-    this.weaponSlot.replaceChildren(
-      tileCanvas(game.assets.tile(tile), this.palette, TILE_SIZE),
-      h("span", {}, game.assets.tileName(tile)),
-    );
+    const name = game.assets.tileName(tile);
+    this.weaponSlot.replaceChildren(this.tileIcon(game, tile));
+    this.weaponSlot.setAttribute("aria-label", `${copy.weapon} : ${name}`);
+    this.weaponSlot.title = name;
+  }
+
+  /** Icône de tuile à la taille de sa case (la feuille de style la règle : pas de taille en ligne). */
+  private tileIcon(game: Game, tile: number): HTMLCanvasElement {
+    const canvas = tileCanvas(game.assets.tile(tile), this.palette, TILE_SIZE);
+    canvas.style.removeProperty("width");
+    canvas.style.removeProperty("height");
+    return canvas;
   }
 
   renderInventory(): void {
     const game = this.game;
     if (!game) return;
     if (this.selected !== null && !game.inventory.includes(this.selected)) this.selected = null;
-    if (!game.inventory.length) {
-      this.list.replaceChildren(h("li", { class: "muted empty" }, copy.emptyInventory));
-      return;
-    }
-    const equipped = game.weapon ? game.weaponTile(game.weapon) : -1;
+    this.blanks = [];
     this.list.replaceChildren(
       ...game.inventory.map((tile, index) => {
         const item = h(
           "li",
           {
-            class: `item${this.selected === tile ? " selected" : ""}${tile === equipped ? " equipped" : ""}`,
+            class: `item${this.selected === tile ? " selected" : ""}`,
             role: "button",
             tabindex: "0",
             "aria-pressed": this.selected === tile ? "true" : "false",
             "data-index": index,
           },
-          tileCanvas(game.assets.tile(tile), this.palette, TILE_SIZE),
+          h("span", { class: "item-icon" }, this.tileIcon(game, tile)),
           h("span", { class: "item-name" }, game.assets.tileName(tile)),
         );
         item.addEventListener("click", () => this.select(tile));
@@ -164,6 +194,22 @@ export class Sidebar {
         return item;
       }),
     );
+    this.fillBlanks();
+  }
+
+  /** Dessine des lignes vides jusqu'en bas de la liste (celles en trop se compriment à zéro : pas d'ascenseur inutile). */
+  private fillBlanks(): void {
+    const game = this.game;
+    if (!game) return;
+    const row = (this.list.querySelector(".item") ?? this.blanks[0])?.getBoundingClientRect().height || 0;
+    const height = this.list.clientHeight;
+    const wanted = row > 0 ? Math.max(0, Math.ceil(height / row) - game.inventory.length) : 0;
+    while (this.blanks.length > wanted) this.blanks.pop()!.remove();
+    while (this.blanks.length < wanted) {
+      const blank = h("li", { class: "item blank", "aria-hidden": "true" }, h("span", { class: "item-icon" }), h("span", { class: "item-name" }));
+      this.blanks.push(blank);
+      this.list.append(blank);
+    }
   }
 
   select(tile: number | null): void {

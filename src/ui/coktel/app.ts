@@ -9,6 +9,7 @@ import { randomSeed, scummvmRandom } from "../../engine/rng";
 import { copy as shared } from "../copy";
 import { h } from "../dom";
 import { mountGameShell, type GameShell, type ShellSoundPrefs } from "../game-shell";
+import type { ControlHandle } from "../shell-controls";
 import { bindCanvasPointer, bindKeyboard } from "../pointer";
 import { BrowserHost, type RemoteGameFiles } from "./browser-host";
 
@@ -25,14 +26,12 @@ export interface CoktelAppCopy {
   ended: string;
   replay: string;
   runtimeError: string;
-  menu: string;
+  /** Noms accessibles des contrôles tactiles : « Menu du jeu » (barre du haut du jeu), « Passer » (Échap), clavier virtuel, « Valider » (Entrée). */
   menuLabel: string;
-  skip: string;
   skipLabel: string;
   keyboard: string;
   confirm: string;
-  /** Bouton « clic droit » de la barre tactile (sans lui, seul l'appui long fait un clic droit). */
-  inventory?: string;
+  /** Nom du contrôle « clic droit » (inventaire) ; sans lui, le contrôle n'existe pas et seul l'appui long fait un clic droit. */
   inventoryLabel?: string;
 }
 
@@ -89,7 +88,6 @@ export class CoktelApp {
     autocorrect: "off",
     spellcheck: "false",
     enterkeyhint: "done",
-    "aria-labelledby": "coktel-keyboard",
   });
   private readonly shell: GameShell;
   private readonly soundBackend: WebAudioSoundBackend;
@@ -98,10 +96,8 @@ export class CoktelApp {
   private readonly game: Game;
   private readonly presenter: CanvasPresenter;
   private readonly prefs: ShellSoundPrefs;
-  private readonly menuButton: HTMLButtonElement;
-  private readonly inventoryButton: HTMLButtonElement | null;
-  private readonly keyboardButton: HTMLButtonElement;
-  private readonly confirmButton: HTMLButtonElement;
+  private readonly keyboardControl: ControlHandle;
+  private readonly confirmControl: ControlHandle;
   private readonly host: BrowserHost;
   private textEntry = false;
 
@@ -120,37 +116,50 @@ export class CoktelApp {
     this.game = session.game;
     this.outputs = [this.soundBackend, ...(session.outputs ?? [])];
     this.prefs = options.soundPrefs(this.outputs);
-    // la zone qui affiche la barre du haut ne couvre que ses deux premières lignes : trop fine pour un doigt
-    this.menuButton = this.touchButton(copy.menu, () => this.movePointerToTop(), { "aria-label": copy.menuLabel });
-    this.inventoryButton = copy.inventory
-      ? this.touchButton(copy.inventory, () => host.input.click(2), copy.inventoryLabel ? { "aria-label": copy.inventoryLabel } : {})
-      : null;
-    this.keyboardButton = this.touchButton(copy.keyboard, () => this.textField.focus({ preventScroll: true }), { id: "coktel-keyboard", hidden: true });
-    this.confirmButton = this.touchButton(copy.confirm, () => host.input.pressKey(KEY_RETURN), { hidden: true });
-    // deux groupes : en paysage tactile, l'un à gauche de l'écran, l'autre à droite (sous les pouces) ; ailleurs, une seule rangée
-    const touchBar = h(
-      "div",
-      { class: "touch-bar coktel-touch-bar" },
-      h(
-        "div",
-        { class: "coktel-touch-group" },
-        this.menuButton,
-        this.touchButton(copy.skip, () => host.input.pressKey(KEY_ESCAPE), { "aria-label": copy.skipLabel }),
-        this.keyboardButton,
-      ),
-      h("div", { class: "coktel-touch-group" }, ...(this.inventoryButton ? [this.inventoryButton] : []), this.confirmButton),
-    );
     this.shell = mountGameShell({
       container,
+      // Écran affiché en 4:3 (pixels non carrés) : le cadre sert à l'échelle, le tampon (320×200, ou 640×400 pour l'écran-titre de
+      // Lost in Time) est celui du moteur ; le pointeur se convertit sur le rectangle affiché (`bindCanvasPointer`).
       logicalWidth: 320,
-      logicalHeight: 200,
-      fit: "css",
+      logicalHeight: 240,
+      buffer: { width: 320, height: 200 },
+      fit: "fractional",
       copy: { canvasLabel: copy.canvasLabel, sound: copy.sound },
       backLabel: shared.backToGames,
-      classes: { stage: "coktel-stage", canvas: "coktel-canvas", footer: "coktel-footer" },
+      classes: { stage: "coktel-stage", canvas: "coktel-canvas" },
       stageChildren: [this.textField],
-      afterStage: [touchBar],
     });
+    this.textField.setAttribute("aria-label", copy.keyboard);
+    // Contrôles tactiles : Passer, Inventaire et « Menu du jeu » à gauche ; à droite, Clavier et Valider pendant une saisie, puis le
+    // Menu du shell. Un appui est un geste (il débloque l'audio) ; le shell ne vole pas le focus au champ de saisie du clavier virtuel.
+    const press = (action: () => void) => (): void => {
+      this.unlockAudio();
+      action();
+    };
+    this.shell.controls.add({ id: "skip", icon: "skip", label: copy.skipLabel, group: "start", onPress: press(() => host.input.pressKey(KEY_ESCAPE)) });
+    if (copy.inventoryLabel) {
+      this.shell.controls.add({ id: "inventory", icon: "inventory", label: copy.inventoryLabel, group: "start", onPress: press(() => host.input.click(2)) });
+    }
+    // la zone qui affiche la barre du haut ne couvre que ses deux premières lignes : trop fine pour un doigt
+    this.shell.controls.add({ id: "game-menu", icon: "system", label: copy.menuLabel, group: "start", onPress: press(() => this.movePointerToTop()) });
+    this.keyboardControl = this.shell.controls.add({
+      id: "keyboard",
+      icon: "keyboard",
+      label: copy.keyboard,
+      group: "end",
+      collapse: true,
+      onPress: press(() => this.textField.focus({ preventScroll: true })),
+    });
+    this.confirmControl = this.shell.controls.add({
+      id: "confirm",
+      icon: "enter",
+      label: copy.confirm,
+      group: "end",
+      collapse: true,
+      onPress: press(() => host.input.pressKey(KEY_RETURN)),
+    });
+    this.keyboardControl.setVisible(false);
+    this.confirmControl.setVisible(false);
     this.presenter = new CanvasPresenter(this.canvas, this.system.gfx, host.input);
     this.bindInput();
     this.bindTextField();
@@ -161,21 +170,6 @@ export class CoktelApp {
 
   private get canvas(): HTMLCanvasElement {
     return this.shell.canvas;
-  }
-
-  /**
-   * Bouton de la barre tactile. Il ne prend pas le focus au toucher ou au clic (le clavier physique
-   * et le clavier virtuel restent sur le jeu ou le champ de saisie) ; au clavier, il le garde.
-   */
-  private touchButton(label: string, action: () => void, props: Record<string, string | boolean> = {}): HTMLButtonElement {
-    const button = h("button", { type: "button", ...props }, label);
-    button.addEventListener("mousedown", (e) => e.preventDefault());
-    button.addEventListener("click", (e) => {
-      this.unlockAudio();
-      action();
-      if (e.detail > 0 && document.activeElement !== this.textField) this.canvas.focus({ preventScroll: true });
-    });
-    return button;
   }
 
   /**
@@ -305,16 +299,13 @@ export class CoktelApp {
     });
   }
 
-  /** Suit le moteur à chaque image : pendant une saisie, la barre tactile propose Clavier et Valider. */
+  /** Suit le moteur à chaque image : pendant une saisie, la barre de contrôles propose Clavier et Valider. */
   private syncTextEntry(): void {
     const active = this.system.hotspots.textEntry;
     if (active === this.textEntry) return;
     this.textEntry = active;
-    // pendant la saisie, Menu et Inventaire laissent la place à Clavier et Valider
-    this.menuButton.hidden = active;
-    if (this.inventoryButton) this.inventoryButton.hidden = active;
-    this.keyboardButton.hidden = !active;
-    this.confirmButton.hidden = !active;
+    this.keyboardControl.setVisible(active);
+    this.confirmControl.setVisible(active);
     if (!active && document.activeElement === this.textField) {
       // fin de la saisie : le clavier virtuel se ferme, le clavier physique revient au jeu
       this.textField.blur();

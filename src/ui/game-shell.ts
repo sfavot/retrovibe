@@ -3,7 +3,8 @@ import { h } from "./dom";
 import { MissingFilesError } from "./files";
 import { createFullscreen } from "./fullscreen";
 import { withIcons } from "./icons";
-import { isRotated, trackTouchLayout } from "./touch-layout";
+import { type ControlHandle, type ControlSize, type ControlSpec, type ShellMenuEntry, createShellControls } from "./shell-controls";
+import { TOUCH_GAP, TOUCH_LAYOUT_CLASS, createTouchMenu, isTouchDevice, layoutTouch, trackInputMode } from "./touch-page";
 
 /** Textes de la page du jeu (propres à chaque jeu ; la copy partagée reste dans `ui/copy.ts`). */
 export interface GameShellCopy {
@@ -36,9 +37,8 @@ export interface GameShellOptions {
    *   Sur écran tactile, l'échelle devient fractionnaire : sur un téléphone, l'échelle entière laisserait l'écran à 1×.
    * `fractional` : le shell dimensionne le canvas à la plus grande échelle qui tient, même fractionnaire (écrans déjà grands,
    *   comme le 640×480 de Mathémagique, qu'une échelle entière laisserait à 1 sur la plupart des fenêtres).
-   * `css` : la taille vient de la feuille de style du jeu (Lost in Time, 4:3 fluide) ; le shell n'y touche pas.
    */
-  fit?: "integer" | "fractional" | "css";
+  fit?: "integer" | "fractional";
   /**
    * Taille du tampon de dessin quand elle diffère du cadre logique (pixels non carrés : un tampon 320×400 affiché en 4:3 avec
    * `logicalWidth` × `logicalHeight` = 320×240). Sans valeur, le tampon a la taille du cadre logique. Le cadre sert à l'échelle ; le jeu
@@ -52,8 +52,6 @@ export interface GameShellOptions {
   classes?: { root?: string; stage?: string; canvas?: string; footer?: string };
   /** Éléments dans le cadre de l'écran (champ de saisie invisible du clavier virtuel…). */
   stageChildren?: HTMLElement[];
-  /** Éléments entre l'écran et le pied de page (barre tactile…). */
-  afterStage?: HTMLElement[];
 }
 
 export interface GameShellRun {
@@ -63,10 +61,29 @@ export interface GameShellRun {
   onPause?(hidden: boolean): void;
   /** Bouton « Son » : préférence, clé de stockage (pour suivre un autre onglet ; sans clé, tout changement du stockage relit la préférence) et déblocage audio au clic. */
   sound?: { prefs: ShellSoundPrefs; storageKey?: string; unlock?(): void };
+  /**
+   * Menu du jeu, ouvert par le bouton « Menu » de la barre tactile. Sans lui, le shell ouvre son menu par défaut (actions système et
+   * `menuEntries`), qui met le jeu en pause (`onPause`) tant qu'il est ouvert. Le menu du jeu gère sa propre pause.
+   */
+  menu?: { open(): void };
+  /** Entrées de plus du menu par défaut du shell (avant les actions système) ; relues à chaque ouverture. */
+  menuEntries?(): ShellMenuEntry[];
   /** Écouteurs de plus, détachés avec les autres à la sortie. */
   listeners?: [EventTarget, string, EventListener][];
   /** À la sortie du jeu (page remplacée ou erreur d'exécution), une seule fois, après le détachement des écouteurs. */
   onDispose?(): void;
+}
+
+/**
+ * Actions système du shell, pour que les menus des jeux les intègrent (son, plein écran, retour à l'accueil). Le menu par défaut du
+ * shell les liste ; un jeu qui a son propre menu (`GameShellRun.menu`) les ajoute au sien.
+ */
+export interface ShellSystem {
+  /** Préférence « Son » ; `null` avant `start` ou quand le jeu n'a pas de son (`GameShellRun.sound`). `toggle` renvoie le nouvel état. */
+  readonly sound: { isEnabled(): boolean; toggle(): boolean } | null;
+  readonly fullscreen: { isActive(): boolean; toggle(): void };
+  /** Retour à l'accueil ; `null` sans `backLabel` (page de dev). */
+  readonly quit: (() => void) | null;
 }
 
 export interface GameShell {
@@ -76,6 +93,12 @@ export interface GameShell {
   readonly footer: HTMLElement;
   /** Conteneur des boutons du pied de page (le bouton « Son » y est ajouté ; d'autres peuvent l'être). */
   readonly toggles: HTMLElement;
+  /**
+   * Contrôles tactiles du jeu : le jeu les déclare, le shell les rend en barre d'icônes (écran tactile seulement) et les place sous
+   * l'écran ou de côté. Utilisable avant `start`. Le bouton « Menu » du shell est toujours le dernier du groupe `end`.
+   */
+  readonly controls: { add(spec: ControlSpec): ControlHandle; addPad(element: HTMLElement, group?: "start" | "end", sizes?: { bottom: ControlSize; sides: ControlSize }): void };
+  readonly system: ShellSystem;
   /** Affiche ou masque le message de chargement. */
   setLoading(loading: boolean): void;
   /** Remplace le message d'erreur (région d'alerte sous l'écran). */
@@ -119,18 +142,11 @@ export interface ShellMetrics {
   mainWidth: number;
   /** Haut du conteneur dans la page (`main.getBoundingClientRect().top + scrollY`). */
   mainTop: number;
-  /** Hauteur du conteneur et de l'écran (`offsetHeight`) : la différence est ce qui entoure l'écran (pied de page, barre tactile, message d'erreur). */
+  /** Hauteur du conteneur et de l'écran (`offsetHeight`) : la différence est ce qui entoure l'écran (pied de page, message d'erreur). */
   mainHeight: number;
   stageHeight: number;
   /** Hauteur de la fenêtre. */
   viewportHeight: number;
-  /** Largeur des colonnes de côté (paysage tactile : boutons et pied de page à gauche et à droite de l'écran, voir `asideWidth`). */
-  asideWidth?: number;
-  /**
-   * Marges hors du conteneur : 32 px en largeur et `BOTTOM_MARGIN` sous l'écran par défaut. En paysage tactile, le conteneur porte
-   * déjà ses marges (comptées dans `mainWidth` / `mainHeight`) : seules restent les zones sûres de la fenêtre.
-   */
-  margins?: { horizontal: number; bottom: number };
 }
 
 /**
@@ -143,46 +159,16 @@ export function contentHeight(childHeights: readonly number[], gap: number, padd
   return total + gap * Math.max(childHeights.length - 1, 0) + paddingTop + paddingBottom;
 }
 
-/** Échelle du canvas pour les mesures données : largeur moins les marges et les colonnes de côté, hauteur moins ce qui précède, entoure l'écran, et la marge du bas. */
+/** Échelle du canvas pour les mesures données (ordinateur) : largeur moins les marges, hauteur moins ce qui précède, entoure l'écran, et la marge du bas. */
 export function shellScale(metrics: ShellMetrics, logicalWidth: number, logicalHeight: number, integer = true): number {
   const around = metrics.mainHeight - metrics.stageHeight;
-  const { horizontal, bottom } = metrics.margins ?? { horizontal: 32, bottom: BOTTOM_MARGIN };
   return fitScale(
-    metrics.mainWidth - horizontal - (metrics.asideWidth ?? 0),
-    metrics.viewportHeight - metrics.mainTop - around - bottom,
+    metrics.mainWidth - 32,
+    metrics.viewportHeight - metrics.mainTop - around - BOTTOM_MARGIN,
     logicalWidth,
     logicalHeight,
     integer,
   );
-}
-
-/**
- * Marges du paysage tactile : les marges intérieures du conteneur en largeur ; en hauteur, ce que la fenêtre a de plus que le cadre
- * du jeu, c'est-à-dire ses zones sûres (lues sur les marges intérieures du `body`, qui les réservent). En paysage, la zone sûre du bas
- * (indicateur d'accueil), et celle du haut en plein écran, où le conteneur fixé commence sous elle alors que `mainTop` vaut 0. En plein
- * écran pivoté, la hauteur disponible est la largeur de la fenêtre, dont le cadre exclut les zones sûres de gauche et de droite : le
- * même calcul que le paysage, pour que l'écran garde sa taille quand on tourne le téléphone.
- */
-function landscapeMargins(style: CSSStyleDeclaration, fixedToViewport: boolean, rotated: boolean): { horizontal: number; bottom: number } {
-  const body = getComputedStyle(document.body);
-  const safe = (side: "Top" | "Right" | "Bottom" | "Left"): number => parseFloat(body[`padding${side}`]) || 0;
-  return {
-    horizontal: parseFloat(style.paddingLeft) + parseFloat(style.paddingRight),
-    bottom: rotated ? safe("Left") + safe("Right") : safe("Bottom") + (fixedToViewport ? safe("Top") : 0),
-  };
-}
-
-/**
- * Largeur prise par les colonnes de côté quand le conteneur est en grille (paysage tactile) : toutes les pistes sauf celle de l'écran
- * (la plus large), et les gouttières. Deux colonnes (écran et commandes à droite) ou trois (commandes de part et d'autre). `columns`
- * est la valeur calculée de `grid-template-columns` (pistes en px). Hors grille, ou une seule piste : 0.
- */
-export function asideWidth(display: string, columns: string, columnGap: string): number {
-  if (display !== "grid") return 0;
-  const tracks = columns.split(" ").map(parseFloat);
-  if (tracks.length < 2 || tracks.length > 3 || tracks.some(Number.isNaN)) return 0;
-  const total = tracks.reduce((sum, track) => sum + track, 0);
-  return total - Math.max(...tracks) + (tracks.length - 1) * (parseFloat(columnGap) || 0);
 }
 
 /**
@@ -211,28 +197,28 @@ export function leaveGame(backLabel: string | undefined, restart: () => void): v
 const join = (base: string, extra?: string): string => (extra ? `${base} ${extra}` : base);
 
 /**
- * Page d'un jeu sur canvas : écran à l'échelle entière (ou dimensionné par la feuille de style), états de chargement et d'erreur,
+ * Page d'un jeu sur canvas : écran à l'échelle entière (ou fractionnaire), états de chargement et d'erreur,
  * lien de retour, boutons « Son » et « Plein écran », pause quand l'onglet est masqué, préférence de son suivie d'un onglet à
  * l'autre, boucle d'images arrêtée quand la page est remplacée.
  *
- * Écran tactile en paysage : la feuille de style range la barre tactile et le pied de page en colonnes de part et d'autre de
- * l'écran (`style.css`) ; l'échelle tient compte de leur largeur.
+ * Écran tactile (`pointer: coarse`), portrait ou paysage : l'écran prend le maximum de place (échelle fractionnaire, ratio du jeu
+ * conservé) et les contrôles du jeu (`controls.add`) forment une barre d'icônes sous l'écran ou en colonnes de côté, selon ce qui
+ * laisse la plus grande échelle (`placeControls`). Le pied de page n'y apparaît plus : retour, son, plein écran et aide passent par
+ * le bouton « Menu » de la barre. Ordinateur : pied de page et échelle entière, inchangés.
  *
  * `mountGameShell` pose le canvas (l'hôte du jeu en a besoin) et le message de chargement ; `start` affiche l'écran une fois le jeu chargé.
  */
 export function mountGameShell(options: GameShellOptions): GameShell {
   const { container, logicalWidth, logicalHeight, copy, classes = {} } = options;
   const fit = options.fit ?? "integer";
-  /** Taille du canvas calculée par le shell (`integer`, `fractional`) plutôt que par la feuille de style du jeu. */
-  const sized = fit !== "css";
   const status = h("p", { class: "game-shell-status", role: "status" }, copy.loading);
   // Région d'erreur présente dès le départ (vide) pour que les lecteurs d'écran annoncent le message quand il arrive.
   const errors = h("p", { class: "game-shell-error", role: "alert" });
-  const back = options.backLabel ? h("a", { class: "back-link", href: "#/" }, ...withIcons(options.backLabel, "close")) : null;
-  const main = h("main", { class: join(`game-shell game-shell--${sized ? "sized" : "css"}`, classes.root) }, status, errors);
+  const back = options.backLabel
+    ? h("a", { class: "back-link desktop-only", href: "#/" }, ...withIcons(options.backLabel, "close"))
+    : null;
+  const main = h("main", { class: join(`game-shell ${TOUCH_LAYOUT_CLASS} controls-bottom`, classes.root) }, status, errors);
   container.replaceChildren(main);
-  // Disposition tactile paysage posée avant le premier affichage (la feuille de style ne connaît que cette classe).
-  const untrackLayout = trackTouchLayout(main);
   const canvas = h("canvas", {
     class: join("game-shell-canvas", classes.canvas),
     width: options.buffer?.width ?? logicalWidth,
@@ -246,12 +232,64 @@ export function mountGameShell(options: GameShellOptions): GameShell {
 
   let disposeRun: (() => void) | null = null;
   let started = false;
+  let currentRun: GameShellRun | null = null;
+  let fullscreen: ReturnType<typeof createFullscreen> | null = null;
+  let soundPrefs: GameShellRun["sound"] | null = null;
+  let soundButton: HTMLButtonElement | null = null;
+  /** Remesure la page (assigné au démarrage) ; appelé quand la liste des contrôles change. */
+  let relayout: () => void = () => {};
 
   const focusCanvas = (): void => {
     if (canvasMayTakeFocus(document.activeElement, document.body, canvas)) canvas.focus();
   };
+  const menu = createTouchMenu({
+    main,
+    title: shared.menu,
+    closeLabel: shared.menuClose,
+    // Le jeu est en pause tant que le menu est ouvert ; onglet masqué entre-temps : il le reste.
+    onOpen: () => currentRun?.onPause?.(true),
+    onClose: () => {
+      currentRun?.onPause?.(document.hidden);
+      focusCanvas();
+    },
+  });
+  /** Bascule du son : préférence, bouton du pied de page, déblocage audio. */
+  const toggleSound = (): boolean => {
+    const sound = soundPrefs;
+    if (!sound) return false;
+    const enabled = sound.prefs.toggle();
+    soundButton?.setAttribute("aria-pressed", String(enabled));
+    sound.unlock?.();
+    return enabled;
+  };
+  const system: ShellSystem = {
+    get sound() {
+      return soundPrefs ? { isEnabled: () => soundPrefs?.prefs.isEnabled() ?? false, toggle: toggleSound } : null;
+    },
+    fullscreen: { isActive: () => fullscreen?.isActive() ?? false, toggle: () => fullscreen?.toggle() },
+    quit: options.backLabel ? () => leaveGame(options.backLabel, () => {}) : null,
+  };
+  /** Menu par défaut : les entrées du jeu, puis les actions système. */
+  const openDefaultMenu = (): void => {
+    const run = currentRun;
+    if (!run) return;
+    const entries: ShellMenuEntry[] = [...(run.menuEntries?.() ?? [])];
+    if (system.sound) entries.push({ label: copy.sound, pressed: system.sound.isEnabled(), onPress: () => void system.sound?.toggle() });
+    entries.push({ label: shared.fullscreen, onPress: () => system.fullscreen.toggle() });
+    if (system.quit) entries.push({ label: shared.quit, onPress: () => system.quit?.() });
+    menu.open(entries);
+  };
+  const controls = createShellControls({
+    // Le canvas reprend le focus après un appui à la souris ou au doigt, sauf si le menu vient de s'ouvrir ou si le jeu a donné le focus à
+    // autre chose (champ de saisie du clavier virtuel).
+    afterPress: () => {
+      if (!menu.isOpen && canvasMayTakeFocus(document.activeElement, document.body, canvas)) canvas.focus({ preventScroll: true });
+    },
+    menu: { label: shared.menu, onPress: () => (currentRun?.menu ? currentRun.menu.open() : openDefaultMenu()) },
+    onChange: () => relayout(),
+  });
   const dispose = (): void => {
-    untrackLayout();
+    menu.close();
     const run = disposeRun;
     disposeRun = null;
     run?.();
@@ -267,6 +305,8 @@ export function mountGameShell(options: GameShellOptions): GameShell {
     stage,
     footer,
     toggles,
+    controls: { add: (spec) => controls.add(spec), addPad: (element, group, sizes) => controls.addPad(element, group, sizes) },
+    system,
     focusCanvas,
     dispose,
     setError,
@@ -292,85 +332,103 @@ export function mountGameShell(options: GameShellOptions): GameShell {
     start(run) {
       if (started) return;
       started = true;
-      let soundButton: HTMLButtonElement | null = null;
+      currentRun = run;
       const sound = run.sound;
+      soundPrefs = sound ?? null;
       if (sound) {
         const button = h(
           "button",
-          { type: "button", class: "toggle", "aria-pressed": String(sound.prefs.isEnabled()) },
+          { type: "button", class: "toggle desktop-only", "aria-pressed": String(sound.prefs.isEnabled()) },
           ...withIcons(copy.sound, "sound-on", "sound-off"),
         );
         button.addEventListener("click", (event) => {
-          button.setAttribute("aria-pressed", String(sound.prefs.toggle()));
-          sound.unlock?.();
+          toggleSound();
           // Clic souris (`detail` > 0) : le canvas reprend la main ; activation au clavier : le focus reste sur le bouton.
           if (event.detail > 0) canvas.focus();
         });
         toggles.prepend(button);
         soundButton = button;
       }
-      // Toute la page du jeu passe en plein écran (barre tactile et pied de page compris), en paysage sur écran tactile.
-      const fullscreen = createFullscreen(main, {
+      // Toute la page du jeu passe en plein écran (barre de contrôles et pied de page compris), en paysage sur écran tactile.
+      const fullscreenControl = createFullscreen(main, {
         label: shared.fullscreen,
         landscape: true,
         onClick: (event) => {
           if (event.detail > 0) canvas.focus();
         },
+        onChange: () => relayout(),
       });
-      toggles.append(fullscreen.button);
-      main.prepend(stage, ...(options.afterStage ?? []));
+      fullscreen = fullscreenControl;
+      fullscreenControl.button.classList.add("desktop-only");
+      toggles.append(fullscreenControl.button);
+      // Barre de contrôles du shell, sous l'écran ou de côté (`style.css`) ; masquée sur ordinateur.
+      main.prepend(stage, controls.element);
       main.append(footer);
       // En jeu, le chargement est une pastille posée sur l'écran : dans le flux, il décalerait le pied de page et l'échelle du canvas.
       stage.append(status);
 
-      let lastScale = 0;
+      let lastLayout = "";
+      /** Écran tactile : barre de contrôles, échelle fractionnaire, placement calculé (`layoutTouch`). */
+      const resizeTouch = (): void => {
+        // Des boutons que le jeu a posés dans le pied de page (hors boutons du shell, masqués ici) gardent leur place sous l'écran.
+        const footerHeight = footer.offsetHeight > 0 ? footer.offsetHeight + TOUCH_GAP : 0;
+        const layout = layoutTouch({ main, controls, logicalWidth, logicalHeight, extraHeight: footerHeight });
+        const key = `${layout.placement}:${layout.scale}:${layout.rowWidth}`;
+        if (key === lastLayout) return;
+        lastLayout = key;
+        canvas.style.width = `${logicalWidth * layout.scale}px`;
+        canvas.style.height = `${logicalHeight * layout.scale}px`;
+        footer.style.width = canvas.style.width;
+      };
+      /** Ordinateur : l'échelle (entière dès 2×) se déduit de ce qui entoure l'écran dans la page. */
+      const resizeDesktop = (): void => {
+        const style = getComputedStyle(main);
+        const paddingTop = parseFloat(style.paddingTop);
+        const paddingBottom = parseFloat(style.paddingBottom);
+        // Plein écran : le conteneur est fixé dans la fenêtre, le défilement de la page n'y change rien.
+        const fixedToViewport = main.classList.contains("is-fullscreen");
+        const scale = shellScale(
+          {
+            mainWidth: main.clientWidth,
+            mainTop: fixedToViewport ? 0 : main.getBoundingClientRect().top + window.scrollY,
+            // La hauteur du contenu (et non `offsetHeight`, étiré à toute la fenêtre en plein écran).
+            mainHeight: contentHeight(
+              // Seuls les enfants dans le flux comptent : ni les masqués, ni les superpositions (`position: absolute` / `fixed`).
+              [...main.children]
+                .filter((child) => {
+                  const childStyle = getComputedStyle(child);
+                  return childStyle.display !== "none" && childStyle.position !== "absolute" && childStyle.position !== "fixed";
+                })
+                .map((child) => (child as HTMLElement).offsetHeight),
+              parseFloat(style.rowGap) || 0,
+              paddingTop,
+              paddingBottom,
+            ),
+            stageHeight: stage.offsetHeight,
+            viewportHeight: window.innerHeight,
+          },
+          logicalWidth,
+          logicalHeight,
+          fit === "integer",
+        );
+        const key = `desktop:${scale}`;
+        if (key === lastLayout) return;
+        lastLayout = key;
+        canvas.style.width = `${logicalWidth * scale}px`;
+        canvas.style.height = `${logicalHeight * scale}px`;
+        footer.style.width = canvas.style.width;
+      };
       const resize = (): void => {
         // Page masquée par le jeu (aide ouverte par-dessus) : rien à mesurer, l'échelle précédente reste.
         if (main.clientWidth === 0) return;
         // Écran masqué (vue posée par le jeu à sa place dans le conteneur) : même chose, sa hauteur nulle fausserait la mesure.
         if (stage.offsetHeight === 0) return;
-        const style = getComputedStyle(main);
-        const aside = asideWidth(style.display, style.gridTemplateColumns, style.columnGap);
-        const paddingTop = parseFloat(style.paddingTop);
-        const paddingBottom = parseFloat(style.paddingBottom);
-        // Plein écran : le conteneur est fixé dans la fenêtre, le défilement de la page n'y change rien.
-        const fixedToViewport = main.classList.contains("is-fullscreen");
-        // Plein écran pivoté : le conteneur se mesure dans son repère (largeur = hauteur de la fenêtre), la hauteur disponible est la largeur de la fenêtre.
-        const rotated = isRotated(main);
-        const scale = shellScale(
-          {
-            mainWidth: main.clientWidth,
-            mainTop: fixedToViewport ? 0 : main.getBoundingClientRect().top + window.scrollY,
-            // En colonnes, la hauteur du conteneur suit la plus haute d'entre elles : seules ses marges entourent l'écran.
-            // Sinon, la hauteur du contenu (et non `offsetHeight`, étiré à toute la fenêtre en plein écran).
-            mainHeight: aside
-              ? stage.offsetHeight + paddingTop + paddingBottom
-              : contentHeight(
-                  // Seuls les enfants dans le flux comptent : ni les masqués, ni les superpositions (`position: absolute` / `fixed`).
-                  [...main.children]
-                    .filter((child) => {
-                      const childStyle = getComputedStyle(child);
-                      return childStyle.display !== "none" && childStyle.position !== "absolute" && childStyle.position !== "fixed";
-                    })
-                    .map((child) => (child as HTMLElement).offsetHeight),
-                  parseFloat(style.rowGap) || 0,
-                  paddingTop,
-                  paddingBottom,
-                ),
-            stageHeight: stage.offsetHeight,
-            viewportHeight: rotated ? window.innerWidth : window.innerHeight,
-            asideWidth: aside,
-            margins: aside ? landscapeMargins(style, fixedToViewport, rotated) : undefined,
-          },
-          logicalWidth,
-          logicalHeight,
-          fit === "integer" && !matchMedia("(pointer: coarse)").matches,
-        );
-        if (scale === lastScale) return;
-        lastScale = scale;
-        canvas.style.width = `${logicalWidth * scale}px`;
-        canvas.style.height = `${logicalHeight * scale}px`;
-        footer.style.width = canvas.style.width;
+        if (isTouchDevice()) resizeTouch();
+        else resizeDesktop();
+      };
+      relayout = () => {
+        lastLayout = "";
+        resize();
       };
       // Onglet masqué : le jeu s'arrête (horloge et son) et repart au même point au retour ; le canvas reprend le focus.
       const onVisibility = (): void => {
@@ -388,15 +446,21 @@ export function mountGameShell(options: GameShellOptions): GameShell {
         [window, "focus", focusCanvas],
         [window, "storage", onStorage],
         [document, "visibilitychange", onVisibility],
-        ...(sized ? ([[window, "resize", resize]] as [EventTarget, string, EventListener][]) : []),
+        [window, "resize", resize],
         ...(run.listeners ?? []),
       ];
       for (const [target, type, listener] of listeners) target.addEventListener(type, listener);
+      const untrackInput = trackInputMode(main);
       // Ce qui entoure l'écran change de taille (barre tactile, pied de page qui passe à la ligne, message d'erreur) : on remesure.
-      const observer = sized && typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
+      const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
       observer?.observe(main);
+      observer?.observe(footer);
       disposeRun = () => {
-        fullscreen.dispose();
+        untrackInput();
+        fullscreenControl.dispose();
+        fullscreen = null;
+        currentRun = null;
+        relayout = () => {};
         observer?.disconnect();
         for (const [target, type, listener] of listeners) target.removeEventListener(type, listener);
         run.onDispose?.();
@@ -404,7 +468,7 @@ export function mountGameShell(options: GameShellOptions): GameShell {
       if (document.hidden) run.onPause?.(true);
       // Le message de chargement doit être masqué avant la mesure : sa hauteur ferait croire à moins de place qu'il n'y en a.
       status.hidden = true;
-      if (sized) resize();
+      resize();
       focusCanvas();
 
       const frame = (now: number): void => {

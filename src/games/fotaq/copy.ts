@@ -38,7 +38,6 @@ export const copy = {
   // Barre tactile et pied de page.
   menu: "Menu",
   menuLabel: "Menu du jeu : sauvegarder, charger, volume, pause, aide, écran titre",
-  skip: "Passer",
   skipLabel: "Passer la scène (Échap)",
   pause: "Pause",
   pauseLabel: "Mettre le jeu en pause ou le reprendre (Espace)",

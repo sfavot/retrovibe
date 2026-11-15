@@ -4,8 +4,8 @@ import { isRotated } from "./touch-layout";
 
 /**
  * Commandes tactiles partagées d'un jeu d'action : un stick virtuel (direction analogique) et des boutons d'action, affichés
- * seulement en disposition tactile (feuille de style, section « commandes tactiles »). À monter dans `stageChildren` du shell :
- * la couche recouvre l'écran, sans capter de toucher ailleurs que sur le stick et les boutons.
+ * seulement sur écran tactile. Ce sont des blocs propres au jeu : le jeu les confie au shell (`shell.controls.addPad`), qui les place
+ * hors de l'écran (sous lui ou de côté, avec les icônes de la barre) et réserve leur place, sans qu'ils le recouvrent.
  */
 
 export interface TouchSink {
@@ -45,7 +45,11 @@ export interface TouchControlsOptions {
 }
 
 export interface TouchControls {
-  element: HTMLElement;
+  /** Le manche (absent sans `stick`) et le groupe de boutons : à poser par `shell.controls.addPad` (manche à gauche, boutons à droite). */
+  stick: HTMLElement | null;
+  buttons: HTMLElement;
+  /** Affiche ou masque les deux blocs ; masqués, ils gardent leur place (`visibility`), l'écran ne change pas de taille. */
+  setVisible(visible: boolean): void;
   /** Relâche tout (stick centré, boutons relevés) : à appeler au blur ou à la pause. */
   reset(): void;
   /** Retire les écouteurs et relâche tout. */
@@ -97,7 +101,7 @@ function capture(element: HTMLElement, pointerId: number): void {
 
 const DIRECTION_KEYS: (keyof TouchDirections)[] = ["up", "down", "left", "right"];
 
-/** Monte le stick et les boutons ; l'élément renvoyé est la couche à insérer dans l'écran du jeu. */
+/** Monte le stick et les boutons ; les éléments renvoyés sont à confier au shell (`shell.controls.addPad`). */
 export function mountTouchControls(options: TouchControlsOptions): TouchControls {
   const { sink, buttons } = options;
   const deadZone = options.stick?.deadZone ?? DEFAULT_DEAD_ZONE;
@@ -105,9 +109,8 @@ export function mountTouchControls(options: TouchControlsOptions): TouchControls
   const abort = new AbortController();
   const { signal } = abort;
 
-  const root = h("div", { class: "touch-controls" });
-  // pas de menu contextuel (appui long), de sélection ni de défilement sur la couche
-  root.addEventListener("contextmenu", (e) => e.preventDefault(), { signal });
+  // pas de menu contextuel (appui long), de sélection ni de défilement sur les blocs
+  const noMenu = (element: HTMLElement): void => element.addEventListener("contextmenu", (e) => e.preventDefault(), { signal });
 
   // --- stick
   const held: Record<keyof TouchDirections, boolean> = { up: false, down: false, left: false, right: false };
@@ -187,7 +190,7 @@ export function mountTouchControls(options: TouchControlsOptions): TouchControls
         { signal },
       );
     }
-    root.append(stick);
+    noMenu(stick);
   }
 
   // --- boutons
@@ -222,7 +225,7 @@ export function mountTouchControls(options: TouchControlsOptions): TouchControls
     }
     group.append(button);
   }
-  root.append(group);
+  noMenu(group);
 
   const reset = (): void => {
     if (stickEl) resetStick();
@@ -232,12 +235,17 @@ export function mountTouchControls(options: TouchControlsOptions): TouchControls
   };
 
   return {
-    element: root,
+    stick: stickEl,
+    buttons: group,
+    setVisible(visible) {
+      for (const element of [stickEl, group]) if (element) element.style.visibility = visible ? "" : "hidden";
+    },
     reset,
     dispose() {
       reset();
       abort.abort();
-      root.remove();
+      stickEl?.remove();
+      group.remove();
     },
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asideWidth, canvasMayTakeFocus, contentHeight, failureMessage, fitScale, shellScale } from "../../src/ui/game-shell";
+import { canvasMayTakeFocus, contentHeight, failureMessage, fitScale, shellScale } from "../../src/ui/game-shell";
 import { MissingFilesError } from "../../src/ui/files";
 
 describe("fitScale (échelle du canvas : entière dès 2×, sinon fractionnaire)", () => {
@@ -43,26 +43,13 @@ describe("shellScale (mesures de la page -> échelle)", () => {
     expect(shellScale({ ...base, mainHeight: base.mainHeight + 60 }, 320, 200)).toBeLessThan(2);
   });
 
-  it("une barre tactile sous l'écran réduit la place disponible", () => {
+  it("un pied de page plus haut sous l'écran réduit la place disponible", () => {
     expect(shellScale({ ...base, mainHeight: 240 + 160, viewportHeight: 800 }, 320, 200)).toBe(2);
     expect(shellScale({ ...base, mainHeight: 240 + 160 }, 320, 200)).toBeCloseTo(1.32);
   });
 
   it("fractionnaire sur demande", () => {
     expect(shellScale({ ...base, mainWidth: 1000, viewportHeight: 900 }, 640, 480, false)).toBeCloseTo(1.5125);
-  });
-
-  it("les colonnes de côté (paysage tactile) réduisent la largeur disponible", () => {
-    // Téléphone en paysage 844×390, écran seul en hauteur (marges de 8 px) : 2× sans colonnes, 1.x avec 2 × 120 px.
-    const phone = { mainWidth: 844, mainTop: 0, mainHeight: 216, stageHeight: 200, viewportHeight: 390 };
-    expect(shellScale(phone, 320, 200, false)).toBeCloseTo(1.79);
-    expect(shellScale({ ...phone, asideWidth: 256 }, 320, 200, false)).toBeCloseTo((844 - 32 - 256) / 320);
-  });
-
-  it("en paysage tactile, seules les marges données comptent (celles du conteneur et la zone sûre du bas)", () => {
-    const phone = { mainWidth: 844, mainTop: 0, mainHeight: 496, stageHeight: 480, viewportHeight: 390, asideWidth: 96 };
-    expect(shellScale({ ...phone, margins: { horizontal: 16, bottom: 21 } }, 640, 480, false)).toBeCloseTo((390 - 16 - 21) / 480);
-    expect(shellScale(phone, 640, 480, false)).toBeCloseTo((390 - 16 - 16) / 480);
   });
 
   it("plein écran : la hauteur du contenu, et non celle du conteneur étiré à la fenêtre, garde l'échelle", () => {
@@ -81,25 +68,6 @@ describe("contentHeight", () => {
     expect(contentHeight([200, 40], 12, 16, 16)).toBe(284);
     expect(contentHeight([200], 12, 16, 16)).toBe(232);
     expect(contentHeight([], 12, 16, 16)).toBe(32);
-  });
-});
-
-describe("asideWidth", () => {
-  it("additionne les deux colonnes extérieures et leurs gouttières", () => {
-    expect(asideWidth("grid", "120px 560px 120px", "8px")).toBe(256);
-  });
-
-  it("deux colonnes (commandes d'un seul côté) : la colonne des commandes et une gouttière", () => {
-    expect(asideWidth("grid", "560px 44px", "8px")).toBe(52);
-  });
-
-  it("vaut 0 hors grille ou avec une seule colonne", () => {
-    expect(asideWidth("flex", "none", "normal")).toBe(0);
-    expect(asideWidth("grid", "800px", "8px")).toBe(0);
-  });
-
-  it("gouttière « normal » comptée nulle", () => {
-    expect(asideWidth("grid", "100px 500px 100px", "normal")).toBe(200);
   });
 });
 

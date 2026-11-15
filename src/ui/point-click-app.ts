@@ -3,13 +3,13 @@ import { type HostStorage, prefixedStorage } from "../engine/storage";
 import type { SlotSummary } from "../engine/save-slots";
 import { h } from "./dom";
 import { MissingFilesError, fetchBytes } from "./files";
+import { copy as shared } from "./copy";
 import { type GameShellCopy, type ShellSoundPrefs, leaveGame, mountGameShell } from "./game-shell";
-import { withIcons } from "./icons";
+import { type IconName, withIcons } from "./icons";
 import { IndexedPresenter } from "./indexed-canvas";
 import { localStorageStore } from "./local-storage";
 import { bindCanvasPointer, bindKeyboard } from "./pointer";
-import { type ChooseResult, type ChoiceDialogOptions, type DialogCopy, dialogOverlay, renderChoiceDialog, parseVolume, renderLeaveDialog, renderMenuDialog, renderSlotDialog, renderVolumeDialog, volumeKey } from "./point-click-dialogs";
-import { syncSkipButton } from "./point-click-touch";
+import { type ChooseResult, type ChoiceDialogOptions, type DialogCopy, type MenuItem, dialogOverlay, renderChoiceDialog, parseVolume, renderLeaveDialog, renderMenuDialog, renderSlotDialog, renderVolumeDialog, volumeKey } from "./point-click-dialogs";
 import { soundPrefKey } from "./sound-prefs";
 import { TickScheduler } from "./tick-scheduler";
 
@@ -18,8 +18,8 @@ import { TickScheduler } from "./tick-scheduler";
  * `docs/fotaq/plan.md`, M8). Le jeu fournit ce qui diffère réellement (`PointClickGame` : textes, taille de l'écran, chargement des
  * fichiers et construction du moteur et de l'hôte, touches, toucher, aide, hooks de l'image) ; ce module fait la colle : page sur
  * `mountGameShell`, chargement avec progression et erreur, pause (onglet masqué, bouton, fenêtre ouverte, aide), message passager,
- * fenêtres (sauvegarde, chargement, volume, menu, retour à l'écran titre), barre tactile Menu / Passer / Pause, aide par-dessus le
- * jeu, entrées et boucle `TickScheduler` + `render`.
+ * fenêtres (sauvegarde, chargement, volume, menu, retour à l'écran titre), contrôles tactiles Passer / Inventaire (le bouton
+ * « Menu » de la barre est celui du shell, qui ouvre le menu du jeu), aide par-dessus le jeu, entrées et boucle `TickScheduler` + `render`.
  */
 
 export interface PointClickAppOptions<TSave> {
@@ -41,10 +41,9 @@ export interface PointClickCopy extends DialogCopy, Required<Pick<GameShellCopy,
   pausedHint: string;
   loading: string;
   loadingFiles(percent: number): string;
-  skip: string;
+  /** Nom accessible du contrôle tactile « Passer ». */
   skipLabel: string;
-  /** Bouton « Inventaire » de la barre tactile (jeux qui ont `PointClickLoaded.inventory`). */
-  inventory?: string;
+  /** Nom accessible du contrôle tactile « Inventaire » (jeux qui ont `PointClickLoaded.inventory`) ; sans valeur, le libellé partagé. */
   inventoryLabel?: string;
   menuLabel: string;
   /** Bouton de l'aide ouverte par-dessus le jeu. */
@@ -106,9 +105,9 @@ export interface PointClickLoaded {
     /** Charge l'emplacement ; la page annonce `loadDone` si `ok`. */
     load(slot: number): ChooseResult | Promise<ChooseResult>;
   };
-  /** Bouton « Passer » de la barre tactile. */
+  /** Contrôle tactile « Passer » (visible seulement quand `engine.canSkip`). */
   skip(): void;
-  /** Bouton « Inventaire » de la barre tactile : absent, le bouton n'existe pas ; `canOpen` le grise (introduction, panneau, choix…). */
+  /** Contrôle tactile « Inventaire » : absent, il n'existe pas ; `canOpen` le grise (introduction, panneau, choix…). */
   inventory?: { canOpen(): boolean; open(): void };
   /** Toucher du doigt (0) ou appui long (2) en (x, y), hors pause : une réplique à passer, ou un clic. */
   tap(button: 0 | 2, x: number, y: number): void;
@@ -167,6 +166,8 @@ export interface PointClickGame<TSave> {
   /** Identifiant (`"drascula"`) : clés du volume et du son, `window.__<id>`. */
   id: string;
   copy: PointClickCopy;
+  /** Icônes des contrôles tactiles quand celles par défaut (Passer : `skip`, Inventaire : `inventory`) ne disent pas ce qu'ils font. */
+  icons?: { skip?: IconName; inventory?: IconName };
   width: number;
   height: number;
   /** Durée d'un tick du moteur (ms) et nombre maximal de ticks rattrapés par image. */
@@ -216,40 +217,6 @@ export async function mountPointClickApp<TSave>(
   const loadingText = h("span", {}, copy.loading);
   const loading = h("div", { class: "pc-loading", role: "status" }, loadingText, progress);
 
-  /**
-   * Bouton de la barre tactile. Il ne prend pas le focus au toucher ou au clic (le canvas le garde) ; au clavier, il le garde.
-   */
-  const touchButton = (label: string, ariaLabel: string, action: () => void): HTMLButtonElement => {
-    const button = h("button", { type: "button", "aria-label": ariaLabel }, label);
-    button.addEventListener("mousedown", (e) => e.preventDefault());
-    button.addEventListener("click", (e) => {
-      loaded?.host.unlock();
-      action();
-      if (e.detail > 0) shell.canvas.focus({ preventScroll: true });
-    });
-    return button;
-  };
-  const skipButton = touchButton(copy.skip, copy.skipLabel, () => loaded?.skip());
-  skipButton.disabled = true;
-  skipButton.setAttribute("aria-disabled", "true");
-  const pauseButton = touchButton(copy.pause, copy.pauseLabel, () => togglePause());
-  const menuButton = touchButton(copy.menu, copy.menuLabel, () => openMenu());
-  // Seulement pour les jeux qui l'offrent (`PointClickLoaded.inventory`) ; grisé tant que le jeu ne peut pas l'ouvrir.
-  const inventoryButton = copy.inventory
-    ? touchButton(copy.inventory, copy.inventoryLabel ?? copy.inventory, () => {
-        if (!isPaused() && loaded?.inventory?.canOpen()) loaded.inventory.open();
-      })
-    : undefined;
-  if (inventoryButton) {
-    inventoryButton.disabled = true;
-    inventoryButton.setAttribute("aria-disabled", "true");
-  }
-  const touchBar = h(
-    "div",
-    { class: "touch-bar pc-touch-bar" },
-    h("div", { class: "pc-touch-group" }, menuButton, skipButton, ...(inventoryButton ? [inventoryButton] : [])),
-    h("div", { class: "pc-touch-group" }, pauseButton),
-  );
   const shell = mountGameShell({
     container,
     logicalWidth: game.width,
@@ -258,10 +225,7 @@ export async function mountPointClickApp<TSave>(
     backLabel: options.backLabel,
     classes: { root: "pc-game", stage: "pc-stage", canvas: "pc-canvas" },
     stageChildren: [notice, pauseNotice],
-    afterStage: [touchBar],
   });
-  // En portrait, la barre a la largeur de l'écran du jeu (que le shell dimensionne).
-  new ResizeObserver(() => touchBar.style.setProperty("--pc-screen-width", `${shell.canvas.offsetWidth}px`)).observe(shell.canvas);
   shell.main.append(loading);
   // Le pied de page (avec le lien de retour) n'existe qu'une fois le jeu lancé : pendant le chargement, et si celui-ci échoue, le lien est posé ici.
   const earlyBack = options.backLabel ? h("a", { class: "back-link", href: "#/" }, options.backLabel) : null;
@@ -318,6 +282,33 @@ export async function mountPointClickApp<TSave>(
   loading.remove();
   earlyBack?.remove();
   const { engine, host, slots, prefs } = loaded;
+  // Contrôles tactiles, que le shell rend en barre d'icônes (le bouton « Menu » est le sien). Un appui est un geste : il débloque l'audio.
+  const press = (action: () => void) => (): void => {
+    loaded?.host.unlock();
+    action();
+  };
+  // « Passer » n'apparaît que quand un appui sur Échap aurait un effet (`canSkip` du moteur).
+  const skipControl = shell.controls.add({
+    id: "skip",
+    icon: game.icons?.skip ?? "skip",
+    label: copy.skipLabel,
+    group: "start",
+    onPress: press(() => loaded?.skip()),
+  });
+  skipControl.setVisible(false);
+  // Seulement pour les jeux qui l'offrent (`PointClickLoaded.inventory`) ; grisé tant que le jeu ne peut pas l'ouvrir.
+  const inventoryControl = loaded.inventory
+    ? shell.controls.add({
+        id: "inventory",
+        icon: game.icons?.inventory ?? "inventory",
+        label: copy.inventoryLabel ?? shared.inventory,
+        group: "start",
+        onPress: press(() => {
+          if (!isPaused() && loaded?.inventory?.canOpen()) loaded.inventory.open();
+        }),
+      })
+    : undefined;
+  inventoryControl?.setDisabled(true);
   const subtitles = loaded.subtitles;
   if (options.debug && loaded.debug) (window as unknown as Record<string, unknown>)[`__${game.id}`] = loaded.debug;
 
@@ -343,7 +334,6 @@ export async function mountPointClickApp<TSave>(
   };
   function togglePause(): void {
     userPaused = !userPaused;
-    pauseButton.textContent = userPaused ? copy.resume : copy.pause;
     applyPause();
     // Le bouton « Reprendre » (masqué à la reprise) avait le focus : le canvas le reprend de force.
     if (!userPaused) shell.canvas.focus({ preventScroll: true });
@@ -444,6 +434,19 @@ export async function mountPointClickApp<TSave>(
   const toggleSubtitles = (): void => {
     if (subtitles) say(subtitles.toggle());
   };
+  /**
+   * Actions système du shell (son, plein écran, retour à l'accueil) dans le menu, sur écran tactile : le pied de page qui les porte
+   * sur ordinateur n'y est plus.
+   */
+  const systemItems = (again: (action: () => void) => () => void): MenuItem[] => {
+    if (!matchMedia("(pointer: coarse)").matches) return [];
+    const { sound, fullscreen, quit } = shell.system;
+    const items: MenuItem[] = [];
+    if (sound) items.push({ label: copy.sound, title: copy.sound, pressed: sound.isEnabled(), run: again(() => void sound.toggle()) });
+    items.push({ label: shared.fullscreen, title: shared.fullscreen, run: again(() => fullscreen.toggle()) });
+    if (quit) items.push({ label: shared.quit, title: shared.quit, run: again(quit) });
+    return items;
+  };
   function openMenu(): void {
     const again = (action: () => void) => (): void => {
       closeModal();
@@ -469,6 +472,7 @@ export async function mountPointClickApp<TSave>(
         },
         subtitles?.enabled() ?? false,
         userPaused,
+        systemItems(again),
       ),
     );
   }
@@ -496,8 +500,8 @@ export async function mountPointClickApp<TSave>(
     }
     applyPause();
   };
-  const menuLink = h("button", { type: "button", class: "toggle pc-menu-link", "aria-label": copy.menuLabel, onclick: () => openMenu() }, ...withIcons(copy.menu, "menu"));
-  const helpLink = h("button", { type: "button", class: "toggle pc-help-link", onclick: () => openHelp() }, ...withIcons(copy.helpLink, "help"));
+  const menuLink = h("button", { type: "button", class: "toggle pc-menu-link desktop-only", "aria-label": copy.menuLabel, onclick: () => openMenu() }, ...withIcons(copy.menu, "menu"));
+  const helpLink = h("button", { type: "button", class: "toggle pc-help-link desktop-only", onclick: () => openHelp() }, ...withIcons(copy.helpLink, "help"));
   shell.toggles.append(menuLink, helpLink);
 
   // --- Entrées -------------------------------------------------------------------------------------------------------------
@@ -590,6 +594,8 @@ export async function mountPointClickApp<TSave>(
   };
 
   shell.start({
+    // Le bouton « Menu » de la barre tactile ouvre le menu du jeu, qui met en pause par sa fenêtre (`openModal`).
+    menu: { open: () => openMenu() },
     onPause: (hidden) => {
       tabHidden = hidden;
       applyPause();
@@ -608,8 +614,8 @@ export async function mountPointClickApp<TSave>(
       if (loaded?.beforeTicks?.(frameUi) === false) return;
       for (let ticks = scheduler.due(now); ticks > 0; ticks--) engine.tick();
       engine.render();
-      syncSkipButton(skipButton, engine.canSkip);
-      if (inventoryButton) syncSkipButton(inventoryButton, loaded?.inventory?.canOpen() ?? false);
+      skipControl.setVisible(engine.canSkip);
+      inventoryControl?.setDisabled(!(loaded?.inventory?.canOpen() ?? false));
       loaded?.afterTicks?.(frameUi);
     },
   });

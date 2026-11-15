@@ -46,7 +46,6 @@ export const copy = {
   // Barre tactile et pied de page.
   menu: "Menu",
   menuLabel: "Menu du site : sauvegarder, charger, volume, pause, aide, écran titre",
-  skip: "Système",
   skipLabel: "Ouvrir le menu du jeu : Pause, Nouvelle partie, Quitter, Charger, Sauver (F10, ou le bouton du milieu de la souris)",
   pause: "Pause",
   pauseLabel: "Mettre le jeu en pause ou le reprendre",

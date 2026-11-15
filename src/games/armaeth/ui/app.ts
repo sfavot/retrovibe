@@ -6,7 +6,7 @@ import { leaveGame, mountGameShell } from "../../../ui/game-shell";
 import { localStorageStore } from "../../../ui/local-storage";
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
 import { h } from "../../../ui/dom";
-import { type IconName, withIcons } from "../../../ui/icons";
+import { withIcons } from "../../../ui/icons";
 import { copy } from "../copy";
 import { parseHelp } from "../data/tables";
 import { parsePlainMessages } from "../data/text";
@@ -90,43 +90,6 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     enterkeyhint: "done",
     "aria-label": copy.keyboardLabel,
   });
-  /**
-   * Bouton de la barre tactile. Il ne prend pas le focus au toucher ou au clic (le clavier virtuel reste sur le champ de saisie,
-   * le clavier physique sur le jeu) ; au clavier, il le garde.
-   */
-  const touchButton = (
-    label: string,
-    ariaLabel: string,
-    iconName: IconName,
-    action: () => void,
-    props: Record<string, string | boolean> = {},
-  ): HTMLButtonElement => {
-    const button = h("button", { type: "button", "aria-label": ariaLabel, ...props }, ...withIcons(label, iconName));
-    button.addEventListener("mousedown", (e) => e.preventDefault());
-    button.addEventListener("click", (e) => {
-      host?.unlock();
-      action();
-      if (e.detail > 0 && document.activeElement !== textField) shell.canvas.focus({ preventScroll: true });
-    });
-    return button;
-  };
-  const key = (char: string) => (): void => host?.pressKey({ type: "char", char });
-  const keyboardButton = touchButton(copy.keyboard, copy.keyboardLabel, "keyboard", () => textField.focus({ preventScroll: true }), {
-    class: "aeth-idle-only",
-  });
-  const cancelButton = touchButton(copy.cancel, copy.cancelLabel, "undo", key("\x1b"), { hidden: true });
-  const confirmButton = touchButton(copy.confirm, copy.confirmLabel, "enter", key("\r"), { hidden: true });
-  const holdButton = touchButton(copy.hold, copy.holdLabel, "hand", () => host?.hold.toggle(), {
-    "aria-pressed": "false",
-    class: "aeth-idle-only",
-  });
-  // une seule rangée de boutons ; en paysage tactile, une colonne d'icônes à gauche de l'écran (`touch-bar--icons`)
-  const touchBar = h(
-    "div",
-    { class: "touch-bar touch-bar--icons aeth-touch-bar" },
-    h("div", { class: "aeth-touch-group" }, keyboardButton, cancelButton),
-    h("div", { class: "aeth-touch-group" }, holdButton, confirmButton),
-  );
   const shell = mountGameShell({
     container,
     logicalWidth: SCREEN_WIDTH,
@@ -135,10 +98,33 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     backLabel: options.backLabel,
     classes: { root: "aeth", stage: "aeth-stage", canvas: "aeth-canvas" },
     stageChildren: [textField],
-    afterStage: [touchBar],
   });
-  // En portrait, la barre a la largeur de l'écran du jeu (que le shell dimensionne).
-  new ResizeObserver(() => touchBar.style.setProperty("--aeth-screen-width", `${shell.canvas.offsetWidth}px`)).observe(shell.canvas);
+  // Contrôles tactiles (barre d'icônes du shell, qui ne prend pas le focus au toucher : le clavier virtuel reste sur le champ de
+  // saisie, le clavier physique sur le jeu). Clavier et Tenir à gauche ; pendant une saisie, Échap et Entrée apparaissent à droite.
+  const press = (action: () => void) => (): void => {
+    host?.unlock();
+    action();
+  };
+  const key = (char: string) => (): void => host?.pressKey({ type: "char", char });
+  shell.controls.add({
+    id: "keyboard",
+    icon: "keyboard",
+    label: copy.keyboardLabel,
+    group: "start",
+    onPress: press(() => textField.focus({ preventScroll: true })),
+  });
+  const holdControl = shell.controls.add({
+    id: "hold",
+    icon: "hand",
+    label: copy.holdLabel,
+    group: "start",
+    onPress: press(() => host?.hold.toggle()),
+  });
+  holdControl.setPressed(false);
+  const cancelControl = shell.controls.add({ id: "cancel", icon: "undo", label: copy.cancelLabel, group: "end", collapse: true, onPress: press(key("\x1b")) });
+  const confirmControl = shell.controls.add({ id: "confirm", icon: "enter", label: copy.confirmLabel, group: "end", collapse: true, onPress: press(key("\r")) });
+  cancelControl.setVisible(false);
+  confirmControl.setVisible(false);
   const store = localStorageStore();
 
   let engine: ArmaethEngine;
@@ -151,7 +137,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     const files = new Map(await Promise.all(manifest.entries.map(async ({ path }) => [baseName(path), await fetchBytes(options.base, path)] as const)));
     const created = new BrowserHost(files, shell.canvas, prefixedStorage(store, `${GAME_ID}:`), () => leave(container, options));
     // « Tenir » est un état de l'hôte : le bouton le pilote (le toucher du doigt le consomme).
-    created.hold.onChange = (armed) => holdButton.setAttribute("aria-pressed", String(armed));
+    created.hold.onChange = (armed) => holdControl.setPressed(armed);
     host = created;
     // Débloque le son tant que l'activation du clic (« Jouer ») est valable.
     created.unlock();
@@ -171,9 +157,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     const open = engine.inputLine.open;
     if (open === typing) return;
     typing = open;
-    cancelButton.hidden = !open;
-    confirmButton.hidden = !open;
-    touchBar.classList.toggle("is-typing", open);
+    cancelControl.setVisible(open);
+    confirmControl.setVisible(open);
     if (!open && document.activeElement === textField) {
       textField.blur();
       shell.canvas.focus({ preventScroll: true });
@@ -220,13 +205,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   };
   const helpLink = h(
     "button",
-    { type: "button", class: "toggle aeth-help-link", onclick: () => openHelp() },
+    { type: "button", class: "toggle aeth-help-link desktop-only", onclick: () => openHelp() },
     ...withIcons(copy.helpLink, "help"),
   );
   // Flèches tenues : clavier seulement (masqué sur écran tactile, où le héros marche au doigt).
   const holdArrowsButton = h(
     "button",
-    { type: "button", class: "toggle aeth-keyboard-only", title: copy.holdArrowsTitle, "aria-pressed": "false" },
+    { type: "button", class: "toggle desktop-only", title: copy.holdArrowsTitle, "aria-pressed": "false" },
     copy.holdArrows,
   );
   const setHoldArrows = (on: boolean): void => {
@@ -244,6 +229,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   shell.toggles.append(holdArrowsButton, helpLink);
 
   shell.start({
+    // Écran tactile : « Aide » est une entrée du menu du shell (le pied de page qui la porte sur ordinateur n'y est plus).
+    menuEntries: () => [{ label: copy.helpLink, onPress: () => openHelp() }],
     onPause: (hidden) => {
       tabHidden = hidden;
       applyPause();

@@ -10,7 +10,16 @@ export interface Cursor {
   rgba: Uint8ClampedArray;
 }
 
+/** Icône de DESKADV.EXE décodée en RGBA (le masque AND rend les pixels transparents). */
+export interface Icon {
+  id: number;
+  width: number;
+  height: number;
+  rgba: Uint8ClampedArray;
+}
+
 const RT_CURSOR = 1;
+const RT_ICON = 3;
 const DIB_HEADER_SIZE = 40;
 /** Type de la ressource personnalisée qui contient les effets sonores enfouis dans l'exécutable. */
 const WAVE_TYPE = "WAVE";
@@ -82,6 +91,20 @@ export function readCursors(exe: ArrayBuffer | Uint8Array): Map<number, Cursor> 
 }
 
 /**
+ * Icônes de l'exécutable, indexées par identifiant (ressources ICON : DIB 1, 4 ou 8 bpp avec sa palette, puis le masque AND 1 bpp ;
+ * la hauteur de l'en-tête couvre les deux images).
+ */
+export function readIcons(exe: ArrayBuffer | Uint8Array): Map<number, Icon> {
+  const icons = new Map<number, Icon>();
+  for (const { type, id, data } of readResources(exe)) {
+    if (type !== RT_ICON || typeof id !== "number") continue;
+    const icon = decodeIcon(data, id);
+    if (icon) icons.set(icon.id, icon);
+  }
+  return icons;
+}
+
+/**
  * Effet sonore (fichier WAV complet) stocké dans les ressources `WAVE` de l'exécutable, ou null s'il n'existe pas.
  * Le jeu en embarque quelques-uns qui ne figurent pas dans la table de sons de DESKTOP.DAW.
  */
@@ -123,4 +146,42 @@ function decodeCursor(data: Uint8Array, id: number): Cursor | null {
     }
   }
   return { id, width, height, hotspotX, hotspotY, rgba };
+}
+
+function decodeIcon(data: Uint8Array, id: number): Icon | null {
+  const r = new BinaryReader(data);
+  if (r.u32() !== DIB_HEADER_SIZE) return null;
+  const width = r.i32();
+  const height = r.i32() / 2;
+  r.offset += 2; // plans
+  const bpp = r.u16();
+  if (bpp !== 1 && bpp !== 4 && bpp !== 8) return null;
+  r.offset = 32;
+  const used = r.u32();
+  const count = used || 1 << bpp;
+  r.offset = DIB_HEADER_SIZE;
+  const colors = Array.from({ length: count }, () => r.u32()); // BGRx
+  const stride = Math.ceil((width * bpp) / 32) * 4;
+  const maskStride = Math.ceil(width / 32) * 4;
+  const pixels = data.subarray(r.offset);
+  const mask = pixels.subarray(stride * height);
+  if (mask.length < maskStride * height) return null;
+
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const stored = height - 1 - y;
+    for (let x = 0; x < width; x++) {
+      if ((mask[stored * maskStride + (x >> 3)] >> (7 - (x & 7))) & 1) continue;
+      const at = stored * stride;
+      const index =
+        bpp === 8 ? pixels[at + x] : bpp === 4 ? (pixels[at + (x >> 1)] >> (x & 1 ? 0 : 4)) & 15 : (pixels[at + (x >> 3)] >> (7 - (x & 7))) & 1;
+      const color = colors[index] ?? 0;
+      const o = (y * width + x) * 4;
+      rgba[o] = (color >> 16) & 0xff;
+      rgba[o + 1] = (color >> 8) & 0xff;
+      rgba[o + 2] = color & 0xff;
+      rgba[o + 3] = 0xff;
+    }
+  }
+  return { id, width, height, rgba };
 }

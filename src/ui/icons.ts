@@ -2,7 +2,7 @@ import { h } from "./dom";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-/** Tracés 24×24 au trait (`currentColor`) des boutons de la page d'un jeu et des barres tactiles. */
+/** Tracés 24×24 au trait (`currentColor`) des boutons de la page d'un jeu et de sa barre de contrôles. */
 const PATHS = {
   close: ["M6 6l12 12", "M18 6 6 18"],
   "sound-on": ["M11 5 6 9H3v6h3l5 4z", "M15.5 8.5a5 5 0 0 1 0 7", "M18.5 5.5a9 9 0 0 1 0 13"],
@@ -19,6 +19,10 @@ const PATHS = {
   undo: ["M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 0 11H11"],
   help: ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z", "M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3", "M12 17h.01"],
   menu: ["M4 6h16", "M4 12h16", "M4 18h16"],
+  skip: ["M5 5v14l11-7z", "M19 5v14"],
+  inventory: ["M6.5 9h11l1.2 10.4a1 1 0 0 1-1 1.1H6.3a1 1 0 0 1-1-1.1z", "M9 9V7a3 3 0 0 1 6 0v2", "M9.5 13.5h5"],
+  pause: ["M8 5v14", "M16 5v14"],
+  system: ["M4 7h8", "M16 7h4", "M12 5v4", "M4 17h4", "M12 17h8", "M8 15v4"],
   shrink: ["M8 3v3a2 2 0 0 1-2 2H3", "M21 8h-3a2 2 0 0 1-2-2V3", "M3 16h3a2 2 0 0 1 2 2v3", "M16 21v-3a2 2 0 0 1 2-2h3"],
 } as const;
 

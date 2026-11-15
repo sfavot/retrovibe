@@ -1,5 +1,5 @@
 import type { Assets } from "./assets";
-import type { Point } from "./geometry";
+import { DIRECTION_VECTORS, Direction, type Point } from "./geometry";
 
 export const WORLD_SIZE = 10;
 
@@ -86,6 +86,21 @@ export class World {
   sectorOf(zoneId: number): Sector | null {
     const index = this.zoneToSector.get(zoneId);
     return index === undefined ? null : this.story.sectors[index];
+  }
+
+  /**
+   * Directions dans lesquelles la carte du monde a un secteur voisin de la zone (celles où `Game.trySectorTransition` laisse passer
+   * le héros au bord de l'écran) ; aucune depuis une pièce. Lecture seule : sert à la boussole.
+   */
+  exits(zoneId: number): Record<Direction, boolean> {
+    const open = { [Direction.Up]: false, [Direction.Down]: false, [Direction.Left]: false, [Direction.Right]: false };
+    const here = this.locate(zoneId);
+    if (!here || !this.isOverworld(zoneId)) return open;
+    for (const direction of [Direction.Up, Direction.Down, Direction.Left, Direction.Right]) {
+      const { x, y } = DIRECTION_VECTORS[direction];
+      open[direction] = this.at(here.x + x, here.y + y) !== null;
+    }
+    return open;
   }
 
   /** La zone est-elle la zone principale de sa case (et non une pièce) ? */

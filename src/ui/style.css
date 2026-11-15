@@ -677,147 +677,263 @@ a.button:hover {
   border-radius: 6px;
 }
 
-/* ------------------------------------------------------------------ panneau latéral */
+/* ------------------------------------------------------------------ panneau de l'inventaire (Indy)
+   Style de la fenêtre d'origine (Windows 3.x) : gris 191, biseaux 127 / 255, cases enfoncées, tout en CSS. L'unité `--u` est un pixel de
+   l'écran d'origine (288 px de côté) : 2× quand l'écran fait 576 ; les icônes de 32 px restent à l'échelle entière sur ordinateur. */
 
-.sidebar {
-  width: min(300px, calc(100vw - 32px));
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.sidebar section,
-.sidebar nav {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 12px;
-}
-
-.label {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin: 0;
-}
-
-.status {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.status-row {
-  display: grid;
-  grid-template-columns: 4.5rem 1fr;
-  align-items: center;
-  gap: 8px;
-}
-
-.health {
-  height: 14px;
-  border-radius: 999px;
-  background: #1a140e;
-  border: 1px solid var(--line);
-  overflow: hidden;
-}
-
-.health-fill {
-  height: 100%;
-  background: var(--good);
-  transition: width 0.25s, background 0.25s;
-}
-
-.health-fill[data-level="warn"] {
-  background: var(--warn);
-}
-
-.health-fill[data-level="bad"] {
-  background: var(--bad);
-}
-
-.weapon-slot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-}
-
-.weapon-slot canvas,
-.item canvas {
-  image-rendering: pixelated;
-  flex: none;
-}
-
-.inventory-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.inventory {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 6px 3px 3px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: var(--bg-2);
-  cursor: grab;
-  font-size: 0.85rem;
-  touch-action: none;
-  user-select: none;
-}
-
-.item:hover {
-  border-color: var(--line);
-}
-
-.item.selected {
-  border-color: var(--accent);
-  background: #3d2f1e;
-}
-
-.item.equipped .item-name::after {
-  content: " ⚔";
-  color: var(--accent);
-}
-
-.item-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.game-screen {
+  --u: calc(var(--stage) / 288);
+  --win-gray: #bfbfbf;
+  --win-shade: #7f7f7f;
+  --win-hi: #fff;
+  --win-sel: #000080;
 }
 
 .muted {
   color: var(--muted);
 }
 
-.empty {
-  grid-column: 1 / -1;
-  font-size: 0.9rem;
+.retro-panel {
+  /* Au-dessus de l'ombre de l'écran, positionné lui aussi. */
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--win-gray);
+  color: #000;
+}
+
+.inventory-frame {
+  box-sizing: border-box;
+  flex: none;
+  height: calc(var(--u) * 228);
+  display: flex;
+  border: calc(var(--u) * 2) solid;
+  border-color: var(--win-shade) var(--win-hi) var(--win-hi) var(--win-shade);
+  background: var(--win-gray);
+}
+
+.inventory {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+}
+
+.item {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  height: calc(var(--u) * 32);
+  cursor: default;
+  user-select: none;
+  touch-action: pan-y;
+  font: calc(var(--u) * 12) / 1 "Segoe UI", "MS Sans Serif", Arial, Helvetica, sans-serif;
+}
+
+.item.blank {
+  flex: 0 1 calc(var(--u) * 32);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.item:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: calc(var(--u) * -4);
+}
+
+.item-icon,
+.item-name {
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* Cases enfoncées : le biseau est dessiné par-dessus l'icône pour que celle-ci garde sa taille entière. */
+.item-icon::after,
+.item-name::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--u) solid;
+  border-color: var(--win-shade) var(--win-hi) var(--win-hi) var(--win-shade);
+  pointer-events: none;
+}
+
+.item-icon {
+  flex: none;
+  width: calc(var(--u) * 32);
+  height: calc(var(--u) * 32);
+}
+
+.item-icon canvas,
+.weapon-slot canvas {
+  display: block;
+  width: calc(var(--u) * 32);
+  height: calc(var(--u) * 32);
+  image-rendering: pixelated;
+}
+
+.item-name {
+  flex: 1;
+  min-width: 0;
+  padding: 0 calc(var(--u) * 4);
+  line-height: calc(var(--u) * 32);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sélection façon liste Windows : le nom passe en bleu marine sur blanc. */
+.item.selected .item-name {
+  background: var(--win-sel);
+  color: #fff;
+}
+
+/* Ascenseur d'époque : boutons à flèche et curseur biseautés, piste grise. */
+.inventory::-webkit-scrollbar {
+  width: calc(var(--u) * 18);
+}
+
+.inventory::-webkit-scrollbar-track {
+  background: var(--win-gray);
+  border-left: var(--u) solid var(--win-shade);
+}
+
+.inventory::-webkit-scrollbar-thumb,
+.inventory::-webkit-scrollbar-button:vertical:start:decrement,
+.inventory::-webkit-scrollbar-button:vertical:end:increment {
+  box-sizing: border-box;
+  background-color: var(--win-gray);
+  border: var(--u) solid;
+  border-color: var(--win-hi) #404040 #404040 var(--win-hi);
+  box-shadow: inset calc(var(--u) * -1) calc(var(--u) * -1) 0 var(--win-shade);
+}
+
+.inventory::-webkit-scrollbar-button:vertical:start:decrement,
+.inventory::-webkit-scrollbar-button:vertical:end:increment {
+  display: block;
+  width: calc(var(--u) * 18);
+  height: calc(var(--u) * 18);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: calc(var(--u) * 7) calc(var(--u) * 4);
+}
+
+.inventory::-webkit-scrollbar-button:vertical:start:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges'%3E%3Cpath d='M3 0h1v1H3zM2 1h3v1H2zM1 2h5v1H1zM0 3h7v1H0z'/%3E%3C/svg%3E");
+}
+
+.inventory::-webkit-scrollbar-button:vertical:end:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 4' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h7v1H0zM1 1h5v1H1zM2 2h3v1H2zM3 3h1v1H3z'/%3E%3C/svg%3E");
+}
+
+.status-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.compass {
+  flex: none;
+  width: calc(var(--u) * 44);
+  height: calc(var(--u) * 44);
+}
+
+.compass-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.weapon-slot {
+  box-sizing: border-box;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 36);
+  height: calc(var(--u) * 36);
+  border: calc(var(--u) * 2) solid;
+  border-color: var(--win-shade) var(--win-hi) var(--win-hi) var(--win-shade);
+  outline: var(--u) solid #404040;
+  outline-offset: calc(var(--u) * -2);
+}
+
+/* Moniteur de santé : disque (vert, puis jaune, rouge, noir qui le recouvrent à partir de 12 h, voir `ui/health-pie.ts`). */
+.health {
+  box-sizing: border-box;
+  flex: none;
+  width: calc(var(--u) * 36);
+  height: calc(var(--u) * 36);
+  border-radius: 50%;
+  border: calc(var(--u) * 2) solid;
+  border-color: var(--win-shade) #dfdfdf #dfdfdf var(--win-shade);
+  background: rgb(0, 255, 0);
+}
+
+.game-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 20px;
 }
 
 .commands {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
 }
 
-.commands button {
-  flex: 1 1 40%;
+/* Ordinateur : écran et panneau dans une même fenêtre grise, les commandes dessous. */
+@media not all and (pointer: coarse) {
+  .game-screen {
+    --stage: min(576px, calc((100vw - 32px) * 0.55));
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 14px;
+    padding-block: 20px;
+  }
+
+  .retro-window {
+    display: flex;
+    align-items: stretch;
+    gap: calc(var(--u) * 10);
+    padding: calc(var(--u) * 10);
+    background: var(--win-gray);
+    border: calc(var(--u) * 2) solid;
+    border-color: var(--win-hi) var(--win-shade) var(--win-shade) var(--win-hi);
+    box-shadow: 0 0 0 1px #000, 0 20px 60px #000a;
+  }
+
+  .retro-window .play-column {
+    border: calc(var(--u) * 3) solid;
+    border-color: var(--win-shade) var(--win-hi) var(--win-hi) var(--win-shade);
+  }
+
+  .retro-window .stage {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .retro-panel {
+    width: calc(var(--u) * 187);
+    height: 100%;
+  }
 }
 
 .drag-ghost {
@@ -853,12 +969,6 @@ a.button:hover {
   }
 }
 
-@media (max-width: 900px) {
-  .sidebar {
-    width: var(--stage);
-  }
-}
-
 .resume {
   display: flex;
   flex-direction: column;
@@ -876,25 +986,6 @@ a.button:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.touch-bar {
-  display: none;
-  gap: 8px;
-}
-
-.touch-bar button {
-  flex: 1;
-  padding: 0.9rem;
-  font-weight: 700;
-  /* pas de zoom au double toucher */
-  touch-action: manipulation;
-}
-
-@media (pointer: coarse) {
-  .touch-bar {
-    display: flex;
-  }
 }
 
 /* ------------------------------------------------------------------ manuel d'origine */
@@ -1068,11 +1159,15 @@ a.button:hover {
   overflow: hidden;
 }
 
-.game-shell--sized .game-shell-stage {
+.game-shell-stage {
   line-height: 0;
 }
 
+/* Avant la première mesure, l'écran garde son ratio dans la place de la page : un canvas de 640 px sur un téléphone élargirait la fenêtre
+   de mise en page, et la mesure de l'échelle (largeur de la fenêtre) partirait de cette largeur faussée. */
 .game-shell-canvas {
+  max-width: 100%;
+  height: auto;
   display: block;
   image-rendering: pixelated;
   /* Pas de défilement ni de zoom tactile sur l'écran ; le curseur est celui du jeu (feuille de style du jeu). */
@@ -1084,9 +1179,14 @@ a.button:hover {
 }
 
 /* Anneau de focus à l'intérieur de l'écran (le cadre `.game-shell-stage` rogne ce qui déborde). */
-.game-shell--sized .game-shell-canvas:focus-visible {
+.game-shell-canvas:focus-visible {
   outline: 3px solid var(--focus, #f6d27a);
   outline-offset: -3px;
+}
+
+/* Au toucher ou à la souris, pas d'anneau de focus sur l'écran (posé par `ui/game-shell.ts`) ; il reste pour le clavier. */
+.game-shell[data-input="pointer"] .game-shell-canvas:focus-visible {
+  outline: none;
 }
 
 .game-shell-footer {
@@ -1212,279 +1312,330 @@ a.button:hover {
   }
 }
 
-/* Disposition tactile paysage, posée par `ui/touch-layout.ts` (classe `is-touch-landscape`) : écran tactile en paysage, ou plein écran
-   pivoté sur un téléphone en portrait (une requête de média ne s'y appliquerait pas). */
+/* ------------------------------------------------------------------ contrôles tactiles du shell (`ui/shell-controls.ts`) */
 
-/* L'écran au centre sur toute la hauteur ; de part et d'autre, les deux groupes de la barre tactile (premier à gauche, dernier à
-   droite) ; à droite, le retour (croix) en haut et les boutons Son / Plein écran en bas. */
-.game-shell.is-touch-landscape {
-  --game-shell-aside: clamp(6.5rem, calc(var(--view-w, 100vw) * 0.16), 9rem);
-  display: grid;
-  grid-template-columns: var(--game-shell-aside) auto var(--game-shell-aside);
-  grid-template-rows: auto 1fr auto;
-  justify-content: center;
-  align-content: center;
-  gap: 8px;
-  min-height: var(--view-h, 100dvh);
-  padding: 8px;
-}
-
-.game-shell.is-touch-landscape > .game-shell-stage {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  align-self: center;
-}
-
-.game-shell.is-touch-landscape > .touch-bar,
-.game-shell.is-touch-landscape > .game-shell-footer {
-  display: contents;
-}
-
-.game-shell.is-touch-landscape > .touch-bar > * {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  align-self: center;
-  min-width: 0;
-}
-
-.game-shell.is-touch-landscape > .touch-bar > :first-child {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.game-shell.is-touch-landscape > .touch-bar > :last-child {
-  grid-column: 3;
-  grid-row: 2;
-}
-
-.is-touch-landscape .game-shell-footer > .back-link {
-  grid-column: 3;
-  grid-row: 1;
-  align-self: start;
-  justify-self: end;
-  font-size: 0.9rem;
-}
-
-.is-touch-landscape .game-shell-toggles {
-  grid-column: 3;
-  grid-row: 3;
-  flex-direction: column;
-  align-self: end;
-  margin: 0;
-}
-
-.is-touch-landscape .game-shell-status,
-.is-touch-landscape .game-shell-error {
-  grid-column: 1 / -1;
-}
-
-/* Sans barre tactile (Mathémagique, Téléportaschtroumpf) : les colonnes de côté ne portent que les icônes du pied de page, l'écran
-   prend le reste de la largeur. */
-.game-shell.is-touch-landscape:not(:has(> .touch-bar)) {
-  --game-shell-aside: 44px;
-}
-
-/* Avec barre tactile : Son et Plein écran côte à côte sous les boutons de droite. */
-.game-shell.is-touch-landscape:has(> .touch-bar) .game-shell-toggles {
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-/* Barre tactile en icônes (`touch-bar--icons`, Armaeth) : toutes les commandes dans une seule colonne d'icônes à droite de l'écran (le
-   retour en haut, la barre au milieu, le pied de page en bas), sans colonne à gauche : l'écran prend toute la place qui reste. */
-.game-shell.is-touch-landscape:has(> .touch-bar--icons) {
-  grid-template-columns: auto 44px;
-}
-
-.game-shell.is-touch-landscape:has(> .touch-bar--icons) > .game-shell-stage {
-  grid-column: 1;
-}
-
-.game-shell.is-touch-landscape:has(> .touch-bar--icons) .game-shell-footer > .back-link,
-.game-shell.is-touch-landscape:has(> .touch-bar--icons) .game-shell-toggles {
-  grid-column: 2;
-  justify-self: center;
-}
-
-.game-shell.is-touch-landscape:has(> .touch-bar--icons) .game-shell-toggles {
-  flex-direction: column;
-}
-
-.game-shell.is-touch-landscape > .touch-bar--icons {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  grid-column: 2;
-  grid-row: 2;
-  align-self: center;
-  width: auto;
-}
-
-.game-shell.is-touch-landscape > .touch-bar--icons > * {
-  display: contents;
-}
-
-.game-shell.is-touch-landscape > .touch-bar--icons button {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: 50%;
-}
-
-.game-shell.is-touch-landscape > .touch-bar--icons button[hidden] {
+/* Barre d'icônes que le jeu déclare (`shell.controls.add`) : masquée sur ordinateur, où le pied de page et le clavier suffisent. Sur
+   écran tactile (portrait comme paysage, plein écran pivoté compris), elle prend la place que le ratio du jeu laisse libre : sous l'écran
+   (`controls-bottom`) ou de part et d'autre (`controls-sides`), choix posé par le shell (`placeControls`). Le pied de page n'y paraît
+   plus : retour, son et plein écran passent par le bouton « Menu ». */
+.shell-controls {
   display: none;
 }
 
-.game-shell.is-touch-landscape > .touch-bar--icons button[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+.shell-controls-group {
+  display: flex;
+  gap: 8px;
 }
 
-.game-shell.is-touch-landscape > .touch-bar--icons .icon {
-  display: block;
+.shell-controls-group:empty {
+  display: none;
 }
 
-/* Icônes du pied de page en paysage tactile : retour (croix), Son (haut-parleur, barré quand coupé), Plein écran (flèches). Le
-   libellé, masqué, reste le nom du bouton pour les lecteurs d'écran. */
-.game-shell.is-touch-landscape .game-shell-footer :is(.back-link, button) {
+.shell-control {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
+  min-height: 44px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--muted);
-  text-decoration: none;
+  /* pas de zoom au double toucher, ni de halo gris d'iOS */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.game-shell.is-touch-landscape .game-shell-footer :is(.back-link, button):hover {
+.shell-control .icon {
+  display: block;
+}
+
+.shell-control:active {
   background: var(--panel-2);
   color: var(--text);
 }
 
-.game-shell.is-touch-landscape :is(.game-shell-footer, .touch-bar--icons) .icon-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+@media (hover: hover) {
+  .shell-control:hover {
+    background: var(--panel-2);
+    color: var(--text);
+  }
 }
 
-.game-shell.is-touch-landscape .toggle[aria-pressed="true"] .icon-sound-on,
-.game-shell.is-touch-landscape .toggle[aria-pressed="false"] .icon-sound-off,
-.game-shell.is-touch-landscape .back-link .icon-close,
-.game-shell.is-touch-landscape .game-shell-footer .icon-help,
-.game-shell.is-touch-landscape .game-shell-footer .icon-menu,
-.game-shell.is-touch-landscape .fullscreen-button[aria-pressed="false"] .icon-expand,
-.game-shell.is-touch-landscape .fullscreen-button[aria-pressed="true"] .icon-shrink {
-  display: block;
+.shell-control[aria-pressed="true"] {
+  background: var(--panel-2);
+  color: var(--accent);
 }
 
-/* Indy : l'écran (carré) sur toute la hauteur, les boutons Attaquer / Utiliser et le lien de retour à sa gauche, le panneau à droite,
-   qui défile s'il dépasse. */
-.game-screen.is-touch-landscape {
-  --stage: min(576px, calc(var(--view-h, 100dvh) - 16px));
-  flex-wrap: nowrap;
+.shell-control:disabled {
+  background: transparent;
+  color: var(--muted);
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (pointer: coarse) {
+  .touch-layout {
+    min-height: var(--view-h, 100dvh);
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .touch-layout > .shell-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+  }
+
+  /* Boutons du pied de page réservés à l'ordinateur ; le pied de page disparaît s'il n'en reste aucun (boutons propres au jeu). */
+  .touch-layout .desktop-only {
+    display: none;
+  }
+
+  .touch-layout > .game-shell-footer:not(:has(> .game-shell-toggles > :not(.desktop-only))) {
+    display: none;
+  }
+
+  /* Barre de côté : colonnes d'icônes de part et d'autre de l'écran (groupe de début à gauche, de fin à droite). */
+  .touch-layout.controls-sides {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: center;
+  }
+
+  .touch-layout.controls-sides > .game-shell-stage {
+    flex: none;
+  }
+
+  .touch-layout.controls-sides > .shell-controls {
+    display: contents;
+  }
+
+  .touch-layout.controls-sides .shell-controls-group {
+    flex-direction: column;
+    justify-content: center;
+    align-self: center;
+  }
+
+  .touch-layout.controls-sides .shell-controls-start {
+    order: -1;
+  }
+
+  .touch-layout.controls-sides .shell-controls-end {
+    order: 1;
+  }
+
+  .touch-layout.controls-sides > :is(.game-shell-footer, .game-shell-error) {
+    flex: 0 0 100%;
+    order: 2;
+  }
+}
+
+/* Menu par défaut du shell (jeu sans menu propre) : petite fenêtre modale par-dessus la page. */
+.shell-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: var(--view-h, 100dvh);
-  padding: 8px;
-}
-
-.is-touch-landscape .play-column {
-  display: grid;
-  grid-template-columns: 6.5rem auto;
-  grid-template-rows: 1fr auto;
-  gap: 8px;
-}
-
-.is-touch-landscape .play-column > .stage {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-}
-
-.is-touch-landscape .play-column > .touch-bar {
-  grid-column: 1;
-  grid-row: 1;
-  flex-direction: column;
   justify-content: center;
+  padding: 16px;
+  overflow: auto;
+  background: #000b;
 }
 
-.is-touch-landscape .play-column > .touch-bar button {
-  flex: none;
+.shell-menu {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(22rem, 100%);
+  max-height: 100%;
+  padding: 14px 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
 }
 
-.is-touch-landscape .play-column > .back-link {
-  grid-column: 1;
-  grid-row: 2;
-  font-size: 0.9rem;
+.shell-menu h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--accent);
 }
 
-.game-screen.is-touch-landscape > .sidebar {
-  flex: 0 1 300px;
-  width: auto;
-  min-width: 0;
-  max-height: calc(var(--view-h, 100dvh) - 16px);
+/* Le titre et « Fermer » restent en place, la liste défile si elle dépasse. */
+.shell-menu-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 8px;
+  margin: -4px;
+  padding: 4px;
   overflow-y: auto;
+  list-style: none;
+}
+
+/* Fenêtre peu haute (téléphone en paysage) : deux colonnes et des marges serrées. */
+@media (max-height: 520px) {
+  .shell-menu-overlay {
+    padding: 8px;
+  }
+
+  .shell-menu {
+    width: min(40rem, 100%);
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  .shell-menu-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    align-content: start;
+  }
+}
+
+.shell-menu-list button {
+  width: 100%;
+  text-align: left;
+}
+
+/* Indy en tactile (`games/indy/ui/app.ts`) : l'écran carré prend le maximum de place (`--stage`, posé par la page selon le placement
+   calculé) ; le panneau d'inventaire (fond gris, sans cadre autour de l'écran : il coûterait de la taille d'écran) est une colonne à côté
+   de l'écran en paysage (liste en haut, rangée boussole / arme / santé en bas), une bande dessous en portrait (liste à gauche, rangée en
+   colonne à droite). La liste défile en interne ; les commandes passent par le bouton « Menu » de la barre de contrôles. Les objets se
+   glissent vers l'écran : en paysage le défilement ne prend que l'axe vertical ; en portrait l'écran est au-dessus, un glisser vertical
+   depuis un objet le déplace donc toujours (la liste se fait défiler par son ascenseur ou ses lignes vides). */
+@media (pointer: coarse) {
+  .game-screen.touch-layout {
+    flex-wrap: nowrap;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .game-screen.touch-layout.controls-sides {
+    flex-direction: row;
+  }
+
+  .retro-window {
+    display: contents;
+  }
+
+  .game-screen.touch-layout .play-column {
+    order: 0;
+    flex: none;
+  }
+
+  .game-screen.touch-layout .sidebar {
+    order: 1;
+    flex: none;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .game-screen.touch-layout .retro-panel {
+    width: 100%;
+    height: 100%;
+    padding: 6px;
+  }
+
+  .game-screen.touch-layout .inventory-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+  }
+
+  .game-screen.touch-layout.controls-sides {
+    --u: min(calc(var(--stage) / 288), 1.5px);
+  }
+
+  .game-screen.touch-layout.controls-sides .sidebar {
+    width: 232px;
+    height: var(--stage);
+  }
+
+  /* Attaquer / Utiliser s'empilent en colonne de côté. */
+  .game-screen.touch-layout.controls-sides .indy-pad {
+    grid-template-columns: 64px;
+  }
+
+  .game-screen.touch-layout.controls-sides .status-row {
+    flex: none;
+    height: calc(var(--u) * 56);
+    margin-top: 6px;
+  }
+
+  .game-screen.touch-layout.controls-bottom {
+    --u: 1px;
+  }
+
+  .game-screen.touch-layout.controls-bottom .sidebar {
+    width: var(--stage);
+    height: 176px;
+  }
+
+  .game-screen.touch-layout.controls-bottom .retro-panel {
+    flex-direction: row;
+    gap: 6px;
+    padding: 4px;
+  }
+
+  .game-screen.touch-layout.controls-bottom .inventory::-webkit-scrollbar {
+    width: 26px;
+  }
+
+  .game-screen.touch-layout.controls-bottom .inventory::-webkit-scrollbar-button:vertical:start:decrement,
+  .game-screen.touch-layout.controls-bottom .inventory::-webkit-scrollbar-button:vertical:end:increment {
+    width: 26px;
+    height: 26px;
+  }
+
+  .game-screen.touch-layout.controls-bottom .status-row {
+    flex: none;
+    flex-direction: column;
+    width: calc(var(--u) * 48);
+    height: 100%;
+  }
+
+  .game-screen.touch-layout.controls-bottom .play-column {
+    order: 0;
+  }
+
+  .game-screen.touch-layout .shell-controls {
+    order: 2;
+  }
 }
 
 /* ------------------------------------------------------------------ commandes tactiles d'un jeu d'action (`ui/touch-controls.ts`) */
 
-/* Couche posée dans l'écran du jeu (`stageChildren`) : cachée hors écran tactile, elle ne capte que le stick et les boutons. Le stick
-   en bas à gauche, les boutons en bas à droite, sur les bords pour laisser le centre libre. */
-.touch-controls {
-  display: none;
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  line-height: normal;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-}
-
-@media (pointer: coarse) {
-  .touch-controls {
-    display: block;
-  }
-}
-
-/* paysage tactile et plein écran pivoté, qui ne correspondent pas toujours à la requête de média */
-.game-shell.is-touch-landscape .touch-controls {
-  display: block;
-}
-
+/* Manche et boutons d'action : blocs que le jeu confie au shell (`shell.controls.addPad`), posés dans la barre de contrôles, hors de
+   l'écran, avec leur taille propre (le shell la mesure et la réserve). */
 .touch-stick,
 .touch-buttons {
-  position: absolute;
-  bottom: max(12px, var(--safe-b));
+  flex: none;
 }
 
 .touch-stick {
-  left: max(12px, var(--safe-l));
-  width: clamp(112px, 26%, 160px);
+  position: relative;
+  width: 112px;
   aspect-ratio: 1;
   box-sizing: border-box;
   border: 2px solid color-mix(in srgb, var(--text) 45%, transparent);
   border-radius: 50%;
   background: color-mix(in srgb, var(--bg) 40%, transparent);
-  pointer-events: auto;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .touch-stick__knob {
@@ -1504,27 +1655,30 @@ a.button:hover {
 }
 
 .touch-buttons {
-  right: max(12px, var(--safe-r));
-  display: flex;
-  flex-wrap: wrap-reverse;
-  justify-content: flex-end;
-  align-content: flex-end;
-  gap: 12px;
-  max-width: 50%;
+  display: grid;
+  grid-template-columns: repeat(2, 64px);
+  gap: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .touch-button {
   display: grid;
   place-items: center;
   box-sizing: border-box;
-  min-width: 72px;
-  min-height: 72px;
-  padding: 0 12px;
+  width: 64px;
+  height: 64px;
+  min-height: 0;
+  padding: 0;
   border: 2px solid color-mix(in srgb, var(--text) 45%, transparent);
   border-radius: 50%;
   background: color-mix(in srgb, var(--panel) 55%, transparent);
   color: var(--text);
+  font-size: 0.75rem;
   font-weight: 700;
+  white-space: nowrap;
+  line-height: 1;
   pointer-events: auto;
   /* ni défilement ni zoom ; le doigt reste sur le bouton même s'il glisse */
   touch-action: none;

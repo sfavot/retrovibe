@@ -2,8 +2,6 @@ import "./style.css";
 import { fitScale as sharedFitScale, leaveGame, mountGameShell } from "../../../ui/game-shell";
 import { MissingFilesError } from "../../../ui/files";
 import { localStorageStore as createLocalStorageStore } from "../../../ui/local-storage";
-import { withIcons } from "../../../ui/icons";
-import { h } from "../../../ui/dom";
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
 import { AudioDebugOverlay, readAudioDebugParams } from "../../../ui/mohawk/audio-debug";
 import { fetchGameFiles } from "../data/files";
@@ -93,6 +91,17 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   if (options.debug) (window as unknown as { __zb: unknown }).__zb = { engine, host, services };
 
   shell.start({
+    // Écran tactile : l'original n'ouvre son menu (enregistrer, charger) qu'au clavier (`/`, `1198:05b3`, hors de la carte). Le bouton
+    // « Menu » de la barre ouvre le menu du shell, dont une entrée fait le même effet que la touche (`openMenu` refuse les écrans sans menu).
+    menuEntries: () => [
+      {
+        label: copy.gameMenu,
+        onPress: () => {
+          engine.ctx.services.get(DIALOG).openMenu(engine.ctx);
+          shell.focusCanvas();
+        },
+      },
+    ],
     // Onglet masqué : le jeu s'arrête (horloge et son) et repart au même point au retour.
     onPause: (hidden) => engine.setPaused(hidden),
     sound: { prefs: new SoundPrefs(createLocalStorageStore(), host.audio, GAME_ID), storageKey: soundPrefKey(GAME_ID), unlock: () => host.audio.unlock() },
@@ -111,12 +120,4 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       shell.setLoading(engine.loading);
     },
   });
-  // Ajout du port pour le tactile (affiché seulement sur écran tactile, `style.css`) : hors de la carte, l'original n'ouvre le menu
-  // (enregistrer, charger) qu'au clavier (`/`, `1198:05b3`). Même effet que la touche : `openMenu` refuse les écrans sans menu.
-  const menuButton = h("button", { type: "button", class: "toggle zb-menu-button" }, ...withIcons(copy.menu, "menu"));
-  menuButton.addEventListener("click", () => {
-    engine.ctx.services.get(DIALOG).openMenu(engine.ctx);
-    shell.focusCanvas();
-  });
-  shell.toggles.prepend(menuButton);
 }

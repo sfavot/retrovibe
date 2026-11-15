@@ -27,14 +27,10 @@ export const copy = {
   runtimeError: "Le jeu s'est arrêté sur une erreur :",
   canvasLabel: "Écran du jeu Armaeth",
   missingFiles: "Les fichiers du jeu sont introuvables : Armaeth ne peut pas démarrer.",
-  // Barre tactile.
-  keyboard: "Clavier",
+  // Contrôles tactiles (noms accessibles des icônes de la barre).
   keyboardLabel: "Clavier : taper une commande, par exemple « regarder »",
-  confirm: "Entrée",
   confirmLabel: "Valider la commande (Entrée)",
-  cancel: "Échap",
   cancelLabel: "Annuler la commande (Échap)",
-  hold: "Tenir",
   holdLabel: "Tenir un objet : activer, puis toucher l'objet de l'inventaire (Ctrl + clic)",
   // Option du pied de page, pendant le jeu (clavier).
   holdArrows: "Flèches tenues",

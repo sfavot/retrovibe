@@ -1,6 +1,6 @@
 import { AudioPlayer } from "../audio/audio";
 import { type Palette, PaletteAnimation } from "../data/palette";
-import type { Cursor } from "../data/resources";
+import type { Cursor, Icon } from "../data/resources";
 import { type HelpDocument, parseHelp } from "../data/help";
 import type { GameData } from "../data/types";
 import { Assets, IndyIds, IndySounds } from "../engine/assets";
@@ -14,7 +14,8 @@ import { copy } from "../copy";
 import { copy as shared } from "../../../ui/copy";
 import { h } from "../../../ui/dom";
 import { createFullscreen, type Fullscreen } from "../../../ui/fullscreen";
-import { trackTouchLayout } from "../../../ui/touch-layout";
+import { createShellControls, type ShellControls, type ShellMenuEntry } from "../../../ui/shell-controls";
+import { type TouchMenu, TOUCH_LAYOUT_CLASS, createTouchMenu, isTouchDevice, layoutTouch } from "../../../ui/touch-page";
 import { titleScreen } from "../../../ui/title-screen";
 import { GameView } from "./game-view";
 import { nearestPreset, nextPreset, speedSetting } from "./game-speed";
@@ -27,6 +28,8 @@ import { saveSlot } from "./save";
 import { Sidebar } from "./sidebar";
 
 const AUTOSAVE_MS = 4000;
+/** Place du panneau (santé, arme, inventaire) en disposition tactile : colonne de cette largeur à côté de l'écran, ou bande de cette hauteur dessous. */
+const PANEL = { sideWidth: 232, bottomHeight: 176 };
 /** Case de départ : devant le bureau de Marcus, en ville. */
 const START = { zone: IndyIds.townZone, at: { x: 11, y: 5 } };
 
@@ -39,6 +42,11 @@ export class App {
   private readonly root: HTMLElement;
   private readonly gameScreen: HTMLElement;
   private readonly fullscreen: Fullscreen;
+  /** Contrôles tactiles (Attaquer / Utiliser et bouton « Menu ») et leur menu ; écran tactile seulement. */
+  private readonly controls: ShellControls;
+  private readonly menu: TouchMenu;
+  /** La partie était en pause quand le menu s'est ouvert : elle le reste à sa fermeture (sinon elle reprend). */
+  private menuWasPaused = false;
   private game: Game | null = null;
   private timer = 0;
   private autosaveTimer = 0;
@@ -64,6 +72,7 @@ export class App {
     exe: ArrayBuffer,
     private readonly loadManual: () => Promise<ArrayBuffer>,
     cursors: Map<number, Cursor> = new Map(),
+    icons: Map<number, Icon> = new Map(),
   ) {
     this.walkCursors = new WalkCursors(cursors);
     this.assets = new Assets(data);
@@ -84,21 +93,12 @@ export class App {
         });
       }
     };
-    this.sidebar = new Sidebar(basePalette, {
+    this.sidebar = new Sidebar(basePalette, icons, {
       onMap: () => void this.openMap(),
       onPause: () => this.togglePause(),
       onNewGame: () => this.showTitle(),
-      onToggleSound: () => {
-        this.audio.soundEnabled = !this.audio.soundEnabled;
-        this.sidebar.soundButton.setAttribute("aria-pressed", String(this.audio.soundEnabled));
-        indyAudioPrefs.writeSound(this.audio.soundEnabled);
-      },
-      onToggleMusic: () => {
-        this.audio.musicEnabled = !this.audio.musicEnabled;
-        if (!this.audio.musicEnabled) this.audio.stopMusic();
-        this.sidebar.musicButton.setAttribute("aria-pressed", String(this.audio.musicEnabled));
-        indyAudioPrefs.writeMusic(this.audio.musicEnabled);
-      },
+      onToggleSound: () => this.toggleSound(),
+      onToggleMusic: () => this.toggleMusic(),
       onHelp: () => void this.showHelp(),
       onCycleSpeed: () => this.setSpeed(nextPreset(this.tickMs)),
       onItemPointerDown: (tile, e) => this.startItemDrag(tile, e),
@@ -107,39 +107,119 @@ export class App {
         if (game) game.requestPlacement(tile, game.hero.x, game.hero.y);
       },
     });
-    const touchBar = h(
+    // Attaquer et Utiliser : gros boutons au pouce, posés par la barre de contrôles hors de l'écran (écran tactile seulement).
+    const bigButton = (label: string, name: string, action: () => void): HTMLButtonElement => {
+      const button = h("button", { type: "button", class: "touch-button", "aria-label": name }, label);
+      // Le toucher ne vole pas le focus au jeu.
+      button.addEventListener("mousedown", (e) => e.preventDefault());
+      button.addEventListener("click", () => {
+        this.audio.unlock();
+        action();
+      });
+      return button;
+    };
+    const pad = h(
       "div",
-      { class: "touch-bar" },
-      h("button", { type: "button", onclick: () => this.game?.requestAttack() }, copy.attack),
-      h(
-        "button",
-        {
-          type: "button",
-          onclick: () => {
-            if (this.game && this.sidebar.selected !== null) this.game.useInFront(this.sidebar.selected);
-          },
-        },
-        copy.useItem,
-      ),
+      { class: "touch-buttons indy-pad" },
+      bigButton(copy.attack, copy.attack, () => this.game?.requestAttack()),
+      bigButton(copy.use, copy.useItem, () => {
+        if (this.game && this.sidebar.selected !== null) this.game.useInFront(this.sidebar.selected);
+      }),
     );
+    this.controls = createShellControls({
+      afterPress: () => {},
+      menu: { label: shared.menu, onPress: () => this.openMenu() },
+      onChange: () => this.relayout(),
+    });
+    // Deux boutons côte à côte sous l'écran, empilés en colonne de côté (tailles déclarées : leur forme change avec le placement).
+    this.controls.addPad(pad, "start", { bottom: { width: 136, height: 64 }, sides: { width: 64, height: 136 } });
     // Retour à l'accueil comme dans les autres jeux ; la partie est sauvegardée avant que la page ne se recharge.
-    const back = h("a", { class: "back-link", href: "#/", onclick: () => this.autosave() }, shared.backToGames);
+    const back = h("a", { class: "back-link desktop-only", href: "#/", onclick: () => this.autosave() }, shared.backToGames);
     this.gameScreen = h(
       "main",
-      { class: "game-screen" },
-      h("div", { class: "play-column" }, this.view.element, touchBar, back),
-      this.sidebar.element,
+      { class: `game-screen ${TOUCH_LAYOUT_CLASS} controls-bottom` },
+      // Écran et panneau dans une même fenêtre grise sur ordinateur ; en tactile `.retro-window` s'efface (`display: contents`).
+      h("div", { class: "retro-window" }, h("div", { class: "play-column" }, this.view.element), this.sidebar.element),
+      h("div", { class: "game-footer desktop-only" }, this.sidebar.commands, back),
+      this.controls.element,
     );
-    // Disposition tactile paysage (classe `is-touch-landscape`) posée avant le premier affichage.
-    trackTouchLayout(this.gameScreen);
-    // Toute la page du jeu (écran, boutons tactiles, panneau) passe en plein écran, en paysage sur écran tactile.
-    this.fullscreen = createFullscreen(this.gameScreen, { label: shared.fullscreen, landscape: true });
+    this.menu = createTouchMenu({
+      main: this.gameScreen,
+      title: shared.menu,
+      closeLabel: shared.menuClose,
+      // Le jeu est en pause tant que le menu est ouvert, sauf s'il l'était déjà ; l'onglet masqué le garde en pause.
+      onOpen: () => {
+        this.menuWasPaused = this.paused;
+        this.togglePause(true);
+      },
+      onClose: () => {
+        if (!this.menuWasPaused && !document.hidden) this.togglePause(false);
+      },
+    });
+    // Toute la page du jeu (écran, contrôles, panneau) passe en plein écran, en paysage sur écran tactile.
+    this.fullscreen = createFullscreen(this.gameScreen, { label: shared.fullscreen, landscape: true, onChange: () => this.relayout() });
+    window.addEventListener("resize", () => this.relayout());
     this.sidebar.addCommand(this.fullscreen.button);
     this.sidebar.soundButton.setAttribute("aria-pressed", String(this.audio.soundEnabled));
     this.sidebar.musicButton.setAttribute("aria-pressed", String(this.audio.musicEnabled));
     this.root = h("div", { class: "app" });
     container.replaceChildren(this.root);
     this.bindInput();
+  }
+
+  private toggleSound(): void {
+    this.audio.soundEnabled = !this.audio.soundEnabled;
+    this.sidebar.soundButton.setAttribute("aria-pressed", String(this.audio.soundEnabled));
+    indyAudioPrefs.writeSound(this.audio.soundEnabled);
+  }
+
+  private toggleMusic(): void {
+    this.audio.musicEnabled = !this.audio.musicEnabled;
+    if (!this.audio.musicEnabled) this.audio.stopMusic();
+    this.sidebar.musicButton.setAttribute("aria-pressed", String(this.audio.musicEnabled));
+    indyAudioPrefs.writeMusic(this.audio.musicEnabled);
+  }
+
+  /**
+   * Bouton « Menu » de la barre tactile : les commandes que le panneau porte sur ordinateur, plus Plein écran et Quitter. Le jeu est en
+   * pause tant qu'il est ouvert (voir `createTouchMenu` ci-dessus) ; « Pause » y est une bascule : le jeu reste en pause à la fermeture.
+   */
+  private openMenu(): void {
+    if (!this.game || this.view.modalOpen) return;
+    const entries: ShellMenuEntry[] = [
+      { label: copy.map, onPress: () => void this.openMap() },
+      { label: copy.pause, pressed: this.paused, onPress: () => this.togglePause() },
+      { label: copy.speedButton(copy.speeds[this.tickMs] ?? String(this.tickMs)), onPress: () => this.setSpeed(nextPreset(this.tickMs)) },
+      { label: copy.help, onPress: () => void this.showHelp() },
+      { label: copy.newGame, onPress: () => this.showTitle() },
+      { label: copy.sound, pressed: this.audio.soundEnabled, onPress: () => this.toggleSound() },
+      { label: copy.music, pressed: this.audio.musicEnabled, onPress: () => this.toggleMusic() },
+      { label: shared.fullscreen, onPress: () => this.fullscreen.toggle() },
+      {
+        label: shared.quit,
+        onPress: () => {
+          this.autosave();
+          location.hash = "#/";
+        },
+      },
+    ];
+    this.menu.open(entries);
+  }
+
+  /**
+   * Écran tactile : l'écran carré prend le maximum de place (ratio 1:1), le panneau et les contrôles se placent dans le reste
+   * (`layoutTouch`) ; la taille de l'écran passe par `--stage`, que lisent le cadre, les bulles et la carte. Ordinateur : feuille de style.
+   */
+  private relayout(): void {
+    // Appelé aussi pendant la construction (ajout du bloc d'Attaquer / Utiliser), avant que la page n'existe.
+    const page = this.gameScreen as HTMLElement | undefined;
+    if (!page?.isConnected) return;
+    if (!isTouchDevice()) {
+      page.style.removeProperty("--stage");
+      return;
+    }
+    const layout = layoutTouch({ main: page, controls: this.controls, logicalWidth: 1, logicalHeight: 1, panel: PANEL });
+    page.style.setProperty("--stage", `${Math.floor(layout.scale)}px`);
   }
 
   // ---------------------------------------------------------------- écrans
@@ -278,6 +358,7 @@ export class App {
     this.palette.reset();
     this.root.replaceChildren(this.gameScreen);
     window.scrollTo(0, 0);
+    this.relayout();
     this.sidebar.setPaused(false);
     this.view.attach(game);
     this.sidebar.attach(game);
@@ -378,7 +459,7 @@ export class App {
     window.addEventListener("keydown", (e) => {
       const game = this.game;
       if (!game || this.view.modalOpen) return;
-      if (e.target instanceof HTMLInputElement) return;
+      if (e.target instanceof HTMLInputElement || this.menu.isOpen) return;
       this.audio.unlock();
       if (MoveKeys.handles(e.code)) {
         e.preventDefault();

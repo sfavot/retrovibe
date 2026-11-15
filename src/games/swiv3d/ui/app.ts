@@ -84,7 +84,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       { id: "brake", label: copy.brake },
     ],
   });
-  touch.element.style.display = "none";
+  touch.setVisible(false);
   const startButton = h("button", { type: "button", class: "primary" }, copy.startButton);
   const startOverlay = h("div", { class: "game-shell-overlay sw3-start", role: "dialog" }, h("p", {}, copy.startPrompt), startButton);
   startOverlay.style.display = "none";
@@ -96,8 +96,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     copy,
     backLabel: options.backLabel,
     classes: { root: "sw3", stage: "sw3-stage", canvas: "sw3-canvas" },
-    stageChildren: [touch.element, startOverlay],
+    stageChildren: [startOverlay],
   });
+  // Manche à gauche, boutons d'action à droite : hors de l'écran, leur place est réservée par le shell (écran tactile seulement).
+  if (touch.stick) shell.controls.addPad(touch.stick, "start");
+  shell.controls.addPad(touch.buttons, "end");
   const store = localStorageStore();
   const pilotStore = new PilotStore(prefixedStorage(store, `${GAME_ID}:`));
 
@@ -224,7 +227,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       session.events.levelComplete.push(() => flow.levelEnded("complete", session.summary()));
       session.events.gameOver.push(() => flow.levelEnded("gameOver", session.summary()));
       session.events.quit.push(() => flow.abortRequested());
-      touch.element.style.display = "";
+      touch.setVisible(true);
       shell.focusCanvas();
     } catch (error) {
       if (token !== loadToken) return;
@@ -236,7 +239,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     loadToken++;
     levelSession?.dispose();
     levelSession = null;
-    touch.element.style.display = "none";
+    touch.setVisible(false);
     touch.reset();
     controls.clear();
   };

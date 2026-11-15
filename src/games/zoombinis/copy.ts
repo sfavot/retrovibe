@@ -10,6 +10,8 @@ export const copy = {
   play: "Jouer",
   sound: "Son",
   menu: "Menu",
+  // Entrée du menu du shell (écran tactile) qui ouvre le menu du jeu : enregistrer, charger.
+  gameMenu: "Menu du jeu",
   // Manuel, sur l'écran de présentation.
   manual: "Manuel",
   manualNote: "Manuel de L'Odyssée des Zoombinis réécrit en français (page web, nouvel onglet).",

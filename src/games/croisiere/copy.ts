@@ -38,9 +38,7 @@ export const copy = {
   // Barre tactile et pied de page. Le bouton « Inventaire » de la page commune sert ici au menu du jeu (l'inventaire est à l'appui long).
   menu: "Menu",
   menuLabel: "Menu du site : sauvegarder, charger, volume, pause, aide, écran titre",
-  inventory: "Menu du jeu",
   inventoryLabel: "Menu du jeu : sauvegarder, charger, recommencer, quitter (F10)",
-  skip: "Passer",
   skipLabel: "Faire avancer l'introduction ou la scène, ou disparaître le texte affiché",
   pause: "Pause",
   pauseLabel: "Mettre le jeu en pause ou le reprendre (P)",

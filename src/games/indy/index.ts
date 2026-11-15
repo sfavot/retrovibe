@@ -1,6 +1,6 @@
 import { parseDaw } from "./data/daw";
 import { extractPalette } from "./data/palette";
-import { readCursors } from "./data/resources";
+import { readCursors, readIcons } from "./data/resources";
 import { App } from "./ui/app";
 import { copy as shared } from "../../ui/copy";
 import { h } from "../../ui/dom";
@@ -33,7 +33,7 @@ export const indy: GameDefinition = {
     container.replaceChildren(h("p", { class: "boot", role: "status" }, copy.loading));
     try {
       const [daw, exe] = await Promise.all([fetchBinary("DESKTOP.DAW"), fetchBinary("DESKADV.EXE")]);
-      const app = new App(container, parseDaw(daw), extractPalette(exe), exe, () => fetchBinary("DESKADV.HLP"), readCursors(exe));
+      const app = new App(container, parseDaw(daw), extractPalette(exe), exe, () => fetchBinary("DESKADV.HLP"), readCursors(exe), readIcons(exe));
       app.showTitle();
       // Développement : ?seed=1234 lance directement une partie avec cette graine.
       const seed = new URLSearchParams(location.search).get("seed");

@@ -19,9 +19,7 @@ export const copy = {
   help: "Aide et crédits",
 
   // Barre tactile sous l'écran (écrans tactiles seulement).
-  menu: "Menu",
   menuLabel: "Menu : afficher la barre du haut (disquette : sauver, charger, quitter)",
-  skip: "Passer",
   skipLabel: "Passer l'introduction ou la vidéo en cours (Échap)",
   keyboard: "Clavier",
   confirm: "Valider",

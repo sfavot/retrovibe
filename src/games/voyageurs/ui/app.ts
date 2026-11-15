@@ -30,6 +30,8 @@ const SAVE_WAIT_FRAMES = 60;
 const voyageurs: PointClickGame<VoyageursSave> = {
   id: "voyageurs",
   copy,
+  // Le bouton « Passer » de la page commune ouvre ici le menu système du jeu.
+  icons: { skip: "system" },
   width: SCREEN_WIDTH,
   height: SCREEN_HEIGHT,
   tickMs: STEP_MS,

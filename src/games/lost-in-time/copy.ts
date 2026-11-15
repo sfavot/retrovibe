@@ -15,11 +15,8 @@ export const copy = {
   sound: "Son",
   manual: "Manuel d'origine",
   // Barre tactile sous l'écran (écrans tactiles seulement).
-  menu: "Menu",
   menuLabel: "Menu : afficher la barre du haut (sauvegarder, charger, quitter)",
-  inventory: "Inventaire",
   inventoryLabel: "Inventaire : ouvrir, fermer ou y ranger l'objet en main (clic droit)",
-  skip: "Passer",
   skipLabel: "Passer ou annuler (Échap)",
   keyboard: "Clavier",
   confirm: "Valider",

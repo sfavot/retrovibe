@@ -124,6 +124,43 @@
   list-style: none;
 }
 
+/* Menu : le titre et « Fermer » restent en place, la liste défile si elle dépasse. Fenêtre peu haute (téléphone en paysage) : deux
+   colonnes et des marges serrées, pour que tout tienne sans défiler. */
+.pc-dialog-menu {
+  overflow: hidden;
+}
+
+.pc-dialog-menu h2 {
+  margin: 0;
+}
+
+/* Marge intérieure compensée : l'anneau de focus des boutons n'est pas rogné par le défilement. */
+.pc-dialog-menu .pc-menu-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: -4px;
+  padding: 4px;
+  overflow-y: auto;
+}
+
+@media (max-height: 520px) {
+  .pc-overlay:has(.pc-dialog-menu) {
+    padding: 8px;
+  }
+
+  .pc-dialog-menu {
+    width: min(40rem, 100%);
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  .pc-dialog-menu .pc-menu-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+  }
+}
+
 .pc-slot,
 .pc-menu-list button {
   display: flex;
@@ -261,38 +298,6 @@
   border-radius: 12px;
   background: #000d;
   color: #fff;
-}
-
-/* ------------------------------------------------------------------ barre tactile */
-
-.pc-touch-group {
-  display: contents;
-}
-
-@media (pointer: coarse) {
-  .pc-touch-bar {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    width: var(--pc-screen-width, 100%);
-  }
-
-  .pc-touch-bar button {
-    padding-inline: 0.5rem;
-  }
-
-  /* « Passer » grisé : rien n'est sautable pour l'instant (texte encore lisible, ni survol ni curseur d'attente). */
-  .pc-touch-bar button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    background: transparent;
-    border-style: dashed;
-  }
-
-  /* Le bouton « Menu » de la barre tactile remplace celui du pied de page. */
-  .pc-menu-link {
-    display: none;
-  }
 }
 
 /* ------------------------------------------------------------------ page d'aide */

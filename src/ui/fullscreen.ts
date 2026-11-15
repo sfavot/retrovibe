@@ -1,6 +1,6 @@
 import { h } from "./dom";
 import { withIcons } from "./icons";
-import { isRotated, ROTATED_CLASS, syncTouchLayout } from "./touch-layout";
+import { isRotated, ROTATED_CLASS } from "./touch-layout";
 
 export { isRotated, ROTATED_CLASS };
 
@@ -14,10 +14,16 @@ export interface FullscreenOptions {
   landscape?: boolean;
   /** Clic sur le bouton, après le changement demandé (rendre le focus au jeu…). */
   onClick?(event: MouseEvent): void;
+  /** L'état du plein écran ou la rotation a changé (le shell remesure la page). */
+  onChange?(): void;
 }
 
 export interface Fullscreen {
   readonly button: HTMLButtonElement;
+  /** Le jeu est en plein écran (vrai ou de repli). */
+  isActive(): boolean;
+  /** Entre en plein écran ou en sort : l'action du bouton, appelable sans lui (menu du shell). */
+  toggle(): void;
   /** Sort du plein écran (l'élément quitte la page : sans l'API, la page défilerait encore bloquée). */
   exit(): void;
   /** Sort du plein écran et détache l'écouteur ; sans effet la seconde fois. */
@@ -76,9 +82,9 @@ export function createFullscreen(target: HTMLElement, options: FullscreenOptions
     if (!on) lockOk = false;
     target.classList.toggle("is-fullscreen", on);
     target.classList.toggle(ROTATED_CLASS, shouldRotate({ coarse: wantsLandscape(), portrait: isPortrait(), lockOk, covering }));
-    syncTouchLayout(target);
     document.documentElement.classList.toggle("has-fullscreen", on);
     button.setAttribute("aria-pressed", String(on));
+    options.onChange?.();
   };
   const cover = (): void => {
     covering = true;
@@ -135,9 +141,13 @@ export function createFullscreen(target: HTMLElement, options: FullscreenOptions
     }
   };
 
-  button.addEventListener("click", (event) => {
+  const toggle = (): void => {
     if (active()) exit();
     else void enter();
+  };
+
+  button.addEventListener("click", (event) => {
+    toggle();
     options.onClick?.(event);
   });
   document.addEventListener("fullscreenchange", sync);
@@ -148,6 +158,8 @@ export function createFullscreen(target: HTMLElement, options: FullscreenOptions
   let disposed = false;
   return {
     button,
+    isActive: active,
+    toggle,
     exit,
     dispose() {
       if (disposed) return;
@@ -159,8 +171,7 @@ export function createFullscreen(target: HTMLElement, options: FullscreenOptions
       exit();
       covering = false;
       target.classList.remove("is-fullscreen", ROTATED_CLASS);
-      syncTouchLayout(target);
-      document.documentElement.classList.remove("has-fullscreen");
+        document.documentElement.classList.remove("has-fullscreen");
     },
   };
 }

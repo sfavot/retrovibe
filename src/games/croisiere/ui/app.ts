@@ -54,6 +54,8 @@ function restoredEngine(files: GameFiles, host: CroisiereHost, frames: FrameQueu
 const croisiere: PointClickGame<SlotData> = {
   id: "croisiere",
   copy,
+  // Le bouton « Inventaire » de la page commune ouvre ici le menu du jeu (l'inventaire est à l'appui long).
+  icons: { inventory: "system" },
   width: SCREEN_WIDTH,
   height: SCREEN_HEIGHT,
   tickMs: STEP_MS,

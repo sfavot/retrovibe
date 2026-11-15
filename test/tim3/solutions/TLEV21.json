@@ -1,0 +1,10 @@
+{
+  "level": "TLEV21",
+  "goalStep": 112,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":2,"type":97,"x":168,"y":323,"width":48,"height":38},
+    {"part":3,"type":88,"x":120,"y":323,"appearance":5},
+    {"part":7,"type":57,"x":56,"y":291,"appearance":3}
+  ]
+}

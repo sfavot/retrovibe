@@ -1,0 +1,16 @@
+{
+  "level": "ELEV22",
+  "goalStep": 253,
+  "note": "Pièces du concepteur (bac sans le bit 0x100), sauf les explosifs (55) remontés de 4 px : à leur place d’origine ils chevauchent le mur 0 selon 437208 (vérifié en appelant 437208 au banc), l’éditeur refuserait la pose.",
+  "parts": [
+    {"part":2,"type":55,"x":103,"y":312,"pair":10},
+    {"part":8,"type":57,"x":264,"y":275,"appearance":3},
+    {"part":10,"type":22,"x":231,"y":259},
+    {"part":12,"type":88,"x":520,"y":227,"flip":"y"},
+    {"part":17,"type":57,"x":328,"y":147,"appearance":2},
+    {"part":18,"type":57,"x":392,"y":67,"appearance":2},
+    {"part":23,"type":57,"x":56,"y":3,"appearance":1},
+    {"part":26,"type":52,"x":328,"y":262},
+    {"part":27,"type":52,"x":202,"y":197}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "level": "TLEV32",
+  "goalStep": 214,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":18,"type":108,"x":500,"y":57,"appearance":18},
+    {"part":3,"type":10,"rope":[{"part":18,"slot":0},{"part":15,"slot":0}],"via":[1,2],"ropeLength":35}
+  ]
+}

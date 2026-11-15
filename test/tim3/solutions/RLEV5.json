@@ -1,0 +1,15 @@
+{
+  "level": "RLEV5",
+  "goalStep": 224,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":8,"type":37,"x":311,"y":318},
+    {"part":20,"type":48,"x":88,"y":136,"width":32,"height":16},
+    {"part":25,"type":89,"x":53,"y":167},
+    {"part":30,"type":25,"x":209,"y":195},
+    {"part":32,"type":50,"x":326,"y":162,"plug":{"part":31}},
+    {"part":26,"type":10,"rope":[{"part":33,"slot":0},{"part":25,"slot":0}],"via":[7],"ropeLength":111},
+    {"part":34,"type":8,"belt":[33,32]},
+    {"part":35,"type":8,"belt":[25,27]}
+  ]
+}

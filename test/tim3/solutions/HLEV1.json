@@ -1,0 +1,13 @@
+{
+  "level": "HLEV1",
+  "goalStep": 337,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":2,"type":7,"x":273,"y":223},
+    {"part":8,"type":25,"x":92,"y":197,"flip":"x"},
+    {"part":9,"type":30,"x":70,"y":194,"flip":"x"},
+    {"part":48,"type":36,"x":139,"y":153},
+    {"part":49,"type":70,"x":392,"y":76},
+    {"part":20,"type":10,"rope":[{"part":10,"slot":0},{"part":14,"slot":0}],"via":[2],"ropeLength":31}
+  ]
+}

@@ -15,26 +15,19 @@
  *   WebKit garde en attente un `resume()` fait pendant une interruption, et une file de transitions resterait bloquée derrière lui. Une voix
  *   d'un contexte qui ne repart pas est abandonnée (`isWavePlaying` faux) au lieu de rester « en cours » sans fin.
  * - `close()` libère tout (voix, synthétiseur, contexte) quand la page est quittée.
- * - Les messages MIDI datés partent vers le worklet au plus `FLUSH_WINDOW_MS` avant leur heure : le worklet ne sait pas
- *   annuler un message planifié, alors que `reset()` doit pouvoir couper net ce que le séquenceur a planifié d'avance. Les note-on
- *   déjà partis mais pas encore joués reçoivent de `reset()` un note-off à la même heure : sinon la note démarre après la coupure et
- *   reste tenue sans fin.
+ * - Le synthétiseur General MIDI (envoi daté par fenêtre de `FLUSH_WINDOW_MS`, `reset()` qui coupe net) est `audio/web-gm-synth.ts`, commun à d'autres
+ *   jeux ; ce fichier lui donne son contexte, son gain maître et l'URL de la soundfont, et garde la reprise des contextes.
  * - Muet = gain maître à 0 (WAVE et MIDI) ; la lecture continue, comme le moteur l'attend.
  * - Diagnostic (`audio-debug.ts`) : `setExperiment` change la façon de créer la sortie (un seul contexte, pas de synthétiseur, `latencyHint`,
  *   fréquence) pour comparer sur l'appareil, et `setProbe` signale chaque contexte créé et chaque WAVE lancé, sans rien changer à la lecture.
  */
-import { WorkletSynthesizer } from "spessasynth_lib";
-// Le processeur du worklet est un fichier à part : `?url` le fait copier par Vite dans les assets (chemin relatif à `base`).
-import processorUrl from "spessasynth_lib/dist/spessasynth_processor.min.js?url";
 import { createMonoBuffer } from "../../audio/pcm";
+import { WebGmSynth } from "../../audio/web-gm-synth";
 import type { AudioSink, MidiSink, PcmSound, WaveHandle } from "../../engine/mohawk/audio/sink";
 
 /** Soundfont réduite, servie par `publicDir` (`original/mathemagique/`). */
 export const SOUNDFONT_URL = `${import.meta.env.BASE_URL}mathemagique/mathemagique-gm.sf2`;
 
-/** Au plus cette avance (ms) entre l'envoi au worklet et l'heure d'un message. */
-const FLUSH_WINDOW_MS = 30;
-const FLUSH_INTERVAL_MS = 8;
 /** Délai (ms) pendant lequel un contexte dont l'hôte vient de demander la reprise compte encore comme actif (voix gardées). */
 const RESUME_GRACE_MS = 1000;
 
@@ -87,11 +80,6 @@ export interface WebAudioSinkOptions {
   experiment?: AudioExperiment;
 }
 
-interface QueuedMessage {
-  at: number;
-  message: Uint8Array;
-}
-
 export class WebAudioSink implements AudioSink {
   /** Contexte des WAVE (sans worklet : sortie directe). */
   private ctx: AudioContext | null = null;
@@ -109,16 +97,12 @@ export class WebAudioSink implements AudioSink {
   private readonly voices = new Map<WaveHandle, AudioBufferSourceNode>();
   private readonly buffers = new WeakMap<PcmSound, AudioBuffer>();
 
-  private synth: WorkletSynthesizer | null = null;
-  private midiReady = false;
+  /** Synthétiseur General MIDI (`audio/web-gm-synth.ts`), créé au premier chargement demandé. */
+  private gm: WebGmSynth | null = null;
   private midiStarted = false;
   private midiWanted = false;
   private closed = false;
   private readonly readyListeners = new Set<() => void>();
-  private queue: QueuedMessage[] = [];
-  /** Note-on confiés au worklet avec une heure encore à venir (le worklet les jouera même après `reset()`). */
-  private posted: QueuedMessage[] = [];
-  private flushTimer: ReturnType<typeof setInterval> | undefined;
   private experiment: AudioExperiment;
   private probe: AudioProbe | null = null;
 
@@ -143,7 +127,7 @@ export class WebAudioSink implements AudioSink {
 
   /** Contextes et état du synthétiseur, pour le diagnostic (lecture seule). */
   get diagnostics(): { wave: AudioContext | null; midi: AudioContext | null; synth: "off" | "waiting" | "loading" | "ready" } {
-    const synth = this.experiment.noMidi ? "off" : this.midiReady ? "ready" : this.midiStarted ? "loading" : "waiting";
+    const synth = this.experiment.noMidi ? "off" : this.ready ? "ready" : this.midiStarted ? "loading" : "waiting";
     return { wave: this.ctx, midi: this.midiCtx, synth };
   }
 
@@ -169,7 +153,7 @@ export class WebAudioSink implements AudioSink {
 
   /** Le synthétiseur est chargé : les messages MIDI sont joués. */
   get ready(): boolean {
-    return this.midiReady;
+    return this.gm?.ready ?? false;
   }
 
   /**
@@ -177,7 +161,7 @@ export class WebAudioSink implements AudioSink {
    * du chargement. Renvoie la fonction qui retire l'écouteur.
    */
   onReady(listener: () => void): () => void {
-    if (this.midiReady) {
+    if (this.ready) {
       listener();
       return () => {};
     }
@@ -206,7 +190,17 @@ export class WebAudioSink implements AudioSink {
   private tryStartMidi(): void {
     if (this.closed || this.experiment.noMidi || !this.midiWanted || this.midiStarted || !this.midiCtx || !this.midiMaster) return;
     this.midiStarted = true;
-    void this.startMidi(this.midiCtx, this.midiMaster);
+    const gm = new WebGmSynth(this.midiCtx, this.midiMaster, {
+      soundfontUrl: this.options.soundfontUrl ?? SOUNDFONT_URL,
+      onReady: () => {
+        const listeners = [...this.readyListeners];
+        this.readyListeners.clear();
+        for (const listener of listeners) listener();
+      },
+      onError: (error) => console.warn("Mathémagique : synthétiseur MIDI indisponible", error),
+    });
+    this.gm = gm;
+    void gm.load();
   }
 
   /** Horloge du contexte MIDI (celle des messages datés). */
@@ -295,86 +289,12 @@ export class WebAudioSink implements AudioSink {
 
   // --- MIDI ---------------------------------------------------------------------------------------------------
 
-  private async startMidi(ctx: AudioContext, output: AudioNode): Promise<void> {
-    try {
-      await ctx.audioWorklet.addModule(processorUrl);
-      if (this.closed) return;
-      const synth = new WorkletSynthesizer(ctx);
-      try {
-        synth.connect(output);
-        const response = await fetch(this.options.soundfontUrl ?? SOUNDFONT_URL);
-        if (!response.ok) throw new Error(`soundfont : HTTP ${response.status}`);
-        const bank = await response.arrayBuffer();
-        if (this.closed) throw new Error("fermé");
-        await synth.soundBankManager.addSoundBank(bank, "main");
-        await synth.isReady;
-        if (this.closed) throw new Error("fermé");
-      } catch (error) {
-        synth.destroy();
-        throw error;
-      }
-      this.synth = synth;
-      this.midiReady = true;
-      const listeners = [...this.readyListeners];
-      this.readyListeners.clear();
-      for (const listener of listeners) listener();
-    } catch (error) {
-      // Le jeu reste jouable sans musique MIDI (et rien à signaler si la page a été quittée pendant le chargement).
-      if (!this.closed) console.warn("Mathémagique : synthétiseur MIDI indisponible", error);
-    }
-  }
-
   private sendMidi(message: Uint8Array, atMs?: number): void {
-    if (!this.midiReady || !this.synth) return;
-    if (atMs === undefined || atMs - this.now() <= FLUSH_WINDOW_MS) {
-      this.post(message, atMs);
-      return;
-    }
-    this.queue.push({ at: atMs, message });
-    this.queue.sort((a, b) => a.at - b.at);
-    this.flushTimer ??= setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
-  }
-
-  private post(message: Uint8Array, atMs?: number): void {
-    this.synth?.sendMessage(message, 0, atMs === undefined ? undefined : { time: atMs / 1000 });
-    if (atMs === undefined || (message[0] & 0xf0) !== 0x90 || message[2] === 0) return;
-    const now = this.now();
-    this.posted = this.posted.filter((m) => m.at > now);
-    if (atMs > now) this.posted.push({ at: atMs, message });
-  }
-
-  private flush(): void {
-    const limit = this.now() + FLUSH_WINDOW_MS;
-    while (this.queue.length > 0 && this.queue[0].at <= limit) {
-      const { at, message } = this.queue.shift()!;
-      this.post(message, at);
-    }
-    if (this.queue.length === 0 && this.flushTimer !== undefined) {
-      clearInterval(this.flushTimer);
-      this.flushTimer = undefined;
-    }
+    this.gm?.send(message, atMs);
   }
 
   private resetMidi(): void {
-    this.queue = [];
-    if (this.flushTimer !== undefined) {
-      clearInterval(this.flushTimer);
-      this.flushTimer = undefined;
-    }
-    const synth = this.synth;
-    const posted = this.posted;
-    this.posted = [];
-    if (!this.midiReady || !synth) return;
-    synth.stopAll(true);
-    // Le worklet garde ses messages datés : chaque note-on encore à venir reçoit son note-off à la même heure (traité juste après lui).
-    const now = this.now();
-    for (const { at, message } of posted) {
-      if (at > now) this.post(Uint8Array.of(0x80 | (message[0] & 0x0f), message[1], 0), at);
-    }
-    for (let channel = 0; channel < 16; channel++) {
-      this.post(Uint8Array.of(0xb0 | channel, 123, 0)); // toutes les notes coupées
-      this.post(Uint8Array.of(0xb0 | channel, 121, 0)); // contrôleurs remis à zéro
-    }
+    this.gm?.reset();
   }
 
   // --- Préférence « Son » et cycle de vie ------------------------------------------------------------------------
@@ -400,23 +320,15 @@ export class WebAudioSink implements AudioSink {
    */
   close(): void {
     if (this.closed) return;
-    this.resetMidi();
+    this.gm?.close();
     this.closed = true;
     this.readyListeners.clear();
     for (const handle of [...this.voices.keys()]) this.stopWave(handle);
-    const { synth } = this;
     const contexts = this.contexts;
-    this.synth = null;
-    this.midiReady = false;
     this.master = null;
     this.ctx = null;
     this.midiMaster = null;
     this.midiCtx = null;
-    try {
-      synth?.destroy();
-    } catch {
-      // déjà libéré
-    }
     for (const ctx of contexts) {
       ctx.onstatechange = null;
       if (ctx.state !== "closed") settle(ctx.close());

@@ -1,0 +1,10 @@
+{
+  "level": "ELEV18",
+  "goalStep": 486,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":6,"type":3,"x":136,"y":328,"appearance":2},
+    {"part":8,"type":88,"x":8,"y":323,"flip":"y"},
+    {"part":2,"type":10,"rope":[{"part":6,"slot":0},{"part":14,"slot":0}],"ropeLength":54}
+  ]
+}

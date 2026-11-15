@@ -1,0 +1,8 @@
+{
+  "level": "TLEV1",
+  "goalStep": 61,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":7,"type":59,"x":445,"y":173}
+  ]
+}

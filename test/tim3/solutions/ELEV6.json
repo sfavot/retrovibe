@@ -1,0 +1,15 @@
+{
+  "level": "ELEV6",
+  "goalStep": 161,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":5,"type":69,"x":8,"y":360},
+    {"part":29,"type":101,"x":8,"y":136,"flip":"x","width":16,"height":32},
+    {"part":30,"type":57,"x":472,"y":131,"appearance":2},
+    {"part":31,"type":101,"x":24,"y":120,"flip":"x","width":32,"height":32,"appearance":1},
+    {"part":33,"type":101,"x":56,"y":104,"flip":"x","width":48,"height":32,"appearance":2},
+    {"part":35,"type":35,"x":195,"y":73},
+    {"part":39,"type":57,"x":472,"y":19},
+    {"part":42,"type":8,"belt":[10,13]}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "level": "TLEV2",
+  "goalStep": 78,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":32,"type":126,"x":360,"y":136,"flip":"x","width":16,"height":32},
+    {"part":34,"type":126,"x":376,"y":120,"flip":"x","width":16,"height":32},
+    {"part":36,"type":126,"x":392,"y":104,"flip":"x","width":16,"height":32},
+    {"part":41,"type":126,"x":408,"y":88,"flip":"x","width":16,"height":32},
+    {"part":44,"type":125,"x":472,"y":72,"width":48,"height":16}
+  ]
+}

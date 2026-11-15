@@ -1,0 +1,9 @@
+{
+  "level": "HLEV30",
+  "goalStep": 442,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":3,"type":39,"x":150,"y":348},
+    {"part":9,"type":24,"x":125,"y":320,"flip":"x","plug":{"part":8}}
+  ]
+}

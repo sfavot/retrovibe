@@ -1,0 +1,30 @@
+@import "../../../ui/asset-viewer/shell.css";
+
+/* Règles propres à la visionneuse de TIM3 : onglets, liste de ressources, rendus. */
+body { height: 100vh; }
+.tim3-viewer { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.tim3-viewer > header { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #2a2c33; }
+.tim3-viewer > header h1 { margin: 0 8px 0 0; font-size: 14px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; }
+.tabs button[aria-selected="true"] { background: #2d4a7a; border-color: #6aa2ff; }
+.pal-pick { margin-left: auto; }
+.tim3-body { display: grid; grid-template-columns: 260px 1fr; min-height: 0; }
+.tim3-body > aside { overflow: auto; border-right: 1px solid #2a2c33; padding: 8px; }
+.tim3-body > main { overflow: auto; padding: 16px; min-width: 0; }
+.tim3-body.wide { grid-template-columns: 1fr; }
+table { border-collapse: collapse; margin: 4px 0 12px; }
+th, td { text-align: left; padding: 1px 10px 1px 0; vertical-align: top; }
+th { color: #7f8696; font-weight: normal; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.text { white-space: pre-wrap; word-break: break-word; max-width: 70ch; }
+.checker { background: repeating-conic-gradient(#2b2d34 0 25%, #1f2026 0 50%) 0 0 / 12px 12px; }
+.stage { display: inline-block; max-width: 100%; overflow: auto; border: 1px solid #2a2c33; }
+.stage canvas { display: block; }
+.cols { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.sw { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border: 1px solid #555; vertical-align: -1px; }
+.hint-fr { color: #9fd49f; }
+.hint-en { color: #7f8696; }
+label { white-space: nowrap; }
+input[type="range"] { padding: 0; vertical-align: middle; }
+.tim3-body > aside .file small { color: #7f8696; margin-left: 6px; }
+@media (max-width: 800px) { .tim3-body { grid-template-columns: 1fr; grid-template-rows: 30vh 1fr; } }

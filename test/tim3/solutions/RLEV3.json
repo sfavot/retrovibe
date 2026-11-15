@@ -1,0 +1,20 @@
+{
+  "level": "RLEV3",
+  "goalStep": 221,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":18,"type":89,"x":24,"y":255},
+    {"part":25,"type":91,"x":29,"y":69,"appearance":3,"plug":{"part":23}},
+    {"part":26,"type":93,"x":9,"y":69,"appearance":3,"plug":{"part":23,"outlet":1}},
+    {"part":35,"type":97,"x":344,"y":291,"width":48,"height":38},
+    {"part":36,"type":57,"x":392,"y":259,"appearance":2},
+    {"part":37,"type":57,"x":280,"y":259,"appearance":3},
+    {"part":38,"type":97,"x":424,"y":211,"width":38,"height":48},
+    {"part":39,"type":57,"x":248,"y":195},
+    {"part":40,"type":69,"x":280,"y":168},
+    {"part":43,"type":50,"x":102,"y":140,"flip":"x","plug":{"part":24}},
+    {"part":32,"type":10,"rope":[{"part":20,"slot":1},{"part":18,"slot":0}],"ropeLength":41},
+    {"part":49,"type":8,"belt":[21,43]},
+    {"part":50,"type":8,"belt":[17,18]}
+  ]
+}

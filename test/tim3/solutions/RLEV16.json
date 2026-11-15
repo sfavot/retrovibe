@@ -1,0 +1,32 @@
+{
+  "level": "RLEV16",
+  "goalStep": 282,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":0,"type":78,"x":448,"y":333},
+    {"part":6,"type":14,"x":440,"y":248},
+    {"part":7,"type":14,"x":408,"y":248},
+    {"part":8,"type":14,"x":376,"y":248},
+    {"part":10,"type":139,"x":-8,"y":128,"appearance":2},
+    {"part":11,"type":57,"x":472,"y":99},
+    {"part":12,"type":25,"x":256,"y":24},
+    {"part":13,"type":5,"x":216,"y":24,"width":32,"height":16},
+    {"part":22,"type":89,"x":90,"y":166,"flip":"x"},
+    {"part":25,"type":16,"x":195,"y":116},
+    {"part":26,"type":40,"x":254,"y":114},
+    {"part":32,"type":5,"x":120,"y":264,"width":64,"height":16,"appearance":10},
+    {"part":39,"type":88,"x":424,"y":99,"appearance":5},
+    {"part":40,"type":24,"x":355,"y":88,"flip":"x","plug":{"part":37}},
+    {"part":47,"type":91,"x":353,"y":21,"plug":{"part":46,"outlet":1}},
+    {"part":50,"type":95,"x":414,"y":16},
+    {"part":51,"type":92,"x":354,"y":2,"plug":{"part":46}},
+    {"part":15,"type":10,"rope":[{"part":21,"slot":0},{"part":20,"slot":1}],"ropeLength":205},
+    {"part":28,"type":10,"rope":[{"part":22,"slot":0},{"part":10,"slot":1}],"ropeLength":31},
+    {"part":52,"type":10,"rope":[{"part":35,"slot":0},{"part":9,"slot":0}],"via":[4],"ropeLength":100},
+    {"part":53,"type":8,"belt":[35,8]},
+    {"part":54,"type":8,"belt":[6,5]},
+    {"part":55,"type":8,"belt":[22,32]},
+    {"part":56,"type":8,"belt":[21,26]},
+    {"part":57,"type":8,"belt":[14,13]}
+  ]
+}

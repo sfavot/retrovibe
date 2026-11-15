@@ -1,0 +1,16 @@
+{
+  "level": "HLEV2",
+  "goalStep": 432,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":14,"type":39,"x":232,"y":292},
+    {"part":16,"type":126,"x":408,"y":264,"width":16,"height":32},
+    {"part":17,"type":126,"x":392,"y":248,"width":16,"height":32},
+    {"part":19,"type":126,"x":232,"y":232,"flip":"x","width":16,"height":32},
+    {"part":20,"type":126,"x":248,"y":216,"flip":"x","width":32,"height":32,"appearance":1},
+    {"part":23,"type":25,"x":60,"y":50},
+    {"part":24,"type":30,"x":110,"y":42},
+    {"part":27,"type":138,"x":126,"y":55},
+    {"part":29,"type":109,"x":196,"y":29}
+  ]
+}

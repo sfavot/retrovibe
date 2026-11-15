@@ -1,0 +1,25 @@
+{
+  "level": "RLEV12",
+  "goalStep": 456,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":0,"type":53,"x":260,"y":340,"appearance":4},
+    {"part":1,"type":53,"x":275,"y":338,"appearance":4},
+    {"part":5,"type":23,"x":387,"y":216,"flip":"y"},
+    {"part":6,"type":23,"x":353,"y":216,"flip":"y"},
+    {"part":7,"type":23,"x":319,"y":216,"flip":"y"},
+    {"part":8,"type":23,"x":285,"y":216,"flip":"y"},
+    {"part":12,"type":139,"x":296,"y":304},
+    {"part":21,"type":139,"x":376,"y":264},
+    {"part":69,"type":4,"x":385,"y":111},
+    {"part":70,"type":4,"x":351,"y":111},
+    {"part":71,"type":4,"x":317,"y":110},
+    {"part":72,"type":4,"x":283,"y":108},
+    {"part":76,"type":79,"x":249,"y":104},
+    {"part":77,"type":109,"x":44,"y":88,"flip":"x"},
+    {"part":11,"type":10,"rope":[{"part":71,"slot":0},{"part":7,"slot":0}],"ropeLength":69},
+    {"part":14,"type":10,"rope":[{"part":5,"slot":0},{"part":69,"slot":0}],"ropeLength":68},
+    {"part":15,"type":10,"rope":[{"part":6,"slot":0},{"part":70,"slot":0}],"ropeLength":68},
+    {"part":16,"type":10,"rope":[{"part":72,"slot":0},{"part":8,"slot":0}],"ropeLength":71}
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "level": "ELEV11",
+  "goalStep": 281,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":0,"type":78,"x":456,"y":287},
+    {"part":17,"type":2,"x":200,"y":312,"flip":"x","width":16,"height":32},
+    {"part":19,"type":120,"x":72,"y":256,"appearance":1},
+    {"part":21,"type":93,"x":92,"y":241,"plug":{"part":19}}
+  ]
+}

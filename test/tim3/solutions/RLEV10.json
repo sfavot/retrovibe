@@ -1,0 +1,12 @@
+{
+  "level": "RLEV10",
+  "goalStep": 366,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":0,"type":137,"x":182,"y":127,"flip":"x","appearance":9},
+    {"part":1,"type":69,"x":376,"y":360},
+    {"part":15,"type":30,"x":98,"y":246},
+    {"part":16,"type":25,"x":50,"y":245},
+    {"part":24,"type":117,"x":292,"y":184}
+  ]
+}

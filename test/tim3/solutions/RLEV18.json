@@ -1,0 +1,24 @@
+{
+  "level": "RLEV18",
+  "goalStep": 414,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":0,"type":137,"x":195,"y":30,"appearance":12},
+    {"part":10,"type":3,"x":8,"y":56},
+    {"part":14,"type":14,"x":232,"y":272},
+    {"part":15,"type":14,"x":232,"y":240},
+    {"part":17,"type":67,"x":122,"y":172,"plug":{"part":18}},
+    {"part":19,"type":14,"x":232,"y":136},
+    {"part":21,"type":14,"x":232,"y":104},
+    {"part":23,"type":14,"x":136,"y":88},
+    {"part":26,"type":14,"x":136,"y":56},
+    {"part":34,"type":88,"x":8,"y":307,"flip":"y"},
+    {"part":35,"type":37,"x":71,"y":77},
+    {"part":75,"type":108,"x":286,"y":166,"appearance":1},
+    {"part":33,"type":10,"rope":[{"part":75,"slot":0},{"part":74,"slot":0}],"via":[9,8],"ropeLength":151},
+    {"part":51,"type":8,"belt":[14,46]},
+    {"part":52,"type":8,"belt":[15,19]},
+    {"part":53,"type":8,"belt":[40,26]},
+    {"part":54,"type":8,"belt":[21,23]}
+  ]
+}

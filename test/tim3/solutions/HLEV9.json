@@ -1,0 +1,15 @@
+{
+  "level": "HLEV9",
+  "goalStep": 346,
+  "note": "Pièces du concepteur (bac sans le bit 0x100), sauf les explosifs (55) décalés de 7 px à gauche : à leur place d’origine ils chevauchent le mur 28 selon 437208 (vérifié en appelant 437208 au banc), l’éditeur refuserait la pose.",
+  "parts": [
+    {"part":5,"type":94,"x":364,"y":241,"appearance":3},
+    {"part":6,"type":94,"x":177,"y":241},
+    {"part":7,"type":22,"x":464,"y":227,"pair":26},
+    {"part":8,"type":96,"x":180,"y":188,"appearance":8},
+    {"part":11,"type":50,"x":197,"y":128,"flip":"x","plug":{"part":8}},
+    {"part":26,"type":55,"x":76,"y":105},
+    {"part":74,"type":52,"x":522,"y":6},
+    {"part":34,"type":8,"belt":[29,11]}
+  ]
+}

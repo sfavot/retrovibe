@@ -1,0 +1,11 @@
+{
+  "level": "TLEV3",
+  "goalStep": 130,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":10,"type":14,"x":496,"y":128},
+    {"part":11,"type":14,"x":464,"y":128},
+    {"part":17,"type":5,"x":424,"y":72,"width":96,"height":16,"appearance":20},
+    {"part":23,"type":8,"belt":[11,17]}
+  ]
+}

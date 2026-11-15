@@ -1,0 +1,28 @@
+{
+  "level": "HLEV23",
+  "goalStep": 200,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":3,"type":86,"x":432,"y":336},
+    {"part":5,"type":14,"x":160,"y":328},
+    {"part":6,"type":14,"x":128,"y":328},
+    {"part":7,"type":86,"x":80,"y":328},
+    {"part":9,"type":14,"x":384,"y":320},
+    {"part":10,"type":14,"x":352,"y":320},
+    {"part":11,"type":86,"x":416,"y":312},
+    {"part":14,"type":14,"x":72,"y":296},
+    {"part":23,"type":5,"x":184,"y":216,"width":64,"height":16,"appearance":10},
+    {"part":27,"type":30,"x":300,"y":186},
+    {"part":28,"type":25,"x":323,"y":184},
+    {"part":31,"type":94,"x":201,"y":145,"appearance":3},
+    {"part":33,"type":16,"x":441,"y":115,"flip":"x"},
+    {"part":37,"type":94,"x":119,"y":84},
+    {"part":38,"type":93,"x":184,"y":76,"appearance":1,"plug":{"part":43,"outlet":1}},
+    {"part":39,"type":93,"x":151,"y":70,"appearance":2,"plug":{"part":43}},
+    {"part":41,"type":94,"x":122,"y":52,"appearance":1},
+    {"part":43,"type":96,"x":188,"y":47,"appearance":24},
+    {"part":52,"type":8,"belt":[7,6]},
+    {"part":53,"type":8,"belt":[2,5]},
+    {"part":54,"type":8,"belt":[14,8]}
+  ]
+}

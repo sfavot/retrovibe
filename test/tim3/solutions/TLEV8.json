@@ -1,0 +1,11 @@
+{
+  "level": "TLEV8",
+  "goalStep": 26,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":8,"type":25,"x":392,"y":153},
+    {"part":10,"type":30,"x":423,"y":62,"flip":"x"},
+    {"part":24,"type":68,"x":426,"y":221},
+    {"part":25,"type":138,"x":381,"y":71}
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "level": "RLEV15",
+  "goalStep": 359,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":34,"type":57,"x":8,"y":227,"appearance":1},
+    {"part":38,"type":6,"x":472,"y":344,"flip":"x"},
+    {"part":39,"type":88,"x":72,"y":323,"flip":"x","appearance":5},
+    {"part":40,"type":5,"x":504,"y":296,"width":48,"height":16,"appearance":5},
+    {"part":41,"type":57,"x":8,"y":291,"appearance":3},
+    {"part":44,"type":24,"x":157,"y":334,"plug":{"part":45}},
+    {"part":46,"type":25,"x":457,"y":297,"flip":"x"},
+    {"part":47,"type":30,"x":434,"y":296,"flip":"x"},
+    {"part":49,"type":50,"x":378,"y":210,"plug":{"part":35}},
+    {"part":50,"type":30,"x":159,"y":168,"flip":"x"},
+    {"part":52,"type":18,"x":66,"y":137,"appearance":149},
+    {"part":17,"type":10,"rope":[{"part":12,"slot":0},{"part":30,"slot":0}],"ropeLength":33},
+    {"part":43,"type":10,"rope":[{"part":36,"slot":0},{"part":51,"slot":0}],"via":[16],"ropeLength":201},
+    {"part":53,"type":8,"belt":[49,33]},
+    {"part":54,"type":8,"belt":[40,38]}
+  ]
+}

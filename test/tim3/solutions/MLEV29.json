@@ -1,0 +1,26 @@
+{
+  "level": "MLEV29",
+  "goalStep": 302,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":0,"type":137,"x":500,"y":10},
+    {"part":19,"type":57,"x":456,"y":275,"appearance":2},
+    {"part":20,"type":57,"x":392,"y":275,"appearance":3},
+    {"part":21,"type":57,"x":248,"y":275,"appearance":2},
+    {"part":22,"type":57,"x":184,"y":275,"appearance":3},
+    {"part":23,"type":57,"x":72,"y":275,"appearance":2},
+    {"part":24,"type":57,"x":8,"y":275,"appearance":3},
+    {"part":25,"type":88,"x":488,"y":227,"flip":"y"},
+    {"part":26,"type":88,"x":280,"y":227,"flip":"y"},
+    {"part":27,"type":88,"x":104,"y":227,"flip":"y"},
+    {"part":28,"type":57,"x":456,"y":147},
+    {"part":30,"type":39,"x":502,"y":89},
+    {"part":32,"type":39,"x":42,"y":76},
+    {"part":33,"type":116,"x":459,"y":66},
+    {"part":34,"type":57,"x":344,"y":19},
+    {"part":35,"type":57,"x":280,"y":19,"appearance":1},
+    {"part":36,"type":57,"x":168,"y":19},
+    {"part":37,"type":57,"x":104,"y":19,"appearance":1},
+    {"part":38,"type":39,"x":445,"y":12}
+  ]
+}

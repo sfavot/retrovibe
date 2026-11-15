@@ -10,9 +10,13 @@ dist/
 !original/indy/DESKADV.EXE
 !original/teleportaschtroumpf/SMURF.EXE
 !original/armaeth/AM1.EXE
+!original/tim3/TIMWIN.EXE
 
 # Configuration locale de Claude Code
 .claude/
 
 # Archives et installeurs des jeux (lourds, hors du site)
 archives/
+
+# Traces de référence de TIM3 produites par le banc Unicorn (hors dépôt, D2) : locales, non versionnées.
+test/tim3/traces/

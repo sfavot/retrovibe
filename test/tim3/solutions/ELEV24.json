@@ -1,0 +1,18 @@
+{
+  "level": "ELEV24",
+  "goalStep": 142,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":7,"type":102,"x":344,"y":280,"width":64,"height":32,"appearance":3},
+    {"part":12,"type":14,"x":408,"y":320},
+    {"part":13,"type":14,"x":376,"y":320},
+    {"part":14,"type":102,"x":408,"y":296,"width":64,"height":32,"appearance":3},
+    {"part":19,"type":14,"x":472,"y":216},
+    {"part":20,"type":14,"x":472,"y":184},
+    {"part":21,"type":6,"x":424,"y":168},
+    {"part":11,"type":10,"rope":[{"part":1,"slot":0},{"part":18,"slot":0}],"via":[3],"ropeLength":16},
+    {"part":25,"type":8,"belt":[13,18]},
+    {"part":26,"type":8,"belt":[20,21]},
+    {"part":27,"type":8,"belt":[12,19]}
+  ]
+}

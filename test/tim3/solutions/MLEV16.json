@@ -1,0 +1,17 @@
+{
+  "level": "MLEV16",
+  "goalStep": 103,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":15,"type":69,"x":472,"y":264},
+    {"part":16,"type":126,"x":440,"y":248,"flip":"x","width":32,"height":32,"appearance":1},
+    {"part":20,"type":126,"x":456,"y":72,"width":32,"height":32,"appearance":1},
+    {"part":21,"type":126,"x":424,"y":56,"width":32,"height":32,"appearance":1},
+    {"part":26,"type":117,"x":108,"y":211},
+    {"part":27,"type":139,"x":256,"y":160},
+    {"part":28,"type":126,"x":488,"y":88,"width":32,"height":32,"appearance":1},
+    {"part":29,"type":126,"x":360,"y":72,"flip":"x","width":32,"height":32,"appearance":1},
+    {"part":30,"type":126,"x":392,"y":56,"flip":"x","width":32,"height":32,"appearance":1},
+    {"part":19,"type":10,"rope":[{"part":27,"slot":1},{"part":18,"slot":0}],"ropeLength":130}
+  ]
+}

@@ -236,9 +236,10 @@ class CavesRun implements CavesProbe {
     const fillers = Math.min(4, SLOT_COUNT - this.party.length);
     if (fillers > 0) f.create({ script: SCRB.filler + fillers, delay: DELAY.default, flags: F.flag4000000 | F.stopAtEnd | F.active, depth: DEPTH.filler });
     for (let s = 1; s <= SLOT_COUNT; s++) {
-      // Dalles : `0x508a000` (`10c8:0000`), avec le bit `0x1000000` (`playOnly`) : zones de dépôt dessinées seulement pendant leur surbrillance, quand un
-      // Zoombini porté les survole (`1168:1742`, `DropTarget.highlight`) ; au repos, le fond montre les dalles.
-      this.tiles[s] = f.create({ script: SCRB.tile + s, delay: DELAY.tile, flags: F.flag4000000 | F.playOnly | F.noReplay | F.active | F.firstImage });
+      // Dalles : `0x508a000` (`10c8:0000`), avec le bit `0x1000000` : l'original dessine leur première image (le pavé de pierre) à la création, puis les arrête sans
+      // effacer l'écran, et ne les rejoue que pendant leur surbrillance, quand un Zoombini porté les survole (`1168:1742`, `DropTarget.highlight`). Le fond, lui,
+      // montre à leur place des cavités : le port les fige donc sur leur première image (`still`) au lieu de ne les dessiner qu'au survol (`playOnly`).
+      this.tiles[s] = f.create({ script: SCRB.tile + s, delay: DELAY.tile, flags: F.flag4000000 | F.still | F.noReplay | F.active | F.firstImage });
     }
     f.create({ script: SCRB.decor, delay: 0, flags: F.flag4000000 });
 

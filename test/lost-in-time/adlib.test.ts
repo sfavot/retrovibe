@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { AdlPlayer, parseAdl } from "../../src/engine/coktel/audio/adlib/adl-player";
-import { AdlibSynth } from "../../src/engine/coktel/audio/adlib/synth";
+import { OplAdlibOutput } from "../../src/engine/coktel/audio/adlib/output";
 import { Opl2 } from "../../src/audio/opl2";
 import type { SoundBackend } from "../../src/engine/coktel/audio/backend";
 import { SoundEngine } from "../../src/engine/coktel/audio/sound";
@@ -119,65 +119,94 @@ describe("ADL", () => {
     expect(parseAdl(miniSong())).not.toBeNull();
   });
 
-  it("joue un morceau minimal puis s'arrête (délais en ms)", () => {
-    const synth = new AdlibSynth(RATE);
+  it("accepte un fichier tronqué comme ADLPlayer::load (seul err() compte) : mots manquants à 0, morceau vide, fin au premier tick", () => {
+    const data = new Uint8Array(60);
+    data.set([0, 2, 0]); // trois timbres annoncés (171 octets), 57 présents
+    data.fill(0x11, 3);
+    const adl = parseAdl(data)!;
+    expect(adl).not.toBeNull();
+    expect(adl.timbres).toHaveLength(3);
+    expect(adl.timbres[0][27]).toBe(0x1111);
+    expect(adl.timbres[1][0]).toBe(0x11); // mot coupé : octet de poids fort manquant
+    expect(adl.timbres[1][1]).toBe(0);
+    expect(Array.from(adl.timbres[2]).every((w) => w === 0)).toBe(true);
+    expect(adl.songSize).toBe(0);
+
+    let ms = 0;
+    const out = new OplAdlibOutput({ write: () => {} }, () => ms);
     let stopped = 0;
-    synth.onStopped = () => stopped++;
-    synth.load(miniSong());
-    synth.setRepeating(0);
-    synth.play();
-    expect(synth.playing).toBe(true);
+    out.onStopped = () => stopped++;
+    out.load(data);
+    out.play();
+    ms = 1;
+    out.update();
+    expect(out.playing).toBe(false);
+    expect(stopped).toBe(1);
+  });
+
+  /** Lecteur rendu par son émulateur (`render`), comme dans le script d'écoute. */
+  function player(data: Uint8Array, repeat: number): AdlPlayer {
+    const p = new AdlPlayer(RATE);
+    p.load(data);
+    p.setRepeating(repeat);
+    p.startPlay();
+    return p;
+  }
+  const render = (p: AdlPlayer, buf: Float32Array) => p.render(buf, 0, buf.length);
+
+  it("joue un morceau minimal puis s'arrête (délais en ms)", () => {
+    const p = player(miniSong(), 0);
+    let stopped = 0;
+    p.onFinished = () => stopped++;
+    expect(p.isPlaying()).toBe(true);
     const buf = new Float32Array(RATE / 10); // 100 ms : la note sonne
-    synth.render(buf);
+    render(p, buf);
     expect(rms(buf)).toBeGreaterThan(0.01);
-    expect(synth.playing).toBe(true);
-    const rest = new Float32Array(RATE / 4);
-    synth.render(rest);
-    expect(synth.playing).toBe(false);
+    expect(p.isPlaying()).toBe(true);
+    render(p, new Float32Array(RATE / 4));
+    expect(p.isPlaying()).toBe(false);
     expect(stopped).toBe(1);
   });
 
   it("boucle selon le compteur de répétitions", () => {
-    const synth = new AdlibSynth(RATE);
-    synth.load(miniSong());
-    synth.setRepeating(2); // trois passages au total
-    synth.play();
+    const p = player(miniSong(), 2); // trois passages au total
     const buf = new Float32Array(RATE / 100);
     let ms = 0;
-    for (; synth.playing && ms < 5000; ms += 10) synth.render(buf);
+    for (; p.isPlaying() && ms < 5000; ms += 10) render(p, buf);
     expect(ms).toBeGreaterThan(3 * 200 - 20);
     expect(ms).toBeLessThan(3 * 200 + 60);
-    expect(synth.repeating).toBe(0);
+    expect(p.getRepeating()).toBe(0);
   });
 
   it("boucle infinie tant qu'on ne l'arrête pas", () => {
-    const synth = new AdlibSynth(RATE);
-    synth.load(miniSong());
-    synth.setRepeating(-1);
-    synth.play();
+    const p = player(miniSong(), -1);
     const buf = new Float32Array(RATE);
-    for (let i = 0; i < 3; i++) synth.render(buf);
-    expect(synth.playing).toBe(true);
-    synth.stop();
-    expect(synth.playing).toBe(false);
+    for (let i = 0; i < 3; i++) render(p, buf);
+    expect(p.isPlaying()).toBe(true);
+    p.stopPlay();
+    expect(p.isPlaying()).toBe(false);
   });
 
-  it("se tait complètement (sans calcul) bien après l'arrêt", () => {
-    const synth = new AdlibSynth(RATE);
-    synth.load(miniSong());
-    synth.play();
+  it("se tait complètement bien après l'arrêt", () => {
+    const p = player(miniSong(), 0);
     const buf = new Float32Array(RATE);
-    for (let i = 0; i < 4; i++) synth.render(buf);
-    expect(synth.playing).toBe(false);
+    for (let i = 0; i < 4; i++) render(p, buf);
+    expect(p.isPlaying()).toBe(false);
     expect(rms(buf)).toBe(0);
+  });
+
+  it("une puce externe ne se rend pas ici", () => {
+    const p = new AdlPlayer({ write: () => {} });
+    expect(() => p.render(new Float32Array(10), 0, 10)).toThrow();
   });
 });
 
 describe("SoundEngine + AdLib", () => {
   function setup(adl: Uint8Array) {
-    const synth = new AdlibSynth(RATE);
+    let ms = 0;
+    const out = new OplAdlibOutput({ write: () => {} }, () => ms);
     const backend: SoundBackend = {
-      adlib: synth,
+      adlib: out,
       playSample: () => {},
       stopSample: () => {},
       queuePcm: () => {},
@@ -185,32 +214,35 @@ describe("SoundEngine + AdLib", () => {
     };
     const sound = new SoundEngine({
       backend,
-      host: { now: () => 0, nextFrame: async () => {} },
+      host: { now: () => ms, nextFrame: async () => {} },
       source: { getFile: () => undefined, getResource: () => adl },
     });
     sound.load({ slot: 1, adlib: true, id: 1, name: null });
-    return { sound, synth };
+    /** Avance l'horloge du jeu, comme une image de l'hôte. */
+    const advance = (dt: number) => {
+      ms += dt;
+      out.update();
+    };
+    return { sound, out, advance, time: () => ms };
   }
 
   it("suit la fin réelle du morceau et la répétition demandée", () => {
-    const { sound, synth } = setup(miniSong());
+    const { sound, advance, time } = setup(miniSong());
     sound.play(1, 2, 0); // deux passages : une répétition
     expect(sound.adlibPlaying).toBe(true);
-    const buf = new Float32Array(RATE / 100);
-    let ms = 0;
-    for (; sound.adlibPlaying && ms < 5000; ms += 10) synth.render(buf);
-    expect(ms).toBeGreaterThan(2 * 200 - 20);
-    expect(ms).toBeLessThan(2 * 200 + 40);
+    while (sound.adlibPlaying && time() < 5000) advance(10);
+    expect(time()).toBeGreaterThan(2 * 200 - 20);
+    expect(time()).toBeLessThan(2 * 200 + 40);
   });
 
   it("stopAdlib coupe, un fichier trop petit ne se charge pas", () => {
-    const { sound, synth } = setup(miniSong());
+    const { sound, out, advance } = setup(miniSong());
     sound.play(1, 0, 0); // répétition 0 = boucle infinie
-    synth.render(new Float32Array(RATE));
+    advance(1000);
     expect(sound.adlibPlaying).toBe(true); // boucle infinie
     sound.stopAdlib();
     expect(sound.adlibPlaying).toBe(false);
-    expect(synth.playing).toBe(false);
+    expect(out.playing).toBe(false);
 
     const small = setup(new Uint8Array(40).fill(1));
     small.sound.play(1, 1, 0);
@@ -252,12 +284,12 @@ describe.skipIf(!hasOriginalFiles)("ADL du jeu (INTRO.STK)", () => {
     const entry = archive.entries.find((e) => /^DORA10\.ADL$/i.test(e.name));
     expect(entry).toBeDefined();
     const render = (): Float32Array => {
-      const synth = new AdlibSynth(RATE);
-      synth.load(archive.extract(entry!));
-      synth.setRepeating(-1);
-      synth.play();
+      const player = new AdlPlayer(RATE);
+      player.load(archive.extract(entry!));
+      player.setRepeating(-1);
+      player.startPlay();
       const out = new Float32Array(RATE * 10);
-      for (let i = 0; i < out.length; i += 1000) synth.render(out, i, Math.min(1000, out.length - i));
+      for (let i = 0; i < out.length; i += 1000) player.render(out, i, Math.min(1000, out.length - i));
       return out;
     };
     const a = render();

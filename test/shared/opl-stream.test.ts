@@ -114,6 +114,20 @@ describe("OplStream", () => {
     expect(stream.pending).toBe(0);
   });
 
+  it("un recalage ne fait jamais passer une écriture avant celles encore en attente (pas de note tenue)", () => {
+    const { chip, stream } = setup();
+    // contexte audio qui ne tourne pas encore : les ticks s'accumulent au-delà de l'avance maximale
+    stream.schedule(0, [pack(0xb0, 0x20)]); // note
+    stream.schedule(20, [pack(0xb0, 0x00)]); // coupure, 0,4 s plus tard
+    stream.schedule(40, [pack(0xb0, 0x20)]); // 0,8 s : recalage
+    stream.schedule(41, [pack(0xb0, 0x00)]);
+    run(stream, 100_000);
+    expect(chip.log.map((w) => w.value)).toEqual([0x20, 0x00, 0x20, 0x00]);
+    const at = chip.log.map((w) => w.at);
+    expect(at).toEqual([...at].sort((a, b) => a - b));
+    expect(at[2]).toBe(LEAD + 20_000); // rejoint la dernière écriture en attente
+  });
+
   it("la cadence des ticks est réglable (250 Hz pour Flight of the Amazon Queen) : un tick = 200 échantillons ici", () => {
     const chip = new FakeChip();
     const stream = new OplStream(RATE, chip, 250);

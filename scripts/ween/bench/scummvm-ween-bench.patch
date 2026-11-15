@@ -1,0 +1,963 @@
+diff --git a/backends/events/sdl/bench.cpp b/backends/events/sdl/bench.cpp
+new file mode 100644
+index 0000000000..18e4f3f8a8
+--- /dev/null
++++ b/backends/events/sdl/bench.cpp
+@@ -0,0 +1,257 @@
++/*
++ * Banc d'essai local (hors dépôt) : pilote ScummVM sans fenêtre à partir d'un scénario texte et écrit des captures
++ * de l'écran du jeu (surface 8 bits + palette) au format PPM.
++ *
++ * BENCH_SCRIPT=fichier  BENCH_OUT=dossier
++ * Une commande par ligne (# = commentaire), exécutées dans l'ordre, chaque attente comptée depuis la fin de la précédente :
++ *   wait MS | move X Y | click X Y | rclick X Y | key NOM (ESC, RETURN, SPACE, F1..F10, ou un caractère)
++ *   shot NOM | burst PERIODE_MS NOMBRE PREFIXE (captures périodiques en tâche de fond) | console COMMANDE...
++ *   log TEXTE | quit
++ */
++#define FORBIDDEN_SYMBOL_ALLOW_ALL
++#include "common/scummsys.h"
++#include "common/events.h"
++#include "common/system.h"
++#include "common/array.h"
++#include "common/str.h"
++#include "common/keyboard.h"
++#include "graphics/surface.h"
++#include "graphics/paletteman.h"
++#include "engines/engine.h"
++#include "gui/debugger.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++namespace Bench {
++
++struct Cmd {
++	Common::String op;
++	Common::Array<Common::String> args;
++	Common::String rest;
++};
++
++struct Pending {
++	uint32 at;
++	Common::Event ev;
++};
++
++static bool inited = false;
++static bool active = false;
++static bool realMouse = false;
++static Common::Array<Cmd> cmds;
++static uint pc = 0;
++static uint32 t0 = 0;
++static uint32 readyAt = 0;
++static Common::String outDir;
++static Common::Array<Pending> pending;
++static uint32 burstPeriod = 0, burstNext = 0;
++static int burstLeft = 0, burstIndex = 0;
++static Common::String burstPrefix;
++
++static uint32 now() { return g_system->getMillis() - t0; }
++
++static void init() {
++	inited = true;
++	const char *script = getenv("BENCH_SCRIPT");
++	const char *out = getenv("BENCH_OUT");
++	if (!script || !out)
++		return;
++	outDir = out;
++	FILE *f = fopen(script, "r");
++	if (!f) {
++		fprintf(stderr, "bench: cannot open %s\n", script);
++		return;
++	}
++	char line[1024];
++	while (fgets(line, sizeof(line), f)) {
++		Common::String s(line);
++		s.trim();
++		if (s.empty() || s[0] == '#')
++			continue;
++		Cmd c;
++		const char *p = s.c_str();
++		Common::String tok;
++		bool first = true;
++		const char *restStart = nullptr;
++		while (*p) {
++			while (*p == ' ' || *p == '\t') p++;
++			if (!*p) break;
++			const char *start = p;
++			while (*p && *p != ' ' && *p != '\t') p++;
++			Common::String w(start, p);
++			if (first) {
++				c.op = w;
++				first = false;
++				const char *q = p;
++				while (*q == ' ' || *q == '\t') q++;
++				restStart = q;
++			} else {
++				c.args.push_back(w);
++			}
++		}
++		if (restStart) c.rest = restStart;
++		cmds.push_back(c);
++	}
++	fclose(f);
++	active = true;
++	t0 = g_system->getMillis();
++	fprintf(stderr, "bench: %d commands\n", (int)cmds.size());
++}
++
++static void shot(const Common::String &name) {
++	Graphics::Surface *s = g_system->lockScreen();
++	if (!s) return;
++	byte pal[256 * 3];
++	memset(pal, 0, sizeof(pal));
++	g_system->getPaletteManager()->grabPalette(pal, 0, 256);
++	Common::String path = outDir + "/" + name + ".ppm";
++	FILE *f = fopen(path.c_str(), "wb");
++	if (f) {
++		fprintf(f, "P6\n%d %d\n255\n", s->w, s->h);
++		for (int y = 0; y < s->h; y++) {
++			const byte *row = (const byte *)s->getBasePtr(0, y);
++			for (int x = 0; x < s->w; x++) {
++				const byte *c = pal + row[x] * 3;
++				fwrite(c, 1, 3, f);
++			}
++		}
++		fclose(f);
++	}
++	// Indices bruts + palette : <nom>.idx (w*h octets) et <nom>.pal (768 octets)
++	Common::String ip = outDir + "/" + name + ".idx";
++	f = fopen(ip.c_str(), "wb");
++	if (f) {
++		for (int y = 0; y < s->h; y++)
++			fwrite(s->getBasePtr(0, y), 1, s->w, f);
++		fclose(f);
++	}
++	Common::String pp = outDir + "/" + name + ".pal";
++	f = fopen(pp.c_str(), "wb");
++	if (f) {
++		fwrite(pal, 1, sizeof(pal), f);
++		fclose(f);
++	}
++	g_system->unlockScreen();
++	fprintf(stderr, "bench: t=%u shot %s\n", now(), name.c_str());
++}
++
++static void queueMouse(Common::EventType type, int x, int y, uint32 at) {
++	Pending p;
++	p.at = at;
++	p.ev.type = type;
++	p.ev.mouse = Common::Point(x, y);
++	pending.push_back(p);
++}
++
++static bool parseKey(const Common::String &k, Common::KeyState &ks) {
++	if (k.equalsIgnoreCase("ESC")) { ks = Common::KeyState(Common::KEYCODE_ESCAPE, Common::ASCII_ESCAPE); return true; }
++	if (k.equalsIgnoreCase("RETURN")) { ks = Common::KeyState(Common::KEYCODE_RETURN, Common::ASCII_RETURN); return true; }
++	if (k.equalsIgnoreCase("SPACE")) { ks = Common::KeyState(Common::KEYCODE_SPACE, ' '); return true; }
++	if (k.equalsIgnoreCase("UP")) { ks = Common::KeyState(Common::KEYCODE_UP, 0); return true; }
++	if (k.equalsIgnoreCase("DOWN")) { ks = Common::KeyState(Common::KEYCODE_DOWN, 0); return true; }
++	if (k.equalsIgnoreCase("LEFT")) { ks = Common::KeyState(Common::KEYCODE_LEFT, 0); return true; }
++	if (k.equalsIgnoreCase("RIGHT")) { ks = Common::KeyState(Common::KEYCODE_RIGHT, 0); return true; }
++	if (k.size() == 3 && (k[0] == 'K' || k[0] == 'k') && (k[1] == 'P' || k[1] == 'p') && k[2] >= '1' && k[2] <= '9') {
++		ks = Common::KeyState((Common::KeyCode)(Common::KEYCODE_KP0 + (k[2] - '0')), 0);
++		return true;
++	}
++	if ((k[0] == 'F' || k[0] == 'f') && k.size() >= 2 && k.size() <= 3) {
++		int n = atoi(k.c_str() + 1);
++		if (n >= 1 && n <= 12) {
++			ks = Common::KeyState((Common::KeyCode)(Common::KEYCODE_F1 + n - 1), (uint16)(Common::ASCII_F1 + n - 1));
++			return true;
++		}
++	}
++	if (k.size() == 1) {
++		char c = k[0];
++		char lc = (c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c;
++		ks = Common::KeyState((Common::KeyCode)lc, (uint16)c);
++		return true;
++	}
++	return false;
++}
++
++static void step() {
++	uint32 t = now();
++	if (burstLeft > 0 && t >= burstNext) {
++		shot(Common::String::format("%s%04d", burstPrefix.c_str(), burstIndex++));
++		burstLeft--;
++		burstNext += burstPeriod;
++		if (burstNext < t) burstNext = t + burstPeriod;
++	}
++	while (pc < cmds.size() && t >= readyAt && pending.empty()) {
++		const Cmd &c = cmds[pc++];
++		fprintf(stderr, "bench: t=%u %s %s\n", t, c.op.c_str(), c.rest.c_str());
++		if (c.op == "wait") {
++			readyAt = t + atoi(c.args[0].c_str());
++		} else if (c.op == "move") {
++			queueMouse(Common::EVENT_MOUSEMOVE, atoi(c.args[0].c_str()), atoi(c.args[1].c_str()), t);
++			readyAt = t + 20;
++		} else if (c.op == "click" || c.op == "rclick") {
++			int x = atoi(c.args[0].c_str()), y = atoi(c.args[1].c_str());
++			bool r = c.op == "rclick";
++			queueMouse(Common::EVENT_MOUSEMOVE, x, y, t);
++			queueMouse(r ? Common::EVENT_RBUTTONDOWN : Common::EVENT_LBUTTONDOWN, x, y, t + 60);
++			queueMouse(r ? Common::EVENT_RBUTTONUP : Common::EVENT_LBUTTONUP, x, y, t + 160);
++			readyAt = t + 200;
++		} else if (c.op == "key") {
++			Common::KeyState ks;
++			if (parseKey(c.args[0], ks)) {
++				Pending d; d.at = t; d.ev.type = Common::EVENT_KEYDOWN; d.ev.kbd = ks;
++				Pending u; u.at = t + 80; u.ev.type = Common::EVENT_KEYUP; u.ev.kbd = ks;
++				pending.push_back(d);
++				pending.push_back(u);
++			}
++			readyAt = t + 120;
++		} else if (c.op == "wheel") {
++			Pending w; w.at = t; w.ev.type = (c.args[0] == "up") ? Common::EVENT_WHEELUP : Common::EVENT_WHEELDOWN;
++			pending.push_back(w);
++			readyAt = t + 60;
++		} else if (c.op == "act") {
++			// Action propre au moteur (`EVENT_CUSTOM_ENGINE_ACTION_START`, numéro de l'énumération du moteur : Lure 14 suivant, 15 précédent, 16 choisir).
++			Pending a; a.at = t; a.ev.type = Common::EVENT_CUSTOM_ENGINE_ACTION_START; a.ev.customType = (Common::CustomEventType)atoi(c.args[0].c_str());
++			pending.push_back(a);
++			readyAt = t + 60;
++		} else if (c.op == "realmouse") {
++			// Le pointeur est celui du banc seul : les mouvements fictifs que SDL renvoie après `warpMouse` (fenêtre factice) sont ignorés, ce qui
++			// rend utilisable le menu surgissant de Lure (mode souris : l'entrée suit la position du pointeur). Par défaut, ils sont gardés (anciens scénarios).
++			realMouse = true;
++		} else if (c.op == "shot") {
++			shot(c.args[0]);
++		} else if (c.op == "burst") {
++			burstPeriod = atoi(c.args[0].c_str());
++			burstLeft = atoi(c.args[1].c_str());
++			burstPrefix = c.args[2];
++			burstIndex = 0;
++			burstNext = t;
++		} else if (c.op == "console") {
++			GUI::Debugger *d = g_engine ? g_engine->getDebugger() : nullptr;
++			if (d) d->parseCommand(c.rest.c_str());
++			else fprintf(stderr, "bench: no debugger\n");
++		} else if (c.op == "log") {
++			// already printed
++		} else if (c.op == "quit") {
++			Pending q; q.at = t; q.ev.type = Common::EVENT_QUIT;
++			pending.push_back(q);
++		}
++	}
++}
++
++bool pollEvent(Common::Event &event) {
++	if (!inited) init();
++	if (!active) return false;
++	step();
++	if (!pending.empty() && now() >= pending[0].at) {
++		event = pending[0].ev;
++		pending.remove_at(0);
++		return true;
++	}
++	return false;
++}
++
++bool isActive() {
++	return active && realMouse;
++}
++
++} // End of namespace Bench
+diff --git a/backends/events/sdl/sdl2-events.cpp b/backends/events/sdl/sdl2-events.cpp
+index 6cddd03279..de54114032 100644
+--- a/backends/events/sdl/sdl2-events.cpp
++++ b/backends/events/sdl/sdl2-events.cpp
+@@ -629,8 +629,15 @@ void SdlEventSource::preprocessFingerMotion(SDL_Event *event) {
+ 	}
+ }
+ 
++namespace Bench { bool pollEvent(Common::Event &event); bool isActive(); }
++
+ bool SdlEventSource::pollEvent(Common::Event &event) {
+ 	finishSimulatedMouseClicks();
++	if (Bench::pollEvent(event))
++		return true;
++	// Le banc pilote seul la souris et le clavier : les événements de la fenêtre (dont le mouvement fictif du pointeur après `warpMouse`) sont ignorés.
++	if (Bench::isActive())
++		return false;
+ 
+ 	// In case we still need to send a key up event for a key down from a
+ 	// TEXTINPUT event we do this immediately.
+diff --git a/backends/module.mk b/backends/module.mk
+index 02a21d2f85..5e7ef1660c 100644
+--- a/backends/module.mk
++++ b/backends/module.mk
+@@ -229,7 +229,8 @@ endif
+ 
+ ifdef USE_SDL2
+ MODULE_OBJS += \
+-	events/sdl/sdl2-events.o
++	events/sdl/sdl2-events.o \
++	events/sdl/bench.o
+ endif
+ 
+ ifdef USE_SDL3
+diff --git a/backends/platform/sdl/sdl.cpp b/backends/platform/sdl/sdl.cpp
+index f2c4e5149d..85c44f313b 100644
+--- a/backends/platform/sdl/sdl.cpp
++++ b/backends/platform/sdl/sdl.cpp
+@@ -43,6 +43,7 @@
+ #endif
+ 
+ #include "backends/mixer/null/null-mixer.h"
++#include "audio/mixer_intern.h"
+ #include "backends/events/default/default-events.h"
+ #include "backends/keymapper/hardware-input.h"
+ #include "backends/mutex/sdl/sdl-mutex.h"
+@@ -876,8 +877,18 @@ Common::MutexInternal *OSystem_SDL::createMutex() {
+ 	return createSdlMutexInternal();
+ }
+ 
++// Banc : SKY_VIRTUAL_TIME=1 : horloge virtuelle, qui n'avance que par delayMillis (sans attendre) ; les tours, fondus, sequences et attentes
++// du jeu prennent leur duree nominale sans temps reel (comme le portage, qui compte ses ticks de 20 ms).
++static bool benchVirtualTime() {
++	static int v = -1;
++	if (v < 0)
++		v = getenv("SKY_VIRTUAL_TIME") ? 1 : 0;
++	return v == 1;
++}
++static volatile uint32 benchNow = 0;
++
+ uint32 OSystem_SDL::getMillis(bool skipRecord) {
+-	uint32 millis = SDL_GetTicks();
++	uint32 millis = benchVirtualTime() ? benchNow : SDL_GetTicks();
+ 
+ #ifdef ENABLE_EVENTRECORDER
+ 	g_eventRec.processMillis(millis, skipRecord);
+@@ -886,7 +897,41 @@ uint32 OSystem_SDL::getMillis(bool skipRecord) {
+ 	return millis;
+ }
+ 
++// Banc : GOB_VIRTUAL_AUDIO=1 (avec SKY_VIRTUAL_TIME=1) : le melangeur n'est plus tire par le peripherique audio (suspendu) mais par
++// l'horloge virtuelle : chaque delayMillis melange (et jette) les echantillons de la duree ecoulee. Les sons finissent donc a leur duree
++// nominale en temps virtuel (necessaire a gob : o1_waitEndPlay attend la fin des samples).
++static void benchMixVirtual(MixerManager *mm, uint32 nowMs) {
++	static int v = -1;
++	if (v < 0)
++		v = getenv("GOB_VIRTUAL_AUDIO") ? 1 : 0;
++	if (v != 1 || !mm || !mm->getMixer())
++		return;
++	static bool suspended = false;
++	static uint64 framesDone = 0;
++	static uint32 startMs = 0;
++	Audio::MixerImpl *mixer = (Audio::MixerImpl *)mm->getMixer();
++	if (!suspended) {
++		mm->suspendAudio();
++		suspended = true;
++		startMs = nowMs;
++	}
++	const uint rate = mixer->getOutputRate();
++	const uint bytesPerFrame = 2 * (mixer->getOutputStereo() ? 2 : 1);
++	const uint64 target = (uint64)(nowMs - startMs) * rate / 1000;
++	static byte buf[4096 * 4];
++	while (framesDone < target) {
++		uint64 n = MIN<uint64>(target - framesDone, sizeof(buf) / bytesPerFrame);
++		mixer->mixCallback(buf, (uint)(n * bytesPerFrame));
++		framesDone += n;
++	}
++}
++
+ void OSystem_SDL::delayMillis(uint msecs) {
++	if (benchVirtualTime()) {
++		benchNow += msecs ? msecs : 1;
++		benchMixVirtual(_mixerManager, benchNow);
++		return;
++	}
+ #ifdef ENABLE_EVENTRECORDER
+ 	if (g_eventRec.processDelayMillis())
+ #endif
+diff --git a/engines/gob/benchtrace.cpp b/engines/gob/benchtrace.cpp
+new file mode 100644
+index 0000000000..3981dd9228
+--- /dev/null
++++ b/engines/gob/benchtrace.cpp
+@@ -0,0 +1,263 @@
++/* Banc d'essai local (hors depot) : traces du moteur gob (Ween), toutes sur stderr, inactives par defaut.
++ *
++ * Une « image » n est un point ou le script rend la main au temps : debut de Util::waitEndFrame (cadence des animations),
++ * Inter::handleBusyWait (chaque o1_keyFunc, y compris l'attente active de l'introduction), VideoPlayer::waitEndFrame (image d'une
++ * video IMD), chaque tour des boucles d'attente de Hotspots::evaluate (zones actives, menus), de Util::getKey / waitMouseUp /
++ * waitMouseDown / waitMouseRelease et de Sound::blasterWaitEndPlay (o1_waitEndPlay, un tour = longDelay(200)). Le compte ne
++ * depend que du deroulement du script (et, pour les boucles d'attente, du temps de jeu : deterministe avec le temps virtuel),
++ * pas du temps reel. Au point d'image n, l'ecran montre deja l'image n (blitInvalidated a eu lieu juste avant).
++ *
++ *   GOB_TRACE=1        `TT n nom` (TOT charge par Game::playTot, loadTot comme totSub), `GB n tot pos id nom` (o2_goblinFunc),
++ *                      `PS n tot offset` (protection sautee), `WK n tot pos v59` (rustine VAR(59) de l'introduction)
++ *   GOB_TRACE=2        + `OP n tot pos opcode` pour chaque instruction (pos = octet de l'opcode, nom ScummVM)
++ *   GOB_TRACE=3        + `DL n t ms tot pos` pour chaque Util::delay (t = horloge avant l'attente ; waitRetrace, longDelay, waitEndFrame...)
++ *   GOB_VARHASH=1      `VH n h` a chaque image : FNV-1a 32 bits des octets des variables courantes (_inter->_variables, ordre memoire)
++ *   GOB_DUMP=a-b       `DV n v0 v1 ...` (toutes les variables 32 bits, non signees) pour les images a a b
++ *   GOB_SHOT_FRAMES=n1,n2,... + GOB_SHOT_DIR=dossier : fr-NNNNN.idx (ecran 320x200, indices bruts, sans le curseur) et fr-NNNNN.pal
++ *   GOB_INPUT=fichier  entrees par image, appliquees au point d'image n (lues par le prochain processInput) :
++ *                      `n m x y` (deplacement), `n c x y` (clic gauche : appui en n, relache en n+1), `n d x y` / `n u x y` (appui / relache
++ *                      gauche), `n r x y` (clic droit), `n k TOUCHE` (ESC, RETURN, SPACE, UP, DOWN, LEFT, RIGHT, F1-F12, ou un caractere ;
++ *                      appui en n, relache en n+1), `n q` (quitter)
++ *   GOB_STOP_FRAME=n   quitte apres l'image n
++ */
++
++#define FORBIDDEN_SYMBOL_ALLOW_ALL
++
++#include "common/scummsys.h"
++#include "common/system.h"
++#include "common/events.h"
++#include "common/array.h"
++#include "common/keyboard.h"
++#include "common/str.h"
++#include "graphics/surface.h"
++#include "graphics/paletteman.h"
++
++#include "gob/benchtrace.h"
++#include "gob/gob.h"
++#include "gob/inter.h"
++#include "gob/variables.h"
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++namespace Gob {
++namespace BenchTrace {
++
++static uint32 frameNo = 0;
++
++int level() {
++	static int l = -1;
++	if (l < 0) {
++		const char *e = getenv("GOB_TRACE");
++		l = e ? atoi(e) : 0;
++	}
++	return l;
++}
++
++uint32 frame() {
++	return frameNo;
++}
++
++struct Input {
++	uint32 n;
++	Common::Event ev;
++};
++
++static Common::Array<Input> inputs;
++static uint inputPos = 0;
++
++static bool parseKey(const char *k, Common::KeyState &ks) {
++	if (!strcasecmp(k, "ESC")) { ks = Common::KeyState(Common::KEYCODE_ESCAPE, Common::ASCII_ESCAPE); return true; }
++	if (!strcasecmp(k, "RETURN")) { ks = Common::KeyState(Common::KEYCODE_RETURN, Common::ASCII_RETURN); return true; }
++	if (!strcasecmp(k, "SPACE")) { ks = Common::KeyState(Common::KEYCODE_SPACE, ' '); return true; }
++	if (!strcasecmp(k, "UP")) { ks = Common::KeyState(Common::KEYCODE_UP, 0); return true; }
++	if (!strcasecmp(k, "DOWN")) { ks = Common::KeyState(Common::KEYCODE_DOWN, 0); return true; }
++	if (!strcasecmp(k, "LEFT")) { ks = Common::KeyState(Common::KEYCODE_LEFT, 0); return true; }
++	if (!strcasecmp(k, "RIGHT")) { ks = Common::KeyState(Common::KEYCODE_RIGHT, 0); return true; }
++	if ((k[0] == 'F' || k[0] == 'f') && k[1] >= '1' && k[1] <= '9') {
++		int n = atoi(k + 1);
++		if (n >= 1 && n <= 12) {
++			ks = Common::KeyState((Common::KeyCode)(Common::KEYCODE_F1 + n - 1), (uint16)(Common::ASCII_F1 + n - 1));
++			return true;
++		}
++	}
++	if (k[0] && !k[1]) {
++		char c = k[0];
++		char lc = (c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c;
++		ks = Common::KeyState((Common::KeyCode)lc, (uint16)c);
++		return true;
++	}
++	return false;
++}
++
++static void addMouse(uint32 n, Common::EventType t, int x, int y) {
++	Input in;
++	in.n = n;
++	in.ev.type = t;
++	in.ev.mouse = Common::Point(x, y);
++	inputs.push_back(in);
++}
++
++static void loadInputs() {
++	static bool loaded = false;
++	if (loaded)
++		return;
++	loaded = true;
++	const char *path = getenv("GOB_INPUT");
++	if (!path)
++		return;
++	FILE *f = fopen(path, "r");
++	if (!f) {
++		fprintf(stderr, "gob bench: cannot open %s\n", path);
++		return;
++	}
++	char line[256];
++	while (fgets(line, sizeof(line), f)) {
++		unsigned n = 0;
++		char op[8] = {0}, a[64] = {0};
++		int x = 0, y = 0;
++		if (line[0] == '#' || sscanf(line, "%u %7s", &n, op) < 2)
++			continue;
++		if (op[0] == 'k') {
++			Common::KeyState ks;
++			if (sscanf(line, "%u %7s %63s", &n, op, a) == 3 && parseKey(a, ks)) {
++				Input d; d.n = n; d.ev.type = Common::EVENT_KEYDOWN; d.ev.kbd = ks;
++				Input u; u.n = n + 1; u.ev.type = Common::EVENT_KEYUP; u.ev.kbd = ks;
++				inputs.push_back(d);
++				inputs.push_back(u);
++			}
++		} else if (op[0] == 'q') {
++			Input q; q.n = n; q.ev.type = Common::EVENT_QUIT;
++			inputs.push_back(q);
++		} else if (sscanf(line, "%u %7s %d %d", &n, op, &x, &y) == 4) {
++			addMouse(n, Common::EVENT_MOUSEMOVE, x, y);
++			if (op[0] == 'c' || op[0] == 'd')
++				addMouse(n, Common::EVENT_LBUTTONDOWN, x, y);
++			if (op[0] == 'c')
++				addMouse(n + 1, Common::EVENT_LBUTTONUP, x, y);
++			if (op[0] == 'u')
++				addMouse(n, Common::EVENT_LBUTTONUP, x, y);
++			if (op[0] == 'r') {
++				addMouse(n, Common::EVENT_RBUTTONDOWN, x, y);
++				addMouse(n + 1, Common::EVENT_RBUTTONUP, x, y);
++			}
++		}
++	}
++	fclose(f);
++	// Tri stable par image (les relaches en n+1 sont ajoutees apres les lignes de l'image n).
++	for (uint i = 1; i < inputs.size(); i++)
++		for (uint j = i; j > 0 && inputs[j - 1].n > inputs[j].n; j--) {
++			Input t = inputs[j - 1];
++			inputs[j - 1] = inputs[j];
++			inputs[j] = t;
++		}
++	fprintf(stderr, "gob bench: %u inputs\n", (unsigned)inputs.size());
++}
++
++static bool listHas(const char *list, uint32 n) {
++	for (const char *p = list; *p;) {
++		if ((uint32)atoi(p) == n)
++			return true;
++		while (*p && *p != ',')
++			p++;
++		if (*p == ',')
++			p++;
++	}
++	return false;
++}
++
++static void shot(uint32 n) {
++	static const char *list = getenv("GOB_SHOT_FRAMES");
++	static const char *dir = getenv("GOB_SHOT_DIR");
++	if (!list || !dir || !listHas(list, n))
++		return;
++	Graphics::Surface *s = g_system->lockScreen();
++	if (!s)
++		return;
++	byte pal[256 * 3];
++	memset(pal, 0, sizeof(pal));
++	g_system->getPaletteManager()->grabPalette(pal, 0, 256);
++	char path[1024];
++	snprintf(path, sizeof(path), "%s/fr-%05u.idx", dir, n);
++	FILE *f = fopen(path, "wb");
++	if (f) {
++		for (int y = 0; y < s->h; y++)
++			fwrite(s->getBasePtr(0, y), 1, s->w * s->format.bytesPerPixel, f);
++		fclose(f);
++	}
++	snprintf(path, sizeof(path), "%s/fr-%05u.pal", dir, n);
++	f = fopen(path, "wb");
++	if (f) {
++		fwrite(pal, 1, sizeof(pal), f);
++		fclose(f);
++	}
++	g_system->unlockScreen();
++}
++
++void onFrame(GobEngine *vm) {
++	frameNo++;
++	const uint32 n = frameNo;
++
++	shot(n);
++
++	Variables *vars = (vm && vm->_inter) ? vm->_inter->_variables : nullptr;
++	static const char *vh = getenv("GOB_VARHASH");
++	if (vh && vars) {
++		const uint8 *p = vars->getAddressOff8(0);
++		uint32 size = vars->getSize();
++		uint32 h = 2166136261u;
++		for (uint32 i = 0; i < size; i++) {
++			h ^= p[i];
++			h *= 16777619u;
++		}
++		fprintf(stderr, "VH %u %u\n", n, h);
++	}
++	static const char *dump = getenv("GOB_DUMP");
++	if (dump && vars) {
++		unsigned a = 0, b = 0;
++		if (sscanf(dump, "%u-%u", &a, &b) == 2 && n >= a && n <= b) {
++			fprintf(stderr, "DV %u", n);
++			for (uint32 i = 0; i + 4 <= vars->getSize(); i += 4)
++				fprintf(stderr, " %u", vars->readOff32(i));
++			fprintf(stderr, "\n");
++		}
++	}
++
++	loadInputs();
++	Common::EventManager *em = g_system->getEventManager();
++	while (inputPos < inputs.size() && inputs[inputPos].n <= n) {
++		em->pushEvent(inputs[inputPos].ev);
++		inputPos++;
++	}
++
++	static const char *stop = getenv("GOB_STOP_FRAME");
++	if (stop && n == (uint32)atoi(stop)) {
++		Common::Event q;
++		q.type = Common::EVENT_QUIT;
++		em->pushEvent(q);
++	}
++}
++
++void onTot(const char *name) {
++	if (level() >= 1)
++		fprintf(stderr, "TT %u %s\n", frameNo, name);
++}
++
++void onOp(const char *tot, uint32 pos, const char *desc, int i, int j) {
++	if (level() >= 2)
++		fprintf(stderr, "OP %u %s %u %s\n", frameNo, tot, pos, (desc && *desc) ? desc : Common::String::format("op_%d_%d", i, j).c_str());
++}
++
++void onGob(const char *tot, uint32 pos, int id, const char *desc, bool known) {
++	if (level() >= 1)
++		fprintf(stderr, "GB %u %s %u %d %s\n", frameNo, tot, pos, id, known ? ((desc && *desc) ? desc : "?") : "unimplemented");
++}
++
++void note(const char *tag, const char *text) {
++	if (level() >= 1)
++		fprintf(stderr, "%s %u %s\n", tag, frameNo, text);
++}
++
++} // End of namespace BenchTrace
++} // End of namespace Gob
+diff --git a/engines/gob/benchtrace.h b/engines/gob/benchtrace.h
+new file mode 100644
+index 0000000000..e13a466015
+--- /dev/null
++++ b/engines/gob/benchtrace.h
+@@ -0,0 +1,35 @@
++/* Banc d'essai local (hors depot) : traces du moteur gob pour comparer Ween a un portage.
++ * Tout est inactif sans variables d'environnement GOB_* (voir benchtrace.cpp).
++ */
++
++#ifndef GOB_BENCHTRACE_H
++#define GOB_BENCHTRACE_H
++
++#include "common/scummsys.h"
++
++namespace Gob {
++
++class GobEngine;
++
++namespace BenchTrace {
++
++/** GOB_TRACE (0 sans la variable). */
++int level();
++/** Numero de la derniere image (0 avant la premiere). */
++uint32 frame();
++/** Point d'image : waitEndFrame, keyFunc (attente active), image d'une video, tour d'attente des zones actives. */
++void onFrame(GobEngine *vm);
++/** `TT n nom` : chargement d'un TOT (Game::playTot). */
++void onTot(const char *name);
++/** `OP n tot pos opcode` (niveau 2) : instruction de script (pos = octet de l'opcode). */
++void onOp(const char *tot, uint32 pos, const char *desc, int i, int j);
++/** `GB n tot pos id nom` : fonction gobelin (o2_goblinFunc), implementee ou non. */
++void onGob(const char *tot, uint32 pos, int id, const char *desc, bool known);
++/** Ligne libre prefixee du numero d'image (niveau >= 1). */
++void note(const char *tag, const char *text);
++
++} // End of namespace BenchTrace
++
++} // End of namespace Gob
++
++#endif
+diff --git a/engines/gob/game.cpp b/engines/gob/game.cpp
+index 4e3187c5f1..549e4ab585 100644
+--- a/engines/gob/game.cpp
++++ b/engines/gob/game.cpp
+@@ -42,6 +42,7 @@
+ #include "gob/scenery.h"
+ #include "gob/videoplayer.h"
+ #include "gob/sound/sound.h"
++#include "gob/benchtrace.h"
+ 
+ namespace Gob {
+ 
+@@ -610,7 +611,10 @@ void Game::playTot(int32 function) {
+ 				function = 0;
+ 			}
+ 
++			BenchTrace::onTot(_curTotFile.c_str());
++
+ 			if (!_script->load(_curTotFile)) {
++				BenchTrace::note("TX", _curTotFile.c_str());
+ 				_vm->_draw->blitCursor();
+ 				_vm->_inter->_terminate = 2;
+ 				break;
+diff --git a/engines/gob/hotspots.cpp b/engines/gob/hotspots.cpp
+index b944ac74d6..214cffd7ae 100644
+--- a/engines/gob/hotspots.cpp
++++ b/engines/gob/hotspots.cpp
+@@ -33,6 +33,7 @@
+ #include "gob/game.h"
+ #include "gob/script.h"
+ #include "gob/inter.h"
++#include "gob/benchtrace.h"
+ 
+ namespace Gob {
+ 
+@@ -837,6 +838,8 @@ uint16 Hotspots::check(uint8 handleMouse, int16 delay, uint16 &id, uint16 &index
+ 		if (handleMouse)
+ 			_vm->_game->evaluateScroll();
+ 
++		BenchTrace::onFrame(_vm);
++
+ 		// Update keyboard and mouse state
+ 		key = _vm->_game->checkKeys(&_vm->_global->_inter_mouseX,
+ 				&_vm->_global->_inter_mouseY, &_vm->_game->_mouseButtons, handleMouse);
+diff --git a/engines/gob/inter.cpp b/engines/gob/inter.cpp
+index b7498135a4..f0002e4151 100644
+--- a/engines/gob/inter.cpp
++++ b/engines/gob/inter.cpp
+@@ -29,6 +29,7 @@
+ 
+ #include "gob/gob.h"
+ #include "gob/inter.h"
++#include "gob/benchtrace.h"
+ #include "gob/global.h"
+ #include "gob/util.h"
+ #include "gob/draw.h"
+@@ -104,6 +105,10 @@ void Inter::executeOpcodeGob(int i, OpGobParams &params) {
+ 	if (_opcodesGob.contains(i))
+ 		op = &_opcodesGob.getVal(i);
+ 
++	if (BenchTrace::level() >= 1)
++		BenchTrace::onGob(_vm->_game->_curTotFile.c_str(), _vm->_game->_script->pos(), i, getDescOpcodeGob(i),
++		                  op && op->proc && op->proc->isValid());
++
+ 	if (op && op->proc && op->proc->isValid()) {
+ 		(*op->proc)(params);
+ 		return;
+@@ -296,6 +301,7 @@ void Inter::funcBlock(int16 retFlag) {
+ 			}
+ 		} // End of workaround
+ 
++		uint32 benchOpPos = _vm->_game->_script->pos();
+ 		cmd = _vm->_game->_script->readByte();
+ 
+ 		// WORKAROUND:
+@@ -323,6 +329,9 @@ void Inter::funcBlock(int16 retFlag) {
+ 		if (cmd2 == 0)
+ 			cmd >>= 4;
+ 
++		if (BenchTrace::level() >= 2)
++			BenchTrace::onOp(_vm->_game->_curTotFile.c_str(), benchOpPos, getDescOpcodeFunc(cmd2, cmd), cmd2, cmd);
++
+ 		params.doReturn = false;
+ 		executeOpcodeFunc(cmd2, cmd, params);
+ 
+@@ -475,6 +484,8 @@ uint32 Inter::readValue(uint16 index, uint16 type) {
+ }
+ 
+ void Inter::handleBusyWait() {
++	BenchTrace::onFrame(_vm);
++
+ 	uint32 now = _vm->_util->getTimeKey();
+ 
+ 	if (!_noBusyWait)
+diff --git a/engines/gob/inter_v1.cpp b/engines/gob/inter_v1.cpp
+index dbd9a180f4..c4f6e2a528 100644
+--- a/engines/gob/inter_v1.cpp
++++ b/engines/gob/inter_v1.cpp
+@@ -47,6 +47,7 @@
+ #include "gob/video.h"
+ #include "gob/videoplayer.h"
+ #include "gob/sound/sound.h"
++#include "gob/benchtrace.h"
+ 
+ namespace Gob {
+ 
+@@ -729,6 +730,22 @@ void Inter_v1::o1_callSub(OpFuncParams &params) {
+ 		return;
+ 	}
+ 
++	// Skipping the copy protection screen in Ween (colour grid). The routine is called from intro.tot (offset 348) when the
++	// intro was skipped, and from intro5.tot (offset 1023) at the end of the watched intro (intro5 sets VAR(217) = 1 just
++	// before, so intro.tot does not ask again). On success it leaves VAR(60) = 1 (already 1 here), VAR(210) = number of tries
++	// and VAR(211) = 10 (blink loop counter): both are reused by the rooms as state variables, so they are set as after a
++	// right answer on the first try. VAR(212-214) (digits of the random question), VAR(190), VAR(3461-3466) and the
++	// string table at VAR(2000) are left untouched (random or never read again).
++	if (!_vm->_copyProtection && (_vm->getGameType() == kGameTypeWeen) &&
++	    (((offset == 348) && _vm->isCurrentTot("intro.tot")) ||
++	     ((offset == 1023) && _vm->isCurrentTot("intro5.tot")))) {
++		debugC(2, kDebugGameFlow, "Skipping copy protection screen");
++		WRITE_VAR(210, 1);
++		WRITE_VAR(211, 10);
++		BenchTrace::note("PS", Common::String::format("%s %d", _vm->_game->_curTotFile.c_str(), offset).c_str());
++		return;
++	}
++
+ 	// Skipping the copy protection screen in Adibou 1
+ 	if (!_vm->_copyProtection && (_vm->getGameType() == kGameTypeAdibou1) && (offset == 1746) &&
+ 		_vm->isCurrentTot("base.tot")) {
+@@ -1356,9 +1373,15 @@ void Inter_v1::o1_keyFunc(OpFuncParams &params) {
+ 	// WORKAROUND for bug #3205: Ween busy-waits in the intro for a counter
+ 	// to become 5000. We deliberately slow down busy-waiting, so we shorten
+ 	// the counting, too.
+-	if ((_vm->getGameType() == kGameTypeWeen) && (VAR(59) < 4000) &&
+-	    (_vm->_game->_script->pos() == 729) && _vm->isCurrentTot("intro5.tot"))
++	// Banc (vague C) : la position 729 ne correspond pas a cet intro5.tot (keyFunc lu a 727) ; la boucle est aussi
++	// reconnue par motif : keyFunc(1) suivi de l'affectation de VAR(59) (o2_assign 0x90, VAR_INT32 0x17, index 59).
++	if ((_vm->getGameType() == kGameTypeWeen) && (VAR(59) < 4000) && _vm->isCurrentTot("intro5.tot") &&
++	    ((_vm->_game->_script->pos() == 729) ||
++	     ((_vm->_game->_script->peekUint16(0) == 1) && (_vm->_game->_script->peekByte(2) == 0x90) &&
++	      (_vm->_game->_script->peekByte(3) == 0x17) && (_vm->_game->_script->peekUint16(4) == 59)))) {
++		BenchTrace::note("WK", Common::String::format("%s %u %u", _vm->_game->_curTotFile.c_str(), _vm->_game->_script->pos(), (uint32)VAR(59)).c_str());
+ 		WRITE_VAR(59, 4000);
++	}
+ 
+ 	int16 cmd = _vm->_game->_script->readInt16();
+ 	int16 key;
+diff --git a/engines/gob/module.mk b/engines/gob/module.mk
+index b64b25589c..d3cf4d958e 100644
+--- a/engines/gob/module.mk
++++ b/engines/gob/module.mk
+@@ -2,6 +2,7 @@ MODULE := engines/gob
+ 
+ MODULE_OBJS := \
+ 	anifile.o \
++	benchtrace.o \
+ 	aniobject.o \
+ 	backbuffer.o \
+ 	cheater.o \
+diff --git a/engines/gob/sound/sound.cpp b/engines/gob/sound/sound.cpp
+index c2e180766f..a229d3da78 100644
+--- a/engines/gob/sound/sound.cpp
++++ b/engines/gob/sound/sound.cpp
+@@ -41,6 +41,7 @@
+ #include "gob/sound/infogrames.h"
+ #include "gob/sound/protracker.h"
+ #include "gob/sound/cdrom.h"
++#include "gob/benchtrace.h"
+ 
+ namespace Gob {
+ 
+@@ -528,6 +529,7 @@ void Sound::blasterWaitEndPlay(bool interruptible, bool stopComp) {
+ 		_blaster->endComposition();
+ 
+ 	while (_blaster->isPlaying() && !_vm->shouldQuit()) {
++		BenchTrace::onFrame(_vm);
+ 		if (interruptible && (_vm->_util->checkKey() == kKeyEscape)) {
+ 			WRITE_VAR(57, (uint32) -1);
+ 			return;
+diff --git a/engines/gob/util.cpp b/engines/gob/util.cpp
+index 4282bc50b9..077f360f6c 100644
+--- a/engines/gob/util.cpp
++++ b/engines/gob/util.cpp
+@@ -36,9 +36,11 @@
+ #include "gob/dataio.h"
+ #include "gob/draw.h"
+ #include "gob/game.h"
++#include "gob/script.h"
+ #include "gob/video.h"
+ #include "gob/videoplayer.h"
+ #include "gob/sound/sound.h"
++#include "gob/benchtrace.h"
+ 
+ namespace Gob {
+ 
+@@ -77,6 +79,10 @@ void Util::notifyPaused(uint32 duration) {
+ }
+ 
+ void Util::delay(uint16 msecs) {
++	if (BenchTrace::level() >= 3)
++		BenchTrace::note("DL", Common::String::format("%u %u %s %u", g_system->getMillis(), (uint)msecs,
++		                 _vm->_game ? _vm->_game->_curTotFile.c_str() : "-",
++		                 (_vm->_game && _vm->_game->_script) ? _vm->_game->_script->pos() : 0).c_str());
+ 	g_system->delayMillis(msecs / _vm->_global->_speedFactor);
+ }
+ 
+@@ -320,6 +326,7 @@ int16 Util::getKey() {
+ 	Common::KeyState key;
+ 
+ 	while (!getKeyFromBuffer(key)) {
++		BenchTrace::onFrame(_vm);
+ 		processInput();
+ 
+ 		if (keyBufferEmpty())
+@@ -380,6 +387,7 @@ void Util::setMousePos(int16 x, int16 y) {
+ 
+ void Util::waitMouseUp() {
+ 	do {
++		BenchTrace::onFrame(_vm);
+ 		processInput();
+ 		if (_mouseButtons != kMouseButtonsNone)
+ 			delay(10);
+@@ -392,6 +400,7 @@ void Util::waitMouseDown() {
+ 	MouseButtons buttons;
+ 
+ 	do {
++		BenchTrace::onFrame(_vm);
+ 		processInput();
+ 		getMouseState(&x, &y, &buttons);
+ 		if (buttons == 0)
+@@ -406,6 +415,7 @@ void Util::waitMouseRelease(char drawMouse) {
+ 
+ 	_vm->_game->checkKeys(&mouseX, &mouseY, &buttons, drawMouse);
+ 	while (buttons != 0) {
++		BenchTrace::onFrame(_vm);
+ 		if (drawMouse != 0)
+ 			_vm->_draw->animateCursor(2);
+ 		delay(10);
+@@ -474,6 +484,8 @@ void Util::notifyNewAnim() {
+ void Util::waitEndFrame(bool handleInput) {
+ 	int32 time;
+ 
++	BenchTrace::onFrame(_vm);
++
+ 	time = getTimeKey() - _startFrameTime;
+ 	if ((time > 1000) || (time < 0)) {
+ 		_vm->_video->retrace();
+diff --git a/engines/gob/videoplayer.cpp b/engines/gob/videoplayer.cpp
+index e10e6e50e4..5cebaac7ab 100644
+--- a/engines/gob/videoplayer.cpp
++++ b/engines/gob/videoplayer.cpp
+@@ -38,6 +38,7 @@
+ #include "gob/inter.h"
+ #include "gob/map.h"
+ #include "gob/sound/sound.h"
++#include "gob/benchtrace.h"
+ 
+ namespace Gob {
+ 
+@@ -529,6 +530,8 @@ bool VideoPlayer::play(int slot, Properties &properties) {
+ }
+ 
+ void VideoPlayer::waitEndFrame(int slot, bool onlySound) {
++	BenchTrace::onFrame(_vm);
++
+ 	Video *video = getVideoBySlot(slot);
+ 	if (!video)
+ 		return;
+diff --git a/gui/debugger.h b/gui/debugger.h
+index a8aa2339b4..124700488d 100644
+--- a/gui/debugger.h
++++ b/gui/debugger.h
+@@ -260,7 +260,9 @@ private:
+ 	 */
+ 	void splitCommand(Common::String &input, int &argc, const char **argv);
+ 
++public:
+ 	bool parseCommand(const char *input);
++private:
+ 	bool tabComplete(const char *input, Common::String &completion) const;
+ 
+ protected:

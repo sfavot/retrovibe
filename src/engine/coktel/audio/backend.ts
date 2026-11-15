@@ -6,8 +6,8 @@ import type { SpeakerOutput } from "./pcspeaker";
  */
 
 /**
- * Musique AdLib (ADL) : lecteur + émulateur OPL2 derrière une commande asynchrone. Les appels
- * reproduisent ceux de ScummVM (ADLPlayer) ; l'état « en lecture » revient par `onStopped`.
+ * Musique AdLib (ADL) : lecteur + puce OPL2 (`OplAdlibOutput` dans le navigateur). Les appels reproduisent ceux de
+ * ScummVM (ADLPlayer) ; la fin d'un morceau revient par `onStopped`.
  */
 export interface AdlibOutput {
   /** Charge un morceau (remplace le précédent, sans le jouer). */

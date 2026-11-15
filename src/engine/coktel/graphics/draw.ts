@@ -3,7 +3,7 @@
  */
 import { parseFont, type Font } from "../data/font";
 import { decodeSprite } from "../data/sprite";
-import { advanceClock, type AddHotspotArgs, type DrawSystem, type HotspotSystem, type PrintTextArgs } from "../host";
+import { advanceRetrace, type AddHotspotArgs, type DrawSystem, type HotspotSystem, type PrintTextArgs } from "../host";
 import {
   BACK_SURFACE,
   CAPTURE_SURFACE,
@@ -202,7 +202,7 @@ export class DrawImpl implements DrawSystem {
     core.scrollX = this.scrollX;
     core.scrollY = this.scrollY;
     // Util::setScrollOffset() en fin d'o2_initScreen : waitRetrace
-    advanceClock(vm.host, 10);
+    advanceRetrace(vm.host);
   }
 
   initSpriteSurf(index: number, width: number, height: number): void {
@@ -576,7 +576,7 @@ export class DrawImpl implements DrawSystem {
     core.scrollY = this.scrollY;
     core.touch();
     // Util::setScrollOffset : waitRetrace
-    if (core.vm) advanceClock(core.vm.host, 10);
+    if (core.vm) advanceRetrace(core.vm.host);
   }
 
   async scroll(startX: number, startY: number, endX: number, endY: number, stepX: number, stepY: number): Promise<void> {

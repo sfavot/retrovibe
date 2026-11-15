@@ -92,7 +92,7 @@ export class CoktelApp {
     "aria-labelledby": "coktel-keyboard",
   });
   private readonly shell: GameShell;
-  private readonly soundBackend = new WebAudioSoundBackend();
+  private readonly soundBackend: WebAudioSoundBackend;
   private readonly outputs: CoktelAudioOutput[];
   private readonly system: System;
   private readonly game: Game;
@@ -113,6 +113,8 @@ export class CoktelApp {
   ) {
     const { copy } = options;
     const host = (this.host = new BrowserHost(files));
+    // la musique AdLib suit l'horloge du jeu : elle s'arrête avec lui pendant la pause
+    this.soundBackend = new WebAudioSoundBackend({ now: () => host.now() });
     const session = options.create({ host, soundBackend: this.soundBackend, random: scummvmRandom(randomSeed()) });
     this.system = session.system;
     this.game = session.game;
@@ -200,6 +202,7 @@ export class CoktelApp {
         this.soundBackend.close();
       },
       onFrame: () => {
+        this.soundBackend.update();
         this.presenter.present();
         this.syncTextEntry();
       },

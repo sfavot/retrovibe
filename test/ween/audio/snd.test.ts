@@ -86,7 +86,7 @@ describe.skipIf(!hasOriginalFiles)("SND de Ween : sortie Web Audio", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("tampon créé à la fréquence (relevée) de chaque échantillon, durée conservée ; Web Audio rééchantillonne à la lecture", () => {
-    const backend = new WebAudioSoundBackend();
+    const backend = new WebAudioSoundBackend({ now: () => 0 });
     backend.unlock();
     const ctx = contexts[0];
     const rates = new Set<number>();

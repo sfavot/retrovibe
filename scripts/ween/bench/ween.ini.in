@@ -1,0 +1,16 @@
+[scummvm]
+versioninfo=2026.4.0
+gfx_mode=surfacesdl
+vsync=false
+audio_driver=null
+last_window_width=640
+last_window_height=400
+
+[ween-fr]
+platform=pc
+gameid=ween
+description=Ween: The Prophecy (DOS/French)
+language=fr
+path=@GAME_DIR@
+engineid=gob
+guioptions=sndNoSubs sndNoSpeech launchNoLoad gameOption2 lang_French plat_pc

@@ -1,7 +1,8 @@
 import { prefixedStorage, type HostStorage } from "../../../engine/storage";
 import { localStorageStore } from "../../../ui/local-storage";
 import type { SaveSystem, VmContext } from "../../../engine/coktel/host";
-import type { GraphicsSystems } from "../../../engine/coktel/graphics";
+import { fromBase64, slotKey, toBase64 } from "../../../engine/coktel/saves/encoding";
+import { TempSpriteHandler, type SaveGraphics, type SpritePart } from "../../../engine/coktel/saves/temp-sprite";
 import type { Variables } from "../../../engine/coktel/variables";
 
 /**
@@ -46,10 +47,7 @@ export class LocalStorageStore implements KeyValueStore {
   }
 }
 
-/** Clé de stockage d'un emplacement de sauvegarde. */
-export function slotKey(slot: number): string {
-  return `cat.s${String(slot).padStart(2, "0")}`;
-}
+export { slotKey };
 
 // --- Constantes (SaveLoad_v3) ---------------------------------------------------------------
 
@@ -61,8 +59,6 @@ export const INDEX_SIZE = SLOT_COUNT * SLOT_NAME_LENGTH;
 export const SHOT_SIZE = 4768;
 export const SHOT_INDEX_SIZE = 50;
 export const NOTES_SIZE = 2560;
-const SPRITE_COUNT = 100;
-const PALETTE_BYTES = 768;
 
 type SaveFileKind = "game" | "screenshot" | "sprite" | "notes";
 
@@ -81,36 +77,7 @@ function lookup(file: string): SaveFileKind | "ignore" | null {
   return SAVE_FILES[name] ?? null;
 }
 
-// --- Sprite (SavePartSprite) ----------------------------------------------------------------
-
-/** Image 8 bits indexée et sa palette (768 octets, 6 bits par composante). */
-interface SpritePart {
-  width: number;
-  height: number;
-  pixels: Uint8Array;
-  palette: Uint8Array;
-}
-
-/** Ce que les sauvegardes lisent et écrivent dans l'affichage (sous-ensemble de GraphicsSystems). */
-export type SaveGraphics = {
-  core: Pick<GraphicsSystems["core"], "wanted" | "setFullPalette" | "touch">;
-  draw: { readonly sprites: ArrayLike<{ width: number; height: number; pixels: Uint8Array } | null>; forceBlit(): void };
-};
-
-// --- Encodage (le stockage ne contient que du texte) --------------------------------------
-
-function toBase64(bytes: Uint8Array): string {
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(out);
-}
-
-function fromBase64(text: string): Uint8Array {
-  const raw = atob(text);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
+export type { SaveGraphics };
 
 /** Fichier d'un emplacement : ses trois parties (info, variables, capture). */
 interface SlotFile {
@@ -156,12 +123,14 @@ export class GameSaves implements SaveSystem {
   private writer: PendingWriter | null = null;
   /** Index des captures (80 octets alloués, 50 utilisés pour Lost in Time). */
   private readonly shotIndex = new Uint8Array(80);
-  private tempSprite: SpritePart | null = null;
+  private readonly tempSprite: TempSpriteHandler;
 
   constructor(
-    private readonly gfx: SaveGraphics,
+    gfx: SaveGraphics,
     private readonly store: KeyValueStore,
-  ) {}
+  ) {
+    this.tempSprite = new TempSpriteHandler(gfx);
+  }
 
   attach(vm: VmContext): void {
     this.vm = vm;
@@ -181,7 +150,7 @@ export class GameSaves implements SaveSystem {
       case "screenshot":
         return this.tally(SHOT_SIZE, SHOT_INDEX_SIZE);
       case "sprite":
-        return this.tempSprite ? 4 + 4 + 1 + this.tempSprite.pixels.length + PALETTE_BYTES : -1;
+        return this.tempSprite.getSize();
       case "notes":
         return this.readNotes() ? NOTES_SIZE : -1;
       default:
@@ -196,7 +165,7 @@ export class GameSaves implements SaveSystem {
       case "screenshot":
         return this.shotLoad(varOffset, size, offset);
       case "sprite":
-        return this.spriteLoad(size);
+        return this.tempSprite.load(size);
       case "notes":
         return this.notesLoad(varOffset, size, offset);
       default:
@@ -211,7 +180,7 @@ export class GameSaves implements SaveSystem {
       case "screenshot":
         return this.shotSave(varOffset, size, offset);
       case "sprite":
-        return this.spriteSave(size);
+        return this.tempSprite.save(size);
       case "notes":
         return this.notesSave(varOffset, size, offset);
       default:
@@ -393,12 +362,12 @@ export class GameSaves implements SaveSystem {
     const rel = offset - SHOT_INDEX_SIZE;
     const slot = Math.trunc(rel / SHOT_SIZE);
     if (slot >= SLOT_COUNT || rel % SHOT_SIZE !== 0) return false;
-    const target = this.spriteAt(size);
+    const target = this.tempSprite.spriteAt(size);
     if (!target) return false;
     const shot = this.readSlot(slot)?.shot;
     // les dimensions doivent concorder (SavePartSprite::read)
     if (!shot || shot.width * shot.height !== target.width * target.height) return false;
-    return this.restoreSprite(shot, size);
+    return this.tempSprite.restore(shot, size);
   }
 
   private shotSave(dataVar: number, size: number, offset: number): boolean {
@@ -411,71 +380,12 @@ export class GameSaves implements SaveSystem {
       this.shotIndex.set(data, offset);
       return true;
     }
-    const part = this.captureSprite(size);
+    const part = this.tempSprite.capture(size);
     if (!part) return false;
     const rel = offset - SHOT_INDEX_SIZE;
     const slot = Math.trunc(rel / SHOT_SIZE);
     if (slot >= SLOT_COUNT || rel % SHOT_SIZE !== 0) return false;
     return this.writePart(slot, { shot: part });
-  }
-
-  // --- intro.$$$ (TempSpriteHandler) ---
-
-  private spriteLoad(size: number): boolean {
-    if (size === 0) return true;
-    const sprite = this.tempSprite;
-    if (!sprite) return false;
-    const target = this.spriteAt(size);
-    if (!target || target.width * target.height !== sprite.width * sprite.height) return false;
-    return this.restoreSprite(sprite, size);
-  }
-
-  private spriteSave(size: number): boolean {
-    if (size === 0) return true;
-    const part = this.captureSprite(size);
-    if (!part) return false;
-    this.tempSprite = part;
-    return true;
-  }
-
-  /** Index de sprite codé dans une « taille » négative (-1 - index) ; -1000 : avec la palette, -3000 en plus. */
-  private static spriteIndex(size: number): number {
-    if (size < -3000) size += 3000;
-    if (size < -1000) size += 1000;
-    return -size - 1;
-  }
-
-  private spriteAt(size: number) {
-    if (size >= 0) return null;
-    const index = GameSaves.spriteIndex(size);
-    if (index < 0 || index >= SPRITE_COUNT) return null;
-    return this.gfx.draw.sprites[index] ?? null;
-  }
-
-  /** TempSpriteHandler::createSprite + readSprite (+ readPalette) : copie le sprite désigné. */
-  private captureSprite(size: number): SpritePart | null {
-    const sprite = this.spriteAt(size);
-    if (!sprite) return null;
-    return {
-      width: sprite.width,
-      height: sprite.height,
-      pixels: sprite.pixels.slice(),
-      palette: size < -1000 ? this.gfx.core.wanted.slice(0, PALETTE_BYTES) : new Uint8Array(PALETTE_BYTES),
-    };
-  }
-
-  /** writeSprite (+ writePalette), puis réaffichage : le sprite 21 est recopié à l'écran, le 20 est l'écran. */
-  private restoreSprite(part: SpritePart, size: number): boolean {
-    const target = this.spriteAt(size)!;
-    target.pixels.set(part.pixels.subarray(0, target.pixels.length));
-    if (size < -1000) {
-      this.gfx.core.wanted.set(part.palette.subarray(0, PALETTE_BYTES));
-      this.gfx.core.setFullPalette();
-    }
-    const index = GameSaves.spriteIndex(size);
-    if (index === 21) this.gfx.draw.forceBlit();
-    else if (index === 20) this.gfx.core.touch();
-    return true;
   }
 
   // --- bloc.inf (NotesHandler) ---

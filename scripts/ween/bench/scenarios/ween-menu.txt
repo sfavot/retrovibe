@@ -1,0 +1,17 @@
+# Ween (gob) : Echap pendant l'introduction (INTRO0) -> INTRO.TOT appelle la protection (sautee, offset 348) -> MENU.TOT (barre
+# d'icones, boucle du jeu) -> nouvelle partie -> premier ecran de jeu (EMAJ1000). Captures m-NNNN toutes les secondes de temps du jeu,
+# puis clic sur la premiere icone (disquette : menu des options) : o-NNNN. Temps virtuel conseille.
+realmouse
+move 160 100
+wait 3000
+shot before-esc
+key ESC
+burst 1000 10 m-
+wait 11000
+move 28 10
+wait 1000
+shot hover-disk
+click 28 10
+burst 500 12 o-
+wait 7000
+quit

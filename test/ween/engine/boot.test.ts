@@ -8,7 +8,7 @@ import { firstDivergence, loadReference, readOriginalStk, runBench, type BenchIn
 /**
  * Démarrage de Ween comparé au banc ScummVM (vague C) : TOT chargés (`TT`), protection sautée (`PS`) et hachage des
  * variables (`VH`) à chaque image, identiques au banc sur toute la longueur des traces de référence
- * (`test/ween/fixtures/`, produites par `bench/run-ween.sh` en temps virtuel, graine 1 ; voir `bench.ts`).
+ * (`test/ween/fixtures/`, produites par `scripts/ween/bench/ween-replay.sh` en temps virtuel, graine 1 ; voir `bench.ts`).
  */
 describe.skipIf(!hasOriginalFiles)("Ween : démarrage comparé au banc ScummVM", () => {
   it("introduction regardée jusqu'à EMAJ1000 (rustine VAR(59) à l'image 2 550) : 4 000 images identiques au banc", async () => {

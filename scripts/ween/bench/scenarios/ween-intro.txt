@@ -1,0 +1,7 @@
+# Ween (gob) : introduction complete sans entree, jusqu'au premier ecran de jeu (INTRO5 -> protection sautee -> MENU -> nouvelle
+# partie automatique -> EMAJ1000). Captures i-NNNN toutes les 2,5 s de temps du jeu. Prevu pour le temps virtuel
+# (SKY_VIRTUAL_TIME=1 GOB_VIRTUAL_AUDIO=1 : ~5 s reelles) ; en temps reel, compter ~7 min (DELAI 450).
+realmouse
+burst 2500 170 i-
+wait 425000
+quit

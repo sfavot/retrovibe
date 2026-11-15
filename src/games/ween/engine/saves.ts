@@ -18,8 +18,9 @@
  */
 import { MemoryStorage, prefixedStorage, type HostStorage } from "../../../engine/storage";
 import type { GameSaveSystem } from "../../../engine/coktel/definition";
-import type { GraphicsSystems } from "../../../engine/coktel/graphics";
 import type { VmContext } from "../../../engine/coktel/host";
+import { fromBase64, slotKey, toBase64 } from "../../../engine/coktel/saves/encoding";
+import { TempSpriteHandler, type SaveGraphics } from "../../../engine/coktel/saves/temp-sprite";
 import type { Variables } from "../../../engine/coktel/variables";
 import { localStorageStore } from "../../../ui/local-storage";
 
@@ -34,27 +35,17 @@ export const SAVE_FORMAT_VERSION = 1;
 /** Préfixe des clés du jeu dans `localStorage`. */
 export const WEEN_STORAGE_PREFIX = "ween:";
 
-const SPRITE_COUNT = 100;
-const PALETTE_BYTES = 768;
-
 /** Stockage durable de Ween : `localStorage` (qui peut être absent ou bloqué), clés préfixées par `ween:`. */
 export function weenStorage(): HostStorage {
   return prefixedStorage(localStorageStore(), WEEN_STORAGE_PREFIX);
 }
 
-/** Clé de stockage d'un emplacement de sauvegarde. */
-export function slotKey(slot: number): string {
-  return `cat.s${String(slot).padStart(2, "0")}`;
-}
+export { slotKey };
 
 /** Clé du bloc-notes. */
 export const NOTES_KEY = "bloc";
 
-/** Ce que le sprite temporaire lit et écrit dans l'affichage (sous-ensemble de GraphicsSystems). */
-export type SaveGraphics = {
-  core: Pick<GraphicsSystems["core"], "wanted" | "setFullPalette" | "touch">;
-  draw: { readonly sprites: ArrayLike<{ width: number; height: number; pixels: Uint8Array } | null>; forceBlit(): void };
-};
+export type { SaveGraphics };
 
 type Handler = "game" | "notes" | "sprite";
 
@@ -71,21 +62,6 @@ function handlerOf(file: string): Handler | null {
   return SAVE_FILES[base] ?? null;
 }
 
-// --- Encodage (le stockage ne contient que du texte) --------------------------------------
-
-function toBase64(bytes: Uint8Array): string {
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(out);
-}
-
-function fromBase64(text: string): Uint8Array {
-  const raw = atob(text);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
-
 /** Emplacement : description (40 octets), taille des variables à l'écriture (SavePartInfo::_varCount) et variables. */
 interface SlotFile {
   varSize: number;
@@ -100,27 +76,21 @@ interface SlotJson {
   vars: string;
 }
 
-/** Sprite temporaire (SavePartSprite) : image 8 bits et palette (768 octets, 6 bits par composante). */
-interface SpritePart {
-  width: number;
-  height: number;
-  pixels: Uint8Array;
-  palette: Uint8Array;
-}
-
 /** Sauvegardes de Ween (SaveLoad_v2) sur un stockage clé / valeur. */
 export class WeenSaves implements GameSaveSystem {
   private vm: VmContext | null = null;
   /** Index des descriptions tel que le script l'a écrit (`_index`), en attente de l'écriture d'un emplacement. */
   private readonly index = new Uint8Array(INDEX_SIZE);
   private hasIndex = false;
-  private tempSprite: SpritePart | null = null;
+  private readonly tempSprite: TempSpriteHandler;
 
   /** Sans `gfx`, `save.inf` reste vu absent ; sans `store`, tout reste en mémoire le temps de la partie. */
   constructor(
-    private readonly gfx: SaveGraphics | null = null,
+    gfx: SaveGraphics | null = null,
     private readonly store: HostStorage = new MemoryStorage(),
-  ) {}
+  ) {
+    this.tempSprite = new TempSpriteHandler(gfx);
+  }
 
   attach(vm: VmContext): void {
     this.vm = vm;
@@ -158,8 +128,7 @@ export class WeenSaves implements GameSaveSystem {
       case "notes":
         return this.readNotes() ? NOTES_SIZE : -1;
       case "sprite":
-        // SavePartSprite : en-tête de taille (4 + 4 + 1 + pixels + palette)
-        return this.tempSprite ? 4 + 4 + 1 + this.tempSprite.pixels.length + PALETTE_BYTES : -1;
+        return this.tempSprite.getSize();
       default:
         return -1;
     }
@@ -172,7 +141,7 @@ export class WeenSaves implements GameSaveSystem {
       case "notes":
         return this.notesLoad(dataVar, size, offset);
       case "sprite":
-        return this.spriteLoad(size);
+        return this.tempSprite.load(size);
       default:
         return false;
     }
@@ -185,7 +154,7 @@ export class WeenSaves implements GameSaveSystem {
       case "notes":
         return this.notesSave(dataVar, size, offset);
       case "sprite":
-        return this.spriteSave(size);
+        return this.tempSprite.save(size);
       default:
         return false;
     }
@@ -342,52 +311,5 @@ export class WeenSaves implements GameSaveSystem {
     const notes = new Uint8Array(NOTES_SIZE);
     notes.set(data, offset);
     return this.writeJson(NOTES_KEY, { data: toBase64(notes) });
-  }
-
-  // --- save.inf (TempSpriteHandler) ---
-
-  /** Index de sprite codé dans une « taille » négative (-1 - index) ; en dessous de -1000 : avec la palette. */
-  private static spriteIndex(size: number): number {
-    if (size < -3000) size += 3000;
-    if (size < -1000) size += 1000;
-    return -size - 1;
-  }
-
-  private spriteAt(size: number) {
-    if (size >= 0 || !this.gfx) return null;
-    const index = WeenSaves.spriteIndex(size);
-    if (index < 0 || index >= SPRITE_COUNT) return null;
-    return this.gfx.draw.sprites[index] ?? null;
-  }
-
-  private spriteLoad(size: number): boolean {
-    if (size === 0) return true; // taille nulle : ni sprite, ni erreur
-    const sprite = this.tempSprite;
-    if (!sprite) return false;
-    const target = this.spriteAt(size);
-    if (!target || target.width * target.height !== sprite.width * sprite.height) return false;
-    // writeSprite, puis writePalette et setFullPalette si la taille l'indique
-    target.pixels.set(sprite.pixels.subarray(0, target.pixels.length));
-    if (size < -1000) {
-      this.gfx!.core.wanted.set(sprite.palette.subarray(0, PALETTE_BYTES));
-      this.gfx!.core.setFullPalette();
-    }
-    const index = WeenSaves.spriteIndex(size);
-    if (index === 21) this.gfx!.draw.forceBlit();
-    else if (index === 20) this.gfx!.core.touch();
-    return true;
-  }
-
-  private spriteSave(size: number): boolean {
-    if (size === 0) return true;
-    const sprite = this.spriteAt(size);
-    if (!sprite) return false;
-    this.tempSprite = {
-      width: sprite.width,
-      height: sprite.height,
-      pixels: sprite.pixels.slice(),
-      palette: size < -1000 ? this.gfx!.core.wanted.slice(0, PALETTE_BYTES) : new Uint8Array(PALETTE_BYTES),
-    };
-    return true;
   }
 }

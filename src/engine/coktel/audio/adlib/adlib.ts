@@ -2,13 +2,17 @@
  * Pilote AdLib des jeux Coktel : gestion des voix OPL2 et séquenceur à 1000 ticks par seconde.
  *
  * Port de engines/gob/sound/adlib.cpp de ScummVM (https://www.scummvm.org, GPL-3.0-or-later,
- * aussi LGPL-2.1+) et de la mécanique de EmulatedChip::readBuffer (audio/softsynth/opl, chip.cpp)
- * qui déclenche la fonction de rappel du séquenceur tous les `rate / 1000` échantillons.
+ * aussi LGPL-2.1+). Comme `OPL::Config::create`, la puce est au choix :
+ * - un émulateur rendu ici (`render`, mécanique de EmulatedChip::readBuffer, audio/softsynth/opl/chip.cpp,
+ *   qui appelle `onTimer` tous les `rate / 1000` échantillons) : rendu hors ligne (tests, script d'écoute) ;
+ * - une sortie externe (`OplSink`, la sortie OPL commune du navigateur `src/audio/web-opl.ts`) : l'appelant
+ *   cadence alors `onTimer` lui-même et date les écritures (`OplAdlibOutput`, `output.ts`).
  *
  * Écarts : pas de mutex (tout tourne dans un seul fil), voix hors bornes ignorées (comportement
  * indéfini en C++), volume de musique fixé à la valeur par défaut de ScummVM (192/256).
  */
 import { Opl2 } from "../../../../audio/opl2";
+import type { OplSink } from "../../../../audio/opl-stream";
 
 // Paramètres d'opérateur
 export const PARAM_KEY_SCALE_LEVEL = 0;
@@ -115,9 +119,11 @@ const FREQS = buildFreqs();
 
 /** Base d'un lecteur de musique AdLib : sous-classes = format (ADL, MDY...). */
 export abstract class AdLib {
-  private readonly opl: Opl2;
-  private readonly sampleRate: number;
-  /** Échantillons entre deux ticks, en virgule fixe 16.16 (EmulatedChip::_samplesPerTick). */
+  /** Puce qui reçoit les écritures de registres. */
+  private readonly chip: OplSink;
+  /** Émulateur rendu par `render` ; absent quand la puce est externe. */
+  private readonly emulator: Opl2 | null;
+  /** Échantillons entre deux ticks, en virgule fixe 16.16 (EmulatedChip::_samplesPerTick), avec l'émulateur. */
   private readonly samplesPerTick: number;
   private nextTick = 0;
   private readonly scratch = new Int16Array(4096);
@@ -148,19 +154,25 @@ export abstract class AdLib {
   /** Appelé quand la lecture s'arrête d'elle-même (fin du morceau, sans répétition restante). */
   onFinished: (() => void) | null = null;
 
-  constructor(sampleRate: number, callbackFrequency: number) {
-    this.sampleRate = sampleRate;
-    this.opl = new Opl2(sampleRate);
+  /**
+   * `output` : fréquence d'échantillonnage d'un émulateur rendu par `render`, ou puce externe cadencée par l'appelant
+   * (`onTimer` à `callbackFrequency` ticks par seconde).
+   */
+  constructor(output: number | OplSink, callbackFrequency: number) {
+    if (typeof output === "number") {
+      const opl = new Opl2(output);
+      this.emulator = opl;
+      this.chip = { write: (reg, value) => opl.writeReg(reg, value) };
+      const d = Math.trunc(output / callbackFrequency);
+      const r = output % callbackFrequency;
+      this.samplesPerTick = (d << 16) + Math.trunc((r << 16) / callbackFrequency);
+    } else {
+      this.emulator = null;
+      this.chip = output;
+      this.samplesPerTick = 0;
+    }
     this.resetFreqs();
     this.initOPL();
-    const d = Math.trunc(sampleRate / callbackFrequency);
-    const r = sampleRate % callbackFrequency;
-    this.samplesPerTick = (d << 16) + Math.trunc((r << 16) / callbackFrequency);
-  }
-
-  /** Cadence d'échantillonnage de la sortie. */
-  get rate(): number {
-    return this.sampleRate;
   }
 
   /** Reste-t-il quelque chose à jouer ? (le `_playing` de ScummVM) */
@@ -191,10 +203,11 @@ export abstract class AdLib {
   }
 
   /**
-   * Génère `length` échantillons mono (flottants -1..1) dans `out` : EmulatedChip::readBuffer,
+   * Avec l'émulateur seulement : génère `length` échantillons mono (flottants -1..1) dans `out` (EmulatedChip::readBuffer),
    * le séquenceur est appelé à chaque tick, entre deux paquets d'échantillons.
    */
   render(out: Float32Array, offset: number, length: number): void {
+    if (!this.emulator) throw new Error("AdLib : puce externe, rien à rendre ici");
     let len = length;
     let pos = offset;
     do {
@@ -215,7 +228,7 @@ export abstract class AdLib {
     const buf = this.scratch;
     for (let done = 0; done < length; ) {
       const n = Math.min(buf.length, length - done);
-      this.opl.generate(buf, 0, n);
+      this.emulator!.generate(buf, 0, n);
       for (let i = 0; i < n; i++) out[offset + done + i] = buf[i] / 32768;
       done += n;
     }
@@ -228,7 +241,8 @@ export abstract class AdLib {
   /** Remet le morceau au début. */
   protected abstract rewind(): void;
 
-  private onTimer(): void {
+  /** Un tick du séquenceur (AdLib::onTimer) : appelé par `render` avec l'émulateur, par l'appelant avec une puce externe. */
+  onTimer(): void {
     if (!this._playing) return;
     if (this.toPoll > 0) {
       this.toPoll--;
@@ -265,7 +279,7 @@ export abstract class AdLib {
   }
 
   private writeOPL(reg: number, val: number): void {
-    this.opl.writeReg(reg, val & 0xff);
+    this.chip.write(reg, val & 0xff);
   }
 
   private reset(): void {

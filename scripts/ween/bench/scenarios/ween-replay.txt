@@ -1,0 +1,4 @@
+# Ween (gob) : rejeu par image (GOB_INPUT, GOB_SHOT_FRAMES, GOB_STOP_FRAME) ; le scenario ne fait qu'attendre (pas d'entree du banc).
+realmouse
+wait 600000
+quit

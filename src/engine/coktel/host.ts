@@ -54,6 +54,11 @@ export interface Host {
    * tour des boucles d'attente (zones actives, relâchement des boutons, fin d'un son). Facultatif (tests).
    */
   markImage?(): void;
+  /**
+   * Signalé juste avant chaque attente du balayage (`Video::waitRetrace`, y compris celles d'une fonction synchrone,
+   * voir `advanceRetrace`), avant l'avance de l'horloge : ScummVM met alors l'écran à jour. Facultatif (tests).
+   */
+  onWaitRetrace?(): void;
   readonly input: InputState;
   /** Date locale (pour renewTimeInVars). */
   date(): Date;
@@ -61,9 +66,11 @@ export interface Host {
 }
 
 /** Video::waitRetrace (voir `FrameTimer.waitRetrace`). */
-export async function waitRetrace(host: Pick<Host, "nextFrame" | "delay">, alone = false): Promise<void> {
-  if (host.delay) await host.delay(10);
-  else if (alone) await host.nextFrame();
+export async function waitRetrace(host: Pick<Host, "nextFrame" | "delay" | "onWaitRetrace">, alone = false): Promise<void> {
+  if (host.delay) {
+    host.onWaitRetrace?.();
+    await host.delay(10);
+  } else if (alone) await host.nextFrame();
 }
 
 /**
@@ -72,6 +79,13 @@ export async function waitRetrace(host: Pick<Host, "nextFrame" | "delay">, alone
  */
 export function advanceClock(host: Pick<Host, "delay">, ms: number): void {
   if (host.delay) void host.delay(ms);
+}
+
+/** Video::waitRetrace faite par une fonction synchrone (voir `advanceClock`) : 10 ms, signalées à `Host.onWaitRetrace`. */
+export function advanceRetrace(host: Pick<Host, "delay" | "onWaitRetrace">): void {
+  if (!host.delay) return;
+  host.onWaitRetrace?.();
+  void host.delay(10);
 }
 
 /**
@@ -88,7 +102,7 @@ export class FrameTimer {
   frameWaitTime = 0;
   startFrameTime = 0;
   constructor(
-    private readonly host: Pick<Host, "now" | "nextFrame" | "delay" | "markImage">,
+    private readonly host: Pick<Host, "now" | "nextFrame" | "delay" | "markImage" | "onWaitRetrace">,
     private readonly shouldQuit: () => boolean = () => false,
   ) {}
 
@@ -772,6 +786,8 @@ export class HeadlessHost implements Host {
   images = 0;
   /** Appelé à chaque point d'image avec son numéro (entrées et traces des tests). */
   onImage: ((n: number) => void) | null = null;
+  /** Appelé avant chaque attente du balayage (voir `Host.onWaitRetrace`). */
+  onWaitRetrace?: () => void;
   readonly delay?: (ms: number) => Promise<void>;
 
   constructor(private readonly options: HeadlessHostOptions) {

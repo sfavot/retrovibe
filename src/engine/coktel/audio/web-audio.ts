@@ -1,7 +1,9 @@
 import { createMonoBuffer, s8ToFloat32 } from "../../../audio/pcm";
+import { WebOpl } from "../../../audio/web-opl";
 import { type Sample, type SampleVoice, WebSampleOutput } from "../../../audio/web-sample-output";
 import type { Mutable, SoundBackend } from "./backend";
-import { WorkletAdlibOutput } from "./adlib/worklet-output";
+import { ADL_TICKS_PER_SECOND } from "./adlib/adl-player";
+import { OplAdlibOutput } from "./adlib/output";
 import { SPEAKER_GAIN, type SpeakerOutput } from "./pcspeaker";
 
 /**
@@ -63,46 +65,56 @@ class WebSpeakerOutput implements SpeakerOutput {
  * navigateurs) : appeler `unlock()` depuis un gestionnaire d'événement utilisateur.
  *
  * Le contexte, le gain général (mute), la suspension de l'onglet et la lecture de l'échantillon courant (`playSample`) sont ceux de
- * `WebSampleOutput` (commun aux jeux). Restent propres à ce jeu : la file de lecture planifiée (`queuePcm`, sur l'horloge du
- * contexte) et la musique AdLib (worklet), branchées sur le même contexte et le même gain général.
+ * `WebSampleOutput` (commun aux jeux). Reste propre à ce moteur la file de lecture planifiée (`queuePcm`, sur l'horloge du
+ * contexte). La musique AdLib passe par la sortie OPL commune (`WebOpl`, son propre contexte, comme la musique de BASS) :
+ * coupure, suspension, déblocage et fermeture suivent ceux des effets.
  */
 export class WebAudioSoundBackend implements SoundBackend, Mutable {
-  private readonly output = new WebSampleOutput({
-    now: () => performance.now(),
-    onContext: (ctx, master) => this.adlib.attach(ctx, master),
-  });
+  private readonly output = new WebSampleOutput({ now: () => performance.now() });
   private voice: SampleVoice | null = null;
   private queued: AudioBufferSourceNode[] = [];
   private queueEnd = 0;
   private readonly samples = new WeakMap<Int8Array, Sample>();
   private readonly queueBuffers = new WeakMap<Float32Array, AudioBuffer>();
-  /** Musique AdLib : synthèse dans un AudioWorklet, branchée sur le même gain général (mute, pause). */
-  readonly adlib = new WorkletAdlibOutput();
+  /** Puce OPL2 de la musique : AudioWorklet commun, écritures datées à 1 000 ticks par seconde. */
+  private readonly opl = new WebOpl({ tickRate: ADL_TICKS_PER_SECOND });
+  /** Musique AdLib : lecteur ADL sur le fil principal, cadencé par l'horloge du jeu (`update`). */
+  readonly adlib: OplAdlibOutput;
   readonly speaker: SpeakerOutput = new WebSpeakerOutput(() => this.output.connection());
 
-  constructor() {
-    // Une musique AdLib demandée avant tout geste crée le contexte (suspendu), le prochain geste le reprend
-    this.adlib.ensureContext = () => this.output.connection();
+  /** `now` : horloge du jeu en millisecondes (arrêtée pendant la pause), qui cadence la musique AdLib. */
+  constructor(options: { now: () => number }) {
+    this.adlib = new OplAdlibOutput(this.opl, options.now);
   }
 
-  /** À appeler de façon synchrone dans un geste utilisateur : crée puis reprend le contexte. */
+  /** Fait avancer la musique AdLib sur l'horloge du jeu : à appeler à chaque image. */
+  update(): void {
+    this.adlib.update();
+  }
+
+  /** À appeler de façon synchrone dans un geste utilisateur : crée puis reprend les contextes. */
   unlock(): void {
     this.output.unlock();
+    this.opl.unlock();
   }
 
   suspend(): void {
     this.output.suspend();
+    this.opl.suspend();
   }
 
   resume(): void {
     this.output.resume();
+    this.opl.resume();
   }
 
-  /** Libère le contexte audio (page du jeu quittée) : musique AdLib, haut-parleur et échantillons se taisent. */
+  /** Libère les contextes audio (page du jeu quittée) : musique AdLib, haut-parleur et échantillons se taisent. */
   close(): void {
     this.clearQueue();
     this.voice = null;
+    this.adlib.unload();
     this.output.close();
+    this.opl.close();
   }
 
   get muted(): boolean {
@@ -111,6 +123,7 @@ export class WebAudioSoundBackend implements SoundBackend, Mutable {
 
   set muted(value: boolean) {
     this.output.setMuted(value);
+    this.opl.setMuted(value);
   }
 
   private sample(pcm: Int8Array, rate: number): Sample {

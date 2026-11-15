@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { parseAdl } from "../../../src/engine/coktel/audio/adlib/adl-player";
-import { AdlibSynth } from "../../../src/engine/coktel/audio/adlib/synth";
+import { describe, expect, it, vi } from "vitest";
+import { Opl2 } from "../../../src/audio/opl2";
+import { AdlPlayer, parseAdl } from "../../../src/engine/coktel/audio/adlib/adl-player";
+import { OplAdlibOutput } from "../../../src/engine/coktel/audio/adlib/output";
 import { hasOriginalFiles, sha1 } from "../helpers";
 import { referenceTrace, TRACE_RATE, tracePlayer, weenAdls } from "./adl-trace";
 
@@ -52,14 +53,40 @@ describe.skipIf(!hasOriginalFiles)("musiques ADL de Ween", () => {
     expect(loop.finishedAt).toEqual([]);
   });
 
+  it.each([0, 1, 2, 3, 4, 5])(
+    "morceau %i : la sortie du navigateur (OplAdlibOutput, horloge du jeu) fait les mêmes écritures OPL aux mêmes ticks",
+    (i) => {
+      const reference = tracePlayer(adls[i], 1, 5_000_000);
+      // Écritures datées par `beginTick` : le tick 0 est celui des commandes (chargement, lecture), le n-ième `onTimer`
+      // tombe au tick n ; `tracePlayer` compte -1 avant le premier `onTimer`.
+      const writes: string[] = [];
+      let tick = 0;
+      let ms = 0;
+      const out = new OplAdlibOutput({ beginTick: (n) => void (tick = n), write: (reg, val) => void writes.push(`${tick - 1} ${reg} ${val}`) }, () => ms);
+      let finished = 0;
+      out.onStopped = () => finished++;
+      out.load(adls[i]);
+      out.setRepeating(1);
+      out.play();
+      // images irrégulières, comme celles d'un navigateur
+      for (let frame = 0; out.playing && ms < 1_000_000; frame++) {
+        ms += [16, 17, 33, 7][frame % 4];
+        out.update();
+      }
+      expect(finished).toBe(1);
+      // la référence commence par la remise à zéro de l'émulateur lui-même (constructeur d'`Opl2`, dans le worklet ici)
+      expect(writes).toEqual(reference.writes.slice(opl2ResetWrites()));
+    },
+  );
+
   it("le début de chaque morceau sonne (synthèse réelle, 3 s) sans valeur aberrante", () => {
     for (const [i, data] of adls.entries()) {
-      const synth = new AdlibSynth(TRACE_RATE);
-      synth.load(data);
-      synth.setRepeating(0);
-      synth.play();
+      const player = new AdlPlayer(TRACE_RATE);
+      player.load(data);
+      player.setRepeating(0);
+      player.startPlay();
       const out = new Float32Array(TRACE_RATE * 3);
-      synth.render(out);
+      player.render(out, 0, out.length);
       let sum = 0;
       for (const v of out) {
         expect(Number.isFinite(v)).toBe(true);
@@ -70,6 +97,17 @@ describe.skipIf(!hasOriginalFiles)("musiques ADL de Ween", () => {
     }
   });
 });
+
+/** Nombre d'écritures de registres faites par le constructeur de l'émulateur (sa remise à zéro). */
+function opl2ResetWrites(): number {
+  const spy = vi.spyOn(Opl2.prototype, "writeReg");
+  try {
+    new Opl2(TRACE_RATE);
+    return spy.mock.calls.length;
+  } finally {
+    spy.mockRestore();
+  }
+}
 
 /** Mesures faites sur les fichiers d'origine (taille, mode, timbres, octets du morceau, sha1) ; (tick de fin, commandes) ; (écritures OPL, hachage). */
 const EXPECTED = {

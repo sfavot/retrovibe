@@ -119,15 +119,15 @@ export class OplStream {
     return at;
   }
 
-  /** Programme les écritures (`(registre << 8) | valeur`) d'un tick. */
+  /**
+   * Programme les écritures (`(registre << 8) | valeur`) d'un tick. L'ordre d'arrivée est toujours gardé : un recalage
+   * qui ramènerait `at` avant des écritures encore en attente les rejoint à leur date (une coupure de note jouée avant
+   * la note qu'elle coupe la laisserait tenue).
+   */
   schedule(tick: number, writes: ArrayLike<number>): void {
-    const at = this.placeTick(tick);
-    // Insertion stable : un recalage peut ramener `at` avant des écritures déjà en attente.
-    let index = this.queue.length;
-    while (index > this.head && this.queue[index - 1].at > at) index--;
-    const items: Pending[] = [];
-    for (let i = 0; i < writes.length; i++) items.push({ at, packed: writes[i] });
-    this.queue.splice(index, 0, ...items);
+    let at = this.placeTick(tick);
+    if (this.queue.length > this.head) at = Math.max(at, this.queue[this.queue.length - 1].at);
+    for (let i = 0; i < writes.length; i++) this.queue.push({ at, packed: writes[i] });
   }
 
   /** Écritures encore en attente. */

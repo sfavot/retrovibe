@@ -91,7 +91,7 @@ describe("haut-parleur : sortie Web Audio", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("onde carrée à la fréquence demandée, arrêt différé, note suivante qui remplace la précédente", () => {
-    const backend = new WebAudioSoundBackend();
+    const backend = new WebAudioSoundBackend({ now: () => 0 });
     backend.unlock();
     const ctx = contexts[0];
     backend.speaker.play(500, Infinity);

@@ -1,0 +1,5 @@
+# Ween (gob) : essai court, captures toutes les 2,5 s
+move 160 100
+burst 2500 12 w-
+wait 31000
+quit

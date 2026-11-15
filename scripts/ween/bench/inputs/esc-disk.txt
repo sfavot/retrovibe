@@ -1,0 +1,4 @@
+# Echap a l image 20, puis clic sur la disquette (menu des options) a l image 400
+20 k ESC
+300 m 28 10
+400 c 28 10

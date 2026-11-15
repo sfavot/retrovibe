@@ -19,7 +19,7 @@ export interface Shot {
  * d'image du banc (`GOB_SHOT_FRAMES`).
  *
  * Le banc relève l'écran de ScummVM (`OSystem::lockScreen`), mis à jour par `Video::retrace` : à chaque attente du
- * balayage (`waitRetrace`, repérée dans la pile d'appels), à la fin de `waitEndFrame` et après l'image voulue d'un film.
+ * balayage (`waitRetrace`, signalée par `Host.onWaitRetrace`), à la fin de `waitEndFrame` et après l'image voulue d'un film.
  * L'écran relevé ici l'est aux mêmes points (`GraphicsCore.retrace`), la palette est celle du moment (ScummVM la
  * pose aussitôt).
  */
@@ -40,14 +40,8 @@ export async function captureFrames(
         // Accents des polices-sprites : ScummVM lit un `char` signé et ne les dessine pas.
         (game.sys.draw as DrawImpl).signedSpriteChars = true;
         core.onRetrace = () => (displayed = composeIndexed(core));
-        const host = game.host as HeadlessHost;
-        const delay = host.delay!.bind(host);
-        (host as { delay: (ms: number) => Promise<void> }).delay = (ms) => {
-          // `waitRetrace` seule retrace : les autres attentes (`Util::delay`) ne montrent rien de nouveau.
-          const stack = new Error().stack ?? "";
-          if (stack.includes("waitRetrace") || (ms === 10 && stack.includes("advanceClock"))) core.retrace();
-          return delay(ms);
-        };
+        // `waitRetrace` seule retrace : les autres attentes (`Util::delay`) ne montrent rien de nouveau.
+        (game.host as HeadlessHost).onWaitRetrace = () => core.retrace();
         const timer = game.timer;
         const waitEndFrame = timer.waitEndFrame.bind(timer);
         timer.waitEndFrame = async () => {

@@ -85,8 +85,8 @@ const OUTPUT_RATE = 44100;
 const MIX_BLOCK = 512;
 
 /**
- * État du lecteur ADL côté moteur (ADLPlayer/AdLib de ScummVM). La synthèse vit dans `AdlibOutput`
- * (AudioWorklet) qui signale la fin du morceau ; sans sortie, une musique joue jusqu'à son arrêt.
+ * État du lecteur ADL côté moteur (ADLPlayer/AdLib de ScummVM). Le lecteur vit dans `AdlibOutput`, qui signale la fin
+ * du morceau ; sans sortie, une musique joue jusqu'à son arrêt.
  */
 class AdlState {
   index = -1;
@@ -475,8 +475,8 @@ export class SoundEngine implements SoundSystem {
   }
 
   // --- AdLib ---------------------------------------------------------------------------------
-  // Le lecteur et l'émulateur OPL2 tournent dans `AdlibOutput` (AudioWorklet) : la fin d'un morceau
-  // (sans répétition restante) revient par `onStopped`, comme `_playing` de AdLib::onTimer.
+  // Le lecteur tourne dans `AdlibOutput` (`OplAdlibOutput` sur la sortie OPL commune dans le navigateur) : la fin d'un
+  // morceau (sans répétition restante) revient par `onStopped`, comme `_playing` de AdLib::onTimer.
 
   private adlLoad(sample: SoundDesc, index: number): void {
     this.adlUnload();
@@ -498,9 +498,10 @@ export class SoundEngine implements SoundSystem {
 
   private adlPlay(): void {
     if (!this.adl.loaded) return;
-    this.adl.playing = true;
     this.adlibOut?.setRepeating(this.adl.repeating);
     this.adlibOut?.play();
+    // après les appels : une fin signalée pendant leur rattrapage de ticks (`OplAdlibOutput.update`) est celle d'avant
+    this.adl.playing = true;
   }
 
   stopAdlib(): void {

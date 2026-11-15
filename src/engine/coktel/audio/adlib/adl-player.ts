@@ -6,12 +6,13 @@
  * un octet ignoré, les timbres (28 mots 16 bits LE chacun), puis le morceau : suites de
  * [commande + arguments + délai] dont le délai est compté en ticks de 1 ms.
  */
+import type { OplSink } from "../../../../audio/opl-stream";
 import { AdLib, MAX_VOICE_COUNT, MAX_VOLUME, MELODY_VOICE_COUNT, OPERATORS_PER_VOICE, PARAM_COUNT } from "./adlib";
 
 /** Nombre de paramètres d'un timbre (2 opérateurs x 14). */
 const TIMBRE_SIZE = OPERATORS_PER_VOICE * PARAM_COUNT;
-/** Fréquence du séquenceur : un tick par milliseconde. */
-const TICKS_PER_SECOND = 1000;
+/** Fréquence du séquenceur : un tick par milliseconde (`ADLPlayer::ADLPlayer() : AdLib(1000)`). */
+export const ADL_TICKS_PER_SECOND = 1000;
 
 export interface AdlSong {
   /** 0 = voix mélodiques seules, sinon mode percussions. */
@@ -25,8 +26,10 @@ export interface AdlSong {
 }
 
 /**
- * ADLPlayer::load : refuse les fichiers de moins de 60 octets. Un fichier tronqué est accepté comme
- * dans ScummVM (lecture hors fichier = rien à jouer) : les mots manquants valent 0.
+ * ADLPlayer::load : refuse les fichiers de moins de 60 octets (`readHeader`). Un fichier tronqué est accepté, comme dans
+ * ScummVM : `readTimbres` et `load` ne testent que `err()`, que la lecture au-delà de la fin d'un flux ne lève pas
+ * (`MemoryReadStream::read`, common/stream.cpp, ne pose que `eos`) ; le morceau est alors vide (`readSongData` lit
+ * 0 octet) et la lecture s'arrête au premier tick. Écart : les mots manquants valent 0 (non initialisés dans ScummVM).
  */
 export function parseAdl(data: Uint8Array): AdlSong | null {
   if (data.length < 60) return null;
@@ -62,8 +65,9 @@ export class AdlPlayer extends AdLib {
   private modifyInstrument = 0xff;
   private readonly currentInstruments = new Uint16Array(MAX_VOICE_COUNT);
 
-  constructor(sampleRate: number) {
-    super(sampleRate, TICKS_PER_SECOND);
+  /** `output` : fréquence d'un émulateur rendu par `render`, ou puce externe cadencée par `onTimer` (voir `AdLib`). */
+  constructor(output: number | OplSink) {
+    super(output, ADL_TICKS_PER_SECOND);
   }
 
   /** ADLPlayer::load ; retourne faux si le fichier est refusé. */

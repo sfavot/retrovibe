@@ -2,7 +2,7 @@
  * Curseur de souris, d'après ScummVM (`engines/gob/draw_v2.cpp`, `inter_v1.cpp` ; GPL v3+).
  */
 import { decodeSprite } from "../data/sprite";
-import { advanceClock, type CursorSystem, type InitCursorArgs } from "../host";
+import { advanceClock, advanceRetrace, type CursorSystem, type InitCursorArgs } from "../host";
 import { CURSOR_SURFACE, type GraphicsCore } from "./core";
 import type { DrawImpl } from "./draw";
 import { Surface } from "./surface";
@@ -130,7 +130,7 @@ export class CursorImpl implements CursorSystem {
           }
           this.cursorTimeKey = now;
         } else if (this.draw.noInvalidated && input.mouseX === this.cursorX && input.mouseY === this.cursorY) {
-          advanceClock(vm.host, 10); // waitRetrace
+          advanceRetrace(vm.host); // waitRetrace
           return;
         }
       } else {
@@ -180,7 +180,7 @@ export class CursorImpl implements CursorSystem {
         } else {
           core.showCursor = 3;
           // waitRetrace, puis delay(5) près du haut de l'écran (draw_v2.cpp:174-178)
-          advanceClock(vm.host, 10);
+          advanceRetrace(vm.host);
           if (Math.min(input.mouseY - hotY, this.cursorY) < 50) advanceClock(vm.host, 5);
         }
       }

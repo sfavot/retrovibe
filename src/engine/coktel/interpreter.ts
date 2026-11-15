@@ -5,7 +5,7 @@
  */
 import type { Game } from "./game";
 import type { HotspotBlock, HotspotContext, HotspotDef, SceneryLoadArgs } from "./host";
-import { MOUSE_BOTH, MOUSE_NONE, WaitingForInput, advanceClock } from "./host";
+import { MOUSE_BOTH, MOUSE_NONE, WaitingForInput, advanceRetrace } from "./host";
 import {
   decodeBlock2,
   decodeInstr,
@@ -380,7 +380,7 @@ export class Interpreter implements ExprEnv {
     let any = false;
     for (let j = 0; j < 8; j++) {
       if (this.animPalDir[j] === 0) continue;
-      if (!any) advanceClock(this.game.host, 10);
+      if (!any) advanceRetrace(this.game.host);
       pal.animate(this.animPalLow[j], this.animPalHigh[j], this.animPalDir[j] as 1 | -1);
       any = true;
     }

@@ -94,7 +94,7 @@ Pour les chapitres 4 à 6, la FAQ de Mogelpower est la plus précise (ordre des 
 Les outils sont dans `test/ween/solution/bench/` :
 
 - `make-reference.test.ts` joue la solution au portage. Il écrit les entrées `GOB_INPUT`, le `VH` de chaque image, les TOT et les points de contrôle.
-- `full.sh` rejoue les entrées au banc avec `GOB_DUMP` sur toute la partie. Le flux est filtré par `vhfilter.mjs` (`VH` masqué, sans gros fichier). Il faut `WEEN_BENCH` (dossier `scummvm-build`), `WEEN_BENCH_INI` (copie privée de `cfg/ween.ini`), un seul ScummVM à la fois.
+- `full.sh` rejoue les entrées au banc avec `GOB_DUMP` sur toute la partie. Le flux est filtré par `vhfilter.mjs` (`VH` masqué, sans gros fichier). Il faut `SCUMMVM` (binaire patché) et `WEEN_GAME_DIR` (dossier du jeu), via `scripts/ween/bench/ween-replay.sh` (configuration privée par lancement), un seul ScummVM à la fois.
 - `compare.mjs` donne la première image divergente. Si tout est identique, il écrit `fixtures/full-game.json` : entrées, TOT, et image + `VH` + libellé de chaque étape.
 - `ref.sh DOSSIER` enchaîne les trois (environ 25 s pour le chapitre 1).
 

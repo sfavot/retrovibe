@@ -1,0 +1,8 @@
+# Echap (image 20), menu des options (image 400), Quitter (image 500), Je confirme (image 720) : chemin des opcodes gob 3 et 13 puis loadTot END
+20 k ESC
+300 m 28 10
+400 c 28 10
+480 m 58 37
+500 c 58 37
+700 m 100 141
+720 c 100 141

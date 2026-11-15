@@ -141,11 +141,24 @@ export function tracePlayer(data: Uint8Array, repeat: number, maxTicks: number):
       }),
     );
     player.onFinished = () => finishedAt.push(tick);
-    // noteOff du séquenceur (commande 0x80) ; reset() / allOff() éteignent aussi les voix, sans passer par une commande.
+    // noteOff du séquenceur (commande 0x80) ; reset() / allOff() éteignent aussi les voix, sans passer par une commande :
+    // allOff est espionnée pour ignorer les noteOff qu'elle appelle.
+    let inAllOff = 0;
+    const originalAllOff = proto.allOff;
+    spies.push(
+      vi.spyOn(proto, "allOff").mockImplementation(function (this: unknown, ...a: unknown[]) {
+        inAllOff++;
+        try {
+          return originalAllOff.apply(this, a);
+        } finally {
+          inAllOff--;
+        }
+      }),
+    );
     const originalOff = proto.noteOff;
     spies.push(
       vi.spyOn(proto, "noteOff").mockImplementation(function (this: unknown, ...a: unknown[]) {
-        if (!new Error().stack!.includes("allOff")) log(`off ${a[0]}`);
+        if (!inAllOff) log(`off ${a[0]}`);
         return originalOff.apply(this, a);
       }),
     );

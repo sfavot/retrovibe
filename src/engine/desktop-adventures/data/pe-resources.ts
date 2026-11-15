@@ -1,5 +1,6 @@
 import { BinaryReader } from "../../../data/reader";
-import type { Cursor, Icon } from "./resources";
+import { decodeCursor, decodeDib } from "./dib";
+import type { Bitmap, Cursor, Icon } from "./resources";
 
 /** Ressource d'un exécutable PE 32 bits : type et identifiant sont des nombres, ou des noms pour les ressources nommées. */
 export interface PeResource {
@@ -10,9 +11,9 @@ export interface PeResource {
 }
 
 const RT_CURSOR = 1;
+const RT_BITMAP = 2;
 const RT_ICON = 3;
 const RT_STRING = 6;
-const DIB_HEADER_SIZE = 40;
 const DIRECTORY_FLAG = 0x80000000;
 
 /** Ressources de la section .rsrc d'un exécutable PE : type → nom ou identifiant → langue → données. */
@@ -102,10 +103,21 @@ export function readPeIcons(exe: ArrayBuffer | Uint8Array): Map<number, Icon> {
   const icons = new Map<number, Icon>();
   for (const { type, id, data } of readPeResources(exe)) {
     if (type !== RT_ICON || typeof id !== "number") continue;
-    const dib = decodeIconDib(data);
+    const dib = decodeDib(data, true);
     if (dib) icons.set(id, { id, ...dib });
   }
   return icons;
+}
+
+/** Images (ressources BITMAP à nom, DIB sans masque) de l'exécutable PE, indexées par nom (voir `readBitmaps`). */
+export function readPeBitmaps(exe: ArrayBuffer | Uint8Array): Map<string, Bitmap> {
+  const bitmaps = new Map<string, Bitmap>();
+  for (const { type, id, data } of readPeResources(exe)) {
+    if (type !== RT_BITMAP || typeof id !== "string") continue;
+    const dib = decodeDib(data, false);
+    if (dib) bitmaps.set(id, { id, ...dib });
+  }
+  return bitmaps;
 }
 
 /**
@@ -126,75 +138,4 @@ export function readPeStrings(exe: ArrayBuffer | Uint8Array): Map<number, string
     }
   }
   return strings;
-}
-
-function decodeCursor(data: Uint8Array, id: number): Cursor | null {
-  const r = new BinaryReader(data);
-  const hotspotX = r.u16();
-  const hotspotY = r.u16();
-  if (r.u32() !== DIB_HEADER_SIZE) return null;
-  const width = r.i32();
-  const height = r.i32() / 2;
-  r.offset += 2; // plans
-  if (r.u16() !== 1) return null; // seuls les curseurs 1 bpp sont gérés
-  r.offset = 4 + DIB_HEADER_SIZE;
-  const colors = [r.u32(), r.u32()]; // BGRx
-  const stride = Math.ceil(width / 32) * 4;
-  const masks = data.subarray(r.offset);
-  if (masks.length < stride * height * 2) return null;
-
-  const rgba = new Uint8ClampedArray(width * height * 4);
-  const bit = (row: number, x: number) => (masks[row * stride + (x >> 3)] >> (7 - (x & 7))) & 1;
-  for (let y = 0; y < height; y++) {
-    const stored = height - 1 - y; // le DIB est stocké de bas en haut
-    for (let x = 0; x < width; x++) {
-      // AND=1 : transparent (l'inversion de l'écran, AND=1 et XOR=1, est rendue transparente aussi).
-      if (bit(height + stored, x)) continue;
-      const color = colors[bit(stored, x)];
-      const o = (y * width + x) * 4;
-      rgba[o] = (color >> 16) & 0xff;
-      rgba[o + 1] = (color >> 8) & 0xff;
-      rgba[o + 2] = color & 0xff;
-      rgba[o + 3] = 0xff;
-    }
-  }
-  return { id, width, height, hotspotX, hotspotY, rgba };
-}
-
-/** DIB d'icône 1, 4 ou 8 bpp avec sa palette, suivi du masque AND 1 bpp (la hauteur de l'en-tête couvre les deux images). */
-function decodeIconDib(data: Uint8Array): { width: number; height: number; rgba: Uint8ClampedArray } | null {
-  const r = new BinaryReader(data);
-  if (r.u32() !== DIB_HEADER_SIZE) return null;
-  const width = r.i32();
-  const height = r.i32() / 2;
-  r.offset += 2; // plans
-  const bpp = r.u16();
-  if (bpp !== 1 && bpp !== 4 && bpp !== 8) return null;
-  r.offset = 32;
-  const count = r.u32() || 1 << bpp;
-  r.offset = DIB_HEADER_SIZE;
-  const colors = Array.from({ length: count }, () => r.u32()); // BGRx
-  const stride = Math.ceil((width * bpp) / 32) * 4;
-  const maskStride = Math.ceil(width / 32) * 4;
-  const pixels = data.subarray(r.offset);
-  const mask = pixels.subarray(stride * height);
-  if (pixels.length < stride * height || mask.length < maskStride * height) return null;
-
-  const rgba = new Uint8ClampedArray(width * height * 4);
-  for (let y = 0; y < height; y++) {
-    const stored = height - 1 - y;
-    for (let x = 0; x < width; x++) {
-      if ((mask[stored * maskStride + (x >> 3)] >> (7 - (x & 7))) & 1) continue;
-      const at = stored * stride;
-      const index =
-        bpp === 8 ? pixels[at + x] : bpp === 4 ? (pixels[at + (x >> 1)] >> (x & 1 ? 0 : 4)) & 15 : (pixels[at + (x >> 3)] >> (7 - (x & 7))) & 1;
-      const color = colors[index] ?? 0;
-      const o = (y * width + x) * 4;
-      rgba[o] = (color >> 16) & 0xff;
-      rgba[o + 1] = (color >> 8) & 0xff;
-      rgba[o + 2] = color & 0xff;
-      rgba[o + 3] = 0xff;
-    }
-  }
-  return { width, height, rgba };
 }

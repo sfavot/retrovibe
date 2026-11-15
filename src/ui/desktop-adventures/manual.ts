@@ -1,4 +1,4 @@
-import type { HelpDocument, HelpImage, HelpParagraph, HelpSpan } from "../../engine/desktop-adventures/data/help";
+import type { HelpContentsEntry, HelpDocument, HelpImage, HelpParagraph, HelpSpan } from "../../engine/desktop-adventures/data/help";
 import type { DesktopCopy } from "./definition";
 import { h } from "../dom";
 
@@ -12,7 +12,10 @@ interface OutlineEntry {
 }
 
 /** Le manuel d'origine : sommaire à gauche, rubrique à droite ; les liens du texte ouvrent d'autres rubriques. */
-export function renderManual(doc: HelpDocument, copy: DesktopCopy, onBack: () => void): HTMLElement {
+/**
+ * `contents` : sommaire d'origine (fichier .CNT de Yoda, par chapitres) ; sans lui, le sommaire est déduit des liens (Indy).
+ */
+export function renderManual(doc: HelpDocument, copy: DesktopCopy, onBack: () => void, contents: HelpContentsEntry[] | null = null): HTMLElement {
   const page = h("article", { class: "manual-page", tabindex: -1 });
   const navButtons = new Map<number, HTMLButtonElement>();
   const nav = h("details", { class: "manual-nav" }, h("summary", {}, copy.manualContents));
@@ -30,9 +33,16 @@ export function renderManual(doc: HelpDocument, copy: DesktopCopy, onBack: () =>
   };
 
   const list = h("ul", {});
-  for (const { topic, depth } of outline(doc)) {
-    const button = h("button", { type: "button", class: "manual-nav-item", style: `--depth: ${depth}`, onclick: () => show(topic) }, doc.topics[topic].title);
-    navButtons.set(topic, button);
+  const entries = contents?.length
+    ? contents.map(({ topic, depth, title }) => ({ topic, depth: depth - 1, title }))
+    : outline(doc).map(({ topic, depth }) => ({ topic, depth, title: doc.topics[topic].title }));
+  for (const { topic, depth, title } of entries) {
+    if (topic === null) {
+      list.append(h("li", { class: "manual-nav-chapter", style: `--depth: ${depth}` }, title));
+      continue;
+    }
+    const button = h("button", { type: "button", class: "manual-nav-item", style: `--depth: ${depth}`, onclick: () => show(topic) }, title);
+    if (!navButtons.has(topic)) navButtons.set(topic, button);
     list.append(h("li", {}, button));
   }
   nav.append(h("nav", { "aria-label": copy.manualContents }, list));

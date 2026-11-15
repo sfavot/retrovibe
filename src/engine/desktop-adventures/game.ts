@@ -351,7 +351,7 @@ export class Game extends EventTarget {
     if (await this.scripts(Mode.Walk)) return;
     if (await this.standHotspots()) return;
     if (await this.updateAttack()) return;
-    moveMonsters(this.monsterHost(), this.variant.moveMonster);
+    moveMonsters(this.monsterHost(), this.variant.moveMonster, this.variant.monsterTile);
     if (this.over) return;
     await this.handleInput();
   }

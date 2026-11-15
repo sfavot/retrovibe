@@ -96,6 +96,8 @@ export interface DesktopResources {
   data: GameData;
   palette: Palette;
   loadManual(): Promise<ArrayBuffer>;
+  /** Sommaire d'origine de l'aide (fichier .CNT, Yoda), facultatif. */
+  loadManualContents?(): Promise<ArrayBuffer>;
   cursors: Map<number, Cursor>;
   icons: Map<number, Icon>;
   bitmaps: Map<string, Bitmap>;

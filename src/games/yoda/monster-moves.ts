@@ -1,6 +1,14 @@
-import { Layer, TileFlag } from "../../engine/desktop-adventures/data/types";
 import { DIRECTION_VECTORS, type Point, directionOf, directionTo } from "../../engine/desktop-adventures/geometry";
-import { type MonsterHost, attackHero, distance, randomDirection } from "../../engine/desktop-adventures/monsters";
+import {
+  type MonsterHost,
+  attackHero,
+  distance,
+  isOpenCell as isOpen,
+  isDoorway,
+  monsterTile,
+  moveMonsterBy,
+  randomDirection,
+} from "../../engine/desktop-adventures/monsters";
 import type { Rng } from "../../engine/desktop-adventures/rng";
 import type { Monster } from "../../engine/desktop-adventures/zone-state";
 
@@ -54,11 +62,6 @@ function randomVector(rng: Rng): Point {
 /** Direction préférée (cardinale) sous forme de vecteur. */
 const preferred = (m: Monster): Point => DIRECTION_VECTORS[m.preferredDirection];
 
-/** La case visée est dans la zone et sans objet (les monstres sont dans la couche objets). */
-function isOpen(host: MonsterHost, x: number, y: number): boolean {
-  return host.zone.inBounds(x, y) && host.zone.getTile(x, y, Layer.Object) === -1;
-}
-
 /** Vrai si le mouvement `v` mène à une case libre (un mouvement nul n'est jamais libre : la case est occupée par le monstre). */
 const isFree = (m: Monster, v: Point, host: MonsterHost) => !isNone(v) && isOpen(host, m.x + v.x, m.y + v.y);
 
@@ -91,9 +94,6 @@ function meleeIfUnarmed(m: Monster, hit: boolean, host: MonsterHost): void {
   if (m.character.reference < 0 && hit) attackHero(m, host);
 }
 
-const isDoorway = (host: MonsterHost, x: number, y: number) =>
-  host.assets.hasFlag(host.zone.getTile(x, y, Layer.Floor), TileFlag.Doorway);
-
 /** Oriente le monstre vers le héros s'il est aligné (sinon garde son regard). */
 function faceHero(m: Monster, host: MonsterHost): void {
   const d = directionTo(m, host.hero);
@@ -102,15 +102,7 @@ function faceHero(m: Monster, host: MonsterHost): void {
 
 /** Applique le déplacement `v` : ignoré si la case est occupée, hors zone ou une porte. Sans mouvement, regarde le héros. */
 function perform(m: Monster, v: Point, host: MonsterHost): void {
-  if (isNone(v)) return faceHero(m, host);
-  const tx = m.x + v.x;
-  const ty = m.y + v.y;
-  if (!isOpen(host, tx, ty) || isDoorway(host, tx, ty) || (tx === host.hero.x && ty === host.hero.y)) return faceHero(m, host);
-  const zone = host.zone;
-  if (m.character.frames[0].includes(zone.getTile(m.x, m.y, Layer.Object))) zone.setTile(m.x, m.y, Layer.Object, -1);
-  m.x = tx;
-  m.y = ty;
-  m.facing = directionOf(v, m.facing);
+  if (!moveMonsterBy(m, v, host)) faceHero(m, host);
 }
 
 /** Pause et nouvelle direction préférée après un obstacle. */
@@ -120,6 +112,16 @@ function bump(m: Monster, cooldown: number, rng: Rng): void {
 }
 
 /** Un tick d'IA d'un ennemi de Yoda selon son type de déplacement. */
+/**
+ * Tuile d'un monstre de Yoda : le type « animation » fait défiler les 6 premières entrées de sa frame
+ * (`updateFaceAndRedraw` de WebFun) ; les autres sont tournés dans la direction de leur regard.
+ */
+export function yodaMonsterTile(m: Monster): number {
+  const frame = m.character.frames[0];
+  if (m.character.movementType === Movement.Animation && frame[m.phaseFrames] >= 0) return frame[m.phaseFrames];
+  return monsterTile(m.character, m.facing);
+}
+
 export function moveYodaMonster(m: Monster, host: MonsterHost): void {
   const { rng, hero } = host;
   const type = m.character.movementType as Movement;

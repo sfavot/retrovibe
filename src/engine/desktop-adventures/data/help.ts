@@ -45,6 +45,8 @@ export interface HelpDocument {
   /** La rubrique 0 est le sommaire. */
   topics: HelpTopic[];
   images: HelpImage[];
+  /** Rubrique de chaque nom de contexte, par son hash (`contextHash`). */
+  contexts: ReadonlyMap<number, number>;
 }
 
 const HLP_MAGIC = 0x00035f3f;
@@ -108,7 +110,7 @@ export function parseHelp(buffer: ArrayBuffer | Uint8Array): HelpDocument {
       for (const s of p.spans) if (s.kind === "image" && !images[s.image]) throw new Error(`Image ${s.image} introuvable`);
     }
   }
-  return { title: readSystemTitle(files.file("|SYSTEM")) ?? topics[0].title, topics, images };
+  return { title: readSystemTitle(files.file("|SYSTEM")) ?? topics[0].title, topics, images, contexts: topicByHash };
 }
 
 /** Le titre figure dans |SYSTEM sous forme d'enregistrement (type 1) : `Guide for Indy's Desktop Adventures`. */
@@ -557,4 +559,47 @@ function runLengthDecode(source: Uint8Array, size: number): Uint8Array {
     o += count;
   }
   return out;
+}
+
+// ------------------------------------------------------------------ sommaire (.CNT)
+
+/**
+ * Hash WinHelp d'un nom de contexte (`|CONTEXT`, liens) : h = h × 43 + valeur du caractère, sur 32 bits signés.
+ * Valeurs : chiffres 1 à 9 → 1 à 9, 0 → 10, « . » → 12, « _ » → 13, lettres (sans casse) → 17 à 42.
+ */
+export function contextHash(name: string): number {
+  let hash = 0;
+  for (const ch of name.toUpperCase()) {
+    const c = ch.charCodeAt(0);
+    const value =
+      c >= 0x31 && c <= 0x39 ? c - 0x30 : c === 0x30 ? 10 : c === 0x2e ? 12 : c === 0x5f ? 13 : c >= 0x41 && c <= 0x5a ? c - 0x41 + 17 : c - 0x30;
+    hash = (Math.imul(hash, 43) + value) | 0;
+  }
+  return hash >>> 0;
+}
+
+/** Entrée du sommaire d'un fichier .CNT : un chapitre (`topic` null) ou une rubrique. */
+export interface HelpContentsEntry {
+  /** 1 pour un chapitre de premier niveau. */
+  depth: number;
+  title: string;
+  topic: number | null;
+}
+
+/**
+ * Sommaire Windows 95 (fichier .CNT, texte en page de code 1252) : lignes « niveau titre » (chapitre)
+ * ou « niveau titre=contexte » (rubrique) ; les lignes « :commande » sont ignorées, comme les contextes inconnus du document.
+ */
+export function parseContents(cnt: ArrayBuffer | Uint8Array, doc: HelpDocument): HelpContentsEntry[] {
+  const text = new TextDecoder("windows-1252").decode(cnt);
+  const entries: HelpContentsEntry[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^(\d+)\s+([^=]+?)(?:=([^@>]+))?\s*$/.exec(line);
+    if (!match) continue;
+    const [, level, title, context] = match;
+    const topic = context === undefined ? null : (doc.contexts.get(contextHash(context.trim())) ?? -1);
+    if (topic === -1) continue;
+    entries.push({ depth: Number(level), title: title.trim(), topic });
+  }
+  return entries;
 }

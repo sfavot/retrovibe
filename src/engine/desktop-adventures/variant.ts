@@ -33,6 +33,8 @@ export interface DesktopVariant {
   readonly bonusTile: number;
   /** Un tick d'IA d'un monstre actif et vivant, selon son type de déplacement. */
   moveMonster(m: Monster, host: MonsterHost): void;
+  /** Tuile affichée pour un monstre (Yoda : monstres animés) ; par défaut, l'image tournée dans la direction du regard. */
+  monsterTile?(m: Monster): number;
   /** Mange / boit / utilise un objet sur le héros. Renvoie faux si l'objet ne se consomme pas (son « impossible »). */
   consume(game: Game, tile: number): Promise<boolean>;
   /** Parole propre au jeu quand le héros cogne un PNJ ; renvoie vrai si elle remplace le texte de puzzle du secteur. */

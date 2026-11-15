@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readPeCursors, readPeIcons, readPeResources, readPeStrings } from "../../src/engine/desktop-adventures/data/pe-resources";
+import { readPeBitmaps, readPeCursors, readPeIcons, readPeResources, readPeStrings } from "../../src/engine/desktop-adventures/data/pe-resources";
 import { originalFiles } from "../support/original";
 
 const original = originalFiles("yoda", "YODESK.DTA");
@@ -46,5 +46,10 @@ describe.skipIf(!original.has)("ressources PE de YODESK.EXE", () => {
     expect(strings.get(57363)).toBe("Astroport");
     expect(strings.get(57372)).toContain("Désolé");
     for (const [id, text] of strings) if (id >= 57344) expect(text).not.toMatch(/[�\u0000]/);
+  });
+
+  it("lit les boutons de la bulle (mêmes noms que dans DESKADV.EXE)", () => {
+    const bitmaps = readPeBitmaps(exe);
+    for (const name of ["DNAU", "UPAU", "CLOSEU"]) expect(bitmaps.get(name)).toMatchObject({ width: 16, height: 16 });
   });
 });

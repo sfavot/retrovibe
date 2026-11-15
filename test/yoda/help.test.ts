@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseHelp } from "../../src/engine/desktop-adventures/data/help";
+import { contextHash, parseContents, parseHelp } from "../../src/engine/desktop-adventures/data/help";
 import { originalFiles } from "../support/original";
 
 const yoda = originalFiles("yoda", "YODESK.HLP");
@@ -35,5 +35,22 @@ describe.skipIf(!yoda.has)("YODESK.HLP", () => {
       }
       expect(colors.size).toBeGreaterThan(1);
     }
+  });
+
+  it("lit le sommaire d'origine (YODESK.CNT) : chapitres et rubriques retrouvées par leur contexte", () => {
+    const contents = parseContents(yoda.read("YODESK.CNT"), doc);
+    const chapters = contents.filter((e) => e.topic === null);
+    const topics = contents.filter((e) => e.topic !== null);
+    expect(chapters[0]).toEqual({ depth: 1, title: "BIENVENUE DANS LE MONDE DE YODA STORIES", topic: null });
+    expect(chapters).toHaveLength(11);
+    expect(topics).toHaveLength(23);
+    expect(doc.topics[topics.find((e) => e.title === "La Force")!.topic!].title).toBe("La Force");
+  });
+});
+
+describe("hash de contexte WinHelp", () => {
+  it("ne dépend pas de la casse", () => {
+    expect(contextHash("The_Force")).toBe(contextHash("THE_FORCE"));
+    expect(contextHash("a")).not.toBe(contextHash("b"));
   });
 });

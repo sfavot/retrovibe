@@ -159,3 +159,13 @@ describe.skipIf(!yoda.has)("IA des monstres sur les zones d'origine", () => {
     expect(zones).toBeGreaterThan(0);
   });
 });
+
+describe("monstres animés (type 12)", () => {
+  it("affichent tour à tour les 6 premières images de leur frame", async () => {
+    const { yodaMonsterTile } = await import("../../src/games/yoda/monster-moves");
+    const frames = [Int16Array.from([10, 11, 12, 13, 14, 15, 16, 17]), new Int16Array(8), new Int16Array(8)];
+    const character = { movementType: 12, frames } as never;
+    const tiles = [0, 1, 2, 3, 4, 5].map((phaseFrames) => yodaMonsterTile({ character, phaseFrames, facing: 0 } as never));
+    expect(tiles).toEqual([10, 11, 12, 13, 14, 15]);
+  });
+});

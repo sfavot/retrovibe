@@ -1,6 +1,6 @@
 import { AudioPlayer } from "../../engine/desktop-adventures/audio/audio";
 import { COLOR_CYCLES, type Palette, PaletteAnimation } from "../../engine/desktop-adventures/data/palette";
-import { type HelpDocument, parseHelp } from "../../engine/desktop-adventures/data/help";
+import { type HelpContentsEntry, type HelpDocument, parseContents, parseHelp } from "../../engine/desktop-adventures/data/help";
 import { Assets } from "../../engine/desktop-adventures/assets";
 import { Game, GameEvent, type GameSnapshot, storyFromSnapshot } from "../../engine/desktop-adventures/game";
 import { randomSeed } from "../../engine/desktop-adventures/rng";
@@ -36,6 +36,7 @@ export class App {
   private readonly copy: DesktopCopy;
   private readonly basePalette: Palette;
   private readonly loadManual: () => Promise<ArrayBuffer>;
+  private readonly loadManualContents: (() => Promise<ArrayBuffer>) | undefined;
   private readonly saveSlot: SaveSlot;
   private readonly progressStore: ProgressStore;
   private readonly speedSetting: ReturnType<typeof createSpeedSetting>;
@@ -67,18 +68,20 @@ export class App {
   /** Réglages de la partie en cours (ceux de la sauvegarde si elle est reprise) : le Replay de défaite les reprend. */
   private gameSettings = { ...this.settings };
   private manual: HelpDocument | null = null;
+  private manualContents: HelpContentsEntry[] | null = null;
   /** Durée d'un tick (ms), mémorisée entre les parties. */
   private tickMs: number;
 
   constructor(
     container: HTMLElement,
     private readonly def: DesktopAdventure,
-    { data, palette: basePalette, loadManual, cursors, icons, bitmaps }: DesktopResources,
+    { data, palette: basePalette, loadManual, loadManualContents, cursors, icons, bitmaps }: DesktopResources,
   ) {
     const copy = def.copy;
     this.copy = copy;
     this.basePalette = basePalette;
     this.loadManual = loadManual;
+    this.loadManualContents = loadManualContents;
     this.saveSlot = createSaveSlot(`${def.key}-desktop-save`);
     this.progressStore = createProgressStore(`${def.key}-desktop-progress`, def.progress);
     this.speedSetting = createSpeedSetting(`${def.key}-desktop-speed`);
@@ -314,8 +317,14 @@ export class App {
     window.scrollTo(0, 0);
     this.root.replaceChildren(h("p", { class: "boot", role: "status" }, this.copy.manualLoading));
     try {
-      this.manual ??= parseHelp(await this.loadManual());
-      this.root.replaceChildren(renderManual(this.manual, this.copy, () => this.showTitle()));
+      if (!this.manual) {
+        const manual = parseHelp(await this.loadManual());
+        // Le sommaire d'origine est un plus : sans lui, celui qui est déduit des liens suffit.
+        const contents = this.loadManualContents ? await this.loadManualContents().catch(() => null) : null;
+        this.manualContents = contents ? parseContents(contents, manual) : null;
+        this.manual = manual;
+      }
+      this.root.replaceChildren(renderManual(this.manual, this.copy, () => this.showTitle(), this.manualContents));
     } catch (e) {
       console.error(e);
       this.root.replaceChildren(

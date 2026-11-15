@@ -3,7 +3,7 @@ import { type Game, MAX_HEALTH } from "../../engine/desktop-adventures/game";
 import type { Point } from "../../engine/desktop-adventures/geometry";
 import type { DesktopVariant } from "../../engine/desktop-adventures/variant";
 import { CharacterIds, DAGOBAH_CELLS, TileIds } from "./ids";
-import { moveYodaMonster } from "./monster-moves";
+import { moveYodaMonster, yodaMonsterTile } from "./monster-moves";
 import { YODA_OPCODES } from "./opcodes";
 import { forceFactor } from "./score";
 import { YodaSounds } from "./sounds";
@@ -153,6 +153,7 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
     defaultWeapon: -1,
     bonusTile: -1,
     moveMonster: moveYodaMonster,
+    monsterTile: yodaMonsterTile,
     briefingOnStart: false,
     slideOnBlock: true,
     hotspotsBeforeBumpScripts: true,

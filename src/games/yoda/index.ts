@@ -1,6 +1,6 @@
 import { parseDaw } from "../../engine/desktop-adventures/data/daw";
 import { extractPalette } from "../../engine/desktop-adventures/data/palette";
-import { readPeCursors, readPeIcons, readPeStrings } from "../../engine/desktop-adventures/data/pe-resources";
+import { readPeBitmaps, readPeCursors, readPeIcons, readPeStrings } from "../../engine/desktop-adventures/data/pe-resources";
 import { App } from "../../ui/desktop-adventures/app";
 import { copy as shared } from "../../ui/copy";
 import { h } from "../../ui/dom";
@@ -37,9 +37,10 @@ export const yoda: GameDefinition = {
         data,
         palette: extractPalette(exe, "yoda"),
         loadManual: () => fetchBinary("YODESK.HLP"),
+        loadManualContents: () => fetchBinary("YODESK.CNT"),
         cursors: readPeCursors(exe),
         icons: readPeIcons(exe),
-        bitmaps: new Map(),
+        bitmaps: readPeBitmaps(exe),
       });
       app.showTitle();
       // Développement : ?seed=1234 lance directement une partie avec cette graine.

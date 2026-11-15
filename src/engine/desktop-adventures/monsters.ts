@@ -42,26 +42,41 @@ export function attackHero(m: Monster, host: MonsterHost): void {
   if (m.character.damage > 0) host.hurtHero(m.character.damage);
 }
 
-/** Déplace le monstre d'une case si possible ; frappe le héros s'il est sur le chemin. */
-export function step(m: Monster, dir: Direction, host: MonsterHost): "moved" | "attacked" | "blocked" {
-  const v = DIRECTION_VECTORS[dir];
+/** Case dans la zone et sans objet (les monstres eux-mêmes sont dans la couche objets). */
+export function isOpenCell(host: MonsterHost, x: number, y: number): boolean {
+  return host.zone.inBounds(x, y) && host.zone.getTile(x, y, Layer.Object) === -1;
+}
+
+/** Les monstres ne franchissent pas les portes. */
+export function isDoorway(host: MonsterHost, x: number, y: number): boolean {
+  return host.assets.hasFlag(host.zone.getTile(x, y, Layer.Floor), TileFlag.Floor | TileFlag.Doorway);
+}
+
+/**
+ * Déplace le monstre selon `v` (une des 8 directions) si la case visée est libre, hors porte et hors héros ;
+ * sa tuile quitte l'ancienne case (elle est redessinée à la nouvelle par `moveMonsters`). Renvoie vrai s'il a bougé.
+ */
+export function moveMonsterBy(m: Monster, v: Point, host: MonsterHost): boolean {
   const tx = m.x + v.x;
   const ty = m.y + v.y;
+  if ((v.x === 0 && v.y === 0) || (tx === host.hero.x && ty === host.hero.y)) return false;
+  if (!isOpenCell(host, tx, ty) || isDoorway(host, tx, ty)) return false;
+  if (isMonsterTileAt(m, host.zone)) host.zone.setTile(m.x, m.y, Layer.Object, -1);
+  m.x = tx;
+  m.y = ty;
+  m.facing = directionOf(v, m.facing);
+  return true;
+}
+
+/** Pas cardinal : le monstre se tourne vers `dir`, frappe le héros s'il est sur le chemin, sinon avance si possible. */
+export function step(m: Monster, dir: Direction, host: MonsterHost): "moved" | "attacked" | "blocked" {
+  const v = DIRECTION_VECTORS[dir];
   m.facing = dir;
-  if (tx === host.hero.x && ty === host.hero.y) {
+  if (m.x + v.x === host.hero.x && m.y + v.y === host.hero.y) {
     attackHero(m, host);
     return "attacked";
   }
-  const zone = host.zone;
-  if (!zone.inBounds(tx, ty) || zone.getTile(tx, ty, Layer.Object) !== -1) return "blocked";
-  // Les monstres ne franchissent pas les portes.
-  if (host.assets.hasFlag(zone.getTile(tx, ty, Layer.Floor), TileFlag.Floor | TileFlag.Doorway)) return "blocked";
-  if (isMonsterTileAt(m, zone)) {
-    zone.setTile(m.x, m.y, Layer.Object, -1);
-  }
-  m.x = tx;
-  m.y = ty;
-  return "moved";
+  return moveMonsterBy(m, v, host) ? "moved" : "blocked";
 }
 
 function isMonsterTileAt(m: Monster, zone: ZoneState): boolean {
@@ -116,8 +131,15 @@ function updateBullet(m: Monster, host: MonsterHost): boolean {
   return updateBullet(m, host);
 }
 
-/** Un tick d'IA pour tous les monstres actifs de la zone. */
-export function moveMonsters(host: MonsterHost, act: (m: Monster, host: MonsterHost) => void): void {
+/**
+ * Un tick d'IA pour tous les monstres actifs de la zone : `act` décide du mouvement, `tileOf` de la tuile affichée
+ * (par défaut, l'image tournée dans la direction du regard).
+ */
+export function moveMonsters(
+  host: MonsterHost,
+  act: (m: Monster, host: MonsterHost) => void,
+  tileOf: (m: Monster) => number = (m) => monsterTile(m.character, m.facing),
+): void {
   const zone = host.zone;
   for (const m of zone.monsters) {
     if (!m.enabled || !isAlive(m)) {
@@ -128,7 +150,7 @@ export function moveMonsters(host: MonsterHost, act: (m: Monster, host: MonsterH
     // Redessine le monstre à sa position (le moteur original les stocke dans la couche objets).
     const current = zone.getTile(m.x, m.y, Layer.Object);
     if (current === -1 || m.character.frames[0].includes(current)) {
-      zone.setTile(m.x, m.y, Layer.Object, monsterTile(m.character, m.facing));
+      zone.setTile(m.x, m.y, Layer.Object, tileOf(m));
     }
   }
 }

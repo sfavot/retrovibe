@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Extrait de l'ISO de Yoda Stories (LucasArts, 1997, Windows, version française) les fichiers utiles au jeu
-# dans original/yoda/ : YODESK.DTA (données), YODESK.EXE (palette, curseurs), YODESK.HLP (manuel) et SFX/*.WAV.
+# dans original/yoda/ : YODESK.DTA (données), YODESK.EXE (palette, curseurs, textes), YODESK.HLP et YODESK.CNT
+# (l'aide et son sommaire) et SFX/*.WAV.
 # Usage : scripts/yoda-extract.sh [Yoda.iso]   (défaut : archives/yoda-stories/Yoda.iso)
 # Le patch anglais archives/yoda-stories/pat-01951-yoda_stories-pcwin.7z (Yopatch6, juin 1997) n'est pas appliqué :
 # il ne contient qu'un YODESK.DTA de la version anglaise, qui remplacerait les textes français.
@@ -22,10 +23,10 @@ ec_verifier_outils 7zz python3
 ec_init_tmp
 
 echo "ISO -> fichiers..."
-7zz x -y -bso0 -bsp0 "-o$tmp/iso" "$iso" 'YODA/YODESK.DTA' 'YODA/YODESK.EXE' 'YODA/YODESK.HLP' 'YODA/SFX/*.WAV'
+7zz x -y -bso0 -bsp0 "-o$tmp/iso" "$iso" 'YODA/YODESK.DTA' 'YODA/YODESK.EXE' 'YODA/YODESK.HLP' 'YODA/YODESK.CNT' 'YODA/SFX/*.WAV'
 
 mkdir -p "$tmp/out/SFX"
-cp "$tmp/iso/YODA/YODESK.DTA" "$tmp/iso/YODA/YODESK.EXE" "$tmp/iso/YODA/YODESK.HLP" "$tmp/out/"
+cp "$tmp/iso/YODA/YODESK.DTA" "$tmp/iso/YODA/YODESK.EXE" "$tmp/iso/YODA/YODESK.HLP" "$tmp/iso/YODA/YODESK.CNT" "$tmp/out/"
 cp "$tmp/iso/YODA/SFX/"*.WAV "$tmp/out/SFX/"
 
 ec_conserver "$sortie" "$tmp/out" COVER.png

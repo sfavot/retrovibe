@@ -578,7 +578,7 @@ export class Game extends EventTarget {
     const sector = this.sector;
     const zone = this.zone;
     const lock = zone.hotspotAt(p.x, p.y, HotspotType.Lock);
-    if (sector && lock?.enabled && p.tile === sector.requiredItem) {
+    if (sector && lock?.enabled && p.tile === sector.requiredItem && (this.variant.lockAccepts?.(sector) ?? true)) {
       lock.enabled = false;
       this.removeItem(p.tile);
       if (sector.kind === SectorKind.Blockade || sector.kind === SectorKind.Travel) sector.solved = true;
@@ -595,6 +595,8 @@ export class Game extends EventTarget {
       if (thanks) await this.presenter.speak(thanks, p);
       if (sector.findItem >= 0) await this.dropItem(sector.findItem, p);
       sector.solved = true;
+      handled = true;
+    } else if (this.variant.placeOnPuzzle?.(this, p.tile, { x: p.x, y: p.y })) {
       handled = true;
     }
 

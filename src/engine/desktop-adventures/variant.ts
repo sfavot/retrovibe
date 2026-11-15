@@ -3,6 +3,7 @@ import type { Game } from "./game";
 import type { Point } from "./geometry";
 import type { MonsterHost } from "./monsters";
 import type { OpcodeTable } from "./script";
+import type { Sector } from "./world";
 import type { Monster } from "./zone-state";
 
 /** Sons que le moteur joue de lui-même (ids de la table de sons du jeu, -1 : aucun). */
@@ -67,8 +68,19 @@ export interface DesktopVariant {
   equipSound?(weapon: Character): number;
   /** L'objet (tuile d'arme) peut-il être équipé ? Par défaut, toute tuile d'arme. */
   canEquip?(tile: number): boolean;
-  /** Objet posé sur une case, avant les règles communes (verrous, PNJ) ; renvoie vrai s'il a été traité. */
+  /**
+   * Un verrou (hotspot Lock) du secteur prend-il l'objet demandé (objet retiré, verrou ouvert) ? Par défaut, toujours.
+   * Yoda : seulement hors des secteurs à puzzle ou une fois le puzzle résolu ; sinon, ce sont les scripts de la zone qui
+   * décident (`executePlacedTileHotspots` de WebFun).
+   */
+  lockAccepts?(sector: Sector): boolean;
+  /** Objet posé sur une case, avant les règles communes (verrous, PNJ) ; renvoie vrai s'il a été traité (sans les scripts). */
   onPlaceTile?(game: Game, tile: number, at: Point): Promise<boolean>;
+  /**
+   * Objet posé sur une case que les règles communes (verrou, PNJ) n'ont pas prise : règle de puzzle propre au jeu. Renvoie
+   * vrai s'il a été pris ; les scripts « objet posé » de la zone s'exécutent ensuite dans tous les cas.
+   */
+  placeOnPuzzle?(game: Game, tile: number, at: Point): boolean;
   /** Coup porté à un monstre ; renvoie vrai si le jeu l'a traité lui-même (Yoda : la Force immobilise). */
   hitMonster?(game: Game, monster: Monster, weapon: Character): boolean;
 }

@@ -121,7 +121,10 @@ async function detonate(game: Game, at: Point): Promise<void> {
   }
 }
 
-/** Offre (puzzle « Offer ») : l'objet posé sur la serrure qui l'attend libère l'objet à trouver du secteur. */
+/**
+ * Offre (puzzle « Offer ») : l'objet posé sur la serrure qui l'attend libère l'objet à trouver du secteur. Les scripts
+ * « objet posé » de la zone s'exécutent ensuite (porte qui s'ouvre…), comme dans `executePlacedTileHotspots` de WebFun.
+ */
 function placeOnOffer(game: Game, tile: number, at: Point): boolean {
   const sector = game.sector;
   if (!sector || sector.solved || game.assets.puzzle(sector.puzzle)?.type !== PuzzleType.Offer) return false;
@@ -195,6 +198,9 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
     // Le détonateur se pose, il ne s'équipe pas.
     canEquip: (tile) => tile !== TileIds.ThermalDetonator,
 
+    // Dans un secteur à puzzle non résolu, poser l'objet sur le verrou ne le consomme pas : seuls les scripts le prennent.
+    lockAccepts: (sector) => sector.puzzle < 0 || sector.solved,
+
     async onPlaceTile(game, tile, at) {
       if (tile === TileIds.ThermalDetonator) {
         await detonate(game, at);
@@ -208,8 +214,10 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
         game.overlays.length = 0;
         return true;
       }
-      return placeOnOffer(game, tile, at);
+      return false;
     },
+
+    placeOnPuzzle: placeOnOffer,
 
     /** La Force ne blesse pas : elle immobilise le monstre pendant `damage` ticks (`hitMonster` de WebFun). */
     hitMonster(_game, monster, weapon) {

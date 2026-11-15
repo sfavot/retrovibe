@@ -127,6 +127,7 @@ describe.skipIf(!hasOriginalFiles)("prise de main sur l'image : choix de dialogu
     const player = new Player({ chapter: 2 });
     player.settle();
     const { engine } = player;
+    engine.subtitlesEnabled = false; // sans le bandeau du portage : le menu d'origine
     const gfx = engine.gfx;
     player.move(300, 190); // le curseur loin du texte
     player.run(10);
@@ -167,6 +168,7 @@ describe.skipIf(!hasOriginalFiles)("prise de main sur l'image : choix de dialogu
     const player = new Player({ chapter: 2 });
     player.settle();
     const { engine } = player;
+    engine.subtitlesEnabled = false;
     player.move(300, 190);
     player.run(10);
     const without = shown(player);
@@ -180,5 +182,30 @@ describe.skipIf(!hasOriginalFiles)("prise de main sur l'image : choix de dialogu
       expect(i % 320).toBeLessThan(10);
     }
     expect(differing).toBeGreaterThan(10);
+  });
+
+  it("avec les sous-titres, un bandeau assombrit le haut de l'écran sous les choix, et rien d'autre", () => {
+    const player = new Player({ chapter: 2 });
+    player.settle();
+    const { engine } = player;
+    player.move(300, 190);
+    player.run(10);
+    const phrases = ["A", "B", "C", "D"];
+    const states = ["unselected", "unselected", "unselected", "unselected"] as const;
+    engine.subtitlesEnabled = false;
+    engine.choices = { phrases, states: [...states], hovered: -1 };
+    const plain = shown(player);
+    engine.subtitlesEnabled = true;
+    const banner = shown(player);
+    const rgb = engine.gfx.palette.shown;
+    const light = (index: number): number => rgb[index * 3] + rgb[index * 3 + 1] + rgb[index * 3 + 2];
+    const bottom = 4 + 8 * 4;
+    let darker = 0;
+    for (let i = 0; i < plain.pixels.length; i++) {
+      const row = Math.trunc(i / 320);
+      if (row >= bottom) expect(banner.pixels[i]).toBe(plain.pixels[i]);
+      else if (light(banner.pixels[i]) < light(plain.pixels[i])) darker++;
+    }
+    expect(darker).toBeGreaterThan(320 * bottom * 0.5);
   });
 });

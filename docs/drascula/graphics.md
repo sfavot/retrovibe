@@ -74,7 +74,7 @@ hors chapitre 2, `99.ALG` dans `back` et `97.ALG` dans `extra` ; puis la lumièr
 ## 5. Le héros
 
 **Lu** (`moveCharacters`, `reduce_hare_chico`, `actors.cpp`, `drascula.cpp`). Le héros est un rectangle de **43 x 70** pris dans une feuille selon `track` : 0 gauche = `extra` (97) rangée **0** ; 1 droite = `extra` rangée **72** ; 2 de dos = `back` (99) rangée 72 ; 3 de face = `front` (96) rangée 72
-(`DIF_MASK_HARE` = 72). Debout : colonne 0 ; en marche : colonne `frameX[image]` (20 valeurs de `drascula.dat`, image 0 à 5, pas de 43 : 43, 87, 130, 173, 216, 259). Rien n'est dessiné si le héros est invisible, sauf aux chapitres 2 et 3.
+(`DIF_MASK_HARE` = 72). Debout : colonne 0 ; en marche : colonne `frameX[image]` (20 valeurs de `drascula.dat`, image 0 à 5, pas de 43 : 43, 87, 130, 173, 216, 259). Au chapitre 2, `enterRoom` (rooms.cpp) recalcule ces colonnes à chaque pièce en cumulant la largeur du héros de la pièce (`walkFrameColumns`, 39 dans la plupart des pièces : 39 à 234) ; sans ce recalcul, l'image 5 lisait la colonne 259, hors des figures, et dessinait un rectangle noir derrière le héros. Rien n'est dessiné si le héros est invisible, sauf aux chapitres 2 et 3.
 
 - **Hors chapitre 2** : le rectangle est **réduit** par le facteur de la perspective à l'ordonnée des pieds (`factor_red[y + hauteur]`, `engine/perspective.ts`) : taille `43 x f / 100` par `70 x f / 100` (divisions entières), prélèvement d'un pixel de la source tous les `43 / largeur` et `70 / hauteur` (plus proche voisin, pas
   en `float` 32 bits), 255 transparent. **Vérifié** : `plane.test.ts` (facteurs 100 et 50, pixels connus) et `renderer.test.ts` (héros près et loin de la caméra, orientations, image de marche).

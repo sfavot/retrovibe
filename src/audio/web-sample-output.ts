@@ -94,6 +94,7 @@ export class WebSampleOutput {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private mutedFlag = false;
+  private volumeLevel = 1;
   /** Instant (horloge de l'hôte) où `suspend()` a figé le jeu ; null si le jeu tourne. */
   private suspendedAt: number | null = null;
   /** Reprises dont la promesse n'est pas résolue : le contexte y est encore `suspended`, mais les sons y sont seulement en attente. */
@@ -110,7 +111,7 @@ export class WebSampleOutput {
     if (!this.ctx) {
       this.ctx = this.options.createContext?.() ?? new AudioContext();
       this.master = this.ctx.createGain();
-      this.master.gain.value = this.mutedFlag ? 0 : 1;
+      this.master.gain.value = this.masterLevel();
       this.master.connect(this.ctx.destination);
       this.options.onContext?.(this.ctx, this.master);
       // Créé pendant une suspension (onglet masqué) : un contexte déjà `running` doit être figé aussi.
@@ -188,7 +189,21 @@ export class WebSampleOutput {
   /** Coupe ou rétablit le son sans arrêter les sources : la durée des voix ne change pas. */
   setMuted(muted: boolean): void {
     this.mutedFlag = muted;
-    if (this.master) this.master.gain.value = muted ? 0 : 1;
+    if (this.master) this.master.gain.value = this.masterLevel();
+  }
+
+  /** Volume général, de 0 à 1 (1 par défaut), appliqué en direct aux voix en cours ; la coupure (`setMuted`) passe avant. */
+  get volume(): number {
+    return this.volumeLevel;
+  }
+
+  set volume(level: number) {
+    this.volumeLevel = Math.min(Math.max(level, 0), 1);
+    if (this.master) this.master.gain.value = this.masterLevel();
+  }
+
+  private masterLevel(): number {
+    return this.mutedFlag ? 0 : this.volumeLevel;
   }
 
   private buffer(ctx: AudioContext, sample: Sample): AudioBuffer {

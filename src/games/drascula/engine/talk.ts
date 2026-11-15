@@ -39,6 +39,11 @@ export interface Speaker {
   /** Consomme une touche du tampon (`getScan`) ; la première, ou `key` si on la nomme ; `null` si elle n'y est pas. */
   takeKey(key?: string): string | null;
   subtitle: Subtitle | null;
+  /**
+   * Tick (`ticks`) où la réplique en cours a commencé : l'hôte du navigateur ne laisse un toucher couper une réplique qu'après
+   * `TAP_SKIP_GRACE_TICKS` (`ui/input.ts`).
+   */
+  speechStart: number;
   /** Tête qui parle en cours : la vue et le tirage du tour ; `null` hors réplique. */
   head: { view: TalkView; roll: Roll } | null;
   /** Ce que la dernière réplique affichait à son dernier tour (sous-titre, tête), gardé après sa fin : voir `DrasculaEngine.holdScreen`. */
@@ -87,6 +92,7 @@ export function* speak(speaker: Speaker, line: TalkLine): Sequence<boolean> {
   let finished = false;
   let skipped = false;
   speaker.subtitle = { text: line.text, x: line.x, y: line.y, color: line.color };
+  speaker.speechStart = speaker.ticks;
   try {
     yield* unskippable(
       (function* (): Sequence {

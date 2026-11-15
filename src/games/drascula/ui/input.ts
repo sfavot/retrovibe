@@ -16,10 +16,38 @@ export const SCREEN_HEIGHT = 200;
 export const TAP_DELAY_TICKS = 2 * FRAME_TICKS;
 
 /**
+ * Ticks pendant lesquels une réplique qui commence ne se coupe pas au toucher (0,6 s). Écart propre au doigt : ScummVM ne coupe une
+ * réplique qu'au clavier (`isTalkFinished`), et la réplique suivante y commence dès la fin de la voix, sans attendre. Le joueur qui
+ * touche l'écran pour « continuer » quand une voix se termine, ou qui touche deux fois pour en couper une, atteignait donc la
+ * réplique suivante, coupée aussitôt (son premier tour, 90 ms). Un toucher de ce délai est ignoré.
+ */
+export const TAP_SKIP_GRACE_TICKS = 60;
+
+/** Ce qu'il faut savoir du moteur pour router un toucher. */
+export interface TapTarget {
+  readonly ticks: number;
+  readonly subtitle: unknown;
+  readonly choices: unknown;
+  readonly speechStart: number;
+}
+
+/**
+ * Effet d'un toucher (bouton gauche) : hors réplique, ou devant les choix d'un dialogue, un clic (`click`) ; pendant une réplique,
+ * Entrée, qui la coupe (`skip`), sauf dans ses `TAP_SKIP_GRACE_TICKS` premiers ticks (`ignore`). L'appui long reste un clic droit.
+ */
+export function tapEffect(engine: TapTarget, button: 0 | 2): "click" | "skip" | "ignore" {
+  if (button !== 0 || engine.subtitle === null || engine.choices !== null) return "click";
+  return engine.ticks - engine.speechStart >= TAP_SKIP_GRACE_TICKS ? "skip" : "ignore";
+}
+
+/**
  * File des entrées du moteur (`DrasculaHost.pollInput`) : la file commune des jeux à pointeur (`ui/pointer-queue.ts`), réglée sur
  * l'écran de 320 x 200 et sur `TAP_DELAY_TICKS`, qui produit les événements `DrasculaInput`.
  */
 export class InputQueue extends PointerQueue<DrasculaInput> {
+  /** Le dernier appui vient d'un doigt (`tap`) et non d'une souris ou d'un stylet (`down`) : le curseur reste là où le doigt a touché. */
+  private touch = false;
+
   constructor() {
     super({
       width: SCREEN_WIDTH,
@@ -28,5 +56,19 @@ export class InputQueue extends PointerQueue<DrasculaInput> {
       pointer: (x, y, buttons) => ({ type: "pointer", x, y, buttons }),
       key: (key) => ({ type: "key", key }),
     });
+  }
+
+  override down(button: number, x: number, y: number): void {
+    this.touch = false;
+    super.down(button, x, y);
+  }
+
+  override tap(button: 0 | 2, x: number, y: number): void {
+    super.tap(button, x, y);
+    this.touch = true;
+  }
+
+  get lastPressTouch(): boolean {
+    return this.touch;
   }
 }

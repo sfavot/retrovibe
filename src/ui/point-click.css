@@ -80,6 +80,22 @@
   background: #000b;
 }
 
+/* Fenêtre qu'un jeu dessine à l'image de ses écrans d'origine (`PointClickStageDialogs`) : posée exactement sur le canvas, à son échelle
+   (la scène a la taille du canvas) ; le voile couvre le reste de la page, sous la couche. */
+.pc-stage-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000a;
+}
+
+.pc-stage-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 51;
+  line-height: normal;
+}
+
 .pc-dialog {
   box-sizing: border-box;
   display: flex;
@@ -214,6 +230,12 @@
 .pc-slot-actions {
   display: flex;
   gap: 8px;
+}
+
+.pc-volume-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .pc-volume-row {

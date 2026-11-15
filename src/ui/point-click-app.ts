@@ -9,7 +9,7 @@ import { type IconName, withIcons } from "./icons";
 import { IndexedPresenter } from "./indexed-canvas";
 import { localStorageStore } from "./local-storage";
 import { bindCanvasPointer, bindKeyboard } from "./pointer";
-import { type ChooseResult, type ChoiceDialogOptions, type DialogCopy, type MenuItem, dialogOverlay, renderChoiceDialog, parseVolume, renderLeaveDialog, renderMenuDialog, renderSlotDialog, renderVolumeDialog, volumeKey } from "./point-click-dialogs";
+import { type ChooseResult, type ChoiceDialogOptions, type DialogCopy, type MenuItem, dialogOverlay, renderChoiceDialog, parseVolume, renderLeaveDialog, renderMenuDialog, renderSlotDialog, renderVolumeDialog, type VolumeSlider, voiceVolumeKey, volumeKey } from "./point-click-dialogs";
 import { soundPrefKey } from "./sound-prefs";
 import { TickScheduler } from "./tick-scheduler";
 
@@ -78,6 +78,9 @@ export interface PointClickHost {
   unlock(): void;
   setPaused(paused: boolean): void;
   setUserVolume(level: number): void;
+  /** Volume des voix et des effets (0 à 1), pour un jeu qui le règle à part de la musique : la fenêtre du volume ajoute son curseur. */
+  readonly voiceVolume?: number;
+  setUserVoiceVolume?(level: number): void;
   close(): void;
 }
 
@@ -91,6 +94,34 @@ export interface PointClickFrameUi {
   hideLoading(): void;
   /** Repart du temps présent : le prochain `due` ne rattrape pas l'attente (après un chargement). */
   resync(): void;
+}
+
+/**
+ * Ce que reçoit l'écran des sauvegardes propre à un jeu (`PointClickStageDialogs.slots`) : même contrat que la fenêtre commune. La
+ * page enveloppe `save` et `load` : un résultat `ok` ferme l'écran et annonce `saveDone` / `loadDone`.
+ */
+export interface StageSlotsOptions {
+  /** Ce qui a ouvert l'écran : F10 / « Sauvegarder », ou F7 / « Charger ». */
+  intent: "save" | "load";
+  /** Faux pendant une séquence : sauvegarder est refusé, l'écran dit pourquoi. */
+  canSave: boolean;
+  summaries(): SlotSummary[];
+  save(slot: number): ChooseResult;
+  load(slot: number): Promise<ChooseResult>;
+  /** Retour au jeu sans rien charger. */
+  close(): void;
+}
+
+/**
+ * Fenêtres qu'un jeu dessine lui-même, à l'image de ses écrans d'origine (Drascula) : la page les pose exactement sur l'écran du jeu
+ * (même échelle, plein écran compris), met le jeu en pause et voile le reste de la page, dont un clic ferme la fenêtre. Sans elles,
+ * les fenêtres communes de `point-click-dialogs.ts`.
+ */
+export interface PointClickStageDialogs {
+  /** Réglage du volume ; le jeu applique et enregistre lui-même ses réglages. */
+  volume?(close: () => void): HTMLElement;
+  /** Écran unique de sauvegarde et de chargement. */
+  slots?(options: StageSlotsOptions): HTMLElement;
 }
 
 /** Ce que le chargement du jeu fournit à la page. */
@@ -120,6 +151,8 @@ export interface PointClickLoaded {
   wheel?(delta: -1 | 1): void;
   /** Jeu à sous-titres réglables : état, et bascule qui renvoie le message à annoncer. Sans valeur, ni entrée de menu ni raccourci. */
   subtitles?: { enabled(): boolean; toggle(): string };
+  /** Fenêtres à l'image du jeu, à la place des fenêtres communes (volume, sauvegardes). */
+  dialogs?: PointClickStageDialogs;
   /** Ce que `window.__<id>` expose en mode `debug`. */
   debug?: Record<string, unknown>;
   /** Échec de chargement en fond, levé à l'image suivante (arrête le jeu) ; `undefined` s'il n'y en a pas. */
@@ -239,6 +272,7 @@ export async function mountPointClickApp<TSave>(
   const store = localStorageStore();
   const presenter = IndexedPresenter.forCanvas(shell.canvas, game.width, game.height);
   const volumePref = volumeKey(game.id);
+  const voiceVolumePref = voiceVolumeKey(game.id);
   const scheduler = new TickScheduler(game.tickMs, game.maxCatchUpTicks);
 
   // --- Chargement ----------------------------------------------------------------------------------------------------------
@@ -269,7 +303,10 @@ export async function mountPointClickApp<TSave>(
           throw options.restore ? new Error(copy.invalidSave) : error;
         }
       },
-      restoreVolume: (host) => host.setUserVolume(parseVolume(store.get(volumePref))),
+      restoreVolume: (host) => {
+        host.setUserVolume(parseVolume(store.get(volumePref)));
+        host.setUserVoiceVolume?.(parseVolume(store.get(voiceVolumePref)));
+      },
       slotsStorage: (prefix) => prefixedStorage(store, prefix),
     });
   } catch (error) {
@@ -317,6 +354,8 @@ export async function mountPointClickApp<TSave>(
   let userPaused = false;
   /** Fenêtre ouverte par-dessus le jeu (sauvegardes, volume, menu) ; l'aide a la sienne (`helpView`). */
   let modal: HTMLElement | null = null;
+  /** Retire de la page la fenêtre ouverte (et son voile). */
+  let unmountModal: (() => void) | null = null;
   let helpView: HTMLElement | null = null;
   const isPaused = (): boolean => tabHidden || userPaused || modal !== null || helpView !== null;
   const applyPause = (): void => {
@@ -340,7 +379,8 @@ export async function mountPointClickApp<TSave>(
   }
 
   const closeModal = (): void => {
-    modal?.parentElement?.remove();
+    unmountModal?.();
+    unmountModal = null;
     modal = null;
     applyPause();
     shell.focusCanvas();
@@ -349,11 +389,70 @@ export async function mountPointClickApp<TSave>(
   const openModal = (dialog: HTMLElement, dismiss: () => void = closeModal): void => {
     if (modal) closeModal();
     modal = dialog;
-    shell.main.append(dialogOverlay(dialog, dismiss));
+    const overlay = dialogOverlay(dialog, dismiss);
+    shell.main.append(overlay);
+    unmountModal = () => overlay.remove();
     applyPause();
+  };
+  /**
+   * Fenêtre d'un jeu posée sur son écran (`PointClickStageDialogs`) : une couche à la taille du canvas dans la scène, et un voile sur
+   * le reste de la page (posé dans `main`, l'élément en plein écran), dont un appui ferme la fenêtre (`dismiss`).
+   */
+  const openStageModal = (dialog: HTMLElement, dismiss: () => void = closeModal): void => {
+    if (modal) closeModal();
+    modal = dialog;
+    const backdrop = h("div", { class: "pc-stage-backdrop" });
+    backdrop.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      dismiss();
+    });
+    const layer = h("div", { class: "pc-stage-layer" }, dialog);
+    shell.main.append(backdrop);
+    shell.stage.append(layer);
+    unmountModal = () => {
+      backdrop.remove();
+      layer.remove();
+    };
+    applyPause();
+  };
+  /** Écran des sauvegardes du jeu (`dialogs.slots`) ; `onCancel` : fermé sans qu'une partie ait été chargée. */
+  const openStageSlots = (render: NonNullable<PointClickStageDialogs["slots"]>, intent: "save" | "load", onCancel?: () => void): void => {
+    let loadedGame = false;
+    const close = (): void => {
+      closeModal();
+      if (!loadedGame) onCancel?.();
+    };
+    openStageModal(
+      render({
+        intent,
+        canSave: engine.canSave,
+        summaries: slots.summaries,
+        save(slot) {
+          const result = slots.save(slot);
+          if (result.ok) {
+            closeModal();
+            say(copy.saveDone);
+          }
+          return result;
+        },
+        async load(slot) {
+          const result = await slots.load(slot);
+          if (result.ok) {
+            loadedGame = true;
+            closeModal();
+            say(copy.loadDone);
+          }
+          return result;
+        },
+        close,
+      }),
+      close,
+    );
   };
 
   const openSave = (): void => {
+    const stageSlots = loaded?.dialogs?.slots;
+    if (stageSlots) return openStageSlots(stageSlots, "save");
     if (!engine.canSave) {
       say(copy.saveBusy);
       return;
@@ -373,6 +472,8 @@ export async function mountPointClickApp<TSave>(
     );
   };
   const openLoad = (onCancel?: () => void): void => {
+    const stageSlots = loaded?.dialogs?.slots;
+    if (stageSlots) return openStageSlots(stageSlots, "load", onCancel);
     let loadedGame = false;
     const close = (): void => {
       closeModal();
@@ -405,17 +506,30 @@ export async function mountPointClickApp<TSave>(
     openModal(renderChoiceDialog({ ...choice, choose: (answer) => then(() => choice.choose(answer))(), cancel }), cancel);
   };
   const openVolume = (): void => {
-    openModal(
-      renderVolumeDialog(
-        copy,
-        host.volume,
-        (level) => {
+    const stageVolume = loaded?.dialogs?.volume;
+    if (stageVolume) return openStageModal(stageVolume(closeModal));
+    const sliders: VolumeSlider[] = [
+      {
+        label: copy.volumeLabel,
+        value: host.volume,
+        change: (level) => {
           host.setUserVolume(level);
           store.set(volumePref, String(Math.round(level * 100)));
         },
-        closeModal,
-      ),
-    );
+      },
+    ];
+    const setVoice = host.setUserVoiceVolume?.bind(host);
+    if (setVoice && copy.voiceVolumeLabel) {
+      sliders.push({
+        label: copy.voiceVolumeLabel,
+        value: host.voiceVolume ?? 1,
+        change: (level) => {
+          setVoice(level);
+          store.set(voiceVolumePref, String(Math.round(level * 100)));
+        },
+      });
+    }
+    openModal(renderVolumeDialog(copy, sliders, closeModal));
   };
   /** Retour à l'écran titre, sans confirmation : le jeu s'arrête et la page est remplacée (`toTitle`) ; sans lui, sortie du jeu. */
   function showTitle(): void {

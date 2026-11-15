@@ -9,16 +9,21 @@ import { drasculaScript } from "../engine/rooms";
 import type { SaveData } from "../engine/save";
 import { BrowserHost, createSoundFiles } from "./browser-host";
 import { renderHelp } from "./help";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "./input";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, tapEffect } from "./input";
 import { keyAction } from "./keys";
 import { ChapterLoader, baseFiles, chapterVideos } from "./preload";
-import { SAVE_PREFIX, createSaveSlots, loadFromSlot, resultMessage, saveToSlot, summarizeSlots } from "./saves";
+import { SAVE_PREFIX, createSaveSlots, loadFromSlot, resultMessage, roomName, saveToSlot, summarizeSlots } from "./saves";
+import { fontSheet, renderSaveScreen, renderVolumeScreen, saveScreenArt, volumeArt } from "./native-dialogs";
+import { type VolumeKind, levelToPercent, percentToLevel, shortDate } from "./native-screens";
+import { parseVolume, voiceVolumeKey, volumeKey } from "../../../ui/point-click-dialogs";
 
 /** `debug` expose `window.__drascula` (`engine`, `host`, `loader`, `slots`) pour la console (page de dev). */
 export type AppOptions = PointClickAppOptions<SaveData>;
 
 /** Préférence des sous-titres (`"0"` = masqués ; affichés par défaut, comme ScummVM). */
 const SUBTITLES_KEY = "retrovibe:drascula:subtitles";
+/** Préférence du volume général (0 à 100, comme la musique et les voix, dont les clés sont celles de la page commune). */
+const MASTER_VOLUME_KEY = "retrovibe:drascula:master-volume";
 
 /**
  * Ce qui est propre à Drascula dans la page des jeux de pointer-et-cliquer (`ui/point-click-app.ts`). Les fichiers (données, images,
@@ -60,6 +65,7 @@ const drascula: PointClickGame<SaveData> = {
       onExit: ctx.exit,
     });
     ctx.restoreVolume(host);
+    host.setUserMasterVolume(parseVolume(store.get(MASTER_VOLUME_KEY)));
     const engine = ctx.buildEngine(() => new DrasculaEngine(host, { script: drasculaScript, restore: options.restore }));
     engine.subtitlesEnabled = store.get(SUBTITLES_KEY) !== "0";
     const slots = createSaveSlots(host.storage);
@@ -102,9 +108,10 @@ const drascula: PointClickGame<SaveData> = {
       },
       skip: () => host.input.key("Escape"),
       tap(button, x, y) {
-        // Pendant une réplique, un toucher la coupe (ScummVM ne le fait qu'au clavier : une touche) ; hors réplique, c'est un clic.
-        if (button === 0 && engine.subtitle !== null && engine.choices === null) host.input.key("Enter");
-        else host.input.tap(button, x, y);
+        // Pendant une réplique, un toucher la coupe (ScummVM ne le fait qu'au clavier : une touche), sauf tout juste commencée ; hors réplique, c'est un clic.
+        const effect = tapEffect(engine, button);
+        if (effect === "skip") host.input.key("Enter");
+        else if (effect === "click") host.input.tap(button, x, y);
       },
       key(event) {
         const action = keyAction(event);
@@ -118,6 +125,39 @@ const drascula: PointClickGame<SaveData> = {
           store.set(SUBTITLES_KEY, engine.subtitlesEnabled ? "1" : "0");
           return engine.subtitlesEnabled ? copy.subtitlesOn : copy.subtitlesOff;
         },
+      },
+      // Écrans d'origine du volume (F9) et des sauvegardes (F10, F7), à la place des fenêtres communes.
+      dialogs: {
+        volume(close) {
+          const volumes: Record<VolumeKind, { key: string; get(): number; set(level: number): void }> = {
+            master: { key: MASTER_VOLUME_KEY, get: () => host.masterVolume, set: (level) => host.setUserMasterVolume(level) },
+            voice: { key: voiceVolumeKey("drascula"), get: () => host.voiceVolume, set: (level) => host.setUserVoiceVolume(level) },
+            music: { key: volumeKey("drascula"), get: () => host.volume, set: (level) => host.setUserVolume(level) },
+          };
+          const levelOf = (kind: VolumeKind): number => percentToLevel(volumes[kind].get() * 100);
+          return renderVolumeScreen({
+            art: volumeArt(engine.gfx, engine.state),
+            sheet: fontSheet(engine.gfx),
+            levels: { master: levelOf("master"), voice: levelOf("voice"), music: levelOf("music") },
+            change(kind, level) {
+              const percent = levelToPercent(level);
+              volumes[kind].set(percent / 100);
+              store.set(volumes[kind].key, String(percent));
+            },
+            close,
+          });
+        },
+        slots: (options) =>
+          renderSaveScreen({
+            art: saveScreenArt(engine.gfx),
+            font: engine.gfx.font,
+            sheet: fontSheet(engine.gfx),
+            describe(slot) {
+              const stored = slots.read(slot);
+              return stored ? { row: roomName(stored.save.room.number), name: copy.saveScreenSlotName(stored.save.chapter, shortDate(stored.savedAt)) } : null;
+            },
+            slots: options,
+          }),
       },
       debug: { engine, host, loader, slots },
       failure: () => loadFailure,
@@ -140,6 +180,8 @@ const drascula: PointClickGame<SaveData> = {
           return false;
         }
         ui.hideLoading();
+        // Au doigt, le curseur s'efface pendant les répliques (il cacherait le texte) ; à la souris, il reste comme dans ScummVM.
+        engine.talkCursor = !host.input.lastPressTouch;
         return true;
       },
     };

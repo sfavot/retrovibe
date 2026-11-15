@@ -89,6 +89,21 @@ describe("WebSampleOutput", () => {
     expect(output.muted).toBe(true);
   });
 
+  it("le volume général s'applique en direct, borné, au contexte créé plus tard, et s'efface devant la coupure", async () => {
+    const { ctx, output } = setup();
+    output.volume = 0.4;
+    output.unlock();
+    await flush();
+    expect(ctx.gains[0].gain.value).toBe(0.4);
+    output.volume = 2;
+    expect(output.volume).toBe(1);
+    output.volume = 0.25;
+    output.setMuted(true);
+    expect(ctx.gains[0].gain.value).toBe(0);
+    output.setMuted(false);
+    expect(ctx.gains[0].gain.value).toBe(0.25);
+  });
+
   it("suspend fige les voix, resume ajoute le temps d'absence", async () => {
     const { clock, ctx, output } = setup();
     output.unlock();

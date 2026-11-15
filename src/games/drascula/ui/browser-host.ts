@@ -5,6 +5,7 @@ import type { SoundFiles } from "../audio/voice";
 import { type GameFiles } from "../data/files";
 import type { DrasculaHost, DrasculaInput } from "../engine/host";
 import { InputQueue } from "./input";
+import { mixedVolume } from "./native-screens";
 
 /**
  * Voix et effets `.ALS` lus à la demande (783 fichiers, 32 Mo : pas de préchargement). `has` est synchrone (liste de `files.json`),
@@ -53,6 +54,10 @@ export class BrowserHost implements DrasculaHost {
   private fade = 1;
   /** Volume choisi par la joueuse (touche F9), de 0 à 1. */
   private userVolume = 1;
+  /** Volume des voix et des effets choisi par la joueuse (fenêtre F9), de 0 à 1. */
+  private userVoiceVolume = 1;
+  /** Volume général (« Master » du panneau F9), de 0 à 1 : il multiplie la musique et les voix. */
+  private userMasterVolume = 1;
 
   constructor(options: BrowserHostOptions) {
     this.options = options;
@@ -121,8 +126,33 @@ export class BrowserHost implements DrasculaHost {
     return this.userVolume;
   }
 
+  /** Volume des voix et des effets choisi par la joueuse (0 à 1) ; le fondu du moteur ne le touche pas. */
+  setUserVoiceVolume(level: number): void {
+    this.userVoiceVolume = Math.min(Math.max(level, 0), 1);
+    this.applyVoiceVolume();
+  }
+
+  get voiceVolume(): number {
+    return this.userVoiceVolume;
+  }
+
+  /** Volume général (0 à 1) : la musique et les voix sont multipliées par lui, comme le `masterVolume` de `volumeControls`. */
+  setUserMasterVolume(level: number): void {
+    this.userMasterVolume = Math.min(Math.max(level, 0), 1);
+    this.applyVolume();
+    this.applyVoiceVolume();
+  }
+
+  get masterVolume(): number {
+    return this.userMasterVolume;
+  }
+
   private applyVolume(): void {
-    this.options.audio.setMusicVolume(this.fade * this.userVolume);
+    this.options.audio.setMusicVolume(this.fade * mixedVolume(this.userMasterVolume, this.userVolume));
+  }
+
+  private applyVoiceVolume(): void {
+    this.options.audio.setVoiceVolume(mixedVolume(this.userMasterVolume, this.userVoiceVolume));
   }
 
   /** À appeler dans un geste de l'utilisatrice : le navigateur ne laisse démarrer le son qu'après. */

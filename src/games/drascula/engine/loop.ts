@@ -93,10 +93,17 @@ export class DrasculaEngine implements Speaker {
    * tête qui parle) sans que son texte soit dessiné. Réglage de l'hôte, pas de l'état du jeu : il n'est pas sauvegardé.
    */
   subtitlesEnabled = true;
+  /**
+   * Curseur affiché pendant une réplique, comme dans ScummVM. L'hôte du navigateur l'éteint quand on joue au doigt : le curseur reste
+   * là où le doigt a touché, souvent sur l'objet regardé, juste sous le texte que dit le héros.
+   */
+  talkCursor = true;
   /** Tête qui parle pendant une réplique (`Speaker.talk`) : la vue de `render/heads.ts` et le tirage du tour. */
   head: { view: TalkView; roll: Roll } | null = null;
   /** Sous-titre et tête de la dernière réplique, gardés après sa fin pour `holdScreen` (`Speaker.lastSpeech`). */
   lastSpeech: Speaker["lastSpeech"] = null;
+  /** Tick où la réplique en cours a commencé (`Speaker.speechStart`). */
+  speechStart = 0;
   /** Choix de dialogue affichés (`converse`). */
   choices: ChoiceMenu | null = null;
   /** Les personnages qui parlent (`talkers.ts`) et les dialogues (`dialogs.ts`). */
@@ -194,9 +201,10 @@ export class DrasculaEngine implements Speaker {
       mouseY: this.mouseY,
       subtitle: this.subtitlesEnabled ? this.subtitle : null,
       main: !this.runner.active,
-      cursorVisible: this.cursorVisible,
+      cursorVisible: this.cursorVisible && (this.talkCursor || this.subtitle === null),
       talk: this.head,
       choices: this.choices,
+      choiceBanner: this.subtitlesEnabled,
     });
     this.host.present(this.gfx.screen.pixels, this.gfx.palette.shown);
   }

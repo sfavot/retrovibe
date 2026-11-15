@@ -6,7 +6,7 @@ import { drasculaScript } from "../../../src/games/drascula/engine/rooms";
 import { BrowserHost, createSoundFiles } from "../../../src/games/drascula/ui/browser-host";
 import { FileStore } from "../../../src/ui/file-store";
 import { describeSave, roomName, SAVE_PREFIX, createSaveSlots } from "../../../src/games/drascula/ui/saves";
-import { parseVolume, slotLabel, slotSelectable, volumeKey } from "../../../src/ui/point-click-dialogs";
+import { parseVolume, slotLabel, slotSelectable, voiceVolumeKey, volumeKey } from "../../../src/ui/point-click-dialogs";
 import { copy } from "../../../src/games/drascula/copy";
 import { hasOriginalFiles, listOriginal, byExtension } from "../helpers";
 import { Player } from "../engine/test-host";
@@ -23,6 +23,7 @@ function fakeAudio() {
     stopMusic: () => void calls.push("stopMusic"),
     musicPlaying: () => true,
     setMusicVolume: (level: number) => void calls.push(`volume:${level}`),
+    setVoiceVolume: (level: number) => void calls.push(`voice:${level}`),
     unlock: () => void calls.push("unlock"),
     suspend: () => void calls.push("suspend"),
     resume: () => void calls.push("resume"),
@@ -82,6 +83,27 @@ describe("BrowserHost", () => {
     expect(host.volume).toBe(0);
   });
 
+  it("le volume des voix et des effets est réglé à part, borné, sans toucher à la musique ni au fondu", () => {
+    const { host, calls } = makeHost();
+    host.setUserVoiceVolume(0.3);
+    host.setMusicVolume(0.5);
+    host.setUserVoiceVolume(4);
+    expect(calls).toEqual(["voice:0.3", "volume:0.5", "voice:1"]);
+    expect(host.voiceVolume).toBe(1);
+    expect(host.volume).toBe(1);
+  });
+
+  it("le volume général multiplie la musique (avec le fondu) et les voix, borné", () => {
+    const { host, calls } = makeHost();
+    host.setUserVolume(0.5);
+    host.setUserVoiceVolume(0.8);
+    host.setUserMasterVolume(0.5);
+    host.setMusicVolume(0.4);
+    host.setUserMasterVolume(3);
+    expect(calls).toEqual(["volume:0.5", "voice:0.8", "volume:0.25", "voice:0.4", "volume:0.1", "volume:0.2", "voice:0.8"]);
+    expect(host.masterVolume).toBe(1);
+  });
+
   it("la pause coupe le son et relâche les boutons ; la reprise relance le son ; fermer ferme l'audio", () => {
     const { host, calls } = makeHost();
     host.input.down(0, 10, 10);
@@ -137,6 +159,7 @@ describe("volume mémorisé", () => {
     expect(parseVolume("-5")).toBe(0);
     expect(parseVolume("abc")).toBe(1);
     expect(volumeKey("drascula")).toBe("retrovibe:drascula:music-volume");
+    expect(voiceVolumeKey("drascula")).toBe("retrovibe:drascula:voice-volume");
   });
 });
 

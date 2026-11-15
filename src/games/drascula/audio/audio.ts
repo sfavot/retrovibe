@@ -65,6 +65,14 @@ export class DrasculaAudio implements Muteable {
     this.music.volume = level;
   }
 
+  /**
+   * Volume des voix et des effets, de 0 à 1 : une seule voie dans le jeu (`kSpeechSoundType` de `playFile`), réglée ensemble par le
+   * curseur des voix de `volumeControls` (ScummVM, qui règle à la fois `kSpeechSoundType` et `kSFXSoundType`).
+   */
+  setVoiceVolume(level: number): void {
+    this.output.volume = level;
+  }
+
   /** Piste demandée (0 si aucune). */
   get musicTrack(): number {
     return this.music.track;

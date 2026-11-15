@@ -60,6 +60,12 @@ const TEXT_COLORS: readonly (readonly [number, number, number])[] = [
   [98, 91, 100],
 ];
 
+/** Couleur du texte `color` (indice de `TextColor`) telle qu'elle s'affiche (RVB 8 bits, comme `setPalette`). */
+export function textColorRgb(color: number): [number, number, number] {
+  const [r, g, b] = TEXT_COLORS[color] ?? TEXT_COLORS[0];
+  return [(r * 4) & 0xff, (g * 4) & 0xff, (b * 4) & 0xff];
+}
+
 /** `adjustToVGA` : valeur 6 bits d'un niveau, 0 si elle est négative (le test `value > 0` de ScummVM). */
 function adjustToVga(value: number): number {
   return value > 0 ? value & 0x3f : 0;

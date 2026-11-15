@@ -5,7 +5,7 @@ import { inventorySlotAt } from "../engine/actions";
 import { CHARACTER_HEIGHT, CHARACTER_WIDTH, type GameState, INVENTORY_SIZE, OBJ_HEIGHT, OBJ_WIDTH, Track } from "../engine/state";
 import { factorAt } from "../engine/perspective";
 import { DIALOG_FONT_SHEET, FONT_SHEET, GameFont, centerText, type DialogState } from "./font";
-import { COMPLETE_PAL, GamePalette, HALF_PAL, TextColor } from "./palette";
+import { COMPLETE_PAL, GamePalette, HALF_PAL, LIGHT_FIRST, TextColor } from "./palette";
 import { HEIGHT, Plane, WIDTH } from "./plane";
 
 /**
@@ -43,6 +43,14 @@ import { HEIGHT, Plane, WIDTH } from "./plane";
  *  3. **`choices`** : le menu des choix de dialogue (`converse`), dessiné par-dessus l'image.
  * Le sous-titre, le nom survolé, l'inventaire, la barre des verbes et le curseur restent dessinés par `compose` après la vue.
  */
+
+/** Colonnes des six images de la marche dans les feuilles du héros : `soc += largeur ; _frameX[n] = soc`. */
+export function walkFrameColumns(width: number): number[] {
+  return Array.from({ length: 6 }, (_, n) => (n + 1) * width);
+}
+
+/** Luminosité gardée sous le bandeau des choix de dialogue (un tiers). */
+const BANNER_LEVEL = 1 / 3;
 
 export const CURSOR_HOTSPOT = { x: 20, y: 17 } as const;
 /** Ordonnée des icônes de verbes dans `99.ALG` (`selectVerb`, `c = 171` hors de l'inventaire). */
@@ -129,6 +137,8 @@ export interface FrameInput {
   talk?: { view: TalkView; roll: Roll } | null;
   /** Choix de dialogue affichés. */
   choices?: ChoiceMenu | null;
+  /** Bandeau assombri sous les choix de dialogue (écart du portage, avec les sous-titres : le texte se lit mal sur certains décors). */
+  choiceBanner?: boolean;
 }
 
 export class DrasculaRenderer {
@@ -141,6 +151,11 @@ export class DrasculaRenderer {
   readonly back = new Plane();
   readonly extra = new Plane();
   readonly table = new Plane();
+  /**
+   * `_frameX` du chapitre 2 : ScummVM le recalcule à chaque `enterRoom` (cumul de la largeur du héros, `curWidth`) ; les autres
+   * chapitres gardent la table de `drascula.dat` (ScummVM la recalcule au début du chapitre avec `CHARACTER_WIDTH` : mêmes valeurs).
+   */
+  private chapter2FrameX: readonly number[] = walkFrameColumns(CHARACTER_WIDTH);
   readonly cursor = new Plane();
   /** Image libre d'une séquence (`owner === "canvas"`) : l'écran « matériel » de ScummVM, écrit par `playFLI`, `animate`, `clearRoom`. */
   readonly canvas = new Plane();
@@ -237,6 +252,8 @@ export class DrasculaRenderer {
    */
   enterRoom(room: { number: number; disk: string; paletteLevel: number; hero: AldHero | null }, chapter: number): void {
     if (chapter === 2) {
+      // `enterRoom` (rooms.cpp) : au chapitre 2, les colonnes de la marche suivent la largeur du héros dans la pièce.
+      this.chapter2FrameX = walkFrameColumns(room.hero?.width ?? CHARACTER_WIDTH);
       if (room.hero) {
         const [front, extra, , back] = room.hero.surfaces;
         this.loadPic(front, this.front);
@@ -284,7 +301,7 @@ export class DrasculaRenderer {
       screen.copyBackground(this.canvas, 0, 0, 0, 0, 320, 200);
       if (input.talk) input.talk.view.draw(this.scene(state), input.talk.roll);
     }
-    if (input.choices) this.drawChoices(input.choices);
+    if (input.choices) this.drawChoices(input.choices, input.choiceBanner ?? false);
     if (input.subtitle) {
       const { text, x, y, color } = input.subtitle;
       if (color !== undefined) this.palette.setTextColor(color);
@@ -337,8 +354,12 @@ export class DrasculaRenderer {
    * Choix de dialogue (`converse`) : les quatre répliques l'une sous l'autre à partir de y = 2, chacune dans son état, puis celle qui
    * est survolée par-dessus en état « survolé ». Les glyphes sont ceux de `CAR.ALG` (feuille à part, `backSurface` n'est pas touchée).
    */
-  private drawChoices(menu: ChoiceMenu): void {
+  private drawChoices(menu: ChoiceMenu, banner: boolean): void {
     const sheet = this.sheet(DIALOG_FONT_SHEET);
+    if (banner) {
+      const lines = menu.phrases.reduce((sum, phrase) => sum + this.font.measureChoice(phrase), 0);
+      this.darkenRows(Math.min(4 + 8 * lines, HEIGHT));
+    }
     let y = 2;
     const tops: number[] = [];
     menu.phrases.forEach((phrase, i) => {
@@ -346,6 +367,36 @@ export class DrasculaRenderer {
       y += 8 * this.font.printChoice(this.screen, sheet, phrase, y, menu.states[i] ?? "unselected");
     });
     if (menu.hovered >= 0 && menu.hovered < menu.phrases.length) this.font.printChoice(this.screen, sheet, menu.phrases[menu.hovered], tops[menu.hovered], "selected");
+  }
+
+  /**
+   * Assombrit les `rows` premières lignes de l'écran (bandeau des choix) : chaque couleur devient la plus proche, dans la palette
+   * affichée, du tiers de sa luminosité. Les couleurs de la lumière de la pièce et du texte (235 à 255), qui changent en cours de
+   * jeu, ne servent pas de cible.
+   */
+  private darkenRows(rows: number): void {
+    const rgb = this.palette.shown;
+    const map = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) {
+      const r = rgb[i * 3] * BANNER_LEVEL;
+      const g = rgb[i * 3 + 1] * BANNER_LEVEL;
+      const b = rgb[i * 3 + 2] * BANNER_LEVEL;
+      let best = i;
+      let bestDistance = Infinity;
+      for (let j = 0; j < LIGHT_FIRST; j++) {
+        const dr = rgb[j * 3] - r;
+        const dg = rgb[j * 3 + 1] - g;
+        const db = rgb[j * 3 + 2] - b;
+        const distance = dr * dr + dg * dg + db * db;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = j;
+        }
+      }
+      map[i] = best;
+    }
+    const pixels = this.screen.pixels;
+    for (let p = 0; p < rows * WIDTH; p++) pixels[p] = map[pixels[p]];
   }
 
   /** `roomPreUpdates` (avant le héros) et `roomUpdates` (après) : rectangles de `draw3` recopiés selon un drapeau. */
@@ -374,7 +425,8 @@ export class DrasculaRenderer {
       return;
     }
     if (chapter !== 2 && chapter !== 3 && !hero.visible) return;
-    const sourceX = hero.moving ? (this.dat.frameX[hero.frame] ?? 0) : 0;
+    const frameX = chapter === 2 ? this.chapter2FrameX : this.dat.frameX;
+    const sourceX = hero.moving ? (frameX[hero.frame] ?? 0) : 0;
     const sourceY = hero.track === Track.Left ? 0 : HERO_ROW_Y;
     const sheet = hero.track === Track.Up ? this.back : hero.track === Track.Down ? this.front : this.extra;
     if (chapter === 2) {

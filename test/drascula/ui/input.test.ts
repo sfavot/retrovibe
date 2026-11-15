@@ -19,6 +19,40 @@ describe("InputQueue : réglage de Drascula", () => {
     expect(ticks[TAP_DELAY_TICKS].map((e) => e.type === "pointer" && e.buttons)).toEqual([1]);
     expect(TAP_DELAY_TICKS).toBe(2 * FRAME_TICKS);
   });
+
+  it("retient si le dernier appui vient d'un doigt (toucher) ou d'une souris (bouton)", () => {
+    const q = new InputQueue();
+    expect(q.lastPressTouch).toBe(false);
+    q.tap(0, 10, 10);
+    expect(q.lastPressTouch).toBe(true);
+    q.move(20, 20);
+    expect(q.lastPressTouch).toBe(true);
+    q.down(0, 20, 20);
+    expect(q.lastPressTouch).toBe(false);
+    q.tap(2, 30, 30);
+    expect(q.lastPressTouch).toBe(true);
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("curseur pendant une réplique", () => {
+  it("affiché à la souris (ScummVM), effacé au doigt ; hors réplique, toujours affiché", () => {
+    const host = new QueueHost();
+    const engine = new DrasculaEngine(host, { seed: 1, script: { ...drasculaScript, animations: {} } });
+    const seen: boolean[] = [];
+    const compose = engine.gfx.compose.bind(engine.gfx);
+    engine.gfx.compose = (input) => {
+      seen.push(input.cursorVisible);
+      compose(input);
+    };
+    engine.cursorVisible = true;
+    engine.subtitle = { text: "UN TEXTE", x: 160, y: 50 };
+    engine.render();
+    engine.talkCursor = false;
+    engine.render();
+    engine.subtitle = null;
+    engine.render();
+    expect(seen).toEqual([true, false, true]);
+  });
 });
 
 describe("keyAction : touches du navigateur", () => {

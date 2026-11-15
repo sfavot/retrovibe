@@ -38,6 +38,8 @@ export interface DialogCopy {
   saveOverwrite(slot: number): string;
   volumeDialogTitle: string;
   volumeLabel: string;
+  /** Nom du curseur des voix et des effets, pour un jeu qui le propose (`PointClickHost.setUserVoiceVolume`). */
+  voiceVolumeLabel?: string;
 }
 
 /** Échap ferme la fenêtre (et n'atteint pas le jeu). */
@@ -288,6 +290,11 @@ export function volumeKey(game: string): string {
   return `retrovibe:${game}:music-volume`;
 }
 
+/** Clé de la préférence du volume des voix et des effets (0 à 100). */
+export function voiceVolumeKey(game: string): string {
+  return `retrovibe:${game}:voice-volume`;
+}
+
 /** Volume enregistré (0 à 1) d'une préférence de 0 à 100 ; 1 si rien de lisible. */
 export function parseVolume(stored: string | null): number {
   if (stored === null) return 1;
@@ -295,31 +302,47 @@ export function parseVolume(stored: string | null): number {
   return Number.isFinite(percent) ? Math.min(Math.max(percent, 0), 100) / 100 : 1;
 }
 
-/** Fenêtre du volume de la musique : un curseur de 0 à 100 appliqué en direct, Échap ou « Fermer » pour revenir au jeu. */
-export function renderVolumeDialog(copy: DialogCopy, volume: number, change: (level: number) => void, close: () => void): HTMLElement {
+/** Un curseur de la fenêtre du volume : son nom, sa valeur (0 à 1) et ce qui l'applique. */
+export interface VolumeSlider {
+  label: string;
+  value: number;
+  change(level: number): void;
+}
+
+/**
+ * Fenêtre du volume : un curseur de 0 à 100 par réglage, appliqué en direct, Échap ou « Fermer » pour revenir au jeu. Un seul curseur
+ * (la musique) est nommé par le titre de la fenêtre ; plusieurs portent chacun leur nom visible.
+ */
+export function renderVolumeDialog(copy: DialogCopy, sliders: readonly VolumeSlider[], close: () => void): HTMLElement {
   const titleId = "pc-dialog-volume-title";
-  const output = h("output", { class: "pc-volume-value", for: "pc-volume" }, `${Math.round(volume * 100)} %`);
-  const range = h("input", {
-    id: "pc-volume",
-    type: "range",
-    min: 0,
-    max: 100,
-    step: 5,
-    value: Math.round(volume * 100),
-    "aria-label": copy.volumeLabel,
-  });
-  range.addEventListener("input", () => {
-    output.textContent = `${range.value} %`;
-    change(Number(range.value) / 100);
+  const named = sliders.length > 1;
+  const rows = sliders.map((slider, index) => {
+    const id = `pc-volume-${index}`;
+    const output = h("output", { class: "pc-volume-value", for: id }, `${Math.round(slider.value * 100)} %`);
+    const range = h("input", {
+      id,
+      type: "range",
+      min: 0,
+      max: 100,
+      step: 5,
+      value: Math.round(slider.value * 100),
+      ...(named ? {} : { "aria-label": slider.label }),
+    });
+    range.addEventListener("input", () => {
+      output.textContent = `${range.value} %`;
+      slider.change(Number(range.value) / 100);
+    });
+    const row = h("div", { class: "pc-volume-row" }, range, output);
+    return { range, element: named ? h("div", { class: "pc-volume-field" }, h("label", { for: id }, slider.label), row) : row };
   });
   const dialog = h(
     "section",
     { class: "pc-dialog pc-dialog-volume", role: "dialog", "aria-modal": "true", "aria-labelledby": titleId },
     h("h2", { id: titleId }, copy.volumeDialogTitle),
-    h("div", { class: "pc-volume-row" }, range, output),
+    ...rows.map((row) => row.element),
     h("button", { type: "button", class: "secondary", onclick: close }, copy.close),
   );
   closeOnEscape(dialog, close);
-  queueMicrotask(() => range.focus());
+  queueMicrotask(() => rows[0]?.range.focus());
   return dialog;
 }

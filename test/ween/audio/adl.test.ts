@@ -95,7 +95,8 @@ describe.skipIf(!hasOriginalFiles)("musiques ADL de Ween", () => {
       }
       expect(Math.sqrt(sum / out.length), `morceau ${i}`).toBeGreaterThan(0.001);
     }
-  });
+    // 6 × 3 s de synthèse OPL réelle : plus de 5 s sur les machines de la CI.
+  }, 60_000);
 });
 
 /** Nombre d'écritures de registres faites par le constructeur de l'émulateur (sa remise à zéro). */

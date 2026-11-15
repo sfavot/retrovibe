@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { type Level, type LevPart, emptyPart, readLev, writeLev, PART_LOCKED } from "../../../../src/games/tim3/data/lev";
@@ -7,13 +7,13 @@ import { registerPipes } from "../../../../src/games/tim3/engine/parts/misc/pipe
 import { firstDifference, parseTrace, traceWorld } from "../../../../src/games/tim3/engine/trace";
 import { World } from "../../../../src/games/tim3/engine/world";
 import { baseIndex } from "../../data/real";
-import { original, readTrace, realTypes, TRACE_DIR } from "../helpers";
+import { original, readTrace, realTypes, TRACE_DIR, traceFiles } from "../helpers";
 
 /** Tuyaux 47, 57, 97, 98, accélérateur 88, bloc de couleur 127 : scénarios minimaux comparés au banc. */
 const PIPES = new Set([47, 57, 88, 97, 98, 127]);
 const OTHERS = new Set([4, 11, 15, 35, 37, 39, 53, 59, 64, 67, 69, 71, 72, 77, 87, 116, 117, 119]);
 const OWN = ["443dc0", "443de8", "444c68", "444cb9", "444ce1", "446c94", "446d4c", "446cd0", "446d89", "4473d0", "44742b", "44750d", "447584", "4475e2", "448268", "44827f", "43d59c"];
-const files = original.has ? readdirSync(TRACE_DIR).filter((f) => /^misc-.*-keep.*\.tsv$/.test(f)).sort() : [];
+const files = original.has ? traceFiles().filter((f) => /^misc-.*-keep.*\.tsv$/.test(f)) : [];
 
 function worldWith(level: string, keep: Set<number>): World {
   const r = defaultRegistry();

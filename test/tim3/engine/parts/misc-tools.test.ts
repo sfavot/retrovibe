@@ -1,4 +1,3 @@
-import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { readLev } from "../../../../src/games/tim3/data/lev";
 import { defaultRegistry } from "../../../../src/games/tim3/engine/parts";
@@ -6,16 +5,14 @@ import { registerTools } from "../../../../src/games/tim3/engine/parts/misc/tool
 import { firstDifference, parseTrace, traceWorld } from "../../../../src/games/tim3/engine/trace";
 import { World } from "../../../../src/games/tim3/engine/world";
 import { baseIndex } from "../../data/real";
-import { original, readTrace, realTypes, TRACE_DIR } from "../helpers";
+import { original, readTrace, realTypes, traceFiles } from "../helpers";
 
 /** Outils : gant 35, taille-haie 37, tremplin 39, ouvre-boîte 67, cisailles 77. Scénarios minimaux comparés au banc. */
 const TOOLS = new Set([35, 37, 39, 67, 77]);
 const OWN = [
   ...["442210", "44224f", "44234c", "4423b5", "442760", "442905", "442800", "442a44", "443168", "443218", "4431d9", "445801", "4457ac"],
 ];
-const files = original.has
-  ? readdirSync(TRACE_DIR).filter((f) => /^misc-.*-tools\d+\.tsv$/.test(f)).sort()
-  : [];
+const files = original.has ? traceFiles().filter((f) => /^misc-.*-tools\d+\.tsv$/.test(f)) : [];
 
 function worldWith(level: string, keep: Set<number>): World {
   const r = defaultRegistry();

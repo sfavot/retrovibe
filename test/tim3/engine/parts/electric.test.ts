@@ -8,6 +8,7 @@ import { World } from "../../../../src/games/tim3/engine/world";
 import { Part, RopeData } from "../../../../src/games/tim3/engine/part";
 import { baseIndex } from "../../data/real";
 import { stateFirst } from "../../../../src/games/tim3/engine/parts/electric/support";
+import { applyAtmosphere } from "../../../../src/games/tim3/engine/gravity";
 import { original, realTypes, TRACE_DIR } from "../helpers";
 
 /**
@@ -150,8 +151,14 @@ describe.skipIf(levels.length === 0)("TIM3 electric : niveaux complets comparés
 
 // --- logique, sans banc ----------------------------------------------------------------------------------------
 
+/**
+ * Pièce seule dans un monde vide. Le jeu ne crée jamais de pièce hors d'un niveau chargé : on refait donc 434141 (gravité et
+ * pression par défaut du monde), sans quoi la table de types partagée garde l'atmosphère du dernier niveau chargé par un autre
+ * test, ou n'en a aucune (vitesse terminale brute du PAR, 0 pour la pulsation 20).
+ */
 function lone(type: number, setup?: (p: Part) => void): { world: World; p: Part } {
   const world = new World(realTypes());
+  applyAtmosphere(world.types, world.gravity, world.pressure);
   const p = new Part();
   p.type = type;
   p.vertexCount = world.types.get(type).vertexCount;

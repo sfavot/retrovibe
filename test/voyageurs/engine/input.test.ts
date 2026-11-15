@@ -5,7 +5,7 @@ import type { VoyageursEngine } from "../../../src/games/voyageurs/engine/game";
 import type { TestHost, VoyageursInput } from "../../../src/games/voyageurs/engine/host";
 import { objectUnderCursor, relEntryForObject } from "../../../src/games/voyageurs/engine/input";
 import { type FrameView, NullRenderer } from "../../../src/games/voyageurs/engine/services";
-import { OverlayType, VAR_MOUSE_X_POS, VAR_MOUSE_Y_POS } from "../../../src/games/voyageurs/engine/state";
+import { OverlayType, VAR_MOUSE_X_MODE, VAR_MOUSE_X_POS, VAR_MOUSE_Y_POS } from "../../../src/games/voyageurs/engine/state";
 import { FAILURE_MESSAGES, VERBS } from "../../../src/games/voyageurs/engine/texts";
 import { hasOriginalFiles, parseBenchInputs, replay } from "./helpers";
 
@@ -169,5 +169,59 @@ describe.skipIf(!hasOriginalFiles)("entrées du joueur dans la première scène"
     pump(engine, 30);
     expect(engine.quitRequested).toBe(true);
     expect(host.exited).toBe(true);
+  });
+});
+
+/**
+ * Pavé numérique (`moveUsingKeyboard`, `executePlayerInput` de FW) : le sens de la touche n'est pas lu ; la cible de marche est remise sur
+ * le héros d'après son sens de marche en cours (globales 253 / 251), ce qui l'arrête, et ne change pas quand il est immobile.
+ */
+describe.skipIf(!hasOriginalFiles)("marche au clavier (pavé numérique)", () => {
+  const hero = (engine: VoyageursEngine) => ({ x: engine.state.objects[1]!.x, y: engine.state.objects[1]!.y });
+
+  it("héros immobile : aucune touche ne le fait marcher ni ne change la cible", () => {
+    const { engine, host } = replay(intro(), 470);
+    const before = { hero: hero(engine), target: [engine.state.globals[VAR_MOUSE_X_POS], engine.state.globals[VAR_MOUSE_Y_POS]] };
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]] as const) {
+      host.push({ type: "walk", dx, dy });
+      pump(engine, 30);
+      host.push({ type: "walk", dx: 0, dy: 0 });
+      pump(engine, 30);
+    }
+    pump(engine, 300);
+    expect(hero(engine)).toEqual(before.hero);
+    expect([engine.state.globals[VAR_MOUSE_X_POS], engine.state.globals[VAR_MOUSE_Y_POS]]).toEqual(before.target);
+  });
+
+  it("héros en marche : une touche tenue un tick l'arrête sur place, quel que soit son sens", () => {
+    const walkLeft = (key?: [number, number]) => {
+      const { engine, host } = replay(intro(), 470);
+      host.push(...click(123, 154));
+      pump(engine, 60);
+      expect(engine.state.globals[VAR_MOUSE_X_MODE]).toBe(2);
+      if (key) host.push({ type: "walk", dx: key[0], dy: key[1] });
+      pump(engine, 15);
+      if (key) host.push({ type: "walk", dx: 0, dy: 0 });
+      const at = hero(engine);
+      pump(engine, 1000);
+      return { at, end: hero(engine), mode: engine.state.globals[VAR_MOUSE_X_MODE] };
+    };
+    const free = walkLeft();
+    expect(free.end.x).toBeLessThan(free.at.x - 10);
+    for (const key of [[-1, 0], [1, 0], [0, 1]] as [number, number][]) {
+      const stopped = walkLeft(key);
+      expect(stopped.end).toEqual(stopped.at);
+      expect(stopped.mode).toBe(0);
+    }
+  });
+
+  it("une touche relâchée avant la fin du tick est perdue, comme dans ScummVM", () => {
+    const { engine, host } = replay(intro(), 470);
+    host.push(...click(123, 154));
+    pump(engine, 60);
+    host.push({ type: "walk", dx: -1, dy: 0 }, { type: "walk", dx: 0, dy: 0 });
+    const at = hero(engine);
+    pump(engine, 200);
+    expect(hero(engine).x).toBeLessThan(at.x - 5);
   });
 });

@@ -23,8 +23,8 @@ export type MouseButton = "left" | "right" | "both";
 export type VoyageursAction = "examine" | "take" | "inventory" | "use" | "activate" | "speak" | "actionMenu" | "systemMenu" | "menuUp" | "menuDown";
 
 /**
- * Entrée de l'utilisateur, en coordonnées de l'écran 320 × 200. `walk` : déplacement au clavier (pavé numérique), `dx` / `dy` dans -1, 0,
- * 1 (0, 0 = arrêt) ; `dy` > 0 vers le haut, comme `moveUsingKeyboard`.
+ * Entrée de l'utilisateur, en coordonnées de l'écran 320 × 200. `walk` : touche du pavé numérique tenue (`moveUsingKeyboard`), `dx` /
+ * `dy` dans -1, 0, 1 (0, 0 = relâchée) ; `dy` > 0 vers le haut. Dans FW, elle arrête le héros en marche sans le diriger (`input.ts`).
  */
 export type VoyageursInput =
   | { type: "move"; x: number; y: number }

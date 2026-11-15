@@ -28,7 +28,7 @@ export const copy = {
   controls: [
     "Souris : clic gauche pour marcher et pour valider, clic droit pour ouvrir le menu des verbes (Examiner, Prendre, Inventaire, Utiliser, Actionner, Parler), puis clic gauche sur un verbe et sur l'objet visé. Le bouton du milieu (ou F10) ouvre le menu du jeu (Pause, Nouvelle partie, Quitter, Charger, Sauver). Quand un message s'affiche, cliquez pour continuer.",
     "Écran tactile : toucher = clic gauche, appui long = clic droit. Le bouton « Système » ouvre le menu du jeu, le bouton « Menu » celui du site.",
-    "Clavier : F1 à F6 choisissent un verbe (Examiner, Prendre, Inventaire, Utiliser, Actionner, Parler), F9 ouvre le menu des verbes, F10 le menu du jeu, Entrée vaut un clic gauche, Échap un clic droit.",
+    "Clavier : F1 à F6 choisissent un verbe (Examiner, Prendre, Inventaire, Utiliser, Actionner, Parler), F9 ouvre le menu des verbes, F10 le menu du jeu, Entrée (ou 5 du pavé numérique) vaut un clic gauche, Échap un clic droit. Dans un menu, les flèches haut et bas changent la ligne choisie. Comme dans le jeu d'origine, les autres touches du pavé numérique arrêtent le héros au lieu de le faire marcher.",
     "Dix emplacements de sauvegarde, dans le navigateur de cet appareil ; la musique est celle du CD.",
     "Version modifiée du jeu : traduction française de fans, musique convertie en MP3, moteur réécrit (détails dans « Aide et crédits »).",
   ],
@@ -107,9 +107,10 @@ export const copy = {
     ["F1 à F6", "Examiner, Prendre, Inventaire, Utiliser, Actionner, Parler"],
     ["F9", "ouvrir le menu des verbes"],
     ["F10", "ouvrir le menu du jeu (Pause, Nouvelle partie, Quitter, Charger, Sauver)"],
-    ["Entrée", "clic gauche à la position du curseur"],
+    ["Entrée, 5 du pavé numérique", "clic gauche à la position du curseur"],
     ["Échap", "clic droit à la position du curseur"],
-    ["Molette", "changer la ligne choisie d'un menu"],
+    ["Flèches haut et bas, molette", "changer la ligne choisie d'un menu"],
+    ["Pavé numérique (sauf 5)", "arrêter le héros en marche"],
   ] as readonly (readonly [string, string])[],
   helpSavesTitle: "Sauvegardes",
   helpSaves:

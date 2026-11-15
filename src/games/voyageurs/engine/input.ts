@@ -401,7 +401,10 @@ export function* processAction(engine: InputEngine, action: VoyageursAction): Se
   }
 }
 
-/** Déplacement au clavier (`moveUsingKeyboard`, `executePlayerInput`). */
+/**
+ * Marche au clavier (`moveUsingKeyboard`, `executePlayerInput`). Dans FW elle ne fait pas marcher : le sens retenu n'est lu que si
+ * `var_5E` diffère de `bgVar0`, ce qui n'arrive jamais (`menuVar` reste à 0) ; la cible de marche est remise sur le héros, ce qui l'arrête.
+ */
 export interface KeyboardWalk {
   xMove: number;
   yMove: number;

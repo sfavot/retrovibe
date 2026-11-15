@@ -36,6 +36,8 @@ export class InputQueue {
   private held = 0;
   /** « Les deux boutons » a été envoyé : les relâchements isolés sont ignorés jusqu'au dernier. */
   private both = false;
+  /** Une touche de marche est tenue : à relâcher avec les boutons. */
+  private walking = false;
   private paused = false;
   private step = 0;
   private at = { x: 0, y: 0 };
@@ -113,9 +115,10 @@ export class InputQueue {
     }
   }
 
-  /** Plus aucun bouton enfoncé (perte du focus, pause). */
+  /** Plus aucun bouton enfoncé ni touche de marche tenue (perte du focus, pause). */
   releaseAll(): void {
     for (const dom of [0, 2]) this.up(dom, this.at.x, this.at.y);
+    this.walk(0, 0);
     if (this.held !== 0) {
       this.held = 0;
       if (this.both) {
@@ -145,13 +148,21 @@ export class InputQueue {
     }
   }
 
+  /** Marche au clavier (pavé numérique) : sens tenu, ou (0, 0) au relâchement, qui passe aussi en pause comme un relâchement de bouton. */
+  walk(dx: number, dy: number): void {
+    const held = dx !== 0 || dy !== 0;
+    if (held ? this.paused : !this.walking) return;
+    this.walking = held;
+    this.push({ type: "walk", dx, dy });
+  }
+
   /** Action du clavier (verbe, menu). */
   action(action: VoyageursAction): void {
     if (this.paused) return;
     this.push({ type: "action", action });
   }
 
-  /** En pause : les boutons tenus sont relâchés ; les autres entrées en attente sont jetées. À la reprise, seuls les relâchements restent. */
+  /** En pause : les boutons tenus sont relâchés ; les autres entrées en attente sont jetées. À la reprise, seuls les relâchements (boutons, marche) restent. */
   setPaused(paused: boolean): void {
     if (paused === this.paused) return;
     if (paused) {
@@ -159,7 +170,7 @@ export class InputQueue {
       this.paused = true;
     } else {
       this.paused = false;
-      this.queue = this.queue.filter(({ input }) => input.type === "up");
+      this.queue = this.queue.filter(({ input }) => input.type === "up" || (input.type === "walk" && input.dx === 0 && input.dy === 0));
       for (const queued of this.queue) queued.due = this.step;
     }
   }

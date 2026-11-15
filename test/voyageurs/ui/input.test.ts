@@ -115,4 +115,26 @@ describe("InputQueue", () => {
       { type: "action", action: "systemMenu" },
     ]);
   });
+
+  it("marche au clavier : sens tenu puis arrêt ; un relâchement sans marche tenue n'envoie rien", () => {
+    const q = new InputQueue();
+    q.walk(0, 0);
+    q.walk(-1, 1);
+    q.walk(0, 0);
+    q.walk(0, 0);
+    expect(run(q, 1).map((e) => e.input)).toEqual([
+      { type: "walk", dx: -1, dy: 1 },
+      { type: "walk", dx: 0, dy: 0 },
+    ]);
+  });
+
+  it("marche au clavier en pause : rien n'entre, et la marche tenue est arrêtée à la reprise", () => {
+    const q = new InputQueue();
+    q.walk(1, 0);
+    run(q, 1);
+    q.setPaused(true);
+    q.walk(0, 1);
+    q.setPaused(false);
+    expect(run(q, 1).map((e) => e.input)).toEqual([{ type: "walk", dx: 0, dy: 0 }]);
+  });
 });

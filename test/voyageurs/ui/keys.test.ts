@@ -21,6 +21,26 @@ describe("keyDown / keyUp", () => {
     expect(keyUp(key("Escape"))).toEqual({ type: "button", button: "right", down: false });
   });
 
+  it("flèches haut et bas : ligne précédente / suivante du menu (MENUUP / MENUDOWN) ; gauche et droite sans effet", () => {
+    expect(keyDown(key("ArrowUp"))).toEqual({ type: "action", action: "menuUp" });
+    expect(keyDown(key("ArrowDown"))).toEqual({ type: "action", action: "menuDown" });
+    expect(keyDown(key("ArrowLeft"))).toBeNull();
+    expect(keyDown(key("ArrowRight"))).toBeNull();
+    expect(keyUp(key("ArrowUp"))).toBeNull();
+  });
+
+  it("pavé numérique 1 à 4, 6 à 9 : marche au clavier tenue (dy > 0 = haut), arrêtée au relâchement ; 5 = clic gauche", () => {
+    const pad = (n: number, extra: Partial<KeyLike> = {}) => key(String(n), { code: `Numpad${n}`, ...extra });
+    const dirs = [1, 2, 3, 4, 6, 7, 8, 9].map((n) => keyDown(pad(n)));
+    expect(dirs).toEqual(
+      [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]].map(([dx, dy]) => ({ type: "walk", dx, dy })),
+    );
+    // Verrouillage numérique éteint : la touche 8 du pavé arrive comme une flèche, mais reste une touche de marche.
+    expect(keyDown(pad(8, { key: "ArrowUp" }))).toEqual({ type: "walk", dx: 0, dy: 1 });
+    expect(keyUp(pad(4))).toEqual({ type: "walk", dx: 0, dy: 0 });
+    expect(keyDown(pad(5))).toEqual({ type: "button", button: "left", down: true });
+  });
+
   it("laisse au navigateur Ctrl / Cmd + touche, Alt + lettre, F11, F12, Tab", () => {
     expect(keyDown(key("F5", { ctrlKey: true }))).toBeNull();
     expect(keyDown(key("r", { metaKey: true }))).toBeNull();

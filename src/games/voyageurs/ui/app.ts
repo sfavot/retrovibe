@@ -79,6 +79,7 @@ const voyageurs: PointClickGame<VoyageursSave> = {
     });
     const send = (action: KeyAction): void => {
       if (action.type === "action") host.input.action(action.action);
+      else if (action.type === "walk") host.input.walk(action.dx, action.dy);
       else host.input.key(action.button, action.down);
     };
 

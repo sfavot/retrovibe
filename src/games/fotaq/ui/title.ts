@@ -7,9 +7,9 @@ import { type FotaqSaveSlots, SAVE_PREFIX, createSaveSlots, describeSave, summar
 
 /** Dossier des fichiers du jeu (servi depuis `original/fotaq/`). */
 export const GAME_URL = `${import.meta.env.BASE_URL}fotaq`;
-/** Jaquette : une pièce du jeu (pixel art 320×200), générée par `scripts/fotaq-cover.mts`. */
-export const COVER_URL = `${GAME_URL}/COVER.png`;
-export const COVER_SIZE: [number, number] = [320, 200];
+/** Jaquette : la boîte d'origine (Wikipédia anglophone, image de l'infobox). */
+export const COVER_URL = `${GAME_URL}/COVER.webp`;
+export const COVER_SIZE: [number, number] = [280, 357];
 
 /** Les emplacements de sauvegarde du navigateur (`fotaq:slot01`…). */
 export function browserSaveSlots(): FotaqSaveSlots {
@@ -19,5 +19,5 @@ export function browserSaveSlots(): FotaqSaveSlots {
 /** Écran de présentation (composant commun des jeux de pointer-et-cliquer : `ui/point-click-pages.ts`). */
 export function renderTitle(actions: TitleActions<SaveData>): HTMLElement {
   const slots = browserSaveSlots();
-  return renderGameTitle({ copy, cover: { url: COVER_URL, size: COVER_SIZE }, slots, describe: describeSave, summaries: () => summarizeSlots(slots), actions });
+  return renderGameTitle({ copy, cover: { url: COVER_URL, size: COVER_SIZE, pixelated: false }, slots, describe: describeSave, summaries: () => summarizeSlots(slots), actions });
 }

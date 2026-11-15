@@ -6,7 +6,7 @@ Généré par `scripts/voyageurs-extract.sh` (ne pas éditer à la main).
 
 - Total versionné (`original/voyageurs/`, hors `files.json`) : **18.2 Mo** (19054007 octets)
 - Données du jeu : 0.8 Mo ; musique (`music/`) : 17.4 Mo, 11 pistes, 1516.23 s
-- Hors extraction, conservé d'une exécution à l'autre : `COVER.png` (vague J)
+- Hors extraction, conservé d'une exécution à l'autre : `COVER.webp` (jaquette de la boîte Amiga de Future Wars)
 
 ## Fichiers
 

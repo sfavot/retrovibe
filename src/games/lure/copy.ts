@@ -8,7 +8,7 @@ export const copy = {
   title: "Lure of the Temptress",
   description:
     "L'aventure en pointer-et-cliquer de Revolution Software (1992), en français : Diermot, un héros malgré lui, réchappe du massacre des cavaliers du Roi par les Skorls, des monstres mercenaires, près de Turnvale, où l'apprentie sorcière Séléna a fomenté une révolte.",
-  coverAlt: "Une rue du village de Turnvale, devant une maison à colombages, avec des villageois.",
+  coverAlt: "Jaquette de Lure of the Temptress : l'enchanteresse Selena dans un éclair vert, entourée de ses Skorls.",
   sound: "Son",
 
   // Écran de présentation.

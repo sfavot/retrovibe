@@ -6,7 +6,7 @@
 #  - uniquement les fichiers utiles au jeu dans original/zoombinis/ (version française, à plat) avec files.json :
 #    les archives Mohawk FRENCH/*.MHK (sauf MIDIMAC.MHK), MIDIMAP.DAT, CORNER.TTF et LOGO025.mp4 (FRENCH/LOGO025.MOV converti par ffmpeg) ;
 #  - l'inventaire docs/zoombinis/files.md.
-# La soundfont réduite zoombinis-gm.sf2 et sa licence (scripts/zoombinis/soundfont.mts) et la jaquette COVER.png (scripts/zoombinis/cover.mts)
+# La soundfont réduite zoombinis-gm.sf2 et sa licence (scripts/zoombinis/soundfont.mts) et la jaquette COVER.webp (boîte d'origine, Wikipédia anglophone)
 # ne viennent pas du CD : conservées telles quelles.
 # Usage : scripts/zoombinis-extract.sh [jeu.7z [installeur.exe [manuel.7z]]]
 #   (défauts : archives/zoombinis/jeu-02069-odyssee_des_zoombinis-pcwin.7z, setup-02069-Zoombinis_Logique-Dosbox.exe,
@@ -62,7 +62,7 @@ logo="$(find "$tmp/cd/FRENCH" -maxdepth 1 -iname 'LOGO025.MOV' | head -1)"
 [ -n "$logo" ] || { echo "FRENCH/LOGO025.MOV introuvable" >&2; exit 1; }
 ffmpeg -hide_banner -loglevel error -y -i "$logo" -c:v libx264 -preset slow -tune animation -crf 23 -pix_fmt yuv420p \
   -c:a aac -b:a 48k -ar 22050 -ac 1 -movflags +faststart "$tmp/out/LOGO025.mp4"
-ec_conserver "$sortie" "$tmp/out" zoombinis-gm.sf2 zoombinis-gm-LICENSE.txt COVER.png
+ec_conserver "$sortie" "$tmp/out" zoombinis-gm.sf2 zoombinis-gm-LICENSE.txt COVER.webp
 
 # Substitution d'un bloc, seulement maintenant que tout a réussi (files.json est généré avant).
 mkdir -p "$dossier_archives"

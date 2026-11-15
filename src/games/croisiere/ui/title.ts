@@ -18,5 +18,5 @@ export function browserSaveSlots(): CroisiereSaveSlots {
 /** Écran de présentation (composant commun des jeux de pointer-et-cliquer : `ui/point-click-pages.ts`). */
 export function renderTitle(actions: TitleActions<SlotData>): HTMLElement {
   const slots = browserSaveSlots();
-  return renderGameTitle({ copy, cover: { url: COVER_URL, size: COVER_SIZE }, slots, describe: describeSave, summaries: () => summarizeSlots(slots), actions });
+  return renderGameTitle({ copy, cover: { url: COVER_URL, size: COVER_SIZE, pixelated: true }, slots, describe: describeSave, summaries: () => summarizeSlots(slots), actions });
 }

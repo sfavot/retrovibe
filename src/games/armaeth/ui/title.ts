@@ -4,16 +4,16 @@ import { copy } from "../copy";
 
 /** Dossier des fichiers du jeu (servi depuis `original/armaeth/`). */
 export const GAME_URL = `${import.meta.env.BASE_URL}armaeth`;
-/** Jaquette : écran titre du jeu (pixel art 320×200). */
-export const COVER_URL = `${GAME_URL}/COVER.png`;
-export const COVER_SIZE: [number, number] = [320, 200];
+/** Jaquette : la boîte d'origine (LaunchBox Games Database, boîte européenne). */
+export const COVER_URL = `${GAME_URL}/COVER.webp`;
+export const COVER_SIZE: [number, number] = [218, 281];
 
 /**
  * Écran de présentation, avant le jeu : jaquette, titre, « Jouer », lien vers la page d'aide et contrôles (même composant que les
  * autres jeux). `failure` : région d'erreur sous le bouton (échec du chargement du moteur).
  */
 export function renderTitle(onPlay: (button: HTMLButtonElement, failure: HTMLElement) => void, onHelp: () => void): HTMLElement {
-  const picture = h("img", { class: "aeth-title-picture", src: COVER_URL, alt: copy.coverAlt, width: COVER_SIZE[0], height: COVER_SIZE[1] });
+  const picture = h("img", { class: "box-art", src: COVER_URL, alt: copy.coverAlt, width: COVER_SIZE[0], height: COVER_SIZE[1] });
   const failure = h("p", { class: "aeth-error", role: "alert" });
   const play = h("button", { class: "primary", type: "button" }, copy.play);
   play.addEventListener("click", () => onPlay(play, failure));

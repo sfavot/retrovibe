@@ -122,17 +122,17 @@ Source dans `archives/tim3/` (non versionnée) : `jeu-00235-incredible_machine_3
 | `FRENCH.DAT` | ISO, tel quel | 0,45 Mo | oui |
 | `TIMWIN.EXE` | ISO, tel quel (source des tables, D13 ; pas lu à l'exécution) | 0,45 Mo | oui, pour régénérer les tables et faire tourner le banc |
 | `voices/<archive>/<n>.mp3` (654), `voices/lipsync.json` | `GOALS.VOC`, `HINT1-7.VOC`, `HELP.VOC`, `PROFESOR.VOC` (D5) | 7,6 Mo (mesuré) + 0,08 Mo | oui |
-| `COVER.png` | `scripts/tim3-cover.mts` (vague J), un puzzle dessiné par le moteur | ~40 Ko | oui |
+| `COVER.webp` | jaquette de la boîte nord-américaine (LaunchBox Games Database) | ~28 Ko | oui |
 | `files.json` | `scripts/manifest.py` | petit | oui |
 
-**Total : 17,4 Mo mesuré (hors `COVER.png`).** Autres langues (`GERMAN.DAT`…), aide `.MVB`, DLL, Win32s, WinG et démo Dr. Brain : non versionnés.
+**Total : 17,4 Mo mesuré (hors `COVER.webp`).** Autres langues (`GERMAN.DAT`…), aide `.MVB`, DLL, Win32s, WinG et démo Dr. Brain : non versionnés.
 
 **Script d'extraction** `scripts/tim3-extract.sh [7z]`, sur le modèle de `scripts/bass-extract.sh` et `zoombinis-extract.sh` :
 - `ec_verifier_outils 7zz python3 ffmpeg` ;
 - `7zz` dans un dossier temporaire vide (archive, puis ISO) ;
 - contrôle des tailles et des hachages ;
 - `scripts/tim3/split_voc.py` (lancé en `python3 -I`, chemins en arguments : archives VOC vers WAV et synchronisation des lèvres) ;
-- `ec_encoder_voix`, copie des fichiers tels quels, `ec_conserver COVER.png` ;
+- `ec_encoder_voix`, copie des fichiers tels quels, `ec_conserver COVER.webp` ;
 - inventaire `docs/tim3/files.md`, puis `ec_publier`.
 
 Le script est idempotent (mêmes hachages en deux exécutions).
@@ -168,7 +168,7 @@ Chaque vague se termine par `npm run typecheck`, `npm test`, `npm run build` et,
 | U | interface et éditeur | `engine/editor.ts` (placement, chevauchement, retournement, taille, liens, pièces fixes), conditions de victoire, session (puzzle, Labo, essais), professeur (but, indices), menus DOM (choix du puzzle, options, Labo), `ui.md` | éditeur sans navigateur ; parcours de menus | un puzzle se résout à la souris et au toucher | R, Φ1 |
 | A | son | M1, M2, musique des niveaux, effets WAV déclenchés par les pièces, voix (D4, D5) et synchronisation des lèvres ; `audio.md` | évènements HMI ; effets déclenchés au bon pas (traces) ; voix absente = texte seul | musique, effets et voix jouent | D |
 | S | sauvegardes | progression, machines du Labo, état d'édition (D11) | aller-retour ; reprise après rechargement | sauvegarder et reprendre partout | U |
-| J | intégration | `ui/` (app, hôte, préchargement des ressources puis voix à la demande), `index.ts`, `copy.ts`, `title.ts`, `help.ts` (copyright, OpenTIM), `scripts/tim3-cover.mts`, M3 | hôte, préchargement | jeu jouable dans le navigateur, sur ordinateur et téléphone | toutes |
+| J | intégration | `ui/` (app, hôte, préchargement des ressources puis voix à la demande), `index.ts`, `copy.ts`, `title.ts`, `help.ts` (copyright, OpenTIM), `COVER.webp` (jaquette de la boîte nord-américaine), M3 | hôte, préchargement | jeu jouable dans le navigateur, sur ordinateur et téléphone | toutes |
 | K | validation | **les 156 puzzles résolus en test** avec des **solutions écrites pour le port** (`test/tim3/solutions/*.json` : pièces du bac placées, positions, liens), vérifiées d'abord sur le banc (le binaire doit les déclarer résolues), Labo, revue fonctionnelle et visuelle, README | | tous les puzzles résolus ; revue | J |
 | F | interface fidèle (ajoutée le 15/11/2026, D7 révisée) | barre d'outils selon le mode ; moteur de fenêtres `.ITF` dessinées avec calque DOM accessible ; `GENERIC`, `PUZZSOLV`, `INFO`, `PROG*`, `GRAVITY`, `MUSICBOX`, `BINSOLVE` ; **parcours d'entrée** : logo Sierra (`SIERRA.BMP`, fondu `SIERRA00…17.PAL`), titre animé (`TITLE.ANM`, `TITLE2.ANM`, musique), menu principal (`MAINMENU.ITF`, tous les modes portés), crédits (`CREDITS.ITF`, `CREDITS.RES`), choix du puzzle par bacs (`DOSBIN.ITF`) puis liste (`DOSBOX.ITF`), fiche du puzzle (`PUZZDISP.ITF`) ; aide du professeur en dernier | rendu des `.ITF` (PNG), rectangles cliquables, parcours | parcours d'origine du lancement au puzzle, au toucher et au clavier | U, J |
 

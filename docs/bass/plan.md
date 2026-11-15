@@ -44,12 +44,12 @@ Source dans `archives/` (non versionnée) : `bass-cd-1.2.zip`.
 | `sky.cpt` | archive, tel quel (D2) | 410 Ko | oui |
 | `voices/<id>.mp3` | 3 491 voix, MP3 (D3) | ~22 Mo | oui |
 | `README-BASS.txt` | `readme.txt` de l'archive, intact | 6 Ko | oui, **obligatoire** (licence) |
-| `COVER.png` | `scripts/bass-cover.mts` (vague J), un décor composé par le moteur | ~30 Ko | oui |
+| `COVER.webp` | jaquette de la boîte d'origine (Wikipédia anglophone) | ~7 Ko | oui |
 | `files.json` | `scripts/manifest.py` | ~100 Ko (3 500 entrées) | oui |
 
 **Total : ~36 Mo**, contre 77 Mo pour FOTAQ. Le dossier `original/` publié passe de ~696 Mo à ~732 Mo : la marge sous la limite de 1 Go de GitHub Pages reste d'environ 270 Mo.
 
-**Script d'extraction** `scripts/bass-extract.sh [zip]` (modèle : `scripts/fotaq-extract.sh`, `scripts/lib/extract-common.sh`) : `ec_verifier_outils bsdtar python3 ffmpeg`, `bsdtar` dans un dossier temporaire, contrôle des tailles (`sky.dsk` 72 395 713 octets, 5 097 entrées) et des hachages, `scripts/bass/split_dsk.py` (lancé en `python3 -I`, chemins en arguments : RNC, reconstruction de `sky.dsk` / `sky.dnr` sans les voix, voix en PCM brut), `ec_encoder_voix` (D10), copie de `sky.cpt` et du readme, `ec_conserver COVER.png`, inventaire `docs/bass/files.md`, `ec_publier`. Idempotent (hachages identiques en deux exécutions).
+**Script d'extraction** `scripts/bass-extract.sh [zip]` (modèle : `scripts/fotaq-extract.sh`, `scripts/lib/extract-common.sh`) : `ec_verifier_outils bsdtar python3 ffmpeg`, `bsdtar` dans un dossier temporaire, contrôle des tailles (`sky.dsk` 72 395 713 octets, 5 097 entrées) et des hachages, `scripts/bass/split_dsk.py` (lancé en `python3 -I`, chemins en arguments : RNC, reconstruction de `sky.dsk` / `sky.dnr` sans les voix, voix en PCM brut), `ec_encoder_voix` (D10), copie de `sky.cpt` et du readme, `ec_conserver COVER.webp`, inventaire `docs/bass/files.md`, `ec_publier`. Idempotent (hachages identiques en deux exécutions).
 
 ## Architecture
 
@@ -115,7 +115,7 @@ Chaque vague se termine par `npm run typecheck`, `npm test`, `npm run build` et,
 | A | son | `audio/` : pilote AdLib (`adlib-music.ts`, `adlib-channel.ts`) sur `WebOpl`, effets (M3), voix (M1), `audio.md` ; `scripts/bass/render-music.mts` (WAV hors ligne) | registres OPL identiques à ScummVM pour chaque morceau sur N ticks ; file différée ; voix absente = texte | musique, effets et voix jouent | D |
 | I | séquences | introduction du CD, séquences plein écran, fin | ordre, durées, fichiers chargés comparés au banc | introduction et fin jouées | R, A |
 | S | panneau, sauvegardes | panneau d'origine (D5), `engine/save.ts`, `ui/saves.ts` (D6), « Recommencer » | aller-retour à chaque étape de la solution ; reprise en pleine marche, pendant un dialogue, pendant un fondu | sauvegarder et reprendre partout | C, R |
-| J | intégration | `ui/` (app, hôte, préchargement de `sky.dsk` puis voix à la demande), touches (F5, Échap, `.`, `p`), toucher, `index.ts`, `copy.ts`, `title.ts`, `help.ts` (licence, ScummVM, mention de version modifiée), `scripts/bass-cover.mts`, M4 | hôte, préchargement | jeu jouable dans le navigateur, ordinateur et téléphone | toutes |
+| J | intégration | `ui/` (app, hôte, préchargement de `sky.dsk` puis voix à la demande), touches (F5, Échap, `.`, `p`), toucher, `index.ts`, `copy.ts`, `title.ts`, `help.ts` (licence, ScummVM, mention de version modifiée), `COVER.webp` (jaquette de la boîte d'origine), M4 | hôte, préchargement | jeu jouable dans le navigateur, ordinateur et téléphone | toutes |
 | K | validation | partie complète en test (solution jouée par clics simulés, puis avec reprises), comparaisons au banc par section, revue fonctionnelle et visuelle, README | | fin du jeu atteinte ; revue | J |
 
 Parallélisme : P et X indépendants. Après D : V, C, A en parallèle (A ne dépend que des lecteurs). Après C : E et R en parallèle ; M dès que E est là pour M2. I après R et A ; S après R. **M se découpe en quatre groupes** (convention d'`engine.md` § 11 : ne rien modifier hors de son dossier, signaler tout besoin partagé).

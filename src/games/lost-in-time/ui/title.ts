@@ -11,7 +11,7 @@ const MANUAL_URL = `${GAME_URL}MANUEL.pdf`;
 
 /** Écran titre, avant le jeu : jaquette du jeu, nouvelle partie, reprise d'une partie, manuel et contrôles. */
 export function renderTitle(onStart: () => void): HTMLElement {
-  const picture = h("img", { class: "lit-title-picture", src: COVER_URL, alt: copy.coverAlt, width: 280, height: 343 });
+  const picture = h("img", { class: "box-art", src: COVER_URL, alt: copy.coverAlt, width: 280, height: 343 });
   const start = h("button", { class: "primary", type: "button", onclick: onStart }, copy.play);
   queueMicrotask(() => start.focus());
   return titleScreen(

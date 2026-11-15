@@ -5,7 +5,7 @@
 #    avec l'inventaire docs/armaeth/files.md.
 # Usage : scripts/armaeth-extract.sh [archive.7z]
 #   (défaut : archives/armaeth/jeu-02436-armaeth-CD-pcdos.7z)
-# original/armaeth/COVER.png (jaquette générée par scripts/armaeth-cover.mts depuis la scène 20) ne vient pas du CD :
+# original/armaeth/COVER.webp (jaquette de la boîte européenne, LaunchBox Games Database) ne vient pas du CD :
 # elle est conservée telle quelle.
 # Idempotent : les dossiers de sortie sont régénérés à côté puis substitués d'un bloc.
 # Briques communes : scripts/lib/ (extraction ISO 9660, inventaire, remplacement atomique).
@@ -46,7 +46,7 @@ mv "$cd_complet.new" "$cd_complet"
 mkdir "$tmp/out"
 py copier "$tmp/iso" "$tmp/out" "$tmp/stats.json"
 
-ec_conserver "$sortie" "$tmp/out" COVER.png
+ec_conserver "$sortie" "$tmp/out" COVER.webp
 ec_publier "$tmp/out" "$sortie"
 
 py inventaire "$sortie" "$tmp/stats.json" "$doc"

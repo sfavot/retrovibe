@@ -12,7 +12,7 @@ export const copy = {
   title: "Beneath a Steel Sky",
   description:
     "L'aventure de science-fiction en pointer-et-cliquer de Revolution Software (1994) : Robert Foster, un étranger innocent, se retrouve prisonnier d'Union City, où les opprimés travaillent dans des tours tandis que les riches vivent à l'abri sous terre. Seul avec Joey, une carte électronique de robot, il doit survivre et découvrir la vérité sur son passé. Textes en français, voix en anglais.",
-  coverAlt: "Au début du jeu, une passerelle métallique au cœur d'une usine, entre tuyaux et machines, avec deux personnages.",
+  coverAlt: "Jaquette de Beneath a Steel Sky : le logo du jeu, une cité-tour stylisée, sur fond noir.",
   sound: "Son",
 
   // Écran de présentation.

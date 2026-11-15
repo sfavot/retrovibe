@@ -4,14 +4,14 @@ Généré par `scripts/lure-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/lure/`) : **4.3 Mo** (4467585 octets), 8 fichiers (hors `files.json`)
-- Hors extraction, conservé d'une exécution à l'autre : `COVER.png` (vague J)
+- Total versionné (`original/lure/`) : **4.3 Mo** (4479585 octets), 8 fichiers (hors `files.json`)
+- Hors extraction, conservé d'une exécution à l'autre : `COVER.webp` (jaquette de la boîte d'origine)
 
 ## Fichiers
 
 | Fichier | Octets | SHA-256 (16 premiers hex) | Origine |
 |---|---:|---|---|
-| COVER.png | 22550 | `69e1cdc2d5470f2b` | vague J (`scripts/lure-cover.mts`), conservé d'une exécution à l'autre |
+| COVER.webp | 34550 | `4e11348046737170` | jaquette de la boîte d'origine (Wikipédia anglophone), conservé d'une exécution à l'autre |
 | DISK1.VGA | 603648 | `26b140100dcc22b4` | `DISK1.VGA` de l'archive, tel quel (conteneur `heywow` n° 1, 39 ressources) |
 | DISK2.VGA | 659488 | `feb533e0ce022ab3` | `DISK2.VGA` de l'archive, tel quel (conteneur `heywow` n° 2, 103 ressources) |
 | DISK3.VGA | 699072 | `81678a2d90dd07a7` | `DISK3.VGA` de l'archive, tel quel (conteneur `heywow` n° 3, 118 ressources) |

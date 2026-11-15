@@ -1,9 +1,5 @@
 /* The Incredible Machine 3 : écran du jeu, fenêtres .ITF (D7), aide. Couleurs : variables du site (`src/ui/style.css`). */
 
-.tim3-title-picture {
-  aspect-ratio: 4 / 3;
-}
-
 .tim3-error {
   min-height: 1.2em;
   margin: 0;

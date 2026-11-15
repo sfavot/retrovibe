@@ -115,7 +115,7 @@ def cmd_inventaire(dest, queen, sortie):
         ('Taille', [
             '- Total versionné (`original/fotaq/`) : **%s** (%d octets), %d fichiers (hors `files.json`)' % (ec.mo(total), total, nb),
             '- Voix et effets (`voices/`) : %s ; données du jeu : %s' % (ec.mo(voix), ec.mo(total - voix)),
-            '- Hors extraction, conservés d\'une exécution à l\'autre : `voices/` (`scripts/fotaq-voices.sh`), `COVER.png` (vague J)']),
+            '- Hors extraction, conservés d\'une exécution à l\'autre : `voices/` (`scripts/fotaq-voices.sh`), `COVER.webp` (jaquette de la boîte d\'origine)']),
         ('Par extension', ec.tableau(['Extension', 'Fichiers', 'Taille'],
                                      [(k, groupes[k][0], ec.mo(groupes[k][1], ko=True)) for k in sorted(groupes)], droite=(1, 2))),
         ('Provenance', ec.tableau(['Fichiers', 'Origine'], [

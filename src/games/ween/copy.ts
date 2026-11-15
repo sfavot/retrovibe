@@ -6,7 +6,7 @@ export const copy = {
   title: "Ween: The Prophecy",
   description:
     "L'aventure en pointer-et-cliquer de Coktel Vision (1992) : Ween, petit-fils du sorcier Ohkram, doit réunir trois grains de sable et les déposer dans le Revuss avant la Grande Éclipse pour vaincre Kraal.",
-  coverAlt: "Une scène du début de Ween: The Prophecy, en pixel art.",
+  coverAlt: "Jaquette de Ween: The Prophecy : un sablier ouvragé au-dessus du jeune héros, sous un ciel nocturne.",
   loading: "Chargement du jeu…",
   missingFiles: "Les fichiers du jeu sont introuvables : Ween ne peut pas démarrer. Vérifiez votre connexion puis rechargez la page.",
   loadError: "Impossible de lire les données du jeu :",

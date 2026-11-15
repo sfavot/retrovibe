@@ -38,7 +38,7 @@ Le site est installable (manifeste et icônes de `src/ui/pwa/`, icônes régén�
 
 `original/indy/` contient `DESKTOP.DAW`, `DESKADV.EXE` (pour la palette), `DESKADV.HLP` (le manuel d'origine, affiché depuis l'écran titre), `COVER.png` (l'image de l'écran titre, générée à partir des données du jeu avec `npx vite-node scripts/indy-cover.mts`) et, pour le son, les `.WAV` / `.MID`.
 
-`original/yoda/` contient `YODESK.DTA`, `YODESK.EXE` (palette, curseurs, icônes, textes de R2-D2), `YODESK.HLP` (l'aide d'origine) et les sons `SFX/*.WAV` (musiques comprises), extraits de l'ISO française par `scripts/yoda-extract.sh` ; `COVER.png` est l'écran du lanceur du CD (`npx vite-node scripts/yoda-cover.mts`).
+`original/yoda/` contient `YODESK.DTA`, `YODESK.EXE` (palette, curseurs, icônes, textes de R2-D2), `YODESK.HLP` (l'aide d'origine) et les sons `SFX/*.WAV` (musiques comprises), extraits de l'ISO française par `scripts/yoda-extract.sh` ; `COVER.webp` est la jaquette de la boîte d'origine (Wikipédia anglophone).
 
 En développement, `?seed=1234` (avant le `#`) démarre directement une partie avec cette graine, et `__indy.game` / `__yoda.game` est exposé dans la console.
 
@@ -246,7 +246,7 @@ Avec `npm run dev` : `src/games/zoombinis/ui/asset-viewer.html` est une visionne
 
 ### Fichiers de données
 
-`scripts/drascula-extract.sh [jeu.zip [pack-international.zip [drascula.dat]]]` lit les archives placées dans `archives/` (non versionnées) et range dans `original/drascula/` les images `.ALG`, les voix `.ALS`, les vidéos `.BIN`, les fiches de pièces `.ALD` et les dialogues `.CAL` français, `drascula.dat` (le fichier de données du moteur de ScummVM, avec sa note de provenance) et les textes de licence d'Alcachofa Soft (à conserver). `scripts/drascula-music.sh` convertit la musique du pack audio (OGG) en MP3 (`track1.mp3` à `track31.mp3`) ; `npx vite-node scripts/drascula-cover.mts` génère `COVER.png` (l'auberge de Transylvanie, composée par le moteur) et régénère `files.json`.
+`scripts/drascula-extract.sh [jeu.zip [pack-international.zip [drascula.dat]]]` lit les archives placées dans `archives/` (non versionnées) et range dans `original/drascula/` les images `.ALG`, les voix `.ALS`, les vidéos `.BIN`, les fiches de pièces `.ALD` et les dialogues `.CAL` français, `drascula.dat` (le fichier de données du moteur de ScummVM, avec sa note de provenance) et les textes de licence d'Alcachofa Soft (à conserver). `scripts/drascula-music.sh` convertit la musique du pack audio (OGG) en MP3 (`track1.mp3` à `track31.mp3`) ; `COVER.webp` est la jaquette de la boîte d'origine (Wikipédia anglophone).
 Au démarrage, le navigateur charge les données et toutes les images (6 Mo), puis les vidéos du chapitre en cours et du suivant (celles de l'introduction pèsent 15 Mo), le reste en fond ; les voix et la musique sont lues à la demande.
 
 ### Architecture
@@ -268,7 +268,7 @@ Au démarrage, le navigateur charge les données et toutes les images (6 Mo), pu
 
 ### Fichiers de données
 
-`scripts/fotaq-extract.sh` découpe `queen.1c` (archive `archives/FOTAQ_Fr_Talkie_1.0.zip`, non versionnée) en 7 671 fichiers rangés dans `original/fotaq/` (décors `.PCX`, banques de sprites, `.JAS`, dialogues `.DOG`, cinématiques `.CUT`, musique AdLib `AQBANK.MUS`, `README-FOTAQ.txt` à conserver) ; `scripts/fotaq-voices.sh` convertit les 6 751 voix et effets en MP3 (`voices/`). `npx vite-node scripts/fotaq-cover.mts` génère `COVER.png` (l'avion, composé par le moteur) et régénère `files.json`.
+`scripts/fotaq-extract.sh` découpe `queen.1c` (archive `archives/fotaq/FOTAQ_Fr_Talkie_1.0.zip`, non versionnée) en 7 671 fichiers rangés dans `original/fotaq/` (décors `.PCX`, banques de sprites, `.JAS`, dialogues `.DOG`, cinématiques `.CUT`, musique AdLib `AQBANK.MUS`, `README-FOTAQ.txt` à conserver) ; `scripts/fotaq-voices.sh` convertit les 6 751 voix et effets en MP3 (`voices/`). `COVER.webp` est la jaquette de la boîte d'origine (Wikipédia anglophone).
 Au démarrage, le navigateur charge les données (14 Mo : banques de sprites, dialogues, cinématiques, musique), puis le décor de chaque pièce avant d'y entrer (les pièces voisines se chargent en fond) ; les voix sont lues à la demande, celles de la scène sont préchargées.
 
 ### Architecture
@@ -289,7 +289,7 @@ Au démarrage, le navigateur charge les données (14 Mo : banques de sprites, di
 
 ### Fichiers de données
 
-`scripts/lure-extract.sh` prépare `original/lure/` à partir de l'archive `archives/lure-fr-1.1.zip` et de `archives/lure.dat` (non versionnées) : les quatre disques `DISK1.VGA` à `DISK4.VGA`, `LURE-FR.DAT` (le bloc français du `lure.dat` de ScummVM, version 1.32), `LICENSE-LURE.txt` (à conserver) et `MANUEL.pdf` (manuel français, lié depuis l'aide), puis l'inventaire `docs/lure/files.md`. `npx vite-node scripts/lure-cover.mts` génère `COVER.png` (une rue du village, composée par le moteur) et régénère `files.json`.
+`scripts/lure-extract.sh` prépare `original/lure/` à partir de l'archive `archives/lure/lure-fr-1.1.zip` et de `archives/lure/lure.dat` (non versionnées) : les quatre disques `DISK1.VGA` à `DISK4.VGA`, `LURE-FR.DAT` (le bloc français du `lure.dat` de ScummVM, version 1.32), `LICENSE-LURE.txt` (à conserver) et `MANUEL.pdf` (manuel français, lié depuis l'aide), puis l'inventaire `docs/lure/files.md`. `COVER.webp` est la jaquette de la boîte d'origine (Wikipédia anglophone).
 Au démarrage, le navigateur charge les données d'un coup (2,7 Mo) ; la musique AdLib (MIDI) est dans les disques, jouée par l'émulateur OPL2 commun.
 
 ### Architecture
@@ -310,7 +310,7 @@ Au démarrage, le navigateur charge les données d'un coup (2,7 Mo) ; la musique
 
 ### Fichiers de données
 
-`scripts/bass-extract.sh` prépare `original/bass/` à partir de l'archive `archives/bass-cd-1.2.zip` (non versionnée) : `sky.dsk` et `sky.dnr` reconstruits sans les voix (13,3 Mo, mêmes fichiers et mêmes octets, index recalculé), `sky.cpt` tel quel, les 3 491 voix converties en MP3 (`voices/<id>.mp3`, 21 Mo, mono 22 050 Hz, 24 kb/s), `README-BASS.txt` (la licence de Revolution Software, à conserver intacte), puis l'inventaire `docs/bass/files.md`. `npx vite-node scripts/bass-cover.mts` génère `COVER.png` (le premier décor du jeu, composé par le moteur) et régénère `files.json`.
+`scripts/bass-extract.sh` prépare `original/bass/` à partir de l'archive `archives/bass/bass-cd-1.2.zip` (non versionnée) : `sky.dsk` et `sky.dnr` reconstruits sans les voix (13,3 Mo, mêmes fichiers et mêmes octets, index recalculé), `sky.cpt` tel quel, les 3 491 voix converties en MP3 (`voices/<id>.mp3`, 21 Mo, mono 22 050 Hz, 24 kb/s), `README-BASS.txt` (la licence de Revolution Software, à conserver intacte), puis l'inventaire `docs/bass/files.md`. `COVER.webp` est la jaquette de la boîte d'origine (Wikipédia anglophone).
 Au démarrage, le navigateur charge `sky.dsk`, `sky.dnr` et `sky.cpt` d'un coup (13,7 Mo) ; chaque voix est lue à la demande au début de la réplique (MP3 décodé par le navigateur).
 
 ### Architecture
@@ -351,7 +351,7 @@ Au démarrage, le navigateur charge `sky.dsk`, `sky.dnr` et `sky.cpt` d'un coup 
 
 ### Fichiers de données
 
-`original/voyageurs/` : les six fichiers du jeu (`PART01` à `PART04B`, `AUTO00.PRC`, `TEXTE.DAT`, 0,9 Mo), les 11 pistes de musique du CD converties en MP3 (`music/track19.mp3` à `track29.mp3`, 17 Mo) et `COVER.png`. `npx vite-node scripts/voyageurs-cover.mts` génère `COVER.png` (un décor de la première scène, composé par le moteur) et régénère `files.json`. Au démarrage, le navigateur charge les six fichiers du jeu d'un coup ; la musique est lue en flux à la demande.
+`original/voyageurs/` : les six fichiers du jeu (`PART01` à `PART04B`, `AUTO00.PRC`, `TEXTE.DAT`, 0,9 Mo), les 11 pistes de musique du CD converties en MP3 (`music/track19.mp3` à `track29.mp3`, 17 Mo) et `COVER.webp` (jaquette de la boîte Amiga de Future Wars, Wikipédia anglophone). Au démarrage, le navigateur charge les six fichiers du jeu d'un coup ; la musique est lue en flux à la demande.
 
 ### Architecture
 
@@ -371,7 +371,7 @@ Au démarrage, le navigateur charge `sky.dsk`, `sky.dnr` et `sky.cpt` d'un coup 
 
 ### Fichiers de données
 
-`original/ween/` : `INTRO.STK` (6,7 Mo, tout le jeu : scripts, images, vidéos, sons) et `COVER.png`. `scripts/ween-extract.sh` prépare `INTRO.STK` à partir de l'installeur (non versionné, jamais exécuté : `innoextract`). `npx vite-node scripts/ween-cover.mts [image]` génère `COVER.png` (un écran de la première pièce, composé par le moteur) et régénère `files.json`.
+`original/ween/` : `INTRO.STK` (6,7 Mo, tout le jeu : scripts, images, vidéos, sons) et `COVER.webp`. `scripts/ween-extract.sh` prépare `INTRO.STK` à partir de l'installeur (non versionné, jamais exécuté : `innoextract`). `COVER.webp` est la jaquette de la boîte d'origine (Wikipédia anglophone).
 
 ### Architecture
 
@@ -399,7 +399,7 @@ Au démarrage, le navigateur charge `sky.dsk`, `sky.dnr` et `sky.cpt` d'un coup 
 
 ### Fichiers de données
 
-`scripts/tim3-extract.sh` prépare `original/tim3/` : les volumes `RESOURCE.001`, `RESOURCE.002` et `RESOURCE.MAP`, `FRENCH.DAT`, `TIMWIN.EXE` (lu pour ses tables, pas à l'exécution), les voix converties en MP3 (`voices/`, 7,6 Mo, mono, 22 050 Hz, 24 kb/s, une par réplique, lues à la demande) et `voices/lipsync.json`, puis l'inventaire `docs/tim3/files.md`. `npx vite-node scripts/tim3-cover.mts [puzzle]` génère `COVER.png` (le puzzle TLEV1 tel que le jeu le dessine, 640 × 480) et régénère `files.json`. Au démarrage, le navigateur charge les volumes d'un coup (9,8 Mo) ; chaque voix est lue au début de la réplique.
+`scripts/tim3-extract.sh` prépare `original/tim3/` : les volumes `RESOURCE.001`, `RESOURCE.002` et `RESOURCE.MAP`, `FRENCH.DAT`, `TIMWIN.EXE` (lu pour ses tables, pas à l'exécution), les voix converties en MP3 (`voices/`, 7,6 Mo, mono, 22 050 Hz, 24 kb/s, une par réplique, lues à la demande) et `voices/lipsync.json`, puis l'inventaire `docs/tim3/files.md`. `COVER.webp` est la jaquette de la boîte nord-américaine (LaunchBox Games Database). Au démarrage, le navigateur charge les volumes d'un coup (9,8 Mo) ; chaque voix est lue au début de la réplique.
 
 ### Architecture
 

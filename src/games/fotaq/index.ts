@@ -10,7 +10,6 @@ export const fotaq: GameDefinition = {
   description: copy.description,
   cover: COVER_URL,
   coverSize: COVER_SIZE,
-  coverPixelated: true,
   coverAlt: copy.coverAlt,
   async start(container) {
     // Écran de présentation, puis le jeu au clic sur un des boutons (ce geste débloque aussi le son). Le moteur, le son et leurs

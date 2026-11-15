@@ -6,7 +6,7 @@ Généré par `scripts/armaeth-extract.sh` (ne pas éditer à la main).
 
 - Total versionné (`original/armaeth/`, version française à plat) : **2.7 Mo** (2805621 octets)
 - Fichiers gardés : 40
-- Hors CD, conservé d'une extraction à l'autre : `COVER.png` (jaquette 320 x 200 générée par `scripts/armaeth-cover.mts` depuis la scène 20 de `A1F00E.VGA`)
+- Hors CD, conservé d'une extraction à l'autre : `COVER.webp` (jaquette de la boîte européenne, LaunchBox Games Database)
 
 ## Par extension (fichiers gardés)
 

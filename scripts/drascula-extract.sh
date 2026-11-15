@@ -6,7 +6,7 @@
 #    de la base ; fiches de pièces .ALD, dialogues .CAL et QPC.BIN de PACKET.002 en remplacement), avec files.json,
 #    drascula.dat (ScummVM), les readme d'Alcachofa (licence, à conserver intacts) et la note de provenance de drascula.dat ;
 #  - l'inventaire docs/drascula/files.md.
-# La musique (scripts/drascula-music.sh) et COVER.png (vague J) ne viennent pas de ces archives : conservées telles quelles.
+# La musique (scripts/drascula-music.sh) et COVER.webp (jaquette de la boîte d'origine, Wikipédia anglophone) ne viennent pas de ces archives : conservées telles quelles.
 # Usage : scripts/drascula-extract.sh [drascula-1.0.zip [drascula-int-1.1.zip [drascula.dat]]]
 #   (défauts : archives/drascula-1.0.zip, archives/drascula-int-1.1.zip, archives/drascula.dat)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
@@ -66,7 +66,7 @@ cp "$(trouve "$tmp/zip-base" 'readme.txt')" "$tmp/out/README-ALCACHOFA.txt"
 cp "$(trouve "$tmp/zip-int" 'readme.txt')" "$tmp/out/README-ALCACHOFA-INT.txt"
 cp "$racine/scripts/drascula/drascula-dat-LICENSE.txt" "$tmp/out/drascula-dat-LICENSE.txt"
 # Musique (scripts/drascula-music.sh) et jaquette : ne viennent pas des archives, conservées si présentes.
-conserves=(COVER.png)
+conserves=(COVER.webp)
 for f in "$sortie"/track*.mp3; do [ -f "$f" ] && conserves+=("$(basename "$f")"); done
 ec_conserver "$sortie" "$tmp/out" "${conserves[@]}"
 

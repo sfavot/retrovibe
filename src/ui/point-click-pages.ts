@@ -32,8 +32,8 @@ export interface TitleActions<T> {
 
 export interface TitleOptions<T> {
   copy: TitleCopy;
-  /** Jaquette : image du jeu (pixel art) et sa taille. */
-  cover: { url: string; size: readonly [number, number] };
+  /** Jaquette et sa taille : un écran du jeu en pixel art 320×200 (`pixelated`) ou l'illustration de la boîte d'origine. */
+  cover: { url: string; size: readonly [number, number]; pixelated: boolean };
   slots: SaveSlots<T>;
   /** Texte d'un emplacement plein (le lieu et la date). */
   describe(stored: StoredSave<T>): string;
@@ -48,7 +48,7 @@ export interface TitleOptions<T> {
 export function renderTitle<T>(options: TitleOptions<T>): HTMLElement {
   const { copy, slots, actions } = options;
   const latest = slots.latest();
-  const picture = h("img", { class: "pc-title-picture", src: options.cover.url, alt: copy.coverAlt, width: options.cover.size[0], height: options.cover.size[1] });
+  const picture = h("img", { class: options.cover.pixelated ? "pc-title-picture" : "box-art", src: options.cover.url, alt: copy.coverAlt, width: options.cover.size[0], height: options.cover.size[1] });
   const failure = h("p", { class: "pc-error", role: "alert" });
   const newGame = h("button", { class: latest ? "secondary" : "primary", type: "button" }, copy.newGame);
   const buttons: HTMLButtonElement[] = [newGame];

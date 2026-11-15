@@ -6,7 +6,7 @@ export const copy = {
   title: "Drascula",
   description:
     "Le jeu d'aventure humoristique d'Alcachofa Soft (1996), en français : choisissez un verbe, puis un objet, pour sauver B.J. du comte Drascula.",
-  coverAlt: "L'auberge de Transylvanie dans Drascula : le héros, le barman, un ivrogne et le pianiste, au pied du comptoir.",
+  coverAlt: "Jaquette de Drascula : le comte vampire grimaçant au milieu des personnages du jeu, sur fond jaune.",
   sound: "Son",
 
   // Écran de présentation.

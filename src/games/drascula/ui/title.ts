@@ -6,9 +6,9 @@ import { SAVE_PREFIX, type DrasculaSaveSlots, type StoredSave, createSaveSlots, 
 
 /** Dossier des fichiers du jeu (servi depuis `original/drascula/`). */
 export const GAME_URL = `${import.meta.env.BASE_URL}drascula`;
-/** Jaquette : une image du jeu (pixel art 320×200), générée par `scripts/drascula-cover.mts`. */
-export const COVER_URL = `${GAME_URL}/COVER.png`;
-export const COVER_SIZE: [number, number] = [320, 200];
+/** Jaquette : la boîte d'origine (Wikipédia anglophone, image de l'infobox). */
+export const COVER_URL = `${GAME_URL}/COVER.webp`;
+export const COVER_SIZE: [number, number] = [278, 357];
 
 /** Les emplacements de sauvegarde du navigateur (`drascula:slot01`…). */
 export function browserSaveSlots(): DrasculaSaveSlots {
@@ -18,5 +18,5 @@ export function browserSaveSlots(): DrasculaSaveSlots {
 /** Écran de présentation de Drascula (composant commun des jeux de pointer-et-cliquer : `ui/point-click-pages.ts`). */
 export function renderTitle(actions: TitleActions<StoredSave["save"]>): HTMLElement {
   const slots = browserSaveSlots();
-  return renderGameTitle({ copy, cover: { url: COVER_URL, size: COVER_SIZE }, slots, describe: describeSave, summaries: () => summarizeSlots(slots), actions });
+  return renderGameTitle({ copy, cover: { url: COVER_URL, size: COVER_SIZE, pixelated: false }, slots, describe: describeSave, summaries: () => summarizeSlots(slots), actions });
 }

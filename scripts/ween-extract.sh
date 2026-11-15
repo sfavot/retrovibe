@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Extrait Ween : The Prophecy (Coktel Vision, 1992), version DOS française, de l'installeur Abandonware France
 # (setup-00126-Ween_The_Prophecy-dosbox.exe, Inno Setup), dans original/ween/ :
-#  - INTRO.STK tel quel (décision D3 : tout le jeu y est) ; COVER.png (vague J) conservé tel quel s'il existe ;
+#  - INTRO.STK tel quel (décision D3 : tout le jeu y est) ; COVER.webp (jaquette de la boîte d'origine, Wikipédia anglophone) conservé tel quel s'il existe ;
 #  - files.json ;
 #  - l'inventaire docs/ween/files.md.
 # Le reste de l'installeur (LOADER.EXE, *.GDR, ALL.ASK, *.INF, DOSBox, DLL...) n'est pas lu par le port : écarté.
@@ -47,8 +47,8 @@ stk="$(find "$tmp/inno" -type f -name INTRO.STK | head -1)"
 [ "$(md5 "$stk")" = "$MD5_STK" ] || { echo "INTRO.STK : MD5 inattendu" >&2; exit 1; }
 cp "$stk" "$tmp/out/INTRO.STK"
 
-# Jaquette (vague J) : ne vient pas de l'installeur, conservée si présente.
-ec_conserver "$sortie" "$tmp/out" COVER.png
+# Jaquette : ne vient pas de l'installeur, conservée si présente.
+ec_conserver "$sortie" "$tmp/out" COVER.webp
 
 # Inventaire (même format que docs/bass/files.md).
 total=0
@@ -59,7 +59,7 @@ for f in "$tmp/out"/*; do
   total=$((total + t))
   case "$n" in
     INTRO.STK) origine="\`INTRO.STK\` de l'installeur, tel quel (décision D3 : tout le jeu est dans ce fichier)" ;;
-    COVER.png) origine="vague J (\`scripts/ween-cover.mts\`), conservé d'une exécution à l'autre" ;;
+    COVER.webp) origine="jaquette de la boîte d'origine (Wikipédia anglophone), conservé d'une exécution à l'autre" ;;
     *) origine="" ;;
   esac
   lignes="$lignes| $n | $t | \`$(sha256 "$f" | cut -c1-16)\` | $origine |"$'\n'
@@ -73,7 +73,7 @@ mkdir -p "$(dirname "$doc")"
   echo "## Taille"
   echo
   echo "- Total versionné (\`original/ween/\`) : **$(awk -v t="$total" 'BEGIN{printf "%.1f Mo", t/1048576}')** ($total octets), $(find "$tmp/out" -type f | wc -l | tr -d ' ') fichier(s) (hors \`files.json\`)"
-  echo "- Hors extraction, conservé d'une exécution à l'autre : \`COVER.png\` (vague J)"
+  echo "- Hors extraction, conservé d'une exécution à l'autre : \`COVER.webp\` (jaquette de la boîte d'origine)"
   echo
   echo "## Fichiers"
   echo

@@ -75,7 +75,7 @@ def cmd_inventaire(dest, base, sortie):
             '- Musique : %s ; voix et sons `.ALS` : %s ; reste : %s' % (
                 ec.mo(groupes.get('.mp3 (musique)', [0, 0])[1]), ec.mo(groupes.get('.ALS', [0, 0])[1]),
                 ec.mo(total - groupes.get('.mp3 (musique)', [0, 0])[1] - groupes.get('.ALS', [0, 0])[1])),
-            '- Hors extraction, conservés d\'une exécution à l\'autre : `COVER.png` (vague J), `track*.mp3` (`scripts/drascula-music.sh`)']),
+            '- Hors extraction, conservés d\'une exécution à l\'autre : `COVER.webp` (jaquette de la boîte d\'origine), `track*.mp3` (`scripts/drascula-music.sh`)']),
         ('Par extension', ec.tableau(['Extension', 'Fichiers', 'Taille'],
                                      [(k, groupes[k][0], ec.mo(groupes[k][1], ko=True)) for k in sorted(groupes)], droite=(1, 2))),
         ('Provenance', ec.tableau(['Fichiers', 'Origine'], [

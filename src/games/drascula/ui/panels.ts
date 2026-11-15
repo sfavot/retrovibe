@@ -595,9 +595,9 @@ function renderText(ctx: PanelContext): HTMLElement {
   return h("pre", { class: "text" }, new TextDecoder("utf-8").decode(ctx.bytes));
 }
 
-/** `COVER.png` : la jaquette de la page d'accueil, générée par `scripts/drascula-cover.mts` (pas une donnée du jeu). */
+/** `COVER` : la jaquette de la page d'accueil (boîte d'origine, pas une donnée du jeu). */
 function renderCover(ctx: PanelContext): HTMLElement {
-  return h("div", {}, h("img", { src: ctx.url, alt: "Jaquette", width: "320", height: "200", style: "image-rendering: pixelated; width: 640px; max-width: 100%" }));
+  return h("div", {}, h("img", { src: ctx.url, alt: "Jaquette", style: "max-width: 100%" }));
 }
 
 export const PANELS: Panel[] = [
@@ -609,5 +609,5 @@ export const PANELS: Panel[] = [
   { matches: hasExtension("ALS"), render: renderAls },
   { matches: hasExtension("MP3"), render: renderMusic },
   { matches: hasExtension("TXT"), render: renderText },
-  { matches: hasExtension("PNG"), render: renderCover },
+  { matches: hasExtension("WEBP"), render: renderCover },
 ];

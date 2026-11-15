@@ -155,7 +155,7 @@ def cmd_inventaire(dest, dossier, dat, sortie):
         'LURE-FR.DAT': 'bloc français de `lure.dat` de ScummVM (langue 6, `0x%X` à `0x%X`), %d ressources `0x3F01` à `0x3F1A`' % (blocs[LANGUE_FR] + (len(table),)),
         'LICENSE-LURE.txt': '`LICENSE.txt` de l\'archive (licence de Revolution Software, à conserver intacte)',
         'MANUEL.pdf': '`Manual.pdf` de l\'archive (manuel français, 42 pages)',
-        'COVER.png': 'vague J (`scripts/lure-cover.mts`), conservé d\'une exécution à l\'autre',
+        'COVER.webp': 'jaquette de la boîte d\'origine (Wikipédia anglophone), conservé d\'une exécution à l\'autre',
     }
     for n in DISQUES:
         origines['DISK%d.VGA' % n] = '`DISK%d.VGA` de l\'archive, tel quel (conteneur `heywow` n° %d, %d ressources)' % (n, n, disques[n])
@@ -165,7 +165,7 @@ def cmd_inventaire(dest, dossier, dat, sortie):
     sections = [
         ('Taille', [
             '- Total versionné (`original/lure/`) : **%s** (%d octets), %d fichiers (hors `files.json`)' % (ec.mo(total, ko=True), total, len(fichiers)),
-            '- Hors extraction, conservé d\'une exécution à l\'autre : `COVER.png` (vague J)']),
+            '- Hors extraction, conservé d\'une exécution à l\'autre : `COVER.webp` (jaquette de la boîte d\'origine)']),
         ('Fichiers', ec.tableau(['Fichier', 'Octets', 'SHA-256 (16 premiers hex)', 'Origine'],
                                 [(r, t, '`%s`' % h, origines.get(r, '')) for r, t, h in lignes], droite=(1,))),
         ('Contrôles faits à l\'extraction', [

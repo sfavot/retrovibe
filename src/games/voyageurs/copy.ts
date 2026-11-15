@@ -15,7 +15,7 @@ export const copy = {
   title: "Les Voyageurs du temps",
   description:
     "L'aventure en pointer-et-cliquer de Delphine Software (1989), aussi sortie sous le titre Future Wars : un laveur de vitres de gratte-ciel tombe sur une machine à voyager dans le temps et se retrouve projeté du Moyen Âge jusqu'au futur. Textes en français (traduction de fans), musique de la version CD.",
-  coverAlt: "Au début du jeu, le laveur de vitres sur son échafaudage, devant la façade vitrée d'un gratte-ciel et la ville.",
+  coverAlt: "Jaquette de Future Wars (Les Voyageurs du temps), version Amiga : une ville futuriste sous un vaisseau géant.",
   sound: "Son",
 
   // Écran de présentation.

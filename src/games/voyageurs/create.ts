@@ -1,6 +1,6 @@
 /**
  * Assemblage du moteur des *Voyageurs du temps* avec son rendu réel (`FwRenderer`) : un seul endroit pour l'hôte (navigateur) et les
- * scripts qui veulent l'image (`scripts/voyageurs-cover.mts`). Le son vient de l'hôte (`VoyageursHost.audio`).
+ * scripts qui veulent l'image. Le son vient de l'hôte (`VoyageursHost.audio`).
  */
 
 import { readFont } from "./data/font";

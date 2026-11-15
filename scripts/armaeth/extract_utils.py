@@ -63,9 +63,8 @@ def cmd_inventaire(dest, stats_json, sortie):
             '- Total versionné (`original/armaeth/`, version française à plat) : **%s** (%d octets)'
             % (ec.mo(total), total),
             '- Fichiers gardés : %d' % len(gardes)]
-            + (['- Hors CD, conservé d\'une extraction à l\'autre : `COVER.png` (jaquette 320 x 200 générée par '
-                '`scripts/armaeth-cover.mts` depuis la scène 20 de `A1F00E.VGA`)']
-               if os.path.exists(os.path.join(dest, 'COVER.png')) else [])),
+            + (['- Hors CD, conservé d\'une extraction à l\'autre : `COVER.webp` (jaquette de la boîte européenne, LaunchBox Games Database)']
+               if os.path.exists(os.path.join(dest, 'COVER.webp')) else [])),
         ('Par extension (fichiers gardés)', ec.tableau_par_categorie('Extension', ec.agreger_gardes(gardes))),
         ('Fichiers exclus (agrégés par catégorie)', ec.tableau_par_categorie('Catégorie', st['exclus'])),
         ('Pourquoi exclus', ec.pourquoi_exclus(EXCLUS)),

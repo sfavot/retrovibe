@@ -9,7 +9,6 @@ export const ween: GameDefinition = {
   description: copy.description,
   cover: COVER_URL,
   coverSize: COVER_SIZE,
-  coverPixelated: true,
   coverAlt: copy.coverAlt,
   start(container) {
     // Tout le jeu est dans INTRO.STK (6,7 Mo), lu avant l'écran titre ; le jeu (INTRO.TOT) part à « Jouer ».

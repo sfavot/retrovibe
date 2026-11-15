@@ -6,7 +6,7 @@ Généré par `scripts/drascula-extract.sh` (ne pas éditer à la main).
 
 - Total versionné (`original/drascula/`) : **85.1 Mo** (89248194 octets), 1146 fichiers (hors `files.json`)
 - Musique : 26.8 Mo ; voix et sons `.ALS` : 30.7 Mo ; reste : 27.6 Mo
-- Hors extraction, conservés d'une exécution à l'autre : `COVER.png` (vague J), `track*.mp3` (`scripts/drascula-music.sh`)
+- Hors extraction, conservés d'une exécution à l'autre : `COVER.webp` (jaquette de la boîte d'origine), `track*.mp3` (`scripts/drascula-music.sh`)
 
 ## Par extension
 

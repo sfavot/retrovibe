@@ -4,7 +4,7 @@
 #  - PART01 PART02 PART03 PART04 PART04B AUTO00.PRC TEXTE.DAT tels quels (décision D2), md5 contrôlés ;
 #  - music/track19.mp3 … track29.mp3 : pistes 19 à 29 converties depuis trackNN.flac (décision D3),
 #    MP3 joint stéréo 44,1 kHz, 96 kb/s CBR, en-tête Xing, sans métadonnées, déterministe (comme Lost in Time) ;
-#  - files.json ; COVER.png (vague J) conservé s'il existe ; l'inventaire docs/voyageurs/files.md.
+#  - files.json ; COVER.webp (jaquette de la boîte Amiga de Future Wars, Wikipédia anglophone) conservé s'il existe ; l'inventaire docs/voyageurs/files.md.
 # Non repris : .PAL, BASESON.SND, exécutables, MANUAL.*, SONY.LBM, VOL.*, pistes 1 à 18.
 # Usage : scripts/voyageurs-extract.sh [installeur]   (défaut : archives/voyageurs/setup-00099-…exe)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
@@ -81,8 +81,8 @@ while read -r n attendue; do
     || { echo "track$n.mp3 : durée $d s, $attendue s attendues" >&2; exit 1; }
 done <<<"$PISTES"
 
-# Jaquette (vague J) : ne vient pas de cette extraction, conservée si présente.
-ec_conserver "$sortie" "$tmp/out" COVER.png
+# Jaquette (boîte Amiga de Future Wars) : ne vient pas de cette extraction, conservée si présente.
+ec_conserver "$sortie" "$tmp/out" COVER.webp
 
 # Inventaire (avant ec_publier, qui ajoute files.json puis déplace le dossier).
 {
@@ -98,7 +98,7 @@ ec_conserver "$sortie" "$tmp/out" COVER.png
   echo
   echo "- Total versionné (\`original/voyageurs/\`, hors \`files.json\`) : **$(mo $((total_jeu + total_mp3))) Mo** ($((total_jeu + total_mp3)) octets)"
   echo "- Données du jeu : $(mo "$total_jeu") Mo ; musique (\`music/\`) : $(mo "$total_mp3") Mo, 11 pistes, $duree_totale s"
-  echo "- Hors extraction, conservé d'une exécution à l'autre : \`COVER.png\` (vague J)"
+  echo "- Hors extraction, conservé d'une exécution à l'autre : \`COVER.webp\` (jaquette de la boîte Amiga de Future Wars)"
   echo
   echo "## Fichiers"
   echo
@@ -107,7 +107,7 @@ ec_conserver "$sortie" "$tmp/out" COVER.png
   for f in "$tmp/out"/*; do
     [ -f "$f" ] || continue
     nom="$(basename "$f")"
-    if [ "$nom" = COVER.png ]; then orig="jaquette composée par le moteur (vague J), conservée"; else orig="\`app/data/$nom\` de l'installeur, tel quel (décision D2), MD5 contrôlé"; fi
+    if [ "$nom" = COVER.webp ]; then orig="jaquette de la boîte Amiga de Future Wars (Wikipédia anglophone), conservée"; else orig="\`app/data/$nom\` de l'installeur, tel quel (décision D2), MD5 contrôlé"; fi
     echo "| $nom | $(taille "$f") | \`$(sha256 "$f" | cut -c1-16)\` | $orig |"
   done
   while read -r n attendue; do

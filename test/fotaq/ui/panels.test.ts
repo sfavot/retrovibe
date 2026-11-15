@@ -47,8 +47,8 @@ describe("panneaux", () => {
 });
 
 describe.skipIf(!hasOriginalFiles)("manifeste du jeu", () => {
-  // `COVER.png` (jaquette de l'accueil, `scripts/fotaq-cover.mts`) n'est pas un fichier du jeu : la visionneuse ne l'ouvre pas.
-  const manifest = readManifest().filter((entry) => entry.path !== "COVER.png");
+  // `COVER.webp` (jaquette de l'accueil, boîte d'origine) n'est pas un fichier du jeu : la visionneuse ne l'ouvre pas.
+  const manifest = readManifest().filter((entry) => entry.path !== "COVER.webp");
 
   it("tous les fichiers du manifeste ont un panneau, sauf files.json et la jaquette", () => {
     expect(manifest).toHaveLength(7671);

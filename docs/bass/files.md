@@ -6,7 +6,7 @@ Généré par `scripts/bass-extract.sh` (ne pas éditer à la main).
 
 - Total versionné (`original/bass/`) : **34.3 Mo** (35993168 octets), 3495 fichiers (hors `files.json`)
 - Voix (`voices/`) : 21.2 Mo ; données du jeu : 13.1 Mo
-- Hors extraction, conservé d'une exécution à l'autre : `COVER.png` (vague J)
+- Hors extraction, conservé d'une exécution à l'autre : `COVER.webp` (jaquette de la boîte d'origine)
 
 ## Fichiers
 

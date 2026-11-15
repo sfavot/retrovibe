@@ -6,7 +6,7 @@
 #  - LICENSE-LURE.txt (licence de Revolution, à conserver intacte), MANUEL.pdf et files.json ;
 #  - l'inventaire docs/lure/files.md.
 # Non versionnés : LURE.EXE (jamais exécuté), PROTECT.PDF (protection non portée), README de ScummVM.
-# COVER.png vient de la vague J : conservé tel quel s'il existe.
+# COVER.webp (jaquette de la boîte d'origine, Wikipédia anglophone) ne vient pas du jeu : conservé tel quel s'il existe.
 # Usage : scripts/lure-extract.sh [lure-fr-1.1.zip] [lure.dat]
 #         (défauts : archives/lure-fr-1.1.zip, archives/lure.dat = dists/engine-data/lure.dat de ScummVM)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
@@ -43,7 +43,7 @@ cp "$(trouver license.txt)" "$tmp/out/LICENSE-LURE.txt"
 cp "$(trouver manual.pdf)" "$tmp/out/MANUEL.pdf"
 py bloc "$dat" "$tmp/out/LURE-FR.DAT"
 # Jaquette (vague J) : ne vient pas de cette extraction, conservée si présente.
-ec_conserver "$sortie" "$tmp/out" COVER.png
+ec_conserver "$sortie" "$tmp/out" COVER.webp
 
 py inventaire "$tmp/out" "$tmp/zip" "$dat" "$doc"
 ec_publier "$tmp/out" "$sortie"

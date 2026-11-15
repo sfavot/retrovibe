@@ -5,7 +5,7 @@
 #  - voices/<archive en minuscules>/<index sur 3 chiffres>.mp3 : les voix de GOALS, HINT1 à 7, HELP et PROFESOR.VOC
 #    (archives maison, PCM 8 bits 11 025 Hz), entrées vides sautées, en MP3 comme BASS (ec_encoder_voix) ;
 #  - voices/lipsync.json : synchronisation labiale (scripts/tim3/split_voc.py) ;
-#  - COVER.png (vague J) conservé s'il existe, files.json, et l'inventaire docs/tim3/files.md.
+#  - COVER.webp (jaquette de la boîte nord-américaine, LaunchBox Games Database) conservé s'il existe, files.json, et l'inventaire docs/tim3/files.md.
 # Usage : scripts/tim3-extract.sh [archive.7z]
 #   (défaut : jeu-00235-incredible_machine_3-pcwin.7z à la racine du dépôt, sinon dans archives/)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
@@ -85,7 +85,7 @@ done
 [ "$total" -eq "$NB_VOIX" ] || { echo "$NB_VOIX voix attendues, $total converties" >&2; exit 1; }
 
 # Jaquette (vague J) : ne vient pas de cette extraction, conservée si présente.
-ec_conserver "$sortie" "$tmp/out" COVER.png
+ec_conserver "$sortie" "$tmp/out" COVER.webp
 
 py inventaire "$tmp/out" "$dossier" "$tmp/wav" "$doc"
 ec_publier "$tmp/out" "$sortie"

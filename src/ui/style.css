@@ -310,6 +310,13 @@ a.button:hover {
   box-shadow: 0 20px 60px #0009;
 }
 
+/* Jaquette de la boîte d'origine : une illustration en portrait (proportions tirées de ses attributs width/height), pas du pixel art. */
+.title-picture.box-art {
+  width: min(280px, calc(100vw - 32px));
+  aspect-ratio: auto;
+  image-rendering: auto;
+}
+
 .title-form {
   width: min(380px, calc(100vw - 32px));
   display: flex;

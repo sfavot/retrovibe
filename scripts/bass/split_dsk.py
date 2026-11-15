@@ -333,7 +333,7 @@ def cmd_inventaire(out, archive, dest_raw, sortie):
     dnr_o, dsk_o, cpt_o = (os.path.join(archive, n) for n in ('sky.dnr', 'sky.dsk', 'sky.cpt'))
     nb_origine = struct.unpack_from('<I', open(dnr_o, 'rb').read(4), 0)[0]
     origines = {
-        'COVER.png': 'vague J (`scripts/bass-cover.mts`), conservé d\'une exécution à l\'autre',
+        'COVER.webp': 'jaquette de la boîte d\'origine (Wikipédia anglophone), conservé d\'une exécution à l\'autre',
         'README-BASS.txt': '`readme.txt` de l\'archive (licence de Revolution Software, à conserver intacte)',
         'sky.cpt': '`sky.cpt` de l\'archive, tel quel (décision D2)',
         'sky.dnr': 'index de `sky.dnr` de l\'archive recalculé pour `sky.dsk` sans les voix (`scripts/bass/split_dsk.py`)',
@@ -346,7 +346,7 @@ def cmd_inventaire(out, archive, dest_raw, sortie):
         ('Taille', [
             '- Total versionné (`original/bass/`) : **%s** (%d octets), %d fichiers (hors `files.json`)' % (ec.mo(total), total, len(fichiers)),
             '- Voix (`voices/`) : %s ; données du jeu : %s' % (ec.mo(taille_voix), ec.mo(total - taille_voix)),
-            '- Hors extraction, conservé d\'une exécution à l\'autre : `COVER.png` (vague J)']),
+            '- Hors extraction, conservé d\'une exécution à l\'autre : `COVER.webp` (jaquette de la boîte d\'origine)']),
         ('Fichiers', ec.tableau(['Fichier', 'Octets', 'SHA-256 (16 premiers hex)', 'Origine'], lignes, droite=(1,))),
         ('Voix', [
             '- %d fichiers MP3 (`voices/<id>.mp3`), %s au total (%d octets)' % (len(voix), ec.mo(taille_voix), taille_voix),

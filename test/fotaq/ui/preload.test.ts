@@ -13,7 +13,7 @@ describe("baseFiles", () => {
     const files = new GameFiles(
       entries({
         "QUEEN.JAS": 1, "QUEEN2.JAS": 1, "OBJECTS.BBK": 1, "AMAZON.ACT": 1, "FACES.SAM": 1, "AND1.DOG": 1, "C1.CUT": 1, "CREDIT1.CRD": 1, "AQBANK.MUS": 1, "PANEL.PCX": 1,
-        "B1.PCX": 1, "B1.MSK": 1, "B1.LUM": 1, "AQ.RL": 1, "README-FOTAQ.txt": 1, "COVER.png": 1, "voices/020001P2.mp3": 1,
+        "B1.PCX": 1, "B1.MSK": 1, "B1.LUM": 1, "AQ.RL": 1, "README-FOTAQ.txt": 1, "COVER.webp": 1, "voices/020001P2.mp3": 1,
       }),
     );
     expect(baseFiles(files).sort()).toEqual(

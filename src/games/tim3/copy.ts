@@ -7,7 +7,7 @@ export const copy = {
   title: "The Incredible Machine 3",
   description:
     "Les puzzles mécaniques de Dynamix (1995) : posez balles, cordes, poulies, moteurs et animaux, puis lancez la machine pour atteindre le but.",
-  coverAlt: "Un puzzle de The Incredible Machine 3 : des balles, des murs de briques et des pentes sur un fond bleu ciel.",
+  coverAlt: "Jaquette de The Incredible Machine 3 : une machine farfelue de poulies, de leviers et de balles.",
   play: "Jouer",
   sound: "Son",
   loading: "Chargement…",

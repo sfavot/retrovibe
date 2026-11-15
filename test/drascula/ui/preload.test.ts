@@ -69,7 +69,7 @@ describe("vidéos par chapitre", () => {
 
 describe("baseFiles", () => {
   it("drascula.dat, les fiches, les dialogues et toutes les images ; ni vidéos, ni voix, ni musique, ni jaquette", () => {
-    const files = new GameFiles(entries({ "drascula.dat": 1, "14.ALD": 1, "OP_1.CAL": 1, "96.ALG": 1, "CIELO.ALG": 1, "LEV.BIN": 1, "5.ALS": 1, "track1.mp3": 1, "COVER.png": 1, "README-ALCACHOFA.txt": 1 }));
+    const files = new GameFiles(entries({ "drascula.dat": 1, "14.ALD": 1, "OP_1.CAL": 1, "96.ALG": 1, "CIELO.ALG": 1, "LEV.BIN": 1, "5.ALS": 1, "track1.mp3": 1, "COVER.webp": 1, "README-ALCACHOFA.txt": 1 }));
     expect(baseFiles(files).sort()).toEqual(["14.ALD", "96.ALG", "CIELO.ALG", "OP_1.CAL", "drascula.dat"].sort());
   });
 });

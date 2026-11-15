@@ -96,8 +96,8 @@ describe("GameFiles (données synthétiques)", () => {
 });
 
 describe.skipIf(!hasOriginalFiles)("files.json du jeu", () => {
-  // `COVER.png` (jaquette de l'accueil, `scripts/fotaq-cover.mts`) est servie avec les données mais n'en fait pas partie.
-  const manifest = readManifest().filter((entry) => entry.path !== "COVER.png");
+  // `COVER.webp` (jaquette de l'accueil, boîte d'origine) est servie avec les données mais n'en fait pas partie.
+  const manifest = readManifest().filter((entry) => entry.path !== "COVER.webp");
   const files = new GameFiles(manifest);
   const count = (extension: string) => manifest.filter((entry) => !entry.path.includes("/") && extensionOf(entry.path) === extension).length;
 

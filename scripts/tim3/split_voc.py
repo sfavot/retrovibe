@@ -138,7 +138,7 @@ def cmd_inventaire(out, iso, dest_wav, sortie):
         par_archive.append((a.upper() + '.VOC', len(wavs), sum(os.path.getsize(c) for c in mp3), '%.0f s' % duree))
         duree_totale += duree
     origines = {
-        'COVER.png': 'vague J (`scripts/tim3-cover.mts`), conservé d\'une exécution à l\'autre',
+        'COVER.webp': 'jaquette de la boîte nord-américaine (LaunchBox Games Database), conservé d\'une exécution à l\'autre',
         'FRENCH.DAT': '`TIMWIN/FRENCH.DAT` de l\'ISO, tel quel (pack de langue : textes français)',
         'RESOURCE.001': '`TIMWIN/RESOURCE.001` de l\'ISO, tel quel',
         'RESOURCE.002': '`TIMWIN/RESOURCE.002` de l\'ISO, tel quel',
@@ -153,7 +153,7 @@ def cmd_inventaire(out, iso, dest_wav, sortie):
         ('Taille', [
             '- Total versionné (`original/tim3/`) : **%s** (%d octets), %d fichiers (hors `files.json`)' % (ec.mo(total), total, len(fichiers)),
             '- Voix (`voices/`, MP3) : %s ; données du jeu : %s' % (ec.mo(taille_voix), ec.mo(total - taille_voix)),
-            '- Hors extraction, conservé d\'une exécution à l\'autre : `COVER.png` (vague J, si présent)']),
+            '- Hors extraction, conservé d\'une exécution à l\'autre : `COVER.webp` (jaquette de la boîte nord-américaine, si présente)']),
         ('Fichiers', ec.tableau(['Fichier', 'Octets', 'SHA-256 (16 premiers hex)', 'Origine'], lignes, droite=(1,))),
         ('Voix', ec.tableau(['Archive', 'Voix', 'Octets MP3', 'Durée'], par_archive, droite=(1, 2, 3)) + [
             '',

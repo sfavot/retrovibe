@@ -6,16 +6,16 @@ import { copy } from "../copy";
 
 /** Dossier des fichiers du jeu (servi depuis `original/ween/`). */
 export const GAME_URL = `${import.meta.env.BASE_URL}ween/`;
-/** Jaquette : un écran du jeu (pixel art 320×200), composé par le moteur (`scripts/ween-cover.mts`). */
-export const COVER_URL = `${GAME_URL}COVER.png`;
-export const COVER_SIZE: [number, number] = [320, 200];
+/** Jaquette : la boîte d'origine (Wikipédia anglophone, image de l'infobox). */
+export const COVER_URL = `${GAME_URL}COVER.webp`;
+export const COVER_SIZE: [number, number] = [280, 345];
 
 /**
  * Écran titre, avant le jeu : image du jeu, « Jouer » (le jeu part de son introduction ; les parties se reprennent depuis le
  * menu de la disquette), lien vers l'aide et les crédits, commandes.
  */
 export function renderTitle(container: HTMLElement, onStart: () => void): HTMLElement {
-  const picture = h("img", { class: "pc-title-picture", src: COVER_URL, alt: copy.coverAlt, width: COVER_SIZE[0], height: COVER_SIZE[1] });
+  const picture = h("img", { class: "box-art", src: COVER_URL, alt: copy.coverAlt, width: COVER_SIZE[0], height: COVER_SIZE[1] });
   const start = h("button", { class: "primary", type: "button", onclick: onStart }, copy.play);
   const showTitle = (): void => {
     container.replaceChildren(renderTitle(container, onStart));

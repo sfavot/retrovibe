@@ -58,8 +58,8 @@ export function family(path: string): string {
     }
     case "MP3":
       return "Musique";
-    case "PNG":
-      return "Jaquette (générée)";
+    case "WEBP":
+      return "Jaquette (boîte d'origine)";
     default:
       return "Données et textes";
   }

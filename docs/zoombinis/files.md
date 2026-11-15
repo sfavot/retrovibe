@@ -41,7 +41,7 @@ Types de ressources (tag de 4 octets : nombre de ressources). Les octets non imp
 | Fichier | Taille |
 |---|---:|
 | `CORNER.TTF` | 33.4 Ko |
-| `COVER.png` | 231.3 Ko |
+| `COVER.webp` | 37.5 Ko |
 | `LOGO025.mp4` | 4.6 Mo |
 | `zoombinis-gm-LICENSE.txt` | 2.3 Ko |
 | `zoombinis-gm.sf2` | 3.3 Mo |

@@ -9,7 +9,7 @@ import { originalFiles } from "../../support/original";
 
 const original = originalFiles("lure", DAT_FILE_NAME);
 const entries = (sizes: Record<string, number>) => Object.entries(sizes).map(([path, size]) => ({ path, size }));
-const complete = { "DISK1.VGA": 10, "DISK2.VGA": 20, "DISK3.VGA": 30, "DISK4.VGA": 40, "LURE-FR.DAT": 5, "LICENSE-LURE.txt": 1, "MANUEL.pdf": 1000, "COVER.png": 2 };
+const complete = { "DISK1.VGA": 10, "DISK2.VGA": 20, "DISK3.VGA": 30, "DISK4.VGA": 40, "LURE-FR.DAT": 5, "LICENSE-LURE.txt": 1, "MANUEL.pdf": 1000, "COVER.webp": 2 };
 const bytes = (path: string) => new TextEncoder().encode(path);
 
 describe("baseFiles", () => {

@@ -8,7 +8,7 @@ import { hasOriginalFiles } from "../data/helpers";
 
 const original = originalFiles("bass", "sky.dnr");
 const entries = (sizes: Record<string, number>) => Object.entries(sizes).map(([path, size]) => ({ path, size }));
-const complete = { "sky.dsk": 100, "sky.dnr": 20, "sky.cpt": 30, "README-BASS.txt": 5, "COVER.png": 2, "voices/50007.mp3": 9, "voices/50011.mp3": 8 };
+const complete = { "sky.dsk": 100, "sky.dnr": 20, "sky.cpt": 30, "README-BASS.txt": 5, "COVER.webp": 2, "voices/50007.mp3": 9, "voices/50011.mp3": 8 };
 const bytes = (path: string) => new TextEncoder().encode(path);
 
 describe("baseFiles", () => {

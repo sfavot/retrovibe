@@ -4,15 +4,15 @@ Généré par `scripts/tim3-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/tim3/`) : **17.4 Mo** (18288845 octets), 661 fichiers (hors `files.json`)
+- Total versionné (`original/tim3/`) : **17.4 Mo** (18300555 octets), 661 fichiers (hors `files.json`)
 - Voix (`voices/`, MP3) : 7.6 Mo ; données du jeu : 9.9 Mo
-- Hors extraction, conservé d'une exécution à l'autre : `COVER.png` (vague J, si présent)
+- Hors extraction, conservé d'une exécution à l'autre : `COVER.webp` (jaquette de la boîte nord-américaine, si présente)
 
 ## Fichiers
 
 | Fichier | Octets | SHA-256 (16 premiers hex) | Origine |
 |---|---:|---|---|
-| COVER.png | 17080 | `63b2a6ff0d766087` | vague J (`scripts/tim3-cover.mts`), conservé d'une exécution à l'autre |
+| COVER.webp | 28790 | `bbcccaf605b0bab2` | jaquette de la boîte nord-américaine (LaunchBox Games Database), conservé d'une exécution à l'autre |
 | FRENCH.DAT | 469457 | `72cd26d4c722ab30` | `TIMWIN/FRENCH.DAT` de l'ISO, tel quel (pack de langue : textes français) |
 | RESOURCE.001 | 7508126 | `022987060475eec9` | `TIMWIN/RESOURCE.001` de l'ISO, tel quel |
 | RESOURCE.002 | 1783838 | `27b30fd7bd2dcfe1` | `TIMWIN/RESOURCE.002` de l'ISO, tel quel |

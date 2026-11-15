@@ -5,7 +5,7 @@
 export const copy = {
   title: "Star Wars: Yoda Stories",
   description: "Une mission Jedi générée à chaque partie, de Dagobah à Tatooine, Hoth ou Endor (LucasArts, 1997).",
-  coverAlt: "Écran de lancement du CD français de Yoda Stories : Yoda et Luke Skywalker",
+  coverAlt: "Jaquette de Star Wars: Yoda Stories : Luke Skywalker, sabre laser à la main.",
   loading: "Chargement des données du jeu…",
   missingFiles:
     "Fichiers du jeu introuvables. Lancez scripts/yoda-extract.sh pour placer YODESK.DTA, YODESK.EXE et les sons dans le dossier original/yoda/, puis rechargez la page.",

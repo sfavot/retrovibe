@@ -100,7 +100,7 @@ L'installeur source est déplacé dans `archives/voyageurs/` (non versionné).
 | `AUTO00.PRC` | 253 o | tel quel (chiffré, décodé au chargement) |
 | `TEXTE.DAT` | 4,9 Ko | tel quel (police) |
 | `music/track19.mp3` … `track29.mp3` | ~18 Mo | FLAC converti (D3) |
-| `COVER.png` | ~50 Ko | composée par le moteur (vague J) |
+| `COVER.webp` | ~26 Ko | jaquette de la boîte Amiga de Future Wars (Wikipédia anglophone) |
 | `files.json` | — | `scripts/manifest.py` |
 
 **Total ≈ 19 Mo** ; `original/` passe d'environ 737 à environ 756 Mo, sous la limite de 1 Go.

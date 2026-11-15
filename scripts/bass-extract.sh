@@ -6,7 +6,7 @@
 #  - voices/<id>.mp3 : les 3 491 voix (PCM 8 bits 11 025 Hz, décompressé du RNC), en MP3 comme FOTAQ (ec_encoder_voix) ;
 #  - sky.cpt tel quel, README-BASS.txt (readme d'origine, licence : à conserver intact) et files.json ;
 #  - l'inventaire docs/bass/files.md.
-# COVER.png vient de la vague J : conservé tel quel s'il existe.
+# COVER.webp (jaquette de la boîte d'origine, Wikipédia anglophone) ne vient pas du jeu : conservé tel quel s'il existe.
 # Usage : scripts/bass-extract.sh [bass-cd-1.2.zip]   (défaut : archives/bass-cd-1.2.zip)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
 # L'archive est une donnée non fiable : rien n'en est exécuté (python en -I, ffmpeg ne lit que des fichiers locaux).
@@ -65,7 +65,7 @@ ec_encoder_voix "$tmp/raw" raw "$tmp/out/voices" 24k -f u8 -ar 11025 -ac 1
 cp "$cpt" "$tmp/out/sky.cpt"
 cp "$readme" "$tmp/out/README-BASS.txt"
 # Jaquette (vague J) : ne vient pas de cette extraction, conservée si présente.
-ec_conserver "$sortie" "$tmp/out" COVER.png
+ec_conserver "$sortie" "$tmp/out" COVER.webp
 
 py inventaire "$tmp/out" "$(dirname "$dsk")" "$tmp/raw" "$doc"
 ec_publier "$tmp/out" "$sortie"

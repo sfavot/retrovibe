@@ -12,7 +12,6 @@ export const armaeth: GameDefinition = {
   description: copy.description,
   cover: COVER_URL,
   coverSize: COVER_SIZE,
-  coverPixelated: true,
   coverAlt: copy.coverAlt,
   async start(container) {
     // Écran de présentation, puis le jeu au clic sur « Jouer » (ce geste débloque aussi le son). Le moteur, l'émulateur AdLib et

@@ -29,11 +29,6 @@
   display: none;
 }
 
-/* Écran de présentation : l'image du jeu est en 4:3 (le composant commun la suppose carrée). */
-.zb-title-picture {
-  aspect-ratio: 4 / 3;
-}
-
 .zb-title-controls {
   margin: 0.4rem 0 0;
   font-size: 1rem;

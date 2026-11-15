@@ -6,7 +6,7 @@ Généré par `scripts/fotaq-extract.sh` (ne pas éditer à la main).
 
 - Total versionné (`original/fotaq/`) : **61.9 Mo** (64903887 octets), 7671 fichiers (hors `files.json`)
 - Voix et effets (`voices/`) : 42.6 Mo ; données du jeu : 19.2 Mo
-- Hors extraction, conservés d'une exécution à l'autre : `voices/` (`scripts/fotaq-voices.sh`), `COVER.png` (vague J)
+- Hors extraction, conservés d'une exécution à l'autre : `voices/` (`scripts/fotaq-voices.sh`), `COVER.webp` (jaquette de la boîte d'origine)
 
 ## Par extension
 

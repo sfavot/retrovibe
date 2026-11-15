@@ -7,9 +7,9 @@ import { SAVE_PREFIX, type VoyageursSlots, createSaveSlots, describeSave, summar
 
 /** Dossier des fichiers du jeu (servi depuis `original/voyageurs/`). */
 export const GAME_URL = `${import.meta.env.BASE_URL}voyageurs`;
-/** Jaquette : un décor de la première scène (pixel art 320×200), générée par `scripts/voyageurs-cover.mts`. */
-export const COVER_URL = `${GAME_URL}/COVER.png`;
-export const COVER_SIZE: [number, number] = [320, 200];
+/** Jaquette : la boîte d'origine (Wikipédia anglophone, image de l'infobox : la boîte Amiga de Future Wars). */
+export const COVER_URL = `${GAME_URL}/COVER.webp`;
+export const COVER_SIZE: [number, number] = [256, 308];
 
 /** Les emplacements de sauvegarde du navigateur (`voyageurs:slot01`…). */
 export function browserSaveSlots(): VoyageursSlots {
@@ -19,5 +19,5 @@ export function browserSaveSlots(): VoyageursSlots {
 /** Écran de présentation (composant commun des jeux de pointer-et-cliquer : `ui/point-click-pages.ts`). */
 export function renderTitle(actions: TitleActions<VoyageursSave>): HTMLElement {
   const slots = browserSaveSlots();
-  return renderGameTitle({ copy, cover: { url: COVER_URL, size: COVER_SIZE }, slots, describe: describeSave, summaries: () => summarizeSlots(slots), actions });
+  return renderGameTitle({ copy, cover: { url: COVER_URL, size: COVER_SIZE, pixelated: false }, slots, describe: describeSave, summaries: () => summarizeSlots(slots), actions });
 }

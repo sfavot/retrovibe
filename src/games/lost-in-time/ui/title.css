@@ -1,11 +1,5 @@
 /* Lost in Time : écran titre (l'écran du jeu est commun : `src/ui/coktel/style.css`). */
 
-/* Écran titre : la jaquette (280x343) est en portrait, pas carrée comme l'image d'Indy ; c'est une illustration, pas du pixel art. */
-.lit-title-picture {
-  aspect-ratio: 280 / 343;
-  image-rendering: auto;
-}
-
 .lit-title-note {
   margin: 0;
   font-size: 0.85rem;

@@ -4,12 +4,12 @@ import { zoombinis } from "../../src/games/zoombinis/index";
 
 // Pas de DOM dans l'environnement de test : on vérifie la définition du jeu (carte d'accueil) et la copy, pas l'écran de présentation.
 describe("Zoombinis : définition du jeu", () => {
-  it("décrit la carte d'accueil avec la jaquette 640 × 480", () => {
+  it("décrit la carte d'accueil avec la jaquette de la boîte (277 × 359)", () => {
     expect(zoombinis.id).toBe("zoombinis");
     expect(zoombinis.title).toBe(copy.title);
     expect(zoombinis.description).toBe(copy.description);
-    expect(zoombinis.cover).toMatch(/zoombinis\/COVER\.png$/);
-    expect(zoombinis.coverSize).toEqual([640, 480]);
+    expect(zoombinis.cover).toMatch(/zoombinis\/COVER\.webp$/);
+    expect(zoombinis.coverSize).toEqual([277, 359]);
     expect(zoombinis.coverAlt).toBe(copy.coverAlt);
   });
 

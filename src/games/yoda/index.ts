@@ -25,8 +25,9 @@ export const yoda: GameDefinition = {
   id: "yoda",
   title: copy.title,
   description: copy.description,
-  cover: `${GAME_URL}COVER.png`,
-  coverSize: [519, 333],
+  /** Jaquette : la boîte d'origine (Wikipédia anglophone, image de l'infobox). */
+  cover: `${GAME_URL}COVER.webp`,
+  coverSize: [252, 352],
   coverAlt: copy.coverAlt,
   async start(container) {
     container.replaceChildren(h("p", { class: "boot", role: "status" }, copy.loading));

@@ -6,7 +6,7 @@ export const copy = {
   title: "L'Odyssée des Zoombinis",
   description:
     "Le jeu de logique de Broderbund et du TERC (1996) : guide les Zoombinis à travers douze épreuves jusqu'à Zoombiniville.",
-  coverAlt: "Décor de l'île du choix des Zoombinis, dans L'Odyssée des Zoombinis",
+  coverAlt: "Jaquette de L'Odyssée des Zoombinis (édition américaine) : des Zoombinis bleus sur le chemin qui serpente à travers leur île.",
   play: "Jouer",
   sound: "Son",
   menu: "Menu",

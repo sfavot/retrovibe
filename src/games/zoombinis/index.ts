@@ -7,9 +7,9 @@ import "./ui/style.css";
 
 /** Dossier des fichiers du jeu (servi depuis `original/zoombinis/`). */
 const GAME_URL = `${import.meta.env.BASE_URL}zoombinis`;
-/** Jaquette : décor de l'île du choix, générée par `scripts/zoombinis/cover.mts`. */
-const COVER_URL = `${GAME_URL}/COVER.png`;
-const COVER_SIZE: [number, number] = [640, 480];
+/** Jaquette : la boîte d'origine (Wikipédia anglophone, image de l'infobox). */
+const COVER_URL = `${GAME_URL}/COVER.webp`;
+const COVER_SIZE: [number, number] = [277, 359];
 /** Manuel (page web), servi depuis `original/zoombinis/`. */
 const MANUAL_URL = `${GAME_URL}/MANUEL.html`;
 
@@ -42,7 +42,7 @@ export const zoombinis: GameDefinition = {
     });
     queueMicrotask(() => play.focus());
     const picture = h("img", {
-      class: "zb-title-picture",
+      class: "box-art",
       src: COVER_URL,
       alt: copy.coverAlt,
       width: COVER_SIZE[0],

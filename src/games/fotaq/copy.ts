@@ -7,7 +7,7 @@ export const copy = {
   title: "Flight of the Amazon Queen",
   description:
     "L'aventure en pointer-et-cliquer de John Passfield et Steven Stamatiadis (1995), en français et parlée : Joe King, pilote, s'enfonce dans la jungle d'Amazonie pour sauver une princesse.",
-  coverAlt: "Dans l'avion de l'aventure : deux personnages entre des caisses, avec le panneau de verbes et l'inventaire du jeu.",
+  coverAlt: "Jaquette de Flight of the Amazon Queen : le pilote Joe King et l'actrice Faye Russell dans la jungle.",
   sound: "Son",
 
   // Écran de présentation.

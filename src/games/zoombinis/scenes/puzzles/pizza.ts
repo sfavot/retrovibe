@@ -124,13 +124,19 @@ const DELAY = 6;
 /** Flags des objets de décor (`0x188000`) et des assiettes ou de la pizza en vol (`0x4108000`, qui jouent dès la création). */
 const STATIC = FeatureFlag.noReplay | FeatureFlag.stopAtEnd | FeatureFlag.active;
 const PLAYING = FeatureFlag.stopAtEnd | FeatureFlag.active;
+/** Type des assiettes de Willa (`478e` : 5 à 7 = Arno, Willa, Shyler). */
+const WILLA_PLATE = 6;
 /**
- * Profondeurs : le décor, le four, les boutons, la table, les trolls, les assiettes, les Zoombinis du kit (1 + y / 1000, moins de 1,5), la pizza servie.
+ * Profondeurs : le décor, le four, les boutons, la table, les assiettes de Willa, les trolls, les autres assiettes, les Zoombinis du kit (1 + y / 1000, moins de
+ * 1,5), la pizza servie.
  * Ordre de dessin de l'original (`1130:54c8`, `3799`, `11a8:2a0a`, de l'arrière vers l'avant) : Shyler derrière Willa derrière Arno (chaque troll est inséré derrière le
  * précédent, qui est devant lui), et la pizza servie devant tout (`2a0a(pizza, 1, table)` la place devant la table, donc devant les trolls dont l'image porte parfois
  * un morceau de table : `SCRB` 8020, 8021, 9026, 9027, 10030, 10031) ; elle reste aussi devant le livreur, qui la porte sur la tête.
+ * Assiettes (`1130:478e`) : une assiette commune (type 4) est mise juste devant la table (`2a0a(table, 1, assiette)`) ; celles de Willa (type 6), posées sur
+ * le rocher derrière elle, sont mises juste derrière elle (`2a0a(Willa, 0, 8e64)` puis `2a0a(8e64, 0, 8e62)`), sans quoi sa tête passe sous elles ; celles
+ * d'Arno et de Shyler ne sont pas replacées.
  */
-const DEPTH = { oven: 0, preview: 0.1, buttons: 0.2, table: 0.3, trolls: [0.42, 0.4, 0.41] as const, plates: 0.5, flight: 2 } as const;
+const DEPTH = { oven: 0, preview: 0.1, buttons: 0.2, table: 0.3, willaPlates: 0.35, trolls: [0.42, 0.4, 0.41] as const, plates: 0.5, flight: 2 } as const;
 
 /** Rectangles de prise des ingrédients, par niveau et indice `k` (régions 4 à 11 de `1130:1803`, §4.2). `null` : pas de bouton à ce niveau. */
 export const PIZZA_INGREDIENT_REGIONS: readonly (readonly (Rect | null)[])[] = [
@@ -402,7 +408,7 @@ export function createPizzaScene(): Scene {
       play(existing, plate.script, done, hook);
       return;
     }
-    const feature = features.create({ script: plate.script, delay: DELAY, flags: plate.initial ? STATIC : PLAYING, depth: DEPTH.plates, onImage: hook });
+    const feature = features.create({ script: plate.script, delay: DELAY, flags: plate.initial ? STATIC : PLAYING, depth: plate.type === WILLA_PLATE ? DEPTH.willaPlates : DEPTH.plates, onImage: hook });
     plateMasks.set(feature, plate.mask);
     plateSlots.set(plateKey(plate), feature);
     if (plate.initial) {

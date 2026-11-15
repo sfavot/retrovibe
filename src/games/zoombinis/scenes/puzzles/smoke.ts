@@ -164,8 +164,8 @@ const EVENT = {
   pedestalReady: 19,
 } as const;
 
-/** Profondeurs : décor 0, avant-plan et wagonnets garés 0,8, wagonnet de sortie 0,9, objets de puzzle 0,5 (les Zoombinis sont à 1 + y / 1000). */
-const DEPTH = { piece: 0.5, front: 0.8, parked: 0.85, out: 0.9 } as const;
+/** Profondeurs : décor et objets de puzzle 0 (rangés entre les décors, `buildPieces`), avant-plan et wagonnets garés 0,8, wagonnet de sortie 0,9 (les Zoombinis sont à 1 + y / 1000). */
+const DEPTH = { front: 0.8, parked: 0.85, out: 0.9 } as const;
 
 /** Zones (§2.3) : levier `DS:2018`, cristal droit `DS:1f38`. */
 const LEVER_ZONE: Rect = { left: 9, top: 300, right: 75, bottom: 364 };
@@ -264,9 +264,17 @@ const STILL_BIT = F.flag4000000 | F.playOnly | F.stopAtEnd | F.noReplay | F.acti
 /** Feature qui joue ses scripts une fois (puis s'arrête sur la dernière image). */
 const PLAYS = F.flag4000000 | F.stopAtEnd | F.active;
 
+/** `2a0a(ref, mode, objet)` : `inFront` = mode 1 (juste devant `ref`), sinon juste derrière. */
+interface PieceAnchor {
+  ref: Feature;
+  inFront: boolean;
+}
+
 /** Un objet de puzzle dessiné avec la planche 10000 (silhouette, filtre, cristal, cible, fiche). */
 interface Piece {
   readonly feature: Feature;
+  /** Place dans l'ordre de dessin (`11a8:2a0a` de `1158:4a01`) : juste devant ou juste derrière une feature du décor. */
+  readonly anchor: PieceAnchor;
   /** Orientation (`+0xf1`) : fixe, ou selon la place (cristal posé à gauche, à droite, ou sur son étagère). */
   readonly orientation: number | (() => number);
   /** Position de repos ; null = absent. */
@@ -374,8 +382,7 @@ class SmokeRun implements SmokeProbe {
   private readonly silhouettes: Piece[] = [];
   private readonly crystals: Piece[] = [];
   private readonly ficheView: Piece[] = [];
-  /** Features des fiches comparées, créées juste après le cristal du fond (ordre de dessin de l'original). */
-  private ficheSlots: Feature[] = [];
+
   private crystalLeft: Piece | null = null;
   private crystalRight: Piece | null = null;
 
@@ -421,9 +428,6 @@ class SmokeRun implements SmokeProbe {
     this.lightLeft = f.create({ script: SCRB.lightLeft, delay: DELAY.default, flags: STILL_BIT });
     this.lightRight = f.create({ script: SCRB.lightRight, delay: DELAY.default, flags: STILL_BIT });
     this.crystalBack = f.create({ script: SCRB.intro, delay: DELAY.default, flags: PLAYS });
-    // Fiches comparées (`1158:4a01` type 5) : `2a0a(9308, 1, fiche)` les range juste devant le cristal du fond, donc derrière la couche avant (`[930a]`) qui
-    // dessine le rocher : quand le cristal remonte, elles passent sous le rocher avec lui.
-    this.ficheSlots = [0, 1].map(() => f.create({ script: 0, delay: 0, flags: 0 }));
     // Couche avant (`[930a]`, `0xd180000`) : avec le bit `0x1000000`, elle n'est dessinée que pendant qu'elle joue (intro, séquences de résultat) ; figée sur sa
     // dernière image, elle laissait un éclat vert sur la machine de gauche.
     this.crystalFront = f.create({ script: SCRB.introFront, delay: DELAY.default, flags: PLAYS | F.playOnly });
@@ -573,14 +577,18 @@ class SmokeRun implements SmokeProbe {
   // ------------------------------------------------------------------------------------------------------------------------
   // Objets de puzzle (planche 10000)
 
-  /** `depth` : profondeur d'une nouvelle feature, ou feature déjà créée à sa place dans l'ordre de dessin. */
-  private addPiece(orientation: Piece["orientation"], place: () => Point | null, attrs: () => Attrs | null, depth: number | Feature = DEPTH.piece): Piece {
-    const draw: NonNullable<Feature["onAfterDraw"]> = (_feature, screen) => this.drawPiece(piece, screen);
-    const feature = typeof depth === "number" ? this.features.create({ script: 0, delay: 0, flags: 0, depth, onAfterDraw: draw }) : depth;
-    feature.onAfterDraw = draw;
-    const piece: Piece = { orientation, place, attrs, override: null, feature };
+  /** Crée la feature d'un objet de puzzle et la range à sa place dans l'ordre de dessin (`anchor`). */
+  private addPiece(orientation: Piece["orientation"], place: () => Point | null, attrs: () => Attrs | null, anchor: PieceAnchor): Piece {
+    const feature = this.features.create({ script: 0, delay: 0, flags: 0, onAfterDraw: (_feature, screen) => this.drawPiece(piece, screen) });
+    const piece: Piece = { orientation, place, attrs, override: null, feature, anchor };
+    this.stackPiece(piece);
     this.pieces.push(piece);
     return piece;
+  }
+
+  /** Remet l'objet à sa place dans l'ordre de dessin (à sa création, et quand il est reposé après un transport). */
+  private stackPiece(piece: Piece): void {
+    this.features.placeNextTo(piece.feature, piece.anchor.ref, piece.anchor.inFront);
   }
 
   /** Cases `(w, x, y)` d'un objet : chaque partie est posée à `(x − REGS_X[w], y − REGS_Y[w])` (`1140:0000`). */
@@ -616,34 +624,46 @@ class SmokeRun implements SmokeProbe {
     return rect ? centre(rect) : null;
   }
 
+  /**
+   * Objets de puzzle, rangés comme `1158:4a01` (`11a8:2a0a`) : silhouettes (type 1) et gemmes, cible et seconde cible (type 3) juste derrière la couche avant `[930a]`
+   * qui dessine le rocher ; filtres (type 2) juste devant le balayage `[930c]` ; cristaux de gauche et de droite (type 4) juste devant `[930a]` ; fiches comparées
+   * (type 5) juste devant le cristal du fond `[9308]`. Quand le cristal remonte, ce qui est derrière le rocher passe dessous avec lui.
+   */
   private buildPieces(): void {
     const s = (): SmokeState => this.state;
+    const behindRock: PieceAnchor = { ref: this.crystalFront, inFront: false };
+    const overRock: PieceAnchor = { ref: this.crystalFront, inFront: true };
+    const overBeam: PieceAnchor = { ref: this.beamA, inFront: true };
+    const overCrystal: PieceAnchor = { ref: this.crystalBack, inFront: true };
     if (this.level <= 2) {
       for (let k = 0; k < SILHOUETTES; k++) {
         this.silhouettes[k] = this.addPiece(
           ORIENTATION.silhouette,
           () => (s()?.silhouette === k ? null : SILHOUETTE_POS[k]!),
           () => s()?.silhouettes[k] ?? null,
+          behindRock,
         );
       }
       if (this.level === 2) {
-        FILTER_POS.forEach((at, i) => this.addPiece(i < 2 ? ORIENTATION.left : ORIENTATION.right, () => at, () => s()?.filters[i] ?? null));
+        FILTER_POS.forEach((at, i) => this.addPiece(i < 2 ? ORIENTATION.left : ORIENTATION.right, () => at, () => s()?.filters[i] ?? null, overBeam));
       }
       // Cristal de gauche (le Zoombini testé) et de droite (la silhouette posée), `26d7`.
-      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (s()?.current != null ? s()!.members[s()!.current!]! : EMPTY_CRYSTAL));
-      this.crystalRight = this.addPiece(ORIENTATION.crystalRight, () => RIGHT_CRYSTAL_POS, () => (s()?.silhouette != null ? s()!.silhouettes[s()!.silhouette!]! : null));
+      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (s()?.current != null ? s()!.members[s()!.current!]! : EMPTY_CRYSTAL), overRock);
+      this.crystalRight = this.addPiece(ORIENTATION.crystalRight, () => RIGHT_CRYSTAL_POS, () => (s()?.silhouette != null ? s()!.silhouettes[s()!.silhouette!]! : null), overRock);
     } else {
-      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (this.ready && s()?.current != null ? s()!.members[s()!.current!]! : EMPTY_CRYSTAL));
+      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (this.ready && s()?.current != null ? s()!.members[s()!.current!]! : EMPTY_CRYSTAL), overRock);
       this.addPiece(
         ORIENTATION.target,
         () => (this.targetsShown && !s()?.second ? RIGHT_CRYSTAL_POS : null),
         () => s()?.target ?? null,
+        behindRock,
       );
       if (this.level === 4) {
         this.addPiece(
           ORIENTATION.second,
           () => (s()?.second || this.target8At !== TARGET2_START ? this.target8At : null),
           () => (s()?.second ? s()!.target2 : null),
+          behindRock,
         );
       }
       for (let n = 1; n <= 6; n++) {
@@ -652,6 +672,7 @@ class SmokeRun implements SmokeProbe {
           () => (s()?.left.includes(n) ? ORIENTATION.left : s()?.right.includes(n) ? ORIENTATION.right : ORIENTATION.shelf),
           () => this.crystalPlace(n),
           () => this.crystalAttrs(n),
+          behindRock,
         );
       }
     }
@@ -661,7 +682,7 @@ class SmokeRun implements SmokeProbe {
         side === 0 ? ORIENTATION.ficheLeft : ORIENTATION.ficheRight,
         () => (this.fiches ? { x: FICHE_X[side]!, y: this.ficheY } : null),
         () => (this.fiches ? (side === 0 ? this.fiches.left : this.fiches.right) : null),
-        this.ficheSlots[side],
+        overCrystal,
       );
     }
   }
@@ -785,13 +806,13 @@ class SmokeRun implements SmokeProbe {
       decide: () => inside(CRYSTAL_ZONE, this.ctx.input.mouseX, this.ctx.input.mouseY),
       onDrop: () => {
         piece.override = null;
-        this.features.restack(piece.feature, DEPTH.piece);
+        this.stackPiece(piece);
         chooseSilhouette(s, k);
         this.features.invalidate();
       },
       onReturn: () => {
         piece.override = null;
-        this.features.restack(piece.feature, DEPTH.piece);
+        this.stackPiece(piece);
         this.features.invalidate();
       },
     });
@@ -834,14 +855,14 @@ class SmokeRun implements SmokeProbe {
       },
       onDrop: () => {
         piece.override = null;
-        this.features.restack(piece.feature, DEPTH.piece);
+        this.stackPiece(piece);
         if (chosen) placeCrystal(s, n, chosen.side, chosen.slot);
         this.stopLights();
         this.features.invalidate();
       },
       onReturn: () => {
         piece.override = null;
-        this.features.restack(piece.feature, DEPTH.piece);
+        this.stackPiece(piece);
         this.stopLights();
         this.features.invalidate();
       },

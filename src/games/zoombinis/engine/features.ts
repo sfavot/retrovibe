@@ -385,6 +385,20 @@ export class Features {
     return feature;
   }
 
+  /**
+   * `11a8:2a0a(ref, mode, feature)` : range la feature juste devant (`inFront`, mode 1) ou juste derrière (mode 0) `ref` dans l'ordre de dessin, à la profondeur de
+   * `ref`, sans toucher à son animation.
+   */
+  placeNextTo(feature: Feature, ref: Feature, inFront: boolean): void {
+    if (feature === ref) return;
+    const index = this.list.indexOf(feature);
+    if (index < 0 || !this.list.includes(ref)) return;
+    this.list.splice(index, 1);
+    feature.depth = ref.depth;
+    this.list.splice(this.list.indexOf(ref) + (inFront ? 1 : 0), 0, feature);
+    this.dirty = true;
+  }
+
   /** Réinsère la feature à la profondeur `depth` (à égalité, derrière celles qui y sont déjà, comme à la création) sans toucher à son animation (`11a8:2a0a`). */
   restack(feature: Feature, depth: number): void {
     const index = this.list.indexOf(feature);

@@ -1,12 +1,12 @@
 /**
  * Outil (pas un test ordinaire) : joue la partie complète (`full-game.test.ts` (a), graine 1) et écrit dans `CROISIERE_BENCH_OUT` de quoi
  * la rejouer dans le banc ScummVM et comparer les deux parties tour par tour :
- * - `inputs.txt` : niveaux de souris par tour, `n x y b` (variable `CRUISE_INPUT` du banc, `bench/cruise-replay.sh`) ;
+ * - `inputs.txt` : niveaux de souris par tour, `n x y b` (variable `CRUISE_INPUT` du banc, `scripts/croisiere/bench/cruise-replay.sh`) ;
  * - `port.trace` : trace du portage au format du banc, lignes `FR` (niveau 1), `VH` (empreinte des 2 000 `globalVars`) et `SC` (CRC32 de
  *   l'image et de la palette) à chaque tour, comme `CRUISE_TRACE=1 CRUISE_VARHASH=1` ;
  * - `steps.txt` : `rang phase étape tour` (dernier tour terminé à la fin de chaque étape).
  *
- * Les points de contrôle de `fixtures/scummvm-checkpoints.txt` se refont avec `bench/cruise-replay.sh inputs.txt DOSSIER STOP 1` et
+ * Les points de contrôle de `fixtures/scummvm-checkpoints.txt` se refont avec `scripts/croisiere/bench/cruise-replay.sh inputs.txt DOSSIER STOP 1` et
  * `scripts/checkpoints.py` (voir `scummvm-replay.test.ts`).
  *
  * Lancer : `CROISIERE_BENCH_OUT=/chemin/absolu npx vitest run test/croisiere/solution/bench-record.test.ts`. `CROISIERE_BENCH_LEVEL=2`

@@ -1,0 +1,1314 @@
+diff --git a/backends/events/sdl/bench.cpp b/backends/events/sdl/bench.cpp
+new file mode 100644
+index 00000000..18e4f3f8
+--- /dev/null
++++ b/backends/events/sdl/bench.cpp
+@@ -0,0 +1,257 @@
++/*
++ * Banc d'essai local (hors dépôt) : pilote ScummVM sans fenêtre à partir d'un scénario texte et écrit des captures
++ * de l'écran du jeu (surface 8 bits + palette) au format PPM.
++ *
++ * BENCH_SCRIPT=fichier  BENCH_OUT=dossier
++ * Une commande par ligne (# = commentaire), exécutées dans l'ordre, chaque attente comptée depuis la fin de la précédente :
++ *   wait MS | move X Y | click X Y | rclick X Y | key NOM (ESC, RETURN, SPACE, F1..F10, ou un caractère)
++ *   shot NOM | burst PERIODE_MS NOMBRE PREFIXE (captures périodiques en tâche de fond) | console COMMANDE...
++ *   log TEXTE | quit
++ */
++#define FORBIDDEN_SYMBOL_ALLOW_ALL
++#include "common/scummsys.h"
++#include "common/events.h"
++#include "common/system.h"
++#include "common/array.h"
++#include "common/str.h"
++#include "common/keyboard.h"
++#include "graphics/surface.h"
++#include "graphics/paletteman.h"
++#include "engines/engine.h"
++#include "gui/debugger.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++namespace Bench {
++
++struct Cmd {
++	Common::String op;
++	Common::Array<Common::String> args;
++	Common::String rest;
++};
++
++struct Pending {
++	uint32 at;
++	Common::Event ev;
++};
++
++static bool inited = false;
++static bool active = false;
++static bool realMouse = false;
++static Common::Array<Cmd> cmds;
++static uint pc = 0;
++static uint32 t0 = 0;
++static uint32 readyAt = 0;
++static Common::String outDir;
++static Common::Array<Pending> pending;
++static uint32 burstPeriod = 0, burstNext = 0;
++static int burstLeft = 0, burstIndex = 0;
++static Common::String burstPrefix;
++
++static uint32 now() { return g_system->getMillis() - t0; }
++
++static void init() {
++	inited = true;
++	const char *script = getenv("BENCH_SCRIPT");
++	const char *out = getenv("BENCH_OUT");
++	if (!script || !out)
++		return;
++	outDir = out;
++	FILE *f = fopen(script, "r");
++	if (!f) {
++		fprintf(stderr, "bench: cannot open %s\n", script);
++		return;
++	}
++	char line[1024];
++	while (fgets(line, sizeof(line), f)) {
++		Common::String s(line);
++		s.trim();
++		if (s.empty() || s[0] == '#')
++			continue;
++		Cmd c;
++		const char *p = s.c_str();
++		Common::String tok;
++		bool first = true;
++		const char *restStart = nullptr;
++		while (*p) {
++			while (*p == ' ' || *p == '\t') p++;
++			if (!*p) break;
++			const char *start = p;
++			while (*p && *p != ' ' && *p != '\t') p++;
++			Common::String w(start, p);
++			if (first) {
++				c.op = w;
++				first = false;
++				const char *q = p;
++				while (*q == ' ' || *q == '\t') q++;
++				restStart = q;
++			} else {
++				c.args.push_back(w);
++			}
++		}
++		if (restStart) c.rest = restStart;
++		cmds.push_back(c);
++	}
++	fclose(f);
++	active = true;
++	t0 = g_system->getMillis();
++	fprintf(stderr, "bench: %d commands\n", (int)cmds.size());
++}
++
++static void shot(const Common::String &name) {
++	Graphics::Surface *s = g_system->lockScreen();
++	if (!s) return;
++	byte pal[256 * 3];
++	memset(pal, 0, sizeof(pal));
++	g_system->getPaletteManager()->grabPalette(pal, 0, 256);
++	Common::String path = outDir + "/" + name + ".ppm";
++	FILE *f = fopen(path.c_str(), "wb");
++	if (f) {
++		fprintf(f, "P6\n%d %d\n255\n", s->w, s->h);
++		for (int y = 0; y < s->h; y++) {
++			const byte *row = (const byte *)s->getBasePtr(0, y);
++			for (int x = 0; x < s->w; x++) {
++				const byte *c = pal + row[x] * 3;
++				fwrite(c, 1, 3, f);
++			}
++		}
++		fclose(f);
++	}
++	// Indices bruts + palette : <nom>.idx (w*h octets) et <nom>.pal (768 octets)
++	Common::String ip = outDir + "/" + name + ".idx";
++	f = fopen(ip.c_str(), "wb");
++	if (f) {
++		for (int y = 0; y < s->h; y++)
++			fwrite(s->getBasePtr(0, y), 1, s->w, f);
++		fclose(f);
++	}
++	Common::String pp = outDir + "/" + name + ".pal";
++	f = fopen(pp.c_str(), "wb");
++	if (f) {
++		fwrite(pal, 1, sizeof(pal), f);
++		fclose(f);
++	}
++	g_system->unlockScreen();
++	fprintf(stderr, "bench: t=%u shot %s\n", now(), name.c_str());
++}
++
++static void queueMouse(Common::EventType type, int x, int y, uint32 at) {
++	Pending p;
++	p.at = at;
++	p.ev.type = type;
++	p.ev.mouse = Common::Point(x, y);
++	pending.push_back(p);
++}
++
++static bool parseKey(const Common::String &k, Common::KeyState &ks) {
++	if (k.equalsIgnoreCase("ESC")) { ks = Common::KeyState(Common::KEYCODE_ESCAPE, Common::ASCII_ESCAPE); return true; }
++	if (k.equalsIgnoreCase("RETURN")) { ks = Common::KeyState(Common::KEYCODE_RETURN, Common::ASCII_RETURN); return true; }
++	if (k.equalsIgnoreCase("SPACE")) { ks = Common::KeyState(Common::KEYCODE_SPACE, ' '); return true; }
++	if (k.equalsIgnoreCase("UP")) { ks = Common::KeyState(Common::KEYCODE_UP, 0); return true; }
++	if (k.equalsIgnoreCase("DOWN")) { ks = Common::KeyState(Common::KEYCODE_DOWN, 0); return true; }
++	if (k.equalsIgnoreCase("LEFT")) { ks = Common::KeyState(Common::KEYCODE_LEFT, 0); return true; }
++	if (k.equalsIgnoreCase("RIGHT")) { ks = Common::KeyState(Common::KEYCODE_RIGHT, 0); return true; }
++	if (k.size() == 3 && (k[0] == 'K' || k[0] == 'k') && (k[1] == 'P' || k[1] == 'p') && k[2] >= '1' && k[2] <= '9') {
++		ks = Common::KeyState((Common::KeyCode)(Common::KEYCODE_KP0 + (k[2] - '0')), 0);
++		return true;
++	}
++	if ((k[0] == 'F' || k[0] == 'f') && k.size() >= 2 && k.size() <= 3) {
++		int n = atoi(k.c_str() + 1);
++		if (n >= 1 && n <= 12) {
++			ks = Common::KeyState((Common::KeyCode)(Common::KEYCODE_F1 + n - 1), (uint16)(Common::ASCII_F1 + n - 1));
++			return true;
++		}
++	}
++	if (k.size() == 1) {
++		char c = k[0];
++		char lc = (c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c;
++		ks = Common::KeyState((Common::KeyCode)lc, (uint16)c);
++		return true;
++	}
++	return false;
++}
++
++static void step() {
++	uint32 t = now();
++	if (burstLeft > 0 && t >= burstNext) {
++		shot(Common::String::format("%s%04d", burstPrefix.c_str(), burstIndex++));
++		burstLeft--;
++		burstNext += burstPeriod;
++		if (burstNext < t) burstNext = t + burstPeriod;
++	}
++	while (pc < cmds.size() && t >= readyAt && pending.empty()) {
++		const Cmd &c = cmds[pc++];
++		fprintf(stderr, "bench: t=%u %s %s\n", t, c.op.c_str(), c.rest.c_str());
++		if (c.op == "wait") {
++			readyAt = t + atoi(c.args[0].c_str());
++		} else if (c.op == "move") {
++			queueMouse(Common::EVENT_MOUSEMOVE, atoi(c.args[0].c_str()), atoi(c.args[1].c_str()), t);
++			readyAt = t + 20;
++		} else if (c.op == "click" || c.op == "rclick") {
++			int x = atoi(c.args[0].c_str()), y = atoi(c.args[1].c_str());
++			bool r = c.op == "rclick";
++			queueMouse(Common::EVENT_MOUSEMOVE, x, y, t);
++			queueMouse(r ? Common::EVENT_RBUTTONDOWN : Common::EVENT_LBUTTONDOWN, x, y, t + 60);
++			queueMouse(r ? Common::EVENT_RBUTTONUP : Common::EVENT_LBUTTONUP, x, y, t + 160);
++			readyAt = t + 200;
++		} else if (c.op == "key") {
++			Common::KeyState ks;
++			if (parseKey(c.args[0], ks)) {
++				Pending d; d.at = t; d.ev.type = Common::EVENT_KEYDOWN; d.ev.kbd = ks;
++				Pending u; u.at = t + 80; u.ev.type = Common::EVENT_KEYUP; u.ev.kbd = ks;
++				pending.push_back(d);
++				pending.push_back(u);
++			}
++			readyAt = t + 120;
++		} else if (c.op == "wheel") {
++			Pending w; w.at = t; w.ev.type = (c.args[0] == "up") ? Common::EVENT_WHEELUP : Common::EVENT_WHEELDOWN;
++			pending.push_back(w);
++			readyAt = t + 60;
++		} else if (c.op == "act") {
++			// Action propre au moteur (`EVENT_CUSTOM_ENGINE_ACTION_START`, numéro de l'énumération du moteur : Lure 14 suivant, 15 précédent, 16 choisir).
++			Pending a; a.at = t; a.ev.type = Common::EVENT_CUSTOM_ENGINE_ACTION_START; a.ev.customType = (Common::CustomEventType)atoi(c.args[0].c_str());
++			pending.push_back(a);
++			readyAt = t + 60;
++		} else if (c.op == "realmouse") {
++			// Le pointeur est celui du banc seul : les mouvements fictifs que SDL renvoie après `warpMouse` (fenêtre factice) sont ignorés, ce qui
++			// rend utilisable le menu surgissant de Lure (mode souris : l'entrée suit la position du pointeur). Par défaut, ils sont gardés (anciens scénarios).
++			realMouse = true;
++		} else if (c.op == "shot") {
++			shot(c.args[0]);
++		} else if (c.op == "burst") {
++			burstPeriod = atoi(c.args[0].c_str());
++			burstLeft = atoi(c.args[1].c_str());
++			burstPrefix = c.args[2];
++			burstIndex = 0;
++			burstNext = t;
++		} else if (c.op == "console") {
++			GUI::Debugger *d = g_engine ? g_engine->getDebugger() : nullptr;
++			if (d) d->parseCommand(c.rest.c_str());
++			else fprintf(stderr, "bench: no debugger\n");
++		} else if (c.op == "log") {
++			// already printed
++		} else if (c.op == "quit") {
++			Pending q; q.at = t; q.ev.type = Common::EVENT_QUIT;
++			pending.push_back(q);
++		}
++	}
++}
++
++bool pollEvent(Common::Event &event) {
++	if (!inited) init();
++	if (!active) return false;
++	step();
++	if (!pending.empty() && now() >= pending[0].at) {
++		event = pending[0].ev;
++		pending.remove_at(0);
++		return true;
++	}
++	return false;
++}
++
++bool isActive() {
++	return active && realMouse;
++}
++
++} // End of namespace Bench
+diff --git a/backends/events/sdl/sdl2-events.cpp b/backends/events/sdl/sdl2-events.cpp
+index 6cddd032..de541140 100644
+--- a/backends/events/sdl/sdl2-events.cpp
++++ b/backends/events/sdl/sdl2-events.cpp
+@@ -629,8 +629,15 @@ void SdlEventSource::preprocessFingerMotion(SDL_Event *event) {
+ 	}
+ }
+ 
++namespace Bench { bool pollEvent(Common::Event &event); bool isActive(); }
++
+ bool SdlEventSource::pollEvent(Common::Event &event) {
+ 	finishSimulatedMouseClicks();
++	if (Bench::pollEvent(event))
++		return true;
++	// Le banc pilote seul la souris et le clavier : les événements de la fenêtre (dont le mouvement fictif du pointeur après `warpMouse`) sont ignorés.
++	if (Bench::isActive())
++		return false;
+ 
+ 	// In case we still need to send a key up event for a key down from a
+ 	// TEXTINPUT event we do this immediately.
+diff --git a/backends/module.mk b/backends/module.mk
+index 02a21d2f..5e7ef166 100644
+--- a/backends/module.mk
++++ b/backends/module.mk
+@@ -229,7 +229,8 @@ endif
+ 
+ ifdef USE_SDL2
+ MODULE_OBJS += \
+-	events/sdl/sdl2-events.o
++	events/sdl/sdl2-events.o \
++	events/sdl/bench.o
+ endif
+ 
+ ifdef USE_SDL3
+diff --git a/backends/platform/sdl/sdl.cpp b/backends/platform/sdl/sdl.cpp
+index f2c4e514..9912b99c 100644
+--- a/backends/platform/sdl/sdl.cpp
++++ b/backends/platform/sdl/sdl.cpp
+@@ -876,8 +876,24 @@ Common::MutexInternal *OSystem_SDL::createMutex() {
+ 	return createSdlMutexInternal();
+ }
+ 
++// Banc : SKY_VIRTUAL_TIME=1 : horloge virtuelle, qui n'avance que par delayMillis (sans attendre) ; les tours, fondus, sequences et attentes
++// du jeu prennent leur duree nominale sans temps reel (comme le portage, qui compte ses ticks de 20 ms).
++static bool benchVirtualTime() {
++	static int v = -1;
++	if (v < 0)
++		v = (getenv("SKY_VIRTUAL_TIME") || getenv("CRUISE_VIRTUAL_TIME")) ? 1 : 0;
++	return v == 1;
++}
++static volatile uint32 benchNow = 0;
++
++// Banc (cruise) : minuterie de 50 Hz (periode 20 ms) pilotee par l'horloge virtuelle, dans le fil principal, a la place du callback OPL du mixeur
++// (qui tourne sur le fil audio en temps reel). Le moteur y enregistre son callback ; il est appele chaque fois que l'horloge franchit un multiple de 20 ms.
++void (*g_benchTimer50)() = nullptr;
++static uint32 benchNextTick = 20;
++static bool benchInTick = false;
++
+ uint32 OSystem_SDL::getMillis(bool skipRecord) {
+-	uint32 millis = SDL_GetTicks();
++	uint32 millis = benchVirtualTime() ? benchNow : SDL_GetTicks();
+ 
+ #ifdef ENABLE_EVENTRECORDER
+ 	g_eventRec.processMillis(millis, skipRecord);
+@@ -887,6 +903,21 @@ uint32 OSystem_SDL::getMillis(bool skipRecord) {
+ }
+ 
+ void OSystem_SDL::delayMillis(uint msecs) {
++	if (benchVirtualTime()) {
++		benchNow += msecs ? msecs : 1;
++		static void (*benchHookSeen)() = nullptr;
++		if (g_benchTimer50 != benchHookSeen) {	// callback (re)enregistre : premiere echeance au prochain multiple de 20 ms, sans rattrapage
++			benchHookSeen = g_benchTimer50;
++			benchNextTick = (benchNow / 20 + 1) * 20;
++		}
++		while (g_benchTimer50 && !benchInTick && benchNow >= benchNextTick) {
++			benchNextTick += 20;
++			benchInTick = true;
++			g_benchTimer50();
++			benchInTick = false;
++		}
++		return;
++	}
+ #ifdef ENABLE_EVENTRECORDER
+ 	if (g_eventRec.processDelayMillis())
+ #endif
+diff --git a/engines/cruise/bench.cpp b/engines/cruise/bench.cpp
+new file mode 100644
+index 00000000..8002627d
+--- /dev/null
++++ b/engines/cruise/bench.cpp
+@@ -0,0 +1,648 @@
++/* Banc de trace local (hors depot) : voir bench.h. */
++#define FORBIDDEN_SYMBOL_ALLOW_ALL
++#include "common/scummsys.h"
++#include "common/array.h"
++#include "common/system.h"
++#include "common/events.h"
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "cruise/cruise.h"
++#include "cruise/cruise_main.h"
++#include "cruise/cell.h"
++#include "cruise/bench.h"
++
++namespace Cruise {
++
++extern palEntry lpalette[256];
++extern stackElementStruct scriptStack[SIZE_STACK];
++extern int currentMouseX;
++extern int currentMouseY;
++extern int currentMouseButton;
++extern bool endpause;
++extern Common::CustomEventType action;
++extern CruiseEngine *_vm;
++
++namespace Bench {
++
++int traceLevel = 0;
++bool skipProtection = false;
++int32 lastRet = 0;
++
++static bool inited = false;
++static bool varHash = false;
++static bool virtualT = false;
++static uint32 tick = 0;
++static uint32 stopFrame = 0;
++static Common::String shotDir;
++static Common::Array<uint32> shotFrames;
++static uint32 dumpA = 1, dumpB = 0;
++
++struct InRow {
++	uint32 n;
++	int x, y, b;
++};
++struct KeyRow {
++	uint32 n;
++	Common::String key;
++};
++static bool useInputs = false;
++static Common::Array<InRow> inputs;
++static uint inPos = 0;
++static Common::Array<KeyRow> keys;
++static uint keyPos = 0;
++static int prevX = 0, prevY = 0, prevB = 0;
++static bool escRelease = false;
++static uint32 escReleaseTick = 0;
++
++static const char *const kFuncNames[] = {
++"?",
++"FadeIn",
++"FadeOut",
++"LoadBackground",
++"LoadAbs",
++"AddCell",
++"AddProc",
++"InitializeState",
++"RemoveCell",
++"FreeCell",
++"RemoveProc",
++"RemoveFrame",
++"LoadOverlay",
++"SetColor",
++"PlayFX",
++"?",
++"FreeOverlay",
++"FindOverlay",
++"?",
++"AddMessage",
++"RemoveMessage",
++"UserWait",
++"FreezeCell",
++"LoadCt",
++"AddAnimation",
++"RemoveAnimation",
++"SetZoom",
++"SetObjectAtNode",
++"SetNodeState",
++"SetNodeColor",
++"TrackAnim",
++"GetNodeX",
++"GetNodeY",
++"EndAnim",
++"GetZoom",
++"GetStep",
++"SetStringColors",
++"XClick",
++"YClick",
++"GetPixel",
++"UserOn",
++"FreeCT",
++"FindObject",
++"FindProc",
++"WriteObject",
++"ReadObject",
++"RemoveOverlay",
++"AddBackgroundIncrust",
++"RemoveBackgroundIncrust",
++"UnmergeBackgroundIncrust",
++"freeBackgroundInscrustList",
++"DialogOn",
++"DialogOff",
++"UserDelay",
++"ThemeReset",
++"Narrator",
++"RemoveBackground",
++"SetActiveBackground",
++"CTOn",
++"CTOff",
++"Random",
++"LoadSong",
++"FadeSong",
++"PlaySong",
++"FreeSong",
++"FrameExist",
++"SetVolume",
++"SongExist",
++"TrackPos",
++"StopSong",
++"RestoreSong",
++"SongSize",
++"SetPattern",
++"SongLoop",
++"SongPlayed",
++"LinkObjects",
++"UserClick",
++"XMenuItem",
++"YMenuItem",
++"Menu",
++"AutoControl",
++"MouseMove",
++"MouseEnd",
++"MsgExist",
++"SetFont",
++"?",
++"Display",
++"GetMouseX",
++"GetMouseY",
++"GetMouseButton",
++"FindSet",
++"regenerateBackgroundIncrust",
++"BgName",
++"LoopFX",
++"StopFX",
++"FreqFX",
++"FreezeAni",
++"FindMsg",
++"FreezeParent",
++"UnfreezeParent",
++"Exec",
++"AutoCell",
++"Sizeof",
++"Preload",
++"FreePreload",
++"?",
++"VBL",
++"LoadFrame",
++"FreezeOverlay",
++"Strcpy",
++"Strcat",
++"Itoa",
++"comment",
++"ComputeLine",
++"FindSymbol",
++"SetXDial",
++"GetlowMemory",
++"AniDir",
++"Protect",
++"ClearScreen",
++"Inventory",
++"UserMenu",
++"GetRingWord",
++"Sec",
++"ProtectionFlag",
++"KillMenu"
++};
++static const uint8 kFuncStr[] = { 0,0,0,1,1,0,0,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,1,1,1,1,1,0,0,0,1,0,0,0,0,0,0,0 };
++
++bool virtualTime() {
++	static int v = -1;
++	if (v < 0)
++		v = getenv("CRUISE_VIRTUAL_TIME") ? 1 : 0;
++	return v == 1;
++}
++
++static uint32 crc32(const uint8 *p, uint n) {
++	static uint32 table[256];
++	static bool ready = false;
++	if (!ready) {
++		for (uint32 i = 0; i < 256; i++) {
++			uint32 c = i;
++			for (int k = 0; k < 8; k++)
++				c = (c & 1) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
++			table[i] = c;
++		}
++		ready = true;
++	}
++	uint32 c = 0xFFFFFFFFu;
++	for (uint i = 0; i < n; i++)
++		c = table[(c ^ p[i]) & 0xFF] ^ (c >> 8);
++	return c ^ 0xFFFFFFFFu;
++}
++
++void init() {
++	if (inited)
++		return;
++	inited = true;
++	virtualT = virtualTime();
++	const char *e = getenv("CRUISE_TRACE");
++	traceLevel = e ? atoi(e) : 0;
++	varHash = getenv("CRUISE_VARHASH") != nullptr;
++	skipProtection = getenv("CRUISE_SKIP_PROTECTION") != nullptr;
++	e = getenv("CRUISE_STOP_FRAME");
++	stopFrame = e ? (uint32)atoi(e) : 0;
++	e = getenv("CRUISE_SHOT_DIR");
++	shotDir = e ? e : ".";
++	e = getenv("CRUISE_SHOT_FRAMES");
++	if (e) {
++		const char *p = e;
++		while (*p) {
++			shotFrames.push_back((uint32)strtoul(p, nullptr, 10));
++			while (*p && *p != ',')
++				p++;
++			if (*p == ',')
++				p++;
++		}
++	}
++	e = getenv("CRUISE_DUMPVARS");
++	if (e)
++		sscanf(e, "%u-%u", &dumpA, &dumpB);
++	e = getenv("CRUISE_INPUT");
++	if (e) {
++		FILE *f = fopen(e, "r");
++		if (!f) {
++			fprintf(stderr, "bench: cannot open %s\n", e);
++		} else {
++			useInputs = true;
++			char line[256];
++			while (fgets(line, sizeof(line), f)) {
++				InRow r;
++				unsigned n;
++				if (line[0] == '#')
++					continue;
++				if (sscanf(line, "%u %d %d %d", &n, &r.x, &r.y, &r.b) == 4) {
++					r.n = n;
++					inputs.push_back(r);
++				}
++			}
++			fclose(f);
++			fprintf(stderr, "bench: %u inputs\n", inputs.size());
++		}
++	}
++	e = getenv("CRUISE_KEYS");
++	if (e) {
++		FILE *f = fopen(e, "r");
++		if (f) {
++			useInputs = true;
++			char line[256];
++			while (fgets(line, sizeof(line), f)) {
++				unsigned n;
++				char k[64];
++				if (line[0] != '#' && sscanf(line, "%u %63s", &n, k) == 2) {
++					KeyRow r;
++					r.n = n;
++					r.key = k;
++					keys.push_back(r);
++				}
++			}
++			fclose(f);
++		}
++	}
++}
++
++bool inputsActive() {
++	return useInputs;
++}
++
++static void setButton(int bit, bool down) {
++	if (down) {
++		currentMouseButton |= bit;
++		if (bit != CRS_MB_MIDDLE)
++			_vm->_mouseButtonDown = true;
++	} else {
++		currentMouseButton &= ~bit;
++		if (bit != CRS_MB_MIDDLE)
++			endpause = true;
++	}
++}
++
++// Entrees : la ligne "n x y b" est un niveau valable des le tick n ; on la rejoue comme les evenements ScummVM
++// (mouvement -> position ; bit de bouton qui change -> mise a 1 / 0 de ce bit seulement), si bien que les
++// remises a zero faites par le moteur (userDelay, isUserWait...) restent effectives jusqu'au changement suivant.
++static void applyInputs() {
++	if (!useInputs)
++		return;
++	bool have = false;
++	InRow cur = { 0, prevX, prevY, prevB };
++	while (inPos < inputs.size() && inputs[inPos].n <= tick) {
++		cur = inputs[inPos++];
++		have = true;
++	}
++	if (have) {
++		if (cur.x != prevX || cur.y != prevY) {
++			currentMouseX = cur.x;
++			currentMouseY = cur.y;
++		}
++		int diff = cur.b ^ prevB;
++		const int bits[3] = { CRS_MB_LEFT, CRS_MB_RIGHT, CRS_MB_MIDDLE };
++		for (int i = 0; i < 3; i++)
++			if (diff & bits[i])
++				setButton(bits[i], (cur.b & bits[i]) != 0);
++		prevX = cur.x;
++		prevY = cur.y;
++		prevB = cur.b;
++	}
++	if (escRelease && tick > escReleaseTick) {
++		currentMouseButton &= ~CRS_MB_MIDDLE;
++		escRelease = false;
++	}
++	while (keyPos < keys.size() && keys[keyPos].n <= tick) {
++		const Common::String &k = keys[keyPos++].key;
++		if (k.equalsIgnoreCase("ESC")) {
++			action = kActionEscape;
++			currentMouseButton |= CRS_MB_MIDDLE;
++			escRelease = true;
++			escReleaseTick = tick;
++		} else if (k.equalsIgnoreCase("SPACE"))
++			action = kActionEndUserWaiting;
++		else if (k.equalsIgnoreCase("F10"))
++			action = kActionPlayerMenu;
++		else if (k.equalsIgnoreCase("P"))
++			action = kActionPause;
++		else if (k.equalsIgnoreCase("X"))
++			action = kActionExit;
++		else if (k.equalsIgnoreCase("I"))
++			action = kActionInventory;
++		else if (k.equalsIgnoreCase("PLUS"))
++			action = kActionIncreaseGameSpeed;
++		else if (k.equalsIgnoreCase("MINUS"))
++			action = kActionDecreaseGameSpeed;
++		endpause = true;
++	}
++}
++
++void frameBegin() {
++	init();
++	tick++;
++	applyInputs();
++}
++
++void modalTick(const char *where) {
++	init();
++	tick++;
++	applyInputs();
++	if (traceLevel >= 1)
++		fprintf(stderr, "MF %u %s %d %d %d\n", tick, where, currentMouseX, currentMouseY, currentMouseButton);
++}
++
++void frameInputs(int mx, int my, int mb) {
++	if (traceLevel < 1)
++		return;
++	fprintf(stderr, "FR %u %d %d %d %d %d %d %d %d %d %d %d\n", tick, mx, my, mb, (int)userEnabled, (int)userWait, (int)autoTrack,
++		(int)currentActiveMenu, (int)dialogueEnabled, linkedRelation ? 1 : 0, _vm->gameSpeed(), (int)userDelay);
++}
++
++static void writeShot(uint32 n) {
++	byte pal[768];
++	for (int i = 0; i < 256; i++) {
++		pal[i * 3] = lpalette[i].R;
++		pal[i * 3 + 1] = lpalette[i].G;
++		pal[i * 3 + 2] = lpalette[i].B;
++	}
++	Common::String base = Common::String::format("%s/fr-%04u", shotDir.c_str(), n);
++	FILE *f = fopen((base + ".idx").c_str(), "wb");
++	if (f) {
++		fwrite(globalScreen, 1, 64000, f);
++		fclose(f);
++	}
++	f = fopen((base + ".pal").c_str(), "wb");
++	if (f) {
++		fwrite(pal, 1, 768, f);
++		fclose(f);
++	}
++}
++
++// CRUISE_DUMP_OVL=dossier : a l'arret, ecrit les scripts (apres edition de liens) des overlays charges : NOM.pN.bin / NOM.rN.bin (octets du bloc
++// de donnees) et NOM.idx (en-tetes : tailles, offsets), pour le desassemblage hors ligne.
++static void dumpOverlays() {
++	const char *dir = getenv("CRUISE_DUMP_OVL");
++	if (!dir)
++		return;
++	for (int o = 1; o < 90; o++) {
++		if (!overlayTable[o].alreadyLoaded || !overlayTable[o].ovlData)
++			continue;
++		ovlDataStruct *d = overlayTable[o].ovlData;
++		for (int kind = 0; kind < 2; kind++) {
++			ovlData3Struct *arr = kind ? d->ptr1 : d->arrayProc;
++			int num = kind ? d->numRel : d->numProc;
++			for (int i = 0; i < num; i++) {
++				if (!arr[i].dataPtr)
++					continue;
++				Common::String base = Common::String::format("%s/%s.%c%d", dir, overlayTable[o].overlayName, kind ? 'r' : 'p', i);
++				FILE *f = fopen((base + ".bin").c_str(), "wb");
++				if (f) {
++					fwrite(arr[i].dataPtr, 1, arr[i].sizeOfData, f);
++					fclose(f);
++				}
++				f = fopen((base + ".txt").c_str(), "w");
++				if (f) {
++					fprintf(f, "size=%d sub3=%d import=%d importName=%d sub2=%d sub5=%d sysKey=%d var12=%d numReloc=%d sub2Size=%d\n", arr[i].sizeOfData, arr[i].offsetToSubData3,
++						arr[i].offsetToImportData, arr[i].offsetToImportName, arr[i].offsetToSubData2, arr[i].offsetToSubData5, arr[i].sysKey, arr[i].var12,
++						arr[i].numRelocGlob, arr[i].subData2Size);
++					fclose(f);
++				}
++			}
++		}
++	}
++}
++
++void frameEnd(bool &quit) {
++	if (varHash) {
++		uint32 h = 2166136261u;
++		for (int i = 0; i < 2000; i++)
++			for (int k = 0; k < 2; k++) {
++				h ^= ((uint16)globalVars[i] >> (8 * k)) & 0xFF;
++				h *= 16777619u;
++			}
++		fprintf(stderr, "VH %u %u\n", tick, h);
++		byte pal[768];
++		for (int i = 0; i < 256; i++) {
++			pal[i * 3] = lpalette[i].R;
++			pal[i * 3 + 1] = lpalette[i].G;
++			pal[i * 3 + 2] = lpalette[i].B;
++		}
++		fprintf(stderr, "SC %u %08x %08x\n", tick, crc32(globalScreen, 64000), crc32(pal, 768));
++	}
++	if (tick >= dumpA && tick <= dumpB) {
++		fprintf(stderr, "DV %u", tick);
++		for (int i = 0; i < 2000; i++)
++			if (globalVars[i])
++				fprintf(stderr, " %d:%d", i, (int)globalVars[i]);
++		fprintf(stderr, "\n");
++		fprintf(stderr, "PC %u %d\n", tick, (int)protectionCode);
++		for (int o = 1; o < 90; o++) {
++			if (!overlayTable[o].alreadyLoaded || !overlayTable[o].ovlData || !overlayTable[o].ovlData->data4Ptr)
++				continue;
++			uint32 h = 2166136261u;
++			for (int i = 0; i < overlayTable[o].ovlData->sizeOfData4; i++) {
++				h ^= overlayTable[o].ovlData->data4Ptr[i];
++				h *= 16777619u;
++			}
++			fprintf(stderr, "BH %u %s %u\n", tick, overlayTable[o].overlayName, h);
++			const char *dn = getenv("CRUISE_DUMPBSS");	// nom d'overlay : mots BE non nuls de son BSS (`BS n nom off:val ...`)
++			if (dn && !strcmp(dn, overlayTable[o].overlayName)) {
++				fprintf(stderr, "BS %u %s", tick, dn);
++				for (int i = 0; i + 1 < overlayTable[o].ovlData->sizeOfData4; i += 2) {
++					int v = (int16)READ_BE_UINT16(overlayTable[o].ovlData->data4Ptr + i);
++					if (v)
++						fprintf(stderr, " %d:%d", i, v);
++				}
++				fprintf(stderr, "\n");
++			}
++		}
++	}
++	for (uint i = 0; i < shotFrames.size(); i++)
++		if (shotFrames[i] == tick)
++			writeShot(tick);
++	if (stopFrame && tick >= stopFrame) {
++		fprintf(stderr, "bench: stop after frame %u\n", tick);
++		dumpOverlays();
++		quit = true;
++	}
++}
++
++static void printScriptList(const char *tag, scriptInstanceStruct *head) {
++	fprintf(stderr, "%s %u", tag, tick);
++	for (scriptInstanceStruct *p = head->nextScriptPtr; p; p = p->nextScriptPtr)
++		fprintf(stderr, " %d:%d:%d:%d:%d:%d", (int)p->overlayNumber, (int)p->scriptNumber, (int)p->type, (int)p->scriptOffset, (int)p->freeze, (int)p->sysKey);
++	fprintf(stderr, "\n");
++}
++
++void afterScripts() {
++	if (traceLevel < 2)
++		return;
++	printScriptList("PL", &procHead);
++	printScriptList("RL", &relHead);
++	fprintf(stderr, "CL %u", tick);
++	for (cellStruct *c = cellHead.next; c; c = c->next)
++		fprintf(stderr, " %d:%d:%d:%d:%d:%d:%d:%d", (int)c->overlay, (int)c->idx, (int)c->type, (int)c->freeze, (int)c->backgroundPlane,
++			(int)c->x, (int)c->field_C, (int)c->spriteIdx);
++	fprintf(stderr, "\n");
++}
++
++void afterAnimation() {
++	if (traceLevel < 2)
++		return;
++	fprintf(stderr, "AC %u", tick);
++	for (actorStruct *a = actorHead.next; a; a = a->next)
++		fprintf(stderr, " %d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d", (int)a->overlayNumber, (int)a->idx, (int)a->type,
++			(int)a->x, (int)a->y, (int)a->x_dest, (int)a->y_dest, (int)a->phase, (int)a->counter, (int)a->pathId, (int)a->startDirection,
++			(int)a->nextDirection, (int)a->endDirection, (int)a->stepX, (int)a->stepY, (int)a->poly, (int)a->flag, (int)a->start, (int)a->freeze);
++	fprintf(stderr, "\n");
++}
++
++void scriptSlice(char list, scriptInstanceStruct *ptr, int ovl, int scr, int ip0, int rc) {
++	if (traceLevel < 2)
++		return;
++	fprintf(stderr, "SS %c %s %d %d %d %d %d ret=%d rc=%d\n", list, overlayTable[ovl].overlayName, ovl, scr, (int)ptr->type, ip0,
++		(int)ptr->scriptOffset, (int)lastRet, rc);
++}
++
++void opcode(int ip, int opcodeByte) {
++	if (traceLevel < 3)
++		return;
++	fprintf(stderr, "OP %d %d %d 0x%02x\n", (int)currentScriptPtr->overlayNumber, (int)currentScriptPtr->scriptNumber, ip, opcodeByte & 0xFF);
++}
++
++static int savedPos = 0;
++static char preStr[8][48];
++static bool preIsStr[8];
++
++static void renderString(const char *p, char *out) {
++	char *o = out;
++	*o++ = 'S';
++	*o++ = '"';
++	for (int i = 0; i < 40 && p[i]; i++) {
++		unsigned char c = (unsigned char)p[i];
++		if (c >= 32 && c < 127 && c != '"' && c != '\\')
++			*o++ = (char)c;
++		else
++			o += sprintf(o, "\\x%02x", c);
++	}
++	*o++ = '"';
++	*o = 0;
++}
++
++// Les chaines passees en argument sont lues AVANT l'appel (Strcpy / Strcat modifient leur destination) ; la destination de Strcpy, Strcat et Itoa
++// est notee P (pointeur) : son contenu avant l'appel n'a pas de sens.
++void nativeBegin(int opc) {
++	savedPos = positionInStack;
++	if (traceLevel < 2)
++		return;
++	bool strFn = opc >= 0 && opc < (int)ARRAYSIZE(kFuncStr) && kFuncStr[opc];
++	for (int i = 0; i < 8; i++) {
++		preIsStr[i] = false;
++		int idx = savedPos - 1 - i;
++		if (idx < 0 || !strFn)
++			continue;
++		const stackElementStruct &e = scriptStack[idx];
++		if (e.type != STACK_PTR || !e.data.ptrVar)
++			continue;
++		if ((opc == 0x6d || opc == 0x6e) && i == 1)
++			continue;
++		if (opc == 0x6f)
++			continue;
++		preIsStr[i] = true;
++		renderString((const char *)e.data.ptrVar, preStr[i]);
++	}
++}
++
++void nativeEnd(int opc, int16 result) {
++	if (traceLevel < 2)
++		return;
++	int n = savedPos - positionInStack;
++	const char *name = (opc >= 0 && opc < (int)ARRAYSIZE(kFuncNames)) ? kFuncNames[opc] : "?";
++	fprintf(stderr, "NF 0x%02x %s (", opc, name);
++	if (n < 0 || n > 16)
++		fprintf(stderr, "n=%d", n);
++	else {
++		for (int i = 0; i < n; i++) {
++			const stackElementStruct &e = scriptStack[savedPos - 1 - i];
++			if (i)
++				fputc(',', stderr);
++			if (e.type == STACK_SHORT)
++				fprintf(stderr, "%d", (int)e.data.shortVar);
++			else if (i < 8 && preIsStr[i])
++				fputs(preStr[i], stderr);
++			else
++				fputc('P', stderr);
++		}
++	}
++	fprintf(stderr, ") -> %d\n", (int)result);
++	if (opc == 0x3c && n >= 1)
++		fprintf(stderr, "RN %d %d\n", (int)scriptStack[savedPos - 1].data.shortVar, (int)result);
++}
++
++static int findOverlay(const char *name) {
++	for (int o = 1; o < 90; o++)
++		if (overlayTable[o].alreadyLoaded && overlayTable[o].ovlData && !strcmp(overlayTable[o].overlayName, name))
++			return o;
++	return 0;
++}
++
++// Contournement de la protection (CRUISE_SKIP_PROTECTION=1). Le script XX2/2 (verification de la copie, lance par LOGO/1) calcule dans la
++// memoire de SUPER (octets 8-9, mot BE) la somme de 864 mots de la table de la roue, puis appelle ProtectionFlag(-1) et compare le resultat a cette somme :
++// egal -> UserMenu(1), Inventory(1), XX2[14] = 1 et LOGO saute le quiz ; different -> XX2[14] = 0 et LOGO lance le quiz XX2/0. Une bonne reponse
++// (XX2/0 puis relation XX2/8) laisse : SUPER[4] = SUPER[6] = 1 (un par question), SUPER[8] = la somme, protectionCode = la somme. On reproduit
++// exactement cet etat quand XX2/2 lit ProtectionFlag(-1) : le jeu prend alors son chemin « deja valide ».
++void protectionCheck() {
++	if (!skipProtection || !currentScriptPtr)
++		return;
++	if (currentScriptPtr->scriptNumber != 2 || currentScriptPtr->type != scriptType_PROC ||
++	        strcmp(overlayTable[currentScriptPtr->overlayNumber].overlayName, "XX2"))
++		return;
++	int sup = findOverlay("SUPER");
++	if (!sup)
++		return;
++	uint8 *bss = overlayTable[sup].ovlData->data4Ptr;
++	WRITE_BE_UINT16(bss + 4, 1);
++	WRITE_BE_UINT16(bss + 6, 1);
++	protectionCode = (int16)READ_BE_UINT16(bss + 8);
++	if (traceLevel >= 1)
++		fprintf(stderr, "PROT skip protectionCode=%d tick=%u\n", (int)protectionCode, tick);
++}
++
++// CRUISE_PROT_CHEAT=1 (verification seulement, jamais avec le contournement) : juste avant la relation XX2/8 (bouton OK de la question), recopie la liste
++// attendue (mots BSS XX2 [16 ..], nombre = 16 - BSS[88], car le script calcule « 16 - mot » : le sommet de pile est l'operande gauche) dans la selection du joueur (BSS[92 ..], compte dans BSS[100]) : le quiz reel prend alors son
++// chemin « bonne reponse » (XX2/0 offset 923) sans passer par l'interface des symboles.
++void beforeSlice(char list, scriptInstanceStruct *ptr) {
++	static int cheat = -1;
++	if (cheat < 0)
++		cheat = getenv("CRUISE_PROT_CHEAT") ? 1 : 0;
++	if (!cheat || list != 'R' || ptr->scriptNumber != 8 || strcmp(overlayTable[ptr->overlayNumber].overlayName, "XX2"))
++		return;
++	uint8 *bss = overlayTable[ptr->overlayNumber].ovlData->data4Ptr;
++	int n = 16 - (int16)READ_BE_UINT16(bss + 88);
++	if (ptr->scriptOffset != 0 || n < 0 || n > 4)
++		return;
++	for (int i = 0; i < 4; i++)
++		WRITE_BE_UINT16(bss + 92 + i * 2, i < n ? READ_BE_UINT16(bss + 16 + i * 2) : 0xFFFF);
++	WRITE_BE_UINT16(bss + 100, n);
++	fprintf(stderr, "PROT cheat n=%d tick=%u\n", n, tick);
++}
++
++} // End of namespace Bench
++
++} // End of namespace Cruise
+diff --git a/engines/cruise/bench.h b/engines/cruise/bench.h
+new file mode 100644
+index 00000000..31f22187
+--- /dev/null
++++ b/engines/cruise/bench.h
+@@ -0,0 +1,52 @@
++/* Banc de trace local (hors depot) : voir cruise-bench/README.md. Variables d'environnement :
++ * CRUISE_TRACE=1|2|3, CRUISE_VARHASH=1, CRUISE_DUMPVARS=a-b, CRUISE_INPUT=fichier, CRUISE_KEYS=fichier, CRUISE_STOP_FRAME=n,
++ * CRUISE_SHOT_FRAMES=n1,n2,.. + CRUISE_SHOT_DIR=dossier, CRUISE_VIRTUAL_TIME=1, CRUISE_SKIP_PROTECTION=1. */
++#ifndef CRUISE_BENCH_H
++#define CRUISE_BENCH_H
++
++#include "common/scummsys.h"
++
++// Minuterie 50 Hz pilotee par l'horloge virtuelle (definie dans backends/platform/sdl/sdl.cpp).
++extern void (*g_benchTimer50)();
++
++namespace Cruise {
++
++struct scriptInstanceStruct;
++
++namespace Bench {
++
++extern int traceLevel;
++extern bool skipProtection;
++extern int32 lastRet;
++
++bool virtualTime();
++void init();
++inline bool trace(int level) { return traceLevel >= level; }
++
++// Boucle principale : numero de tick (1 a la premiere iteration), entrees, trace.
++void frameBegin();                       // tick++ puis applique CRUISE_INPUT / CRUISE_KEYS (avant processInput)
++void frameInputs(int mx, int my, int mb);// ligne FR (apres processInput)
++void frameEnd(bool &quit);               // VH, SC, captures, arret (CRUISE_STOP_FRAME)
++void modalTick(const char *where);       // iteration d'une boucle modale (menu joueur, pause) : tick++, entrees, ligne MF
++bool inputsActive();
++void afterScripts();                     // PL / RL / CL
++void afterAnimation();                   // AC
++
++void scriptSlice(char list, scriptInstanceStruct *ptr, int ovl, int scr, int ip0, int rc);
++void opcode(int ip, int opcodeByte);
++void nativeBegin(int opcode);                   // appele avant la fonction native (snapshot de la pile)
++void nativeEnd(int opcode, int16 result);
++void protectionCheck();                  // Op_ProtectionFlag(-1) : contournement de la copie (CRUISE_SKIP_PROTECTION)
++void beforeSlice(char list, scriptInstanceStruct *ptr); // CRUISE_PROT_CHEAT : bonne reponse injectee (verification du contournement)
++
++struct FrameGuard {
++	bool &quit;
++	explicit FrameGuard(bool &q) : quit(q) {}
++	~FrameGuard() { frameEnd(quit); }
++};
++
++} // End of namespace Bench
++
++} // End of namespace Cruise
++
++#endif
+diff --git a/engines/cruise/cruise.h b/engines/cruise/cruise.h
+index d85016f5..5d11852d 100644
+--- a/engines/cruise/cruise.h
++++ b/engines/cruise/cruise.h
+@@ -105,6 +105,7 @@ public:
+ 	Common::Language getLanguage() const;
+ 	Common::Platform getPlatform() const;
+ 	PCSound &sound() { return *_sound; }
++	int gameSpeed() const { return _gameSpeed; } // banc
+ 	virtual void pauseEngine(bool pause);
+ 	const char *langString(LangStringId langId) { return _langStrings[(int)langId].c_str(); }
+ 	void sayText(const Common::String &text, Common::TextToSpeechManager::Action action);
+diff --git a/engines/cruise/cruise_main.cpp b/engines/cruise/cruise_main.cpp
+index 78d0523b..01409dbb 100644
+--- a/engines/cruise/cruise_main.cpp
++++ b/engines/cruise/cruise_main.cpp
+@@ -28,6 +28,7 @@
+ #include "cruise/cruise.h"
+ #include "cruise/cruise_main.h"
+ #include "cruise/cell.h"
++#include "cruise/bench.h"
+ #include "cruise/staticres.h"
+ 
+ namespace Cruise {
+@@ -1447,6 +1448,7 @@ int CruiseEngine::processInput() {
+ 
+ 		while (!_vm->shouldQuit()) {
+ 			manageEvents();
++			Bench::modalTick("pause");
+ 			getMouseStatus(&main10, &mouseX, &button, &mouseY);
+ 
+ 			if (endpause)
+@@ -1715,6 +1717,10 @@ bool manageEvents() {
+ 	while (eventMan->pollEvent(event)) {
+ 		bool abortFlag = true;
+ 
++		// Banc : entrees pilotees par CRUISE_INPUT / CRUISE_KEYS, evenements souris et clavier ignores (sauf la fermeture)
++		if (Bench::inputsActive() && event.type != Common::EVENT_QUIT && event.type != Common::EVENT_RETURN_TO_LAUNCHER)
++			continue;
++
+ 		switch (event.type) {
+ 		case Common::EVENT_LBUTTONDOWN:
+ 			currentMouseButton |= CRS_MB_LEFT;
+@@ -1808,6 +1814,7 @@ void CruiseEngine::mainLoop() {
+ 	initAllData();
+ 
+ 	_playerDontAskQuit = false;
++	Bench::init();
+ 
+ 	if (ConfMan.hasKey("save_slot"))
+ 		loadGameState(ConfMan.getInt("save_slot"));
+@@ -1871,6 +1878,10 @@ void CruiseEngine::mainLoop() {
+ 
+ 		_lastTick = g_system->getMillis();
+ 
++		Bench::frameBegin();
++		Bench::FrameGuard benchFrame(_playerDontAskQuit);
++		int benchMx = currentMouseX, benchMy = currentMouseY, benchMb = currentMouseButton;
++
+ 		// Handle switchover in game speed after intro
+ 		if (!_speedFlag && canLoadGameStateCurrently()) {
+ 			_speedFlag = true;
+@@ -1893,7 +1904,11 @@ void CruiseEngine::mainLoop() {
+ 			currentMouseButton = 0;
+ 		}
+ 
++		benchMx = currentMouseX;
++		benchMy = currentMouseY;
++		benchMb = currentMouseButton;
+ 		_playerDontAskQuit = processInput();
++		Bench::frameInputs(benchMx, benchMy, benchMb);
+ 		if (_playerDontAskQuit)
+ 			break;
+ 
+@@ -1930,6 +1945,8 @@ void CruiseEngine::mainLoop() {
+ 			removeFinishedScripts(&relHead);
+ 			removeFinishedScripts(&procHead);
+ 
++			Bench::afterScripts();
++
+ 			if (!bgChanged && backgroundChanged[masterScreen] &&
+ 					!strcmp(backgroundTable[0].name, "S06B.PI1")) {
+ 				bgChanged = true;
+@@ -1938,6 +1955,7 @@ void CruiseEngine::mainLoop() {
+ 		}
+ 
+ 		processAnimation();
++		Bench::afterAnimation();
+ 
+ 		if (remdo) {
+ 			// assert(0);
+diff --git a/engines/cruise/function.cpp b/engines/cruise/function.cpp
+index ba0f3697..80a7e4ad 100644
+--- a/engines/cruise/function.cpp
++++ b/engines/cruise/function.cpp
+@@ -25,6 +25,7 @@
+ #include "cruise/cruise.h"
+ #include "cruise/cruise_main.h"
+ #include "cruise/cell.h"
++#include "cruise/bench.h"
+ #include "cruise/sound.h"
+ #include "cruise/staticres.h"
+ 
+@@ -785,10 +786,13 @@ int16 Op_UnfreezeParent() {
+ }
+ 
+ int16 Op_ProtectionFlag() {
+-	int16 temp = protectionCode;
++	int16 temp;
+ 	int16 newVar;
+ 
+ 	newVar = popVar();
++	if (newVar == -1)
++		Bench::protectionCheck();	// banc : CRUISE_SKIP_PROTECTION
++	temp = protectionCode;
+ 	if (newVar != -1) {
+ 		protectionCode = newVar;
+ 	}
+@@ -2004,7 +2008,10 @@ int32 opcodeType8() {
+ 		return (-21);
+ 
+ 	if (opcode < ARRAYSIZE(opcodeTablePtr) && opcodeTablePtr[opcode]) {
+-		pushVar(opcodeTablePtr[opcode]());
++		Bench::nativeBegin(opcode);
++		int16 benchResult = opcodeTablePtr[opcode]();
++		Bench::nativeEnd(opcode, benchResult);
++		pushVar(benchResult);
+ 		return (0);
+ 	} else {
+ 		warning("Unsupported opcode %d in opcode type 8", opcode);
+diff --git a/engines/cruise/menu.cpp b/engines/cruise/menu.cpp
+index 9c8260f5..0d1fe539 100644
+--- a/engines/cruise/menu.cpp
++++ b/engines/cruise/menu.cpp
+@@ -21,6 +21,7 @@
+ 
+ #include "cruise/cruise.h"
+ #include "cruise/cruise_main.h"
++#include "cruise/bench.h"
+ #include "cruise/staticres.h"
+ 
+ #include "engines/metaengine.h"
+@@ -200,6 +201,7 @@ int processMenu(menuStruct *pMenu) {
+ 		flipScreen();
+ 
+ 		manageEvents();
++		Bench::modalTick("menu");
+ 		g_system->delayMillis(10);
+ 		if (_vm->shouldQuit())
+ 			return -1;
+diff --git a/engines/cruise/module.mk b/engines/cruise/module.mk
+index 8487ff3f..28bccb2a 100644
+--- a/engines/cruise/module.mk
++++ b/engines/cruise/module.mk
+@@ -4,6 +4,7 @@ MODULE_OBJS := \
+ 	actor.o \
+ 	background.o \
+ 	backgroundIncrust.o \
++	bench.o \
+ 	cell.o \
+ 	cruise.o \
+ 	cruise_main.o \
+diff --git a/engines/cruise/script.cpp b/engines/cruise/script.cpp
+index 69c5b1e2..73e4e4d6 100644
+--- a/engines/cruise/script.cpp
++++ b/engines/cruise/script.cpp
+@@ -21,6 +21,7 @@
+ 
+ #include "cruise/cruise.h"
+ #include "cruise/cruise_main.h"
++#include "cruise/bench.h"
+ #include "common/endian.h"
+ #include "common/textconsole.h"
+ 
+@@ -605,6 +606,7 @@ int executeScripts(scriptInstanceStruct *ptr) {
+ 			pushVar(50);
+ 		}
+ 
++		Bench::opcode(currentScriptPtr->scriptOffset, (uint8)currentData3DataPtr[currentScriptPtr->scriptOffset]);
+ 		opcodeType = getByteFromScript();
+ 
+ 		debugC(5, kCruiseDebugScript, "Script %s/%d ip=%d opcode=%d",
+@@ -618,7 +620,7 @@ int executeScripts(scriptInstanceStruct *ptr) {
+ 		if (!opcodeTypeTable[(opcodeType & 0xFB) >> 3]) {
+ 			error("Unsupported opcode type %d", (opcodeType & 0xFB) >> 3);
+ 		}
+-	} while (!opcodeTypeTable[(opcodeType & 0xFB) >> 3]());
++	} while (!(Bench::lastRet = opcodeTypeTable[(opcodeType & 0xFB) >> 3]()));
+ 
+ 	currentScriptPtr = nullptr;
+ 
+@@ -630,8 +632,12 @@ void manageScripts(scriptInstanceStruct *scriptHandle) {
+ 
+ 	while (ptr) {
+ 		if (!overlayTable[ptr->overlayNumber].executeScripts) {
+-			if ((ptr->scriptNumber != -1) && (ptr->freeze == 0) && (ptr->sysKey != 0))
+-				executeScripts(ptr);
++			if ((ptr->scriptNumber != -1) && (ptr->freeze == 0) && (ptr->sysKey != 0)) {
++				Bench::beforeSlice(scriptHandle == &procHead ? 'P' : 'R', ptr);
++				int benchOvl = ptr->overlayNumber, benchScr = ptr->scriptNumber, benchIp = ptr->scriptOffset;
++				int benchRc = executeScripts(ptr);
++				Bench::scriptSlice(scriptHandle == &procHead ? 'P' : 'R', ptr, benchOvl, benchScr, benchIp, benchRc);
++			}
+ 
+ 			if (ptr->sysKey == 0)
+ 				ptr->sysKey = 1;
+diff --git a/engines/cruise/sound.cpp b/engines/cruise/sound.cpp
+index 84a3e3f3..b04560ed 100644
+--- a/engines/cruise/sound.cpp
++++ b/engines/cruise/sound.cpp
+@@ -27,6 +27,7 @@
+ #include "cruise/cruise_main.h"
+ #include "cruise/sound.h"
+ #include "cruise/volume.h"
++#include "cruise/bench.h"
+ 
+ #include "audio/fmopl.h"
+ 
+@@ -296,6 +297,12 @@ void PCSoundDriver::syncSounds() {
+ 	_sfxVolume = sfx_mute ? 0 : MIN(255, ConfMan.getInt("sfx_volume"));
+ }
+ 
++static AdLibSoundDriver *s_benchDriver = nullptr;
++static void benchTimer50() {
++	if (s_benchDriver)
++		s_benchDriver->onTimer();
++}
++
+ AdLibSoundDriver::AdLibSoundDriver(Audio::Mixer *mixer)
+ 	: _mixer(mixer) {
+ 	_opl = OPL::Config::create();
+@@ -312,10 +319,20 @@ AdLibSoundDriver::AdLibSoundDriver(Audio::Mixer *mixer)
+ 	_musicVolume = ConfMan.getBool("music_mute") ? 0 : MIN(255, ConfMan.getInt("music_volume"));
+ 	_sfxVolume = ConfMan.getBool("sfx_mute") ? 0 : MIN(255, ConfMan.getInt("sfx_volume"));
+ 
+-	_opl->start(new Common::Functor0Mem<void, AdLibSoundDriver>(this, &AdLibSoundDriver::onTimer), 50);
++	if (Bench::virtualTime()) {
++		// Banc : le callback de 50 Hz est appele par l'horloge virtuelle (delayMillis), pas par le mixeur (fil audio en temps reel).
++		s_benchDriver = this;
++		g_benchTimer50 = benchTimer50;
++	} else {
++		_opl->start(new Common::Functor0Mem<void, AdLibSoundDriver>(this, &AdLibSoundDriver::onTimer), 50);
++	}
+ }
+ 
+ AdLibSoundDriver::~AdLibSoundDriver() {
++	if (s_benchDriver == this) {
++		g_benchTimer50 = nullptr;
++		s_benchDriver = nullptr;
++	}
+ 	delete _opl;
+ }
+ 

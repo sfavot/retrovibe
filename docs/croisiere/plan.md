@@ -22,7 +22,7 @@ Ce document est le brief commun aux sous-agents, sur le modèle de `docs/bass/pl
     - le rastériseur de polygones (R1) et le son (A) sont identiques au bit près au code de ScummVM compilé à part ;
     - le dépaqueteur est commun avec Les Voyageurs du temps (`src/engine/delphine/unpack.ts`).
   - **Écarts et rustines** : voir `engine.md` § 12 à 14. La rustine S26 reste inerte, comme dans ScummVM, et aucun blocage n'est apparu au bar. La rustine des crédits vise l'overlay `FIN01`.
-- Banc ScummVM hors dépôt : `cruise-bench/` dans le scratchpad de la session d'étude (patchs `cruise-trace.patch`, `cruise-virtual-time.patch`, `cruise-replay.sh`, `cruise-checkpoints.py`).
+- Banc ScummVM : `scripts/croisiere/bench/` (patch de ScummVM 2026.4.0, `cruise-replay.sh`, `cruise-checkpoints.py`, mode d'emploi dans son `README.md`) ; ScummVM se compile à part.
 - **Consignes de l'utilisatrice** : « mutualiser avec ce qu'on a déjà, sans pour autant trop dévoyer les jeux » ; décider le code commun Delphine avec la session *Les Voyageurs du temps* (moteur `cine`), sans éditer les mêmes fichiers en même temps.
 - **D1 à D12 validées par l'utilisatrice le 14/11/2026**, telles que recommandées ci-dessous.
 - **M2 abandonnée (14/11)** : Les Voyageurs du temps (CD) joue sa musique sur pistes FLAC et ses bruitages par `AdLibSoundDriverINS` (instrument à l'octet 257 des `.SPL`), pas par le pilote ADL ni le lecteur de modules de Croisière. Le pilote AdLib reste dans `src/games/croisiere/audio/` ; seul `src/engine/delphine/unpack.ts` est commun.
@@ -156,7 +156,7 @@ Pilote AdLib : FOTAQ, Lure et BASS ont chacun le leur. Il n'y a pas de pilote Ad
 | M2 | `src/engine/delphine/adlib-*.ts` (conditionnel) | Pilote ADL et lecteur de modules paramétrés : fréquence du timer, offset des motifs, formule de tempo. | Seulement si Voyageurs joue des modules AdLib (D9). | Faible : deux jeux neufs. | A |
 | M3 | `src/ui/point-click-app.ts` | Si besoin, à constater en J : touche ou bouton « menu joueur » distinct de « Menu » du site. | Le jeu ouvre son menu au double bouton, sans équivalent tactile. | Faible : à revérifier sur Drascula, FOTAQ, Lure et BASS. | J |
 
-Le **banc ScummVM** reste hors dépôt, dans le scratchpad de cette session (`cruise-bench/`) : clone APFS de la source du banc commun, compilé avec `--enable-engine=cruise` seul, avec sa propre config `cfg/scummvm.ini`. Il ne touche ni au banc des autres sessions, ni à `~/Library`.
+Le **banc ScummVM** est décrit dans `scripts/croisiere/bench/README.md` : patch de ScummVM 2026.4.0, compilé à part avec `--enable-engine=cruise` seul, avec sa propre configuration par lancement. Il ne touche ni au banc des autres sessions, ni à `~/Library`.
 
 ## Vagues
 

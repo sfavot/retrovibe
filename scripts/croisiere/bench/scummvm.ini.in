@@ -1,0 +1,19 @@
+[scummvm]
+versioninfo=2026.4.0
+gfx_mode=surfacesdl
+audio_driver=null
+vsync=false
+music_mute=false
+last_window_width=640
+last_window_height=400
+
+[cruise-fr]
+platform=pc
+gameid=cruise
+description=Cruise for a Corpse (256 colors/DOS/French)
+language=fr
+extra=256 colors
+path=@GAME_DIR@
+engineid=cruise
+guioptions=gameOption1 sndNoSpeech sndNoMIDI lang_French plat_pc
+

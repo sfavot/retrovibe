@@ -1,10 +1,10 @@
 /**
  * Partie complète comparée au banc ScummVM (vague K) : les entrées de la partie de `full-game.test.ts` (a), relevées tour par tour
- * (`fixtures/scummvm-inputs.txt`, niveaux de souris `n x y b` de `CRUISE_INPUT`), sont rejouées dans ScummVM (`bench/cruise-replay.sh` :
+ * (`fixtures/scummvm-inputs.txt`, niveaux de souris `n x y b` de `CRUISE_INPUT`), sont rejouées dans ScummVM (`scripts/croisiere/bench/cruise-replay.sh` :
  * `cruise-fr`, graine 1, temps virtuel, contournement de la protection) et dans le portage ; `fixtures/scummvm-checkpoints.txt` garde, pour
  * chaque fin d'étape de la solution, l'empreinte de la trace du banc depuis le point précédent (lignes `FR` : souris, utilisateur, attente,
  * menus, dialogue, vitesse ; `MF` : tours modaux ; `VH` : empreinte des 2 000 `globalVars`, à chaque tour) et la ligne `SC` du tour (CRC32
- * de l'image présentée et de la palette). Fixtures refaites par `bench-record.test.ts` puis `bench/cruise-checkpoints.py` (banc).
+ * de l'image présentée et de la palette). Fixtures refaites par `bench-record.test.ts` puis `scripts/croisiere/bench/cruise-checkpoints.py`.
  *
  * Résultat (banc du 15 novembre 2026) : les 672 444 lignes `FR`/`VH`/`SC` des 224 148 tours sont identiques, image comprise à chaque tour.
  *

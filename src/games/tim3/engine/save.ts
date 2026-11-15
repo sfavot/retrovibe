@@ -3,8 +3,10 @@
  *
  * - **Progression** (puzzles résolus, dernier puzzle) : `Progress`, dans `session.ts`.
  * - **Machines du Labo** : 10 emplacements de `SaveSlots` (préfixe `tim3:`), un JSON versionné qui reprend les champs d'un LEV
- *   (réglages de `LevInfo` et pièces `LevPart`, celles de `data/lev.ts`) plus le nom saisi par le joueur. Le jeu d'origine
- *   écrivait un fichier LEV ; on garde le même contenu, sans fichier.
+ *   (réglages de `LevInfo` et pièces `LevPart`, celles de `data/lev.ts`) plus le nom saisi par le joueur (le titre du LEV). Le jeu
+ *   d'origine écrivait un fichier LEV ; on garde le même contenu, sans fichier. **Version 2** : le puzzle maison (but, indices,
+ *   conditions de réussite et délai, `lab-puzzle.ts`) ; une machine de la version 1 se lit avec un puzzle vide (`migrateLabMachine`).
+ *   Les pièces verrouillées au cadenas sont celles qui ne sont pas dans `placed`.
  * - **État d'édition** : l'aire d'un puzzle (clé `edit:<puzzle>`) ou du Labo (`edit:lab`) est gardée à la sortie, jamais en pleine
  *   simulation : une photo n'est prise que hors marche, donc c'est toujours l'état d'avant « Démarrer ».
  *
@@ -24,15 +26,18 @@
  *
  * Module pur : il ne connaît pas le stockage, sauf `EditStore` et `labSaveSlots` qui y branchent `HostStorage` et `SaveSlots`.
  */
-import { emptyPart, partKind, PART_LOCKED, type Level, type LevPart } from "../data/lev";
+import { emptyPart, partKind, PART_LOCKED, type Level, type LevCondition, type LevHint, type LevPart, type LevSolution } from "../data/lev";
 import { SaveSlots } from "../../../engine/save-slots";
 import type { HostStorage } from "../../../engine/storage";
+import { GOAL_MAX, HINT_TEXT_MAX, LabPuzzle, MAX_CONDITIONS, MAX_HINTS } from "./lab-puzzle";
 import { DEFAULT_LAB, labLevel, puzzleList, type LabSettings } from "./session";
 import { TYPE_COUNT } from "./types";
 import type { Part } from "./part";
 import type { World } from "./world";
 
-export const SAVE_VERSION = 1;
+/** Version écrite ; la version 1 (machines sans puzzle maison) se lit encore. */
+export const SAVE_VERSION = 2;
+const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2]);
 /** Emplacements de machines du Labo : clés `slot01` … `slot10` sous `tim3:`. */
 export const SLOT_COUNT = 10;
 /** Longueur maximale du nom d'une machine. */
@@ -50,12 +55,30 @@ export interface PartsSnapshot {
   placed: number[];
 }
 
-/** Machine du Labo : réglages de `LevInfo` (gravité, pression, musique), couleur du décor, et pièces. */
+/** Machine du Labo : réglages de `LevInfo` (gravité, pression, musique), couleur du décor, pièces, et le puzzle maison. */
 export interface LabMachine extends PartsSnapshot {
   background: number;
   gravity: number;
   pressure: number;
   music: number;
+  /** Texte du but (barre du but au Labo). */
+  goal: string;
+  /** 8 indices du LEV (texte vide : emplacement libre). */
+  hints: LevHint[];
+  /** Conditions de réussite (index des pièces dans fixes puis mobiles) et délai. */
+  solution: LevSolution;
+}
+
+/** Puzzle vide : la machine se joue sans but (Labo de la version 1). */
+export function emptyPuzzle(): Pick<LabMachine, "goal" | "hints" | "solution"> {
+  const empty = new LabPuzzle();
+  const { hints } = empty.levHints();
+  return { goal: "", hints, solution: empty.solution(() => -1) };
+}
+
+/** La machine a-t-elle un but (au moins une condition) : elle se joue alors comme un puzzle (bac « Maison »). */
+export function hasGoal(machine: Pick<LabMachine, "solution">): boolean {
+  return machine.solution.conditions.some((c) => c.partIndex >= 0);
 }
 
 const FIXED = 0x6000;
@@ -204,10 +227,23 @@ export function levelWithParts(base: Level, parts: PartsSnapshot): Level {
   return { ...base, fixedParts: parts.fixedParts, movingParts: parts.movingParts };
 }
 
-/** Le niveau d'une machine du Labo. */
-export function machineLevel(machine: LabMachine): Level {
+/** Le niveau d'une machine du Labo (`title` : son nom). Les pièces sont toutes écrites verrouillées : `placed` dit lesquelles libérer. */
+export function machineLevel(machine: LabMachine, title = ""): Level {
   const settings: LabSettings = { gravity: machine.gravity, pressure: machine.pressure, background: machine.background, music: machine.music };
-  return levelWithParts(labLevel(settings), machine);
+  const hintCount = machine.hints.filter((h) => h.text !== "").length;
+  return { ...levelWithParts(labLevel(settings), machine), title, goal: machine.goal, hintCount, hints: machine.hints.map((h) => ({ ...h })), solution: machine.solution };
+}
+
+/**
+ * Le niveau qu'on joue d'une machine (essai du Labo, mode 8, et bac « Maison ») : comme 43252d le recharge hors des modes 1 et 6, les
+ * pièces non verrouillées (`placed`) partent au bac (43267a), les verrouillées restent à leur place.
+ */
+export function puzzleLevel(machine: LabMachine, title = ""): Level {
+  const level = machineLevel(machine, title);
+  const free = new Set(machine.placed);
+  const fixedCount = machine.fixedParts.length;
+  const unlock = (p: LevPart, i: number): LevPart => (free.has(i) ? { ...p, flags3: p.flags3 & ~PART_LOCKED } : p);
+  return { ...level, fixedParts: level.fixedParts.map((p, i) => unlock(p, i)), movingParts: level.movingParts.map((p, i) => unlock(p, fixedCount + i)) };
 }
 
 /** Les réglages du Labo d'une machine. */
@@ -215,10 +251,13 @@ export function machineSettings(machine: LabMachine): LabSettings {
   return { gravity: machine.gravity, pressure: machine.pressure, background: machine.background, music: machine.music };
 }
 
-/** Photo du Labo avec ses réglages ; `null` si le monde est en marche. */
-export function snapshotLab(world: World, settings: LabSettings): LabMachine | null {
+/** Photo du Labo avec ses réglages et son puzzle maison ; `null` si le monde est en marche. */
+export function snapshotLab(world: World, settings: LabSettings, puzzle: LabPuzzle | null = null): LabMachine | null {
   const parts = snapshotWorld(world);
-  return parts && { ...parts, ...settings };
+  if (!parts) return null;
+  const order = [...world.statics, ...world.mobiles];
+  const p = puzzle ?? new LabPuzzle();
+  return { ...parts, ...settings, goal: p.goal, hints: p.levHints().hints, solution: p.solution((q) => order.indexOf(q)) };
 }
 
 // ------------------------------------------------------------------ lecture d'une valeur inconnue
@@ -264,13 +303,56 @@ export function parsePartsSnapshot(value: unknown): PartsSnapshot | null {
   return { fixedParts, movingParts, placed: [...placed] as number[] };
 }
 
-/** Machine du Labo lisible, ou `null`. */
-export function parseLabMachine(value: unknown): LabMachine | null {
+function parseHints(value: unknown): LevHint[] | null {
+  if (!Array.isArray(value) || value.length !== MAX_HINTS) return null;
+  const out: LevHint[] = [];
+  for (const h of value) {
+    if (!isRecord(h) || !isInt(h.x, -0x8000, 0x7fff) || !isInt(h.y, -0x8000, 0x7fff) || !isInt(h.flip, 0, 3) || typeof h.text !== "string" || h.text.length > HINT_TEXT_MAX) return null;
+    out.push({ x: h.x, y: h.y, flip: h.flip, text: h.text });
+  }
+  return out;
+}
+
+function parseSolution(value: unknown, total: number): LevSolution | null {
+  if (!isRecord(value) || !isInt(value.unknown00, 0, 0xffff) || !isInt(value.delay, 0, 0xffff)) return null;
+  const list = value.conditions;
+  if (!Array.isArray(list) || list.length !== MAX_CONDITIONS) return null;
+  const conditions: LevCondition[] = [];
+  for (const c of list) {
+    if (!isRecord(c) || !isInt(c.partIndex, -1, total - 1)) return null;
+    const out = { partIndex: c.partIndex } as Record<string, number>;
+    for (const key of ["state1", "state2", "count", "rectX", "rectY", "rectWidth", "rectHeight"] as const) {
+      const v = c[key];
+      if (!isInt(v, -0x80000000, 0x7fffffff)) return null;
+      out[key] = v;
+    }
+    conditions.push(out as unknown as LevCondition);
+  }
+  return { unknown00: value.unknown00, conditions, delay: value.delay };
+}
+
+/**
+ * Machine du Labo lisible, ou `null`. `version` 1 : pas de puzzle maison, il est vide (migration) ; version 2 : but, indices et
+ * solution obligatoires.
+ */
+export function parseLabMachine(value: unknown, version: number = SAVE_VERSION): LabMachine | null {
   if (!isRecord(value)) return null;
   const parts = parsePartsSnapshot(value);
   const { background, gravity, pressure, music } = value;
   if (!parts || !isInt(background, 1, 11) || !isInt(gravity, 0, 999) || !isInt(pressure, 0, 999) || !isInt(music, 0, 1023)) return null;
-  return { ...parts, background, gravity, pressure, music };
+  const machine = { ...parts, background, gravity, pressure, music };
+  if (version === 1) return migrateLabMachine(machine);
+  const total = parts.fixedParts.length + parts.movingParts.length;
+  const goal = value.goal;
+  const hints = parseHints(value.hints);
+  const solution = parseSolution(value.solution, total);
+  if (typeof goal !== "string" || goal.length > GOAL_MAX || !hints || !solution) return null;
+  return { ...machine, goal, hints, solution };
+}
+
+/** Version 1 → 2 : la machine garde ses pièces et ses réglages, sans but, indice ni condition. */
+export function migrateLabMachine(machine: Omit<LabMachine, "goal" | "hints" | "solution">): LabMachine {
+  return { ...machine, ...emptyPuzzle() };
 }
 
 // ------------------------------------------------------------------ machines du Labo (emplacements)
@@ -289,11 +371,14 @@ export function cleanName(name: string): string | null {
   return clean === "" ? null : clean;
 }
 
-/** Valide la valeur d'un emplacement : `null` si c'est une autre version, un JSON étranger ou des données corrompues. */
+/**
+ * Valide la valeur d'un emplacement : `null` si c'est une version inconnue, un JSON étranger ou des données corrompues. Une machine de
+ * la version 1 est rendue en version 2 (puzzle vide).
+ */
 export function parseLabSave(value: unknown): LabSave | null {
-  if (!isRecord(value) || value.version !== SAVE_VERSION || typeof value.name !== "string") return null;
+  if (!isRecord(value) || !READABLE_VERSIONS.has(value.version) || typeof value.name !== "string") return null;
   const name = cleanName(value.name);
-  const machine = parseLabMachine(value.machine);
+  const machine = parseLabMachine(value.machine, value.version as number);
   return name !== null && machine ? { version: SAVE_VERSION, name, machine } : null;
 }
 
@@ -331,7 +416,7 @@ export function loadMachine(slots: LabSlots, slot: number): LoadOutcome {
 
 /** Valeur gardée pour l'aire d'un puzzle (`edit:<puzzle>`) ou du Labo (`edit:lab`). */
 interface EditValue<T> {
-  version: typeof SAVE_VERSION;
+  version: number;
   parts: T;
 }
 
@@ -342,12 +427,13 @@ export const LAB_EDIT_KEY = "edit:lab";
 export class EditStore {
   constructor(private readonly storage: HostStorage) {}
 
-  private read<T>(key: string, parse: (value: unknown) => T | null): T | null {
+  private read<T>(key: string, parse: (value: unknown, version: number) => T | null): T | null {
     const text = this.storage.get(key);
     if (text === null) return null;
     try {
       const value: unknown = JSON.parse(text);
-      if (isRecord(value) && value.version === SAVE_VERSION) return parse(value.parts);
+      // Version 1 : l'aire d'un puzzle n'a pas changé ; celle du Labo se lit sans puzzle maison.
+      if (isRecord(value) && READABLE_VERSIONS.has(value.version)) return parse(value.parts, value.version as number);
     } catch {
       // JSON cassé : comme s'il n'y avait rien
     }

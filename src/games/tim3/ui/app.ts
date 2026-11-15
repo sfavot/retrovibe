@@ -8,6 +8,10 @@
  * disquette ouvre le choix du puzzle (`DOSBOX`, `DOSBIN`) ; « Menu principal » sous l'écran reprend l'entrée « Zones > Menu
  * principal » du menu Windows d'origine.
  *
+ * Labo (`docs/tim3/ui.md` § Outils du Labo) : cadenas (`HTLOCK`), levier d'essai (mode 8 : la machine se joue comme un puzzle, puis le
+ * Labo revient tel quel), éditeur d'indices (`HINT.ITF`), conditions de réussite (`SOLVE.ITF`), but écrit dans la barre du bas, onglets
+ * du bac. Les machines qui ont un but se jouent depuis le bac « Puzzles Personnels » du choix du puzzle.
+ *
  * Données : les volumes Dynamix (`RESOURCE.MAP/.001/.002` + `FRENCH.DAT`) sont chargés d'un bloc ; les voix MP3 à la demande.
  */
 import "./style.css";
@@ -27,11 +31,13 @@ import { HELP_INTRO, HELP_NOTHING, helpTable, type HelpTable } from "../data/hel
 import { readItf } from "../data/itf";
 import { levelParts, readLev, type Level } from "../data/lev";
 import { readPartDef } from "../data/part-def";
-import { readBinSolveRes } from "../data/solutions";
+import { readBinSolveRes, readSolveRes, type SolvePart } from "../data/solutions";
 import { interfaceText, loadTexts, parseIdTable, parseLines, type GameTexts } from "../data/text";
 import { ResourceIndex } from "../data/volume";
 import { readSoundEffect } from "../data/wave";
-import { Editor, createPart } from "../engine/editor";
+import { Editor } from "../engine/editor";
+import { TAB_TEXT } from "../engine/bin-tabs";
+import { GOAL_MAX } from "../engine/lab-puzzle";
 import type { Part } from "../engine/part";
 import { parseProgramRows, type ProgramRow } from "../engine/program";
 import {
@@ -41,18 +47,20 @@ import {
   labSaveSlots,
   levelWithParts,
   loadMachine,
+  hasGoal,
   machineLevel,
   machineSettings,
+  puzzleLevel,
   saveMachine,
   snapshotLab,
   snapshotWorld,
   type LabMachine,
 } from "../engine/save";
-import { DEFAULT_LAB, Progress, STEP_MS, Tim3Session, labLevel, puzzleList, type PuzzleRef } from "../engine/session";
+import { DEFAULT_LAB, HOME_CATEGORY, HomeProgress, Progress, STEP_MS, Tim3Session, homePuzzleRef, homeSlot, labLevel, puzzleList, type PuzzleRef } from "../engine/session";
 import { solutionSession } from "../engine/solution";
 import { TypeTable } from "../engine/types";
 import { renderHelp } from "../help";
-import { RenderAssets, SCREEN_HEIGHT, SCREEN_WIDTH, Surface, type Rect } from "../render";
+import { RenderAssets, SCREEN_HEIGHT, SCREEN_WIDTH, Surface, imageCount, stateImage, type Rect } from "../render";
 import { LOGO, TITLE, opaqueLut, type FrameSound } from "../render/front";
 import { BinScreen, PuzzleCardScreen, PuzzleListScreen, currentPuzzle, type ChooserTexts } from "./chooser";
 import { CreditsScreen } from "./credits";
@@ -62,14 +70,17 @@ import { MainMenuScreen, quitMainMenu, type MainMenuAction } from "./main-menu";
 import { openBinsolveWindow } from "./binsolve-window";
 import { openGlobeWindow } from "./globe-window";
 import { openHelpWindow } from "./help-window";
-import { openHintWindow } from "./hint-window";
+import { HINT_TEXT, openHintEditorWindow, openHintWindow, type HintEditorChoice } from "./hint-window";
+import { openGoalEditor } from "./goal-editor";
+import { LOCK_TEXT, openLockWindow } from "./lock-window";
+import { SOLVE_TEXT, drawPartPreview, openSolveWindow } from "./solve-window";
 import { openInfoWindow } from "./info-window";
 import { openLoadSaveWindow, openMachineListWindow, type LoadSaveChoice } from "./machines-window";
-import { confirmDialog, messageDialog, solvedDialog } from "./menus";
+import { confirmDialog, genericDialog, messageDialog, solvedDialog } from "./menus";
 import { openMusicboxWindow } from "./musicbox-window";
 import { openProgramWindow } from "./program-window";
 import { PlayScreen, type HelpTarget, type PlayEvent, type ShownButton, type ToolbarButton } from "./play";
-import { TOOLBAR_NAMES, toolbarDecision, type ToolbarAction } from "./toolbar";
+import { TOOLBAR_NAMES, TOOLBAR_TEXT, toolbarDecision, type ToolbarAction } from "./toolbar";
 
 export interface AppOptions {
   /** URL du dossier des fichiers du jeu, sans barre finale (`./tim3`). */
@@ -93,6 +104,10 @@ const SOUND_PLACE = 0xe1b;
 /** Ouverture de la fenêtre « programmer » (42ea72). */
 const SOUND_PROGRAM = 0xc40;
 const SOUND_REMOVE = 0xe1a;
+/** Poignée « solution » (42eab4 : 0xC8C, puis `SOLVE.ITF`). */
+const SOUND_SOLVE = 0xc8c;
+/** `INTRFACE.RES` : machine du Labo ou essai réussi (419878 : 31178, au lieu de PUZZSOLV dans les modes 1, 6 et 8). */
+const LAB_SOLVED_TEXT = 31178;
 /** Puzzle réussi : son 0xE21, 18 pas après l'ouverture de PUZZSOLV (4261df : compte à rebours 0x12, 426234). */
 const SOUND_SOLVED = 0xe21;
 const SOLVED_SOUND_STEPS = 18;
@@ -137,6 +152,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let programRows: ProgramRow[];
   let interfaceLines: string[];
   let help: HelpTable;
+  let solveParts: SolvePart[] = [];
   try {
     const files = await fetchGameFiles(options.base).catch((error: unknown) => {
       throw new MissingFilesError(error instanceof Error ? error.message : String(error));
@@ -155,6 +171,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     congratulations = readBinSolveRes(index.get("BINSOLVE.RES"));
     programRows = parseProgramRows(parseLines(index.get("PROGPART.RES")));
     interfaceLines = parseLines(index.get("INTRFACE.RES"));
+    try {
+      solveParts = readSolveRes(index.get("SOLVE.RES"));
+    } catch (error) {
+      console.warn("TIM3 : SOLVE.RES illisible", error);
+    }
     help = helpTable(index);
     types = new TypeTable({
       anm: (t) => (index.has(`PART${t}.ANM`) ? readAnm(index.get(`PART${t}.ANM`)) : null),
@@ -190,6 +211,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   }
   const sound: Tim3Audio = audio;
   const progress = new Progress(storage);
+  const homeProgress = new HomeProgress(storage);
   const edits = new EditStore(storage);
   const slots = labSaveSlots(storage);
   const puzzles = puzzleList();
@@ -207,6 +229,18 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let baseLevel: Level | null = null;
   /** Nom de la dernière machine du Labo sauvegardée ou chargée (proposé à la sauvegarde suivante). */
   let labName = "";
+  /** Essai du Labo (mode 8) : la machine d'avant l'essai, rendue telle quelle à la fin (43252d(fichier, 1)). */
+  let labTest: LabMachine | null = null;
+  /** 31143 n'est montré qu'à la première entrée en essai (`[0x481004]`). */
+  let testIntroShown = false;
+  /** Onglet du bac au Labo (`[0x471f90]`), mode avancé de `SOLVE.ITF` (`[0x472f98]`), gardés pendant la partie. */
+  let labTab = 0;
+  let solveAdvanced = false;
+  /** Puzzle maison ouvert : emplacement et date de sa sauvegarde (progression). */
+  let home: { slot: number; savedAt: number } | null = null;
+  /** Pièce dont `SOLVE.ITF` attend un rectangle (« Position »). */
+  let solvePart: Part | null = null;
+  let goalEditor: { close(): void } | null = null;
   let session!: Tim3Session;
   let screen!: PlayScreen;
   let dialog: ItfWindowHandle | null = null;
@@ -238,8 +272,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   };
 
   const playScreen = (level: Level, goal: string, hints: string[]): void => {
+    goalEditor?.close();
     screen = new PlayScreen(session, assets, level, { goal, hints, parts: texts.parts }, toolbar, onEvent);
-    screen.solved = current !== null && progress.isSolved(current.name);
+    screen.solved = home ? homeProgress.isSolved(home.slot, home.savedAt) : current !== null && progress.isSolved(current.name);
+    screen.test = labTest !== null;
+    screen.binTab = labTab;
     if (options.debug) (window as unknown as { __tim3: unknown }).__tim3 = { session: () => session, screen: () => screen, index };
   };
 
@@ -248,14 +285,15 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
    * « Démarrer »). Un puzzle auquel on n'a rien posé n'a rien à garder. Une erreur ne doit jamais gêner le jeu.
    */
   const persistEdit = (): void => {
-    if (!session || session.running) return;
+    // Essai : le Labo gardé est celui d'avant l'essai. Puzzle maison : l'aire n'est pas gardée (la machine peut changer d'emplacement).
+    if (!session || session.running || labTest || home) return;
     try {
       if (current && baseLevel) {
         const parts = snapshotWorld(session.world, baseLevel);
         if (parts && parts.placed.length > 0) edits.savePuzzle(current.name, parts);
         else edits.clearPuzzle(current.name);
       } else if (session.lab) {
-        const machine = snapshotLab(session.world, session.lab);
+        const machine = snapshotLab(session.world, session.lab, session.labPuzzle);
         if (machine) edits.saveLab(machine);
       }
     } catch (error) {
@@ -264,8 +302,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   };
 
   /** Ouvre un puzzle : l'aire qu'on y avait laissée, ou (`solution`, ampoule) la solution du concepteur posée. */
-  const loadPuzzle = (ref: PuzzleRef, solution = false): void => {
+  const loadPuzzle = (ref: PuzzleRef, solution = false): boolean => {
     persistEdit();
+    labTest = null;
+    const slot = homeSlot(ref);
+    if (slot !== null) return loadHome(ref, slot, solution);
+    home = null;
     const original = readLev(index.get(`${ref.name}.LEV`));
     const kept = solution ? null : edits.puzzle(ref.name);
     let fresh = true;
@@ -289,17 +331,46 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       // Même puzzle : musique et voix continuent ; l'aire avec la solution remplace l'état gardé.
       persistEdit();
       announce(copy.solutionShown);
-      return;
+      return true;
     }
     progress.last = ref.name;
     music(level.info.music);
     sound.playVoice(goalVoice(ref.index));
     announce(`${copy.categories[ref.category]} ${ref.number} : ${t?.title ?? ""}. ${t?.goal ?? ""}`);
+    return true;
+  };
+
+  /**
+   * Puzzle maison (bac « Puzzles Personnels ») : la machine de l'emplacement, jouée comme un puzzle (pièces non verrouillées au bac,
+   * 43267a), avec son but et ses indices (sans voix : elles sont celles des puzzles du professeur). `solution` : l'ampoule, la machine
+   * telle que son auteur l'a construite (pièces du bac remises à leur place, `solutionSession`).
+   */
+  const loadHome = (ref: PuzzleRef, slot: number, solution: boolean): boolean => {
+    const stored = slots.read(slot);
+    if (!stored || !hasGoal(stored.save.machine)) {
+      pauseFor(messageDialog(itfHost(), copy.homeMissing, resume));
+      return false;
+    }
+    const level = puzzleLevel(stored.save.machine, stored.save.name);
+    current = ref;
+    baseLevel = level;
+    home = { slot, savedAt: stored.savedAt };
+    session = solution ? solutionSession(types, level, { puzzle: ref }) : new Tim3Session(types, level, { puzzle: ref });
+    playScreen(level, level.goal, level.hints.map((h) => h.text));
+    if (solution) {
+      announce(copy.solutionShown);
+      return true;
+    }
+    music(level.info.music);
+    announce(`${copy.homeCategory} ${slot} : ${level.title}. ${level.goal}`);
+    return true;
   };
 
   /** Ouvre le Labo : la machine donnée (emplacement chargé) ou, sans elle, celle qu'on y avait laissée. `false` si elle est illisible. */
   const openLab = (machine: LabMachine | null = edits.lab()): boolean => {
     persistEdit();
+    labTest = null;
+    home = null;
     let settings = machine ? machineSettings(machine) : { ...DEFAULT_LAB };
     let ok = true;
     current = null;
@@ -321,10 +392,224 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     return ok;
   };
 
+  /** Palette du Labo : une pièce de chaque type de l'onglet (417264), pièces des fêtes le jour venu (43b06c). */
   const fillLabBin = (): void => {
     if (!session.lab) return;
-    const present = new Set(session.editor.binParts().map((p) => p.type));
-    for (const t of Editor.labTypes(session.world)) if (!present.has(t)) createPart(session.world, t);
+    session.editor.stockLab(Editor.labTypes(session.world, labTab, new Date()));
+  };
+
+  /** Texte de `INTRFACE.RES`. */
+  const gameText = (id: number): string => interfaceText(interfaceLines, id).replaceAll("\\n", "\n");
+
+  // ------------------------------------------------------------------ outils du Labo
+
+  /** Levier d'essai au Labo (41908a) : 31143 la première fois, puis l'essai (mode 8) de la machine telle qu'elle est. */
+  const startTest = (): void => {
+    if (!session.lab || session.running) return;
+    const machine = snapshotLab(session.world, session.lab, session.labPuzzle);
+    if (!machine) return;
+    persistEdit();
+    const enter = (): void => {
+      labTest = machine;
+      const level = puzzleLevel(machine, labName);
+      session = new Tim3Session(types, level);
+      playScreen(level, machine.goal, level.hints.map((h) => h.text));
+      announce(copy.testStarted);
+    };
+    if (testIntroShown) return enter();
+    testIntroShown = true;
+    pauseFor(
+      messageDialog(itfHost(), gameText(TOOLBAR_TEXT.testIntro), () => {
+        resume();
+        enter();
+      }),
+    );
+  };
+
+  /** Fin de l'essai (43252d(fichier, 1)) : le Labo d'avant l'essai revient, pièces et puzzle maison compris. */
+  const endTest = (): void => {
+    const machine = labTest;
+    if (!machine) return;
+    if (session.running) toggleRun();
+    labTest = null;
+    openLab(machine);
+    announce(copy.testEnded);
+  };
+
+  /** Cadenas de la barre (420810) : HTLOCK, puis tout verrouiller (4209e5) ou tout déverrouiller (420afc) et le message du jeu. */
+  const openLock = (): void => {
+    if (!session.lab || session.running) return;
+    let choice: boolean | null = null;
+    pauseFor(
+      openLockWindow(itfHost(), {
+        choose: (locked) => {
+          choice = locked;
+        },
+        onClose: () => {
+          resume();
+          if (choice === null) return;
+          screen.resetFocus();
+          session.editor.lockAll(choice);
+          persistEdit();
+          pauseFor(messageDialog(itfHost(), gameText(choice ? LOCK_TEXT.locked : LOCK_TEXT.unlocked), resume));
+        },
+      }),
+    );
+  };
+
+  /**
+   * Éditeur d'indices (41f3dc) : `null` depuis la barre ; un emplacement (poignée « modifier ») ; ou la place d'une nouvelle main
+   * (après « Nouveau »), créée quand son texte est écrit (41f159).
+   */
+  const openHintEditor = (target: { slot: number } | { at: { x: number; y: number } } | null): void => {
+    const lab = session.labPuzzle;
+    if (!lab || session.running) return;
+    let slot = target && "slot" in target ? target.slot : null;
+    const at = target && "at" in target ? target.at : null;
+    let choice: HintEditorChoice = "done";
+    pauseFor(
+      openHintEditorWindow(itfHost(), {
+        text: slot !== null ? (lab.hints[slot]?.text ?? "") : at ? "" : null,
+        count: lab.hintCount + (at && slot === null ? 1 : 0),
+        save: (text) => {
+          if (slot !== null) lab.setHintText(slot, text);
+          else if (at) slot = lab.addHint(at.x, at.y, text);
+        },
+        message: (text) => void messageDialog(itfHost(), text),
+        choose: (c) => {
+          choice = c;
+        },
+        onClose: () => {
+          resume();
+          switch (choice) {
+            case "create":
+              screen.placing = "hint";
+              screen.hintsShown = true;
+              return announce(copy.hintPlace);
+            case "show":
+              screen.hintsShown = lab.hintCount > 0;
+              return announce(screen.hintsShown ? copy.hintsShown(lab.hintCount) : copy.hintsHidden);
+            case "hide":
+              screen.hintsShown = false;
+              return announce(copy.hintsHidden);
+            case "help":
+              return openHelp();
+            case "done":
+              return;
+          }
+        },
+      }),
+    );
+  };
+
+  /** Poignée « effacer » d'une main (41f867) : 31122 « Effacer » / « Annuler », puis l'emplacement est libéré (41f1bd). */
+  const deleteHint = (slot: number): void => {
+    const lab = session.labPuzzle;
+    if (!lab) return;
+    pauseFor(
+      genericDialog(itfHost(), {
+        text: gameText(HINT_TEXT.confirmDelete),
+        buttons: [HINT_TEXT.delete, HINT_TEXT.cancel],
+        choose: (r) => {
+          if (r !== 1) return;
+          lab.removeHint(slot);
+          announce(copy.hintDeleted);
+        },
+        onClose: resume,
+      }),
+    );
+  };
+
+  /** Première image d'un état de l'ANM d'un type (44b2c0 : −1 = nombre d'images). */
+  const stateFirst = (type: number) => {
+    const anm = assets.partAnm(type);
+    return (state: number): number => (!anm ? 0 : state === -1 ? imageCount(anm) : Math.max(0, stateImage(anm, state)));
+  };
+
+  /** Poignée « solution » (42ea99 → 426d1c) : `SOLVE.ITF` pour la pièce (une télécommande : ses explosifs). */
+  const openSolve = (target: Part): void => {
+    const lab = session.labPuzzle;
+    if (!lab || session.running) return;
+    const part = target.type === 0x16 && target.links[1] ? target.links[1] : target;
+    const existing = lab.conditionOf(part);
+    let position = false;
+    sound.playEffect(SOUND_SOLVE);
+    pauseFor(
+      openSolveWindow(itfHost(), {
+        name: texts.parts.find((p) => p.id === part.type)?.name ?? "",
+        solve: solveParts[part.type] ?? null,
+        frame: part.editFrame,
+        first: stateFirst(part.type),
+        drawPart: (surface, r, image) => drawPartPreview(surface, assets, part.type, r, image),
+        condition: existing && { state1: existing.state1, state2: existing.state2, count: existing.count, rectX: existing.rectX, rectY: existing.rectY, rectWidth: existing.rectWidth, rectHeight: existing.rectHeight },
+        others: lab.conditions.filter((c) => c.part !== part).length,
+        delay: lab.delay,
+        advanced: solveAdvanced,
+        set: (value) => lab.setCondition(part, value),
+        setDelay: (d) => {
+          lab.delay = d;
+        },
+        setAdvanced: (a) => {
+          solveAdvanced = a;
+        },
+        message: (text) => void messageDialog(itfHost(), text),
+        drawPosition: () => {
+          position = true;
+        },
+        help: () => queueMicrotask(() => openHelp()),
+        onClose: () => {
+          resume();
+          if (!position) return announce(copy.solveSaved);
+          // 427419(0x4a5f) : 31138, puis un rectangle tracé dans l'aire ; la fenêtre revient ensuite (426d1c).
+          solvePart = part;
+          pauseFor(
+            messageDialog(itfHost(), gameText(SOLVE_TEXT.drawBox), () => {
+              resume();
+              screen.placing = "rect";
+              announce(gameText(SOLVE_TEXT.drawBox));
+            }),
+          );
+        },
+      }),
+    );
+  };
+
+  /** Rectangle « Position » tracé : la condition de la pièce devient « dans ce rectangle », puis `SOLVE.ITF` revient. */
+  const solveRect = (rect: Rect | null): void => {
+    const part = solvePart;
+    const lab = session.labPuzzle;
+    solvePart = null;
+    if (!part || !lab) return;
+    if (rect && rect.width > 0 && rect.height > 0) {
+      const count = lab.conditionOf(part)?.count ?? 0;
+      if (!lab.setCondition(part, { state1: 0, state2: 0, count, rectX: rect.x, rectY: rect.y, rectWidth: rect.width, rectHeight: rect.height })) {
+        return pauseFor(messageDialog(itfHost(), gameText(SOLVE_TEXT.full), () => {
+          resume();
+          openSolve(part);
+        }));
+      }
+      persistEdit();
+    }
+    openSolve(part);
+  };
+
+  /** Barre du but au Labo (414fc1) : le texte s'écrit sur place. */
+  const editGoal = (): void => {
+    const lab = session.labPuzzle;
+    if (!lab || session.running || goalEditor) return;
+    goalEditor = openGoalEditor(shell, {
+      value: lab.goal,
+      maxLength: GOAL_MAX,
+      label: copy.goalEdit,
+      input: (v) => {
+        lab.goal = v;
+      },
+      onClose: () => {
+        goalEditor = null;
+        persistEdit();
+        announce(copy.goalEditDone);
+      },
+    });
   };
 
   // ------------------------------------------------------------------ actions
@@ -359,7 +644,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   /** Clic sur la main d'un indice (42013d) : HINT.ITF avec son texte et sa voix (emplacement LEV `slot`). */
   const openHint = (slot: number): void => {
     const text = screen.texts.hints[slot] ?? "";
-    const voice = current ? hintVoice(slot + 1, current.index) : null;
+    const voice = current && current.index >= 0 ? hintVoice(slot + 1, current.index) : null;
     const play = (): void => {
       sound.stopVoice();
       if (voice) sound.playVoice(voice);
@@ -381,8 +666,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     sound.stopEffects();
     screen.session = session;
     screen.resetFocus();
+    // Labo et essai (419878) : GENERIC 31178, la machine est revenue à l'état d'édition.
+    if (session.lab || labTest) {
+      pauseFor(messageDialog(itfHost(), gameText(LAB_SOLVED_TEXT), resume));
+      return;
+    }
     if (!current) return;
     const ref = current;
+    if (home) return homeSolved(ref, home);
     const wasSolved = progress.isSolved(ref.name);
     progress.markSolved(ref.name);
     screen.solved = true;
@@ -426,6 +717,39 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
   };
 
+  /** Puzzles maison qui ont un but, par emplacement. */
+  const homePuzzles = (): PuzzleRef[] =>
+    Array.from({ length: SLOT_COUNT }, (_, i) => i + 1).flatMap((slot) => {
+      const s = slots.read(slot);
+      return s && hasGoal(s.save.machine) ? [homePuzzleRef(slot)] : [];
+    });
+
+  /** Puzzle maison réussi : noté (emplacement et date), PUZZSOLV ; « Puzzle Suivant » : le puzzle maison suivant non résolu. */
+  const homeSolved = (ref: PuzzleRef, h: { slot: number; savedAt: number }): void => {
+    homeProgress.markSolved(h.slot, h.savedAt);
+    screen.solved = true;
+    const list = homePuzzles();
+    const after = list.filter((p) => p.number > ref.number);
+    const isSolved = (p: PuzzleRef): boolean => homeProgress.isSolved(p.number, slots.read(p.number)?.savedAt ?? -1);
+    const next = after.find((p) => !isSolved(p)) ?? after[0] ?? null;
+    const fanfare = window.setTimeout(() => sound.playEffect(SOUND_SOLVED), SOLVED_SOUND_STEPS * STEP_MS);
+    pauseFor(
+      solvedDialog(itfHost(), {
+        hasNext: next !== null,
+        canReplay: true,
+        same: () => undefined,
+        replay: () => {
+          if (!session.running) toggleRun();
+        },
+        next: () => next && enterPuzzle(next),
+        onClose: () => {
+          window.clearTimeout(fanfare);
+          resume();
+        },
+      }),
+    );
+  };
+
   const onEvent = (e: PlayEvent): void => {
     switch (e.type) {
       case "start":
@@ -435,7 +759,41 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         if (session.running) toggleRun();
         break;
       case "goal":
-        if (current && !session.running) sound.playVoice(goalVoice(current.index));
+        if (current && current.index >= 0 && !session.running) sound.playVoice(goalVoice(current.index));
+        break;
+      case "goalEdit":
+        editGoal();
+        break;
+      case "locked":
+        persistEdit();
+        announce(e.locked ? copy.partLocked : copy.partUnlocked);
+        break;
+      case "solution":
+        openSolve(e.part);
+        break;
+      case "hintEdit":
+        openHintEditor({ slot: e.slot });
+        break;
+      case "hintDelete":
+        deleteHint(e.slot);
+        break;
+      case "hintChanged":
+        persistEdit();
+        break;
+      case "hintPlaced":
+        openHintEditor({ at: { x: e.x, y: e.y } });
+        break;
+      case "rectDrawn":
+        solveRect(e.rect);
+        break;
+      case "placeCancel":
+        announce(copy.placeCancelled);
+        if (solvePart) solveRect(null);
+        break;
+      case "tab":
+        labTab = e.tab;
+        fillLabBin();
+        announce(copy.binTab(gameText(TAB_TEXT + e.tab)));
         break;
       case "program":
         openProgram(e.part);
@@ -517,7 +875,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const toolbarAction = (name: string): void => {
     const lab = session.lab !== null;
     const fieldEmpty = session.world.statics.head === null && session.world.mobiles.head === null;
-    const decision = toolbarDecision(name, { lab, solved: screen.solved, running: session.running, fieldEmpty });
+    const decision = toolbarDecision(name, { lab, test: labTest !== null, solved: screen.solved, running: session.running, fieldEmpty });
+    if (decision.endTest) {
+      // Mode 8 : l'essai se termine (Labo d'avant l'essai), puis le bouton agit comme au Labo.
+      endTest();
+      if (decision.action !== "none") toolbarAction(name);
+      return;
+    }
     if (decision.confirm === undefined) return runToolbar(decision.action);
     pauseFor(confirmDialog(itfHost(), interfaceText(interfaceLines, decision.confirm), () => runToolbar(decision.action), resume));
   };
@@ -553,6 +917,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         return playHelp(HELP_INTRO);
       case "hints":
         return showHint();
+      case "hintEditor":
+        return openHintEditor(null);
+      case "lock":
+        return openLock();
+      case "test":
+        return startTest();
       case "solution":
         if (current && !session.running) loadPuzzle(current, true);
         return;
@@ -807,22 +1177,40 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   /** Ouvre un puzzle sur sa fiche (`PUZZDISP`, 425d20), comme le jeu à chaque entrée dans un puzzle. */
   const enterPuzzle = (ref: PuzzleRef): void => {
     front = null;
-    loadPuzzle(ref);
-    const title = texts.levels[ref.index]?.title ?? "";
+    if (!loadPuzzle(ref)) return;
+    const title = puzzleTitle(ref);
     showScreen(new PuzzleCardScreen(assets, readItf(index.get("PUZZDISP.ITF")), ref, title), () => shell.focusCanvas());
+  };
+
+  /** Titre d'un puzzle : `LEVELS.INF`, ou le nom de la machine d'un puzzle maison. */
+  const puzzleTitle = (p: PuzzleRef): string => {
+    const slot = homeSlot(p);
+    return slot !== null ? (slots.read(slot)?.save.name ?? "") : (texts.levels[p.index]?.title ?? "");
   };
 
   const chooserTexts: ChooserTexts = {
     title: copy.chooserTitle,
-    puzzleTitle: (p) => texts.levels[p.index]?.title ?? "",
+    puzzleTitle,
     solved: copy.solvedMark,
   };
 
-  /** Disquette en Jeu (418f2c) : la liste des puzzles de la catégorie en cours (`DOSBOX`). */
+  /** Puzzles résolus pour la liste : ceux du jeu, et les puzzles maison (emplacement et date de sauvegarde). */
+  const chooserProgress = {
+    isSolved: (name: string): boolean => {
+      const m = /^HOME(\d+)$/.exec(name);
+      if (!m) return progress.isSolved(name);
+      const slot = Number(m[1]);
+      const stored = slots.read(slot);
+      return stored !== null && homeProgress.isSolved(slot, stored.savedAt);
+    },
+  };
+
+  /** Disquette en Jeu (418f2c) : la liste des puzzles de la catégorie en cours (`DOSBOX`), puzzles maison compris. */
   const openChooser = (): void => {
     if (!current) return;
     if (session.running) toggleRun();
-    showList(new PuzzleListScreen(assets, readItf(index.get("DOSBOX.ITF")), puzzles, progress, chooserTexts, current.category, current, effect));
+    const all = [...puzzles, ...homePuzzles()];
+    showList(new PuzzleListScreen(assets, readItf(index.get("DOSBOX.ITF")), all, chooserProgress, chooserTexts, current.category, current, effect));
   };
 
   const showList = (list: PuzzleListScreen): void =>
@@ -850,6 +1238,15 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       (r) => {
         switch (r?.kind) {
           case "category":
+            // Bac « Maison » sans machine qui ait un but : le jeu dit que le répertoire est vide (31184) ; le port explique.
+            if (r.category === HOME_CATEGORY && homePuzzles().length === 0) {
+              return pauseFor(
+                messageDialog(itfHost(), copy.homeEmpty, () => {
+                  resume();
+                  showBins(list);
+                }),
+              );
+            }
             list.setCategory(r.category, current);
             return showList(list);
           case "cancel":
@@ -1030,8 +1427,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const hoverTip = (x: number, y: number): void => {
     const slot = screen.slotUnder(x, y);
     const button = slot ? null : screen.toolbarAt(x, y);
+    const tab = slot || button ? null : screen.tabAt(x, y);
     // Les boutons sont recalculés à chaque appel : on les compare par nom.
-    const target = slot ?? button?.name ?? null;
+    const target = slot ?? button?.name ?? (tab ? `tab${tab.tab}` : null);
     if (target === tipSlot) return;
     tipSlot = target;
     window.clearTimeout(tipTimer);
@@ -1039,6 +1437,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     if (session.editor.held) return;
     if (slot) tipTimer = window.setTimeout(() => showTip(slot.type, slot), TIP_DELAY_MS);
     if (button) tipTimer = window.setTimeout(() => showButtonTip(button), TIP_DELAY_MS);
+    if (tab) tipTimer = window.setTimeout(() => placeTip([gameText(TAB_TEXT + tab.tab)], { x, y, width: 1, height: 1 }, "left"), TIP_DELAY_MS);
   };
 
   const unbindPointer = bindCanvasPointer(

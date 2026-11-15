@@ -15,11 +15,14 @@
  * - 42ee68 (corde, câble), 42ed3f (courroie) : liens en deux appuis (437f0d : pièce qui accepte une corde, +0x10 & 4, et
  *   point d'accroche le plus proche si +0x10 & 8 ; 438985 / 438932 : courroie entre deux pièces +0x10 & 1, à moins de 140 px).
  * - 438ea8 : une pièce à fiche (+0x14 & 1) posée se branche seule sur une prise libre (+0x14 & 2) à moins de 8 px.
+ * - Labo (modes 1 et 6) : cadenas d'une pièce (43806a bits 0x10 / 0x400, poignée de 42e1e4, 42e9d8 : +0x14 ^= 0x40, la
+ *   télécommande et ses explosifs ensemble), poignée « solution » des pièces +0x14 & 0x8000 (bit 0x200, 42ea99 → `SOLVE.ITF`),
+ *   « Verrouiller / Déverrouiller » toutes les pièces (4209e5, 420afc), décors posés et repris (bac à onglets, `bin-tabs.ts`).
  *
  * Le noyau (`World`) garde privées les opérations de bac de l'exe (42f978, 4395ba, 43909c, 4390ff, 438fe3) : l'éditeur
  * les atteint par `core()` (API manquante signalée, voir `docs/tim3/plan.md`, vague U).
  */
-import { BIN_ORDER } from "../data/tables/bin-order";
+import { labTabTypes } from "./bin-tabs";
 import { insertSorted } from "./lists";
 import { updateGeometry } from "./move";
 import { BeltData, F0C, Part, Polygon, RopeData } from "./part";
@@ -48,6 +51,10 @@ export const Zone = {
   Remove: 8,
   Info: 0xc,
   Program: 0xd,
+  /** Cadenas (Labo) : 0x0B de 43840d, 42e9d8. */
+  Lock: 0xb,
+  /** Solution (Labo) : 0x0E de 43840d, 42ea99 → 426d1c (`SOLVE.ITF`). */
+  Solution: 0xe,
   Turn: 0xf,
 } as const;
 export type ZoneId = (typeof Zone)[keyof typeof Zone];
@@ -58,12 +65,20 @@ const Z = {
   HEIGHT: 0x2,
   FLIP_X: 0x4,
   FLIP_Y: 0x8,
+  LOCK: 0x10,
   INFO: 0x20,
   REMOVE: 0x40,
   PROGRAM: 0x80,
   BODY: 0x100,
+  SOLUTION: 0x200,
+  UNLOCK: 0x400,
   PROGRAM_LOW: 0x800,
 } as const;
+
+/** +0x14 : décor (scenery), pièce verrouillée, pièce qui peut entrer dans la solution d'un puzzle maison (43806a). */
+const SCENERY = 0x1000;
+const LOCKED = 0x40;
+const IN_SOLUTION = 0x8000;
 
 /** Poignée dessinée par 42e1e4 : rectangle 36 × 36 et état de `HANDLES.ANM` (table 0x473310). */
 export interface Handle {
@@ -130,7 +145,7 @@ function pointInside(part: Part, x: number, y: number): boolean {
 }
 
 export interface EditorOptions {
-  /** Labo : pièces en nombre illimité (palette), aucune pièce verrouillée par le puzzle. */
+  /** Labo : pièces en nombre illimité (palette), cadenas et poignée « solution », décors déplaçables. */
   lab?: boolean;
 }
 
@@ -169,29 +184,37 @@ export class Editor {
     return this.world.bin.toArray().filter((p) => p !== this.held);
   }
 
-  /** Types de la palette du Labo, dans l'ordre du bac (0x47201c), limités aux pièces de `INFO.RES` (0 … 148). */
-  static labTypes(world: World): number[] {
-    const seen = new Set<number>();
-    const out: number[] = [];
-    for (const t of BIN_ORDER) {
-      if (t < 0 || t > 148 || seen.has(t)) continue;
-      seen.add(t);
-      if (world.types.anims[t]) out.push(t);
-    }
-    return out;
+  /**
+   * Types de la palette du Labo pour l'onglet `tab` du bac (417264 en modes 1 et 6, `bin-tabs.ts`) : tout l'ordre du bac
+   * (0x47201c, types 0 à 280, décors compris), filtré par l'onglet. `date` : pièces des fêtes (43b06c).
+   */
+  static labTypes(world: World, tab = 0, date: Date | null = null): number[] {
+    return labTabTypes(world.types, tab, { date }).filter((t) => world.types.anims[t]);
+  }
+
+  /**
+   * Remplit le bac du Labo avec la palette de l'onglet : une pièce de chaque type (renouvelée quand on la prend) ; les pièces
+   * des autres onglets quittent le bac (417264 refait la liste à chaque changement d'onglet).
+   */
+  stockLab(types: readonly number[]): void {
+    if (!this.lab) return;
+    const wanted = new Set(types);
+    for (const p of this.world.bin.toArray()) if (p !== this.held && !wanted.has(p.type)) this.world.bin.remove(p);
+    const present = new Set(this.binParts().map((p) => p.type));
+    for (const t of types) if (!present.has(t)) createPart(this.world, t);
   }
 
   /**
    * 437cc9 (simplifié) : pièce posée sous le point (x, y) de l'aire. Rectangle de la pièce (438319 : position et forme),
    * filtre 1 = accepte une corde (+0x10 & 4), 2 = accepte une courroie (+0x10 & 1) ; les décors (+0x14 & 0x1000) ne se
-   * prennent pas. Entre plusieurs candidates : celle dont le polygone contient le point, puis la plus petite (437c88).
+   * prennent qu'au Labo, où on les pose. Entre plusieurs candidates : celle dont le polygone contient le point, puis la plus petite (437c88).
    */
   partAt(x: number, y: number, filter: 0 | 1 | 2 = 0): Part | null {
     let best: Part | null = null;
     let bestInside = false;
     let bestArea = Infinity;
     for (const p of this.world.staticThenMobile()) {
-      if (p.flags14 & 0x1000) continue;
+      if (p.flags14 & SCENERY && !this.lab) continue;
       if (filter === 1 && !(p.flags10 & 4)) continue;
       if (filter === 2 && !(p.flags10 & 1)) continue;
       const r = this.partRect(p);
@@ -224,19 +247,22 @@ export class Editor {
     return { x: p.px, y: p.py, w: p.shapeW || p.frameW, h: p.shapeH || p.frameH };
   }
 
-  /** La pièce peut-elle être prise ou modifiée par le joueur (non verrouillée par le puzzle, pas un décor) ? */
+  /** La pièce peut-elle être prise ou modifiée (non verrouillée ; un décor seulement au Labo) ? */
   isMovable(p: Part): boolean {
-    return !(p.flags14 & 0x40) && !(p.flags14 & 0x1000);
+    return !(p.flags14 & LOCKED) && (this.lab || !(p.flags14 & SCENERY));
   }
 
   /**
-   * 43806a : zones offertes par une pièce posée. Pièce verrouillée : aucune (le Labo n'a pas les cadenas ici). Sinon :
-   * retirer et déplacer ; puis, sauf corde, câble et courroie : largeur (+0x10 & 0x80), hauteur (+0x10 & 0x100), retourner
-   * (+0x0C & 0x400 / 0x200, seulement si la pièce retournée ne chevauche rien), programmer (+0x14 & 0x400) ; infos toujours.
+   * 43806a : zones offertes par une pièce posée. Labo, hors décor : cadenas fermé (0x400, pièce verrouillée) ou ouvert (0x10).
+   * Infos sauf décor. Pièce verrouillée : rien d'autre. Sinon : retirer et déplacer ; puis, sauf corde, câble et courroie :
+   * largeur (+0x10 & 0x80), hauteur (+0x10 & 0x100), retourner (+0x0C & 0x400 / 0x200, seulement si la pièce retournée ne
+   * chevauche rien), programmer (+0x14 & 0x400), et au Labo la solution (+0x14 & 0x8000). Les poignées 0x1000 / 0x2000 des
+   * décors (premier plan, arrière-plan : 42ead8, 42eb25) ne sont pas portées.
    */
   zoneMask(p: Part): number {
     let mask = 0;
-    if (!(p.flags14 & 0x1000)) mask |= Z.INFO;
+    if (this.lab && !(p.flags14 & SCENERY)) mask |= p.flags14 & LOCKED ? Z.UNLOCK : Z.LOCK;
+    if (!(p.flags14 & SCENERY)) mask |= Z.INFO;
     if (!this.isMovable(p)) return mask;
     mask |= Z.REMOVE | Z.BODY;
     if (isRope(p) || isBelt(p)) return mask;
@@ -249,7 +275,21 @@ export class Editor {
       if (p.flags0C & 0x200 && this.flipFits(p, 2)) mask |= Z.FLIP_Y;
     }
     if (p.flags14 & 0x400) mask |= mask & Z.WIDTH ? Z.PROGRAM_LOW : Z.PROGRAM;
+    if (this.lab && p.flags14 & IN_SOLUTION) mask |= Z.SOLUTION;
     return mask;
+  }
+
+  /**
+   * 42e1e4 (bits 0x410) : coin de la poignée du cadenas. Ouvert : à droite, en haut. Fermé : à droite s'il reste 18 px dans
+   * l'aire, sinon à gauche (+18) ; en haut, sauf si la pièce dépasse de plus de 18 px vers le haut (alors en bas − 18, à gauche).
+   */
+  private lockCorner(p: Part, r: { x: number; y: number; w: number; h: number }): { x: number; y: number } {
+    const left = r.x - HANDLE_SIZE;
+    const top = r.y - HANDLE_SIZE;
+    const right = r.x + r.w;
+    if (!(p.flags14 & LOCKED)) return { x: right, y: top };
+    if (top < -18) return { x: left + 18, y: r.y + r.h - 18 };
+    return { x: FIELD_WIDTH - 18 > right ? right : left + 18, y: top };
   }
 
   /** Poignées de 42e1e4 autour d'une pièce posée, aux positions de l'exe (coordonnées de l'aire). */
@@ -264,6 +304,7 @@ export class Editor {
     const bottom = r.y + r.h;
     const out: Handle[] = [];
     if (mask & Z.REMOVE) out.push({ zone: Zone.Remove, x: left, y: top, state: HANDLE_STATES[7] });
+    if (mask & Z.SOLUTION) out.push({ zone: Zone.Solution, x: midX, y: top, state: HANDLE_STATES[10] });
     if (mask & Z.WIDTH) {
       out.push({ zone: Zone.WidthLeft, x: left, y: midY, state: HANDLE_STATES[0] });
       out.push({ zone: Zone.WidthRight, x: right, y: midY, state: HANDLE_STATES[1] });
@@ -276,6 +317,7 @@ export class Editor {
     if (mask & Z.INFO) out.push({ zone: Zone.Info, x: right, y: bottom, state: HANDLE_STATES[9] });
     if (mask & Z.PROGRAM) out.push({ zone: Zone.Program, x: right, y: midY, state: HANDLE_STATES[8] });
     if (mask & Z.PROGRAM_LOW) out.push({ zone: Zone.Program, x: left + 16, y: bottom - 8, state: HANDLE_STATES[8] });
+    if (mask & (Z.LOCK | Z.UNLOCK)) out.push({ zone: Zone.Lock, ...this.lockCorner(p, r), state: HANDLE_STATES[mask & Z.UNLOCK ? 6 : 5] });
     return out;
   }
 
@@ -297,6 +339,10 @@ export class Editor {
     const right = r.x + r.w;
     const bottom = r.y + r.h;
     const band = large ? HANDLE_SIZE >> 1 : 9;
+    if (mask & (Z.LOCK | Z.UNLOCK)) {
+      const c = this.lockCorner(p, r);
+      if (x >= c.x && x < c.x + HANDLE_SIZE && y >= c.y && y < c.y + HANDLE_SIZE) return Zone.Lock;
+    }
     const inLeft = x >= r.x - HANDLE_SIZE && x < r.x;
     const inRight = x > right && x < right + HANDLE_SIZE;
     const inTop = y >= r.y - HANDLE_SIZE && y < r.y;
@@ -312,6 +358,7 @@ export class Editor {
     }
     if (mask & (Z.FLIP_X | Z.FLIP_Y) && inLeft && inBottom) return this.flipZone(p);
     if (mask & Z.INFO && x > right && x < right + 41 && y > bottom && y < bottom + 41) return Zone.Info;
+    if (mask & Z.SOLUTION && inTop && x >= cx - 18 && x < cx + 18) return Zone.Solution;
     if (mask & Z.PROGRAM && inRight && y >= cy - 18 && y < cy + 18) return Zone.Program;
     if (mask & Z.PROGRAM_LOW && inLeft && inBottom) return Zone.Program;
     if (mask & Z.BODY && x >= r.x && x < right && y >= r.y && y < bottom) return Zone.Body;
@@ -595,6 +642,39 @@ export class Editor {
       this.removeToBin(p);
     }
     for (const p of [...this.world.staticThenMobile()]) if (this.isMovable(p)) this.removeToBin(p);
+  }
+
+  // ------------------------------------------------------------------ cadenas (Labo)
+
+  /**
+   * 42e9d8 : poignée du cadenas, la pièce change d'état (+0x14 ^= 0x40) ; une télécommande (0x16) ou des explosifs (0x37) entraînent
+   * leur partenaire (+0x94). Rend le nouvel état (vrai : verrouillée), `null` hors du Labo ou pour un décor.
+   */
+  toggleLock(p: Part): boolean | null {
+    if (!this.lab || p.flags14 & SCENERY || p === this.held) return null;
+    p.flags14 ^= LOCKED;
+    const partner = (p.type === 0x16 || p.type === 0x37) && p.links[1] ? p.links[1] : null;
+    if (partner) partner.flags14 ^= LOCKED;
+    this.world.redraw(p, 2);
+    return (p.flags14 & LOCKED) !== 0;
+  }
+
+  /**
+   * « Verrouiller » (4209e5) ou « Déverrouiller » (420afc) de la fenêtre `HTLOCK` : toutes les pièces posées, mobiles puis fixes,
+   * hors décors (+0x14 & 0x1040 : déjà verrouillées ou décor). Rend le nombre de pièces changées.
+   */
+  lockAll(locked: boolean): number {
+    if (!this.lab) return 0;
+    this.release();
+    let n = 0;
+    for (const list of [this.world.mobiles, this.world.statics]) {
+      for (const p of list) {
+        if (p.flags14 & SCENERY || ((p.flags14 & LOCKED) !== 0) === locked) continue;
+        p.flags14 ^= LOCKED;
+        n++;
+      }
+    }
+    return n;
   }
 
   // ------------------------------------------------------------------ retournement et taille

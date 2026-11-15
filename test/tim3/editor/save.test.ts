@@ -11,6 +11,7 @@ import {
   SAVE_VERSION,
   SLOT_COUNT,
   cleanName,
+  emptyPuzzle,
   labSaveSlots,
   levelWithParts,
   loadMachine,
@@ -40,7 +41,7 @@ function toyMachine(overrides: Partial<LabMachine> = {}): LabMachine {
   const ball = emptyPart(0);
   Object.assign(ball, { type: 0, flags1: 0x1000, flags3: 0x40, x: 100, y: 50, width1: 16, height1: 16, width2: 16, height2: 16, connected1: -1, connected2: -1, plugged1: -1, plugged2: -1 });
   const second = { ...ball, x: 200 };
-  return { ...DEFAULT_LAB, fixedParts: [], movingParts: [ball, second], placed: [0, 1], ...overrides };
+  return { ...DEFAULT_LAB, fixedParts: [], movingParts: [ball, second], placed: [0, 1], ...emptyPuzzle(), ...overrides };
 }
 
 describe("progression (D11)", () => {
@@ -82,7 +83,7 @@ describe("machines du Labo : emplacements", () => {
     const back = loadMachine(labSaveSlots(reopen(store)), 4);
     expect(back).toEqual({ status: "loaded", name: "Ma machine", machine });
     expect(machineSettings(machine)).toEqual({ gravity: 120, pressure: 9, background: 7, music: 1003 });
-    expect(store.get("tim3:slot04")).toContain('"version":1');
+    expect(store.get("tim3:slot04")).toContain(`"version":${SAVE_VERSION}`);
     expect(loadMachine(slots, 5)).toEqual({ status: "empty" });
   });
 
@@ -137,8 +138,14 @@ describe("machines du Labo : emplacements", () => {
     const good = { version: SAVE_VERSION, name: "Bonne", machine: toyMachine() };
     const bad = (save: unknown): string => JSON.stringify({ savedAt: 1, save });
     const corrupt = [
-      bad({ ...good, version: 2 }),
+      bad({ ...good, version: 3 }),
       bad({ ...good, version: "1" }),
+      bad({ ...good, machine: { ...good.machine, goal: 4 } }),
+      bad({ ...good, machine: { ...good.machine, hints: [] } }),
+      bad({ ...good, machine: { ...good.machine, hints: good.machine.hints.map((h, i) => (i === 0 ? { ...h, flip: 9 } : h)) } }),
+      bad({ ...good, machine: { ...good.machine, solution: { ...good.machine.solution, conditions: [] } } }),
+      bad({ ...good, machine: { ...good.machine, solution: { ...good.machine.solution, conditions: good.machine.solution.conditions.map((c, i) => (i === 0 ? { ...c, partIndex: 2 } : c)) } } }),
+      bad({ ...good, machine: { ...good.machine, solution: undefined } }),
       bad({ ...good, name: "" }),
       bad({ ...good, name: 7 }),
       bad({ ...good, machine: null }),
@@ -200,7 +207,7 @@ describe("état d'édition : stockage", () => {
     expect(edits.savePuzzle("HH3", parts)).toBe(false);
     expect(store.data.size).toBe(0);
     for (const text of [
-      JSON.stringify({ version: 2, parts }),
+      JSON.stringify({ version: 3, parts }),
       JSON.stringify({ version: 1, parts: { ...parts, placed: [3] } }),
       JSON.stringify({ version: 1, parts: { ...parts, fixedParts: "non" } }),
       JSON.stringify({ version: 1 }),

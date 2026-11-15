@@ -31,6 +31,10 @@ S'ajouteront ensuite `files.md` (généré par l'extraction), `graphics.md`, `au
 - **15/11/2026** : vagues X, P (banc Unicorn, format v2), D, V, A (commun + jeu), Φ1, Φ2 et R faites ; **les 206 niveaux complets donnent des traces identiques au banc sur 600 pas** (`traces.test.ts`, 633/633). En cours : U. Rien commité.
 - **Vague F** : l'aide du professeur est portée (`HELP.ITF`, mode aide de l'écran et du menu principal, professeur animé et
   synchronisé sur sa voix, aussi dans `BINSOLVE`) : `ui.md` § Aide du professeur.
+- **Outils du Labo** (éléments différés, faits le 15/11/2026) : cadenas (`HTLOCK`, cadenas de chaque pièce), levier d'essai (mode 8),
+  éditeur d'indices, but écrit dans la barre, conditions de réussite (`SOLVE.ITF`), onglets du bac (décors 110 à 280 compris), puzzles
+  maison jouables depuis le bac « Puzzles Personnels » avec leur progression ; sauvegardes en version 2 avec migration de la version 1 :
+  `ui.md` § Outils du Labo. Écarts : poignées des décors, mesure du délai en marche, voix de l'éditeur d'indices.
 - **Décisions déjà prises par l'utilisatrice** :
   - on porte **TIM3**, pas TIM1 ; l'installeur de TIM1 DOS fourni ne sert que de référence éventuelle (`engine.md` § 6) ;
   - consigne générale : « mutualiser avec ce qu'on a déjà, sans pour autant trop dévoyer les jeux » ;

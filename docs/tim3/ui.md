@@ -8,11 +8,13 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 
 | Fichier | Rôle |
 | --- | --- |
-| `engine/editor.ts` | `Editor` : bac, pièce tenue, pose sur la grille (42f24a), chevauchement refusé (437208), zones et poignées (43806a, 43840d, 42e1e4), retournement et quart de tour (slot 3), taille (+ et −, poignées des bords), cordes et poulies (42ee68), courroies (42ed3f), fiches (438ea8), télécommande et explosifs (42f57b), pièces verrouillées, « dégager l'aire », palette du Labo (`labTypes`, `takeNew`). |
+| `engine/editor.ts` | `Editor` : bac, pièce tenue, pose sur la grille (42f24a), chevauchement refusé (437208), zones et poignées (43806a, 43840d, 42e1e4), retournement et quart de tour (slot 3), taille (+ et −, poignées des bords), cordes et poulies (42ee68), courroies (42ed3f), fiches (438ea8), télécommande et explosifs (42f57b), pièces verrouillées, « dégager l'aire », palette du Labo (`labTypes`, `stockLab`, `takeNew`), cadenas (`toggleLock`, `lockAll`), poignée « solution », décors au Labo. |
+| `engine/bin-tabs.ts` | Onglets du bac au Labo (417264, 4187b5) : filtres des 14 familles, pièces des fêtes (43b06c). |
+| `engine/lab-puzzle.ts` | `LabPuzzle` : le puzzle maison du Labo (but, 8 indices, conditions de réussite tenues par leurs pièces, délai), plages d'états de `SOLVE.RES` (429cb8, 429ef4). |
 | `engine/program.ts` | `PartProgram` : fenêtre « programmer » (42ea57 → 4249f8, `PROG<type>.ITF`) des types 4, 27, 54, 58, 63, 71, 80, 81, 87, 96, 108, 137 ; choix lus dans `PROGPART.RES` (`parseProgramRows`), compteur du pistolet laser, réglettes de la balle programmable et du seau troué, boîtes et ballon refusés s'ils chevauchent. `Editor.program(pièce, lignes)`. |
 | `engine/goals.ts` | `GoalTest` (436dc6 : zones, états, conditions « nombre », délai) et `SolvedCountdown` (30 images après le premier succès, 4359a4). |
 | `engine/session.ts` | `Tim3Session` : édition / marche, Démarrer (copie de l'état d'édition), Arrêter (retour exact), puzzle réussi, sons des pièces (`drainEffects`), Labo (`LabSettings`, `labLevel`), `Progress` (clés `tim3:solved`, `tim3:last`, noms de puzzles du jeu seulement), `puzzleList` (156 puzzles, HH reportés) ; options `unlock` et `originalCount` pour reprendre une aire gardée. |
-| `engine/save.ts` | Sauvegardes (D11) : `snapshotWorld` / `snapshotLab` (inverse de `World.addFromLev`, un monde en édition → enregistrements de LEV), `parse*` (valeur inconnue → `null`), machines du Labo (`labSaveSlots`, `saveMachine`, `loadMachine`), `EditStore` (état d'édition). |
+| `engine/save.ts` | Sauvegardes (D11) : `snapshotWorld` / `snapshotLab` (inverse de `World.addFromLev`, un monde en édition → enregistrements de LEV), `parse*` (valeur inconnue → `null`), machines du Labo (`labSaveSlots`, `saveMachine`, `loadMachine`, version 2 et `migrateLabMachine`), niveau à jouer d'une machine (`puzzleLevel`), `EditStore` (état d'édition). |
 | `engine/solution.ts` | « Montrer la solution » (ampoule) : `designerSolution` verrouille à leur place les pièces du bac sans le bit 0x100 (leurres et liens vers un leurre exclus), `solutionSession` les déverrouille (`unlock`). |
 | `ui/toolbar.ts` | Barre du haut sans DOM : `toolbarStates` (boutons montrés, enfoncés, grisés selon le mode, 418b78), `toolbarDecision` (clic et confirmation, 418ded), `interfaceText` (texte de `INTRFACE.RES` par identifiant). |
 | `ui/play.ts` | `PlayScreen` : pointeur et clavier → éditeur et session ; image 640×480 (aire, bac, poignées, pièce tenue, lien élastique, indice). |
@@ -23,7 +25,10 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 | `ui/globe-window.ts` | Globe (`GRAVITY.ITF`, 41cbdc). |
 | `ui/musicbox-window.ts` | Guitare (`MUSICBOX.ITF`, 4234ec), plus la bande « Voix du professeur » du site. |
 | `ui/binsolve-window.ts` | Fin de catégorie (`BINSOLVE.ITF`, 419c9c), par-dessus PUZZSOLV. |
-| `ui/hint-window.ts` | Un indice (`HINT.ITF`, 41f3dc). |
+| `ui/hint-window.ts` | Un indice (`HINT.ITF`, 41f3dc) ; au Labo, l'éditeur d'indices (`hintEditorWindow`). |
+| `ui/lock-window.ts` | Cadenas du Labo (`HTLOCK.ITF`, 420810). |
+| `ui/solve-window.ts` | Conditions de réussite d'une pièce (`SOLVE.ITF`, 426d1c). |
+| `ui/goal-editor.ts` | But du puzzle maison écrit dans la barre du but au Labo (414fc1). |
 | `ui/professor.ts` | `Professor` (sans DOM) : le professeur animé de `HELP.ITF` et `BINSOLVE.ITF` (423e50, 4241ae, 424089, 42452c), attente `PROFAMBT.ANM`, parole `PROFSPCH.ANM` synchronisée sur `mouth()`. |
 | `ui/help-window.ts` | Aide du professeur (`HELP.ITF`, 41d9a3, 41db2d, 41e567). Textes et voix : `data/help.ts` (`HelpTable`, 41e7e7). |
 | `ui/machines-window.ts` | Machines du Labo : `LOADSAVE.ITF` (42289c) puis la liste `DOSBOX.ITF` des dix emplacements. |
@@ -38,7 +43,9 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 - Jeu : Puzzle enfoncé ; deux joueurs, manuel, visite guidée, inscription grisés (palette atténuée, `RenderAssets.fadeTable` :
   l'ANM n'a que « relâché » et « enfoncé », le jeu cache ses boutons sans jamais les griser) ; cadenas et levier d'essai cachés ;
   ampoule à x = 540 si le puzzle est résolu (`Progress`), sinon vide.
-- Labo : clé enfoncée ; cadenas, levier d'essai et indices (éditeur d'indices 41f3dc) grisés ; pas d'ampoule.
+- Labo : clé enfoncée ; cadenas (`HTLOCK`), levier d'essai et main (éditeur d'indices 41f3dc) actifs ; pas d'ampoule (§ Outils du Labo).
+- Essai (mode 8, 418ca4) : les boutons du Labo, levier d'essai enfoncé (418d91) ; chaque bouton qui touche à la machine termine d'abord
+  l'essai (418e7f, 418ed1, 41928e, 41930e, 419360, 41923c), la main et le levier ne font que cela ; aide et drapeau gardent l'essai.
 - Disquette : en Jeu, le choix du puzzle (`DOSBOX`, 418f2c) ; au Labo, les machines du Labo.
 - Clics : Puzzle sans effet en Jeu, depuis le Labo 31397 puis le dernier puzzle ; clé 31398 puis le Labo ; balayette sans
   question en Jeu (43252d), 31134 au Labo si l'aire n'est pas vide ; ampoule 31125 puis la solution du concepteur ; bouton grisé :
@@ -112,9 +119,10 @@ lancement ; le port aussi, à chaque clic sur « Jouer » (la page de dev avec `
   repart). Options : la guitare (`MUSICBOX`). Bande `MM_TEXT` : seuls les six modes ont un texte « contrôle + 100 » ; pour Aide,
   Options, Quitter et hors des boutons, elle est vide (4233a3 ne trouve rien, 423473 ne dessine rien). Le focus du clavier tient lieu
   de survol : la bande suit la dernière des deux actions.
-- `DOSBIN` : Deux joueurs (D12) et Maison (puzzles personnels : fichiers LEV lus sur disque ; les machines du Labo du port n'ont ni but
-  ni bac de puzzle, elles se rouvrent par la disquette du Labo) grisés ; « Avancé » grisé. Le titre et son champ de `DOSBOX` ne
-  servent qu'à « Enregistrer sous » (Labo) : cachés, comme le fait l'exe en chargement.
+- `DOSBIN` : Deux joueurs (D12) grisé ; « Avancé » grisé. Maison (`DB_USER`, « Puzzles Personnels ») : les machines du Labo qui ont
+  un but (§ Outils du Labo), au lieu des fichiers LEV du répertoire des puzzles personnels ; sans aucune, un message du site (le jeu
+  dit « Le répertoire ne contient aucun puzzle », 31184). Le titre et son champ de `DOSBOX` ne servent qu'à « Enregistrer sous » (Labo) :
+  cachés, comme le fait l'exe en chargement.
 - Rangée choisie à l'ouverture de `DOSBOX` : le puzzle en cours ; après un changement de catégorie, le premier non résolu (41c861 non
   lu). Double clic : deux appuis sur la même rangée en moins de 500 ms (au doigt aussi). Flèches : comme toutes les flèches `.ITF`
   (44ee9d), une rangée à la fin de leur animation, répétée bouton tenu.
@@ -238,18 +246,85 @@ sans aide).
 
 ## Sauvegardes (vague S, D11)
 
-- **Progression** : `tim3:solved`, `tim3:last` (`Progress`).
-- **Machines du Labo** : `tim3:slot01` … `slot10` (`SaveSlots`), `{ savedAt, save: { version: 1, name, machine } }` ; `machine` reprend
+- **Progression** : `tim3:solved`, `tim3:last` (`Progress`) ; puzzles maison résolus : `tim3:homeSolved` (`HomeProgress`, « emplacement@date
+  de sauvegarde » : une autre machine enregistrée au même emplacement repart non résolue).
+- **Machines du Labo** : `tim3:slot01` … `slot10` (`SaveSlots`), `{ savedAt, save: { version: 2, name, machine } }` ; `machine` reprend
   les champs d'un LEV (`gravity`, `pressure`, `music`, `background`, `fixedParts`, `movingParts` de `data/lev.ts`) plus `placed`
   (index des pièces que le joueur peut déplacer : tout ce qui est posé est écrit « verrouillé » pour que `World.loadLevel` ne le
-  range pas au bac, `SessionOptions.unlock` le déverrouille). Version inconnue, JSON cassé ou champ invalide : emplacement
-  vide, jamais d'exception. Nom : 1 à 32 caractères ; emplacement plein : confirmation (`saveMachine(..., replace)`).
-- **Puzzle en cours** : `tim3:edit:<puzzle>` (`fixedParts`, `movingParts` y compris le bac, `placed`) et `tim3:edit:lab`. Gardé
+  range pas au bac, `SessionOptions.unlock` le déverrouille ; une pièce verrouillée au cadenas n'est pas dans `placed`), et depuis la
+  **version 2** le puzzle maison : `goal`, `hints` (8 emplacements du LEV), `solution` (bloc solution du LEV : 8 conditions, index des
+  pièces dans fixes puis mobiles, délai). Le nom est le titre du LEV. **Migration** : une machine de la version 1 se lit avec un puzzle
+  vide (`migrateLabMachine`) et se réécrit en version 2 à la sauvegarde suivante. Version inconnue, JSON cassé ou champ invalide :
+  emplacement vide, jamais d'exception. Nom : 1 à 32 caractères ; emplacement plein : confirmation (`saveMachine(..., replace)`).
+- **Puzzle en cours** : `tim3:edit:<puzzle>` (`fixedParts`, `movingParts` y compris le bac, `placed` ; versions 1 et 2 identiques) et
+  `tim3:edit:lab` (une machine, version 1 migrée comme ci-dessus). Pendant l'essai du Labo, c'est la machine d'avant l'essai qui est
+  gardée ; l'aire d'un puzzle maison n'est pas gardée (sa machine peut être remplacée dans son emplacement). Gardé
   par `persistEdit` (`ui/app.ts`) au relâchement du pointeur, aux touches, à la fermeture d'une fenêtre, avant de changer de
   puzzle, avant « Démarrer », à `pagehide` et quand l'onglet se masque ; jamais en marche, donc c'est l'état d'avant « Démarrer ».
   Un puzzle sans pièce posée n'a pas d'entrée. Les index du LEV d'origine sont gardés (les conditions de victoire s'y rapportent).
 - Écarts : l'ordre d'insertion dans les listes (égalités de masse et de position) peut différer de celui d'une pose à la main ; une
   pièce tenue ou en cours de pose (corde tendue à moitié) n'est pas gardée comme telle (elle retourne au bac).
+
+## Outils du Labo (lu dans TIMWIN.EXE)
+
+**Cadenas** (`ui/lock-window.ts`, `Editor.toggleLock`, `lockAll`). Au Labo, une pièce posée (hors décor) a une poignée de cadenas
+(43806a : bit 0x10 ouvert, 0x400 fermé ; 42e1e4 : ouvert en haut à droite, image 14 de `HANDLES.ANM` ; fermé, image 13, à droite s'il
+reste 18 px dans l'aire, sinon à gauche ; testée en premier par 43840d, zone 0x0B). Un appui (42e9d8, son 0xE1B) change +0x14 & 0x40, et
+celui du partenaire d'une télécommande. Une pièce verrouillée n'offre plus que le cadenas et les infos : au Labo comme en Jeu, elle ne se
+déplace plus. Le bouton `TB_LOCKED` ouvre `HTLOCK.ITF` (420810) : Verrouiller (4209e5 : toutes les pièces posées, mobiles puis fixes,
+sauf décors et déjà verrouillées, puis 31132), Déverrouiller (420afc, puis 31133), Annuler. Quand on joue la machine (essai, Maison), les
+pièces non verrouillées partent au bac (43252d hors des modes 1 et 6 → 43267a), les autres restent à leur place.
+
+**Levier d'essai** (`TB_TEST`, 41908a ; mode 8). Le jeu écrit la machine dans un fichier temporaire (432607 ; échec : 31216) puis la
+recharge en mode 8 (43252d) ; 31143 n'est montré qu'à la première entrée (`[0x481004]`). Le port garde la machine du Labo (`labTest`), et
+joue `puzzleLevel(machine)` : pièces non verrouillées au bac, but, indices et conditions de la machine. Un second appui, ou un bouton qui
+touche à la machine, recharge le Labo tel qu'avant l'essai (43252d(fichier, 1)). But atteint, en essai comme au Labo (419803 teste le but
+dans les modes 1, 6 et 8) : GENERIC 31178 au lieu de PUZZSOLV.
+
+**Indices** (`ui/hint-window.ts`, `PlayScreen`). La main de la barre ouvre `HINT.ITF` en éditeur (41f3dc, 41f668) : consigne 31259 (plus
+31264 s'il y a des indices) en lecture seule ; Nouveau, Montrer (caché sans indice), Cacher (Échap), Aide. Nouveau (41fcdc) : 8 indices
+déjà, 31265 ; sinon une main suit le pointeur jusqu'à un appui (42057e, gardée dans l'aire), puis la fenêtre revient avec un EDIT
+modifiable (blanc sur bleu, 254 caractères, 41f787) ; texte vide : 31263 ; l'indice prend le premier emplacement libre (41f159). Montrer
+/ Cacher : toutes les mains (4204cf, 420536). Les mains montrées ont au Labo trois poignées (41ffd0) : effacer en haut à gauche (31122,
+« Effacer » / « Annuler », 41f867), tourner en bas à gauche (420289 : 0 → 1 → 3 → 2 → 0), modifier en bas à droite (l'EDIT) ; un appui sur
+la main la déplace (42057e). Les indices sont gardés avec la machine (8 emplacements du LEV).
+
+**But et titre.** Au Labo, la barre du but est un EDIT (414fc1 : `[0x4811e8]`, 399 caractères, retours à la ligne retirés) : dans le
+port, un appui sur la barre y pose une zone de texte (`ui/goal-editor.ts`), fermée par Entrée, Échap ou un clic ailleurs ; vide, la barre
+montre la consigne du site. Le titre est le nom donné à la sauvegarde (`DR_TITLE`, « Titre: »).
+
+**Conditions de réussite** (`ui/solve-window.ts`, `engine/lab-puzzle.ts`). Au Labo, une pièce +0x14 & 0x8000 a une poignée « solution »
+(drapeau à damier, image 21 de `HANDLES.ANM`, en haut au milieu, zone 0x0E) : son 0xC8C puis `SOLVE.ITF` (426d1c ; une télécommande y
+mène ses explosifs). Voyants (état 43 de `SOLVE.ANM`, éteint à la première image, allumé à la dernière) : Pas dans la Solution, Par le
+Haut (−500, −2000, 1640, 2000), Par le Bas (−500, 400, 1640, 3000), De l'Écran (−1 partout), et l'état choisi par ▲ ▼ parmi ceux de
+`SOLVE.RES` (plage d'images de 429cb8 : première image de l'état a jusqu'à celle de b − 1, b = −1 : la fin ; dans la variante de la
+pièce, 429ef4) ; Avancé / Normal (31082 / 31083) montre la rangée du bas : Nombre (EDIT de 2 chiffres ; sans condition, 31090), Retarde
+(délai du puzzle, EDIT de 4 chiffres ; sans aucune condition, 31088), Position (31138, un rectangle tracé dans l'aire, puis la fenêtre
+revient). 8 conditions au plus (31089). Le ballon : « Intact » donne les images 0 à 0, « Éclaté » 1 à 5, la plage des puzzles du jeu.
+
+**Onglets du bac** (`engine/bin-tabs.ts`, `drawBinTabs`). La fenêtre de bac Windows porte au Labo 14 onglets de 30 px dans sa barre de
+titre (4184e0, 4186c5 : `WPARTBIN.BMP`) ; leurs filtres (417264) : sans décor, décors (types 110 à 147 et 150 à 280, qui n'étaient pas
+proposés jusqu'ici : `labTypes` s'arrêtait aux 149 pièces de `INFO.RES`), rotations, cordes, balles, murs, électricité, feu, lasers,
+programmables, tuyaux, pentes, bestioles, divers ; les pièces des fêtes 32, 33, 34, 65 seulement le jour venu (43b06c). La table du bac ne
+propose pas 20, 41, 55, 72 (pièces créées en marche) ni 149.
+
+**Puzzles maison** (bac « Puzzles Personnels » de `DOSBIN`). Une machine sauvegardée qui a au moins une condition s'y joue comme un
+puzzle du jeu (`homePuzzleRef`, catégorie 6) : `PUZZDISP` avec l'icône `PD_HOME` et sans numéro (425fee), pièces non verrouillées au bac,
+but et indices de la machine (sans voix), PUZZSOLV et « Puzzle Suivant » vers le puzzle maison suivant ; l'ampoule pose la machine de
+son auteur (les pièces du bac sans le bit 0x100, `solutionSession`).
+
+Écarts du port :
+- Onglets : le panneau du bac du port (80 px, `PARTSBIN`) ne loge pas 14 onglets de 30 px. Un bouton à la place de `PB_CONTROL` montre
+  l'icône de l'onglet en cours ; un appui ouvre les 14 onglets en deux colonnes dans la liste du bac. L'option « fond » des préférences
+  du joueur (`USERPREF.ITF`, non porté) est supposée active : tous les décors sont proposés.
+- Poignées des décors (premier plan, arrière-plan : 43806a bits 0x1000 / 0x2000, 42ead8, 42eb25) : non portées ; un décor se déplace et
+  se retire comme une pièce.
+- « Retarde » : le jeu propose de lancer la machine et de cliquer quand la vérification doit commencer (31087, 427b19) ; le port pose 31
+  pas (une seconde), à corriger dans le champ. La variante d'une pièce (429ef4) est lue en partie : la plage de la ligne `@`, sinon du
+  premier état, qui contient l'image de la pièce ; le jeu remet aussi la condition à jour quand on retourne ou programme la pièce (429d84),
+  pas le port.
+- Professeur de l'éditeur d'indices : pas de voix (le jeu y joue celle d'un indice du dernier puzzle joué, `[0x481600]`).
+- Une condition dont la pièce est retirée au Labo disparaît ; une main sans texte n'est pas créée.
 
 ## Son
 
@@ -261,7 +336,7 @@ la machine et au puzzle réussi (ambiances en boucle). La file `World.sounds` es
 
 ## Vérification sans navigateur
 
-`npx vitest run test/tim3/editor test/tim3/ui` (moins d'une seconde ; `test/tim3/ui` : barre d'outils) : éditeur, session, Labo, conditions de victoire, progression, `save.test.ts` (sauvegardes : aller-retour, reprise après
+`npx vitest run test/tim3/editor test/tim3/ui` (moins d'une seconde ; `test/tim3/ui` : barre d'outils) : éditeur, session, Labo, conditions de victoire, progression, `lab-tools.test.ts` (cadenas, onglets, puzzle maison, but au Labo ; fenêtres `HTLOCK`, éditeur d'indices, `SOLVE`, écran du Labo), `homemade.test.ts` (puzzle maison construit par l'éditeur, sauvegardé, relu au Labo, joué et résolu ; migration des sauvegardes de la version 1), `save.test.ts` (sauvegardes : aller-retour, reprise après
 rechargement, données corrompues, emplacement plein, nom vide, quinze solutions reprises et résolues au même pas), et
 `professor.test.ts` (professeur, fenêtre d'aide, mode aide), `test/tim3/data/help.test.ts` (`HELP.RES`), `solution.test.ts` (ampoule : solution du concepteur posée, `TIM3_SOLUTION_ALL=1` pour les 156 : toutes résolues, HLEV9 17 pas avant le banc), `program.test.ts` et `replay.test.ts`, qui rejoue quinze solutions du concepteur **par l'API de l'éditeur** (`replay.ts` : prendre au bac, retourner,
 étirer, tourner, poser, tendre courroies et cordes, brancher, programmer) puis vérifie la victoire au pas du banc + 30.

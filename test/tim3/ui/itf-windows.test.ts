@@ -12,7 +12,7 @@ import { BINSOLVE, binsolveShown, binsolveWindow } from "../../../src/games/tim3
 import { GLOBE, GRAVITY_MAX, globeWindow } from "../../../src/games/tim3/ui/globe-window";
 import { HINT, hintWindow } from "../../../src/games/tim3/ui/hint-window";
 import { INFO, infoWindow } from "../../../src/games/tim3/ui/info-window";
-import { ItfWindow, type ItfWindowOptions } from "../../../src/games/tim3/ui/itf-window";
+import { ItfWindow, inputsOf, type ItfWindowOptions } from "../../../src/games/tim3/ui/itf-window";
 import { DOSBOX, LOADSAVE, loadSaveWindow, machineListWindow, machineRowText } from "../../../src/games/tim3/ui/machines-window";
 import { CD_TRACKS, MUSICBOX, musicboxWindow, speakerFrame, volumeStep } from "../../../src/games/tim3/ui/musicbox-window";
 import { PlayScreen } from "../../../src/games/tim3/ui/play";
@@ -336,12 +336,12 @@ describe.skipIf(!original.has)("fenêtres .ITF de la vague F", () => {
       const w = machineListWindow(assets, itf("DOSBOX.ITF"), { mode: "save", slots: () => slots, name: "Ma machine", validate });
       const m = model(w);
       expect(m.item(DOSBOX.load)!.text).toBe("Sauvegarder");
-      expect(w.options.input!.value).toBe("Ma machine");
+      expect(inputsOf(w.options)[0]!.value).toBe("Ma machine");
       // La liste s'arrête au-dessus du champ du titre.
       expect(w.options.list!.view.rect.y + w.options.list!.view.rect.height).toBeLessThan(m.rect(DOSBOX.title)!.y - m.origin.dy);
       clickRow(w, m, 2);
       expect(w.name()).toBe("Fusée");
-      expect(w.options.input!.value).toBe("Fusée");
+      expect(inputsOf(w.options)[0]!.value).toBe("Fusée");
       w.options.choose(DOSBOX.load);
       expect(validate).toHaveBeenCalledWith(3, "Fusée");
     });

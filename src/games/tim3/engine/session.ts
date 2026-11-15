@@ -10,11 +10,14 @@
  *   de l'image de l'ANM) ; quelques handlers les demandent eux-mêmes (`World.sound` / `stopSound`, crochets `onSound`). La
  *   session relève les deux après chaque pas, dans l'ordre (`drainEffects`) ; l'hôte coupe les effets à l'arrêt (ambiances
  *   en boucle).
- * - Progression (D11) : puzzles résolus et dernier puzzle, stockage préfixé `tim3:`.
+ * - Progression (D11) : puzzles résolus et dernier puzzle, stockage préfixé `tim3:` ; puzzles maison résolus (`HomeProgress`).
+ * - Labo : le puzzle maison (`LabPuzzle` : but, indices, conditions). 419803 teste le but en marche aussi au Labo (modes 1, 6 et 8) :
+ *   s'il est atteint, la machine s'arrête et GENERIC 31178 le dit (au lieu de PUZZSOLV).
  */
 import { PART_LOCKED, type Level, type LevCondition, type LevHint } from "../data/lev";
 import { DEFAULT_GRAVITY, DEFAULT_PRESSURE, applyAtmosphere } from "./gravity";
 import { Editor } from "./editor";
+import { LabPuzzle } from "./lab-puzzle";
 import { GOAL_MET, GoalTest, SolvedCountdown, type GoalResult } from "./goals";
 import { F0C, type Part } from "./part";
 import { insertSorted } from "./lists";
@@ -152,6 +155,50 @@ export class Progress {
   }
 }
 
+// ------------------------------------------------------------------ puzzles maison
+
+/** Catégorie des puzzles maison (`DOSBIN` : `DB_USER`, « Puzzles Personnels » 31054 = 31048 + 6 ; icône `PD_HOME` de `PUZZDISP`). */
+export const HOME_CATEGORY = 6;
+
+/** Puzzle maison : la machine de l'emplacement `slot` du Labo (`HOME<slot>`), hors de l'ordre du jeu (`index` −1). */
+export function homePuzzleRef(slot: number): PuzzleRef {
+  return { name: `HOME${slot}`, index: -1, category: HOME_CATEGORY, number: slot };
+}
+
+/** Emplacement d'un puzzle maison, `null` pour un puzzle du jeu. */
+export function homeSlot(ref: PuzzleRef): number | null {
+  return ref.category === HOME_CATEGORY ? ref.number : null;
+}
+
+/**
+ * Puzzles maison résolus (clé `homeSolved` sous `tim3:`) : un emplacement et la date de sa sauvegarde, pour qu'une autre machine
+ * enregistrée au même emplacement reparte non résolue. Valeurs étrangères ignorées.
+ */
+export class HomeProgress {
+  private readonly solved: Set<string>;
+
+  constructor(private readonly storage: HostStorage) {
+    this.solved = new Set((storage.get("homeSolved") ?? "").split(",").filter((s) => /^\d{1,2}@\d{1,16}$/.test(s)));
+  }
+
+  private static key(slot: number, savedAt: number): string {
+    return `${slot}@${Math.trunc(savedAt)}`;
+  }
+
+  isSolved(slot: number, savedAt: number): boolean {
+    return this.solved.has(HomeProgress.key(slot, savedAt));
+  }
+
+  markSolved(slot: number, savedAt: number): void {
+    const key = HomeProgress.key(slot, savedAt);
+    if (this.solved.has(key)) return;
+    // Une seule entrée par emplacement : l'ancienne machine de l'emplacement est oubliée.
+    for (const k of [...this.solved]) if (k.startsWith(`${slot}@`)) this.solved.delete(k);
+    this.solved.add(key);
+    this.storage.set("homeSolved", [...this.solved].join(","));
+  }
+}
+
 // ------------------------------------------------------------------ Labo
 
 export interface LabSettings {
@@ -230,8 +277,12 @@ export class Tim3Session {
   goalReached = false;
   readonly puzzle: PuzzleRef | null;
   readonly lab: LabSettings | null;
+  /** Labo : but, indices et conditions du puzzle maison. */
+  readonly labPuzzle: LabPuzzle | null;
   /** Copie de l'état d'édition prise au démarrage. */
   private snapshot: World | null = null;
+  /** Pièces de l'aire au démarrage, dans l'ordre des listes (la copie les a dans le même ordre : `LabPuzzle.remap`). */
+  private startOrder: Part[] = [];
   private readonly shownFrames = new WeakMap<Part, number>();
   private effects: EffectRequest[] = [];
 
@@ -261,6 +312,7 @@ export class Tim3Session {
     this.attach();
     this.editor = new Editor(this.world, { lab: this.lab !== null });
     this.goals = GoalTest.fromLevel(level, this.world);
+    this.labPuzzle = this.lab ? LabPuzzle.fromLevel(level, this.world) : null;
   }
 
   /** Sons demandés par les handlers (41126d, 41151e : `World.sound` / `stopSound`) : dans la file de la session. */
@@ -308,8 +360,11 @@ export class Tim3Session {
   start(): void {
     if (this.running) return;
     this.editor.release();
+    this.labPuzzle?.prune(this.world);
+    this.startOrder = [...this.world.statics, ...this.world.mobiles];
     this.snapshot = cloneWorld(this.world);
     if (this.lab) applyAtmosphere(this.types, this.lab.gravity, this.lab.pressure);
+    if (this.labPuzzle) this.goals = this.labPuzzle.goalTest();
     this.world.start();
     this.goals.reset();
     this.countdown.reset();
@@ -329,6 +384,8 @@ export class Tim3Session {
     this.attach();
     this.editor = new Editor(this.world, { lab: this.lab !== null });
     this.goals = GoalTest.fromLevel(this.level, this.world);
+    this.labPuzzle?.remap(this.startOrder, [...this.world.statics, ...this.world.mobiles]);
+    this.startOrder = [];
     this.effects = [];
     this.mode = "edit";
   }
@@ -341,7 +398,7 @@ export class Tim3Session {
     // La file du pas (`World.sounds`) n'est lue par personne d'autre : vidée pour ne pas grossir pendant la marche.
     this.world.sounds.length = 0;
     this.collectEffects();
-    if (this.lab) return { goal: 0, solved: false };
+    if (this.labPuzzle && !this.labPuzzle.hasGoal) return { goal: 0, solved: false };
     const goal = this.goals.check(this.world);
     if (goal === GOAL_MET) this.goalReached = true;
     const solved = this.countdown.update(goal);

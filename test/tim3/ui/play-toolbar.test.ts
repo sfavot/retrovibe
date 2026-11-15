@@ -40,12 +40,14 @@ describe.skipIf(!original.has)("écran de jeu : barre d'outils", () => {
     expect(screen.toolbarAt(90, 10)).toMatchObject({ name: "TB_GOTO_H2H", disabled: true });
   });
 
-  it("Labo : cadenas et levier d'essai grisés, clé enfoncée", () => {
+  it("Labo : cadenas et levier d'essai actifs, clé enfoncée ; en essai, le levier est enfoncé", () => {
     const { screen } = make(lab());
     screen.solved = true;
-    expect(screen.toolbarAt(510, 10)).toMatchObject({ name: "TB_LOCKED", disabled: true });
-    expect(screen.toolbarAt(550, 10)).toMatchObject({ name: "TB_TEST", disabled: true });
+    expect(screen.toolbarAt(510, 10)).toMatchObject({ name: "TB_LOCKED", disabled: false });
+    expect(screen.toolbarAt(550, 10)).toMatchObject({ name: "TB_TEST", disabled: false, pressed: false });
     expect(screen.toolbarAt(50, 10)).toMatchObject({ name: "TB_GOTO_WORK", pressed: true });
+    screen.test = true;
+    expect(screen.toolbarAt(550, 10)).toMatchObject({ name: "TB_TEST", pressed: true });
   });
 
   it("un clic sur un bouton le transmet ; un appui long au doigt donne l'infobulle sans cliquer", () => {

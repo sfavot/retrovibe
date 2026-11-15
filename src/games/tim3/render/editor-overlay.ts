@@ -149,3 +149,62 @@ export function drawCursorAt(surface: Surface, assets: RenderAssets, index: numb
   const c = cursorAt(assets, index);
   if (c) drawCursor(surface, c, x, y);
 }
+
+// ------------------------------------------------------------------ onglets du bac (Labo)
+
+/**
+ * Onglets du bac au Labo (choix du port, `engine/bin-tabs.ts`). La fenêtre de bac de la version Windows porte 14 onglets de 30 px
+ * dans sa barre de titre (4186c5 : fond 0x1D choisi ou 0x1E, icône 2 × onglet (+ 1 s'il n'est pas choisi) de `WPARTBIN.BMP`) ; le
+ * panneau du port, large de 80 px, ne les loge pas. Le port pose donc un bouton à la place de `PB_CONTROL` (602, 4 dans
+ * `PARTSBIN.ITF`), qui montre l'icône de l'onglet en cours ; un appui ouvre, dans la liste du bac, les 14 onglets en deux colonnes.
+ */
+export const BIN_TAB_BUTTON = { x: 600, y: 4 + BIN_PANEL.y, width: 32, height: 35 } as const;
+/** Cases du choix d'onglet : deux colonnes de 36 × 35 dans la liste du bac. */
+const TAB_CELL = { width: 36, height: 35 } as const;
+const WPARTBIN = "WPARTBIN.BMP";
+
+/** Case de l'onglet `tab` dans le choix (coordonnées de l'écran). */
+export function binTabCell(tab: number): Rect {
+  return { x: BIN_CLIP.x + (tab % 2) * TAB_CELL.width, y: BIN_CLIP.y + Math.floor(tab / 2) * TAB_CELL.height, width: TAB_CELL.width, height: TAB_CELL.height };
+}
+
+/** Icône d'un onglet centrée dans `r` (image 2 × onglet si choisi, sinon la suivante). */
+function drawTabIcon(surface: Surface, assets: RenderAssets, tab: number, selected: boolean, r: Rect): void {
+  const icon = assets.bitmap(WPARTBIN)?.frames[2 * tab + (selected ? 0 : 1)];
+  if (icon) surface.blit(icon, r.x + ((r.width - icon.width) >> 1), r.y + ((r.height - icon.height) >> 1), false, false);
+}
+
+export interface BinTabsView {
+  tab: number;
+  /** Le choix des onglets est ouvert (il remplace la liste du bac). */
+  picker: boolean;
+  /** Onglet survolé dans le choix. */
+  hover?: number | null;
+  count: number;
+}
+
+/** Bouton de l'onglet en cours et, s'il est ouvert, le choix des onglets (le fond de la liste a été posé par `drawBinOverlay`). */
+export function drawBinTabs(surface: Surface, assets: RenderAssets, view: BinTabsView): void {
+  const b = BIN_TAB_BUTTON;
+  surface.fillRect(b.x + 1, b.y + 1, b.width - 2, b.height - 2, mapColor(view.picker ? 7 : 15));
+  surface.strokeRect(b.x, b.y, b.width, b.height, mapColor(0));
+  drawTabIcon(surface, assets, view.tab, true, b);
+  if (!view.picker) return;
+  const old = surface.setClip(BIN_CLIP.x, BIN_CLIP.y, BIN_CLIP.width, BIN_CLIP.height);
+  for (let t = 0; t < view.count; t++) {
+    const r = binTabCell(t);
+    const chosen = t === view.tab;
+    if (chosen || view.hover === t) surface.fillRect(r.x + 1, r.y + 1, r.width - 2, r.height - 2, mapColor(chosen ? 15 : 7));
+    if (chosen) surface.strokeRect(r.x + 1, r.y + 1, r.width - 2, r.height - 2, mapColor(0));
+    drawTabIcon(surface, assets, t, chosen, r);
+  }
+  surface.restoreClip(old);
+}
+
+/** Rectangle en cours de tracé dans l'aire (« Endroit précis » de `SOLVE.ITF`, 427419 → 43144c), coordonnées de l'aire. */
+export function drawFieldRect(surface: Surface, r: Rect): void {
+  const old = surface.setClip(PLAYFIELD.x, PLAYFIELD.y, PLAYFIELD.width, PLAYFIELD.height);
+  surface.strokeRect(PLAYFIELD.x + r.x, PLAYFIELD.y + r.y, Math.max(1, r.width), Math.max(1, r.height), mapColor(15));
+  surface.strokeRect(PLAYFIELD.x + r.x + 1, PLAYFIELD.y + r.y + 1, Math.max(1, r.width - 2), Math.max(1, r.height - 2), mapColor(0));
+  surface.restoreClip(old);
+}

@@ -147,7 +147,46 @@
   font: 14px/1 sans-serif;
 }
 
+/* Contrôle EDIT du jeu (texte d'un indice, valeurs de la fenêtre Solution) : un vrai champ visible, aux couleurs du jeu. */
+.tim3-itf-edit {
+  padding: 2px 4px;
+  font: 13px/1.25 sans-serif;
+  caret-color: currentColor;
+  resize: none;
+  overflow: auto;
+}
+
 .tim3-itf-input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* But d'un puzzle maison : zone de texte posée sur la barre du but, le temps de l'écrire (Labo). */
+.tim3-goal-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.tim3-goal-frame {
+  position: absolute;
+}
+
+.tim3-goal-input {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 2px 4px;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+  font: 14px/1.2 serif;
+  resize: none;
+  pointer-events: auto;
+}
+
+.tim3-goal-input:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }

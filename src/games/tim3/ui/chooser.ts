@@ -6,18 +6,20 @@
  *   (son 0xE1B), un double clic ou « Lancer » charge le puzzle, « Annuler » ferme. Flèches (44ee9d) : une rangée. « Autres Puzzles »
  *   (`DR_BIN`) ouvre `DOSBIN` puis revient à la liste de la catégorie choisie (41ae39). « Avancé » (sélecteur de fichiers Windows,
  *   42a088) n'est pas porté : grisé. Le titre et son champ (`DR_TITLE`) ne servent qu'à « enregistrer » : cachés (41b10f).
- * - **`DOSBIN.ITF`** (41b649) : les bacs. Deux joueurs (puzzles HH, D12) et Maison (puzzles personnels : fichiers LEV du disque,
- *   lus par le sélecteur de fichiers ; les machines du Labo du port n'ont ni but ni bac de puzzle) sont grisés. Le bac de la catégorie
- *   en cours a le focus ; « Annuler » revient à la liste sans changer de catégorie.
+ * - **`DOSBIN.ITF`** (41b649) : les bacs. Deux joueurs (puzzles HH, D12) est grisé. Maison (`DB_USER`, « Puzzles Personnels ») : le
+ *   jeu y lit les fichiers LEV du répertoire des puzzles personnels ; le port, les machines du Labo qui ont un but (catégorie 6,
+ *   `homePuzzleRef`), rangées par emplacement. Le bac de la catégorie en cours a le focus ; « Annuler » revient à la liste sans changer
+ *   de catégorie.
  * - **`PUZZDISP.ITF`** (425d20) avant de jouer : catégorie (`PD_BIN`, texte 31048 + catégorie), « Puzzle no N » (`PD_NUMBER`,
- *   format « %Fs %d » de 2064), titre (`PD_TITLE`), icône de la catégorie (seule montrée parmi 34005 à 34011), « OK ».
+ *   format « %Fs %d » de 2064, aucun pour un puzzle maison), titre (`PD_TITLE`), icône de la catégorie (seule montrée parmi 34005 à
+ *   34011), « OK ».
  *
  * Accès dans le jeu : la disquette en mode Jeu ouvre `DOSBOX` (418f2c : chargement seulement), ainsi que « Fichier > Ouvrir » du
  * menu Windows ; le menu principal y revient par « Zones > Menu principal ».
  */
 import type { Font } from "../data/font";
 import type { Itf } from "../data/itf";
-import type { Progress, PuzzleRef } from "../engine/session";
+import { HOME_CATEGORY, type Progress, type PuzzleRef } from "../engine/session";
 import type { RenderAssets } from "../render/assets";
 import type { FrameSound } from "../render/front";
 import { ITF_DEFAULT_FONT, drawTextBox, itfText } from "../render/itf-draw";
@@ -197,8 +199,8 @@ export const DOSBIN = {
 
 /** Bac de chaque catégorie (table 0x4726d4) : 0 travaux pratiques … 4 très difficiles, 5 deux joueurs, 6 maison. */
 export const BIN_OF_CATEGORY: readonly number[] = [DOSBIN.tutorial, DOSBIN.easy, DOSBIN.medium, DOSBIN.hard, DOSBIN.reallyHard, DOSBIN.duel, DOSBIN.user];
-/** Bacs non portés : deux joueurs (D12) et maison. */
-export const BIN_GREYED: readonly number[] = [DOSBIN.duel, DOSBIN.user];
+/** Bac non porté : deux joueurs (D12). */
+export const BIN_GREYED: readonly number[] = [DOSBIN.duel];
 
 export type BinResult = { kind: "category"; category: number } | { kind: "help" } | { kind: "unavailable" } | { kind: "cancel" };
 
@@ -276,8 +278,9 @@ export class PuzzleCardScreen implements ItfScreen<"ok"> {
     return itfText(this.assets, CHOOSER_TEXT.category + this.puzzle.category);
   }
 
+  /** « Puzzle no N » ; rien pour un puzzle maison (425fee : `[0x477990]` = 6). */
   numberText(): string {
-    return `${itfText(this.assets, CHOOSER_TEXT.number)} ${this.puzzle.number}`;
+    return this.puzzle.category === HOME_CATEGORY ? "" : `${itfText(this.assets, CHOOSER_TEXT.number)} ${this.puzzle.number}`;
   }
 
   action(id: number): "ok" | undefined {

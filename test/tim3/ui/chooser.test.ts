@@ -204,7 +204,7 @@ describe.skipIf(!original.has)("choix du puzzle sur les données d'origine (DOSB
     expect(diff(solved, unsolved, g.textX, g.textX + g.textWidth)).toBe(0);
   });
 
-  it("DOSBIN : bacs des catégories, deux joueurs et maison grisés, focus sur la catégorie en cours", () => {
+  it("DOSBIN : bacs des catégories, deux joueurs grisé, Maison actif, focus sur la catégorie en cours", () => {
     const bins = new BinScreen(readItf(index.get("DOSBIN.ITF")), "Bacs", 3);
     const { m } = open(bins);
     expect(bins.options.defaultId).toBe(DOSBIN.hard);
@@ -212,7 +212,8 @@ describe.skipIf(!original.has)("choix du puzzle sur les données d'origine (DOSB
     expect(bins.action(DOSBIN.easy)).toEqual({ kind: "category", category: 1 });
     expect(bins.action(DOSBIN.tutorial)).toEqual({ kind: "category", category: 0 });
     expect(bins.action(DOSBIN.duel)).toEqual({ kind: "unavailable" });
-    expect(bins.action(DOSBIN.user)).toEqual({ kind: "unavailable" });
+    expect(bins.action(DOSBIN.user)).toEqual({ kind: "category", category: 6 });
+    expect(m.name(m.item(DOSBIN.user)!)).not.toContain("non disponible");
     expect(bins.action(DOSBIN.cancel)).toEqual({ kind: "cancel" });
     expect(bins.action(DOSBIN.help)).toEqual({ kind: "help" });
     expect(m.name(m.item(DOSBIN.duel)!)).toBe("À Deux Joueurs (non disponible)");

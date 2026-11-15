@@ -6,11 +6,18 @@
  * la glisse, on la lâche ; un simple appui sans glisser la garde en main (comme le clic de l'original, qui prend puis pose en
  * deux clics). Au doigt, la pièce tenue est dessinée au-dessus du doigt (`TOUCH_LIFT`), un appui sur une pièce posée la
  * sélectionne (ses poignées s'affichent) et un appui long dans le bac donne le nom et la description de la pièce.
+ *
+ * Labo : cadenas et poignée « solution » des pièces (`Zone.Lock`, `Zone.Solution`), mains des indices du puzzle maison avec leurs
+ * poignées (41ffd0 : effacer en haut à gauche, tourner en bas à gauche, modifier en bas à droite ; un appui sur la main la déplace,
+ * 42057e), pose d'une nouvelle main (42057e après « Nouveau »), tracé d'un rectangle (« Endroit précis » de `SOLVE.ITF`), barre du but
+ * à écrire (414fc1), onglets du bac (`engine/bin-tabs.ts`, `drawBinTabs`).
  */
 import { HELP_BIN, HELP_GOAL } from "../data/help";
 import type { Level } from "../data/lev";
 import type { PartInfo } from "../data/text";
-import { FIELD_HEIGHT, FIELD_WIDTH, HANDLE_SIZE, Zone, type HeldPreview, type ZoneId } from "../engine/editor";
+import { FIELD_HEIGHT, FIELD_WIDTH, HANDLE_SIZE, HANDLE_STATES, Zone, type HeldPreview, type ZoneId } from "../engine/editor";
+import { LAB_TAB_COUNT } from "../engine/bin-tabs";
+import { HINT_HEIGHT, HINT_WIDTH } from "../engine/lab-puzzle";
 import type { Part } from "../engine/part";
 import type { Tim3Session } from "../engine/session";
 import {
@@ -18,14 +25,18 @@ import {
   BIN_PANEL,
   BIN_PLAY,
   BIN_RIGHT,
+  BIN_TAB_BUTTON,
   GOALBAR,
   PLAYFIELD,
   TOOLBAR,
   binLayout,
   binScrollStep,
+  binTabCell,
   composeScreen,
   drawBinIcon,
   drawBinOverlay,
+  drawBinTabs,
+  drawFieldRect,
   drawGoalBar,
   drawHandles,
   drawHeldPart,
@@ -76,7 +87,26 @@ export type PlayEvent =
   /** Mode aide (41e6b7) : l'élément choisi d'un appui. */
   | { type: "helpPick"; target: HelpTarget }
   /** Mode aide : Échap l'abandonne (ajout du port). */
-  | { type: "helpCancel" };
+  | { type: "helpCancel" }
+  /** Labo : poignée du cadenas (42e9d8), la pièce est maintenant verrouillée ou non. */
+  | { type: "locked"; locked: boolean }
+  /** Labo : poignée « solution » (42ea99 → `SOLVE.ITF`). */
+  | { type: "solution"; part: Part }
+  /** Labo : main d'un indice, poignée « modifier » (41ffd0 → 0x20 : `HINT.ITF`), « effacer » (0x40 : 31122 d'abord). */
+  | { type: "hintEdit"; slot: number }
+  | { type: "hintDelete"; slot: number }
+  /** Labo : main tournée ou déplacée (puzzle maison changé). */
+  | { type: "hintChanged" }
+  /** Labo : la nouvelle main est posée (42057e), en (x, y) de l'aire. */
+  | { type: "hintPlaced"; x: number; y: number }
+  /** Labo : rectangle tracé dans l'aire (« Endroit précis »), coordonnées de l'aire. */
+  | { type: "rectDrawn"; rect: Rect }
+  /** Pose d'une main ou tracé abandonné (Échap). */
+  | { type: "placeCancel" }
+  /** Labo : un appui sur la barre du but l'ouvre à l'écriture (414fc1). */
+  | { type: "goalEdit" }
+  /** Labo : onglet du bac choisi. */
+  | { type: "tab"; tab: number };
 
 /**
  * Élément sous le pointeur en mode aide (41e85c) : un contrôle (son identifiant, clé de `HELP.RES`), une pièce posée (sa description,
@@ -93,8 +123,20 @@ export interface PlayTexts {
   parts: PartInfo[];
 }
 
+/** Main d'indice visible : emplacement LEV, position et texte. */
+export interface HintView {
+  slot: number;
+  x: number;
+  y: number;
+  flip: number;
+  text: string;
+}
+
+/** Zones d'une main d'indice au Labo (41ffd0). */
+type HintZone = "remove" | "flip" | "edit" | "body";
+
 interface Drag {
-  kind: "bin" | "field" | "resize" | "pending" | "press";
+  kind: "bin" | "field" | "resize" | "pending" | "press" | "hint" | "rect";
   part: Part | null;
   zone?: ZoneId;
   startX: number;
@@ -105,10 +147,14 @@ interface Drag {
   button?: string;
   /** La pièce vient d'être prise par cet appui (relâchée sans glisser, elle reste en main). */
   fresh?: boolean;
+  /** Main d'indice déplacée : emplacement et écart du pointeur. */
+  slot?: number;
+  grabX?: number;
+  grabY?: number;
 }
 
 /** Curseur CSS selon la zone (le port garde les curseurs du système, plus nets que ceux de `CURSORS.BMP`). */
-export type CursorKind = "default" | "pointer" | "grab" | "grabbing" | "ew-resize" | "ns-resize" | "not-allowed" | "copy" | "help";
+export type CursorKind = "default" | "pointer" | "grab" | "grabbing" | "ew-resize" | "ns-resize" | "not-allowed" | "copy" | "help" | "crosshair";
 
 export class PlayScreen {
   /** Défilement horizontal du bac, en pixels (borné par `binLayout`). */
@@ -123,6 +169,17 @@ export class PlayScreen {
   solved = false;
   /** Mode aide (41e6b7) : le prochain appui choisit l'élément à expliquer au lieu d'agir. */
   helpPicking = false;
+  /** Essai du puzzle maison (mode 8) : barre d'outils du Labo, levier enfoncé. */
+  test = false;
+  /** Labo : onglet du bac (`[0x471f90]`) et choix des onglets ouvert. */
+  binTab = 0;
+  tabPicker = false;
+  /** Labo : pose d'une nouvelle main d'indice, ou tracé d'un rectangle (`SOLVE.ITF`). */
+  placing: "hint" | "rect" | null = null;
+  /** Main d'indice dont les poignées sont montrées (Labo). */
+  private hintFocus: number | null = null;
+  /** Rectangle en cours de tracé (coordonnées de l'aire). */
+  private rect: Rect | null = null;
   private drag: Drag | null = null;
   private pointer = { x: -1, y: -1, touch: false, inside: false };
   private preview: HeldPreview = { valid: true };
@@ -142,24 +199,57 @@ export class PlayScreen {
     return this.session.editor;
   }
 
-  /** Indices non vides du puzzle (texte français de `LEVELS.INF`, position du LEV). */
+  /** Indices non vides du puzzle (texte français de `LEVELS.INF`, position du LEV ; au Labo, le puzzle maison). */
   get hintCount(): number {
-    return this.hintSlots().length;
+    return this.hintList().length;
   }
 
   /** Emplacements LEV (0 à 7) des indices non vides. */
   hintSlots(): number[] {
-    return this.texts.hints.flatMap((h, i) => (h !== "" && this.level.hints[i] ? [i] : []));
+    return this.hintList().map((h) => h.slot);
+  }
+
+  /** Mains d'indice : au Labo, celles du puzzle maison (modifiables) ; sinon celles du LEV, avec les textes donnés. */
+  hintList(): HintView[] {
+    const lab = this.session.labPuzzle;
+    if (lab) return lab.hints.flatMap((h, slot) => (h.text !== "" ? [{ slot, x: h.x, y: h.y, flip: h.flip ?? 0, text: h.text }] : []));
+    return this.texts.hints.flatMap((text, slot) => {
+      const h = this.level.hints[slot];
+      return text !== "" && h ? [{ slot, x: h.x, y: h.y, flip: h.flip ?? 0, text }] : [];
+    });
   }
 
   /** Main d'indice sous le point (contrôle de 44 × 43 en x, y de l'emplacement, 41ef54), si les indices sont affichés. */
   hintAt(x: number, y: number): number | null {
     if (!this.hintsShown || this.session.running) return null;
-    for (const slot of this.hintSlots()) {
-      const h = this.level.hints[slot]!;
-      if (inRect(hintRect(h.x, h.y), x, y)) return slot;
-    }
+    for (const h of this.hintList()) if (inRect(hintRect(h.x, h.y), x, y)) return h.slot;
     return null;
+  }
+
+  /** 41ffd0 : zone d'une main au Labo (poignées à 36 px autour du contrôle de 44 × 43), point de l'écran. */
+  private hintZone(h: HintView, x: number, y: number): HintZone | null {
+    const r = hintRect(h.x, h.y);
+    const left = r.x - HANDLE_SIZE;
+    const top = r.y - HANDLE_SIZE;
+    const bottom = r.y + r.height;
+    const right = r.x + r.width;
+    if (x >= left && x < r.x && y >= top && y < r.y) return "remove";
+    if (x >= left && x < r.x && y >= bottom && y < bottom + HANDLE_SIZE) return "flip";
+    if (x >= right && x < right + HANDLE_SIZE && y >= bottom && y < bottom + HANDLE_SIZE) return "edit";
+    return inRect(r, x, y) ? "body" : null;
+  }
+
+  /** Main et zone sous le point au Labo : d'abord les poignées de la main en vue, puis le corps d'une main. */
+  private labHintAt(x: number, y: number): { hint: HintView; zone: HintZone } | null {
+    if (!this.session.labPuzzle || !this.hintsShown || this.session.running) return null;
+    const list = this.hintList();
+    const focus = list.find((h) => h.slot === this.hintFocus);
+    if (focus) {
+      const zone = this.hintZone(focus, x, y);
+      if (zone) return { hint: focus, zone };
+    }
+    const body = list.find((h) => inRect(hintRect(h.x, h.y), x, y));
+    return body ? { hint: body, zone: "body" } : null;
   }
 
   /** Session remplacée (Arrêter restaure une copie du monde) : la sélection n'a plus de sens. */
@@ -189,7 +279,16 @@ export class PlayScreen {
    * qui se vide disparaît et les suivantes remontent). Au Labo, palette illimitée : pas de nombre (modes 1 et 6).
    */
   get bin(): BinLayout {
-    return binLayout(this.assets, this.editor.binParts(), this.binScroll, this.session.lab === null);
+    return binLayout(this.assets, this.tabPicker ? [] : this.editor.binParts(), this.binScroll, this.session.lab === null);
+  }
+
+  /** Labo : onglet sous le point (bouton de l'onglet en cours, ou case du choix ouvert), sinon `null`. */
+  tabAt(x: number, y: number): { tab: number; button: boolean } | null {
+    if (!this.session.lab || this.session.running) return null;
+    if (inRect(BIN_TAB_BUTTON, x, y)) return { tab: this.binTab, button: true };
+    if (!this.tabPicker) return null;
+    for (let t = 0; t < LAB_TAB_COUNT; t++) if (inRect(binTabCell(t), x, y)) return { tab: t, button: false };
+    return null;
   }
 
   private slotAt(x: number, y: number): BinSlot | null {
@@ -198,7 +297,7 @@ export class PlayScreen {
 
   /** Boutons montrés dans le mode courant (418b78), avec leur géométrie. */
   shownButtons(): ShownButton[] {
-    const states = toolbarStates({ lab: this.session.lab !== null, solved: this.solved, running: this.session.running });
+    const states = toolbarStates({ lab: this.session.lab !== null, test: this.test, solved: this.solved, running: this.session.running });
     return states.flatMap((st) => {
       const b = this.toolbar.find((t) => t.name === st.name);
       return b ? [{ ...b, pressed: st.pressed, disabled: st.disabled }] : [];
@@ -267,15 +366,20 @@ export class PlayScreen {
   cursor(): CursorKind {
     const { x, y } = this.pointer;
     if (this.helpPicking) return "help";
+    if (this.placing === "rect") return this.inField(x, y) ? "crosshair" : "default";
+    if (this.placing === "hint") return this.inField(x, y) ? "copy" : "default";
+    if (this.drag?.kind === "hint") return "grabbing";
     if (this.drag?.kind === "resize") return this.drag.zone === Zone.WidthLeft || this.drag.zone === Zone.WidthRight ? "ew-resize" : "ns-resize";
     if (this.editor.held) {
       if (this.inField(x, y)) return this.preview.valid ? "grabbing" : "not-allowed";
       return "grabbing";
     }
-    if (this.toolbarAt(x, y) || inRect(BIN_PLAY, x, y) || inRect(BIN_LEFT, x, y) || inRect(BIN_RIGHT, x, y)) return "pointer";
+    if (this.toolbarAt(x, y) || inRect(BIN_PLAY, x, y) || inRect(BIN_LEFT, x, y) || inRect(BIN_RIGHT, x, y) || this.tabAt(x, y)) return "pointer";
     if (this.slotAt(x, y)) return "grab";
-    if (inRect(GOALBAR, x, y)) return "pointer";
+    if (inRect(GOALBAR, x, y)) return this.session.lab && !this.session.running ? "default" : "pointer";
     if (this.session.running || !this.inField(x, y)) return "default";
+    const hint = this.labHintAt(x, y);
+    if (hint) return hint.zone === "body" ? "grab" : "pointer";
     switch (this.hoverZone) {
       case Zone.Body:
         return "grab";
@@ -291,6 +395,8 @@ export class PlayScreen {
       case Zone.FlipX:
       case Zone.FlipY:
       case Zone.Turn:
+      case Zone.Lock:
+      case Zone.Solution:
         return "pointer";
       default:
         return "default";
@@ -310,6 +416,37 @@ export class PlayScreen {
       this.emit({ type: "helpPick", target: this.helpTargetAt(x, y) });
       return;
     }
+    if (this.placing) {
+      // Pose d'une main (42057e : un appui la pose) ou début du rectangle ; hors de l'aire, rien.
+      if (!this.inField(x, y)) return;
+      const f = this.toField(x, y, false);
+      if (this.placing === "hint") {
+        this.placing = null;
+        const at = clampHint(f.x - (HINT_WIDTH >> 1), f.y - (HINT_HEIGHT >> 1));
+        this.emit({ type: "hintPlaced", x: at.x, y: at.y });
+        return;
+      }
+      this.rect = { x: f.x, y: f.y, width: 0, height: 0 };
+      this.drag = { kind: "rect", part: null, startX: f.x, startY: f.y, moved: false, touch };
+      return;
+    }
+    const tab = this.tabAt(x, y);
+    if (tab) {
+      if (tab.button) this.tabPicker = !this.tabPicker;
+      else {
+        this.tabPicker = false;
+        if (tab.tab !== this.binTab) {
+          this.binTab = tab.tab;
+          this.binScroll = 0;
+          this.emit({ type: "tab", tab: tab.tab });
+        }
+      }
+      return;
+    }
+    if (this.tabPicker && this.inBin(x, y)) {
+      this.tabPicker = false;
+      return;
+    }
     const button = this.toolbarAt(x, y);
     if (button) {
       this.drag = { kind: "press", part: null, startX: x, startY: y, moved: false, touch, button: button.name };
@@ -322,10 +459,25 @@ export class PlayScreen {
     if (inRect(BIN_LEFT, x, y)) return this.scrollBin(-1);
     if (inRect(BIN_RIGHT, x, y)) return this.scrollBin(1);
     if (inRect(GOALBAR, x, y)) {
-      this.emit({ type: "goal" });
+      this.emit({ type: this.session.lab && !this.session.running ? "goalEdit" : "goal" });
       return;
     }
-    const hint = this.hintAt(x, y);
+    const labHint = this.labHintAt(x, y);
+    if (labHint) {
+      const { hint: h, zone } = labHint;
+      this.hintFocus = h.slot;
+      if (zone === "remove") this.emit({ type: "hintDelete", slot: h.slot });
+      else if (zone === "edit") this.emit({ type: "hintEdit", slot: h.slot });
+      else if (zone === "flip") {
+        this.session.labPuzzle!.flipHint(h.slot);
+        this.emit({ type: "hintChanged" });
+      } else {
+        const f = this.toField(x, y, false);
+        this.drag = { kind: "hint", part: null, startX: x, startY: y, moved: false, touch, slot: h.slot, grabX: f.x - h.x, grabY: f.y - h.y };
+      }
+      return;
+    }
+    const hint = this.session.labPuzzle ? null : this.hintAt(x, y);
     if (hint !== null) {
       this.emit({ type: "hint", slot: hint });
       return;
@@ -391,6 +543,17 @@ export class PlayScreen {
       case Zone.Program:
         this.emit({ type: "program", part });
         return;
+      case Zone.Lock: {
+        const locked = ed.toggleLock(part);
+        if (locked !== null) {
+          this.emit({ type: "sound", name: "pick" });
+          this.emit({ type: "locked", locked });
+        }
+        return;
+      }
+      case Zone.Solution:
+        this.emit({ type: "solution", part });
+        return;
       default:
         this.focus = touch ? part : this.focus;
     }
@@ -418,6 +581,16 @@ export class PlayScreen {
       this.editor.resizeEdge(d.part, d.zone!, f.x, f.y);
       return;
     }
+    if (d?.kind === "hint" && d.moved) {
+      const f = this.toField(x, y, false);
+      this.session.labPuzzle?.moveHint(d.slot!, f.x - d.grabX!, f.y - d.grabY!, FIELD_WIDTH, FIELD_HEIGHT);
+      return;
+    }
+    if (d?.kind === "rect" && this.rect) {
+      const f = this.toField(x, y, false);
+      this.rect = normalRect(d.startX, d.startY, clamp(f.x, 0, FIELD_WIDTH), clamp(f.y, 0, FIELD_HEIGHT));
+      return;
+    }
     this.updateHover();
   }
 
@@ -425,7 +598,18 @@ export class PlayScreen {
   private updateHover(): void {
     const { x, y, touch } = this.pointer;
     const ed = this.editor;
-    if (this.helpPicking) return;
+    if (this.helpPicking || this.placing) return;
+    if (this.session.labPuzzle && this.hintsShown && !this.session.running && !ed.held) {
+      const h = this.labHintAt(x, y);
+      if (h) {
+        this.hintFocus = h.hint.slot;
+        this.focus = null;
+        this.hoverZone = Zone.None;
+        return;
+      }
+      const focus = this.hintList().find((k) => k.slot === this.hintFocus);
+      if (!focus || !this.inHintFrame(focus, x, y)) this.hintFocus = null;
+    }
     if (ed.held) {
       if (this.inField(x, y)) {
         const f = this.toField(x, y, touch && !isLink(ed.held));
@@ -470,6 +654,18 @@ export class PlayScreen {
       return;
     }
     if (d.kind === "resize") return;
+    if (d.kind === "hint") {
+      if (d.moved) this.emit({ type: "hintChanged" });
+      return;
+    }
+    if (d.kind === "rect") {
+      const r = this.rect;
+      this.rect = null;
+      if (!r) return;
+      this.placing = null;
+      this.emit({ type: "rectDrawn", rect: r });
+      return;
+    }
     if (d.kind === "bin" && d.touch) this.emit({ type: "tipEnd" });
     const ed = this.editor;
     if (!ed.held) return;
@@ -549,6 +745,18 @@ export class PlayScreen {
       this.emit({ type: "helpCancel" });
       return true;
     }
+    if (this.placing) {
+      if (key !== "Escape") return false;
+      this.placing = null;
+      this.rect = null;
+      this.drag = null;
+      this.emit({ type: "placeCancel" });
+      return true;
+    }
+    if (this.tabPicker && key === "Escape") {
+      this.tabPicker = false;
+      return true;
+    }
     if (this.session.running) {
       if (key === "Escape") {
         this.emit({ type: "stop" });
@@ -607,7 +815,8 @@ export class PlayScreen {
     const ed = this.editor;
     const bin = this.bin;
     this.binScroll = bin.scroll;
-    const goal = this.message ?? this.texts.goal;
+    // Labo : le but du puzzle maison, sinon la consigne (texte donné).
+    const goal = this.message ?? (this.session.labPuzzle?.goal || this.texts.goal);
     const screen = composeScreen(this.assets, s.world, {
       backgroundColor: s.background,
       goal: "",
@@ -619,13 +828,22 @@ export class PlayScreen {
     const { x: px, y: py } = this.pointer;
     const hoverSlot = !this.pointer.touch && this.pointer.inside && !ed.held && this.inBin(px, py) ? (bin.slots.find((k) => inRect(k, px, py)) ?? null) : null;
     drawBinOverlay(screen, this.assets, { layout: bin, running: s.running, hover: hoverSlot });
+    if (s.lab && !s.running) {
+      const t = this.tabPicker ? this.tabAt(px, py) : null;
+      drawBinTabs(screen, this.assets, { tab: this.binTab, picker: this.tabPicker, hover: t && !t.button ? t.tab : null, count: LAB_TAB_COUNT });
+    }
     if (s.running) return screen;
     if (this.hintsShown) {
-      for (const slot of this.hintSlots()) {
-        const h = this.level.hints[slot]!;
-        drawHintArrow(screen, this.assets, h.x, h.y, h.flip ?? 0);
-      }
+      for (const h of this.hintList()) drawHintArrow(screen, this.assets, h.x, h.y, h.flip);
+      const focus = this.session.labPuzzle ? this.hintList().find((h) => h.slot === this.hintFocus) : undefined;
+      if (focus && !ed.held && !this.placing) drawHandles(screen, this.assets, this.hintHandleViews(focus));
     }
+    if (this.placing === "hint" && this.pointer.inside && this.inField(px, py)) {
+      const f = this.toField(px, py, false);
+      const at = clampHint(f.x - (HINT_WIDTH >> 1), f.y - (HINT_HEIGHT >> 1));
+      drawHintArrow(screen, this.assets, at.x, at.y, 0);
+    }
+    if (this.rect) drawFieldRect(screen, this.rect);
     const focus = this.focus;
     if (focus && !ed.held && (focus.flags0C & 0x3000) !== 0) drawHandles(screen, this.assets, this.handleViews(focus));
     const held = ed.held;
@@ -676,6 +894,20 @@ export class PlayScreen {
     });
   }
 
+  /** Poignées d'une main au Labo (41ffd0) : effacer, tourner, modifier, aux états de `HANDLES.ANM` des pièces (0x48101c = 7, 4, 9). */
+  private hintHandleViews(h: HintView): HandleView[] {
+    const anm = this.assets.anm("HANDLES.ANM");
+    if (!anm) return [];
+    const at = (state: number, x: number, y: number): HandleView => ({ x, y, frame: stateImage(anm, state) });
+    return [at(HANDLE_STATES[7], h.x - HANDLE_SIZE, h.y - HANDLE_SIZE), at(HANDLE_STATES[4], h.x - HANDLE_SIZE, h.y + HINT_HEIGHT), at(HANDLE_STATES[9], h.x + HINT_WIDTH, h.y + HINT_HEIGHT)];
+  }
+
+  /** Le point de l'écran est-il dans le cadre des poignées d'une main ? */
+  private inHintFrame(h: HintView, x: number, y: number): boolean {
+    const r = hintRect(h.x, h.y);
+    return x >= r.x - HANDLE_SIZE && x < r.x + r.width + HANDLE_SIZE && y >= r.y - HANDLE_SIZE && y < r.y + r.height + HANDLE_SIZE;
+  }
+
   /** Rectangle d'une pièce posée dans l'écran (ancrage d'une infobulle). */
   screenRect(p: Part): Rect {
     const r = this.editor.partRect(p);
@@ -684,5 +916,9 @@ export class PlayScreen {
 }
 
 const isLink = (p: Part): boolean => p.type === 8 || p.type === 10 || p.type === 76;
+const clamp = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, v));
+/** 42057e : une main reste dans l'aire. */
+const clampHint = (x: number, y: number): { x: number; y: number } => ({ x: clamp(x, 0, FIELD_WIDTH - HINT_WIDTH), y: clamp(y, 0, FIELD_HEIGHT - HINT_HEIGHT) });
+const normalRect = (x0: number, y0: number, x1: number, y1: number): Rect => ({ x: Math.min(x0, x1), y: Math.min(y0, y1), width: Math.abs(x1 - x0), height: Math.abs(y1 - y0) });
 
 export { FIELD_HEIGHT, FIELD_WIDTH };

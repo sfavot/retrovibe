@@ -3,13 +3,14 @@
  * portés grisés, et ce que fait un clic (confirmation d'origine comprise).
  *
  * TIMWIN.EXE : 418b78 cache ou montre les boutons selon le mode (`[0x477988]` : 0 Jeu, 1 Labo, 8 Labo en essai) puis enfonce
- * le bouton du mode passé par l'appelant (4197c7) ; 418ded aiguille les clics (identifiants 35001 à 35022). Le port n'a que
- * deux modes : Jeu (un puzzle ouvert) et Labo.
+ * le bouton du mode passé par l'appelant (4197c7) ; 418ded aiguille les clics (identifiants 35001 à 35022). Le port a trois
+ * modes : Jeu (un puzzle ouvert, du jeu ou maison), Labo, et l'essai du Labo (mode 8).
  *
  * - Toujours montrés : les six modes de gauche, musique, valeurs globales, balayette, aide, drapeau.
  * - Jeu : disquette et indices ; cadenas, essai du Labo (`TB_TEST`), visite et fin de tour cachés ; l'ampoule
  *   « Montrer la solution » (x = 540) seulement si le puzzle a déjà été résolu (42d210), sinon l'emplacement reste vide.
  * - Labo : disquette, indices, cadenas et levier d'essai montrés ; ampoule, visite et fin de tour cachées.
+ * - Essai (mode 8, 418ca4) : les boutons du Labo, levier d'essai enfoncé (418d91).
  *
  * Le jeu ne grise jamais un bouton (il les cache) : les boutons montrés mais non portés sont grisés par le port.
  */
@@ -40,6 +41,8 @@ export type ToolbarName = (typeof TOOLBAR_NAMES)[number];
 export interface ToolbarContext {
   /** Labo (sinon Jeu : un puzzle ouvert). */
   lab: boolean;
+  /** Essai du puzzle maison (mode 8) : la barre du Labo, levier d'essai enfoncé. */
+  test?: boolean;
   /** Le puzzle ouvert a déjà été résolu (`Progress`) : l'ampoule apparaît. */
   solved: boolean;
   /** La machine est en marche (drapeau enfoncé). */
@@ -55,20 +58,18 @@ export interface ToolbarButtonState {
 
 /** Modes montrés mais non portés : deux joueurs, visite guidée, inscription. Le manuel (`TIMHELP.EXE`, hors jeu) ouvre l'aide du site. */
 const UNPORTED: ReadonlySet<ToolbarName> = new Set(["TB_GOTO_H2H", "TB_GOTO_SIGNIN", "TB_GOTO_TUTORIAL"]);
-/** Labo : cadenas (verrouiller les pièces), levier d'essai (mode 8) et indices (éditeur d'indices 41f3dc) non portés. */
-const LAB_UNPORTED: ReadonlySet<ToolbarName> = new Set(["TB_LOCKED", "TB_TEST", "TB_HINT"]);
-
 /** Boutons montrés (418b78), de gauche à droite. */
 export function toolbarStates(ctx: ToolbarContext): ToolbarButtonState[] {
-  const mode: ToolbarName = ctx.lab ? "TB_GOTO_WORK" : "TB_GOTO_PUZ";
+  const workshop = ctx.lab || ctx.test === true;
+  const mode: ToolbarName = workshop ? "TB_GOTO_WORK" : "TB_GOTO_PUZ";
   const out: ToolbarButtonState[] = [];
   for (const name of TOOLBAR_NAMES) {
-    if (!ctx.lab && (name === "TB_LOCKED" || name === "TB_TEST")) continue;
-    if (name === "TB_SOLUTION" && (ctx.lab || !ctx.solved)) continue;
+    if (!workshop && (name === "TB_LOCKED" || name === "TB_TEST")) continue;
+    if (name === "TB_SOLUTION" && (workshop || !ctx.solved)) continue;
     out.push({
       name,
-      pressed: name === mode || (name === "TB_FLAG" && ctx.running),
-      disabled: UNPORTED.has(name) || (ctx.lab && LAB_UNPORTED.has(name)),
+      pressed: name === mode || (name === "TB_FLAG" && ctx.running) || (name === "TB_TEST" && ctx.test === true),
+      disabled: UNPORTED.has(name),
     });
   }
   return out;
@@ -84,14 +85,34 @@ export const TOOLBAR_TEXT = {
   showSolution: 31125,
   /** 0x799e : balayette au Labo quand l'aire n'est pas vide (et Puzzle / clé quand le Labo a été modifié). */
   clearLab: 31134,
+  /** 0x79a7 : première entrée en essai (41913b, `[0x481004]`, une fois par partie). */
+  testIntro: 31143,
 } as const;
 
-export type ToolbarAction = "none" | "unavailable" | "play" | "lab" | "machines" | "chooser" | "options" | "globals" | "clear" | "help" | "hints" | "solution" | "run";
+export type ToolbarAction =
+  | "none"
+  | "unavailable"
+  | "play"
+  | "lab"
+  | "machines"
+  | "chooser"
+  | "options"
+  | "globals"
+  | "clear"
+  | "help"
+  | "hints"
+  | "hintEditor"
+  | "lock"
+  | "test"
+  | "solution"
+  | "run";
 
 export interface ToolbarDecision {
   action: ToolbarAction;
   /** Confirmation à demander d'abord : identifiant de `INTRFACE.RES` (Oui / Non). */
   confirm?: number;
+  /** Mode 8 : l'essai se termine d'abord (43252d(fichier, 1), le Labo revient tel qu'avant l'essai). */
+  endTest?: boolean;
 }
 
 /**
@@ -104,11 +125,16 @@ export interface ToolbarDecision {
  * - Ampoule : 31125 puis la solution du concepteur (43252d avec le mode 9).
  * - Disquette : en Jeu, le choix du puzzle (418f2c : `DOSBOX` en chargement seulement) ; au Labo, les machines (42289c demande
  *   charger ou enregistrer).
+ * - Main : en Jeu, les indices (4192ee) ; au Labo, l'éditeur d'indices (4192dc → 41f3dc).
+ * - Cadenas (41927c → 420810) : la fenêtre `HTLOCK`. Levier d'essai (41908a) : le Labo passe en essai (mode 8), ou en revient.
+ * - Essai (mode 8) : musique, disquette, main, globe, balayette, cadenas et levier terminent d'abord l'essai (418e7f, 418ed1,
+ *   41928e, 41930e, 419360, 41923c, 41909b) ; la main s'arrête là (419297 : pas de fenêtre). Aide et drapeau gardent l'essai.
  */
 export function toolbarDecision(name: string, ctx: ToolbarContext & { fieldEmpty: boolean }): ToolbarDecision {
   const state = toolbarStates(ctx).find((b) => b.name === name);
   if (!state) return { action: "none" };
   if (state.disabled) return { action: "unavailable" };
+  if (ctx.test) return testDecision(state.name, ctx);
   switch (state.name) {
     case "TB_GOTO_PUZ":
       return ctx.lab ? { action: "play", confirm: TOOLBAR_TEXT.openPlay } : { action: "none" };
@@ -127,12 +153,36 @@ export function toolbarDecision(name: string, ctx: ToolbarContext & { fieldEmpty
     case "TB_GOTO_TOUR":
       return { action: "help" };
     case "TB_HINT":
-      return { action: "hints" };
+      return { action: ctx.lab ? "hintEditor" : "hints" };
+    case "TB_LOCKED":
+      return ctx.running ? { action: "none" } : { action: "lock" };
+    case "TB_TEST":
+      return ctx.running ? { action: "none" } : { action: "test" };
     case "TB_SOLUTION":
       return ctx.running ? { action: "none" } : { action: "solution", confirm: TOOLBAR_TEXT.showSolution };
     case "TB_FLAG":
       return { action: "run" };
     default:
       return { action: "unavailable" };
+  }
+}
+
+/** Mode 8 : chaque bouton qui touche à la machine termine d'abord l'essai (`endTest`), puis agit comme au Labo. */
+function testDecision(name: ToolbarName, ctx: ToolbarContext & { fieldEmpty: boolean }): ToolbarDecision {
+  if (ctx.running && name !== "TB_FLAG" && name !== "TB_HELP" && name !== "TB_GOTO_TOUR") return { action: "none" };
+  switch (name) {
+    case "TB_HELP":
+    case "TB_GOTO_TOUR":
+      return { action: "help" };
+    case "TB_FLAG":
+      return { action: "run" };
+    case "TB_TEST":
+    case "TB_HINT":
+    case "TB_GOTO_WORK":
+      return { action: "none", endTest: true };
+    default: {
+      const lab = toolbarDecision(name, { ...ctx, lab: true, test: false });
+      return { ...lab, endTest: true };
+    }
   }
 }

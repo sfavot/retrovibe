@@ -17,7 +17,9 @@
  * - **Liste** (`list`, DR_LIST de `DOSBOX`, 41bf29) : `ScrollList` dessinée sur son contrôle, un clic choisit une rangée ; au
  *   clavier, un `role="listbox"` (flèches, Origine, Fin, pages ; Entrée : bouton par défaut).
  * - **Zones** (`zones`) : rectangles cliquables propres à l'appelant, dessinés par lui (`ItfState.draw`).
- * - **Champ** (`input`) : `<input>` transparent posé sur un contrôle dont le texte est dessiné par la fenêtre.
+ * - **Champs** (`input`, un ou plusieurs) : `<input>` transparent posé sur un contrôle dont le texte est dessiné par la fenêtre ; ou
+ *   (`edit`) un vrai champ visible, sur plusieurs lignes au besoin, comme les contrôles EDIT Win32 que le jeu pose dans ses fenêtres
+ *   (texte d'un indice 41f787, valeurs de `SOLVE.ITF` 426f92 : blanc sur bleu).
  * - **Survol animé** (`hoverAnimate`, menu principal, bacs) : le bouton survolé (ou qui a le focus) montre les images de son état,
  *   une par passe (422c0f → 4506f4 → 44f0a8), avec leurs sons.
  * - **Grisés activables** (`greyedActive`, écrans du parcours d'entrée) : un bouton grisé s'enfonce et agit (l'appelant répond
@@ -86,6 +88,13 @@ export interface ItfInput {
   value: string;
   maxLength: number;
   input(value: string): void;
+  /**
+   * Contrôle EDIT du jeu : le champ est visible (texte et fond aux couleurs données), le texte n'est pas dessiné par la fenêtre ;
+   * `multiline` : zone de texte (Entrée choisit quand même le bouton par défaut, comme un EDIT sans ES_WANTRETURN).
+   */
+  edit?: { color: string; background: string; multiline?: boolean };
+  /** Chiffres seulement (EDIT de `SOLVE.ITF`). */
+  numeric?: boolean;
 }
 
 /** Liste à défilement posée sur un contrôle (DR_LIST) : son état (`ScrollList`) et ce que font ses rangées. */
@@ -116,7 +125,7 @@ export interface ItfWindowOptions {
   checked?(id: number): boolean | undefined;
   sliders?: readonly ItfSlider[];
   zones?(): readonly ItfZone[];
-  input?: ItfInput;
+  input?: ItfInput | readonly ItfInput[];
   list?: ItfList;
   /** Contrôles image dont l'image avance à chaque passe (animation en boucle). */
   animate?: readonly number[];
@@ -174,6 +183,12 @@ export function screenOptions<R>(screen: ItfScreen<R>, then: (result: R | null) 
     },
     onClose: () => then(result),
   };
+}
+
+/** Les champs d'une fenêtre (un seul, plusieurs ou aucun). */
+export function inputsOf(options: Pick<ItfWindowOptions, "input">): readonly ItfInput[] {
+  const i = options.input;
+  return i === undefined ? [] : Array.isArray(i) ? i : [i as ItfInput];
 }
 
 const sameRow = (a: Rect, b: Rect): boolean => a.y < b.y + b.height / 2 && b.y < a.y + a.height / 2;
@@ -336,9 +351,11 @@ export class ItfWindow {
       const r = this.item(s.slider);
       if (r) out.push({ kind: "slider", key: `s${s.slider}`, slider: s, rect: r, name: s.label });
     }
-    const input = this.options.input;
-    const field = input ? this.item(input.id) : null;
-    if (input && field) out.push({ kind: "input", key: `i${input.id}`, input, rect: field, name: input.label });
+    for (const input of inputsOf(this.options)) {
+      // Un EDIT du jeu remplace son contrôle, que la fenêtre cache (41f53f : 45064c(HT_TEXT, 8)).
+      const field = this.item(input.id) ?? (input.edit ? this.rect(input.id) : null);
+      if (field) out.push({ kind: "input", key: `i${input.id}`, input, rect: field, name: input.label });
+    }
     const list = this.options.list;
     const listRect = this.listRect();
     if (list && listRect) out.push({ kind: "list", key: `l${list.id}`, list, rect: listRect, name: this.options.title });
@@ -740,19 +757,22 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
       } else if (c.kind === "input") {
         const inp = c.input;
         const e = reuse(c.key, () => {
-          const el = h("input", { type: "text", class: "tim3-itf-input", maxlength: inp.maxLength, autocomplete: "off", spellcheck: "false" });
+          const attrs = { class: inp.edit ? "tim3-itf-input tim3-itf-edit" : "tim3-itf-input", maxlength: inp.maxLength, autocomplete: "off", spellcheck: "false" };
+          const el = inp.edit?.multiline ? h("textarea", attrs) : h("input", { type: "text", ...attrs, ...(inp.numeric ? { inputmode: "numeric" } : {}) });
+          if (inp.edit) Object.assign(el.style, { color: inp.edit.color, backgroundColor: inp.edit.background });
           el.addEventListener("input", () => {
+            if (inp.numeric) el.value = el.value.replace(/\D+/g, "");
             inp.input(el.value);
             draw();
           });
           el.addEventListener("keydown", (event) => {
-            if (event.key === "Enter" && options.defaultId !== undefined) {
+            if ((event as KeyboardEvent).key === "Enter" && options.defaultId !== undefined) {
               event.preventDefault();
               pick(options.defaultId);
             }
           });
           return el;
-        }) as HTMLInputElement;
+        }) as HTMLInputElement | HTMLTextAreaElement;
         e.setAttribute("aria-label", c.name);
         if (e.value !== inp.value) e.value = inp.value;
       } else {
@@ -856,7 +876,7 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
     return { x: ((event.clientX - r.left) / r.width) * SCREEN_WIDTH, y: ((event.clientY - r.top) / r.height) * SCREEN_HEIGHT };
   };
   dialog.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || event.target instanceof HTMLInputElement) return;
+    if (event.button !== 0 || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
     const p = logical(event);
     event.preventDefault();
     if (helpMode && picking()) {
@@ -935,7 +955,8 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
     if (closed) return;
     const usable = (e: HTMLElement | undefined): e is HTMLElement => e !== undefined && !(e instanceof HTMLButtonElement && e.disabled);
     const list = options.list ? elements.get(`l${options.list.id}`) : undefined;
-    const preferred = [options.input ? elements.get(`i${options.input.id}`) : undefined, options.defaultId !== undefined ? elements.get(`b${options.defaultId}`) : undefined, list];
+    const firstInput = inputsOf(options)[0];
+    const preferred = [firstInput ? elements.get(`i${firstInput.id}`) : undefined, options.defaultId !== undefined ? elements.get(`b${options.defaultId}`) : undefined, list];
     const target = preferred.find(usable) ?? [...elements.values()].find(usable);
     (target ?? dialog).focus({ preventScroll: true });
   });

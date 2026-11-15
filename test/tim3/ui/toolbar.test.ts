@@ -31,12 +31,15 @@ describe("barre d'outils : boutons selon le mode (418b78)", () => {
     expect(state({ ...play, solved: true }, "TB_SOLUTION")?.disabled).toBe(false);
   });
 
-  it("Labo : cadenas et levier d'essai montrés (grisés), jamais l'ampoule", () => {
+  it("Labo : cadenas, levier d'essai et indices actifs, jamais l'ampoule ; essai (mode 8) : la même barre, levier enfoncé", () => {
     const shown = names({ ...lab, solved: true });
     expect(shown).toContain("TB_LOCKED");
     expect(shown).toContain("TB_TEST");
     expect(shown).not.toContain("TB_SOLUTION");
-    for (const n of ["TB_LOCKED", "TB_TEST", "TB_HINT"]) expect(state(lab, n)?.disabled).toBe(true);
+    for (const n of ["TB_LOCKED", "TB_TEST", "TB_HINT"]) expect(state(lab, n)?.disabled).toBe(false);
+    const test = { ...play, test: true, solved: true };
+    expect(names(test)).toEqual(names(lab));
+    expect(toolbarStates(test).filter((b) => b.pressed).map((b) => b.name)).toEqual(["TB_GOTO_WORK", "TB_TEST"]);
   });
 
   it("le bouton du mode est enfoncé : Puzzle en Jeu, clé au Labo ; le drapeau pendant la marche", () => {
@@ -82,10 +85,28 @@ describe("barre d'outils : clics (418ded)", () => {
   it("boutons grisés : « non disponible » ; boutons cachés : sans effet", () => {
     expect(at("TB_GOTO_H2H", play).action).toBe("unavailable");
     expect(at("TB_GOTO_TOUR", play).action).toBe("help");
-    expect(at("TB_LOCKED", lab).action).toBe("unavailable");
-    expect(at("TB_HINT", lab).action).toBe("unavailable");
     expect(at("TB_LOCKED", play).action).toBe("none");
     expect(at("TB_TEST", play).action).toBe("none");
+  });
+
+  it("Labo : cadenas, levier d'essai, éditeur d'indices (418ded) ; rien pendant la marche", () => {
+    expect(at("TB_LOCKED", lab).action).toBe("lock");
+    expect(at("TB_TEST", lab).action).toBe("test");
+    expect(at("TB_HINT", lab).action).toBe("hintEditor");
+    expect(at("TB_LOCKED", { ...lab, running: true }).action).toBe("none");
+    expect(at("TB_TEST", { ...lab, running: true }).action).toBe("none");
+  });
+
+  it("essai (mode 8) : les boutons terminent d'abord l'essai ; la main et le levier ne font que cela ; aide et drapeau le gardent", () => {
+    const test = { ...play, test: true };
+    for (const n of ["TB_TEST", "TB_HINT", "TB_GOTO_WORK"]) expect(at(n, test)).toEqual({ action: "none", endTest: true });
+    for (const n of ["TB_DISK", "TB_MUSIC", "TB_GLOBAL", "TB_SWEEP", "TB_LOCKED"]) expect(at(n, test).endTest, n).toBe(true);
+    expect(at("TB_DISK", test).action).toBe("machines");
+    expect(at("TB_LOCKED", test).action).toBe("lock");
+    expect(at("TB_GOTO_PUZ", test)).toMatchObject({ action: "play", endTest: true });
+    expect(at("TB_FLAG", test)).toEqual({ action: "run" });
+    expect(at("TB_HELP", test)).toEqual({ action: "help" });
+    expect(at("TB_DISK", { ...test, running: true }).action).toBe("none");
   });
 
   it("autres boutons", () => {

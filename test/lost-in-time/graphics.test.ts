@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { Game } from "../../src/games/lost-in-time/engine/game";
-import { installGraphics } from "../../src/games/lost-in-time/engine/graphics";
-import { HeadlessHost, NullSubsystems, WaitingForInput } from "../../src/games/lost-in-time/engine/host";
-import { StepBudgetExceeded } from "../../src/games/lost-in-time/engine/interpreter";
-import { composeFrame } from "../../src/games/lost-in-time/render/canvas";
+import { LostInTimeGame as Game } from "../../src/games/lost-in-time/engine/lost-in-time";
+import { installGraphics } from "../../src/engine/coktel/graphics";
+import { HeadlessHost, NullSubsystems, WaitingForInput } from "../../src/engine/coktel/host";
+import { StepBudgetExceeded } from "../../src/engine/coktel/interpreter";
+import { composeFrame } from "../../src/engine/coktel/render/canvas";
 import { hasOriginalFiles } from "./helpers";
 
 const ORIGINAL = resolve(import.meta.dirname, "../../original/lost-in-time");

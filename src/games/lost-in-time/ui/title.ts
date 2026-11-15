@@ -1,10 +1,13 @@
+import "./title.css";
 import { copy } from "../copy";
 import { h } from "../../../ui/dom";
 import { titleScreen } from "../../../ui/title-screen";
 
-/** Jaquette et manuel d'origine, servis depuis `original/lost-in-time/`. */
-const COVER_URL = `${import.meta.env.BASE_URL}lost-in-time/COVER.png`;
-const MANUAL_URL = `${import.meta.env.BASE_URL}lost-in-time/MANUEL.pdf`;
+/** Dossier des fichiers du jeu (servi depuis `original/lost-in-time/`). */
+export const GAME_URL = `${import.meta.env.BASE_URL}lost-in-time/`;
+/** Jaquette et manuel d'origine. */
+export const COVER_URL = `${GAME_URL}COVER.png`;
+const MANUAL_URL = `${GAME_URL}MANUEL.pdf`;
 
 /** Écran titre, avant le jeu : jaquette du jeu, nouvelle partie, reprise d'une partie, manuel et contrôles. */
 export function renderTitle(onStart: () => void): HTMLElement {

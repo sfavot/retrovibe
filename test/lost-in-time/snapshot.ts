@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
-import type { Frame } from "../../src/games/lost-in-time/render/canvas";
+import type { Frame } from "../../src/engine/coktel/render/canvas";
 
 const SNAPSHOT_DIR = process.env.SNAPSHOT_DIR ?? resolve(tmpdir(), "lit-snapshots");
 

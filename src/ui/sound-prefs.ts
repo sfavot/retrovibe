@@ -9,6 +9,15 @@ export interface Muteable {
   setMuted(muted: boolean): void;
 }
 
+/** Une seule sortie à couper pour plusieurs (`muted` de chacune) : effets et musique d'un même jeu suivent la même préférence. */
+export function muteAll(targets: readonly { muted: boolean }[]): Muteable {
+  return {
+    setMuted(muted) {
+      for (const target of targets) target.muted = muted;
+    },
+  };
+}
+
 /** Clé de la préférence « Son » d'un jeu : `retrovibe:<jeu>:sound`. */
 export function soundPrefKey(game: string): string {
   return `retrovibe:${game}:sound`;

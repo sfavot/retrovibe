@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LONG_PRESS_MS, TouchPress, type Timers } from "../../src/games/lost-in-time/ui/touch-press";
+import { LONG_PRESS_MS, TouchPress, type Timers } from "../../src/ui/pointer";
 
 /** Minuteries manuelles : `advance` déclenche ce qui arrive à échéance. */
 function fakeTimers() {

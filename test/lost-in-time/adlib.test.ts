@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { AdlPlayer, parseAdl } from "../../src/games/lost-in-time/engine/audio/adlib/adl-player";
-import { AdlibSynth } from "../../src/games/lost-in-time/engine/audio/adlib/synth";
+import { AdlPlayer, parseAdl } from "../../src/engine/coktel/audio/adlib/adl-player";
+import { AdlibSynth } from "../../src/engine/coktel/audio/adlib/synth";
 import { Opl2 } from "../../src/audio/opl2";
-import type { SoundBackend } from "../../src/games/lost-in-time/engine/audio/backend";
-import { SoundEngine } from "../../src/games/lost-in-time/engine/audio/sound";
+import type { SoundBackend } from "../../src/engine/coktel/audio/backend";
+import { SoundEngine } from "../../src/engine/coktel/audio/sound";
 import { hasOriginalFiles, loadArchive } from "./helpers";
 
 const RATE = 44100;

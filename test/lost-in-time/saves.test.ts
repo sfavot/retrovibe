@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DataFiles } from "../../src/games/lost-in-time/engine/game";
-import { HeadlessHost, type VmContext } from "../../src/games/lost-in-time/engine/host";
+import { DataFiles } from "../../src/engine/coktel/game";
+import { HeadlessHost, type VmContext } from "../../src/engine/coktel/host";
 import { GameSaves, MemoryStore, hasSavedGame, slotKey, PROPS_SIZE, INDEX_SIZE, SHOT_INDEX_SIZE, SHOT_SIZE } from "../../src/games/lost-in-time/engine/saves";
-import { Variables } from "../../src/games/lost-in-time/engine/variables";
+import { Variables } from "../../src/engine/coktel/variables";
 
 const VAR_COUNT = 64;
 

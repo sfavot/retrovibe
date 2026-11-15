@@ -20,6 +20,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | [Beneath a Steel Sky (Revolution Software, 1994)](https://sfavot.github.io/retrovibe/#/bass) | jouable (en cours de validation) |
 | [Croisière pour un cadavre (Delphine Software International, 1991)](https://sfavot.github.io/retrovibe/#/croisiere) | jouable |
 | [Les Voyageurs du temps (Delphine Software, 1989)](https://sfavot.github.io/retrovibe/#/voyageurs) | jouable (en cours de validation) |
+| [Ween: The Prophecy (Coktel Vision, 1992)](https://sfavot.github.io/retrovibe/#/ween) | jouable (en cours de validation) |
 
 ## Déploiement
 
@@ -87,12 +88,19 @@ Les fichiers sont chargés à la demande. Les sauvegardes (`CAT.INF`, `IMA.INF`,
 
 ### Architecture
 
-- `src/games/lost-in-time/data/` — lecteurs : archives STK / ITK (LZSS), TOT, polices, sprites, palettes, IMD (vidéo), SND, LIC.
-- `src/games/lost-in-time/engine/` — machine virtuelle : interpréteur et opcodes, expressions, ressources, cycle de vie des TOT (`game.ts`), zones de la souris (`hotspots.ts`), entrées (`input.ts`), sauvegardes (`saves.ts`).
-  `host.ts` définit la frontière avec l'extérieur (fichiers, horloge, entrées, sous-systèmes) et `system.ts` assemble les vrais sous-systèmes.
-- `src/games/lost-in-time/engine/graphics/`, `mult/`, `video/`, `audio/` — affichage et palette, animations, vidéos IMD, sons (Web Audio) et piste CD (`<audio>`).
-- `src/games/lost-in-time/render/` — présentation de l'image indexée sur le canvas.
-- `src/games/lost-in-time/ui/` — hôte du navigateur (fichiers, images, entrées), page du jeu (canvas 4:3) et styles. Ses textes sont dans `copy.ts`.
+Le moteur Coktel est partagé avec Ween :
+
+- `src/engine/coktel/data/` — lecteurs : archives STK / ITK (LZSS), TOT, polices, sprites, palettes, IMD (vidéo), SND.
+- `src/engine/coktel/` — machine virtuelle : interpréteur et opcodes, expressions, ressources, cycle de vie des TOT (`game.ts`), zones de la souris (`hotspots.ts`), entrées (`input.ts`).
+  `host.ts` définit la frontière avec l'extérieur (fichiers, horloge, entrées, sous-systèmes), `system.ts` assemble les vrais sous-systèmes et `definition.ts` décrit ce qui varie d'un jeu à l'autre.
+- `src/engine/coktel/graphics/`, `mult/`, `video/`, `audio/`, `render/` — affichage et palette, animations, vidéos IMD, sons (Web Audio, AdLib) et présentation sur le canvas.
+- `src/ui/coktel/` — hôte du navigateur (fichiers, images, entrées), page du jeu (canvas 4:3) et styles communs.
+
+Propre à Lost in Time :
+
+- `src/games/lost-in-time/engine/` — définition du jeu (`lost-in-time.ts`), suivi des parties (`parts.ts`), sauvegardes (`saves.ts`) et piste CD (`audio/`, `<audio>`).
+- `src/games/lost-in-time/data/lic.ts` — lecteur LIC.
+- `src/games/lost-in-time/ui/` — écran titre et page du jeu. Ses textes sont dans `copy.ts`.
 
 ### Scripts
 
@@ -344,6 +352,23 @@ Au démarrage, le navigateur charge `sky.dsk`, `sky.dnr` et `sky.cpt` d'un coup 
 
 `docs/voyageurs/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`) et moteur (`engine.md`). Les tests sont dans `test/voyageurs/`.
 
+## Ween: The Prophecy
+
+*Ween: The Prophecy* (Coktel Vision / MDO, 1992), version française : aventure en pointer-et-cliquer, 320 × 200 en 256 couleurs, où Ween, petit-fils du sorcier Ohkram, doit vaincre Kraal avant la Grande Éclipse. Le jeu tourne sur le même moteur que *Lost in Time* : une machine virtuelle qui exécute les scripts `.TOT`, réimplémentée d'après le moteur `gob` de ScummVM (GPL), qui sert de référence. La protection de copie (grille de couleurs) est retirée.
+
+### Fichiers de données
+
+`original/ween/` : `INTRO.STK` (6,7 Mo, tout le jeu : scripts, images, vidéos, sons) et `COVER.png`. `scripts/ween-extract.sh` prépare `INTRO.STK` à partir de l'installeur (non versionné, jamais exécuté : `innoextract`). `npx vite-node scripts/ween-cover.mts [image]` génère `COVER.png` (un écran de la première pièce, composé par le moteur) et régénère `files.json`.
+
+### Architecture
+
+- `src/engine/coktel/` — le moteur commun avec Lost in Time (archives, TOT, IMD, graphismes, sons, machine virtuelle) ; `src/ui/coktel/` — le démarrage commun (écran titre, chargement, page du jeu).
+- `src/games/ween/engine/` — la définition du jeu et les particularités de Ween (`ween.ts`, sauvegardes) ; `src/games/ween/ui/` — écran titre et page du jeu ; `copy.ts` — les textes.
+
+### Documentation
+
+`docs/ween/` : plan (`plan.md`), inventaire (`files.md`), formats (`formats.md`), moteur (`engine.md`), graphismes (`graphics.md`), audio (`audio.md`) et solution (`walkthrough.md`). Les tests sont dans `test/ween/`.
+
 ## Code commun aux jeux
 
 - `src/data/` — lecture binaire (`reader.ts`), page de code 437, Mac OS Roman (`mac-roman.ts`), archives et ressources du moteur Mohawk de Broderbund partagées par Mathémagique et Zoombinis (`mohawk/`), liste des fichiers d'un jeu (`game-files.ts`), fichiers RIFF WAVE (`riff-wave.ts`), vidéos Smacker (`smacker.ts`).
@@ -373,4 +398,4 @@ Référence : [WebFun](https://codeberg.org/cyco/WebFun) (MIT), réimplémentati
 
 Le code est sous [GPL v3 ou ultérieure](LICENSE) : les moteurs de Lost in Time et de Drascula sont portés de [ScummVM](https://www.scummvm.org/) (GPL v3+),
 y compris l'émulateur OPL (MAME, `src/audio/opl2.ts`) utilisé pour la musique AdLib de Lost in Time et d'Armaeth. Les fichiers des jeux de `original/` ne sont pas couverts
-par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives). Les données de Flight of the Amazon Queen sont © John Passfield et Steven Stamatiadis, redistribuées selon la licence de `original/fotaq/README-FOTAQ.txt` (à conserver ; ce portage en est une version modifiée : données extraites de `queen.1c`, voix converties en MP3). Les données de Lure of the Temptress sont © Revolution Software Ltd, redistribuées selon la licence de `original/lure/LICENSE-LURE.txt` (à conserver ; ce portage en est une version modifiée : moteur réécrit, données lues telles quelles) ; `original/lure/LURE-FR.DAT` est le bloc français du fichier `lure.dat` distribué par ScummVM (généré depuis `LURE.EXE` par son outil `create_lure`) : des données du jeu, sous la licence de Revolution Software. Les données de Beneath a Steel Sky sont © Revolution Software Ltd, redistribuées selon la licence de `original/bass/README-BASS.txt` (à conserver ; ce portage en est une version modifiée : voix converties en MP3, `sky.dsk` et `sky.dnr` reconstruits sans les voix, moteur réécrit d'après celui de ScummVM). Les données de Croisière pour un cadavre restent la propriété de leurs ayants droit (© Delphine Software International, 1991) : c'est de l'abandonware, et aucune licence de redistribution n'existe ; elles seront retirées sur demande d'un ayant droit. Ce portage en est une version modifiée : moteur réécrit d'après le moteur `cruise` de ScummVM, protection de copie retirée, données lues telles quelles. Les données des Voyageurs du temps (*Future Wars*) restent la propriété de leurs ayants droit (Delphine Software, l'éditeur de l'édition CD de Sony, les auteurs de la traduction française) : c'est de l'abandonware, pas un jeu libre de droits, et aucune licence de redistribution n'existe, comme pour les autres jeux non libres du dépôt ; elles sont retirées sur demande d'un ayant droit. La traduction française est un patch de fans, la musique du CD est convertie en MP3, et le moteur est réécrit d'après le moteur `cine` de ScummVM.
+par cette licence : ils restent la propriété de leurs ayants droit. `original/drascula/drascula.dat` fait exception : c'est un fichier de ScummVM, sous GPL v3 ou ultérieure (voir `original/drascula/drascula-dat-LICENSE.txt`). Les données de Drascula sont © Alcachofa Soft S.L., redistribuées selon la licence de `original/drascula/README-ALCACHOFA.txt` (à conserver ; ce portage en est une version modifiée : musique convertie en MP3, données extraites de leurs archives). Les données de Flight of the Amazon Queen sont © John Passfield et Steven Stamatiadis, redistribuées selon la licence de `original/fotaq/README-FOTAQ.txt` (à conserver ; ce portage en est une version modifiée : données extraites de `queen.1c`, voix converties en MP3). Les données de Lure of the Temptress sont © Revolution Software Ltd, redistribuées selon la licence de `original/lure/LICENSE-LURE.txt` (à conserver ; ce portage en est une version modifiée : moteur réécrit, données lues telles quelles) ; `original/lure/LURE-FR.DAT` est le bloc français du fichier `lure.dat` distribué par ScummVM (généré depuis `LURE.EXE` par son outil `create_lure`) : des données du jeu, sous la licence de Revolution Software. Les données de Beneath a Steel Sky sont © Revolution Software Ltd, redistribuées selon la licence de `original/bass/README-BASS.txt` (à conserver ; ce portage en est une version modifiée : voix converties en MP3, `sky.dsk` et `sky.dnr` reconstruits sans les voix, moteur réécrit d'après celui de ScummVM). Les données de Croisière pour un cadavre restent la propriété de leurs ayants droit (© Delphine Software International, 1991) : c'est de l'abandonware, et aucune licence de redistribution n'existe ; elles seront retirées sur demande d'un ayant droit. Ce portage en est une version modifiée : moteur réécrit d'après le moteur `cruise` de ScummVM, protection de copie retirée, données lues telles quelles. Les données des Voyageurs du temps (*Future Wars*) restent la propriété de leurs ayants droit (Delphine Software, l'éditeur de l'édition CD de Sony, les auteurs de la traduction française) : c'est de l'abandonware, pas un jeu libre de droits, et aucune licence de redistribution n'existe, comme pour les autres jeux non libres du dépôt ; elles sont retirées sur demande d'un ayant droit. La traduction française est un patch de fans, la musique du CD est convertie en MP3, et le moteur est réécrit d'après le moteur `cine` de ScummVM. Les données de Ween: The Prophecy restent la propriété de leurs ayants droit (Coktel Vision / MDO) : c'est de l'abandonware, pas un jeu libre de droits, et aucune licence de redistribution n'existe ; elles sont retirées sur demande d'un ayant droit. Ce portage en est une version modifiée : moteur réécrit d'après le moteur `gob` de ScummVM, protection de copie retirée, version française, données lues telles quelles.

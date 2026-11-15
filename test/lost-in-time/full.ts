@@ -1,11 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { CdBackend, SoundBackend } from "../../src/games/lost-in-time/engine/audio/backend";
-import { Game } from "../../src/games/lost-in-time/engine/game";
-import { HeadlessHost, WaitingForInput } from "../../src/games/lost-in-time/engine/host";
+import type { CdBackend, SoundBackend } from "../../src/engine/coktel/audio/backend";
+import { LostInTimeGame as Game } from "../../src/games/lost-in-time/engine/lost-in-time";
+import { HeadlessHost, WaitingForInput } from "../../src/engine/coktel/host";
 import { MemoryStore } from "../../src/games/lost-in-time/engine/saves";
-import { createSystem } from "../../src/games/lost-in-time/engine/system";
-import { composeFrame } from "../../src/games/lost-in-time/render/canvas";
+import { createLostInTimeSystem as createSystem } from "../../src/games/lost-in-time/engine/lost-in-time";
+import { composeFrame } from "../../src/engine/coktel/render/canvas";
 
 const ORIGINAL = resolve(import.meta.dirname, "../../original/lost-in-time");
 

@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CONTROL_FLOW_NAMES, disassemble } from "../../src/games/lost-in-time/engine/opcodes";
-import { loadResources } from "../../src/games/lost-in-time/engine/resources";
-import { Script } from "../../src/games/lost-in-time/engine/script";
+import { CONTROL_FLOW_NAMES, disassemble } from "../../src/engine/coktel/opcodes";
+import { loadResources } from "../../src/engine/coktel/resources";
+import { Script } from "../../src/engine/coktel/script";
 import { hasOriginalFiles, loadArchive } from "./helpers";
 
 const fixture: Record<string, string[]> = JSON.parse(

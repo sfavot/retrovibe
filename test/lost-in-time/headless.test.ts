@@ -1,9 +1,9 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { Game } from "../../src/games/lost-in-time/engine/game";
-import { HeadlessHost, NullSubsystems, WaitingForInput } from "../../src/games/lost-in-time/engine/host";
-import { StepBudgetExceeded } from "../../src/games/lost-in-time/engine/interpreter";
+import { LostInTimeGame as Game } from "../../src/games/lost-in-time/engine/lost-in-time";
+import { HeadlessHost, NullSubsystems, WaitingForInput } from "../../src/engine/coktel/host";
+import { StepBudgetExceeded } from "../../src/engine/coktel/interpreter";
 import { hasOriginalFiles, loadArchive } from "./helpers";
 
 const ORIGINAL = resolve(import.meta.dirname, "../../original/lost-in-time");

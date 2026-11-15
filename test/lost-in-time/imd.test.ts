@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ImdDecoder, usedPaletteIndices } from "../../src/games/lost-in-time/data/imd";
+import { ImdDecoder, usedPaletteIndices } from "../../src/engine/coktel/data/imd";
 import { hasOriginalFiles, ITK_FILES, loadArchive } from "./helpers";
 
 describe.skipIf(!hasOriginalFiles)("IMD", () => {

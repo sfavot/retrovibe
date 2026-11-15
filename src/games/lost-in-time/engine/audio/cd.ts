@@ -1,6 +1,6 @@
 import { parseLic, type LicTrack } from "../../data/lic";
-import type { CdSystem } from "../host";
-import type { CdBackend } from "./backend";
+import type { CdSystem } from "../../../../engine/coktel/host";
+import type { CdBackend } from "../../../../engine/coktel/audio/backend";
 
 /** Secteurs CD par seconde. */
 export const SECTORS_PER_SECOND = 75;

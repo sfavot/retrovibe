@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeAudioContext } from "../support/fake-audio-context";
-import { WebAudioSoundBackend } from "../../src/games/lost-in-time/engine/audio/web-audio";
+import { WebAudioSoundBackend } from "../../src/engine/coktel/audio/web-audio";
 
 /** Faux AudioContext : trace les créations, et le chargement du module worklet est résolu à la main. */
 class FakeNode {

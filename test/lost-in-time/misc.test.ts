@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseFont } from "../../src/games/lost-in-time/data/font";
+import { parseFont } from "../../src/engine/coktel/data/font";
 import { parseLic } from "../../src/games/lost-in-time/data/lic";
-import { parseSnd } from "../../src/games/lost-in-time/data/snd";
-import { createSurface } from "../../src/games/lost-in-time/data/surface";
+import { parseSnd } from "../../src/engine/coktel/data/snd";
+import { createSurface } from "../../src/engine/coktel/data/surface";
 import { hasOriginalFiles, loadArchive, readOriginal } from "./helpers";
 
 describe.skipIf(!hasOriginalFiles)("LOST.LIC", () => {

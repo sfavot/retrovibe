@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { decodeInstr } from "../../src/games/lost-in-time/engine/opcodes";
-import { Expression, Script, ScriptError } from "../../src/games/lost-in-time/engine/script";
-import { Variables } from "../../src/games/lost-in-time/engine/variables";
+import { decodeInstr } from "../../src/engine/coktel/opcodes";
+import { Expression, Script, ScriptError } from "../../src/engine/coktel/script";
+import { Variables } from "../../src/engine/coktel/variables";
 
 function scriptOf(bytes: number[]): Script {
   const data = new Uint8Array(128 + bytes.length);

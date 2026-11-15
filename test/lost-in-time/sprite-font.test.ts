@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { GraphicsSystems, Surface } from "../../src/games/lost-in-time/engine/graphics";
-import { BACK_SURFACE } from "../../src/games/lost-in-time/engine/graphics/core";
+import { GraphicsSystems, Surface } from "../../src/engine/coktel/graphics";
+import { BACK_SURFACE } from "../../src/engine/coktel/graphics/core";
 
 /** Planche de police en sprite : cellules de 4x4, 8 par ligne, `base` = 65 ('A'), cellule i remplie de la couleur i + 1. */
 function setup(rows: number) {

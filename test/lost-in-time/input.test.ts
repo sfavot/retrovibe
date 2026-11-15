@@ -11,9 +11,9 @@ import {
   textEditKeys,
   toCP850,
   translateKey,
-} from "../../src/games/lost-in-time/engine/input";
-import { MOUSE_LEFT, MOUSE_NONE, MOUSE_RIGHT } from "../../src/games/lost-in-time/engine/host";
-import { convertSpecialKey } from "../../src/games/lost-in-time/engine/hotspots";
+} from "../../src/engine/coktel/input";
+import { MOUSE_LEFT, MOUSE_NONE, MOUSE_RIGHT } from "../../src/engine/coktel/host";
+import { convertSpecialKey } from "../../src/engine/coktel/hotspots";
 
 describe("translateKey", () => {
   it("convertit les touches spéciales en codes du jeu", () => {

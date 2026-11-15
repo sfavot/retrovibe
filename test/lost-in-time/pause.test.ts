@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HtmlCdBackend } from "../../src/games/lost-in-time/engine/audio/html-cd";
-import { AudioPrefs } from "../../src/games/lost-in-time/engine/audio/prefs";
+import { lostInTimeSoundPrefs } from "../../src/games/lost-in-time/sound-prefs";
 import { MemoryStore } from "../../src/games/lost-in-time/engine/saves";
-import { PausableClock } from "../../src/games/lost-in-time/ui/clock";
+import { PausableClock } from "../../src/ui/coktel/clock";
 
 describe("PausableClock", () => {
   it("n'avance pas pendant la pause et reprend sans saut", () => {
@@ -98,11 +98,11 @@ describe("HtmlCdBackend en pause", () => {
   });
 });
 
-describe("AudioPrefs.reload (autre onglet)", () => {
+describe("préférence « Son » : reload (autre onglet)", () => {
   it("reprend la valeur écrite par un autre onglet et l'applique aux sorties", () => {
     const store = new MemoryStore();
     const target = { muted: false };
-    const prefs = new AudioPrefs(store, [target]);
+    const prefs = lostInTimeSoundPrefs(store, [target]);
     expect(prefs.reload()).toBe(false);
     store.set("audio.sound", "0"); // écrit par un autre onglet
     expect(prefs.reload()).toBe(true);
@@ -115,9 +115,9 @@ describe("AudioPrefs.reload (autre onglet)", () => {
 describe("style de l'écran", () => {
   it("l'anneau de focus entoure l'écran au lieu de recouvrir les bords du canvas", async () => {
     const { readFileSync } = await import("node:fs");
-    const css = readFileSync(new URL("../../src/games/lost-in-time/ui/style.css", import.meta.url), "utf8");
+    const css = readFileSync(new URL("../../src/ui/coktel/style.css", import.meta.url), "utf8");
     // Le jeu dessine jusqu'à x = 0 (libellés du bas) : un anneau intérieur masquait la 1re colonne (« U » lu « J »).
-    expect(css).not.toMatch(/\.lit-canvas:focus-visible\s*\{[^}]*outline-offset:\s*-/);
-    expect(css).toMatch(/\.lit-stage:has\(\.lit-canvas:focus-visible\)/);
+    expect(css).not.toMatch(/\.coktel-canvas:focus-visible\s*\{[^}]*outline-offset:\s*-/);
+    expect(css).toMatch(/\.coktel-stage:has\(\.coktel-canvas:focus-visible\)/);
   });
 });

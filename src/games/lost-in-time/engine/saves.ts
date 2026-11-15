@@ -1,8 +1,8 @@
 import { prefixedStorage, type HostStorage } from "../../../engine/storage";
 import { localStorageStore } from "../../../ui/local-storage";
-import type { SaveSystem, VmContext } from "./host";
-import type { GraphicsSystems } from "./graphics";
-import type { Variables } from "./variables";
+import type { SaveSystem, VmContext } from "../../../engine/coktel/host";
+import type { GraphicsSystems } from "../../../engine/coktel/graphics";
+import type { Variables } from "../../../engine/coktel/variables";
 
 /**
  * Sauvegardes de Lost in Time : port de gob/save/saveload_v3.cpp (SaveLoad_v3, Gob3 / Lost in Time),

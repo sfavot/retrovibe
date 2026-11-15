@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { Archive } from "../../src/games/lost-in-time/data/archive";
+import { Archive } from "../../src/engine/coktel/data/archive";
 import { GameSaves, INDEX_SIZE, MemoryStore, PROPS_SIZE, SHOT_INDEX_SIZE, SHOT_SIZE, slotKey } from "../../src/games/lost-in-time/engine/saves";
-import { disassemble } from "../../src/games/lost-in-time/engine/opcodes";
-import { loadResources } from "../../src/games/lost-in-time/engine/resources";
-import { Script } from "../../src/games/lost-in-time/engine/script";
-import { Variables } from "../../src/games/lost-in-time/engine/variables";
-import type { VmContext } from "../../src/games/lost-in-time/engine/host";
+import { disassemble } from "../../src/engine/coktel/opcodes";
+import { loadResources } from "../../src/engine/coktel/resources";
+import { Script } from "../../src/engine/coktel/script";
+import { Variables } from "../../src/engine/coktel/variables";
+import type { VmContext } from "../../src/engine/coktel/host";
 import { drive, makeFullGame, type Step } from "./full";
 import { hasOriginalFiles, ITK_FILES, loadArchive } from "./helpers";
 

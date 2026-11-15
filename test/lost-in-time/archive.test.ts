@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Archive } from "../../src/games/lost-in-time/data/archive";
+import { Archive } from "../../src/engine/coktel/data/archive";
 import { hasOriginalFiles, loadArchive } from "./helpers";
 
 describe.skipIf(!hasOriginalFiles)("INTRO.STK", () => {

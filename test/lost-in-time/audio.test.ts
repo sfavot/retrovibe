@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseLic } from "../../src/games/lost-in-time/data/lic";
-import type { CdBackend, SoundBackend, SoundSource } from "../../src/games/lost-in-time/engine/audio/backend";
+import type { CdBackend, SoundBackend, SoundSource } from "../../src/engine/coktel/audio/backend";
 import { CdAudio } from "../../src/games/lost-in-time/engine/audio/cd";
-import { SoundEngine } from "../../src/games/lost-in-time/engine/audio/sound";
+import { SoundEngine } from "../../src/engine/coktel/audio/sound";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 
 /** Horloge simulée : nextFrame avance de 16 ms. */

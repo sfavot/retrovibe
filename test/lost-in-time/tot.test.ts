@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { decodeSprite } from "../../src/games/lost-in-time/data/sprite";
-import { parseExtTable, readExtResource } from "../../src/games/lost-in-time/data/ext";
-import { palette6ToRgb } from "../../src/games/lost-in-time/data/palette";
-import { getTotResource, loadTot, localizedTextFile, type Tot } from "../../src/games/lost-in-time/data/tot";
+import { decodeSprite } from "../../src/engine/coktel/data/sprite";
+import { parseExtTable, readExtResource } from "../../src/engine/coktel/data/ext";
+import { palette6ToRgb } from "../../src/engine/coktel/data/palette";
+import { getTotResource, loadTot, localizedTextFile, type Tot } from "../../src/engine/coktel/data/tot";
 import { hasOriginalFiles, loadArchive } from "./helpers";
 
 function totNames(): string[] {

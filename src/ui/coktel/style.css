@@ -1,0 +1,71 @@
+/* Jeux du moteur Coktel (Lost in Time, Ween) : écran du jeu, canvas pixelisé au format 4:3 de l'affichage d'origine. */
+
+.coktel-stage {
+  /* Largeur limitée par la hauteur de la fenêtre pour que l'écran reste entier sans défilement vertical. */
+  width: min(100%, calc((100dvh - 80px) * 4 / 3));
+  min-width: 0;
+  aspect-ratio: 4 / 3;
+}
+
+.coktel-footer {
+  width: min(100%, calc((100dvh - 80px) * 4 / 3));
+}
+
+.coktel-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Le jeu dessine son propre curseur. */
+  cursor: none;
+}
+
+.coktel-canvas:focus-visible {
+  outline: none;
+}
+
+/* L'anneau de focus entoure l'écran au lieu de le recouvrir : le jeu dessine jusqu'aux bords (libellés du bas à x = 0). */
+.coktel-stage:has(.coktel-canvas:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Barre tactile (Menu, Passer, Inventaire ; pendant une saisie : Passer, Clavier, Valider) : même largeur que l'écran, trois boutons égaux sur une ligne. */
+.coktel-touch-bar {
+  width: min(100%, calc((100dvh - 80px) * 4 / 3));
+}
+
+@media (pointer: coarse) {
+  .coktel-touch-bar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .coktel-touch-bar button {
+    padding-inline: 0.5rem;
+  }
+}
+
+/* Groupes de boutons (gauche / droite en paysage tactile, voir `ui/style.css`) : ailleurs, leurs boutons forment une seule rangée. */
+.coktel-touch-group {
+  display: contents;
+}
+
+/* Paysage tactile : l'écran prend toute la hauteur, entre les colonnes de boutons (deux colonnes, leurs gouttières et les marges). */
+.is-touch-landscape .coktel-stage {
+  width: min(calc(var(--view-w, 100vw) - 2 * var(--game-shell-aside) - 32px), calc((var(--view-h, 100dvh) - 16px) * 4 / 3));
+}
+
+/* Champ de saisie invisible : il ne sert qu'à ouvrir le clavier virtuel (16px évite le zoom d'iOS au focus). */
+.coktel-text-field {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  font-size: 16px;
+  opacity: 0;
+  pointer-events: none;
+}

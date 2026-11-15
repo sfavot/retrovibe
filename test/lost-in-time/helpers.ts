@@ -1,4 +1,4 @@
-import { Archive } from "../../src/games/lost-in-time/data/archive";
+import { Archive } from "../../src/engine/coktel/data/archive";
 import { originalFiles } from "../support/original";
 
 const original = originalFiles("lost-in-time", "INTRO.STK");

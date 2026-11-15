@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { Game } from "../../src/games/lost-in-time/engine/game";
-import { HeadlessHost, NullSubsystems } from "../../src/games/lost-in-time/engine/host";
-import { Script } from "../../src/games/lost-in-time/engine/script";
+import { LostInTimeGame as Game } from "../../src/games/lost-in-time/engine/lost-in-time";
+import { HeadlessHost, NullSubsystems } from "../../src/engine/coktel/host";
+import { Script } from "../../src/engine/coktel/script";
 
 /**
  * Script synthétique : while (cond) { o1_animate(); }.

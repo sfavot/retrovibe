@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { Game } from "../../src/games/lost-in-time/engine/game";
+import { LostInTimeGame as Game } from "../../src/games/lost-in-time/engine/lost-in-time";
 import {
   HeadlessHost,
   MOUSE_LEFT,
@@ -12,10 +12,10 @@ import {
   type HotspotContext,
   type HotspotDef,
   type VmContext,
-} from "../../src/games/lost-in-time/engine/host";
-import { Hotspots } from "../../src/games/lost-in-time/engine/hotspots";
-import { GameInput, KEY_BACKSPACE, KEY_ESCAPE, KEY_LEFT, KEY_RETURN, KEY_SPACE } from "../../src/games/lost-in-time/engine/input";
-import { Variables } from "../../src/games/lost-in-time/engine/variables";
+} from "../../src/engine/coktel/host";
+import { Hotspots } from "../../src/engine/coktel/hotspots";
+import { GameInput, KEY_BACKSPACE, KEY_ESCAPE, KEY_LEFT, KEY_RETURN, KEY_SPACE } from "../../src/engine/coktel/input";
+import { Variables } from "../../src/engine/coktel/variables";
 import { hasOriginalFiles } from "./helpers";
 
 /** Garde-fou : un test qui n'avance plus échoue au lieu de tourner indéfiniment. */

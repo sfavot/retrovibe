@@ -1,17 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ImdDecoder, usedPaletteIndices } from "../../src/games/lost-in-time/data/imd";
-import { createSurface } from "../../src/games/lost-in-time/data/surface";
-import { Game } from "../../src/games/lost-in-time/engine/game";
-import { installGraphics } from "../../src/games/lost-in-time/engine/graphics";
-import { BACK_SURFACE } from "../../src/games/lost-in-time/engine/graphics/core";
-import { HeadlessHost, NullSubsystems, WaitingForInput, type PlayImdArgs } from "../../src/games/lost-in-time/engine/host";
-import { KEY_ESCAPE } from "../../src/games/lost-in-time/engine/input";
-import { StepBudgetExceeded } from "../../src/games/lost-in-time/engine/interpreter";
-import { loadResources } from "../../src/games/lost-in-time/engine/resources";
-import { installVideo, videoProps } from "../../src/games/lost-in-time/engine/video";
-import { composeFrame } from "../../src/games/lost-in-time/render/canvas";
+import { ImdDecoder, usedPaletteIndices } from "../../src/engine/coktel/data/imd";
+import { createSurface } from "../../src/engine/coktel/data/surface";
+import { LostInTimeGame as Game } from "../../src/games/lost-in-time/engine/lost-in-time";
+import { installGraphics } from "../../src/engine/coktel/graphics";
+import { BACK_SURFACE } from "../../src/engine/coktel/graphics/core";
+import { HeadlessHost, NullSubsystems, WaitingForInput, type PlayImdArgs } from "../../src/engine/coktel/host";
+import { KEY_ESCAPE } from "../../src/engine/coktel/input";
+import { StepBudgetExceeded } from "../../src/engine/coktel/interpreter";
+import { loadResources } from "../../src/engine/coktel/resources";
+import { installVideo, videoProps } from "../../src/engine/coktel/video";
+import { composeFrame } from "../../src/engine/coktel/render/canvas";
 import { hasOriginalFiles, loadArchive } from "./helpers";
 import { snapshot } from "./snapshot";
 

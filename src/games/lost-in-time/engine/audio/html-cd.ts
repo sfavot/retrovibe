@@ -1,6 +1,5 @@
 import { TrackPlayer } from "../../../../audio/track-player";
-import type { CdBackend } from "./backend";
-import type { Mutable } from "./prefs";
+import type { CdBackend, Mutable } from "../../../../engine/coktel/audio/backend";
 
 /**
  * Piste CD de Lost in Time : un seul fichier (MUSIC.mp3, 36 Mo) lu en flux par le lecteur partagé,

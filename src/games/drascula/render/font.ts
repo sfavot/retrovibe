@@ -126,16 +126,17 @@ export class GameFont {
 
   /** Nombre de lignes qu'occupe un choix de dialogue (`print_abc_opc` rend ce nombre) : de quoi placer les choix sans les dessiner. */
   measureChoice(said: string): number {
-    return this.layoutChoice(encodeCp850(said)).lines;
+    return this.layoutChoice(encodeCp850(stripDialogAccents(said))).lines;
   }
 
   /**
    * `print_abc_opc` : un choix de dialogue en glyphes de 6 x 5 (feuille `CAR.ALG`), à partir de x = 1 ; un mot qui ne tient pas
    * avant x = 317 passe à la ligne suivante (x = 0). Rend le nombre de lignes. Sans entrée, le glyphe est celui de la rangée
-   * des lettres, à la colonne du caractère précédent.
+   * des lettres, à la colonne du caractère précédent. Écart : les lettres accentuées sont dessinées sans accent
+   * (`stripDialogAccents`).
    */
   printChoice(dest: Plane, sheet: Plane, said: string, y: number, state: DialogState): number {
-    const codes = encodeCp850(said);
+    const codes = encodeCp850(stripDialogAccents(said));
     const { xs, dys, lines } = this.layoutChoice(codes);
     let letterX = 0;
     let letterY = 0;
@@ -153,6 +154,16 @@ export class GameFont {
     }
     return lines;
   }
+}
+
+/**
+ * La police des choix (`CAR.ALG`) n'a pas d'accents : ScummVM range les accentués dans la rangée des signes, où ils
+ * s'affichent comme une ponctuation (« JUSQU'À » donne une virgule). Écart voulu : la lettre est dessinée sans son accent,
+ * ce qui permet aux répliques des `.CAL` et de `text` d'être accentuées pour les sous-titres, dessinés avec la police du jeu.
+ * Le `ñ` (une lettre de la police) et les signes sans décomposition (`º`, `¿`, `¡`) ne changent pas.
+ */
+export function stripDialogAccents(said: string): string {
+  return said.replace(/[^\x00-\x7fñÑ]/g, (char) => char.normalize("NFD")[0]);
 }
 
 // --- Texte centré -------------------------------------------------------------------------------------------------------

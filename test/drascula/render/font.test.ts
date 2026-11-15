@@ -10,6 +10,7 @@ import {
   GameFont,
   centerText,
   layoutCenteredText,
+  stripDialogAccents,
   textFitsCentered,
 } from "../../../src/games/drascula/render/font";
 import { Plane, TRANSPARENT, WIDTH } from "../../../src/games/drascula/render/plane";
@@ -145,6 +146,14 @@ describe("print_abc_opc (choix de dialogue)", () => {
     expect(lines).toBeGreaterThanOrEqual(2);
     expect(dest.at(0, 8)).toBe(1);
   });
+
+  it("dessine les lettres accentuées sans accent, la police des choix n'en ayant pas", () => {
+    expect(stripDialogAccents("JUSQU'À LA FIN, ÇA VA ? ÉTÉ, BENOÎT")).toBe("JUSQU'A LA FIN, CA VA ? ETE, BENOIT");
+    expect(stripDialogAccents("¿AÑOS?º¡")).toBe("¿AÑOS?º¡");
+    const dest = new Plane();
+    font.printChoice(dest, sheet, "À", 0, "unselected");
+    expect(dest.at(1, 0)).toBe(1);
+  });
 });
 
 describe("textFitsCentered et centerText", () => {
@@ -212,12 +221,12 @@ describe.skipIf(!hasOriginalFiles)("police du jeu (95.ALG et CAR.ALG)", () => {
     return rows.join("/");
   };
 
-  it("chaque caractère du texte français du jeu a un glyphe, sauf le tréma de « AÏOLI » et « AÏE »", () => {
+  it("chaque caractère du texte français du jeu a un glyphe (les trémas sans glyphe ont été retirés des textes)", () => {
     const missing = new Set<string>();
     for (const [name, languages] of Object.entries(dat.texts)) {
       for (const line of languages.fr ?? []) for (const code of encodeCp850(line)) if (!font.find(code)) missing.add(`${name}:${code}`);
     }
-    expect([...missing]).toEqual(["text:216"]);
+    expect([...missing]).toEqual([]);
   });
 
   it("une phrase française avec accents : chaque glyphe est celui de la feuille, la minuscule accentuée prend la capitale", () => {

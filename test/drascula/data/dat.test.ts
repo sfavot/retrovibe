@@ -96,8 +96,9 @@ describe.skipIf(!hasOriginalFiles)("drascula.dat du jeu", () => {
   it("est de version 7, signature DRASCULA, consommé jusqu'au dernier octet sans reste", () => {
     expect(new TextDecoder().decode(bytes.subarray(0, 8))).toBe("DRASCULA");
     expect(dat.version).toBe(7);
-    expect(bytes.length).toBe(259625);
-    expect(dat.bytesRead).toBe(259625);
+    // 259 625 octets chez ScummVM ; plus long ici à cause des textes français corrigés (scripts/drascula/fr-corrections.tsv).
+    expect(bytes.length).toBe(260065);
+    expect(dat.bytesRead).toBe(260065);
   });
 
   it("a six langues dont le français à l'index 3", () => {
@@ -135,7 +136,7 @@ describe.skipIf(!hasOriginalFiles)("drascula.dat du jeu", () => {
   it("lit le français : accents CP850, majuscules accentuées et minuscules codées pour la police", () => {
     const fr = (name: (typeof DAT_TEXT_NAMES)[number]) => dat.texts[name].fr!;
     expect(fr("text")[1]).toBe("C'EST LA DEUXIèME PORTE LA PLUS GRANDE QUE J'AI VUE DANS MA VIE.");
-    expect(fr("textd")[1]).toBe("HÉ IGOR, COMMENT ÇA AVANCE?");
+    expect(fr("textd")[1]).toBe("HÉ, IGOR, COMMENT ÇA AVANCEº?");
     expect(fr("textsys")[0]).toBe("APPUYEZ À NOUVEAU SUR 'SUPR' POUR RECOMMENCER");
     expect(fr("textverbs")).toEqual(["regarder", "ramasser", "ouvrir", "fermer", "parler", "pousser"]);
     expect(fr("textmisc")[0]).toBe("BOSSU");
@@ -144,11 +145,11 @@ describe.skipIf(!hasOriginalFiles)("drascula.dat du jeu", () => {
     expect(dat.texts.text.en![1]).toBe("THAT'S THE SECOND BIGGEST DOOR I'VE SEEN IN MY LIFE");
   });
 
-  it("garde les écarts de la version française d'origine : texthis en casse mixte avec Ê et Â, textd1 en chiffres", () => {
+  it("garde les singularités de la version française : texthis en casse mixte avec Ê et Â, textd1 en chiffres", () => {
     const history = dat.texts.texthis.fr!.join("\n");
     expect(history).toContain("Être prÊt");
     expect(history).toContain("chÂteau");
-    expect(history).toContain("passÉ ce jour lÀ");
+    expect(history).toContain("passÉ ce jour-lÀ");
     for (const digits of dat.texts.textd1.fr!) expect(digits).toMatch(/^[0-9]+$/);
   });
 

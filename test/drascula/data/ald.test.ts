@@ -138,11 +138,11 @@ describe.skipIf(!hasOriginalFiles)("fiches .ALD du jeu", () => {
     expect([room.music, room.disk, room.paletteLevel]).toEqual([21, "AUX14.ALG", 0]);
     expect(room.objects).toHaveLength(12);
     expect(room.objects.map((o) => o.name)).toEqual([
-      "ESCALERA", "HABITACIONES", "PUERTA", "TAVERNIER", "PIANISTE", "IVROGNE", "PIANO", "AFFICHE", "TETE", "AFFICHE", "AFFICHE", "CORBEILLE",
+      "ESCALIER", "CHAMBRES", "PORTE", "TAVERNIER", "PIANISTE", "IVROGNE", "PIANO", "AFFICHE", "TÊTE", "AFFICHE", "AFFICHE", "CORBEILLE",
     ]);
     expect(room.objects[0]).toEqual({
       id: 159,
-      name: "ESCALERA",
+      name: "ESCALIER",
       rect: { x1: 4, y1: 66, x2: 40, y2: 134 },
       approach: { x: 38, y: 128 },
       track: 0,

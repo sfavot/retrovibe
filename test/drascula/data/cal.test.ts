@@ -38,8 +38,8 @@ describe.skipIf(!hasOriginalFiles)("dialogues .CAL du jeu", () => {
 
   it("lit OP_1.CAL en français, avec ses voix et ses réponses", () => {
     const dialog = dialogs.get("OP_1.CAL")!;
-    expect(dialog.choices[0].text).toBe("UN VAMPIRE A KIDNAPPE LA FILLE DE LA 501!");
-    expect(dialog.choices[1].text).toBe("TU NE POURRAIS PAS JOUER UNE CHANSON DE BLUR?");
+    expect(dialog.choices[0].text).toBe("UN VAMPIRE A KIDNAPPÉ LA FILLE DE LA 501 !");
+    expect(dialog.choices[1].text).toBe("TU NE POURRAIS PAS JOUER UNE CHANSON DE BLUR ?");
     expect(dialog.choices.map((c) => c.voice)).toEqual(["357.als", "359.als", "360.als", "365.als"]);
     expect(dialog.answers).toEqual([8, 9, 10]);
   });

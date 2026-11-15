@@ -12,8 +12,12 @@ Description : https://github.com/scummvm/scummvm/blob/master/dists/engine-data/R
 Licence : celle de ScummVM, GNU General Public License version 3 ou, a votre choix, toute version ulterieure
 (https://github.com/scummvm/scummvm/blob/master/COPYING ; en-tete de licence de engines/drascula/ et de
 devtools/create_drascula/ : "either version 3 of the License, or (at your option) any later version").
-Copyright (C) The ScummVM Team (https://www.scummvm.org). Le fichier est distribue avec ce depot sous cette licence,
-sans modification.
+Copyright (C) The ScummVM Team (https://www.scummvm.org). Le fichier est distribue avec ce depot sous cette licence.
+
+Version modifiee : les textes francais (orthographe, grammaire, typographie, accents) ont ete corriges en novembre 2026
+par scripts/drascula/fr_corrections.py, d'apres la liste scripts/drascula/fr-corrections.tsv du depot ; le reste du
+fichier (tables, autres langues) est inchange. Les fiches de pieces (.ALD) et les dialogues (.CAL) francais d'Alcachofa
+Soft sont corriges de la meme facon : ce sont donc aussi des versions modifiees (point 4 de README-ALCACHOFA-INT.txt).
 
 Les donnees du jeu (images, voix, videos, fiches de pieces, dialogues, musique) restent la propriete d'Alcachofa Soft S.L. et
 sont redistribuees selon la licence de README-ALCACHOFA.txt et README-ALCACHOFA-INT.txt (a conserver intacts).

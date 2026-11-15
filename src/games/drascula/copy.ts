@@ -197,7 +197,7 @@ export const copy = {
   helpAbout: [
     "Drascula: The Vampire Strikes Back est un jeu d'Alcachofa Soft S.L. (1996). Tout le contenu du jeu (images, voix, vidéos, musique, textes) est © Alcachofa Soft S.L., qui l'a mis gratuitement à disposition.",
     "Cette version est une version modifiée du jeu : le moteur a été réécrit en TypeScript pour fonctionner dans le navigateur, d'après le moteur « drascula » de ScummVM (© l'équipe de ScummVM, licence GNU GPL version 3 ou ultérieure). Le fichier drascula.dat (tables et textes du jeu) vient aussi de ScummVM, sous la même licence.",
-    "Les données d'origine ont été extraites de leurs archives et servies fichier par fichier ; la musique, fournie par le pack audio du jeu, a été convertie en MP3. Les textes et les fiches de pièces sont ceux de la version française, sur les voix anglaises du jeu de base.",
+    "Les données d'origine ont été extraites de leurs archives et servies fichier par fichier ; la musique, fournie par le pack audio du jeu, a été convertie en MP3. Les textes et les fiches de pièces sont ceux de la version française, sur les voix anglaises du jeu de base ; leur orthographe, leur grammaire, leur typographie et leurs accents ont été corrigés, dans drascula.dat comme dans les fichiers du jeu.",
     "Les données du jeu se distribuent librement et gratuitement, sans pouvoir les vendre, avec les mentions de copyright conservées intactes ; toute version modifiée doit le signaler, ce que fait cette page.",
     "Le code de cette adaptation est publié sous licence GNU GPL version 3 ou ultérieure ; il est disponible dans le dépôt public du site.",
   ],

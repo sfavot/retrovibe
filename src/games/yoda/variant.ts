@@ -106,13 +106,14 @@ export function r2d2Hint(game: Game, at: Point): number {
 /** Détonateur thermique posé en `at` : animation, puis 10 − 2|dx| − 2|dy| de dégâts aux monstres du carré 3×3. */
 async function detonate(game: Game, at: Point): Promise<void> {
   game.removeItem(TileIds.ThermalDetonator);
+  // 0x40d39a : l'explosion retentit dès la pose, avant l'animation.
+  game.playSound(YodaSounds.BangLarge);
   for (const tile of DETONATOR_FRAMES) {
     game.overlays.length = 0;
     game.overlays.push({ x: at.x, y: at.y, tile });
     await game.waitTicks(1);
   }
   game.overlays.length = 0;
-  game.playSound(YodaSounds.BangLarge);
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       const m = game.zone.monsterAt(at.x + dx, at.y + dy);
@@ -148,11 +149,16 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
       // Les portes de Yoda jouent leur son dans leurs scripts (doorelec, doorpnum…) : aucun son en dur.
       door: -1,
       noGo: YodaSounds.NoGo,
-      // Déduits des noms de fichiers (non vérifiés dans YODESK.EXE) : TRANSPRT.WAV et, comme Indy, EEP.WAV.
-      teleport: YodaSounds.Transporter,
+      // Sons appelés en dur par YODESK.EXE (seul appelant de WaveMixPlay : 0x405c10), adresses en commentaire.
+      teleportOpen: YodaSounds.Transporter, // 0x4116a1 : ouverture du choix de téléporteur
+      teleport: YodaSounds.Schwing, // 0x40e808 : destination choisie
+      teleportCancel: YodaSounds.MapClose, // 0x40e650… : choix annulé
+      pickUp: YodaSounds.Shpoonk, // 0x425bf9 : tout ajout à l'inventaire
+      placeTooFar: YodaSounds.NoGo, // 0x40db43 : objet posé trop loin
+      monsterDeath: YodaSounds.Eep, // 0x4269f7, 0x426c7d
+      // Non trouvés en dur dans l'exécutable (ni dans les scripts) : gardés pour accompagner les fins, à confirmer.
       defeat: YodaSounds.TryAgain,
       victory: YodaSounds.YouWin,
-      monsterDeath: YodaSounds.Eep,
     },
     // Sans arme équipée, Luke ne peut pas attaquer.
     defaultWeapon: -1,
@@ -173,7 +179,8 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
       if (bonus > 0 && game.hero.health >= MAX_HEALTH) return false;
       game.removeItem(tile);
       game.setHealth(game.hero.health + bonus);
-      if (bonus < 0) game.playSound(YodaSounds.Hurt);
+      // 0x40f5f1 / 0x40f63c : son du soin, ou de la blessure pour un objet nocif.
+      game.playSound(bonus < 0 ? YodaSounds.Hurt : YodaSounds.Schwing);
       return true;
     },
 
@@ -211,8 +218,8 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
         return true;
       }
       if (tile === TileIds.R2D2) {
+        // R2-D2 posé : aucun son (il bipe quand on le prend dans l'inventaire, voir `grabSound`), seulement le conseil.
         game.overlays.push({ x: at.x, y: at.y, tile });
-        game.playSound(game.rng.mod(2) ? YodaSounds.R2D2a : YodaSounds.R2D2b);
         const text = strings.get(r2d2Hint(game, at));
         if (text) await game.speak(text, at);
         game.overlays.length = 0;
@@ -222,6 +229,18 @@ export function createYodaVariant(strings: ReadonlyMap<number, string>): Desktop
     },
 
     placeOnPuzzle: placeOnOffer,
+
+    /**
+     * Spirit Heart (`FUN_00424270` de YODESK.EXE) : quand la santé est épuisée et que le cœur est dans l'inventaire,
+     * il est consommé et rend toute la santé, avec FLOURISH.WAV.
+     */
+    revive(game) {
+      if (!game.hasItem(TileIds.SpiritHeart)) return false;
+      game.removeItem(TileIds.SpiritHeart);
+      game.hero.health = MAX_HEALTH;
+      game.playSound(YodaSounds.Flourish);
+      return true;
+    },
 
     /** La Force ne blesse pas : elle immobilise le monstre pendant `damage` ticks (`hitMonster` de WebFun). */
     hitMonster(_game, monster, weapon) {

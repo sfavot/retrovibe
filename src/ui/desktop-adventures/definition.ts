@@ -123,6 +123,8 @@ export interface DesktopAdventure {
   readonly theme: number;
   /** Touche (KeyboardEvent.code) qui ouvre la carte. */
   readonly mapKey: string;
+  /** Son joué quand on prend un objet dans l'inventaire (Yoda : détonateur, R2-D2), -1 : aucun. */
+  grabSound?(tile: number): number;
   /** Sons d'ouverture et de fermeture de la carte (Yoda : LOCATOR.WAV, MAPCLS.WAV), facultatifs. */
   readonly mapSounds?: { open: number; close: number };
   readonly locator: LocatorTiles;

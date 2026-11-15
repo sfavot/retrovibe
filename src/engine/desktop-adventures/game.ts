@@ -164,6 +164,8 @@ export class Game extends EventTarget {
 
   addItem(tile: number): void {
     if (tile < 0) return;
+    // Yoda (`FUN_00425b30` de YODESK.EXE) : un son à chaque ajout, sauf pour une seconde carte.
+    if (!(this.assets.isMapTile(tile) && this.inventory.some((t) => this.assets.isMapTile(t)))) this.playSound(this.variant.sounds.pickUp ?? -1);
     if (this.assets.isMapTile(tile)) this.inventory.unshift(tile);
     else this.inventory.push(tile);
     this.emit(GameEvent.Inventory);
@@ -546,8 +548,12 @@ export class Game extends EventTarget {
       return state?.hotspots.some((h) => h.type === HotspotType.Teleporter && h.enabled) ? [index] : [];
     });
     if (!destinations.length) return false;
+    this.playSound(this.variant.sounds.teleportOpen ?? -1);
     const choice = await this.presenter.chooseTeleport(destinations);
-    if (choice === null || !destinations.includes(choice)) return false;
+    if (choice === null || !destinations.includes(choice)) {
+      this.playSound(this.variant.sounds.teleportCancel ?? -1);
+      return false;
+    }
     const target = this.zones.get(this.story.sectors[choice]!.zoneId)!;
     const pad = target.hotspots.find((h) => h.type === HotspotType.Teleporter && h.enabled)!;
     this.playSound(this.variant.sounds.teleport);
@@ -576,7 +582,10 @@ export class Game extends EventTarget {
       else if (!(await this.consume(p.tile))) this.playSound(this.variant.sounds.noGo);
       return false;
     }
-    if (Math.max(Math.abs(p.x - hero.x), Math.abs(p.y - hero.y)) > 1 || !this.zone.inBounds(p.x, p.y)) return false;
+    if (Math.max(Math.abs(p.x - hero.x), Math.abs(p.y - hero.y)) > 1 || !this.zone.inBounds(p.x, p.y)) {
+      this.playSound(this.variant.sounds.placeTooFar ?? -1);
+      return false;
+    }
 
     let handled = false;
     const sector = this.sector;
@@ -626,7 +635,9 @@ export class Game extends EventTarget {
   setHealth(value: number): void {
     this.hero.health = Math.max(0, Math.min(MAX_HEALTH, value));
     this.emit(GameEvent.Health);
-    if (this.hero.health <= 0 && !this.over) void this.lose();
+    if (this.hero.health > 0 || this.over) return;
+    if (this.variant.revive?.(this)) this.emit(GameEvent.Health);
+    else void this.lose();
   }
 
   /** Barème de l'original : les dégâts sont divisés par 100 / difficulté (÷2 à difficulté normale), avec un minimum de 1. */

@@ -575,6 +575,7 @@ export class App {
 
   private startItemDrag(tile: number, e: PointerEvent): void {
     if (!this.game || e.button !== 0) return;
+    this.audio.play(this.def.grabSound?.(tile) ?? -1);
     const ghost = h("div", { class: "drag-ghost", "aria-hidden": "true" }, tileCanvas(this.assets.tile(tile), this.basePalette, 48));
     this.itemDrag = { tile, ghost, startX: e.clientX, startY: e.clientY, moved: false };
   }

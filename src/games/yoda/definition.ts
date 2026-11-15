@@ -3,6 +3,7 @@ import { ZoneType } from "../../engine/desktop-adventures/data/types";
 import type { DesktopAdventure } from "../../ui/desktop-adventures/definition";
 import { copy } from "./copy";
 import { generateYodaStory, type YodaStory } from "./generation/world-generator";
+import { TileIds } from "./ids";
 import { YODA_MUSIC, YodaSounds } from "./sounds";
 import { createYodaVariant } from "./variant";
 
@@ -28,8 +29,11 @@ export function yodaAdventure(dtaSounds: readonly string[], baseUrl: string, str
     theme: YodaSounds.Opening,
     // Touche du localisateur de l'original (`mapKey` de WebFun).
     mapKey: "KeyL",
-    // Déduits des noms de fichiers (non vérifiés dans YODESK.EXE).
+    // YODESK.EXE : 0x40efec (ouverture) et 0x412036… (fermeture).
     mapSounds: { open: YodaSounds.Locator, close: YodaSounds.MapClose },
+    // 0x40f111 (détonateur) et 0x40f148 (R2-D2, un bip sur deux) : sons joués quand on prend l'objet dans l'inventaire.
+    grabSound: (tile) =>
+      tile === TileIds.ThermalDetonator ? YodaSounds.Grenade : tile === TileIds.R2D2 ? (Math.random() < 0.5 ? YodaSounds.R2D2a : YodaSounds.R2D2b) : -1,
     // Tuiles du localisateur (`locator-tile.ts` de WebFun).
     locator: {
       unvisited: 835,

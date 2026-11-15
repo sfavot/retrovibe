@@ -18,6 +18,14 @@ export interface VariantSounds {
   victory: number;
   /** Mort d'un monstre. */
   monsterDeath: number;
+  /** Objet ajouté à l'inventaire (sauf une carte déjà possédée). */
+  pickUp?: number;
+  /** Ouverture du choix de téléporteur (le son `teleport` accompagne le choix d'une destination). */
+  teleportOpen?: number;
+  /** Choix de téléporteur annulé. */
+  teleportCancel?: number;
+  /** Objet posé à plus d'une case du héros. */
+  placeTooFar?: number;
 }
 
 /**
@@ -89,6 +97,8 @@ export interface DesktopVariant {
   placeOnPuzzle?(game: Game, tile: number, at: Point): boolean;
   /** Zones jouées en scène de fin avant la fenêtre de fin (Yoda : 76 et 77). Sans elles, la fenêtre s'affiche directement. */
   readonly endZones?: { win: number; lose: number };
+  /** La santé tombe à 0 : le jeu peut sauver le héros (Yoda : le Spirit Heart) ; renvoie vrai s'il l'a fait. */
+  revive?(game: Game): boolean;
   /** Coup porté à un monstre ; renvoie vrai si le jeu l'a traité lui-même (Yoda : la Force immobilise). */
   hitMonster?(game: Game, monster: Monster, weapon: Character): boolean;
 }

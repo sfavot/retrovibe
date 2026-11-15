@@ -3,9 +3,11 @@
  * Les ids 13, 28 et 30 répètent banglrg, switch-4 et moverock ; l'entrée 45 est vide.
  */
 export const YodaSounds = {
+  /** SCHWING.WAV : soin, choix d'une destination de téléporteur. */
   Schwing: 0,
   Push: 1,
   Switch7: 2,
+  /** SHPOONK.WAV : objet ajouté à l'inventaire. */
   Shpoonk: 3,
   Hurt: 4,
   Eep: 5,

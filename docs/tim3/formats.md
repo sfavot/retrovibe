@@ -1,7 +1,7 @@
 # The Incredible Machine 3 : formats des fichiers
 
 Légende : **vérifié** par script sur les vrais fichiers (ISO extraite dans le scratchpad, scripts Python lancés en `python3 -I`, rien d'exécuté, PNG regardés) ; **lu** dans les octets, les chaînes de l'exécutable ou une documentation externe, cohérent sur quelques exemples sans validation exhaustive ; **supposé**.
-Source : `jeu-00235-incredible_machine_3-pcwin.7z` (Abandonware France) → `IncMac3.iso`, Sierra/Dynamix 1995, **version 3.0** (écran de titre « Version 3.0 », « ©1995 Sierra On-Line », vérifié ; boîte « About » de l'exe, lu).
+Source : `archives/tim3/jeu-00235-incredible_machine_3-pcwin.7z` (Abandonware France) → `IncMac3.iso`, Sierra/Dynamix 1995, **version 3.0** (écran de titre « Version 3.0 », « ©1995 Sierra On-Line », vérifié ; boîte « About » de l'exe, lu).
 Références externes (lues, non reprises telles quelles) : ModdingWiki (formats de ressource, d'image, de niveau, ANM de TIM 1 à 3), `timgres` (visionneuse, noyau CC0), ScummVM `engines/dgds` (LZW et RLE, GPL v3 ou ultérieure). Aucun code de ces projets n'est repris. Droits : voir `plan.md`, décision D1 (abandonware, pas freeware).
 Scripts d'étude (hors dépôt, scratchpad `tools-tim3/`) : `dgds.py` (chunks, LZW), `lev.py` (heuristique, échoue sur 161/206), etc. ; sorties : `reslist.txt`, `bmp_frames.txt`, `levels_en.txt`, `levels_fr.txt`.
 
@@ -185,7 +185,7 @@ piste : "HMI-MIDITRACK" ; u32 à +0x57 = position des évènements (0xCD ou proc
 
 ## 11. TIM1 (référence, non porté)
 
-L'utilisatrice a aussi fourni `setup-01113-the incredible machine-PCDOSBox.exe` : TIM1 DOS 1.0 sur disquette, anglais (RESOURCE.MAP, `.001` à `.004`, `TIM.EXE` 109 Ko, `TONSOFUN.TIM`, `CATOMATC.TIM`), extrait dans le scratchpad `tim1-setup/app/C`. **Non porté.** Format de ressource différent de TIM3 (variante `RESOURCE.MAP` à entrées `u16`, animations dans l'exe, lu dans ModdingWiki) ; 87 puzzles selon les sources. Référence possible pour la **physique de base** : OpenTIM (réimplémentation fidèle de TIM1, correctifs marqués VANILLAFIX, licence non lue), DOSBox-X installé pour observer l'original. TIM3 ne la reprend pas forcément (supposé).
+L'utilisatrice a aussi fourni `archives/tim3/setup-01113-the incredible machine-PCDOSBox.exe` : TIM1 DOS 1.0 sur disquette, anglais (RESOURCE.MAP, `.001` à `.004`, `TIM.EXE` 109 Ko, `TONSOFUN.TIM`, `CATOMATC.TIM`), extrait dans le scratchpad `tim1-setup/app/C`. **Non porté.** Format de ressource différent de TIM3 (variante `RESOURCE.MAP` à entrées `u16`, animations dans l'exe, lu dans ModdingWiki) ; 87 puzzles selon les sources. Référence possible pour la **physique de base** : OpenTIM (réimplémentation fidèle de TIM1, correctifs marqués VANILLAFIX, licence non lue), DOSBox-X installé pour observer l'original. TIM3 ne la reprend pas forcément (supposé).
 
 ## 12. Points à vérifier en vague D
 

@@ -18,6 +18,7 @@ import {
   layoutText,
   mapColor,
   parseTextCodes,
+  textBoxFrame,
 } from "../../../src/games/tim3/render";
 import { frenchIndex, original } from "../data/real";
 import { image } from "./support";
@@ -144,5 +145,59 @@ describe.skipIf(!original.has)("GENERIC et PUZZSOLV sur les données d'origine",
     let ink = 0;
     for (let y = 178; y < 201; y++) for (let x = 188; x < 451; x++) if (s.pixels[y * 640 + x] === mapColor(5)) ink++;
     expect(ink).toBeGreaterThan(100);
+  });
+});
+
+describe("moteur ITF : contrôles de la vague F", () => {
+  it("cadre d'une zone de texte selon valeur % 100 (4218d4)", () => {
+    expect(textBoxFrame(2)).toEqual({ first: 0x78, fill: 9 });
+    expect(textBoxFrame(4)).toEqual({ first: 0x78, fill: 9 });
+    expect(textBoxFrame(3)).toEqual({ first: 0, fill: 15 });
+    expect(textBoxFrame(5)).toEqual({ first: -1, fill: 15 });
+    expect(textBoxFrame(14)).toEqual({ first: 0x70, fill: 11 });
+    expect(textBoxFrame(15)).toEqual({ first: 0x78, fill: 9 });
+    expect(textBoxFrame(99)).toEqual({ first: 0x20, fill: 5 });
+  });
+
+  it("la première ligne est toujours posée, même dans un cadre moins haut que la police", () => {
+    expect(layoutText(font, "ab cd", 100, 1, TEXT_WRAP).lines.map((l) => l.text)).toEqual(["ab cd"]);
+    expect(layoutText(font, "ab\ncd", 100, 3, 0).lines.map((l) => l.text)).toEqual(["ab"]);
+  });
+});
+
+describe.skipIf(!original.has)("moteur ITF sur les fichiers du jeu (vague F)", () => {
+  const index = frenchIndex();
+  const assets = new RenderAssets(index);
+  const info = readItf(index.get("INFO.ITF"));
+  const music = readItf(index.get("MUSICBOX.ITF"));
+
+  it("valeur 161 : texte de l'appelant, lignes visibles et totales, défilement ; 162 : titre", () => {
+    const long = "mot ".repeat(200);
+    const layout = layoutItf(assets, info, { ...itfOrigin(info), texts: { 22014: long, 22011: "Ballon" } });
+    const text = layout.items.find((i) => i.id === 22014)!;
+    expect(text.text).toBe(long);
+    expect(text.lines!.total).toBeGreaterThan(text.lines!.visible);
+    expect(text.more).toBe(true);
+    const end = layoutItf(assets, info, { ...itfOrigin(info), texts: { 22014: long }, scroll: { 22014: text.lines!.total - 1 } });
+    expect(end.items.find((i) => i.id === 22014)!.more).toBe(false);
+    expect(layout.items.find((i) => i.id === 22011)!.text).toBe("Ballon");
+  });
+
+  it("image d'un contrôle : décalage imposé (interrupteur) et nombre d'images de l'état", () => {
+    const draw = (frames: Record<number, number>) => {
+      const s = new Surface(640, 480);
+      const layout = drawItf(s, assets, music, { ...itfOrigin(music), frames });
+      return { s, layout };
+    };
+    const on = draw({ 15003: 0 });
+    const off = draw({ 15003: 1 });
+    expect(on.layout.items.find((i) => i.id === 15003)!.frameCount).toBe(2);
+    expect(on.s.pixels.some((v, i) => v !== off.s.pixels[i])).toBe(true);
+  });
+
+  it("dessin propre d'un contrôle (rappel +0x5c) : appelé avec son rectangle", () => {
+    const seen: number[] = [];
+    drawItf(new Surface(640, 480), assets, info, { ...itfOrigin(info), draw: { 22010: (_s, r) => seen.push(r.width, r.height) } });
+    expect(seen).toEqual([176, 111]);
   });
 });

@@ -4,14 +4,15 @@ Généré par `scripts/tim3-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/tim3/`) : **17.4 Mo** (18271765 octets), 660 fichiers (hors `files.json`)
-- Voix (`voices/`, MP3) : 7.6 Mo ; données du jeu : 9.8 Mo
+- Total versionné (`original/tim3/`) : **17.4 Mo** (18288845 octets), 661 fichiers (hors `files.json`)
+- Voix (`voices/`, MP3) : 7.6 Mo ; données du jeu : 9.9 Mo
 - Hors extraction, conservé d'une exécution à l'autre : `COVER.png` (vague J, si présent)
 
 ## Fichiers
 
 | Fichier | Octets | SHA-256 (16 premiers hex) | Origine |
 |---|---:|---|---|
+| COVER.png | 17080 | `63b2a6ff0d766087` | vague J (`scripts/tim3-cover.mts`), conservé d'une exécution à l'autre |
 | FRENCH.DAT | 469457 | `72cd26d4c722ab30` | `TIMWIN/FRENCH.DAT` de l'ISO, tel quel (pack de langue : textes français) |
 | RESOURCE.001 | 7508126 | `022987060475eec9` | `TIMWIN/RESOURCE.001` de l'ISO, tel quel |
 | RESOURCE.002 | 1783838 | `27b30fd7bd2dcfe1` | `TIMWIN/RESOURCE.002` de l'ISO, tel quel |
@@ -52,4 +53,4 @@ Généré par `scripts/tim3-extract.sh` (ne pas éditer à la main).
 bash scripts/tim3-extract.sh [archive.7z]
 ```
 
-Archive par défaut : `jeu-00235-incredible_machine_3-pcwin.7z` à la racine, sinon dans `archives/` (non versionnée). Outils requis : `7zz`, `python3`, `ffmpeg` (`libmp3lame`).
+Archive par défaut : `archives/tim3/jeu-00235-incredible_machine_3-pcwin.7z` (non versionnée). Outils requis : `7zz`, `python3`, `ffmpeg` (`libmp3lame`).

@@ -19,13 +19,18 @@
  *   - taille-haie 37 (442a75) : au plan 0, si l'image courante est avant le début de l'état 0xB (0x481e6c, la lame seule),
  *     cette lame passe devant ;
  *   - cisailles 77 (442ab8) : au plan 0, à l'image 0 (ouvertes), la lame seule (début de l'état 5, 0x481e7c) passe devant.
- * - Pas portés (dessinés comme des pièces ordinaires ou omis) : faisceau des lasers (43cd22), détails des types 30, 127, 136.
+ * - **Lasers et mélangeur** (91 à 93, 95 : slot 6 = 43cd22, plan 3) : le corps (42deab), puis, s'il est allumé (+0x24), le
+ *   faisceau : ligne de Bresenham (4570c8) d'un point du tampon (+0x90) au suivant, sur les +0xFC tronçons posés par la passe
+ *   43d013 ; le dernier s'arrête au point d'impact (+0x54, +0x58) sauf si +0x54 = −0x1000 (faisceau jusqu'au bout). Couleur
+ *   logique (43cdfd → 413388) : 12 pour 91, 10 pour 92, 9 pour 93 ; pour 95, table 0x477d64 indexée par les faisceaux reçus.
+ * - Pas portés (dessinés comme des pièces ordinaires ou omis) : détails des types 30, 127, 136.
  */
 import type { Anm } from "../data/anm";
 import type { Part } from "../engine/part";
 import type { World } from "../engine/world";
 import { FLIP_X, FLIP_Y, drawAnmImage, imageFrame, stateStart } from "./anm-draw";
 import type { RenderAssets } from "./assets";
+import { mapColor } from "./palette";
 import { drawBelt, drawRope } from "./ropes";
 import type { Surface } from "./surface";
 
@@ -36,6 +41,12 @@ const STRETCHED = new Set([1, 46, 48, 56, 60, 82, 83, 84, 85, 97, 118, 125]);
 /** Types dessinés par 43e74b (aplats). */
 const AREA = new Set([121, 122, 123, 124, 203, 205, 271, 280]);
 const BUCKETS: Record<number, number> = { 11: 1, 17: 1, 108: 0x5a };
+/** 43cdfd : couleur logique du faisceau des lasers 91, 92, 93. */
+const BEAM_COLORS: Record<number, number> = { 0x5b: 12, 0x5c: 10, 0x5d: 9 };
+/** 0x477d64 : couleur logique du faisceau du mélangeur 95, selon les faisceaux reçus (+0x24 : 4 = 91, 2 = 92, 1 = 93). */
+const MIXER_COLORS = [0, 9, 10, 11, 12, 1, 14, 15] as const;
+/** +0x54 d'un laser dont le faisceau ne touche rien (43d013). */
+const BEAM_UNBLOCKED = -0x1000;
 
 export interface DrawOptions {
   /** Décalage de la vue (0x481580 / 0x481584), nul dans TIM3. */
@@ -77,11 +88,53 @@ export function drawPart(surface: Surface, assets: RenderAssets, world: World, p
   const anm = assets.partAnm(p.type);
   if (p.type === 8) return drawBelt(surface, p, view);
   if (p.type === 10 || p.type === 76) return drawRope(surface, assets, p, view);
+  if (isBeamSource(p.type)) return drawLaser(surface, assets, anm, p, view);
   if (!anm) return;
   if (STRETCHED.has(p.type)) return drawStretched(surface, assets, anm, p, view);
   if (AREA.has(p.type)) return drawArea(surface, assets, world, anm, p, view);
   const frame = layerFrame(anm, p, layer);
   if (frame !== null) drawOrdinary(surface, assets, anm, p, frame, view);
+}
+
+/** Lasers 91, 92, 93 et mélangeur 95 : types dont le slot 6 est 43cd22. */
+function isBeamSource(type: number): boolean {
+  return type === 0x5f || type in BEAM_COLORS;
+}
+
+/**
+ * 43cd22 : le corps (42deab ; l'exe le saute lors d'un redessin partiel si l'image n'a pas changé, sans objet ici), puis le
+ * faisceau.
+ */
+function drawLaser(surface: Surface, assets: RenderAssets, anm: Anm | null, p: Part, view: { x: number; y: number }): void {
+  if (anm) drawOrdinary(surface, assets, anm, p, p.frame, view);
+  drawBeam(surface, p, view);
+}
+
+/** 43cdfd : couleur logique du faisceau d'un laser ou du mélangeur, `undefined` hors table. */
+export function beamColor(p: Part): number | undefined {
+  return p.type === 0x5f ? MIXER_COLORS[p.f24] : BEAM_COLORS[p.type];
+}
+
+/**
+ * 43cd22 (après le corps) : faisceau d'un laser allumé, tronçon par tronçon depuis le tampon +0x90 ; le dernier des +0xFC
+ * tronçons s'arrête au point d'impact (+0x54, +0x58) s'il y en a un. Le tampon est en coordonnées de l'aire.
+ */
+export function drawBeam(surface: Surface, p: Part, view: { x: number; y: number }): void {
+  const buf = p.beam;
+  if (p.f24 === 0 || !buf) return;
+  const logical = beamColor(p);
+  if (logical === undefined) return;
+  const color = mapColor(logical);
+  if (color < 0) return;
+  const n = Math.min(p.fFC, (buf.length >> 1) - 1);
+  for (let i = 0; i < n; i++) {
+    const x0 = buf[2 * i]! - view.x;
+    const y0 = buf[2 * i + 1]! - view.y;
+    const hit = i === n - 1 && p.vx !== BEAM_UNBLOCKED;
+    const x1 = (hit ? p.vx : buf[2 * i + 2]!) - view.x;
+    const y1 = (hit ? p.vy : buf[2 * i + 3]!) - view.y;
+    surface.line(x0, y0, x1, y1, color);
+  }
 }
 
 /** Image dessinée par le slot 6 d'une pièce ordinaire pour un plan, `null` pour rien. */

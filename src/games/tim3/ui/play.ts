@@ -13,14 +13,15 @@ import { FIELD_HEIGHT, FIELD_WIDTH, HANDLE_SIZE, Zone, type HeldPreview, type Zo
 import type { Part } from "../engine/part";
 import type { Tim3Session } from "../engine/session";
 import {
-  BIN_DOWN,
+  BIN_LEFT,
   BIN_PANEL,
   BIN_PLAY,
-  BIN_UP,
+  BIN_RIGHT,
   GOALBAR,
   PLAYFIELD,
   TOOLBAR,
   binLayout,
+  binScrollStep,
   composeScreen,
   drawBinIcon,
   drawBinOverlay,
@@ -29,6 +30,7 @@ import {
   drawHeldPart,
   drawHintArrow,
   drawRubberBand,
+  hintRect,
   inRect,
   nextHandleFrame,
   stateImage,
@@ -67,6 +69,8 @@ export type PlayEvent =
   | { type: "toolbarTip"; button: ShownButton }
   | { type: "tipEnd" }
   | { type: "goal" }
+  /** Clic sur la main d'un indice (42013d) : son emplacement dans le LEV (0 à 7). */
+  | { type: "hint"; slot: number }
   | { type: "sound"; name: "pick" | "drop" | "refused" | "remove" };
 
 export interface PlayTexts {
@@ -93,12 +97,12 @@ interface Drag {
 export type CursorKind = "default" | "pointer" | "grab" | "grabbing" | "ew-resize" | "ns-resize" | "not-allowed" | "copy" | "help";
 
 export class PlayScreen {
-  /** Première case affichée dans le bac. */
-  binFirst = 0;
+  /** Défilement horizontal du bac, en pixels (borné par `binLayout`). */
+  binScroll = 0;
   /** Pièce posée dont les poignées sont affichées (survol à la souris, sélection au doigt). */
   focus: Part | null = null;
-  /** Indice affiché (−1 : le but). */
-  hint = -1;
+  /** Mains des indices affichées (4204cf / 420536 : toutes à la fois, `[0x472938]`). */
+  hintsShown = false;
   /** Texte qui remplace le but dans la barre (message de l'interface), jusqu'au prochain geste. */
   message: string | null = null;
   /** Le puzzle ouvert a déjà été résolu : l'ampoule « Montrer la solution » apparaît (42d210). */
@@ -108,7 +112,6 @@ export class PlayScreen {
   private preview: HeldPreview = { valid: true };
   private handleFrames = new Map<number, number>();
   private hoverZone: ZoneId = Zone.None;
-  private layout: BinLayout = { slots: [], first: 0, total: 0 };
 
   constructor(
     public session: Tim3Session,
@@ -125,7 +128,22 @@ export class PlayScreen {
 
   /** Indices non vides du puzzle (texte français de `LEVELS.INF`, position du LEV). */
   get hintCount(): number {
-    return this.texts.hints.filter((h) => h !== "").length;
+    return this.hintSlots().length;
+  }
+
+  /** Emplacements LEV (0 à 7) des indices non vides. */
+  hintSlots(): number[] {
+    return this.texts.hints.flatMap((h, i) => (h !== "" && this.level.hints[i] ? [i] : []));
+  }
+
+  /** Main d'indice sous le point (contrôle de 44 × 43 en x, y de l'emplacement, 41ef54), si les indices sont affichés. */
+  hintAt(x: number, y: number): number | null {
+    if (!this.hintsShown || this.session.running) return null;
+    for (const slot of this.hintSlots()) {
+      const h = this.level.hints[slot]!;
+      if (inRect(hintRect(h.x, h.y), x, y)) return slot;
+    }
+    return null;
   }
 
   /** Session remplacée (Arrêter restaure une copie du monde) : la sélection n'a plus de sens. */
@@ -150,8 +168,16 @@ export class PlayScreen {
     return x >= BIN_PANEL.x && y >= BIN_PANEL.y && y < BIN_PANEL.y + BIN_PANEL.height;
   }
 
+  /**
+   * Cases du bac à l'état courant (417264 : la mise en page est refaite à chaque prise ou retour d'une pièce ; une case
+   * qui se vide disparaît et les suivantes remontent). Au Labo, palette illimitée : pas de nombre (modes 1 et 6).
+   */
+  get bin(): BinLayout {
+    return binLayout(this.assets, this.editor.binParts(), this.binScroll, this.session.lab === null);
+  }
+
   private slotAt(x: number, y: number): BinSlot | null {
-    return this.layout.slots.find((s) => inRect(s, x, y)) ?? null;
+    return this.bin.slots.find((s) => inRect(s, x, y)) ?? null;
   }
 
   /** Boutons montrés dans le mode courant (418b78), avec leur géométrie. */
@@ -194,7 +220,7 @@ export class PlayScreen {
       if (this.inField(x, y)) return this.preview.valid ? "grabbing" : "not-allowed";
       return "grabbing";
     }
-    if (this.toolbarAt(x, y) || inRect(BIN_PLAY, x, y) || inRect(BIN_UP, x, y) || inRect(BIN_DOWN, x, y)) return "pointer";
+    if (this.toolbarAt(x, y) || inRect(BIN_PLAY, x, y) || inRect(BIN_LEFT, x, y) || inRect(BIN_RIGHT, x, y)) return "pointer";
     if (this.slotAt(x, y)) return "grab";
     if (inRect(GOALBAR, x, y)) return "pointer";
     if (this.session.running || !this.inField(x, y)) return "default";
@@ -236,10 +262,15 @@ export class PlayScreen {
       this.drag = { kind: "press", part: null, startX: x, startY: y, moved: false, touch, button: "PB_PLAY" };
       return;
     }
-    if (inRect(BIN_UP, x, y)) return this.scrollBin(-1);
-    if (inRect(BIN_DOWN, x, y)) return this.scrollBin(1);
+    if (inRect(BIN_LEFT, x, y)) return this.scrollBin(-1);
+    if (inRect(BIN_RIGHT, x, y)) return this.scrollBin(1);
     if (inRect(GOALBAR, x, y)) {
       this.emit({ type: "goal" });
+      return;
+    }
+    const hint = this.hintAt(x, y);
+    if (hint !== null) {
+      this.emit({ type: "hint", slot: hint });
       return;
     }
     if (this.session.running) {
@@ -438,9 +469,10 @@ export class PlayScreen {
     return this.inBin(x, y) ? this.slotAt(x, y) : null;
   }
 
-  scrollBin(delta: number): void {
-    const max = Math.max(0, this.layout.total - this.layout.slots.length);
-    this.binFirst = Math.max(0, Math.min(this.binFirst + delta, max));
+  /** Flèche du bac : −1 (gauche) ou 1 (droite), une colonne (`binScrollStep`). */
+  scrollBin(direction: number): void {
+    const bin = this.bin;
+    this.binScroll = binScrollStep(bin, direction);
   }
 
   // ------------------------------------------------------------------ clavier
@@ -486,7 +518,7 @@ export class PlayScreen {
       case "Escape":
         if (ed.held) ed.returnHeld();
         else if (this.focus) this.focus = null;
-        else if (this.hint >= 0) this.hint = -1;
+        else if (this.hintsShown) this.hintsShown = false;
         else return false;
         this.updateHover();
         return true;
@@ -495,12 +527,11 @@ export class PlayScreen {
     }
   }
 
-  /** Indice suivant (bouton `TB_HINT`) : rend l'index affiché, −1 au retour au but. */
-  nextHint(): number {
-    const count = this.hintCount;
+  /** Bouton `TB_HINT` en mode Jeu (4192d3) : montre toutes les mains des indices (4204cf) ou les cache (420536). */
+  toggleHints(): boolean {
     this.message = null;
-    this.hint = this.hint + 1 < count ? this.hint + 1 : -1;
-    return this.hint;
+    this.hintsShown = !this.hintsShown && this.hintCount > 0;
+    return this.hintsShown;
   }
 
   // ------------------------------------------------------------------ dessin
@@ -509,10 +540,9 @@ export class PlayScreen {
   render(): Surface {
     const s = this.session;
     const ed = this.editor;
-    // Au Labo, palette illimitée : pas de compteur (417264, modes 1 et 6).
-    this.layout = binLayout(this.assets, ed.binParts(), this.binFirst, this.session.lab === null);
-    this.binFirst = this.layout.first;
-    const goal = this.message ?? (this.hint >= 0 ? (this.texts.hints.filter((h) => h !== "")[this.hint] ?? "") : this.texts.goal);
+    const bin = this.bin;
+    this.binScroll = bin.scroll;
+    const goal = this.message ?? this.texts.goal;
     const screen = composeScreen(this.assets, s.world, {
       backgroundColor: s.background,
       goal: "",
@@ -521,12 +551,15 @@ export class PlayScreen {
       binPanelOnly: true,
     });
     drawGoalBar(screen, this.assets, goal);
-    const hoverSlot = !this.pointer.touch && this.pointer.inside && !ed.held ? this.slotUnder(this.pointer.x, this.pointer.y) : null;
-    drawBinOverlay(screen, this.assets, { layout: this.layout, running: s.running, hover: hoverSlot });
+    const { x: px, y: py } = this.pointer;
+    const hoverSlot = !this.pointer.touch && this.pointer.inside && !ed.held && this.inBin(px, py) ? (bin.slots.find((k) => inRect(k, px, py)) ?? null) : null;
+    drawBinOverlay(screen, this.assets, { layout: bin, running: s.running, hover: hoverSlot });
     if (s.running) return screen;
-    if (this.hint >= 0) {
-      const h = this.level.hints.filter((_, i) => this.texts.hints[i] !== "")[this.hint];
-      if (h) drawHintArrow(screen, this.assets, h.x, h.y, h.flip ?? 0);
+    if (this.hintsShown) {
+      for (const slot of this.hintSlots()) {
+        const h = this.level.hints[slot]!;
+        drawHintArrow(screen, this.assets, h.x, h.y, h.flip ?? 0);
+      }
     }
     const focus = this.focus;
     if (focus && !ed.held && (focus.flags0C & 0x3000) !== 0) drawHandles(screen, this.assets, this.handleViews(focus));

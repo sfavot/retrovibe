@@ -162,3 +162,46 @@ describe("avant au plan 0 (slots 6 445ce0, 442a75, 442ab8)", () => {
     expect(pixel(assets, 77, 2, 4)).toBe(3);
   });
 });
+
+describe("faisceau des lasers (43cd22)", () => {
+  const none = new FakeAssets({ frames: [] }, new Map());
+  /** Laser allumé dont le tampon trace un L : (1, 1) → (6, 1) → (6, 4), impact éventuel sur le dernier tronçon. */
+  function laser(type: number, f24 = 1, impact: [number, number] | null = null) {
+    const p = part(type, 0, 0, 1, 1);
+    p.beam = new Int32Array(32);
+    p.beam.set([1, 1, 6, 1, 6, 4]);
+    p.f24 = f24;
+    p.fFC = 2;
+    [p.vx, p.vy] = impact ?? [-0x1000, 0];
+    return p;
+  }
+  const lit = (s: Surface) => Array.from({ length: 6 }, (_, y) => Array.from(s.pixels.subarray(y * 8, y * 8 + 8), (v) => (v ? "#" : "0")).join(""));
+
+  it("trace chaque tronçon du tampon, jusqu'au bout sans impact (+0x54 = −0x1000)", () => {
+    const s = new S(8, 6);
+    draw(s, none, laser(0x5b), 3);
+    expect(lit(s)).toEqual(["00000000", "0######0", "000000#0", "000000#0", "000000#0", "00000000"]);
+  });
+
+  it("arrête le dernier tronçon au point d'impact (+0x54, +0x58)", () => {
+    const s = new S(8, 6);
+    draw(s, none, laser(0x5b, 1, [6, 2]), 3);
+    expect(lit(s)).toEqual(["00000000", "0######0", "000000#0", "00000000", "00000000", "00000000"]);
+  });
+
+  it("ne dessine rien quand le laser est éteint (+0x24 = 0)", () => {
+    const s = new S(8, 6);
+    draw(s, none, laser(0x5b, 0), 3);
+    expect(s.pixels.every((v) => v === 0)).toBe(true);
+  });
+
+  it("couleur logique 12, 10, 9 pour 91, 92, 93 ; table 0x477d64 pour le mélangeur 95", () => {
+    const at = (type: number, f24: number) => {
+      const s = new S(8, 6);
+      draw(s, none, laser(type, f24), 3);
+      return s.pixels[1 * 8 + 1];
+    };
+    expect([at(0x5b, 1), at(0x5c, 1), at(0x5d, 1)]).toEqual([27, 25, 24]);
+    expect([1, 2, 3, 4, 5, 6, 7].map((f) => at(0x5f, f))).toEqual([24, 25, 26, 27, 16, 29, 30]);
+  });
+});

@@ -5,7 +5,7 @@ import { readLev } from "../../../src/games/tim3/data/lev";
 import { step } from "../../../src/games/tim3/engine/step";
 import type { Part } from "../../../src/games/tim3/engine/part";
 import { World } from "../../../src/games/tim3/engine/world";
-import { BIN_PANEL, PLAYFIELD, RenderAssets, SCREEN_HEIGHT, SCREEN_WIDTH, backgroundIndex, composeScreen, drawOrder, renderPlayfield } from "../../../src/games/tim3/render";
+import { BIN_PANEL, PLAYFIELD, RenderAssets, SCREEN_HEIGHT, SCREEN_WIDTH, backgroundIndex, beamColor, composeScreen, drawOrder, mapColor, renderPlayfield } from "../../../src/games/tim3/render";
 import { baseIndex, frenchIndex, original } from "../data/real";
 import { realTypes, realWorld } from "../engine/helpers";
 import { applySolution, type Solution } from "../solutions/apply";
@@ -102,5 +102,34 @@ describe.skipIf(!original.has)("composition réelle", () => {
     const inBasket = diff(render([]), render(balls));
     expect(inBasket).toBeGreaterThan(0);
     expect(inBasket).toBeLessThan(alone / 2);
+  });
+
+  it("HLEV8 résolu : les faisceaux des lasers 91, 92, 93 et du mélangeur 95 suivent les tronçons du moteur, à leur couleur", () => {
+    const solution = JSON.parse(readFileSync(resolve(import.meta.dirname, "../solutions/HLEV8.json"), "utf8")) as Solution;
+    const world = new World(realTypes());
+    world.loadLevel(applySolution(readLev(baseIndex().get("HLEV8.LEV")), solution));
+    for (let i = 0; i < (solution.goalStep ?? 71); i++) step(world);
+    const field = renderPlayfield(assets, world, { backgroundColor: 3 });
+    const lasers = world.statics.toArray().filter((p) => [0x5b, 0x5c, 0x5d, 0x5f].includes(p.type) && p.f24 !== 0);
+    expect(lasers.map((p) => p.type).sort()).toEqual([0x5b, 0x5c, 0x5d, 0x5f]);
+    // Miroirs : 6 tronçons pour 91 et 92, 4 pour 93 ; le mélangeur reçoit les trois (+0x24 = 7, blanc).
+    expect(lasers.find((p) => p.type === 0x5f)!.f24).toBe(7);
+    for (const p of lasers) {
+      const color = mapColor(beamColor(p)!);
+      for (let i = 0; i < p.fFC; i++) {
+        const b = p.beam!;
+        const last = i === p.fFC - 1 && p.vx !== -0x1000;
+        const [x0, y0, x1, y1] = [b[2 * i]!, b[2 * i + 1]!, last ? p.vx : b[2 * i + 2]!, last ? p.vy : b[2 * i + 3]!];
+        // Tronçons horizontaux ou verticaux : part des pixels à la couleur du faisceau (le reste : pièces au premier plan, croisements).
+        const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) + 1;
+        let same = 0;
+        for (let k = 0; k < n; k++) {
+          const x = x0 + Math.sign(x1 - x0) * k;
+          const y = y0 + Math.sign(y1 - y0) * k;
+          if (field.pixels[y * field.width + x] === color) same++;
+        }
+        expect(same / n, `type ${p.type}, tronçon ${i}`).toBeGreaterThan(0.6);
+      }
+    }
   });
 });

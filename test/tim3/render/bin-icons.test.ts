@@ -42,9 +42,8 @@ describe.skipIf(!original.has)("icônes du bac (4171c9)", () => {
       const icon = assets.binIcon(s.type)!;
       // Case = icône + 4, + 12 pour le nombre.
       expect(s.height).toBe(icon.height + 16);
-      // Icône centrée à 2 pixels du haut de la case : ses pixels (hors des 3 dernières lignes, sous le nombre) sont à l'écran.
-      const ox = s.x + ((s.width - icon.width) >> 1);
-      const oy = s.y + 2;
+      const ox = s.iconX;
+      const oy = s.iconY;
       let drawn = 0;
       let expected = 0;
       for (let y = 0; y < icon.height - 3; y++)
@@ -64,5 +63,7 @@ describe.skipIf(!original.has)("icônes du bac (4171c9)", () => {
     // Sans nombre (palette illimitée) : les cases rétrécissent de 12.
     const bare = binLayout(assets, world.bin.toArray(), 0, false);
     expect(bare.slots.map((s) => s.height)).toEqual(layout.slots.map((s) => s.height - 12));
+    // Une seule colonne, rien à faire défiler.
+    expect([layout.columns, layout.maxScroll]).toEqual([[8], 0]);
   });
 });

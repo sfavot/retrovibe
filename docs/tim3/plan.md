@@ -1,6 +1,6 @@
 # The Incredible Machine 3 : plan d'implémentation
 
-Jeu : *The Incredible Machine 3* (Dynamix / Sierra, 1995), **version 3.0 pour Windows 3.x** (Win32s + WinG). Source : `jeu-00235-incredible_machine_3-pcwin.7z` (Abandonware France), qui contient `IncMac3.iso`.
+Jeu : *The Incredible Machine 3* (Dynamix / Sierra, 1995), **version 3.0 pour Windows 3.x** (Win32s + WinG). Source : `archives/tim3/jeu-00235-incredible_machine_3-pcwin.7z` (Abandonware France), qui contient `IncMac3.iso`.
 
 C'est un jeu de puzzles mécaniques en 640×480 et 256 couleurs. On construit une machine en déposant des pièces (balles, cordes, poulies, courroies, moteurs, animaux…) dans l'aire de jeu, puis on la met en marche ; la simulation physique décide si le but est atteint. Le jeu contient :
 - **156 puzzles** répartis en cinq niveaux : 40 de travaux pratiques, 26 faciles, 30 moyens, 31 difficiles, 29 très difficiles ;
@@ -103,7 +103,7 @@ La soundfont réduite est déjà servie depuis `original/mathemagique/`. **TIM3 
 
 ## Ce qui est versionné dans `original/tim3/`
 
-Source dans `archives/` (non versionnée) : `jeu-00235-incredible_machine_3-pcwin.7z`. L'archive est aujourd'hui à la racine du dépôt ; le script accepte son chemin en argument.
+Source dans `archives/tim3/` (non versionnée) : `jeu-00235-incredible_machine_3-pcwin.7z`. Le script accepte un autre chemin en argument.
 
 | Fichiers | Source | Poids | Versionné |
 | --- | --- | --- | --- |

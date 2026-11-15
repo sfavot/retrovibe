@@ -12,7 +12,7 @@ import type { RenderAssets } from "./assets";
 import { mapColor } from "./palette";
 import { drawParts } from "./parts";
 import { Surface } from "./surface";
-import { drawParagraph } from "./text";
+import { drawParagraph, drawText } from "./text";
 import { readItf } from "../data/itf";
 import type { Anm } from "../data/anm";
 import type { Part } from "../engine/part";
@@ -97,29 +97,146 @@ export function drawToolbar(surface: Surface, assets: RenderAssets, running = fa
   }
 }
 
-/** Bac : le panneau de `PARTSBIN.ANM`, puis les pièces du bac empilées (mise en page supposée, voir `docs/tim3/graphics.md`). */
+/** Bac : le panneau de `PARTSBIN.ANM`, puis les cases du bac (`binLayout`, sans défilement). */
 export function drawBin(surface: Surface, assets: RenderAssets, world: World, panelOnly = false): void {
   const anm = assets.anm("PARTSBIN.ANM");
   if (anm) {
     const f = imageFrame(anm, 1);
     if (f) drawAnmImage(surface, assets, anm, 1, BIN_PANEL.x - f.x, BIN_PANEL.y - f.y);
   }
-  if (!panelOnly) drawBinParts(surface, assets, [...world.bin]);
+  if (!panelOnly) drawBinSlots(surface, assets, binLayout(assets, [...world.bin], 0));
 }
 
-/** Pièces du bac, l'une sous l'autre (icônes de `RenderAssets.binIcon`), centrées dans la colonne ; celles qui ne tiennent pas sont omises. */
-function drawBinParts(surface: Surface, assets: RenderAssets, parts: Part[]): void {
-  const colX = BIN_PANEL.x + 4;
-  const colW = BIN_PANEL.width - 8;
-  let y = BIN_PANEL.y + 60;
-  const bottom = BIN_PANEL.y + BIN_PANEL.height - 6;
-  const old = surface.setClip(colX, BIN_PANEL.y, colW, BIN_PANEL.height);
+// ------------------------------------------------------------------ cases du bac
+
+/** `PB_LIST` (573, 81, 54 × 247 dans la fenêtre de `PARTSBIN.ITF`), décalé de `BIN_PANEL.y` comme le panneau. */
+export const BIN_LIST = { x: 573, y: 81 + BIN_PANEL.y, width: 54, height: 247 } as const;
+/**
+ * Fenêtre défilante du bac (choix du port) : toute la largeur du panneau (80) sur la hauteur de `PB_LIST`. L'original
+ * (417264) range les cases dans la zone cliente de sa fenêtre de bac (56 × 433 hors tout en 640×480, table 0x471f9c) ; 80 de
+ * large laissent voir en entier une colonne de la plus grande case (8 + 56 + 16).
+ */
+export const BIN_VIEW = { x: BIN_PANEL.x, y: BIN_LIST.y, width: BIN_PANEL.width, height: BIN_LIST.height } as const;
+/** Partie visible de la fenêtre : l'intérieur du cadre du panneau (4 pixels de chaque côté). */
+export const BIN_CLIP = { x: BIN_PANEL.x + 4, y: BIN_LIST.y, width: BIN_PANEL.width - 8, height: BIN_LIST.height } as const;
+
+/** Marge de la fenêtre (417264 : première case en (8, 8), passage à la colonne suivante quand y + h + 8 ≥ hauteur). */
+const BIN_MARGIN = 8;
+/** Case = icône + 4, + 12 de plus quand le nombre de pièces est affiché (417264 : en largeur comme en hauteur). */
+const SLOT_PAD = 4;
+const COUNT_PAD = 12;
+
+/** Une case du bac : les pièces consécutives d'un même type (ordre 417133), dessinées une fois avec leur nombre. */
+export interface BinSlot {
+  type: number;
+  parts: Part[];
+  /** Case visible à l'écran (colonne × icône et marge du dessous, rognée à `BIN_CLIP`) : zone de prise et d'infobulle. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Coin haut gauche de l'icône à l'écran (peut sortir de `BIN_CLIP` : le dessin est rogné). */
+  iconX: number;
+  iconY: number;
+}
+
+export interface BinLayout {
+  /** Cases visibles (au moins en partie), en coordonnées de l'écran. */
+  slots: BinSlot[];
+  /** Décalage horizontal de la fenêtre (pixels), borné à [0, `maxScroll`]. */
+  scroll: number;
+  maxScroll: number;
+  /** Bord gauche de chaque colonne dans la fenêtre non défilée (le défilement s'y cale, `binScrollStep`). */
+  columns: number[];
+  /** Nombre total de cases. */
+  total: number;
+  /** Le nombre de pièces est affiché sous chaque icône (oui si absent). */
+  counts?: boolean;
+}
+
+/**
+ * Mise en page du bac (417264, sens 0x47c514 = 1, le seul que pose 416f1d) : les cases s'empilent de haut en bas à partir
+ * de (8, 8) ; quand l'icône suivante dépasserait (y + h + 8 ≥ hauteur), on passe à la colonne suivante, large de la plus
+ * large case de la précédente, et les icônes d'une colonne sont centrées dans sa largeur. Une case fait l'icône
+ * (`RenderAssets.binIcon`) + 4, + 16 avec le nombre (absent dans les modes 1 et 6, palette illimitée : `counts` faux). Un
+ * type sans icône n'a pas de case. Le contenu fait 8 + la somme des colonnes de large ; la fenêtre défile en largeur
+ * (barre horizontale, 0 … contenu − largeur). `scroll` est borné ici (l'original le garde tel quel quand une case
+ * disparaît, 417264 appelé avec 0, et ne le borne qu'au défilement suivant).
+ */
+export function binLayout(assets: RenderAssets, parts: readonly Part[], scroll: number, counts = true): BinLayout {
+  const pad = SLOT_PAD + (counts ? COUNT_PAD : 0);
+  const cells: { type: number; parts: Part[]; x: number; y: number; w: number; h: number; column: number }[] = [];
+  const columns: number[] = [BIN_MARGIN];
+  const widths: number[] = [0];
+  let x = BIN_MARGIN;
+  let y = BIN_MARGIN;
+  let previous: (typeof cells)[number] | undefined;
   for (const p of parts) {
+    if (previous && previous.type === p.type) {
+      previous.parts.push(p);
+      continue;
+    }
     const icon = assets.binIcon(p.type);
+    if (!icon) {
+      previous = undefined;
+      continue;
+    }
+    if (y + icon.height + BIN_MARGIN >= BIN_VIEW.height) {
+      x += widths[widths.length - 1]!;
+      y = BIN_MARGIN;
+      columns.push(x);
+      widths.push(0);
+    }
+    previous = { type: p.type, parts: [p], x, y, w: icon.width, h: icon.height, column: columns.length - 1 };
+    cells.push(previous);
+    y += icon.height + pad;
+    widths[widths.length - 1] = Math.max(widths[widths.length - 1]!, icon.width + pad);
+  }
+  // Une colonne vide (première icône plus haute que la fenêtre) ne prend pas de place.
+  const extent = widths.reduce((a, b) => a + b, 0) + BIN_MARGIN;
+  const maxScroll = Math.max(0, extent - BIN_VIEW.width);
+  const s = Math.max(0, Math.min(Math.round(scroll), maxScroll));
+  const slots: BinSlot[] = [];
+  for (const c of cells) {
+    const colW = widths[c.column]!;
+    const left = BIN_VIEW.x + c.x - s;
+    const top = BIN_VIEW.y + c.y;
+    const x0 = Math.max(left, BIN_CLIP.x);
+    const x1 = Math.min(left + colW, BIN_CLIP.x + BIN_CLIP.width);
+    const y1 = Math.min(top + c.h + pad, BIN_CLIP.y + BIN_CLIP.height);
+    if (x1 <= x0 || y1 <= top) continue;
+    slots.push({ type: c.type, parts: c.parts, x: x0, y: top, width: x1 - x0, height: y1 - top, iconX: left + ((colW - c.w) >> 1), iconY: top });
+  }
+  return { slots, scroll: s, maxScroll, columns: columns.filter((_, i) => widths[i]! > 0), total: cells.length, counts };
+}
+
+/**
+ * Défilement d'un cran (choix du port) : `direction` −1 ou 1 cale la colonne précédente ou suivante à la marge gauche.
+ * L'original (417fff, WM_HSCROLL) avance de 16 pixels par flèche de sa barre, de la largeur de la fenêtre par page, ou
+ * suit le curseur de la barre ; le panneau du port n'a que deux flèches.
+ */
+export function binScrollStep(layout: BinLayout, direction: number): number {
+  const stops = layout.columns.map((c) => Math.min(c - BIN_MARGIN, layout.maxScroll));
+  let target = layout.scroll;
+  if (direction > 0) target = stops.find((v) => v > layout.scroll) ?? layout.maxScroll;
+  else if (direction < 0) target = [...stops].reverse().find((v) => v < layout.scroll) ?? 0;
+  return Math.max(0, Math.min(target, layout.maxScroll));
+}
+
+/**
+ * Cases du bac (4183e7) : icône telle quelle (456270), puis, hors des modes 1 et 6, le nombre « %d » en `MEMOFNT8.PFT`,
+ * couleur 0x14 (413388), en (x + l/2 − 6, y + h − 3) depuis le coin de l'icône, même pour 1. Rogné à `BIN_CLIP`. `hover` :
+ * case encadrée de blanc (ajout du port, l'original ne marque pas la case survolée).
+ */
+export function drawBinSlots(surface: Surface, assets: RenderAssets, layout: BinLayout, hover?: BinSlot | null): void {
+  const old = surface.setClip(BIN_CLIP.x, BIN_CLIP.y, BIN_CLIP.width, BIN_CLIP.height);
+  const font = assets.font("MEMOFNT8.PFT") ?? assets.font("SYS12.FNT");
+  for (const s of layout.slots) {
+    if (hover === s) surface.strokeRect(s.x + 1, s.y + 1, s.width - 2, s.height - 2, mapColor(15));
+    const icon = assets.binIcon(s.type);
     if (!icon) continue;
-    if (y + icon.height > bottom) break;
-    surface.blit(icon, colX + ((colW - icon.width) >> 1), y, false, false);
-    y += icon.height + 4;
+    surface.blit(icon, s.iconX, s.iconY, false, false);
+    if (layout.counts !== false && font) drawText(surface, font, String(s.parts.length), s.iconX + (icon.width >> 1) - 6, s.iconY + icon.height - 3, mapColor(0x14));
   }
   surface.restoreClip(old);
 }

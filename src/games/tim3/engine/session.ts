@@ -157,7 +157,7 @@ export class Progress {
 export interface LabSettings {
   gravity: number;
   pressure: number;
-  /** Couleur de fond du LEV (1 à 11). */
+  /** Couleur de fond du LEV (couleur logique 1 à 15 : globe, 41ce47). */
   background: number;
   /** Musique (1000 à 1023, 0 = aucune). */
   music: number;
@@ -274,8 +274,17 @@ export class Tim3Session {
   }
 
   /** Couleur de fond (1 à 11). */
+  /** Couleur de fond changée au globe en mode Jeu (41cc25 l'écrit dans le niveau en mémoire) ; `null` : celle du LEV. */
+  private puzzleBackground: number | null = null;
+
   get background(): number {
-    return this.lab?.background ?? this.level.prefix?.backgroundColor ?? 3;
+    return this.lab?.background ?? this.puzzleBackground ?? this.level.prefix?.backgroundColor ?? 3;
+  }
+
+  /** Globe : couleur de fond (Labo : réglage du Labo ; Jeu : gardée jusqu'au prochain chargement du puzzle). */
+  setBackground(color: number): void {
+    if (this.lab) this.lab.background = color;
+    else this.puzzleBackground = color;
   }
 
   get music(): number {

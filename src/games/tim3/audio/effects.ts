@@ -46,6 +46,9 @@ export class EffectMixer {
     slot.voice = null;
   }
 
+  /** Gain des effets, de 0 à 1 (volume de la guitare, 411674(3001, v)), appliqué aux effets lancés ensuite. */
+  volume = 1;
+
   /** Joue un effet ; faux s'il est abandonné (fichier absent, déjà en cours avec le drapeau 1, tous les emplacements plus prioritaires). */
   play(rawId: number, priority = 1, rawFlags = 0): boolean {
     const { id, flags } = normalizeEffect(rawId, rawFlags);
@@ -70,7 +73,7 @@ export class EffectMixer {
     if (!sample) return false;
     target.id = id;
     target.priority = priority;
-    target.voice = this.output.play(sample, { loop: (flags & SOUND_LOOP) !== 0 });
+    target.voice = this.output.play(sample, this.volume === 1 ? { loop: (flags & SOUND_LOOP) !== 0 } : { loop: (flags & SOUND_LOOP) !== 0, volume: this.volume });
     return true;
   }
 

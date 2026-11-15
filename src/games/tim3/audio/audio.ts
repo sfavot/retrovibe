@@ -40,6 +40,10 @@ export interface Tim3Audio {
   /** Pose du professeur pour la voix en cours (bouche fermée sans voix ni synchro). */
   mouth(): MouthPose;
   voicesEnabled: boolean;
+  /** Effets activés (interrupteur du son de la guitare, 4115e6(3001, état)) : coupés, `playEffect` ne joue rien. */
+  effectsEnabled: boolean;
+  /** Volume de la guitare, 0 à 15 (`[0x47796c]`) : musique et effets, pas les voix (411674(1001 / 3001, v), gain v / 15). */
+  volume: number;
   /** Entrée dans un puzzle ou le Labo : coupe voix et effets, lance la musique du niveau (`LevInfo.music`). */
   enterPuzzle(music: number): void;
   /** Coupe tout (sortie vers les menus). */
@@ -71,6 +75,9 @@ export class WebTim3Audio implements Tim3Audio {
   private readonly voicePrefs: SoundPrefs;
   private readonly effectCache = new Map<number, Sample | null>();
   private music: Tim3Music | null = null;
+  private musicGain: GainNode | null = null;
+  private level = 15;
+  effectsEnabled = true;
   private port: (GmPort & { load(): Promise<void>; close(): void }) | null = null;
 
   constructor(private readonly options: Tim3AudioOptions) {
@@ -103,11 +110,16 @@ export class WebTim3Audio implements Tim3Audio {
   private engine(): Tim3Music {
     if (this.music) return this.music;
     const { ctx, master } = this.output.connection();
+    // Volume de la musique : un gain entre le synthétiseur et le gain général (celui du muet du site).
+    const gain = ctx.createGain();
+    gain.gain.value = this.level / 15;
+    gain.connect(master);
+    this.musicGain = gain;
     const onReady = (): void => this.music?.tick();
     const create =
       this.options.createGmPort ??
       ((c: AudioContext, node: AudioNode, ready: () => void) => new WebGmSynth(c, node, { soundfontUrl: this.options.soundfontUrl, onReady: ready }));
-    const port = create(ctx, master, onReady);
+    const port = create(ctx, gain, onReady);
     this.port = port;
     this.music = new Tim3Music(this.options.resources, port);
     void port.load();
@@ -135,7 +147,18 @@ export class WebTim3Audio implements Tim3Audio {
   // --- effets ------------------------------------------------------------------------------------------------------------
 
   playEffect(id: number, priority = 1, flags = 0): boolean {
+    if (!this.effectsEnabled) return false;
     return this.effects.play(id, priority, flags);
+  }
+
+  get volume(): number {
+    return this.level;
+  }
+
+  set volume(v: number) {
+    this.level = Math.max(0, Math.min(15, Math.round(v)));
+    this.effects.volume = this.level / 15;
+    if (this.musicGain) this.musicGain.gain.value = this.level / 15;
   }
 
   stopEffect(id: number): void {

@@ -89,7 +89,8 @@ describe("barre d'outils : clics (418ded)", () => {
   });
 
   it("autres boutons", () => {
-    expect(at("TB_DISK", play).action).toBe("machines");
+    expect(at("TB_DISK", play).action).toBe("chooser");
+    expect(at("TB_DISK", lab).action).toBe("machines");
     expect(at("TB_MUSIC", lab).action).toBe("options");
     expect(at("TB_GLOBAL", play).action).toBe("globals");
     expect(at("TB_HELP", play).action).toBe("help");

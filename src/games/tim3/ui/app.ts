@@ -1,7 +1,12 @@
 /**
  * Application de The Incredible Machine 3 : page commune des jeux sur canvas (`mountGameShell`, 640×480, échelle
  * fractionnaire), un pas de simulation toutes les 32 ms (`TickScheduler`, D10), pointeur et clavier (`bindCanvasPointer`,
- * `bindKeyboard`), son (`WebTim3Audio`, `SoundPrefs`), fenêtres DOM (choix du puzzle, options, Labo), progression (`tim3:`).
+ * `bindKeyboard`), son (`WebTim3Audio`, `SoundPrefs`), fenêtres `.ITF` du jeu (`*-window.ts`, `menus.ts`), progression (`tim3:`).
+ *
+ * Démarrage comme le jeu (43b16c, `docs/tim3/ui.md` § Parcours d'entrée) : logo et titre animés (`IntroPlayer`), crédits si rien
+ * n'a été passé, menu principal (`MAINMENU`), puis le mode choisi ; un puzzle s'ouvre sur sa fiche (`PUZZDISP`). En Jeu, la
+ * disquette ouvre le choix du puzzle (`DOSBOX`, `DOSBIN`) ; « Menu principal » sous l'écran reprend l'entrée « Zones > Menu
+ * principal » du menu Windows d'origine.
  *
  * Données : les volumes Dynamix (`RESOURCE.MAP/.001/.002` + `FRENCH.DAT`) sont chargés d'un bloc ; les voix MP3 à la demande.
  */
@@ -10,7 +15,7 @@ import { fetchGameFiles } from "../../../data/game-files";
 import { prefixedStorage } from "../../../engine/storage";
 import { h } from "../../../ui/dom";
 import { MissingFilesError, fetchBytes } from "../../../ui/files";
-import { mountGameShell } from "../../../ui/game-shell";
+import { leaveGame, mountGameShell } from "../../../ui/game-shell";
 import { localStorageStore } from "../../../ui/local-storage";
 import { bindCanvasPointer, bindKeyboard } from "../../../ui/pointer";
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
@@ -24,6 +29,7 @@ import { readPartDef } from "../data/part-def";
 import { readBinSolveRes } from "../data/solutions";
 import { interfaceText, loadTexts, parseIdTable, parseLines, type GameTexts } from "../data/text";
 import { ResourceIndex } from "../data/volume";
+import { readSoundEffect } from "../data/wave";
 import { Editor, createPart } from "../engine/editor";
 import type { Part } from "../engine/part";
 import { parseProgramRows, type ProgramRow } from "../engine/program";
@@ -40,15 +46,26 @@ import {
   snapshotLab,
   snapshotWorld,
   type LabMachine,
-  type SaveOutcome,
 } from "../engine/save";
 import { DEFAULT_LAB, Progress, STEP_MS, Tim3Session, labLevel, puzzleList, type PuzzleRef } from "../engine/session";
 import { solutionSession } from "../engine/solution";
 import { TypeTable } from "../engine/types";
 import { renderHelp } from "../help";
-import { RenderAssets, SCREEN_HEIGHT, SCREEN_WIDTH, Surface, drawAnmImage, imageFrame, stateImage, type Rect } from "../render";
-import type { ItfHost } from "./itf-dialog";
-import { confirmDialog, labDialog, machinesDialog, messageDialog, optionsDialog, partInfoDialog, programDialog, puzzleChooser, solvedDialog, type DialogHandle } from "./menus";
+import { RenderAssets, SCREEN_HEIGHT, SCREEN_WIDTH, Surface, type Rect } from "../render";
+import { LOGO, TITLE, opaqueLut, type FrameSound } from "../render/front";
+import { BinScreen, PuzzleCardScreen, PuzzleListScreen, currentPuzzle, type ChooserTexts } from "./chooser";
+import { CreditsScreen } from "./credits";
+import { IntroPlayer } from "./intro";
+import { openItfWindow, screenOptions, type ItfHost, type ItfScreen, type ItfWindowHandle } from "./itf-window";
+import { MainMenuScreen, quitMainMenu, type MainMenuAction } from "./main-menu";
+import { openBinsolveWindow } from "./binsolve-window";
+import { openGlobeWindow } from "./globe-window";
+import { openHintWindow } from "./hint-window";
+import { openInfoWindow } from "./info-window";
+import { openLoadSaveWindow, openMachineListWindow, type LoadSaveChoice } from "./machines-window";
+import { confirmDialog, messageDialog, solvedDialog } from "./menus";
+import { openMusicboxWindow } from "./musicbox-window";
+import { openProgramWindow } from "./program-window";
 import { PlayScreen, type PlayEvent, type ShownButton, type ToolbarButton } from "./play";
 import { TOOLBAR_NAMES, toolbarDecision, type ToolbarAction } from "./toolbar";
 
@@ -73,8 +90,6 @@ const TIP_DELAY_MS = 600;
 const SOUND_PLACE = 0xe1b;
 /** Ouverture de la fenêtre « programmer » (42ea72). */
 const SOUND_PROGRAM = 0xc40;
-/** Identifiants de `INTRFACE.RES` (rubrique « PROGRAM PART ») : Terminé, réglettes, refus des boîtes (0x7a6e) et du ballon (0x7a6f). */
-const PROGRAM_TEXT = { done: 31334, mass: 31335, elasticity: 31336, density: 31337, friction: 31341, box: 31342, balloon: 31343 } as const;
 const SOUND_REMOVE = 0xe1a;
 /** Puzzle réussi : son 0xE21, 18 pas après l'ouverture de PUZZSOLV (4261df : compte à rebours 0x12, 426234). */
 const SOUND_SOLVED = 0xe21;
@@ -82,6 +97,12 @@ const SOLVED_SOUND_STEPS = 18;
 const VOLUMES = ["RESOURCE.MAP", "RESOURCE.001", "RESOURCE.002", "FRENCH.DAT"] as const;
 /** Musique de l'option « Musique » (préférence mémorisée, activée par défaut). */
 const MUSIC_KEY = "music";
+/** Guitare : effets activés, volume de 0 à 15 (préférences mémorisées ; le jeu les garde par 42c8cb). */
+const EFFECTS_KEY = "effects";
+const VOLUME_KEY = "volume";
+
+/** Écran plein du parcours d'entrée : l'intro, ou le fond noir derrière le menu principal, les crédits et le choix du puzzle. */
+type Front = { kind: "intro"; player: IntroPlayer } | { kind: "backdrop" };
 
 /** Bouton de barre d'action du pied de page. */
 function actionButton(label: string, title: string, onClick: (event: MouseEvent) => void): HTMLButtonElement {
@@ -169,6 +190,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const slots = labSaveSlots(storage);
   const puzzles = puzzleList();
   let musicOn = storage.get(MUSIC_KEY) !== "0";
+  sound.effectsEnabled = storage.get(EFFECTS_KEY) !== "0";
+  const storedVolume = Number(storage.get(VOLUME_KEY) ?? "15");
+  sound.volume = Number.isFinite(storedVolume) ? storedVolume : 15;
+  /** Effet choisi dans la guitare (gardé d'une ouverture à l'autre, `[0x47f980]`). */
+  let effectChoice = 0;
 
   // ------------------------------------------------------------------ état
 
@@ -179,7 +205,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let labName = "";
   let session!: Tim3Session;
   let screen!: PlayScreen;
-  let dialog: DialogHandle | null = null;
+  let dialog: ItfWindowHandle | null = null;
   let helpView: HTMLElement | null = null;
   let tabHidden = false;
   const scheduler = new TickScheduler(STEP_MS, MAX_CATCH_UP);
@@ -189,9 +215,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const live = h("p", { class: "tim3-sr", "aria-live": "polite" });
   shell.stage.append(live);
 
-  // Démarrer, indices, options (guitare) et aide (livre, « ? ») sont dans la barre d'outils du jeu : seul le choix du puzzle reste ici.
-  const puzzlesButton = actionButton(copy.puzzles, copy.puzzlesLabel, () => openChooser());
-  shell.toggles.append(h("span", { class: "tim3-actions" }, puzzlesButton));
+  // Démarrer, indices, options (guitare), aide (livre, « ? ») et choix du puzzle (disquette) sont dans la barre d'outils du jeu ;
+  // reste ici l'entrée « Zones > Menu principal » du menu Windows d'origine.
+  const menuButton = actionButton(copy.mainMenu, copy.mainMenuLabel, () => backToMainMenu());
+  shell.toggles.append(h("span", { class: "tim3-actions" }, menuButton));
+  /** Parcours d'entrée en cours (intro, ou fond des menus) ; `null` en Jeu et au Labo. */
+  let front: Front | null = null;
 
   const announce = (text: string): void => {
     live.textContent = text;
@@ -313,19 +342,35 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
   };
 
+  /** Main de la barre (4192d3) : montre toutes les mains des indices (4204cf) ou les cache (420536) ; sans indice, GENERIC 31112. */
   const showHint = (): void => {
     if (session.running) return;
     if (screen.hintCount === 0) {
       pauseFor(messageDialog(itfHost(), copy.noHints, resume));
       return;
     }
-    const i = screen.nextHint();
-    sound.stopVoice();
-    if (i >= 0 && current) {
-      const ref = hintVoice(i + 1, current.index);
-      if (ref) sound.playVoice(ref);
-      announce(screen.texts.hints.filter((x) => x !== "")[i] ?? "");
-    } else announce(screen.texts.goal);
+    announce(screen.toggleHints() ? copy.hintsShown(screen.hintCount) : copy.hintsHidden);
+  };
+
+  /** Clic sur la main d'un indice (42013d) : HINT.ITF avec son texte et sa voix (emplacement LEV `slot`). */
+  const openHint = (slot: number): void => {
+    const text = screen.texts.hints[slot] ?? "";
+    const voice = current ? hintVoice(slot + 1, current.index) : null;
+    const play = (): void => {
+      sound.stopVoice();
+      if (voice) sound.playVoice(voice);
+    };
+    play();
+    pauseFor(
+      openHintWindow(itfHost(), {
+        text,
+        replay: play,
+        onClose: () => {
+          sound.stopVoice();
+          resume();
+        },
+      }),
+    );
   };
 
   const solved = (): void => {
@@ -334,36 +379,47 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     screen.resetFocus();
     if (!current) return;
     const ref = current;
+    const wasSolved = progress.isSolved(ref.name);
     progress.markSolved(ref.name);
     screen.solved = true;
     const inCategory = puzzles.filter((p) => p.category === ref.category).map((p) => p.name);
-    let extra: string | undefined;
-    if (progress.count(puzzles.map((p) => p.name)) === puzzles.length) extra = congratulations[5];
-    else if (progress.count(inCategory) === inCategory.length) extra = congratulations[ref.category];
+    // Fin de catégorie (42ccae) : BINSOLVE.ITF par-dessus PUZZSOLV, seulement à la première résolution de ce puzzle (42d210).
+    let finished: number | "all" | null = null;
+    if (!wasSolved && progress.count(puzzles.map((p) => p.name)) === puzzles.length) finished = "all";
+    else if (!wasSolved && progress.count(inCategory) === inCategory.length) finished = ref.category;
     const next = progress.next(ref.name);
     // PUZZSOLV (4260f0) ; le son 0xE21 part 18 pas après l'ouverture (426213). « Rejouer la Solution » relance la machine du
     // joueur : à la victoire, la session est revenue à l'état d'avant « Démarrer » (`Tim3Session.tick` → `stop`).
-    const openSolved = (): void => {
-      const fanfare = window.setTimeout(() => sound.playEffect(SOUND_SOLVED), SOLVED_SOUND_STEPS * STEP_MS);
-      pauseFor(
-        solvedDialog(itfHost(), {
-          hasNext: next !== null,
-          canReplay: true,
-          same: () => undefined,
-          replay: () => {
-            if (!session.running) toggleRun();
-          },
-          next: () => next && loadPuzzle(next),
-          onClose: () => {
-            window.clearTimeout(fanfare);
-            resume();
-          },
+    const fanfare = window.setTimeout(() => sound.playEffect(SOUND_SOLVED), SOLVED_SOUND_STEPS * STEP_MS);
+    let binsolve: ItfWindowHandle | null = null;
+    pauseFor(
+      solvedDialog(itfHost(), {
+        hasNext: next !== null,
+        canReplay: true,
+        same: () => undefined,
+        replay: () => {
+          if (!session.running) toggleRun();
+        },
+        next: () => next && enterPuzzle(next),
+        onClose: () => {
+          window.clearTimeout(fanfare);
+          binsolve?.close();
+          resume();
+        },
+      }),
+    );
+    // BINSOLVE (419c9c) s'ouvre pendant l'initialisation de PUZZSOLV, donc par-dessus ; après la prise du focus de PUZZSOLV, pour
+    // qu'il lui revienne à la fermeture.
+    if (finished !== null) {
+      const category = finished;
+      queueMicrotask(() =>
+        queueMicrotask(() => {
+          binsolve = openBinsolveWindow(itfHost(), category, congratulations[category === "all" ? 5 : category] ?? "", () => {
+            binsolve = null;
+          });
         }),
       );
-    };
-    // Fin de catégorie (BINSOLVE.RES) : la fenêtre BINSOLVE.ITF n'est pas encore dessinée, son texte passe par GENERIC d'abord.
-    if (extra) pauseFor(messageDialog(itfHost(), extra, openSolved));
-    else openSolved();
+    }
   };
 
   const onEvent = (e: PlayEvent): void => {
@@ -381,7 +437,10 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         openProgram(e.part);
         break;
       case "info":
-        pauseFor(partInfoDialog(shell.main, texts.parts.find((p) => p.id === e.partType), resume));
+        openInfo(e.partType);
+        break;
+      case "hint":
+        openHint(e.slot);
         break;
       case "tip":
         showTip(e.partType, e.anchor);
@@ -418,18 +477,19 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       case "play": {
         if (session.running) toggleRun();
         const ref = puzzles.find((p) => p.name === (current?.name ?? progress.last)) ?? puzzles[0]!;
-        return loadPuzzle(ref);
+        return enterPuzzle(ref);
       }
       case "lab":
         if (session.running) toggleRun();
         return void openLab();
       case "machines":
         return openMachines();
+      case "chooser":
+        return openChooser();
       case "options":
         return openOptions();
       case "globals":
-        if (session.lab) return openLabSettings();
-        return pauseFor(messageDialog(itfHost(), copy.labOnly, resume));
+        return openGlobe();
       case "clear":
         if (session.running) return;
         session.editor.clearField();
@@ -451,53 +511,26 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
   };
 
-  /** Poignée « programmer » (42ea57 : son 0xC40, puis 4249f8). */
+  /** Description d'une pièce (INFO.ITF, 420c14) ; l'appelant du jeu joue 0xE1B à l'ouverture (41ea91, 42e979). */
+  const openInfo = (type: number): void => {
+    sound.playEffect(SOUND_PLACE);
+    pauseFor(openInfoWindow(itfHost(), type, texts.parts.find((p) => p.id === type), resume));
+  };
+
+  /** Poignée « programmer » (42ea57 : son 0xC40, puis 4249f8, `PROG<type>.ITF`). */
   const openProgram = (part: Part): void => {
     if (session.running) return;
     const program = session.editor.program(part, programRows);
-    const info = texts.parts.find((p) => p.id === part.type);
-    if (!program) {
-      pauseFor(partInfoDialog(shell.main, info, resume));
-      return;
-    }
+    if (!program) return openInfo(part.type);
     sound.playEffect(SOUND_PROGRAM);
-    const line = (id: number): string => interfaceText(interfaceLines, id);
     pauseFor(
-      programDialog(shell.main, {
-        title: info?.name ?? copy.partInfoTitle,
+      openProgramWindow(itfHost(), {
+        title: texts.parts.find((p) => p.id === part.type)?.name ?? copy.partInfoTitle,
         program,
-        texts: {
-          done: line(PROGRAM_TEXT.done),
-          mass: line(PROGRAM_TEXT.mass),
-          elasticity: line(PROGRAM_TEXT.elasticity),
-          density: line(PROGRAM_TEXT.density),
-          friction: line(PROGRAM_TEXT.friction),
-          box: line(PROGRAM_TEXT.box),
-          balloon: line(PROGRAM_TEXT.balloon),
-        },
-        preview: programPreview,
         changed: () => sound.playEffect(SOUND_PLACE),
         onClose: resume,
       }),
     );
-  };
-
-  /** Aperçu d'un choix : première image de l'état de `PROGPART.ANM`, à la palette du jeu. */
-  const programPreview = (state: number): HTMLCanvasElement | null => {
-    const anm = assets.anm("PROGPART.ANM");
-    if (!anm) return null;
-    const image = stateImage(anm, state);
-    const f = image >= 0 ? imageFrame(anm, image) : null;
-    if (!f || f.width <= 0 || f.height <= 0) return null;
-    const surface = new Surface(f.width, f.height);
-    drawAnmImage(surface, assets, anm, image, -f.x, -f.y);
-    const canvas = h("canvas", { width: f.width, height: f.height, style: `--w: ${f.width}` });
-    const c2d = canvas.getContext("2d");
-    if (!c2d) return null;
-    const data = c2d.createImageData(f.width, f.height);
-    surface.toRgba(assets.gameLut(), new Uint32Array(data.data.buffer));
-    c2d.putImageData(data, 0, 0);
-    return canvas;
   };
 
   /** Infobulle d'un bouton de la barre : texte de `DESCRIPT.RES`, plus « non disponible » s'il est grisé. */
@@ -532,13 +565,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   // ------------------------------------------------------------------ fenêtres
 
   /** Où les fenêtres `.ITF` se dessinent : par-dessus le canvas du jeu. */
-  const itfHost = (): ItfHost => ({ main: shell.main, canvas: shell.canvas, assets });
+  const itfHost = (): ItfHost => ({ main: shell.main, canvas: shell.canvas, assets, descriptions, playEffect: (id) => sound.playEffect(id) });
 
-  const pauseFor = (handle: DialogHandle): void => {
+  const pauseFor = (handle: ItfWindowHandle): void => {
     dialog?.close();
     dialog = handle;
     tip.hidden = true;
-    screen.cancelGesture();
+    if (!front) screen.cancelGesture();
     applyPause();
   };
   const resume = (): void => {
@@ -547,124 +580,344 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     persistEdit();
   };
 
-  const openChooser = (): void =>
+  // ------------------------------------------------------------------ parcours d'entrée et choix du puzzle
+
+  const effect = (s: FrameSound): void => void sound.playEffect(s.id, s.priority, s.flags);
+
+  /** Écran `.ITF` du parcours d'entrée ; `then` reçoit son résultat (`null` : fermé par l'hôte). */
+  const showScreen = <R,>(s: ItfScreen<R>, then: (result: R | null) => void): void =>
     pauseFor(
-      puzzleChooser(shell.main, {
-        progress,
-        titles: texts.levels,
-        current: current?.name ?? null,
-        pick: (p) => loadPuzzle(p),
-        lab: () => void openLab(),
-        onClose: resume,
+      openItfWindow(
+        itfHost(),
+        s.itf,
+        screenOptions(s, (result) => {
+          dialog = null;
+          applyPause();
+          then(result);
+        }),
+      ),
+    );
+
+  /** Message « non disponible » du jeu, puis `then`. */
+  const unavailable = (then: () => void): void =>
+    pauseFor(
+      messageDialog(itfHost(), copy.notAvailable, () => {
+        resume();
+        then();
       }),
     );
 
-  const openOptions = (): void =>
+  /** Fond noir derrière les menus : le jeu n'est plus montré (comme la fenêtre du menu principal d'origine). */
+  const setBackdrop = (): void => {
+    front = { kind: "backdrop" };
+    frontSurface.clear(0);
+    frontSurface.toRgba(blackLut, pixels);
+    ctx.putImageData(image, 0, 0);
+    shell.canvas.style.cursor = "";
+    lastCursor = "";
+  };
+
+  const startIntro = (): void => {
+    let jingleMs = 0;
+    try {
+      jingleMs = readSoundEffect(index.get(`SX_${LOGO.jingle}.WAV`)).duration * 1000;
+    } catch (error) {
+      console.warn("TIM3 : air de Sierra illisible", error);
+    }
+    const player = new IntroPlayer(
+      assets,
+      index,
+      {
+        effect,
+        stopEffect: (id) => sound.stopEffect(id),
+        music: (id) => {
+          if (musicOn) sound.playMusic(id);
+        },
+      },
+      jingleMs,
+    );
+    front = { kind: "intro", player };
+    announce(copy.introSkip);
+    shell.focusCanvas();
+  };
+
+  /** Fin de l'intro : la musique du titre (43b194), puis les crédits si rien n'a été passé, sinon le menu principal. */
+  const endIntro = (player: IntroPlayer): void => {
+    setBackdrop();
+    if (musicOn) sound.playMusic(TITLE.music);
+    if (player.skipped) openMainMenu();
+    else showScreen(new CreditsScreen(assets, readItf(index.get("CREDITS.ITF")), parseLines(index.get("CREDITS.RES")), copy.creditsTitle), (r) => r && openMainMenu());
+  };
+
+  const openMainMenu = (): void => {
+    setBackdrop();
+    const menu = new MainMenuScreen(
+      assets,
+      readItf(index.get("MAINMENU.ITF")),
+      { title: copy.mainMenu, describe: (id) => descriptions.get(id) },
+      effect,
+    );
+    showScreen(menu, (action) => mainMenuChoice(action));
+  };
+
+  const mainMenuChoice = (action: MainMenuAction | null): void => {
+    switch (action) {
+      case "play":
+        return enterPuzzle(currentPuzzle(puzzles, progress));
+      case "lab":
+        front = null;
+        openLab();
+        return shell.focusCanvas();
+      case "help":
+        return openHelp(openMainMenu);
+      case "options":
+        return openOptions(openMainMenu);
+      case "unavailable":
+        return unavailable(openMainMenu);
+      case "quit":
+        return quit();
+      case null:
+        return;
+    }
+  };
+
+  /** Quitter (422f00) : « Désirez-vous quitter? » ; Oui : l'accueil du site, ou le jeu relancé sur la page de dev ; Non : le menu. */
+  const quit = (): void => {
+    let leaving = false;
+    quitMainMenu(
+      (text, yes, no) =>
+        pauseFor(
+          confirmDialog(itfHost(), interfaceText(interfaceLines, text), yes, () => {
+            resume();
+            queueMicrotask(() => leaving || no());
+          }),
+        ),
+      () => {
+        leaving = true;
+        leaveGame(options.backLabel, () => void mountApp(container, options));
+      },
+      openMainMenu,
+    );
+  };
+
+  /** « Menu principal » sous l'écran : la machine s'arrête, l'aire est gardée, le menu remplace le jeu. Pendant l'intro : la passe. */
+  const backToMainMenu = (): void => {
+    if (front?.kind === "intro") return front.player.skip();
+    if (front || dialog || helpView) return;
+    if (session.running) toggleRun();
+    persistEdit();
+    sound.stopEffects();
+    sound.stopVoice();
+    tip.hidden = true;
+    openMainMenu();
+  };
+
+  /** Ouvre un puzzle sur sa fiche (`PUZZDISP`, 425d20), comme le jeu à chaque entrée dans un puzzle. */
+  const enterPuzzle = (ref: PuzzleRef): void => {
+    front = null;
+    loadPuzzle(ref);
+    const title = texts.levels[ref.index]?.title ?? "";
+    showScreen(new PuzzleCardScreen(assets, readItf(index.get("PUZZDISP.ITF")), ref, title), () => shell.focusCanvas());
+  };
+
+  const chooserTexts: ChooserTexts = {
+    title: copy.chooserTitle,
+    puzzleTitle: (p) => texts.levels[p.index]?.title ?? "",
+    solved: copy.solvedMark,
+  };
+
+  /** Disquette en Jeu (418f2c) : la liste des puzzles de la catégorie en cours (`DOSBOX`). */
+  const openChooser = (): void => {
+    if (!current) return;
+    if (session.running) toggleRun();
+    showList(new PuzzleListScreen(assets, readItf(index.get("DOSBOX.ITF")), puzzles, progress, chooserTexts, current.category, current, effect));
+  };
+
+  const showList = (list: PuzzleListScreen): void =>
+    showScreen(list, (r) => {
+      switch (r?.kind) {
+        case "load":
+          return enterPuzzle(r.puzzle);
+        case "bins":
+          return showBins(list);
+        case "help":
+          return openHelp(() => showList(list));
+        case "unavailable":
+          return unavailable(() => showList(list));
+        case "cancel":
+          return shell.focusCanvas();
+        default:
+          return;
+      }
+    });
+
+  /** « Autres Puzzles » : les bacs (`DOSBIN`), puis la liste de la catégorie choisie (41ae39). */
+  const showBins = (list: PuzzleListScreen): void =>
+    showScreen(
+      new BinScreen(readItf(index.get("DOSBIN.ITF")), copy.binsTitle, list.category, effect),
+      (r) => {
+        switch (r?.kind) {
+          case "category":
+            list.setCategory(r.category, current);
+            return showList(list);
+          case "cancel":
+            return showList(list);
+          case "help":
+            return openHelp(() => showBins(list));
+          case "unavailable":
+            return unavailable(() => showBins(list));
+          default:
+            return;
+        }
+      },
+    );
+
+  /** Guitare (MUSICBOX.ITF, 4234ec) : musique, effets, volume, voix du professeur ; depuis le menu principal aussi (`after`). */
+  const openOptions = (after?: () => void): void => {
+    // Depuis le menu principal de départ, aucun puzzle n'est ouvert : musique du titre.
+    const live = session as Tim3Session | undefined;
     pauseFor(
-      optionsDialog(shell.main, {
-        voices: sound.voicesEnabled,
-        music: musicOn,
+      openMusicboxWindow(itfHost(), {
+        musicList: texts.music,
+        soundList: texts.sounds,
+        initial: { music: sound.musicNumber || (live?.music ?? TITLE.music), musicOn, effectsOn: sound.effectsEnabled, volume: sound.volume, voicesOn: sound.voicesEnabled, effect: effectChoice },
+        playMusic: (id) => {
+          if (musicOn) sound.playMusic(id);
+        },
+        stopMusic: () => sound.stopMusic(),
+        playEffect: (id) => sound.playEffect(id),
+        stopEffect: (id) => sound.stopEffect(id),
+        setMusicOn: (on) => {
+          musicOn = on;
+          storage.set(MUSIC_KEY, on ? "1" : "0");
+          if (!on) sound.stopMusic();
+        },
+        setEffectsOn: (on) => {
+          sound.effectsEnabled = on;
+          storage.set(EFFECTS_KEY, on ? "1" : "0");
+          if (!on) sound.stopEffects();
+        },
+        setVolume: (v) => {
+          sound.volume = v;
+          storage.set(VOLUME_KEY, String(v));
+        },
         setVoices: (on) => {
           sound.voicesEnabled = on;
           if (!on) sound.stopVoice();
         },
-        setMusic: (on) => {
-          musicOn = on;
-          storage.set(MUSIC_KEY, on ? "1" : "0");
-          if (on) sound.playMusic(session.music);
-          else sound.stopMusic();
+        // Au Labo, le morceau choisi devient celui de la machine (423999 : `[0x477950]`) ; en Jeu, il dure jusqu'au puzzle suivant.
+        musicChosen: (id) => {
+          if (live?.lab && !live.running) live.setLab({ music: id });
+        },
+        effectChosen: (i) => {
+          effectChoice = i;
+        },
+        onClose: () => {
+          resume();
+          after?.();
+        },
+      }),
+    );
+  };
+
+  /** Globe (GRAVITY.ITF, 41cbdc) : réglettes au Labo, consultation en Jeu ; couleur du décor partout. */
+  const openGlobe = (): void => {
+    if (session.running) return;
+    const lab = session.lab;
+    pauseFor(
+      openGlobeWindow(itfHost(), {
+        settings: { gravity: lab?.gravity ?? session.world.gravity, pressure: lab?.pressure ?? session.world.pressure, background: session.background },
+        lab: lab !== null,
+        change: (s) => {
+          if (s.background !== undefined) session.setBackground(s.background);
+          if (lab && (s.gravity !== undefined || s.pressure !== undefined)) session.setLab({ ...(s.gravity !== undefined ? { gravity: s.gravity } : {}), ...(s.pressure !== undefined ? { pressure: s.pressure } : {}) });
+        },
+        refused: (text) => void messageDialog(itfHost(), text),
+        onClose: resume,
+      }),
+    );
+  };
+
+  /** Machines du Labo (disquette au Labo, 418f3a) : LOADSAVE, puis la liste des emplacements. */
+  const openMachines = (): void => {
+    if (session.running || !session.lab) return;
+    const worked = session.world.statics.head !== null || session.world.mobiles.head !== null;
+    pauseFor(
+      openLoadSaveWindow(itfHost(), {
+        modified: worked,
+        choose: (choice) => {
+          if (choice === "save") {
+            // 418f41 : rien à sauvegarder → 31209.
+            if (!worked) return pauseFor(messageDialog(itfHost(), copy.machineNothing, resume));
+            return openMachineList("save");
+          }
+          // Charger au Labo modifié : 31134 d'abord.
+          if (worked) return pauseFor(confirmDialog(itfHost(), copy.clearConfirm, () => openMachineList("load"), resume));
+          openMachineList("load");
         },
         onClose: resume,
       }),
     );
+  };
 
-  const dateOf = (savedAt: number): string => new Date(savedAt).toLocaleString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  /** Liste DOSBOX des dix emplacements (Charger ou Sauvegarder). */
+  const openMachineList = (mode: LoadSaveChoice): void => {
+    const handle: ItfWindowHandle = openMachineListWindow(itfHost(), {
+      mode,
+      name: labName,
+      slots: () => Array.from({ length: SLOT_COUNT }, (_, i) => ({ slot: i + 1, name: slots.read(i + 1)?.save.name ?? null })),
+      click: () => sound.playEffect(SOUND_PLACE),
+      validate: (slot, name) => (mode === "load" ? loadSlot(slot, handle) : saveSlot(slot, name, handle, false)),
+      onClose: resume,
+    });
+    pauseFor(handle);
+  };
 
-  const saveMessage = (outcome: SaveOutcome, name: string): string => {
+  /** Sauvegarde dans un emplacement ; les messages s'ouvrent par-dessus la liste, qui se ferme une fois la machine gardée. */
+  const saveSlot = (slot: number, name: string, list: ItfWindowHandle, replace: boolean): void => {
+    const machine = session.lab ? snapshotLab(session.world, session.lab) : null;
+    const outcome = machine ? saveMachine(slots, slot, name, machine, Date.now(), replace) : "failed";
+    const clean = cleanName(name) ?? "";
     switch (outcome) {
       case "saved":
-        return copy.machineSaved(name);
-      case "noName":
-        return copy.machineNoName;
-      case "empty":
-        return copy.machineNothing;
+        labName = clean;
+        list.close();
+        return announce(copy.machineSaved(clean));
       case "occupied":
-        return copy.machineOccupied;
+        return void confirmDialog(itfHost(), copy.machineOccupied, () => saveSlot(slot, name, list, true));
+      case "noName":
+        return void messageDialog(itfHost(), copy.machineNoName);
+      case "empty":
+        return void messageDialog(itfHost(), copy.machineNothing);
       case "failed":
-        return copy.machineFailed;
+        return void messageDialog(itfHost(), copy.machineFailed);
     }
   };
 
-  /** Bouton disque : les dix emplacements de machines (Sauvegarder au Labo seulement, Charger partout). */
-  const openMachines = (): void => {
-    if (session.running) return;
-    pauseFor(
-      machinesDialog(shell.main, {
-        canSave: session.lab !== null,
-        name: labName,
-        rows: () =>
-          Array.from({ length: SLOT_COUNT }, (_, i) => {
-            const stored = slots.read(i + 1);
-            return { slot: i + 1, name: stored?.save.name ?? null, date: stored ? dateOf(stored.savedAt) : "" };
-          }),
-        save: (slot, name, replace) => {
-          const machine = session.lab ? snapshotLab(session.world, session.lab) : null;
-          const outcome = machine ? saveMachine(slots, slot, name, machine, Date.now(), replace) : "failed";
-          const clean = cleanName(name) ?? "";
-          if (outcome === "saved") labName = clean;
-          return { ok: outcome === "saved", occupied: outcome === "occupied", message: saveMessage(outcome, clean) };
-        },
-        load: (slot) => {
-          const loaded = loadMachine(slots, slot);
-          if (loaded.status !== "loaded") return { ok: false, message: copy.machineUnreadable };
-          const apply = (): void => {
-            if (openLab(loaded.machine)) {
-              labName = loaded.name;
-              announce(copy.machineLoaded(loaded.name));
-            } else {
-              pauseFor(messageDialog(itfHost(), copy.machineLoadFailed, resume));
-            }
-          };
-          // La fenêtre se ferme après ce retour ; la machine remplace l'aire du Labo (après confirmation s'il y avait du travail).
-          const worked = session.lab !== null && (session.world.statics.head !== null || session.world.mobiles.head !== null);
-          queueMicrotask(() => (worked ? pauseFor(confirmDialog(itfHost(), copy.clearConfirm, apply, resume)) : apply()));
-          return { ok: true, message: copy.machineLoaded(loaded.name) };
-        },
-        erase: (slot) => {
-          slots.clear(slot);
-          return copy.machineErased(slot);
-        },
-        onClose: resume,
-      }),
-    );
+  /** Charge un emplacement au Labo (la liste se ferme d'abord). */
+  const loadSlot = (slot: number, list: ItfWindowHandle): void => {
+    const loaded = loadMachine(slots, slot);
+    if (loaded.status !== "loaded") return void messageDialog(itfHost(), copy.machineUnreadable);
+    list.close();
+    if (openLab(loaded.machine)) {
+      labName = loaded.name;
+      announce(copy.machineLoaded(loaded.name));
+    } else pauseFor(messageDialog(itfHost(), copy.machineLoadFailed, resume));
   };
 
-  const openLabSettings = (): void => {
-    if (!session.lab || session.running) return;
-    pauseFor(
-      labDialog(shell.main, {
-        settings: session.lab,
-        music: texts.music.filter((m) => m.id >= 1000 && m.id <= 1023),
-        change: (s) => {
-          session.setLab(s);
-          if (s.music !== undefined && musicOn) sound.playMusic(s.music);
-        },
-        onClose: resume,
-      }),
-    );
-  };
-
-  const openHelp = (): void => {
+  /** Aide du site ; `after` : à sa fermeture (retour au menu principal ou au choix du puzzle). */
+  const openHelp = (after?: () => void): void => {
     if (helpView) return;
     const close = (): void => {
       helpView?.remove();
       helpView = null;
       applyPause();
       shell.focusCanvas();
+      after?.();
     };
     helpView = h("div", { class: "tim3-help-overlay", role: "dialog", "aria-modal": "true", "aria-label": copy.help }, renderHelp(close, copy.helpResume));
     shell.main.append(helpView);
-    screen.cancelGesture();
+    if (!front) screen.cancelGesture();
     applyPause();
   };
 
@@ -701,7 +954,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
     {
       move: (x, y, event) => {
-        if (paused) return;
+        if (paused || front) return;
         const touch = event?.pointerType === "touch";
         screen.pointerMove(x, y, touch);
         if (!touch) hoverTip(x, y);
@@ -709,23 +962,27 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       down: (button, x, y, event) => {
         if (paused || button !== 0) return;
         audio.unlock();
+        // Intro : un clic ou un toucher la passe (42a4d8 : bouton de la souris).
+        if (front?.kind === "intro") return front.player.skip();
+        if (front) return;
         window.clearTimeout(tipTimer);
         tip.hidden = true;
         screen.pointerDown(x, y, event.pointerType === "touch");
       },
       up: (button, x, y) => {
-        if (paused || button !== 0) return;
+        if (paused || front || button !== 0) return;
         screen.pointerUp(x, y);
         persistEdit();
       },
       leave: () => {
+        if (front) return;
         screen.pointerLeave();
         window.clearTimeout(tipTimer);
         tipSlot = null;
         if (!session.editor.held) tip.hidden = true;
       },
       longPress: (x, y) => {
-        if (!paused) screen.longPress(x, y);
+        if (!paused && !front) screen.longPress(x, y);
       },
     },
     { onGesture: () => audio.unlock() },
@@ -735,6 +992,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     {
       keyDown: (event) => {
         if (paused || event.ctrlKey || event.metaKey || event.altKey) return false;
+        // Intro : une touche la passe (42a4e4 : touche enfoncée).
+        if (front?.kind === "intro") {
+          front.player.skip();
+          return true;
+        }
+        if (front) return false;
         const taken = screen.key(event.key);
         if (taken) {
           tip.hidden = true;
@@ -749,21 +1012,26 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   // ------------------------------------------------------------------ démarrage
 
   window.addEventListener("pagehide", persistEdit);
-  const first = puzzles.find((p) => p.name === (options.puzzle ?? progress.last)) ?? puzzles[0]!;
-  loadPuzzle(first);
 
   const ctx = shell.canvas.getContext("2d")!;
   const image = ctx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
   const pixels = new Uint32Array(image.data.buffer);
   const lut = assets.gameLut();
+  const blackLut = opaqueLut(lut);
+  const frontSurface = new Surface(SCREEN_WIDTH, SCREEN_HEIGHT);
   let lastCursor = "";
+
+  // Page de dev avec `?puzzle=` : le puzzle tout de suite ; sinon le parcours d'origine.
+  const asked = options.puzzle ? puzzles.find((p) => p.name === options.puzzle) : undefined;
+  if (asked) loadPuzzle(asked);
+  else startIntro();
 
   shell.start({
     sound: { prefs: new SoundPrefs(store, audio, GAME_ID), storageKey: soundPrefKey(GAME_ID), unlock: () => audio.unlock() },
     onPause: (hidden) => {
       tabHidden = hidden;
       if (hidden) persistEdit();
-      if (hidden) screen.cancelGesture();
+      if (hidden && !front) screen.cancelGesture();
       applyPause();
     },
     onDispose: () => {
@@ -778,6 +1046,18 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     onFrame: (now) => {
       audio.update();
       if (paused) return;
+      if (front) {
+        if (front.kind !== "intro") return;
+        const player = front.player;
+        const phase = player.update(now);
+        if (player.dirty) {
+          player.surface.toRgba(player.lut, pixels);
+          ctx.putImageData(image, 0, 0);
+          player.dirty = false;
+        }
+        if (phase === "done") endIntro(player);
+        return;
+      }
       if (session.running) {
         for (let ticks = scheduler.due(now); ticks > 0 && session.running; ticks--) {
           const r = session.tick();

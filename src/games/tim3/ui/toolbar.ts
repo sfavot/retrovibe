@@ -86,7 +86,7 @@ export const TOOLBAR_TEXT = {
   clearLab: 31134,
 } as const;
 
-export type ToolbarAction = "none" | "unavailable" | "play" | "lab" | "machines" | "options" | "globals" | "clear" | "help" | "hints" | "solution" | "run";
+export type ToolbarAction = "none" | "unavailable" | "play" | "lab" | "machines" | "chooser" | "options" | "globals" | "clear" | "help" | "hints" | "solution" | "run";
 
 export interface ToolbarDecision {
   action: ToolbarAction;
@@ -102,6 +102,8 @@ export interface ToolbarDecision {
  * - Clé : rien au Labo ; depuis le Jeu, 31398 puis le Labo.
  * - Balayette : en Jeu, l'aire est remise sans question (43252d) ; au Labo, 31134 si l'aire n'est pas vide (419405).
  * - Ampoule : 31125 puis la solution du concepteur (43252d avec le mode 9).
+ * - Disquette : en Jeu, le choix du puzzle (418f2c : `DOSBOX` en chargement seulement) ; au Labo, les machines (42289c demande
+ *   charger ou enregistrer).
  */
 export function toolbarDecision(name: string, ctx: ToolbarContext & { fieldEmpty: boolean }): ToolbarDecision {
   const state = toolbarStates(ctx).find((b) => b.name === name);
@@ -113,7 +115,7 @@ export function toolbarDecision(name: string, ctx: ToolbarContext & { fieldEmpty
     case "TB_GOTO_WORK":
       return ctx.lab ? { action: "none" } : { action: "lab", confirm: TOOLBAR_TEXT.openLab };
     case "TB_DISK":
-      return { action: "machines" };
+      return { action: ctx.lab ? "machines" : "chooser" };
     case "TB_MUSIC":
       return { action: "options" };
     case "TB_GLOBAL":

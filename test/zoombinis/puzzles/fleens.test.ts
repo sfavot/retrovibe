@@ -257,13 +257,14 @@ describe("nizibooms : essais, cocons, fin", () => {
     expect(state.closed).toBe(false);
   });
 
-  it("n = 1 : le Zoombini disparaît (événement 137) et est perdu à la sortie (probable)", () => {
+  it("n = 1 : le seul essai remplit le dernier cocon et personne n'est perdu (l'événement 137 ne fait que suspendre le Zoombini)", () => {
     const { state, members } = play(2, 1);
-    tryMember(state, 0);
+    expect(state.single).toBe(true);
+    expect(tryMember(state, 0)).toMatchObject({ special: true, cocoons: 3, done: true });
     endClosure(state);
     const exit = goExit(state)!;
-    expect(exit).toEqual({ lost: [0], clean: false });
-    expect(groupAfterExit(members, exit)[0]!.present).toBe(false);
+    expect(exit).toEqual({ lost: [], clean: true });
+    expect(groupAfterExit(members, exit)[0]!.present).toBe(true);
   });
 
   it("le bouton carte abandonne : tout le groupe est perdu", () => {

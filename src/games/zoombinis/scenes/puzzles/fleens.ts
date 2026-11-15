@@ -12,10 +12,15 @@
  *     Événement 4 : son cousin de la terrasse se tourne vers lui (type 5) ; 5 (`10e0:23a0`, type 6) : le cousin rejoint le repère : perché, il descend de la branche
  *     (`SCRS` 4000 + position, 4017 à 4019) ; sur la terrasse, il court jusqu'à (429, 223) (`SCRS` 4004 + position) ; 6 : si le cousin était perché, le cocon se remplit
  *     (`SCRB` 1000 + cocons) et les autres perchés réagissent sur place (types 7 / 8) ; 7 : le repère se libère (un autre Zoombini peut être déposé, son essai attend la fin du
- *     précédent) et le cousin court derrière le Zoombini (type 9, `SCRS` 4025 + pieds, absolu : sortie à droite, retour par la droite) jusqu'à la **file des cousins** en
- *     (214, 207), sous la file des Zoombinis (199, 120), où il reste (`+0x120 = 20`) ; 132 : les essais précédents reculent de 20 pixels, leurs cousins aussi (type 12,
+ *     précédent) et le cousin court jusqu'à la **file des cousins** en (214, 207), sous la file des Zoombinis (199, 120), où il reste (`+0x120 = 20`) : course directe
+ *     (type 10, `SCRS` 4030 + pieds), ou sortie à gauche au troisième cocon (type 11, 4035 + pieds) ; 132 : les essais précédents reculent de 20 pixels, leurs cousins aussi (type 12,
  *     `SCRS` 4040 + pieds) et, quand la file de 7 est pleine, le plus ancien saute au sol (`SCRS` 5999 + pieds) ; son cousin sort à gauche à l'événement 60 (type 13,
  *     `4045 + pieds`), puis lui (`7010 + pieds`). À la clôture (`SCRB` 1004 à 1006, événement 136 relayé par `10e0:2f0d`), les cousins de la file s'enfuient (`4050 + pieds`).
+ *     **Grand détour** (drapeau `[7334]` : 0 à l'entrée, 1 d'emblée pour un groupe d'un seul Zoombini) : le premier essai d'un groupe de 2 ou plus joue `SCRS` 7041 + pieds
+ *     (`292a` / `297c`) et son cousin le type 9 (`SCRS` 4025 + pieds : sortie à droite, retour par la droite). Événement 1 du cousin (image 69, `10e0:215c`) : `[7334] = 1`,
+ *     la poussière (`SCRB` 1200) passe derrière lui et rejoue depuis le début (`11a8:1b89`, rappel `10e0:20ec`) ; événement 137 du cousin puis du Zoombini (`26b1`) :
+ *     `+0xE0 = 0`, ils sont suspendus et cachés ; événement 136 de la poussière (image 18, après son son 1200) : `+0xE0 = 1`, ils réapparaissent et finissent leur
+ *     script. Personne ne se perd : l'événement 137 n'est pas une disparition.
  *  3. **Trois cocons** : le dernier essai joue `SCRS` 7005 + pieds ; événements 133 et 134 : les nizibooms de la terrasse s'enfuient (`SCRS` 4056 à 4058) ; événement 30 : séquence de
  *     clôture (`SCRB` 1004 + tirage de 0 à 2) ; à sa fin « Go » est actif et le groupe est « sauvé » (`1168:3dd0(0, 1)`), voix de réussite.
  *  4. **« Go »** : son 996, les Zoombinis partent à pied ; écran suivant (l'hôtel). **Carte** : abandon, groupe perdu.
@@ -27,13 +32,17 @@
  *  - un Zoombini déjà essayé ne se reprend pas (l'original le laisse déplaçable sans nouvel essai, `[96fe]`) ;
  *  - pas de chargement progressif des 8 `SCRS` d'ambiance (`[7490]`, `10e0:0f51`) ni d'animation de joie des Zoombinis (`[7496]`, `292a(5)`) ni de réactions de groupe de l'événement 135 ;
  *  - le retour d'un Zoombini sorti de la file n'existe pas : il quitte l'écran par la gauche, sauvé ;
- *  - un groupe d'un seul Zoombini n'a pas de `SCRS` 7005 + pieds : la clôture est lancée à la fin de son parcours (7041 + pieds) ; **probable** ;
+ *  - fin d'un script de niziboom : la boucle de pas qu'il a lancée (WAVE en boucle infinie : 4001, 4006, 4013, 4015, 4017…) est coupée si c'est encore le son en cours
+ *    (`stopFootsteps`) ; l'original la laisse tourner sur son canal unique jusqu'au son suivant (choix de l'utilisatrice) ;
+ *  - garde : un événement 137 qui arrive après l'événement 136 de la poussière ne suspend plus personne (l'original resterait figé ; pas observé) ;
  *  - le « 20036 / `0x4e44` » des études n'est pas une voix mais l'étiquette de type `SND` de `1028:0d9e(996, SND)` (« le son de « Go » joue-t-il encore ? ») : le kit attend déjà la fin des sons avant l'écran suivant ; départ : tous les sauvés marchent vers (660, 357) (`SCRS` 7021 à 7030 non portés).
  */
 import type { KeyEvent } from "../../../../engine/mohawk/input";
 import type { Archive } from "../../../../engine/mohawk/resources";
 import { FEATURE_END, FEATURES, FeatureFlag, type Feature, type FeaturePart, type Features, type Sheet, createSheet } from "../../engine/features";
 import { ZOOMBINIS_GAME } from "../../engine/game";
+import { ZOOMBINIS_SOUND } from "../../engine/sound";
+import { TAG_SND } from "../../../../data/mohawk/mohawk";
 import { showDebugMessage } from "../../engine/shortcuts";
 import type { Scene, SceneContext } from "../../engine/scene";
 import { DIALOG } from "../../engine/dialog";
@@ -45,7 +54,6 @@ import {
   canGo,
   canTry,
   endClosure,
-  goExit,
   prepareFleens,
   tryMember,
   type Cousin,
@@ -118,10 +126,10 @@ const SCRS = {
   dash: 4004,
   descend: 4000,
   perch: 4020,
-  /** Types 9 à 14, `+ pieds` du niziboom (`+0xef`) : vers la file (9 : 4026 à 4030 ; 10 : groupe d'un seul, 4031 à 4035), sortie à gauche (11 : 4036 à 4040),
-   *  recul d'un cran dans la file (12 : 4041 à 4045), éjection (13 : 4046 à 4050), fuite de la file à la fin (14 : 4051 à 4055). */
-  toLine: 4025,
-  toLineSingle: 4030,
+  /** Types 9 à 14, `+ pieds` du niziboom (`+0xef`) : vers la file (9 : grand détour avec la poussière, 4026 à 4030 ; 10 : course directe, 4031 à 4035), sortie à
+   *  gauche (11 : 4036 à 4040), recul d'un cran dans la file (12 : 4041 à 4045), éjection (13 : 4046 à 4050), fuite de la file à la fin (14 : 4051 à 4055). */
+  toLineDetour: 4025,
+  toLine: 4030,
   outLeft: 4035,
   lineStep: 4040,
   lineEject: 4045,
@@ -131,7 +139,8 @@ const SCRS = {
   fleeNear: 4058,
   trial: 7000,
   trialLast: 7005,
-  trialSingle: 7041,
+  /** `292a(2)` quand `[7334] == 0` : parcours du grand détour (7041 à 7045), suspendu à l'événement 137 le temps de la poussière. */
+  trialDetour: 7041,
   eject: 7010,
   /** `292a(9)` : le Zoombini éjecté saute de la file au sol (`5999 + pieds`, 6000 à 6004, (68, 140) → (57, 246)) ; son évènement 61 fait partir son cousin. */
   jumpDown: 5999,
@@ -141,8 +150,36 @@ const SCRS = {
   lineExit: 7025,
   intro: 7035,
 } as const;
-/** Événements (octet bas du terminateur − 1, `10e0:227e`). */
-const EVENT = { turn: 0, alert: 4, dash: 5, perched: 6, free: 7, closure: 30, queue: 132, exitLine: 131, fleeNear: 133, fleeFar: 134, fleeLine: 135, vanish: 137 } as const;
+/** Événements des Zoombinis (octet bas du terminateur − 1, `10e0:227e`) et des nizibooms (`10e0:215c` : 0, 1, 2, 137, 140). */
+const EVENT = {
+  turn: 0,
+  dust: 1,
+  inFront: 2,
+  alert: 4,
+  dash: 5,
+  perched: 6,
+  free: 7,
+  closure: 30,
+  queue: 132,
+  exitLine: 131,
+  fleeNear: 133,
+  fleeFar: 134,
+  fleeLine: 135,
+  freeze: 137,
+  behind: 140,
+  /** `SCRS` 4003, image 2 (le cousin se tourne vers son Zoombini) : une réplique tirée au hasard (`10e0:2238`). */
+  greet: 218,
+} as const;
+/** Répliques du cousin qui se tourne vers son Zoombini (`\0SND` 4100 à 4124, `10e0:2238`). */
+const GREET_SOUNDS = [4100, 4124] as const;
+/** Événement de la poussière (`SCRB` 1200, image 18 : `10e0:20ec`) qui relance le Zoombini et le cousin suspendus. */
+const DUST_RELEASE = 136;
+/** Brillance `SCRB` 1202 (`[732a]`), rangée derrière le cousin au premier événement 0 qui suit l'événement 7 (`[7348]`). */
+const SHINE = 2;
+/** Nombre de boucles d'un WAVE qui se répète sans fin. */
+const LOOP_FOREVER = 0xffff;
+/** Écart de profondeur pour ranger une feature juste devant ou derrière une autre (`11a8:2a0a`). */
+const NEXT_TO = 1e-6;
 /** Arrivée de la course du cousin près du repère (`10e0:23a0` : (0x1ad, 0xdf)) et place de la file des cousins (`10e0:24fc` : (0xd6, 0xcf)) ; sortie à gauche (−56, 241). */
 const DASH_END: Point = { x: 429, y: 223 };
 const COUSIN_LINE: Point = { x: 214, y: 207 };
@@ -250,6 +287,7 @@ class Niziboom {
     const done = options.onEnd;
     this.onEnd = () => {
       this.position = end;
+      this.run.stopFootsteps(id);
       done?.();
     };
     const f = this.run.features;
@@ -277,8 +315,24 @@ class Niziboom {
       done?.();
       return;
     }
-    // Événement 0 : bascule le sens du regard (`+0xf2`).
+    // Événement 0 : bascule le sens du regard (`+0xf2`) ; les autres (1, 2, 137, 140) regardent l'écran (`10e0:215c`).
     if (n === EVENT.turn) this.facing = this.facing === 0 ? 1 : 0;
+    this.run.niziboomEvent(this, n);
+  }
+
+  /** `+0xE0 = 0` (événement 137) : le tick ne l'avance plus et il n'est plus dessiné. */
+  freeze(): void {
+    this.feature.active = false;
+    this.feature.flags |= FeatureFlag.noDraw;
+    this.run.features.invalidate();
+  }
+
+  /** `+0xE0 = 1` (`10e0:20ec`) : il réapparaît et reprend son script là où il s'était arrêté. */
+  thaw(): void {
+    if (this.gone) return;
+    this.feature.flags &= ~FeatureFlag.noDraw;
+    this.run.features.resume(this.feature);
+    this.run.features.invalidate();
   }
 
   /** Retire le nizibooms de l'écran. */
@@ -301,7 +355,11 @@ export interface FleensProbe {
   readonly state: FleensState;
   readonly nizibooms: readonly { readonly cousin: Cousin; readonly feature: Feature; readonly gone: boolean }[];
   readonly branch: Feature;
+  /** Poussière (`SCRB` 1200, `[7326]`), relancée par le grand détour. */
+  readonly dust: Feature;
   readonly dropTarget: DropTarget;
+  /** `[7334]` : le grand détour est déjà joué (ou le groupe n'a qu'un Zoombini) ; les essais suivants courent directement. */
+  readonly detourDone: boolean;
   /** Essai en cours (`[7338]`) et essais en attente. */
   readonly trial: KitMember | null;
   readonly pending: number;
@@ -323,9 +381,11 @@ class FleensRun implements FleensProbe {
   readonly features: Features;
   readonly nizibooms: Niziboom[] = [];
   readonly branch: Feature;
+  readonly dust: Feature;
   readonly dropTarget: DropTarget;
   readonly level: number;
   trial: KitMember | null = null;
+  detourDone: boolean;
   introPlaying = false;
   closureStarted = false;
   leaving = false;
@@ -340,10 +400,21 @@ class FleensRun implements FleensProbe {
   private readonly scripts: (id: number) => Script | undefined;
   private pendingPose: number | null = null;
   private finished = false;
+  /** Cousin de l'essai en cours (`[7336]`). */
+  private trialCousin: Niziboom | undefined;
+  /** Brillance 1202 (`[732a]`) et `[7348]` : à ranger derrière le cousin de l'essai à son prochain événement 0. */
+  private readonly shine: Feature | undefined;
+  private shineBehindCousin = false;
+  /** Poussière du grand détour : pas encore lancée, en cours, ou passée à son événement 136 (les suspendus sont repartis). */
+  private dustPhase: "idle" | "playing" | "released" = "idle";
+  /** Relances des features suspendues par l'événement 137 (Zoombini de l'essai et son cousin). */
+  private readonly frozen: (() => void)[] = [];
+  /** Sons en boucle infinie lancés par chaque `SCRS` de nizibooms (les pas). */
+  private readonly loops = new Map<number, ReadonlySet<number>>();
 
   constructor(
     readonly ctx: SceneContext,
-    archive: Archive,
+    private readonly archive: Archive,
   ) {
     const zoombinis = ctx.services.get(ZOOMBINIS_GAME);
     const { game, session } = zoombinis;
@@ -371,9 +442,15 @@ class FleensRun implements FleensProbe {
     this.state = prepareFleens(this.party, this.level, rule, ctx.rng);
     for (let i = 0; i < FLEENS_RULE_BYTES; i++) game.fleensRule[i] = rule[i]!;
 
-    // Poussière (1200, une fois) et brillances (1201 à 1206, en boucle).
-    f.create({ script: SCRB.dust, delay: DELAY, flags: F.flag4000000 | F.stopAtEnd | F.noReplay });
-    for (let k = 1; k <= 6; k++) f.create({ script: SCRB.dust + k, delay: DELAY, flags: F.flag4000000 });
+    // `[7334]` (`10e0:00ab`, `10e0:1bbf`) : un groupe d'un seul Zoombini ne fait jamais le grand détour.
+    this.detourDone = this.state.single;
+
+    // Poussière (1200, une fois ; relancée par le grand détour) et brillances (1201 à 1206, en boucle).
+    this.dust = f.create({ script: SCRB.dust, delay: DELAY, flags: F.flag4000000 | F.stopAtEnd | F.noReplay });
+    for (let k = 1; k <= 6; k++) {
+      const shine = f.create({ script: SCRB.dust + k, delay: DELAY, flags: F.flag4000000 });
+      if (k === SHINE) this.shine = shine;
+    }
 
     const sheet = createSheet(archive, NIZIBOOM_SHEET, true);
     for (const cousin of this.state.cousins) this.nizibooms.push(new Niziboom(this, cousin, sheet, this.scripts));
@@ -490,11 +567,12 @@ class FleensRun implements FleensProbe {
     this.trial = member;
     this.tried.add(member.index);
     const cousin = this.nizibooms.find((n) => n.cousin.member === member.index);
+    this.trialCousin = cousin;
     const previous = [...this.queue];
     const { snoid } = member;
     const feet = snoid.traits.feet;
-    // Script d'essai : `292a(2)` (7041 + pieds pour un Zoombini seul, 7005 + pieds au troisième cocon, sinon 7000 + pieds).
-    const id = (this.state.single ? SCRS.trialSingle : result.cocoons >= 3 ? SCRS.trialLast : SCRS.trial) + feet - 1;
+    // Script d'essai : `292a(2)` / `297c` (7041 + pieds tant que `[7334] == 0`, sinon 7005 + pieds au troisième cocon, 7000 + pieds autrement).
+    const id = (!this.detourDone ? SCRS.trialDetour : result.cocoons >= 3 ? SCRS.trialLast : SCRS.trial) + feet - 1;
     this.pendingPose = null;
     snoid.onEnd = () => {
       snoid.onEnd = undefined;
@@ -534,8 +612,9 @@ class FleensRun implements FleensProbe {
       case EVENT.free:
         // `1168:170f(1, 0)` : le repère se libère.
         this.release(member);
-        // `10e0:24fc` : le cousin rejoint la file des cousins, sous la file des Zoombinis (type 9) ; groupe d'un seul : type 10, ou sortie à gauche au troisième cocon (11).
+        // `10e0:24fc` : le cousin rejoint la file des cousins, sous la file des Zoombinis (type 9 ou 10), ou sort à gauche au troisième cocon (11) ; `[7348] = 1`.
         if (cousin && !cousin.gone) this.cousinToLine(cousin, result.cocoons);
+        this.shineBehindCousin = true;
         break;
       case EVENT.queue:
         this.advanceLine(previous, result.ejected);
@@ -549,10 +628,10 @@ class FleensRun implements FleensProbe {
       case EVENT.closure:
         this.startClosure();
         break;
-      case EVENT.vanish:
-        // `+0xE0 = 0` : le Zoombini seul disparaît avec son cousin (perdu, voir `tryMember`) ; il finit son script sans être dessiné.
-        snoid.feature.flags |= FeatureFlag.noDraw;
-        this.features.invalidate();
+      case EVENT.freeze:
+        // `26b1` (image 92 de 7042) : `+0xE0 = 0`, le Zoombini du grand détour est suspendu et caché jusqu'à l'événement 136 de la poussière (`10e0:20ec`).
+        // Garde du port : la poussière déjà passée, il ne s'arrête plus (l'original resterait figé).
+        if (this.dustPhase !== "released") this.freezeSnoid(member);
         break;
       default:
         if (n >= 240 && n <= 243) this.pendingPose = n - 239;
@@ -579,13 +658,112 @@ class FleensRun implements FleensProbe {
     }
   }
 
-  /** `10e0:24fc` puis `28b1` : le cousin de l'essai court jusqu'à la file des cousins (214, 207) et y reste (`+0x120 = 20`). */
+  /**
+   * `10e0:24fc` puis `28b1` : le cousin de l'essai court jusqu'à la file des cousins (214, 207) et y reste (`+0x120 = 20`). Tant que `[7334] == 0` (premier essai
+   * d'un groupe de 2 ou plus), c'est le grand détour (type 9) ; ensuite la course directe (type 10), ou la sortie à gauche au troisième cocon (type 11).
+   */
   private cousinToLine(cousin: Niziboom, cocoons: number): void {
-    const single = this.state.single;
-    const out = single && cocoons >= 3;
-    const id = (single ? (out ? SCRS.outLeft : SCRS.toLineSingle) : SCRS.toLine) + cousin.feet;
+    const detour = !this.detourDone;
+    const out = !detour && cocoons >= 3;
+    const id = (detour ? SCRS.toLineDetour : out ? SCRS.outLeft : SCRS.toLine) + cousin.feet;
     cousin.pos = LINE_POSITION;
     cousin.play(id, { at: out ? COUSIN_OUT : COUSIN_LINE, onEnd: () => (out ? cousin.remove() : cousin.rest()) });
+  }
+
+  /**
+   * Rappel des nizibooms (`10e0:215c`) pour les événements autres que la fin : 0 range une fois la brillance 1202 derrière le cousin de l'essai (`[7348]`) ;
+   * 1 (image 69 du grand détour) : `[7334] = 1`, la poussière passe derrière le cousin et repart du début (`11a8:1b89`, rappel `10e0:20ec`) ; 2 et 140 : le Zoombini
+   * de l'essai juste devant / derrière le cousin ; 137 : le niziboom est suspendu et caché (`+0xE0 = 0`).
+   */
+  niziboomEvent(niz: Niziboom, n: number): void {
+    const cousin = this.trialCousin;
+    const zoombini = this.trial?.snoid.feature;
+    switch (n) {
+      case EVENT.greet:
+        // `10e0:2238` : `11a0:0ee7(0, 10a8:04e8(4100, 4124))`, une des 25 répliques `\0SND` 4100 à 4124.
+        this.ctx.services.tryGet(ZOOMBINIS_SOUND)?.queue(this.ctx.rng.range(GREET_SOUNDS[0], GREET_SOUNDS[1]));
+        break;
+      case EVENT.turn:
+        if (this.shineBehindCousin && niz === cousin && this.shine) {
+          this.shineBehindCousin = false;
+          this.features.restack(this.shine, niz.feature.depth - NEXT_TO);
+        }
+        break;
+      case EVENT.dust:
+        if (this.detourDone) break;
+        this.detourDone = true;
+        if (cousin) this.features.restack(this.dust, cousin.feature.depth - NEXT_TO);
+        this.startDust();
+        break;
+      case EVENT.inFront:
+        if (cousin && zoombini) this.features.restack(zoombini, cousin.feature.depth + NEXT_TO);
+        break;
+      case EVENT.behind:
+        if (cousin && zoombini) this.features.restack(zoombini, cousin.feature.depth - NEXT_TO);
+        break;
+      case EVENT.freeze:
+        if (this.dustPhase === "released") break;
+        niz.freeze();
+        this.frozen.push(() => niz.thaw());
+        break;
+    }
+  }
+
+  /** `11a8:1b89(1200, …, 10e0:20ec)` : la poussière rejoue depuis le début (son 1200 à l'image 5) ; à son événement 136, les suspendus repartent. */
+  private startDust(): void {
+    this.dustPhase = "playing";
+    this.features.setScript(this.dust, SCRB.dust);
+    this.dust.onEvent = (_image, n) => {
+      if (n !== DUST_RELEASE) return;
+      this.dustPhase = "released";
+      for (const thaw of this.frozen.splice(0)) thaw();
+    };
+  }
+
+  /** Événement 137 du Zoombini (`26b1`) : suspendu et caché ; la poussière le relance (`10e0:20ec`). */
+  private freezeSnoid(member: KitMember): void {
+    const { feature } = member.snoid;
+    feature.active = false;
+    feature.flags |= FeatureFlag.noDraw;
+    this.features.invalidate();
+    this.frozen.push(() => {
+      if (member.snoid.destroyed) return;
+      feature.flags &= ~FeatureFlag.noDraw;
+      this.features.resume(feature);
+      this.features.invalidate();
+    });
+  }
+
+  /**
+   * Écart assumé : à la fin d'un script de niziboom, la boucle de pas qu'il a lancée est coupée (l'original la laisse tourner jusqu'au son suivant, un seul
+   * canal). Seulement si le son en cours est un WAVE en boucle infinie lancé par ce script : une voix ou un autre son n'est pas touché.
+   */
+  stopFootsteps(scriptId: number): void {
+    const sound = this.ctx.services.tryGet(ZOOMBINIS_SOUND);
+    if (!sound) return;
+    const id = sound.currentEffect;
+    if (id === 0 || !this.loopingSounds(scriptId).has(id) || !sound.isPlaying(id)) return;
+    sound.stopSound(id);
+    sound.resetCurrentEffect();
+  }
+
+  /** Sons d'un `SCRS` (terminateurs de ses images) qui se répètent sans fin. */
+  private loopingSounds(scriptId: number): ReadonlySet<number> {
+    let found = this.loops.get(scriptId);
+    if (found) return found;
+    const ids = new Set<number>();
+    for (const image of this.scripts(scriptId)?.images ?? []) {
+      const id = image.soundId;
+      if (id === undefined || id === 0 || ids.has(id) || !this.archive.has(TAG_SND, id)) continue;
+      try {
+        if (this.archive.wave(id).loopCount === LOOP_FOREVER) ids.add(id);
+      } catch {
+        // Un `\0SND` MIDI ne boucle pas ici.
+      }
+    }
+    found = ids;
+    this.loops.set(scriptId, found);
+    return found;
   }
 
   /** Évènement 135 (renvoyé par la clôture, `10e0:2f0d` → `26c1`, positions 20 à 25) : les cousins de la file s'enfuient à gauche (type 14 : `4050 + pieds`). */
@@ -658,15 +836,15 @@ class FleensRun implements FleensProbe {
     snoid.play(SCRS.eject, FeatureFlag.stopAtEnd, { kind: "normal", at: { ...snoid.position } });
   }
 
-  /** Fin de l'essai (événement −1) : le verrou tombe ; trois cocons sans événement 30 (Zoombini seul) : la clôture démarre. */
+  /** Fin de l'essai (événement −1) : le verrou tombe ; trois cocons sans événement 30 (garde : tout dernier essai joue 7005, qui l'a) : la clôture démarre. */
   private trialEnded(member: KitMember, done: boolean): void {
     const { snoid } = member;
     snoid.setFacing(0);
     snoid.setPose(null);
     snoid.onEvent = undefined;
-    if (this.state.vanished.includes(member.index)) snoid.destroy();
-    else if (!snoid.destroyed) snoid.idle();
+    if (!snoid.destroyed) snoid.idle();
     this.trial = null;
+    this.trialCousin = undefined;
     if (done && !this.closureStarted) this.startClosure();
     this.nextTrial();
   }
@@ -704,31 +882,20 @@ class FleensRun implements FleensProbe {
     });
   }
 
-  /** Fin de la clôture (`[7380] = 1`) : « Go » actif, tout le groupe est sauvé (`3dd0(0, 1)`), commentaire. */
+  /**
+   * Fin de la clôture (`[7380] = 1`) : « Go » actif, tout le groupe est sauvé (`3dd0(0, 1)`), voix de réussite. L'original compare les sauvés (`1168:02cc`) au groupe
+   * d'entrée (`[73a2]`) pour choisir la voix de regret ; personne ne se perdant sur cet écran, c'est toujours la réussite.
+   */
   private closed(): void {
     endClosure(this.state);
     this.saveAll();
     this.kit.goEnabled = canGo(this.state);
-    if (this.state.vanished.length === 0) {
-      this.kit.playSuccessVoice();
-      return;
-    }
-    // Un disparu : commentaire de regret si `rand(0..4) ≤ niveau` ou plus de trois visites (`S+0x38 & 0xFFF`).
-    const { game } = this.ctx.services.get(ZOOMBINIS_GAME);
-    const slot = dialogMemoryIndex(SCREEN);
-    const visits = slot >= 0 ? game.dialogMemory[slot]! & 0xfff : 0;
-    if (this.ctx.rng.range(0, 4) <= this.level || visits > 3) this.kit.playRegretVoice();
+    this.kit.playSuccessVoice();
   }
 
-  /** `1168:3dd0(0, 1)` puis les disparus (événement 137) ne comptent pas. */
+  /** `1168:3dd0(0, 1)` : tout le groupe est sauvé. */
   private saveAll(): void {
     this.kit.markAll(true);
-    const exit = goExit(this.state);
-    const lost = exit ? exit.lost : this.state.vanished;
-    for (const index of lost) {
-      const member = this.kit.members[index];
-      if (member) member.zoombini.present = false;
-    }
   }
 
   // ------------------------------------------------------------------------------------------------------------------------

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { MohawkArchive } from "../../../src/data/mohawk/mohawk";
 import { decodeTbmpImages } from "../../../src/data/mohawk/tbmp";
-import { parseScrs } from "../../../src/games/zoombinis/data/script";
+import { parseScrb, parseScrs } from "../../../src/games/zoombinis/data/script";
 import { createZoombinisEngine } from "../../../src/games/zoombinis/engine/engine";
 import { DIALOG } from "../../../src/games/zoombinis/engine/dialog";
-import { FEATURES } from "../../../src/games/zoombinis/engine/features";
+import { FEATURES, FeatureFlag } from "../../../src/games/zoombinis/engine/features";
 import { ScreenId } from "../../../src/games/zoombinis/engine/scene";
 import { installServices } from "../../../src/games/zoombinis/engine/services";
 import { ZOOMBINIS_SOUND } from "../../../src/games/zoombinis/engine/sound";
@@ -208,19 +208,19 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(zone.active).toBe(false);
   });
 
-  it("un essai juste remplit un cocon : parcours 7000 + pieds, cocon (SCRB 1001), cousin perché descendu dans la file des cousins, repère libéré à l'événement 7", async () => {
+  it("un essai juste remplit un cocon : parcours du premier essai (7041 + pieds), cocon (SCRB 1001), cousin perché descendu dans la file des cousins, repère libéré à l'événement 7", async () => {
     const { probe, tryOnce, until, specials, state, features, settle, mark } = await start();
     const index = specials()[0]!;
     const member = probe().kit.members[index]!;
     const niz = probe().nizibooms.find((n) => n.cousin.member === index)!;
     expect(niz.cousin.special).toBe(true);
     await tryOnce(index);
-    // Dépôt : posé sur le repère, essai compté tout de suite, parcours 7000 + pieds, sauvé (`+0x127 = 1` par le Tick).
+    // Dépôt : posé sur le repère, essai compté tout de suite, parcours du grand détour (premier essai : 7041 + pieds), sauvé (`+0x127 = 1` par le Tick).
     expect(member.snoid.position).toEqual(mark());
     expect(state().cocoons).toBe(1);
     expect(state().found).toEqual([index]);
     expect(probe().trial).toBe(member);
-    expect(member.snoid.scriptId).toBe(7000 + member.snoid.traits.feet - 1);
+    expect(member.snoid.scriptId).toBe(7041 + member.snoid.traits.feet - 1);
     expect(probe().dropTarget.owner).toBe(member);
     // Événement 5 (`10e0:23a0`, type 6) : le cousin perché descend de la branche (`SCRS` 4000 + position, 4017 à 4019) jusqu'au repère.
     await until(() => niz.feature.scriptId === 4000 + niz.cousin.position);
@@ -247,7 +247,7 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
   }, 60_000);
 
   it("un essai faux ne change aucun compteur : le cousin de la terrasse se tourne (4003), court au repère (4004 + position), rejoint la file des cousins (214, 207) ; le Zoombini finit dans la file, il ne se reprend pas", async () => {
-    const { probe, tryOnce, until, others, state, settle, drag, mark, wait } = await start();
+    const { probe, tryOnce, until, others, state, settle, drag, mark, wait, queued } = await start();
     const index = others()[0]!;
     const member = probe().kit.members[index]!;
     const niz = probe().nizibooms.find((n) => n.cousin.member === index)!;
@@ -256,7 +256,10 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(state().trials).toEqual([{ member: index, special: false }]);
     expect(probe().branch.scriptId).toBe(1000);
     await until(() => niz.feature.scriptId === 4003);
+    const before = queued.length;
     await until(() => niz.feature.scriptId === 4004 + niz.cousin.position);
+    // Événement 218 de 4003 (`10e0:2238`) : en se tournant, le cousin dit une réplique tirée entre 4100 et 4124.
+    expect(queued.slice(before).some((id) => id >= 4100 && id <= 4124)).toBe(true);
     await until(() => niz.feature.scriptId === 4025 + niz.cousin.attrs[3]);
     await settle();
     expect(state().cocoons).toBe(0);
@@ -407,28 +410,98 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(engine.error).toBeNull();
   });
 
-  it("un groupe de 2 Zoombinis : un cocon est déjà plein, un seul spécial à trouver par essai ; avec 1 : deux cocons pleins, il disparaît (perdu)", async () => {
+  it("un groupe de 2 Zoombinis : un cocon est déjà plein, un seul spécial à trouver ; avec 1 : deux cocons pleins, pas de grand détour, 7005 + pieds, sortie du cousin à gauche, personne de perdu", async () => {
     const two = await start(undefined, 2);
     expect(two.state().cocoons).toBe(1);
     expect(two.probe().branch.scriptId).toBe(1001);
+    expect(two.probe().detourDone).toBe(false);
     const one = await start(undefined, 1);
     expect(one.state().cocoons).toBe(2);
     expect(one.probe().branch.scriptId).toBe(1002);
-    expect(one.state().single).toBe(true);
+    // `[7334] = 1` dès l'entrée (`10e0:1bbf`) : jamais de grand détour.
+    expect(one.probe().detourDone).toBe(true);
+    const member = one.probe().kit.members[0]!;
+    const niz = one.probe().nizibooms[0]!;
     await one.until(() => !one.probe().introPlaying, 600);
     await one.tryOnce(0);
     expect(one.state().cocoons).toBe(3);
-    expect(one.probe().trial?.snoid.scriptId).toBe(7041 + one.probe().kit.members[0]!.snoid.traits.feet - 1);
-    await one.until(() => one.state().closed, 1500);
-    expect(one.state().vanished).toEqual([0]);
-    expect(one.probe().kit.members[0]!.zoombini.present).toBe(false);
+    expect(member.snoid.scriptId).toBe(7005 + member.snoid.traits.feet - 1);
+    // Type 11 (`10e0:24fc`, troisième cocon hors du premier essai) : le cousin sort à gauche ; ni l'un ni l'autre n'est jamais caché.
+    let hidden = false;
+    let outLeft = false;
+    for (let t = 0; t < 1500 && !one.state().closed; t += 2) {
+      await one.wait(2);
+      if (member.snoid.feature.hasFlag(FeatureFlag.noDraw) || (!niz.gone && niz.feature.hasFlag(FeatureFlag.noDraw))) hidden = true;
+      if (!niz.gone && niz.feature.scriptId === 4035 + niz.cousin.attrs[3]) outLeft = true;
+    }
+    expect(one.state().closed).toBe(true);
+    expect(hidden).toBe(false);
+    expect(outLeft).toBe(true);
+    expect(member.snoid.destroyed).toBe(false);
+    expect(member.zoombini.present).toBe(true);
     expect(one.probe().kit.goEnabled).toBe(true);
-    // Sortie par « Go » : l'écran suivant est l'hôtel, le disparu est perdu.
+    expect(one.queued.some((id) => id >= 20055 && id <= 20063)).toBe(true);
+    // Sortie par « Go » : l'écran suivant est l'hôtel, le Zoombini est sauvé.
     one.host.click(620, 460);
     await one.until(() => one.zoombinis.lastChange?.screen === S.xfer, 3000);
     expect(one.zoombinis.lastChange).toMatchObject({ screen: S.xfer, target: nextScreen(S.fleens, "success") });
-    expect(one.zoombinis.game.group.members.filter((z) => z.present)).toHaveLength(0);
+    expect(one.zoombinis.game.group.members.filter((z) => z.present)).toHaveLength(1);
   }, 120_000);
+
+  it("premier essai d'un groupe de 2 ou plus : grand détour (7041 + pieds, cousin 4025 + pieds), poussière 1200 relancée, Zoombini et cousin suspendus et cachés puis repartis ; les essais suivants courent directement (7000, 4030 + pieds) sans disparaître", async () => {
+    const { probe, tryOnce, settle, others, until, wait, queued, sound } = await start();
+    const [first, second] = others();
+    const member = probe().kit.members[first!]!;
+    const niz = probe().nizibooms.find((n) => n.cousin.member === first)!;
+    const busy = (n: unknown) => (n as { busy: boolean }).busy;
+    const position = (n: unknown) => (n as { position: { x: number; y: number } }).position;
+    await tryOnce(first!);
+    expect(member.snoid.scriptId).toBe(7041 + member.snoid.traits.feet - 1);
+    await until(() => niz.feature.scriptId === 4025 + niz.cousin.attrs[3]);
+    expect(probe().detourDone).toBe(false);
+    // Événement 1 (image 69) : `[7334] = 1`, la poussière rejoue depuis le début ; événement 137 : les deux sont suspendus et cachés.
+    await until(() => probe().detourDone, 900);
+    expect(probe().dust.active).toBe(true);
+    expect(probe().dust.scriptId).toBe(1200);
+    await until(() => niz.feature.hasFlag(FeatureFlag.noDraw) && member.snoid.feature.hasFlag(FeatureFlag.noDraw), 300);
+    expect(niz.feature.active).toBe(false);
+    expect(member.snoid.feature.active).toBe(false);
+    const frozenAt = niz.feature.image;
+    await wait(20);
+    expect(niz.feature.image).toBe(frozenAt);
+    await until(() => queued.includes(1200), 300);
+    // Événement 136 de la poussière (`10e0:20ec`) : ils réapparaissent et finissent leur script.
+    await until(() => !niz.feature.hasFlag(FeatureFlag.noDraw) && !member.snoid.feature.hasFlag(FeatureFlag.noDraw), 300);
+    await until(() => !busy(niz), 900);
+    expect(position(niz)).toEqual({ x: 214, y: 207 });
+    await settle();
+    expect(member.snoid.position).toEqual({ x: 199, y: 120 });
+    // À l'arrivée, la boucle de pas du cousin est coupée (écart assumé).
+    expect([4001, 4006, 4013, 4015, 4017].some((id) => sound.isPlaying(id))).toBe(false);
+
+    // Deuxième essai : course directe, jamais cachés.
+    const next = probe().kit.members[second!]!;
+    const niz2 = probe().nizibooms.find((n) => n.cousin.member === second)!;
+    await tryOnce(second!);
+    expect(next.snoid.scriptId).toBe(7000 + next.snoid.traits.feet - 1);
+    let hidden = false;
+    let direct = false;
+    let stepping = false;
+    for (let t = 0; t < 1500 && (probe().trial !== null || busy(niz2)); t += 2) {
+      await wait(2);
+      if (next.snoid.feature.hasFlag(FeatureFlag.noDraw) || niz2.feature.hasFlag(FeatureFlag.noDraw)) hidden = true;
+      if (niz2.feature.scriptId === 4030 + niz2.cousin.attrs[3]) {
+        direct = true;
+        if ([4001, 4006, 4013, 4015, 4017].includes(sound.currentEffect) && sound.isPlaying(sound.currentEffect)) stepping = true;
+      }
+    }
+    expect(direct).toBe(true);
+    expect(hidden).toBe(false);
+    expect(stepping).toBe(true);
+    expect(position(niz2)).toEqual({ x: 214, y: 207 });
+    // La boucle de pas est coupée quand le cousin arrive à sa place.
+    expect([4001, 4006, 4013, 4015, 4017].some((id) => sound.isPlaying(id))).toBe(false);
+  }, 240_000);
 
   describe("touches du mode de test (`10e0:0def`)", () => {
     /** Presse une touche et renvoie les textes dessinés dans la foulée (ligne d'état du mode de test). */
@@ -498,18 +571,21 @@ describe.skipIf(!original.has)("nizibooms : écran sur les vrais fichiers (FLEEN
     expect(dialogs.beforeSave).toHaveLength(0);
   }, 60_000);
 
-  it("les `SCRS` de l'archive ont les événements que l'écran attend (essai : 4, 5, 6, 7, 132 ; 7005 : 30 ; fuite : 0 ; Zoombini seul : 137) et la planche 4000 ses 740 images", () => {
+  it("les `SCRS` de l'archive ont les événements que l'écran attend (essai : 4, 5, 6, 7, 132 ; 7005 : 30 ; fuite : 0 ; grand détour : 137, cousin 1 et 137, poussière 136) et la planche 4000 ses 740 images", () => {
     const archive = MohawkArchive.parse(original.read("FLEENS.MHK"));
     const events = (id: number) => parseScrs(archive.get("SCRS", id)).images.map((image) => image.event - 1);
     for (let feet = 0; feet < 5; feet++) {
       expect(events(7000 + feet)).toEqual(expect.arrayContaining([4, 5, 6, 7, 132]));
       expect(events(7005 + feet)).toEqual(expect.arrayContaining([4, 5, 6, 7, 132, 133, 134, 30]));
       expect(events(7041 + feet)).toContain(137);
+      expect(events(4026 + feet)).toEqual(expect.arrayContaining([1, 2, 137]));
+      expect(events(4031 + feet)).not.toContain(137);
       expect(parseScrs(archive.get("SCRS", 7000 + feet)).pose).toBe(0);
     }
     for (const id of [4056, 4057, 4058]) expect(events(id)).toContain(0);
     expect(parseScrs(archive.get("SCRS", 4000)).pose).toBe(3);
     expect(archive.ids("SCRB")).toEqual(expect.arrayContaining([1000, 1001, 1002, 1003, 1004, 1005, 1006, 1100, 1200, 1206]));
     expect(decodeTbmpImages(archive.get("tBMP", 4000))).toHaveLength(740);
+    expect(parseScrb(archive.get("SCRB", 1200)).images.map((image) => image.event - 1)).toContain(136);
   });
 });

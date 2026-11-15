@@ -108,7 +108,7 @@ export interface FleensState {
   found: number[];
   /** `[7324]` : cocons remplis (0 à 3). */
   cocoons: number;
-  /** `[7334]` : un seul Zoombini (le cocon est une variante d'animation, voir `vanished`). */
+  /** Un seul Zoombini : `[7334]` vaut 1 dès l'entrée (`10e0:1bbf`), le premier essai ne fait pas le grand détour (voir la scène). */
   single: boolean;
   /** `[734c]` : les derniers essais sur le chemin, du plus ancien au plus récent (7 au plus, 6 après la sortie du plus ancien). */
   queue: number[];
@@ -116,8 +116,6 @@ export interface FleensState {
   trials: FleensTrial[];
   /** `[7380]` : séquence de clôture terminée (le bouton « Go » est autorisé avec les trois cocons). */
   closed: boolean;
-  /** Membres disparus pendant l'animation (événement 137 : `+0xE0 = 0`), perdus à la sortie. */
-  vanished: number[];
 }
 
 /**
@@ -146,7 +144,6 @@ export function prepareFleens(members: readonly Zoombini[], level: number, rule:
     queue: [],
     trials: [],
     closed: false,
-    vanished: [],
   };
   if (n === 0) return state;
 
@@ -220,15 +217,15 @@ export interface FleensTryResult {
 
 /**
  * Un essai (dépose du membre `member` sur le chemin, `10e0:06a8` puis événements 6 et 132 de `10e0:227e`). Renvoie null si l'essai est refusé : écran terminé
- * (3 cocons), membre inconnu ou disparu.
+ * (3 cocons) ou membre inconnu.
  *  - spécial (rang tiré, pas encore trouvé) : `[7324]++`, le cocon se remplit, le spécial sort de la liste (un spécial trouvé ne compte pas deux fois : événement 6, **probable**) ;
  *  - sinon : sans effet sur les compteurs. **Aucune limite d'essais ni pénalité** (étude §2.5) : on peut déposer le même Zoombini autant de fois qu'on veut.
- *  - l'essai entre dans la file ; quand elle contient 7 essais, le plus ancien sort (événement 132) ;
- *  - un seul Zoombini (`n = 1`) : l'animation du cocon le fait disparaître (événement 137), il sera perdu (**probable**, étude §2.5).
+ *  - l'essai entre dans la file ; quand elle contient 7 essais, le plus ancien sort (événement 132).
+ * Personne ne se perd sur cet écran : l'événement 137 des parcours ne fait que suspendre le Zoombini et son cousin le temps de la poussière (voir la scène).
  */
 export function tryMember(state: FleensState, member: number): FleensTryResult | null {
   if (!canTry(state)) return null;
-  if (!state.cousins.some((c) => c.member === member) || state.vanished.includes(member)) return null;
+  if (!state.cousins.some((c) => c.member === member)) return null;
   const special = state.specials.includes(member) && !state.found.includes(member);
   if (special) {
     state.found.push(member);
@@ -238,7 +235,6 @@ export function tryMember(state: FleensState, member: number): FleensTryResult |
   state.queue.push(member);
   let ejected: number | null = null;
   if (state.queue.length === FLEENS_QUEUE) ejected = state.queue.shift()!;
-  if (special && state.single) state.vanished.push(member);
   return { special, cocoons: state.cocoons, done: state.cocoons >= FLEENS_COCOONS, ejected };
 }
 
@@ -265,13 +261,12 @@ export interface FleensExit {
 }
 
 /**
- * Sortie par « Go » (`1168:3dd0(0, 1)`, `1168:36e1`) : tous les Zoombinis actifs sont sauvés (`+0x127 = 1`), sauf ceux qui ont disparu (`+0xE0 = 0`).
+ * Sortie par « Go » (`1168:3dd0(0, 1)`, `1168:36e1`) : tous les Zoombinis actifs sont sauvés (`+0x127 = 1`), aucun n'est perdu.
  * Renvoie null tant que « Go » n'est pas actif. Les attributs du groupe ne changent pas.
  */
 export function goExit(state: FleensState): FleensExit | null {
   if (!canGo(state)) return null;
-  const lost = [...state.vanished].sort((a, b) => a - b);
-  return { lost, clean: lost.length === 0 };
+  return { lost: [], clean: true };
 }
 
 /** Sortie par le bouton « carte » : l'épreuve est abandonnée (règle générale du parcours, `screens.md` §3.4), tout le groupe est perdu. */

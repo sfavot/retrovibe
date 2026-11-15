@@ -41,13 +41,18 @@ export function openScreen(ctx: SceneContext, archive: Archive, setup: ScreenSet
   return surface;
 }
 
-/** `leave` d'un écran (handler Exit) : features et groupes libérés, sons de l'écran arrêtés et détachés, curseur rendu. */
+/**
+ * `leave` d'un écran (handler Exit) : features et groupes libérés, sons arrêtés et détachés, curseur rendu. Comme l'Exit de chaque écran de l'original
+ * (`11a8:021c` oublie la dernière musique, `DS:3ea6 = 0`, puis `1028:0e53` libère tous les sons de type `SND`, musique comprise, que `1028:0c0a('SND', 3ea6)`
+ * sait couper), la musique s'arrête aussi : celle des véhibules ne suit plus le groupe jusqu'à Zoombiniville.
+ */
 export function closeScreen(ctx: SceneContext): void {
   const features = ctx.services.get(FEATURES);
   features.clear();
   features.setBackground(null);
   const sound = ctx.services.get(ZOOMBINIS_SOUND);
-  sound.stopEffects();
+  sound.stopAll();
+  sound.forgetMusic();
   sound.setScreenArchive(null);
   ctx.setCursor("system");
 }

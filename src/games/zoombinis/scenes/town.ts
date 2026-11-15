@@ -50,7 +50,8 @@
  * - Transport d'un habitant : la boucle reprend celle de `PuzzleKit` (constantes partagées, logique dupliquée : voir `engine-ts.md`) ; pendant le transport la danse ne choisit pas l'habitant porté (l'original bloque dans `1168:1742`, ce que fait alors `1188:0ce5` n'est pas établi) ; le retour est immédiat (l'état 4 attend l'échéance suivante, ≤ 6 ticks).
  * - Curseurs : l'original affiche des curseurs en image (`tBMP` 2000 : flèche gauche, flèche droite, loupe, `11a8:0fe9`) ; l'hôte n'a pas de curseur « image », la main (`curs1`) sert
  *   de loupe et les flèches de bord ne sont pas affichées.
- * - Fondu d'entrée de palette (`1188:0128` appelle `11a8:302b`) et musique (aucun appel dans `1188:*`, elle continue) non portés. L'horloge est relue
+ * - Fondu d'entrée de palette (`1188:0128` appelle `11a8:302b`) non porté. Pas de musique (aucun appel dans `1188:*`) : celle de l'écran précédent est coupée à sa sortie
+ *   (`1028:0e53`, voir `closeScreen`). L'horloge est relue
  *   dès la première image (l'original attend 30 s d'horloge de programme à cause d'une comparaison non signée), le son d'une phrase fini est détecté par la file des effets entière
  *   (pas par identifiant), le survol d'un bâtiment est calculé au clic et non à chaque tick.
  */

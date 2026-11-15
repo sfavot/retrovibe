@@ -354,6 +354,11 @@ export class ZoombinisSound {
     this.stopMusic();
   }
 
+  /** `11a8:021c` (Exit commun) : `DS:3ea6 = 0`, la dernière musique est oubliée (`queue(0)` ne rejoue plus rien). */
+  forgetMusic(): void {
+    this.lastMusic = 0;
+  }
+
   // --- Lecture ---
 
   /** Archive qui porte l'id d'un `\0SND` (routage de `11a8:2d3f`). */

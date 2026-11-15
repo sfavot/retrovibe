@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { TileFlag } from "../../src/games/indy/data/types";
+import { TileFlag } from "../../src/engine/desktop-adventures/data/types";
 import { copy } from "../../src/games/indy/copy";
-import { type ItemCategory, itemCategory, mapClue, mapClueText } from "../../src/games/indy/engine/map-clues";
-import { SectorKind, emptySector } from "../../src/games/indy/engine/world";
+import { type ItemCategory, itemCategory, mapClue, mapClueText } from "../../src/engine/desktop-adventures/map-clues";
+import { SectorKind, emptySector } from "../../src/engine/desktop-adventures/world";
 import { hasOriginalFiles, loadGameData } from "./helpers";
 
 const categoryOf = (tile: number): ItemCategory => (tile === 1 ? "tool" : tile === 2 ? "key" : "unknown");
@@ -15,8 +15,8 @@ describe("indices de la carte", () => {
 
   it("barrage : nécessite une catégorie, puis ouvert", () => {
     const s = sector(SectorKind.Blockade, { requiredItem: 1 });
-    expect(mapClueText(mapClue(s, categoryOf)!)).toBe(copy.clueRequires(copy.clueItem.tool));
-    expect(mapClueText(mapClue({ ...s, solved: true }, categoryOf)!)).toBe(copy.clueOpen);
+    expect(mapClueText(mapClue(s, categoryOf)!, copy)).toBe(copy.clueRequires(copy.clueItem.tool));
+    expect(mapClueText(mapClue({ ...s, solved: true }, categoryOf)!, copy)).toBe(copy.clueOpen);
   });
 
   it("passage : même logique que le barrage", () => {

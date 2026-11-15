@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MoveKeys } from "../../src/games/indy/ui/move-keys";
+import { MoveKeys } from "../../src/ui/desktop-adventures/move-keys";
 
 describe("MoveKeys", () => {
   it("combine deux touches maintenues en diagonale (flèches, ZQSD)", () => {

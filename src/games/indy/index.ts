@@ -1,10 +1,11 @@
-import { parseDaw } from "./data/daw";
-import { extractPalette } from "./data/palette";
-import { readCursors, readIcons } from "./data/resources";
-import { App } from "./ui/app";
+import { parseDaw } from "../../engine/desktop-adventures/data/daw";
+import { extractPalette } from "../../engine/desktop-adventures/data/palette";
+import { readBitmaps, readCursors, readIcons } from "../../engine/desktop-adventures/data/resources";
+import { App } from "../../ui/desktop-adventures/app";
 import { copy as shared } from "../../ui/copy";
 import { h } from "../../ui/dom";
 import { copy } from "./copy";
+import { indyAdventure } from "./definition";
 import type { GameDefinition } from "../types";
 
 /** Dossier des fichiers du jeu (servi depuis `original/indy/`). */
@@ -33,7 +34,15 @@ export const indy: GameDefinition = {
     container.replaceChildren(h("p", { class: "boot", role: "status" }, copy.loading));
     try {
       const [daw, exe] = await Promise.all([fetchBinary("DESKTOP.DAW"), fetchBinary("DESKADV.EXE")]);
-      const app = new App(container, parseDaw(daw), extractPalette(exe), exe, () => fetchBinary("DESKADV.HLP"), readCursors(exe), readIcons(exe));
+      const data = parseDaw(daw);
+      const app = new App(container, indyAdventure(data.sounds, GAME_URL, exe), {
+        data,
+        palette: extractPalette(exe),
+        loadManual: () => fetchBinary("DESKADV.HLP"),
+        cursors: readCursors(exe),
+        icons: readIcons(exe),
+        bitmaps: readBitmaps(exe),
+      });
       app.showTitle();
       // Développement : ?seed=1234 lance directement une partie avec cette graine.
       const seed = new URLSearchParams(location.search).get("seed");

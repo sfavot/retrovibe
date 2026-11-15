@@ -457,27 +457,169 @@ a.button:hover {
   pointer-events: auto;
 }
 
+/* Bulle de dialogue au style d'origine : fond blanc, texte noir, trait noir fin, trois boutons empilés à droite (haut, bas, fermer ;
+   images de l'exécutable en variables CSS, voir `ui/desktop-adventures/bubble-buttons.ts`). */
 .bubble {
+  --bubble-scale: 2;
   position: absolute;
-  background: var(--bubble);
-  color: var(--bubble-ink);
-  border-radius: 14px;
-  padding: 12px 14px 8px;
-  box-shadow: 0 6px 24px #0008, 0 0 0 2px #1e1a14;
+  box-sizing: border-box;
+  /* La colonne de boutons (3 × 16 px mis à l'échelle et ses écarts) est la hauteur minimale. */
+  min-height: calc(var(--bubble-scale) * 48px + 2 * var(--bubble-gap) + 16px);
+  --bubble-gap: 4px;
+  background: #fff;
+  color: #000;
+  border-radius: 12px;
+  padding: 8px 8px 8px 12px;
+  box-shadow: 0 0 0 1px #000;
   font-size: clamp(0.85rem, 2.6vw, 1rem);
   cursor: pointer;
   animation: pop 0.12s ease-out;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.bubble:focus {
+  outline: none;
 }
 
 .bubble-text {
   white-space: pre-wrap;
-  max-height: calc(var(--stage) * 0.42);
+  /* Hauteur visible = un nombre entier de lignes (`lh`), dont la hauteur est en pixels entiers pour que le défilement d'une ligne par les
+     boutons reste aligné : jamais de ligne coupée en haut ni en bas. Plafond : 42 % de l'écran et la place restante de la bulle
+     (`--bubble-room`, posée par `GameView.speak`) moins ses marges ; plancher : la colonne de boutons. */
+  line-height: round(1.3em, 1px);
+  --bubble-buttons: calc(var(--bubble-scale) * 48px + 2 * var(--bubble-gap));
+  max-height: max(
+    round(up, var(--bubble-buttons), 1lh),
+    round(down, min(calc(var(--stage) * 0.42), calc(var(--bubble-room, 9999px) - 16px)), 1lh)
+  );
   min-height: 0;
+  min-width: 0;
   flex: 1 1 auto;
+  align-self: flex-start;
   overflow-y: auto;
+  scrollbar-width: none;
 }
+
+.bubble-text::-webkit-scrollbar {
+  display: none;
+}
+
+.bubble-buttons {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--bubble-gap);
+}
+
+.bubble-button {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  width: calc(var(--bubble-scale) * 16px);
+  height: calc(var(--bubble-scale) * 16px);
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  background-color: #c0c0c0;
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  color: #000;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+/* Zone de toucher étendue autour du bouton visuel (44 px au moins). */
+.bubble-button::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.bubble-images .bubble-button {
+  font-size: 0;
+}
+
+.bubble-button {
+  transition: none;
+}
+
+/* Le survol global des boutons (`button:hover`, raccourci `background`) remettrait la taille et la répétition du fond à zéro :
+   l'image 16 px se répéterait dans le bouton (survol resté collé après un toucher). */
+.bubble-button:hover {
+  background-color: #c0c0c0;
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border: 0;
+}
+
+.bubble-button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.bubble-button:focus-visible {
+  outline: none;
+}
+
+/* États relâché / enfoncé / désactivé / focus clavier de chaque bouton : une variable CSS par image. */
+.bubble-images .bubble-button[data-kind="up"] {
+  background-image: var(--bubble-up-rest);
+}
+
+.bubble-images .bubble-button[data-kind="up"]:focus-visible {
+  background-image: var(--bubble-up-focus);
+}
+
+.bubble-images .bubble-button[data-kind="up"]:active {
+  background-image: var(--bubble-up-pressed);
+}
+
+.bubble-images .bubble-button[data-kind="up"]:disabled {
+  background-image: var(--bubble-up-disabled);
+}
+
+.bubble-images .bubble-button[data-kind="down"] {
+  background-image: var(--bubble-down-rest);
+}
+
+.bubble-images .bubble-button[data-kind="down"]:focus-visible {
+  background-image: var(--bubble-down-focus);
+}
+
+.bubble-images .bubble-button[data-kind="down"]:active {
+  background-image: var(--bubble-down-pressed);
+}
+
+.bubble-images .bubble-button[data-kind="down"]:disabled {
+  background-image: var(--bubble-down-disabled);
+}
+
+.bubble-images .bubble-button[data-kind="close"] {
+  background-image: var(--bubble-close-rest);
+}
+
+.bubble-images .bubble-button[data-kind="close"]:focus-visible {
+  background-image: var(--bubble-close-focus);
+}
+
+.bubble-images .bubble-button[data-kind="close"]:active {
+  background-image: var(--bubble-close-pressed);
+}
+
+.bubble-images .bubble-button[data-kind="close"]:disabled {
+  background-image: var(--bubble-close-disabled);
+}
+
 
 .bubble-hint {
   text-align: right;
@@ -490,9 +632,9 @@ a.button:hover {
   position: absolute;
   width: 16px;
   height: 16px;
-  background: var(--bubble);
+  background: #fff;
   transform: translateX(-50%) rotate(45deg);
-  box-shadow: 2px 2px 0 0 #1e1a14;
+  box-shadow: 1px 1px 0 0 #000;
 }
 
 .bubble.above .bubble-tail {
@@ -501,7 +643,13 @@ a.button:hover {
 
 .bubble.below .bubble-tail {
   top: -8px;
-  box-shadow: -2px -2px 0 0 #1e1a14;
+  box-shadow: -1px -1px 0 0 #000;
+}
+
+@media (pointer: coarse) {
+  .bubble {
+    --bubble-gap: 12px;
+  }
 }
 
 .letter {
@@ -783,10 +931,19 @@ a.button:hover {
   flex: 1;
   min-width: 0;
   padding: 0 calc(var(--u) * 4);
-  line-height: calc(var(--u) * 32);
+  display: flex;
+  align-items: center;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+/* Un nom long passe sur deux lignes avant d'être tronqué (le nom complet reste en `title`). */
+.item-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 /* Sélection façon liste Windows : le nom passe en bleu marine sur blanc. */
@@ -861,10 +1018,50 @@ a.button:hover {
   place-items: center;
   width: calc(var(--u) * 36);
   height: calc(var(--u) * 36);
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  background: var(--win-gray);
   border: calc(var(--u) * 2) solid;
   border-color: var(--win-shade) var(--win-hi) var(--win-hi) var(--win-shade);
-  outline: var(--u) solid #404040;
-  outline-offset: calc(var(--u) * -2);
+  /* coins droits, comme le cadre d'origine (le style global des boutons les arrondit) */
+  border-radius: 0;
+  box-shadow: inset 0 0 0 var(--u) #404040;
+  min-height: 0;
+  color: inherit;
+  cursor: default;
+  transition: none;
+}
+
+.weapon-slot:hover {
+  background: var(--win-gray);
+  border-color: var(--win-shade) var(--win-hi) var(--win-hi) var(--win-shade);
+}
+
+.weapon-slot:focus-visible {
+  outline: 2px solid var(--win-sel);
+  outline-offset: 2px;
+}
+
+/* Case d'arme et, à sa gauche, la jauge de munitions de Yoda (barre verticale qui se vide par le haut). */
+.weapon-box {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 3);
+}
+
+.ammo {
+  box-sizing: border-box;
+  width: calc(var(--u) * 8);
+  height: calc(var(--u) * 36);
+  border: calc(var(--u) * 2) solid;
+  border-color: var(--win-shade) var(--win-hi) var(--win-hi) var(--win-shade);
+  background: linear-gradient(to top, rgb(0, 255, 0) calc(var(--ammo, 1) * 100%), rgb(0, 0, 0) 0);
+}
+
+.ammo[hidden] {
+  display: none;
 }
 
 /* Moniteur de santé : disque (vert, puis jaune, rouge, noir qui le recouvrent à partir de 12 h, voir `ui/health-pie.ts`). */
@@ -901,12 +1098,20 @@ a.button:hover {
 /* Ordinateur : écran et panneau dans une même fenêtre grise, les commandes dessous. */
 @media not all and (pointer: coarse) {
   .game-screen {
-    --stage: min(576px, calc((100vw - 32px) * 0.55));
+    --stage-fit: min(576px, calc((100vw - 32px) * 0.55));
+    --stage: var(--stage-fit);
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: center;
+    /* Centré tant que ça tient ; sinon aligné en haut (le haut resterait inaccessible). */
+    justify-content: safe center;
     gap: 14px;
     padding-block: 20px;
+  }
+
+  /* Plein écran : l'écran passe à 3× (864 px) si la fenêtre grise et les commandes y tiennent, en multiples entiers de 288. */
+  .game-screen.is-fullscreen {
+    --stage: max(var(--stage-fit), round(down, min(calc((100vw - 32px) * 0.55), calc((100vh - 120px) * 0.905), 864px), 288px));
   }
 
   .retro-window {
@@ -1509,7 +1714,7 @@ a.button:hover {
   text-align: left;
 }
 
-/* Indy en tactile (`games/indy/ui/app.ts`) : l'écran carré prend le maximum de place (`--stage`, posé par la page selon le placement
+/* Indy en tactile (`ui/desktop-adventures/app.ts`) : l'écran carré prend le maximum de place (`--stage`, posé par la page selon le placement
    calculé) ; le panneau d'inventaire (fond gris, sans cadre autour de l'écran : il coûterait de la taille d'écran) est une colonne à côté
    de l'écran en paysage (liste en haut, rangée boussole / arme / santé en bas), une bande dessous en portrait (liste à gauche, rangée en
    colonne à droite). La liste défile en interne ; les commandes passent par le bouton « Menu » de la barre de contrôles. Les objets se
@@ -1568,10 +1773,23 @@ a.button:hover {
     grid-template-columns: 64px;
   }
 
+  /* Colonne de côté : la liste montre toujours un nombre entier de lignes (32 u chacune). Hauteur disponible pour la liste = écran moins
+     les marges du panneau (2 × 6 px), la rangée du bas (56 u), son écart (6 px) et le cadre (2 × 2 u) ; le reste, moins d'une ligne,
+     descend entre la liste et la rangée du bas. */
+  .game-screen.touch-layout.controls-sides .inventory-frame {
+    flex: none;
+    height: auto;
+  }
+
+  /* `flex` reste celui de la liste (elle prend la largeur du cadre, qui est en ligne) ; seule sa hauteur est fixée. */
+  .game-screen.touch-layout.controls-sides .inventory {
+    height: round(down, calc(var(--stage) - 18px - var(--u) * 60), calc(var(--u) * 32));
+  }
+
   .game-screen.touch-layout.controls-sides .status-row {
     flex: none;
     height: calc(var(--u) * 56);
-    margin-top: 6px;
+    margin-top: auto;
   }
 
   .game-screen.touch-layout.controls-bottom {
@@ -1583,10 +1801,11 @@ a.button:hover {
     height: 176px;
   }
 
+  /* Bande de 176 px : 6 px de marge en haut et en bas + le cadre de la liste (2 × 2 px) laissent 160 px, soit exactement 5 lignes de 32. */
   .game-screen.touch-layout.controls-bottom .retro-panel {
     flex-direction: row;
     gap: 6px;
-    padding: 4px;
+    padding: 6px 4px;
   }
 
   .game-screen.touch-layout.controls-bottom .inventory::-webkit-scrollbar {

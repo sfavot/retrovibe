@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Lcg, borlandRand, msvcRand, msvcRand16, randomSeed, scummvmRandom } from "../../src/engine/rng";
-import { Rng } from "../../src/games/indy/engine/rng";
+import { Rng } from "../../src/engine/desktop-adventures/rng";
 import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readCursors } from "../../src/games/indy/data/resources";
-import { arrowCursorId, stepToward } from "../../src/games/indy/ui/walk-cursor";
+import { readCursors } from "../../src/engine/desktop-adventures/data/resources";
+import { arrowCursorId, stepToward } from "../../src/ui/desktop-adventures/walk-cursor";
 import { hasOriginalFiles, loadExe } from "./helpers";
 
 describe.skipIf(!hasOriginalFiles)("curseurs de DESKADV.EXE", () => {
@@ -40,7 +40,7 @@ describe("direction du curseur", () => {
 
   it("associe les 8 directions aux ids 11 à 18 (←, →, ↑, ↓, ↖, ↗, ↙, ↘) et rien sur place", () => {
     const steps = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
-    expect(steps.map(([x, y]) => arrowCursorId({ x, y }))).toEqual([11, 12, 13, 14, 15, 16, 17, 18]);
-    expect(arrowCursorId({ x: 0, y: 0 })).toBeNull();
+    expect(steps.map(([x, y]) => arrowCursorId({ x, y }, 11))).toEqual([11, 12, 13, 14, 15, 16, 17, 18]);
+    expect(arrowCursorId({ x: 0, y: 0 }, 11)).toBeNull();
   });
 });

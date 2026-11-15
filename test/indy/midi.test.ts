@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseMidi } from "../../src/games/indy/audio/midi";
+import { parseMidi } from "../../src/engine/desktop-adventures/audio/midi";
 import { hasOriginalFiles } from "./helpers";
 
 const ORIGINAL = resolve(import.meta.dirname, "../../original/indy");

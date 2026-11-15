@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { Assets, IndyIds } from "../../src/games/indy/engine/assets";
-import { type GenerateOptions, generateStory } from "../../src/games/indy/engine/generation/generator";
-import { MYSTERY_GOAL } from "../../src/games/indy/engine/history";
-import { canReachHotspot } from "../../src/games/indy/engine/generation/reachability";
-import { solve } from "../../src/games/indy/engine/generation/solver";
-import { HotspotType, Layer, PuzzleType } from "../../src/games/indy/data/types";
-import { SectorKind, WorldSize } from "../../src/games/indy/engine/world";
+import { Assets } from "../../src/engine/desktop-adventures/assets";
+import { IndyIds } from "../../src/games/indy/ids";
+import { type GenerateOptions, generateStory } from "../../src/games/indy/generation/generator";
+import { MYSTERY_GOAL } from "../../src/games/indy/history";
+import { canReachHotspot } from "../../src/games/indy/generation/reachability";
+import { solve } from "../../src/games/indy/generation/solver";
+import { HotspotType, Layer, PuzzleType } from "../../src/engine/desktop-adventures/data/types";
+import { SectorKind, WorldSize } from "../../src/engine/desktop-adventures/world";
 import { hasOriginalFiles, loadGameData } from "./helpers";
 
 describe.skipIf(!hasOriginalFiles)("génération du monde", () => {

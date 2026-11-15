@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Assets, IndyIds, IndySounds } from "../../src/games/indy/engine/assets";
-import { Game } from "../../src/games/indy/engine/game";
-import { generateStory } from "../../src/games/indy/engine/generation/generator";
+import { indyVariant } from "../../src/games/indy/variant";
+import { Assets } from "../../src/engine/desktop-adventures/assets";
+import { IndyIds, IndySounds } from "../../src/games/indy/ids";
+import { Game } from "../../src/engine/desktop-adventures/game";
+import { generateStory } from "../../src/games/indy/generation/generator";
 import {
   HISTORY_LENGTH,
   MAX_VICTORIES,
@@ -10,10 +12,13 @@ import {
   drawHistory,
   isGoalDrawable,
   recordGoal,
-} from "../../src/games/indy/engine/history";
-import { indyQuotient, paceOf } from "../../src/games/indy/engine/score";
-import { WorldSize } from "../../src/games/indy/engine/world";
-import { progressStore } from "../../src/games/indy/ui/progress";
+} from "../../src/games/indy/history";
+import { indyQuotient, paceOf } from "../../src/games/indy/score";
+import { WorldSize } from "../../src/engine/desktop-adventures/world";
+import { createProgressStore } from "../../src/ui/desktop-adventures/progress";
+import { indyProgressRules } from "../../src/games/indy/definition";
+
+const progressStore = createProgressStore("indy-desktop-progress", indyProgressRules);
 import { hasOriginalFiles, loadGameData } from "./helpers";
 
 describe("Indy Quotient (DESKADV.EXE 4:e514)", () => {
@@ -131,7 +136,7 @@ describe.skipIf(!hasOriginalFiles)("score d'une partie", () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
     const story = generateStory(assets, 7, WorldSize.Medium);
-    const game = new Game(assets, story, presenter, { difficulty: 85 });
+    const game = new Game(indyVariant, assets, story, presenter, { difficulty: 85 });
     await game.start(IndyIds.townZone, { x: 11, y: 5 });
     vi.setSystemTime(10 * story.pace * story.pace * 1000);
     expect(game.score()).toBe(300 + 4); // aucun son 0 : D = 4
@@ -140,7 +145,7 @@ describe.skipIf(!hasOriginalFiles)("score d'une partie", () => {
     expect(game.score()).toBe(300 + 4 * 85);
     // Le décompte survit à une sauvegarde.
     const snapshot = JSON.parse(JSON.stringify(game.snapshot()));
-    const resumed = new Game(assets, { ...story }, presenter, snapshot.settings);
+    const resumed = new Game(indyVariant, assets, { ...story }, presenter, snapshot.settings);
     await resumed.resume(snapshot);
     expect(resumed.score()).toBe(300 + 4 * 85);
   });

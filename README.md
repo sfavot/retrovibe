@@ -8,6 +8,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | Jeu | État |
 | --- | --- |
 | [Indiana Jones and his Desktop Adventures](https://sfavot.github.io/retrovibe/#/indy) | jouable |
+| [Star Wars: Yoda Stories (LucasArts, 1997)](https://sfavot.github.io/retrovibe/#/yoda) | jouable (en cours de validation) |
 | [Lost in Time (Coktel Vision, 1993)](https://sfavot.github.io/retrovibe/#/lost-in-time) | jouable (en cours de validation) |
 | [Le Téléportaschtroumpf (Infogrames Multimedia, 1995)](https://sfavot.github.io/retrovibe/#/teleportaschtroumpf) | jouable (en cours de validation) |
 | [Math Workshop / Mathémagique (Broderbund, 1994)](https://sfavot.github.io/retrovibe/#/mathemagique) | jouable (en cours de validation) |
@@ -37,7 +38,9 @@ Le site est installable (manifeste et icônes de `src/ui/pwa/`, icônes régén�
 
 `original/indy/` contient `DESKTOP.DAW`, `DESKADV.EXE` (pour la palette), `DESKADV.HLP` (le manuel d'origine, affiché depuis l'écran titre), `COVER.png` (l'image de l'écran titre, générée à partir des données du jeu avec `npx vite-node scripts/indy-cover.mts`) et, pour le son, les `.WAV` / `.MID`.
 
-En développement, `?seed=1234` démarre directement une partie avec cette graine et `__indy.game` est exposé dans la console.
+`original/yoda/` contient `YODESK.DTA`, `YODESK.EXE` (palette, curseurs, icônes, textes de R2-D2), `YODESK.HLP` (l'aide d'origine) et les sons `SFX/*.WAV` (musiques comprises), extraits de l'ISO française par `scripts/yoda-extract.sh` ; `COVER.png` est l'écran du lanceur du CD (`npx vite-node scripts/yoda-cover.mts`).
+
+En développement, `?seed=1234` (avant le `#`) démarre directement une partie avec cette graine, et `__indy.game` / `__yoda.game` est exposé dans la console.
 
 ## Scripts
 
@@ -48,7 +51,7 @@ En développement, `?seed=1234` démarre directement une partie avec cette grain
 | `npm run typecheck` | vérification des types |
 | `npm test` | tests (ceux qui lisent les données sont ignorés si `original/` est vide) |
 
-Les tests d'Indy sont dans `test/indy/`. Le test de robustesse (`test/indy/fuzz.test.ts`) parcourt les 366 zones ; il est long et ne tourne qu'avec `FUZZ=1 npm test`.
+Les tests d'Indy sont dans `test/indy/`, ceux de Yoda Stories dans `test/yoda/`. Le test de robustesse (`test/indy/fuzz.test.ts`) parcourt les 366 zones ; il est long et ne tourne qu'avec `FUZZ=1 npm test`.
 Les variables `FUZZ_FROM` / `FUZZ_TO` permettent de n'en traiter qu'une plage.
 
 `PLAY=1 npm test` lance un robot qui joue des parties générées en suivant la solution du solveur et
@@ -61,22 +64,31 @@ Réimplémentation du moteur d'*Indiana Jones and his Desktop Adventures* (Lucas
 
 ### Architecture
 
-- `src/games/indy/data/` — lecture de `DESKTOP.DAW` (tuiles, zones, scripts, puzzles, personnages) et, dans l'exécutable, de la palette et des ressources (curseurs, son intégré).
-- `src/games/indy/engine/` — moteur : état des zones, scripts (`script.ts`), monstres, héros, combats, sauvegarde (`game.ts`).
-- `src/games/indy/engine/generation/` — génération du monde : disposition de la carte (algorithme d'origine, porté depuis WebFun),
-  affectation des zones et de la chaîne de puzzles, et un solveur qui rejette toute partie impossible à terminer.
-- `src/games/indy/render/` — composition de la vue 9×9 en image indexée, convertie avec la palette animée.
-- `src/games/indy/audio/` — effets WAV d'origine (Web Audio) et petit synthétiseur pour les musiques MIDI.
+Indy et Yoda Stories partagent le moteur « Desktop Adventures » de LucasArts, comme Ween et Lost in Time partagent celui de Coktel :
+
+- `src/engine/desktop-adventures/data/` — lecture du fichier de données (`DESKTOP.DAW` d'Indy ou `YODESK.DTA` de Yoda, `parseDaw(…, variant)`) et, dans l'exécutable, de la palette et des ressources (NE 16 bits pour Indy : `resources.ts` ; PE 32 bits pour Yoda : `pe-resources.ts`), et du manuel WinHelp (`help.ts`).
+- `src/engine/desktop-adventures/` — moteur commun : état des zones, scripts (`script.ts` : opérations communes, chaque jeu traduit ses opcodes), monstres, héros, combats, munitions, véhicules, sauvegarde (`game.ts`), carte du monde (`world.ts`, avec la seconde carte de Dagobah). Ce qui distingue un jeu passe par une `DesktopVariant` (`variant.ts`).
+- `src/engine/desktop-adventures/generation/` — disposition de la carte du monde (algorithme d'origine, porté depuis WebFun), commune aux deux jeux.
+- `src/engine/desktop-adventures/render/` et `audio/` — composition de la vue 9×9 en image indexée (palette animée) ; effets WAV, musiques MIDI (synthétiseur) ou WAV.
+- `src/ui/desktop-adventures/` — interface commune (écran titre, vue de jeu, bulles, panneau, localisateur, manuel), paramétrée par une `DesktopAdventure` (`definition.ts`) : textes, sons, tuiles du localisateur, icônes, stockage.
+- `src/games/indy/` — Indy : règles (`variant.ts`), opcodes, IA des ennemis, identifiants et sons (`ids.ts`), génération et solveur (`generation/`), Indy Quotient, historique des objectifs, textes (`copy.ts`).
 - `src/games/` — un dossier par jeu (`src/games/<id>/`, point d'entrée `index.ts` exportant une `GameDefinition`),
-  référencé dans `registry.ts`. Les routes sont `#/` (accueil) et `#/<id>` (jeu). Indy est dans `src/games/indy/`.
-- `src/games/indy/ui/` — interface d'Indy (écran titre, vue de jeu, bulles, inventaire, carte). Ses textes sont dans `copy.ts`.
+  référencé dans `registry.ts`. Les routes sont `#/` (accueil) et `#/<id>` (jeu).
 - `src/ui/` — éléments communs : page d'accueil, helper DOM, styles, textes de l'accueil.
 - `src/engine/mohawk/` et `src/ui/mohawk/` — le moteur commun des jeux Mohawk (Mathémagique, bientôt Zoombinis) : cœur pur (`Engine`, scènes, horloge de 17 ms, entrées, hasard, cache d'archives, `Host`), graphismes indexés (`graphics/` : surface, palette, blit, `Frame`), audio (`audio/` : séquenceur MIDI, lecteur SMF, `AudioSink`, inventaire des timbres) et, côté navigateur, l'hôte (`browser-host.ts`), le présentateur du canvas et la sortie audio Web Audio ; chaque jeu fournit ses écrans, ses curseurs et la taille de sa zone de jeu.
 
 ### Choix
 
 - **Sauvegardes** : seule la sauvegarde automatique du navigateur existe. Les sauvegardes `.WLD` de l'original (signature `INDYSAV44`) ne sont ni lues ni écrites, et ne le seront pas (décision du 2026-10-27).
-- **Musique** : `THEMW3.MID` n'est jamais joué ; l'original ne l'utilise que sous Windows 3.x, à la place de `THEME.MID` (voir `engine/assets.ts`).
+- **Musique** : `THEMW3.MID` n'est jamais joué ; l'original ne l'utilise que sous Windows 3.x, à la place de `THEME.MID` (voir `src/games/indy/ids.ts`).
+
+## Star Wars: Yoda Stories
+
+Réimplémentation de *Star Wars: Yoda Stories* (LucasArts, 1997), version française, sur le moteur commun « Desktop Adventures » d'Indy (voir ci-dessus). Le code de `src/games/yoda/` ne contient que ce qui diffère : opcodes (`opcodes.ts`), règles (`variant.ts` : Yoda qui donne la mission, munitions, détonateur thermique, conseils de R2-D2, la Force qui immobilise, soins), IA des monstres (`monster-moves.ts`), génération du monde et de Dagobah (`generation/`, portage du générateur de WebFun), score « Force Factor » (`score.ts`), sons et textes.
+
+- **Données** : l'ISO française (`archives/yoda-stories/Yoda.iso`). Le patch `Yopatch6` (juin 1997) n'est pas appliqué : il ne contient que le `YODESK.DTA` de la version anglaise.
+- **Départ** : comme l'original, la partie commence dans la zone de chargement (arrivée du X-Wing) avant Dagobah. Le voyage vers la planète et le retour sont entièrement scriptés par les données.
+- **À confirmer** : le générateur n'a pas été comparé graine à graine avec WebFun ; les vols par les zones 470 / 472 et le retour d'un vol interplanétaire ne sont pas couverts par les tests.
 
 ## Lost in Time
 

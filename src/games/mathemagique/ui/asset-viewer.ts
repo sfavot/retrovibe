@@ -6,7 +6,7 @@
  * Navigation : archive (barre latérale) -> type de ressource -> id. L'état est dans le hash : `#ARCHIVE.DAT/SHAP/105`.
  * Les libellés sont ceux d'un outil de développement, pas du texte du produit.
  */
-import { parseMidi as parseMidiNotes } from "../../indy/audio/midi";
+import { parseMidi as parseMidiNotes } from "../../../engine/desktop-adventures/audio/midi";
 import { baseName, fetchGameFiles, type GameFiles } from "../data/files";
 import { extractMidi, isMidi } from "../../../data/mohawk/midi";
 import { MohawkArchive, TAG_SCR, TAG_SHAP, TAG_SHPL, TAG_SND, TAG_SNDL, TAG_STRL } from "../../../data/mohawk/mohawk";

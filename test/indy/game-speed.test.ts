@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GAME_SPEED, SPEED_PRESETS, clampSpeed, nearestPreset, nextPreset, speedSetting } from "../../src/games/indy/ui/game-speed";
+import { GAME_SPEED, SPEED_PRESETS, clampSpeed, nearestPreset, nextPreset, createSpeedSetting } from "../../src/ui/desktop-adventures/game-speed";
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -34,6 +34,7 @@ describe("vitesse de jeu", () => {
   });
 
   it("mémorise le réglage, avec repli si le stockage est absent ou corrompu", () => {
+    const speedSetting = createSpeedSetting("indy-desktop-speed");
     const storage = fakeStorage();
     vi.stubGlobal("localStorage", storage);
     expect(speedSetting.read()).toBe(140);

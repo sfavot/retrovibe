@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type HelpDocument, parseHelp } from "../../src/games/indy/data/help";
+import { type HelpDocument, parseHelp } from "../../src/engine/desktop-adventures/data/help";
 import { hasOriginalFiles } from "./helpers";
 
 const hlp = resolve(import.meta.dirname, "../../original/indy/DESKADV.HLP");

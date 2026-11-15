@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { extractPalette } from "../../src/games/indy/data/palette";
-import { PuzzleType, ZoneType } from "../../src/games/indy/data/types";
+import { extractPalette } from "../../src/engine/desktop-adventures/data/palette";
+import { PuzzleType, ZoneType } from "../../src/engine/desktop-adventures/data/types";
 import { hasOriginalFiles, loadExe, loadGameData } from "./helpers";
 
 describe.skipIf(!hasOriginalFiles)("DESKTOP.DAW", () => {

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { readIcons } from "../../src/games/indy/data/resources";
-import { Assets } from "../../src/games/indy/engine/assets";
-import { MAX_HEALTH } from "../../src/games/indy/engine/game";
-import { generateStory } from "../../src/games/indy/engine/generation/generator";
-import { Direction } from "../../src/games/indy/engine/geometry";
-import { WORLD_SIZE, World, WorldSize } from "../../src/games/indy/engine/world";
-import { arrowIconId, describeExits } from "../../src/games/indy/ui/compass";
-import { HEALTH_COLORS, healthGradient, healthPie } from "../../src/games/indy/ui/health-pie";
+import { INDY_COMPASS_ICONS } from "../../src/games/indy/definition";
+import { readIcons } from "../../src/engine/desktop-adventures/data/resources";
+import { Assets } from "../../src/engine/desktop-adventures/assets";
+import { MAX_HEALTH } from "../../src/engine/desktop-adventures/game";
+import { generateStory } from "../../src/games/indy/generation/generator";
+import { Direction } from "../../src/engine/desktop-adventures/geometry";
+import { WORLD_SIZE, World, WorldSize } from "../../src/engine/desktop-adventures/world";
+import { arrowIconId, describeExits } from "../../src/ui/desktop-adventures/compass";
+import { HEALTH_COLORS, healthGradient, healthPie } from "../../src/ui/desktop-adventures/health-pie";
 import { hasOriginalFiles, loadExe, loadGameData } from "./helpers";
 
 describe("moniteur de santé", () => {
@@ -45,7 +46,7 @@ describe("boussole", () => {
   const names = { [Direction.Up]: "haut", [Direction.Down]: "bas", [Direction.Left]: "gauche", [Direction.Right]: "droite" };
 
   it("choisit la flèche éteinte ou allumée de chaque direction (ICON 3 à 10)", () => {
-    expect([Direction.Down, Direction.Left, Direction.Right, Direction.Up].map((d) => [arrowIconId(d, false), arrowIconId(d, true)])).toEqual([
+    expect([Direction.Down, Direction.Left, Direction.Right, Direction.Up].map((d) => [arrowIconId(INDY_COMPASS_ICONS, d, false), arrowIconId(INDY_COMPASS_ICONS, d, true)])).toEqual([
       [3, 4],
       [5, 6],
       [7, 8],

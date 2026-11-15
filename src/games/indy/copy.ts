@@ -57,6 +57,10 @@ export const copy = {
     "M : carte (si vous l'avez trouvée), cliquez un symbole pour un indice · Échap : pause",
   ],
   continueHint: "Entrée",
+  /** Indice de la lettre de mission sur écran tactile (un toucher la ferme, voir `GameView.message`). */
+  continueTouchHint: "Touchez pour continuer",
+  scrollUp: "Remonter le texte",
+  scrollDown: "Descendre le texte",
   found: (name: string) => `Trouvé : ${name}`,
   winTitle: "Mission accomplie !",
   score: (n: number) => `Indy Quotient : ${n}`,

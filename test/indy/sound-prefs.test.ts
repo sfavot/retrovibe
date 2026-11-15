@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MUSIC_PREF_KEY, audioPrefs } from "../../src/games/indy/ui/audio-prefs";
+import { audioPrefs } from "../../src/ui/desktop-adventures/audio-prefs";
 
 function fakeStore(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -8,20 +8,20 @@ function fakeStore(initial: Record<string, string> = {}) {
 
 describe("préférences audio d'Indy", () => {
   it("active le son et la musique par défaut", () => {
-    const prefs = audioPrefs(fakeStore());
+    const prefs = audioPrefs("indy", fakeStore());
     expect(prefs.readSound()).toBe(true);
     expect(prefs.readMusic()).toBe(true);
   });
 
   it("écrit et relit les deux clés séparément", () => {
     const store = fakeStore();
-    const prefs = audioPrefs(store);
+    const prefs = audioPrefs("indy", store);
     prefs.writeSound(false);
     expect(store.data.get("retrovibe:indy:sound")).toBe("0");
     expect(prefs.readSound()).toBe(false);
     expect(prefs.readMusic()).toBe(true);
     prefs.writeMusic(false);
-    expect(store.data.get(MUSIC_PREF_KEY)).toBe("0");
+    expect(store.data.get("retrovibe:indy:music")).toBe("0");
     expect(prefs.readMusic()).toBe(false);
     prefs.writeSound(true);
     expect(store.data.get("retrovibe:indy:sound")).toBe("1");

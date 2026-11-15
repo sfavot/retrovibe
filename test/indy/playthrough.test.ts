@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { HotspotType, Layer } from "../../src/games/indy/data/types";
-import { Assets, IndyIds } from "../../src/games/indy/engine/assets";
-import { Game, type Presenter } from "../../src/games/indy/engine/game";
-import { generateStory } from "../../src/games/indy/engine/generation/generator";
-import { solve } from "../../src/games/indy/engine/generation/solver";
-import type { Point } from "../../src/games/indy/engine/geometry";
-import { type Sector, SectorKind, WORLD_SIZE, WorldSize } from "../../src/games/indy/engine/world";
+import { indyVariant } from "../../src/games/indy/variant";
+import { HotspotType, Layer } from "../../src/engine/desktop-adventures/data/types";
+import { Assets } from "../../src/engine/desktop-adventures/assets";
+import { IndyIds } from "../../src/games/indy/ids";
+import { Game, type Presenter } from "../../src/engine/desktop-adventures/game";
+import { generateStory } from "../../src/games/indy/generation/generator";
+import { solve } from "../../src/games/indy/generation/solver";
+import type { Point } from "../../src/engine/desktop-adventures/geometry";
+import { type Sector, SectorKind, WORLD_SIZE, WorldSize } from "../../src/engine/desktop-adventures/world";
 import { hasOriginalFiles, loadGameData } from "./helpers";
 
 /**
@@ -417,7 +419,7 @@ describe.skipIf(!hasOriginalFiles || !process.env.PLAY)("parties jouées par un 
     const seeds = Number(process.env.PLAY_SEEDS ?? 10);
     for (let seed = 1; seed <= seeds; seed++) {
       const story = generateStory(assets, seed * 7, WorldSize.Small);
-      const game = new Game(assets, story, presenter, { difficulty: 1 });
+      const game = new Game(indyVariant, assets, story, presenter, { difficulty: 1 });
       const bot = new Bot(game);
       let done = false;
       const start = game.start(IndyIds.townZone, { x: 11, y: 5 }).finally(() => (done = true));

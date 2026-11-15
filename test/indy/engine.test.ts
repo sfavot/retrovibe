@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { HotspotType, Layer } from "../../src/games/indy/data/types";
-import { Assets, IndyIds, IndySounds } from "../../src/games/indy/engine/assets";
-import { Instr, Mode, ScriptOutcome, runScripts } from "../../src/games/indy/engine/script";
-import { MAX_HEALTH, Game, type GameSnapshot, type Presenter, storyFromSnapshot } from "../../src/games/indy/engine/game";
-import { generateStory } from "../../src/games/indy/engine/generation/generator";
-import { Direction } from "../../src/games/indy/engine/geometry";
-import { SectorKind, WorldSize, emptySector } from "../../src/games/indy/engine/world";
+import { indyVariant } from "../../src/games/indy/variant";
+import { HotspotType, Layer } from "../../src/engine/desktop-adventures/data/types";
+import { Assets } from "../../src/engine/desktop-adventures/assets";
+import { IndyIds, IndySounds } from "../../src/games/indy/ids";
+import { Mode, ScriptOutcome, opcodeOf, runScripts } from "../../src/engine/desktop-adventures/script";
+import { INDY_OPCODES } from "../../src/games/indy/opcodes";
+import { MAX_HEALTH, Game, type GameSnapshot, type Presenter, storyFromSnapshot } from "../../src/engine/desktop-adventures/game";
+import { generateStory } from "../../src/games/indy/generation/generator";
+import { Direction } from "../../src/engine/desktop-adventures/geometry";
+import { SectorKind, WorldSize, emptySector } from "../../src/engine/desktop-adventures/world";
 import { hasOriginalFiles, loadGameData } from "./helpers";
 
 class FakePresenter implements Presenter {
@@ -44,7 +47,7 @@ async function newGame(seed = 7) {
   const assets = new Assets(loadGameData());
   const story = generateStory(assets, seed, WorldSize.Medium);
   const presenter = new FakePresenter();
-  const game = new Game(assets, story, presenter);
+  const game = new Game(indyVariant, assets, story, presenter);
   await game.start(IndyIds.townZone, { x: 11, y: 5 });
   return { assets, story, presenter, game };
 }
@@ -73,7 +76,7 @@ async function gameWithSector(zoneId: number, kind: SectorKind, requiredItem = -
   const town = story.sectors.findIndex((s) => s?.kind === SectorKind.Town);
   story.sectors[town - 1] = { ...emptySector(zoneId, kind), requiredItem, findItem };
   const presenter = new FakePresenter();
-  const game = new Game(assets, story, presenter);
+  const game = new Game(indyVariant, assets, story, presenter);
   await game.start(IndyIds.townZone, { x: 11, y: 5 });
   await game.debugTeleport(zoneId, 0, 0);
   return { assets, story, presenter, game, sector: story.sectors[town - 1]! };
@@ -314,10 +317,10 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
 
   it("opcode KillHero : défaite immédiate ; opcode 0x23 : sans effet", async () => {
     const { game, presenter } = await newGame();
-    const noop = { opcode: Instr.Noop, args: new Int16Array(5), text: "" };
-    const kill = { opcode: Instr.KillHero, args: new Int16Array(5), text: "" };
+    const noop = { opcode: 0x23, args: new Int16Array(5), text: "" };
+    const kill = { opcode: opcodeOf(INDY_OPCODES.instructions, "KillHero"), args: new Int16Array(5), text: "" };
     const run = (instructions: Array<typeof kill | typeof noop>) =>
-      runScripts(game["scriptHost"](), Mode.Walk, [{ name: "t", conditions: [], instructions }], () => "");
+      runScripts(game["scriptHost"](), Mode.Walk, [{ name: "t", conditions: [], instructions }]);
     expect(await run([noop])).toBe(ScriptOutcome.Ran);
     expect(game.hero.health).toBe(MAX_HEALTH);
     await run([kill]);
@@ -329,7 +332,7 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
 
   it("la zone 118 « Walkthru24 » tue le héros via l'opcode 0x1f", () => {
     const zone = new Assets(loadGameData()).zone(118);
-    const uses = zone.actions.flatMap((a) => a.instructions).filter((i) => i.opcode === Instr.KillHero);
+    const uses = zone.actions.flatMap((a) => a.instructions).filter((i) => INDY_OPCODES.instructions[i.opcode] === "KillHero");
     expect(uses).toHaveLength(1);
   });
 
@@ -441,7 +444,7 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
     const town = story.sectors.findIndex((s) => s?.kind === SectorKind.Town);
     story.sectors[town + 1] = { ...emptySector(14, SectorKind.Empty), visited: true };
     // Recrée le monde pour qu'il connaisse la nouvelle case.
-    const fresh = new Game(game.assets, story, presenter);
+    const fresh = new Game(indyVariant, game.assets, story, presenter);
     await fresh.start(IndyIds.townZone, { x: 11, y: 5 });
     await fresh.debugTeleport(14, 1, 1);
     fresh.zone.hotspots.forEach((h) => h.type === HotspotType.Teleporter && (h.enabled = true));
@@ -469,7 +472,7 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
     game.hurtHero(40);
     const snapshot = JSON.parse(JSON.stringify(game.snapshot())) as GameSnapshot;
     const presenter = new FakePresenter();
-    const resumed = new Game(assets, storyFromSnapshot(snapshot), presenter, snapshot.settings);
+    const resumed = new Game(indyVariant, assets, storyFromSnapshot(snapshot), presenter, snapshot.settings);
     await resumed.resume(snapshot);
     expect(resumed.zone.id).toBe(4);
     expect([resumed.hero.x, resumed.hero.y]).toEqual([game.hero.x, game.hero.y]);

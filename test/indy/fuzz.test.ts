@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { Assets, IndyIds } from "../../src/games/indy/engine/assets";
-import { Game, type Presenter } from "../../src/games/indy/engine/game";
-import { generateStory } from "../../src/games/indy/engine/generation/generator";
-import { Rng } from "../../src/games/indy/engine/rng";
-import { WorldSize } from "../../src/games/indy/engine/world";
+import { indyVariant } from "../../src/games/indy/variant";
+import { Assets } from "../../src/engine/desktop-adventures/assets";
+import { IndyIds } from "../../src/games/indy/ids";
+import { Game, type Presenter } from "../../src/engine/desktop-adventures/game";
+import { generateStory } from "../../src/games/indy/generation/generator";
+import { Rng } from "../../src/engine/desktop-adventures/rng";
+import { WorldSize } from "../../src/engine/desktop-adventures/world";
 import { hasOriginalFiles, loadGameData } from "./helpers";
 
 const presenter: Presenter = {
@@ -42,7 +44,7 @@ describe.skipIf(!hasOriginalFiles || !process.env.FUZZ)("robustesse", () => {
     const to = Number(process.env.FUZZ_TO ?? assets.data.zones.length);
     for (const zone of assets.data.zones.slice(from, to)) {
       if (process.env.FUZZ_LOG) console.log("zone", zone.id);
-      const game = new Game(assets, story, presenter, { difficulty: 1 });
+      const game = new Game(indyVariant, assets, story, presenter, { difficulty: 1 });
       try {
         await drive(game, game.start(IndyIds.townZone, { x: 11, y: 5 }));
         // Une case libre de la zone comme point d'arrivée.

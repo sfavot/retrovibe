@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type GameSnapshot, SAVE_VERSION, migrateSnapshot } from "../../src/games/indy/engine/game";
+import { type GameSnapshot, SAVE_VERSION, migrateSnapshot } from "../../src/engine/desktop-adventures/game";
 
 /** Sauvegarde au format v1 : `puzzleCount` dans l'histoire, ni `difficultySum` ni `difficultyCount`. */
 const v1 = () => ({

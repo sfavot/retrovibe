@@ -1,5 +1,5 @@
-import { parseDaw } from "../../src/games/indy/data/daw";
-import type { GameData } from "../../src/games/indy/data/types";
+import { parseDaw } from "../../src/engine/desktop-adventures/data/daw";
+import type { GameData } from "../../src/engine/desktop-adventures/data/types";
 import { originalFiles } from "../support/original";
 
 const original = originalFiles("indy", "DESKTOP.DAW");

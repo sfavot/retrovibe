@@ -3,8 +3,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
-import { parseDaw } from "../src/games/indy/data/daw";
-import { extractPalette } from "../src/games/indy/data/palette";
+import { parseDaw } from "../src/engine/desktop-adventures/data/daw";
+import { extractPalette } from "../src/engine/desktop-adventures/data/palette";
 
 const dir = resolve(import.meta.dirname, "../original/indy");
 const SIZE = 288;

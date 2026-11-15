@@ -1,0 +1,9 @@
+# Entrées du banc (CINE_INPUT) : clics sur les 5 messages de l'intro, puis marche dans la première scène
+324 c 160 100 1
+361 c 160 100 1
+382 c 160 100 1
+389 c 160 100 1
+445 c 160 100 1
+460 m 120 100
+470 c 250 150 1
+520 m 100 60

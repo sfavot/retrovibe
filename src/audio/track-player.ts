@@ -7,7 +7,10 @@ export interface TrackOptions {
   start?: number;
   /** Position d'arrêt automatique, en secondes ; absente = fin du fichier. */
   end?: number;
-  /** Reprend à `start` au lieu de s'arrêter en fin de plage (`onEnded` n'est alors jamais appelé). */
+  /**
+   * Reprend à `start` au lieu de s'arrêter en fin de plage (`onEnded` n'est alors jamais appelé). Sans `end`, la boucle est celle
+   * de l'élément média (`loop`), sans blanc à la reprise ; avec `end`, la reprise est un saut, au pas de la surveillance.
+   */
   loop?: boolean;
 }
 
@@ -96,6 +99,9 @@ export class TrackPlayer {
     this.startSec = startSec;
     this.endSec = opts.end ?? Infinity;
     this.looping = opts.loop ?? false;
+    // boucle sur le fichier entier : l'élément repart seul au début, sans `ended` ni latence de surveillance
+    const nativeLoop = this.looping && this.endSec === Infinity;
+    this.audio.loop = nativeLoop;
     this.active = true;
     const token = ++this.token;
     this.load(url);
@@ -111,6 +117,11 @@ export class TrackPlayer {
     if (audio.readyState >= 1) begin();
     else audio.addEventListener("loadedmetadata", begin, { once: true });
     this.timer = setInterval(() => {
+      if (nativeLoop) {
+        // l'élément est reparti à 0 : rejoint le début de la plage
+        if (startSec > 0 && audio.readyState >= 1 && audio.currentTime < startSec) audio.currentTime = startSec;
+        return;
+      }
       if (!(audio.currentTime >= this.endSec || audio.ended)) return;
       if (this.looping) {
         audio.currentTime = this.startSec;
@@ -126,6 +137,7 @@ export class TrackPlayer {
     this.active = false;
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
+    this.audio.loop = false;
     this.audio.pause();
   }
 

@@ -1,0 +1,22 @@
+# Captures du banc ScummVM (fw-cd-fr, graine 1, temps virtuel) : rejeu de verbs.inputs, CINE_SHOT_TICKS, fin de tick.
+# tick  sha256(tk-NNNN.idx + tk-NNNN.pal)[0:16]  # contenu
+4 4e089b00823be1e5 # LOGO.PI1
+5 6c0003f6fd6307a3 # CINEMA.PI1 (musique piste 20)
+6 599112694b47f5ff # intro L0.PI1, début
+100 6c7a02407eb6cd68 # intro, animation
+200 bfbac403543c961d # intro, animation
+311 80dbb13d78505b5d # intro, dernière image de L0
+312 93751c01588f3e8a # L1.PI1 : la scène s'installe
+323 332a95cad8245a95 # L1, premier message (bulle)
+360 5ff7d9a8077dcd6a # L1, deuxième message
+444 af39c9790c604663 # L1, dernier message de l'intro
+446 64ba66dd411bc2dc # premier tick jouable
+470 64ba66dd411bc2dc # clic de marche en (250,150)
+480 981818f042eb70a6 # marche
+540 cd9374158c90e85a # PRENDRE au clavier : ligne de commande
+542 55a9d5df287c8b46 # PRENDRE un objet : bulle
+543 32791301c15da5fc # après la bulle
+560 e08f8f68482fc538 # ACTIONNER : ligne de commande
+582 9a1bfc1e77d52792 # PARLER : bulle
+620 5e6c3a56dae1d276 # UTILISER (inventaire vide)
+640 0dfcfe5a8d1d6dc3 # marche après le dernier clic

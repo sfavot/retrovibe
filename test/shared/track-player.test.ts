@@ -5,6 +5,7 @@ import { TrackPlayer } from "../../src/audio/track-player";
 class FakeAudio {
   paused = true;
   ended = false;
+  loop = false;
   muted = false;
   volume = 1;
   preload = "";
@@ -81,6 +82,33 @@ describe("TrackPlayer", () => {
     expect(audio.currentTime).toBe(2);
     expect(audio.paused).toBe(false);
     expect(onEnded).not.toHaveBeenCalled();
+    player.stop();
+  });
+
+  it("boucle sur le fichier entier : confiée à l'élément média, sans saut ni arrêt", () => {
+    const onEnded = vi.fn();
+    player.onEnded = onEnded;
+    player.play("track19.mp3", { loop: true });
+    expect(audio.loop).toBe(true);
+    audio.currentTime = 30;
+    vi.advanceTimersByTime(40);
+    audio.currentTime = 0.02; // l'élément est reparti seul
+    vi.advanceTimersByTime(40);
+    expect(audio.currentTime).toBe(0.02);
+    expect(audio.paused).toBe(false);
+    expect(onEnded).not.toHaveBeenCalled();
+    player.stop();
+    expect(audio.loop).toBe(false);
+  });
+
+  it("boucle depuis start sans end : après le retour à 0, rejoint start", () => {
+    player.play("a.mp3", { start: 5, loop: true });
+    expect(audio.loop).toBe(true);
+    audio.currentTime = 0.1;
+    vi.advanceTimersByTime(40);
+    expect(audio.currentTime).toBe(5);
+    player.play("a.mp3", { start: 2, end: 8, loop: true });
+    expect(audio.loop).toBe(false);
     player.stop();
   });
 

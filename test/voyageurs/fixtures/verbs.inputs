@@ -1,0 +1,21 @@
+# Banc : verbes au clavier dans la première scène (PRENDRE, ACTIONNER, PARLER, EXAMINER, UTILISER), clics sur les messages enregistrés par CINE_AUTOCLICK.
+324 c 160 100 1
+361 c 160 100 1
+382 c 160 100 1
+389 c 160 100 1
+445 c 160 100 1
+460 m 120 100
+470 c 250 150 1
+520 m 100 60
+540 k take
+542 c 175 40 1
+543 c 160 100 1
+560 k activate
+562 c 155 150 1
+580 k speak
+582 c 175 40 1
+583 c 160 100 1
+600 k examine
+602 c 150 130 1
+620 k use
+630 c 100 100 1

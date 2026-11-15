@@ -26,7 +26,7 @@ import type { GameScript } from "./script";
 import { type Sequence, SequenceRunner, wait } from "../../../engine/sequence";
 import { delay, pause } from "./cadence";
 import { type GameState, HERO_OBJECT, LAST_CHAPTER, type RoomObject, type RoomState, STEP_X, STEP_Y, Track, Verb, createGameState } from "./state";
-import { type Speaker, type Subtitle, speak, voiceFile } from "./talk";
+import { MISSING_VOICE_TICKS_PER_CHAR, type Speaker, type Subtitle, speak, voiceFile } from "./talk";
 import { Talkers } from "./talkers";
 import { moveCharacters, startWalking } from "./walk";
 
@@ -104,6 +104,15 @@ export class DrasculaEngine implements Speaker {
   lastSpeech: Speaker["lastSpeech"] = null;
   /** Tick où la réplique en cours a commencé (`Speaker.speechStart`). */
   speechStart = 0;
+  /**
+   * Temps de lecture minimal des sous-titres (`Speaker.readingTicks`), écart du portage que l'hôte du navigateur active : sans lui,
+   * une réplique dure sa voix, comme dans ScummVM.
+   */
+  subtitleReadingTime = false;
+
+  readingTicks(text: string): number {
+    return this.subtitleReadingTime && this.subtitlesEnabled ? text.length * MISSING_VOICE_TICKS_PER_CHAR : 0;
+  }
   /** Choix de dialogue affichés (`converse`). */
   choices: ChoiceMenu | null = null;
   /** Les personnages qui parlent (`talkers.ts`) et les dialogues (`dialogs.ts`). */

@@ -68,6 +68,8 @@ const drascula: PointClickGame<SaveData> = {
     host.setUserMasterVolume(parseVolume(store.get(MASTER_VOLUME_KEY)));
     const engine = ctx.buildEngine(() => new DrasculaEngine(host, { script: drasculaScript, restore: options.restore }));
     engine.subtitlesEnabled = store.get(SUBTITLES_KEY) !== "0";
+    // Avec les sous-titres, une voix courte laisse le texte le temps de le lire (écart du portage, `engine.readingTicks`).
+    engine.subtitleReadingTime = true;
     const slots = createSaveSlots(host.storage);
 
     /** Chapitre dont les vidéos sont en cours de chargement (pastille « chargement du chapitre suivant »). */

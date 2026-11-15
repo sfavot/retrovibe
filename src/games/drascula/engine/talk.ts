@@ -14,7 +14,8 @@ import { pause } from "./cadence";
  * ne se sautent pas : `unskippable`). Exception : `talk_drascula_big` lit Échap avant `isTalkFinished` et en fait un saut de la
  * cinématique, la voix allant à son terme (`escapeSkips`).
  * Écart voulu (`plan.md`, « Cas limites ») : une voix absente ne coupe pas la réplique au premier tour ; le texte reste affiché
- * `MISSING_VOICE_TICKS_PER_CHAR` ticks par caractère. Les visages sont tirés par le hasard du jeu (graine injectable), pas par un
+ * `MISSING_VOICE_TICKS_PER_CHAR` ticks par caractère. Écart voulu (navigateur, sous-titres affichés) : une voix plus courte que ce même
+ * temps de lecture laisse le texte affiché jusqu'à son terme, la tête figée (`Speaker.readingTicks`). Les visages sont tirés par le hasard du jeu (graine injectable), pas par un
  * hasard rebattu à chaque réplique (`talkInit` : `setSeed(generateNewSeed())`).
  */
 
@@ -44,6 +45,11 @@ export interface Speaker {
    * `TAP_SKIP_GRACE_TICKS` (`ui/input.ts`).
    */
   speechStart: number;
+  /**
+   * Durée minimale d'affichage du texte d'une réplique, en ticks depuis son début (écart du portage, `DrasculaEngine.readingTicks`) :
+   * 0 sans sous-titres ou hors du navigateur. Une voix plus courte laisse le texte affiché, la tête figée, jusqu'à ce terme.
+   */
+  readingTicks?(text: string): number;
   /** Tête qui parle en cours : la vue et le tirage du tour ; `null` hors réplique. */
   head: { view: TalkView; roll: Roll } | null;
   /** Ce que la dernière réplique affichait à son dernier tour (sous-titre, tête), gardé après sa fin : voir `DrasculaEngine.holdScreen`. */
@@ -109,9 +115,16 @@ export function* speak(speaker: Speaker, line: TalkLine): Sequence<boolean> {
           if (line.escapeSkips && speaker.takeKey("Escape") !== null) skipped = true;
           if (speaker.takeKey() !== null) {
             speaker.stopSound();
-            break;
+            return;
           }
         } while (playing ? speaker.soundActive() : speaker.ticks < silentUntil);
+        // Voix finie avant le temps de lecture : le texte reste, la tête ne bouge plus ; une touche le fait passer.
+        const readUntil = speaker.speechStart + (speaker.readingTicks?.(line.text) ?? 0);
+        while (speaker.ticks < readUntil) {
+          yield* pause(line.turn ?? 3);
+          if (line.escapeSkips && speaker.takeKey("Escape") !== null) skipped = true;
+          if (speaker.takeKey() !== null) return;
+        }
       })(),
     );
     finished = true;

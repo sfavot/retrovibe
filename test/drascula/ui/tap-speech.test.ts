@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pauseTicks } from "../../../src/games/drascula/engine/cadence";
+import { MISSING_VOICE_TICKS_PER_CHAR } from "../../../src/games/drascula/engine/talk";
 import { pianistDialog } from "../../../src/games/drascula/engine/rooms/chapter-1/room-62";
 import { TAP_SKIP_GRACE_TICKS, tapEffect } from "../../../src/games/drascula/ui/input";
 import { Player } from "../engine/test-host";
@@ -25,8 +26,9 @@ function tap(player: Player): void {
  * Joue le dialogue du pianiste (`animation_4_1`) en touchant l'écran `after` ticks après le début de la voix `at` ; rend la durée
  * de chaque voix (ticks entre son début et celui de la suivante).
  */
-function pianistWithTap(at: string, after: number): Map<string, number> {
+function pianistWithTap(at: string, after: number, reading = false): Map<string, number> {
   const player = new Player({ chapter: 1 });
+  player.engine.subtitleReadingTime = reading;
   player.settle();
   const sounds = player.host.sounds;
   const from = sounds.length;
@@ -74,5 +76,31 @@ describe("toucher pendant une réplique", () => {
       expect(said.get("207.als")).toBeLessThanOrEqual(TAP_SKIP_GRACE_TICKS + 10 + pauseTicks(3));
       expect(said.get("p3.als")).toBeGreaterThanOrEqual(Math.floor(voiceTicks("P3.als")));
     });
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("temps de lecture minimal des sous-titres (navigateur)", () => {
+  it("le texte de 207 (80 caractères, voix de 2,2 s) reste affiché le temps de le lire ; sans sous-titres, la réplique dure sa voix", () => {
+    const text207 = new Player({ chapter: 1 }).engine.data.text("text", 207).length;
+    expect(text207).toBeGreaterThan(70);
+    const reading = pianistWithTap("none", 0, true);
+    expect(reading.get("207.als")).toBeGreaterThanOrEqual(text207 * MISSING_VOICE_TICKS_PER_CHAR);
+    expect(reading.get("207.als")).toBeLessThanOrEqual(text207 * MISSING_VOICE_TICKS_PER_CHAR + pauseTicks(3));
+    const faithful = pianistWithTap("none", 0, false);
+    expect(faithful.get("207.als")).toBeLessThan(text207 * MISSING_VOICE_TICKS_PER_CHAR);
+  });
+
+  it("un toucher pendant le temps de lecture fait passer la réplique", () => {
+    const said = pianistWithTap("207.als", 300, true);
+    expect(said.get("207.als")).toBeLessThanOrEqual(300 + pauseTicks(3));
+  });
+
+  it("le moteur seul (sans l'hôte du navigateur) ou sans sous-titres : aucun temps ajouté", () => {
+    const player = new Player({ chapter: 1 });
+    expect(player.engine.readingTicks("UN TEXTE")).toBe(0);
+    player.engine.subtitleReadingTime = true;
+    expect(player.engine.readingTicks("UN TEXTE")).toBe(8 * MISSING_VOICE_TICKS_PER_CHAR);
+    player.engine.subtitlesEnabled = false;
+    expect(player.engine.readingTicks("UN TEXTE")).toBe(0);
   });
 });

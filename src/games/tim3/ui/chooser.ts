@@ -6,7 +6,8 @@
  *   (son 0xE1B), un double clic ou « Lancer » charge le puzzle, « Annuler » ferme. Flèches (44ee9d) : une rangée. « Autres Puzzles »
  *   (`DR_BIN`) ouvre `DOSBIN` puis revient à la liste de la catégorie choisie (41ae39). « Avancé » (sélecteur de fichiers Windows,
  *   42a088) n'est pas porté : grisé. Le titre et son champ (`DR_TITLE`) ne servent qu'à « enregistrer » : cachés (41b10f).
- * - **`DOSBIN.ITF`** (41b649) : les bacs. Deux joueurs (puzzles HH, D12) est grisé. Maison (`DB_USER`, « Puzzles Personnels ») : le
+ * - **`DOSBIN.ITF`** (41b649) : les bacs, dont Deux joueurs (puzzles HH, catégorie 5 : en Jeu, ils se jouent seul ; en mode à deux
+ *   joueurs, le puzzle choisi devient la partie suivante, comme 41acf0 en mode 2). Maison (`DB_USER`, « Puzzles Personnels ») : le
  *   jeu y lit les fichiers LEV du répertoire des puzzles personnels ; le port, les machines du Labo qui ont un but (catégorie 6,
  *   `homePuzzleRef`), rangées par emplacement. Le bac de la catégorie en cours a le focus ; « Annuler » revient à la liste sans changer
  *   de catégorie.
@@ -199,8 +200,8 @@ export const DOSBIN = {
 
 /** Bac de chaque catégorie (table 0x4726d4) : 0 travaux pratiques … 4 très difficiles, 5 deux joueurs, 6 maison. */
 export const BIN_OF_CATEGORY: readonly number[] = [DOSBIN.tutorial, DOSBIN.easy, DOSBIN.medium, DOSBIN.hard, DOSBIN.reallyHard, DOSBIN.duel, DOSBIN.user];
-/** Bac non porté : deux joueurs (D12). */
-export const BIN_GREYED: readonly number[] = [DOSBIN.duel];
+/** Bacs non portés (aucun depuis le mode à deux joueurs). */
+export const BIN_GREYED: readonly number[] = [];
 
 export type BinResult = { kind: "category"; category: number } | { kind: "help" } | { kind: "unavailable" } | { kind: "cancel" };
 
@@ -251,6 +252,9 @@ export const PUZZDISP = {
 /** Textes de la fiche (425fa5) : « Puzzle no N » en (x, y + 4), couleur 5 ; titre en (x + 6, y + 4, l − 9, h − 6), couleur 15 ; 0x1302. */
 const CARD_FLAGS = 0x1302;
 
+/** Passes de la fiche avant la voix du but (425f1b : `[0x472ef0]` = 18, décompté à chaque message de la fenêtre, 425f51). */
+export const CARD_GOAL_VOICE_PASSES = 18;
+
 export class PuzzleCardScreen implements ItfScreen<"ok"> {
   readonly options: Omit<ItfWindowOptions, "choose" | "onClose">;
   private readonly font: Font | null;
@@ -260,8 +264,14 @@ export class PuzzleCardScreen implements ItfScreen<"ok"> {
     readonly itf: Itf,
     private readonly puzzle: PuzzleRef,
     private readonly puzzleTitle: string,
+    /**
+     * Voix du but, lancée `CARD_GOAL_VOICE_PASSES` passes après l'ouverture, **pendant** que la fiche est montrée (425f6b → 424684) ; la
+     * fermeture la coupe (425d6f, à l'appelant). Absente : puzzle maison, voix sans objet.
+     */
+    goalVoice?: () => void,
   ) {
     this.font = assets.font(ITF_DEFAULT_FONT);
+    let voiceIn = goalVoice ? CARD_GOAL_VOICE_PASSES : -1;
     // Icône de la catégorie seule (425e96 cache 34005 à 34011, 425eaf montre 34005 + catégorie).
     const icons = [PUZZDISP.tutorial, PUZZDISP.easy, PUZZDISP.medium, PUZZDISP.hard, PUZZDISP.reallyHard, PUZZDISP.duel, PUZZDISP.home];
     this.options = {
@@ -271,6 +281,10 @@ export class PuzzleCardScreen implements ItfScreen<"ok"> {
       cancelId: PUZZDISP.done,
       texts: () => [this.numberText(), this.puzzleTitle],
       decorate: (surface, win) => this.decorate(surface, win),
+      tick: () => {
+        if (voiceIn > 0 && --voiceIn === 0) goalVoice?.();
+        return false;
+      },
     };
   }
 

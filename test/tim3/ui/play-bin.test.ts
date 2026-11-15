@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readLev } from "../../../src/games/tim3/data/lev";
 import { Editor, createPart } from "../../../src/games/tim3/engine/editor";
 import { DEFAULT_LAB, Tim3Session, labLevel, puzzleList } from "../../../src/games/tim3/engine/session";
-import { BIN_CLIP, BIN_LEFT, BIN_RIGHT, RenderAssets } from "../../../src/games/tim3/render";
-import { PlayScreen, type PlayEvent } from "../../../src/games/tim3/ui/play";
+import { BIN_CLIP, BIN_LEFT, BIN_RIGHT, GOALBAR, PLAYFIELD, RenderAssets, inRect } from "../../../src/games/tim3/render";
+import { PlayScreen, TOUCH_LIFT, type PlayEvent } from "../../../src/games/tim3/ui/play";
 import { frenchIndex, original } from "../data/real";
 import { realTypes } from "../engine/helpers";
 
@@ -47,6 +47,39 @@ describe.skipIf(!original.has)("écran de jeu : bac", () => {
     // Rendue au bac (appui sans glisser puis Échap) : la case revient.
     s.editor.returnHeld();
     expect(screen.bin.total).toBe(before);
+  });
+
+  it("TLEV17 au doigt : le tremplin se pose au ras du sol, le doigt sur la barre du but (pièce 40 px au-dessus)", () => {
+    // Glisser depuis le bac puis lâcher.
+    const s = puzzle("TLEV17");
+    const { screen, events } = make(s);
+    const slot = screen.bin.slots.find((k) => k.type === 39)!;
+    screen.pointerDown(...center(slot), true);
+    const p = s.editor.held!;
+    // Pièce en (71, 333) de l'aire, tenue par son centre : le doigt est sous l'aire, sur la barre du but.
+    const fx = PLAYFIELD.x + 71 + s.editor.grabX;
+    const fy = PLAYFIELD.y + 333 + s.editor.grabY + TOUCH_LIFT;
+    expect(inRect(GOALBAR, fx, fy)).toBe(true);
+    screen.pointerMove(fx, fy - 20, true);
+    screen.pointerMove(fx, fy, true);
+    expect(screen.cursor()).toBe("grabbing");
+    screen.pointerUp(fx, fy);
+    expect(events).toContainEqual({ type: "sound", name: "drop" });
+    expect(s.editor.held).toBeNull();
+    expect([p.px, p.py]).toEqual([71, 333]);
+
+    // Prise d'un appui puis pose d'un second appui sur la barre du but : la barre ne s'ouvre pas, la pièce se pose.
+    const s2 = puzzle("TLEV17");
+    const two = make(s2);
+    const slot2 = two.screen.bin.slots.find((k) => k.type === 39)!;
+    two.screen.pointerDown(...center(slot2), true);
+    two.screen.pointerUp(...center(slot2));
+    const p2 = s2.editor.held!;
+    two.screen.pointerDown(fx, fy, true);
+    two.screen.pointerUp(fx, fy);
+    expect(two.events.some((e) => e.type === "goal")).toBe(false);
+    expect(s2.editor.held).toBeNull();
+    expect([p2.px, p2.py]).toEqual([71, 333]);
   });
 
   it("appui long sur une case : infobulle ancrée sur la case visible", () => {

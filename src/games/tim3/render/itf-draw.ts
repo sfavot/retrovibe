@@ -235,6 +235,8 @@ export interface ItfState {
    * dernière image = arrêt, 423dca), volume. Sans valeur : enfoncé = image suivante (supposé), sinon la première.
    */
   frames?: Readonly<Record<number, number>>;
+  /** État de l'ANM d'un contrôle image à la place de sa valeur (410c4b : image changée par l'appelant, tableau des deux joueurs 414a93). */
+  values?: Readonly<Record<number, number>>;
   /** Dessin propre d'un contrôle (rappel +0x5c, posé par 44f070), appelé après son dessin ordinaire : zones animées (style 17), aperçus. */
   draw?: Readonly<Record<number, (surface: Surface, rect: Rect) => void>>;
 }
@@ -369,7 +371,7 @@ function run(surface: Surface | null, assets: RenderAssets, itf: Itf, state: Itf
     if (c.name !== undefined) item.name = c.name;
 
     if (c.image) {
-      const first = anm ? imageOfState(anm, c.value) : -1;
+      const first = anm ? imageOfState(anm, state.values?.[c.id] ?? c.value) : -1;
       if (anm && first >= 0) {
         const count = stateLength(anm, first);
         item.frameCount = count;

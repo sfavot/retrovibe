@@ -1,0 +1,16 @@
+{
+  "level": "HH23",
+  "goalStep": 22,
+  "note": "Pièces du concepteur (bac sans le bit 0x100).",
+  "parts": [
+    {"part":1,"type":137,"x":360,"y":230},
+    {"part":2,"type":69,"x":296,"y":280},
+    {"part":3,"type":37,"x":364,"y":274},
+    {"part":4,"type":116,"x":416,"y":240},
+    {"part":10,"type":27,"x":97,"y":124},
+    {"part":12,"type":139,"x":192,"y":304,"appearance":2},
+    {"part":15,"type":109,"x":369,"y":321},
+    {"part":6,"type":10,"rope":[{"part":10,"slot":0},{"part":12,"slot":0}],"via":[9,8],"ropeLength":46},
+    {"part":11,"type":10,"rope":[{"part":12,"slot":1},{"part":13,"slot":0}],"ropeLength":122}
+  ]
+}

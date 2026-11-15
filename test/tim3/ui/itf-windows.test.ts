@@ -195,6 +195,14 @@ describe.skipIf(!original.has)("fenêtres .ITF de la vague F", () => {
       expect(calls.at(-1)).toBe(`music ${last}`);
     });
 
+    it("« Relancer » (MB_MUSIC, 423a29) : le morceau repart du début 5 passes plus tard, même s'il jouait", () => {
+      const { w, calls } = open();
+      w.options.choose(MUSICBOX.music);
+      for (let i = 0; i < 6; i++) w.options.tick!();
+      // `PlaySound(choix, 0, 0)` : arrêt puis départ, et non `playMusic` seul, qui laisserait jouer le morceau en cours.
+      expect(calls).toEqual(["stop", "music 1000"]);
+    });
+
     it("les morceaux du CD sont sautés", () => {
       const { w, calls } = open();
       const seen = new Set<number>();

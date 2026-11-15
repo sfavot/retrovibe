@@ -17,6 +17,7 @@
 import { PART_LOCKED, type Level, type LevCondition, type LevHint } from "../data/lev";
 import { DEFAULT_GRAVITY, DEFAULT_PRESSURE, applyAtmosphere } from "./gravity";
 import { Editor } from "./editor";
+import type { EditGuard } from "./duel";
 import { LabPuzzle } from "./lab-puzzle";
 import { GOAL_MET, GoalTest, SolvedCountdown, type GoalResult } from "./goals";
 import { F0C, type Part } from "./part";
@@ -29,7 +30,7 @@ import type { HostStorage } from "../../../engine/storage";
 /** Durée d'un pas de simulation (4359a4 attend 32 ms entre deux pas ; plan D10). */
 export const STEP_MS = 32;
 
-/** Catégories de puzzles, dans l'ordre de `LEVELS.INF` (préfixe des LEV, nombre). Les puzzles HH sont reportés (D12). */
+/** Catégories des puzzles solo, dans l'ordre de `LEVELS.INF` (préfixe des LEV, nombre). Les puzzles à deux joueurs suivent (`DUEL_PUZZLES`). */
 export const CATEGORIES = [
   { prefix: "TLEV", count: 40 },
   { prefix: "ELEV", count: 26 },
@@ -49,13 +50,23 @@ export interface PuzzleRef {
   number: number;
 }
 
-/** Les 156 puzzles, dans l'ordre du jeu. */
+/** Les 156 puzzles solo, dans l'ordre du jeu. */
 export function puzzleList(): PuzzleRef[] {
   const out: PuzzleRef[] = [];
   CATEGORIES.forEach((c, category) => {
     for (let n = 1; n <= c.count; n++) out.push({ name: `${c.prefix}${n}`, index: out.length, category, number: n });
   });
   return out;
+}
+
+/** Catégorie des puzzles à deux joueurs (`DOSBIN` : `DB_HEAD2HEAD`, 31053 = 31048 + 5 ; mode 2, 42cbad(5)). */
+export const DUEL_CATEGORY = 5;
+/** Puzzles à deux joueurs : `HH1` … `HH50`, index 156 à 205 de `LEVELS.INF` et des voix. */
+export const DUEL_PUZZLES = { prefix: "HH", count: 50, first: 156 } as const;
+
+/** Les 50 puzzles à deux joueurs (catégorie 5), dans l'ordre du jeu. */
+export function duelPuzzleList(): PuzzleRef[] {
+  return Array.from({ length: DUEL_PUZZLES.count }, (_, i) => ({ name: `${DUEL_PUZZLES.prefix}${i + 1}`, index: DUEL_PUZZLES.first + i, category: DUEL_CATEGORY, number: i + 1 }));
 }
 
 // ------------------------------------------------------------------ copie de l'état d'édition
@@ -107,18 +118,21 @@ export function cloneWorld(world: World): World {
 
 // ------------------------------------------------------------------ progression
 
-/** Noms des puzzles du jeu (`TLEV1` … `RLEV29`) : toute autre valeur lue ou écrite est ignorée. */
+/** Noms des puzzles solo du jeu (`TLEV1` … `RLEV29`). */
 const PUZZLE_NAMES: ReadonlySet<string> = new Set(CATEGORIES.flatMap((c) => Array.from({ length: c.count }, (_, i) => `${c.prefix}${i + 1}`)));
+/** Puzzles qu'on peut noter résolus : les solo et les 50 à deux joueurs (42ccae note aussi ceux-là, octet par puzzle de `0x4803d4`). */
+const SOLVABLE_NAMES: ReadonlySet<string> = new Set([...PUZZLE_NAMES, ...duelPuzzleList().map((p) => p.name)]);
 
 /**
- * Progression (D11) : clés `solved` (noms séparés par des virgules) et `last` d'un stockage déjà préfixé par `tim3:`. Seuls les
- * noms de puzzles du jeu sont gardés : une valeur étrangère ou corrompue est ignorée, jamais levée.
+ * Progression (D11) : clés `solved` (noms séparés par des virgules, puzzles solo et à deux joueurs) et `last` (dernier puzzle solo)
+ * d'un stockage déjà préfixé par `tim3:`. Seuls les noms de puzzles du jeu sont gardés : une valeur étrangère ou corrompue est
+ * ignorée, jamais levée.
  */
 export class Progress {
   private readonly solved: Set<string>;
 
   constructor(private readonly storage: HostStorage) {
-    this.solved = new Set((storage.get("solved") ?? "").split(",").filter((s) => PUZZLE_NAMES.has(s)));
+    this.solved = new Set((storage.get("solved") ?? "").split(",").filter((s) => SOLVABLE_NAMES.has(s)));
   }
 
   isSolved(name: string): boolean {
@@ -126,7 +140,7 @@ export class Progress {
   }
 
   markSolved(name: string): void {
-    if (this.solved.has(name) || !PUZZLE_NAMES.has(name)) return;
+    if (this.solved.has(name) || !SOLVABLE_NAMES.has(name)) return;
     this.solved.add(name);
     this.storage.set("solved", [...this.solved].join(","));
   }
@@ -263,6 +277,8 @@ export interface SessionOptions {
    * d'une télécommande) sont rangées dans la liste que dit leur type (+0x0C & 0x4000, 43965b), pas dans celle de leur index.
    */
   originalCount?: number;
+  /** Mode à deux joueurs : la règle du tour, que l'éditeur consulte (`EditGuard`). */
+  guard?: EditGuard;
 }
 
 export class Tim3Session {
@@ -279,10 +295,14 @@ export class Tim3Session {
   readonly lab: LabSettings | null;
   /** Labo : but, indices et conditions du puzzle maison. */
   readonly labPuzzle: LabPuzzle | null;
+  /** Règle du tour à deux joueurs (`null` : aucune). */
+  readonly guard: EditGuard | null;
   /** Copie de l'état d'édition prise au démarrage. */
   private snapshot: World | null = null;
   /** Pièces de l'aire au démarrage, dans l'ordre des listes (la copie les a dans le même ordre : `LabPuzzle.remap`). */
   private startOrder: Part[] = [];
+  /** Toutes les pièces au démarrage, bac compris (même ordre dans la copie) : la règle du tour suit les copies à l'arrêt. */
+  private startAll: Part[] = [];
   private readonly shownFrames = new WeakMap<Part, number>();
   private effects: EffectRequest[] = [];
 
@@ -293,6 +313,7 @@ export class Tim3Session {
   ) {
     this.puzzle = options.puzzle ?? null;
     this.lab = options.lab ? { ...options.lab } : null;
+    this.guard = options.guard ?? null;
     this.world = new World(types);
     this.world.loadLevel(level);
     if (options.unlock?.length) {
@@ -310,9 +331,13 @@ export class Tim3Session {
       }
     }
     this.attach();
-    this.editor = new Editor(this.world, { lab: this.lab !== null });
+    this.editor = this.newEditor();
     this.goals = GoalTest.fromLevel(level, this.world);
     this.labPuzzle = this.lab ? LabPuzzle.fromLevel(level, this.world) : null;
+  }
+
+  private newEditor(): Editor {
+    return new Editor(this.world, { lab: this.lab !== null, ...(this.guard ? { guard: this.guard } : {}) });
   }
 
   /** Sons demandés par les handlers (41126d, 41151e : `World.sound` / `stopSound`) : dans la file de la session. */
@@ -362,6 +387,7 @@ export class Tim3Session {
     this.editor.release();
     this.labPuzzle?.prune(this.world);
     this.startOrder = [...this.world.statics, ...this.world.mobiles];
+    this.startAll = this.guard ? [...this.startOrder, ...this.world.bin] : [];
     this.snapshot = cloneWorld(this.world);
     if (this.lab) applyAtmosphere(this.types, this.lab.gravity, this.lab.pressure);
     if (this.labPuzzle) this.goals = this.labPuzzle.goalTest();
@@ -382,10 +408,15 @@ export class Tim3Session {
     this.snapshot = null;
     this.world.running = false;
     this.attach();
-    this.editor = new Editor(this.world, { lab: this.lab !== null });
+    this.editor = this.newEditor();
     this.goals = GoalTest.fromLevel(this.level, this.world);
     this.labPuzzle?.remap(this.startOrder, [...this.world.statics, ...this.world.mobiles]);
+    if (this.guard?.remap) {
+      const now = [...this.world.statics, ...this.world.mobiles, ...this.world.bin];
+      this.guard.remap(new Map(this.startAll.map((p, i) => [p, now[i]!])));
+    }
     this.startOrder = [];
+    this.startAll = [];
     this.effects = [];
     this.mode = "edit";
   }

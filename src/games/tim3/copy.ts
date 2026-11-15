@@ -34,6 +34,7 @@ export const copy = {
     "Puzzles Moyennement Difficiles",
     "Puzzles Difficiles",
     "Puzzles Très Difficiles",
+    "Puzzles À Deux Joueurs",
   ] /* (jeu) */,
   solvedMark: "résolu",
 
@@ -73,6 +74,19 @@ export const copy = {
   homeCategory: "Puzzles Personnels" /* (jeu) */,
   homeEmpty: "Aucune machine du Labo n'a encore de but. Au Labo, donnez des conditions de réussite à une machine (poignée « solution » d'une pièce), puis sauvegardez-la : elle se jouera ici.",
   homeMissing: "Ce puzzle maison n'existe plus : son emplacement a été vidé ou remplacé.",
+
+  // Mode à deux joueurs (HEDTOHED.ITF, tableau H2H.ITF) : les messages du match viennent d'INTRFACE.RES.
+  duelSetupTitle: "Mode à Deux Joueurs" /* (jeu) */,
+  duelName: (n: number) => `Nom du joueur ${n}`,
+  duelGamesMore: "Nombre de parties : plus",
+  duelGamesLess: "Nombre de parties : moins",
+  duelTimeMore: (n: number) => `Durée du tour du joueur ${n} : plus`,
+  duelTimeLess: (n: number) => `Durée du tour du joueur ${n} : moins`,
+  duelSetupStatus: (games: number, t1: number, t2: number) => `Parties : ${games}. Durée d'un tour : ${t1} secondes pour le joueur 1, ${t2} secondes pour le joueur 2.`,
+  duelEndTurn: "Terminer le tour",
+  duelEndTurnLabel: "Terminer le tour et passer la main à l'autre joueur",
+  duelTurnStarted: (name: string, seconds: number) => `À ${name} de jouer : ${seconds} secondes, une pièce du bac et une pièce de l'aire au plus.`,
+  duelScore: (n1: string, w1: number, n2: string, w2: number) => `Score : ${n1} ${w1}, ${n2} ${w2}.`,
 
   // Machines du Labo (bouton disque) : « (jeu) » = INTRFACE.RES (FRENCH.DAT), le reste est écrit pour le site.
   machinesTitle: "Machines du Labo",
@@ -163,7 +177,9 @@ export const copy = {
     "Pièce de puzzle : le mode Jeu, enfoncée tant que vous jouez un puzzle. Au Labo, elle rouvre votre dernier puzzle, après confirmation. Pour choisir un autre puzzle, utilisez la disquette.",
     "Clé : le Labo du Professeur Tim, après confirmation ; elle reste enfoncée tant que vous y êtes.",
     "Livre : le manuel, c'est-à-dire cette page.",
-    "Chat et Tim, chaussure, feuille et stylo : le mode à deux joueurs, la visite guidée du Labo et l'inscription des joueurs. Grisés, ils ne sont pas disponibles dans cette version.",
+    "Chat et Tim : le mode à deux joueurs, sur le même écran, après confirmation. On choisit le nombre de parties, la durée du tour de chacun et les noms ; les joueurs jouent chacun leur tour sur le même puzzle. À chaque tour, on peut prendre une seule pièce dans le bac et changer une seule pièce déjà posée (la déplacer, la ranger, la retourner ou l'étirer). Le joueur pendant le tour duquel la machine atteint le but gagne la partie ; le premier à remporter la majorité des parties gagne le match. Le tableau en bas à droite montre le joueur du tour, son temps restant et les parties gagnées.",
+    "Terminer le tour (à côté de la main, en mode à deux joueurs, et sous l'écran) : passe la main à l'autre joueur sans attendre la fin du temps.",
+    "Chaussure, feuille et stylo : la visite guidée du Labo et l'inscription des joueurs. Grisés, ils ne sont pas disponibles dans cette version.",
     "Disquette : en Jeu, la liste des puzzles de la catégorie (une ampoule allumée devant chaque puzzle résolu ; « Autres Puzzles » pour changer de catégorie) ; au Labo, les machines du Labo.",
     "Guitare : la musique, les sons, le volume et la voix du professeur.",
     "Globe : la gravité et la pression (réglables au Labo seulement) et la couleur du décor.",
@@ -177,7 +193,7 @@ export const copy = {
     "Au Labo, le bouton à droite du drapeau, en haut du bac, choisit la famille de pièces montrée (toutes, décors, mécanismes, cordes, balles, murs…).",
     "Drapeau : démarre la machine ; un clic dans l'aire de jeu ou Échap l'arrête.",
     "Survolez un bouton à la souris, ou gardez le doigt dessus, pour afficher son nom.",
-    "« Menu principal », sous l'écran, ramène au menu du jeu : Jeu, Labo, manuel, options et Quitter.",
+    "« Menu principal », sous l'écran, ramène au menu du jeu : Jeu, Labo, Duel, manuel, options et Quitter.",
   ],
   toolbarUnavailable: (label: string) => `${label} (non disponible)`,
   solutionShown: "La solution du professeur est posée : démarrez la machine pour la voir fonctionner.",

@@ -13,11 +13,14 @@
  *   `0xD2` (u16, 192 sauf 480 pour un morceau) et `0xD6` (position d'une table suivante) ne sont pas utilisés.
  * - Piste : signature `HMI-MIDITRACK`, u32 à `+0x57` = position des évènements depuis le début de la piste ; la piste va jusqu'à la suivante.
  * - Évènements : durée variable standard (delta, 7 bits par octet, bit 7 = suite), puis un message MIDI avec running status, qui diffère du SMF :
- *   - `0x9n kk vv` est suivi de la **durée** de la note (durée variable) ; il n'y a pas de Note Off : ils sont recréés ici (`0x8n kk 00`) ;
+ *   - `0x9n kk vv` est suivi de la **durée** de la note (durée variable) ; il n'y a pas de Note Off : ils sont recréés ici (`0x8n kk 00`),
+ *     une note de durée nulle dure un tick, une seule note à la fois par canal et touche (`placeNotes`) ;
  *   - `FF 2F 00` termine la piste ; les autres méta-évènements sont lus comme en SMF ;
  *   - `FE tt …` : évènements propres à HMI. `FE 10` = 2 octets, un octet de longueur `n`, `n` octets, 4 octets (point de branchement, un par piste,
  *     ignoré) ; `FE 14` = 2 octets `FF FF` (**début de boucle**) ; `FE 15` = 6 octets `80 01` + u32 (**fin de boucle**, sur la piste maîtresse :
  *     renvoie à la position de `FE 14` + 2 dans la même piste) ; `FE 11`, `FE 12` = 2 octets (absents des 24 morceaux, taille supposée).
+ *
+ * Boucle : l'état des canaux au début de boucle y est reposé à chaque tour (`chaseLoopStart`).
  *
  * Tempo : un seul, 1 000 000 µs par noire, soit 120 ticks par seconde (voir ci-dessus). Les durées ainsi obtenues (58 à 155 s, un morceau de
  * 14 s) sont celles de boucles musicales, alors que lire `0xD2` comme un tempo en battements par minute donnerait des notes de 20 ms.
@@ -76,7 +79,9 @@ interface Raw {
 }
 
 /** Fin d'une note avant tout, début d'une note après tout : une note répétée repart proprement. */
-const PRIORITY_TEMPO = -1;
+const PRIORITY_TEMPO = -2;
+/** État des canaux reposé au début de boucle : avant les évènements du fichier au même instant, qui le remplacent. */
+const PRIORITY_CHASE = -1;
 const PRIORITY_OFF = 0;
 const PRIORITY_OTHER = 1;
 const PRIORITY_ON = 2;
@@ -91,7 +96,82 @@ interface TrackResult {
   loopEnd: number | undefined;
 }
 
-function parseTrack(bytes: Uint8Array, view: DataView, start: number, end: number, raw: Raw[]): TrackResult {
+/** Note lue (`0x9n kk vv` + durée) : `velocity` 0 vaut un note-off de la touche à `on`. */
+interface Note {
+  channel: number;
+  key: number;
+  velocity: number;
+  on: number;
+  off: number;
+}
+
+/**
+ * Pose les note-on et note-off des notes de toutes les pistes.
+ *
+ * - **Durée nulle** (`0x9n kk vv 00`, des centaines dans `SX_1004`, `SX_1009`…) : la note dure un tick. Posé au même tick, son note-off
+ *   passait avant son note-on (les fins avant les débuts) ; la note n'était jamais relâchée et restait tenue sans fin. Le pilote SOS de
+ *   l'original ne peut couper la note qu'à un évènement suivant de son minuteur (120 par seconde) : un tick est l'approximation retenue.
+ * - **Une seule note à la fois par canal et touche** : une note qui repart sur
+ * une touche encore tenue termine la précédente à cet instant (son note-off, prévu plus tard, est retiré) ; deux notes au même instant n'en
+ * font qu'une (la plus longue) ; un `0x9n kk 00` termine la note tenue. Les morceaux de TIM3 rejouent souvent une touche tenue (3 358 fois
+ * dans `SX_1009`) : sans cela, une note-on n'avait pas de note-off à elle (le synthétiseur les apparie dans l'ordre, le séquenceur ne compte
+ * qu'une note par touche) et restait tenue sans fin au tour de boucle. C'est aussi ce que fait un synthétiseur General MIDI matériel, où le
+ * premier note-off d'une touche la coupe (le pilote SOS de l'original envoie les note-off à l'échéance de chaque durée ; non lu).
+ */
+function placeNotes(notes: Note[], raw: Raw[]): void {
+  for (const n of notes) if (n.velocity > 0 && n.off <= n.on) n.off = n.on + 1;
+  const order = notes.map((n, i) => [n, i] as const).sort(([a, i], [b, j]) => a.on - b.on || i - j);
+  const sounding = new Map<number, Note>();
+  const kept: Note[] = [];
+  for (const [note] of order) {
+    const id = (note.channel << 7) | note.key;
+    const previous = sounding.get(id);
+    if (previous && previous.off > note.on) {
+      if (previous.on === note.on) {
+        previous.off = Math.max(previous.off, note.off);
+        if (note.velocity > 0) previous.velocity = Math.max(previous.velocity, note.velocity);
+        continue;
+      }
+      previous.off = note.on;
+    }
+    if (note.velocity === 0) {
+      sounding.delete(id);
+      continue;
+    }
+    sounding.set(id, note);
+    kept.push(note);
+  }
+  for (const n of kept) {
+    raw.push({ tick: n.on, priority: PRIORITY_ON, event: { kind: "midi", bytes: Uint8Array.of(0x90 | n.channel, n.key, n.velocity) } });
+    raw.push({ tick: n.off, priority: PRIORITY_OFF, event: { kind: "midi", bytes: Uint8Array.of(0x80 | n.channel, n.key, 0) } });
+  }
+}
+
+/** Contrôleurs non rejoués au début de boucle : séquences RPN / NRPN (l'étendue du pitch bend reste réglée d'un tour à l'autre). */
+const UNCHASED_CONTROLLERS = new Set([6, 38, 96, 97, 98, 99, 100, 101]);
+
+/**
+ * État des canaux au début de la boucle (programme, contrôleurs, pitch bend, tels que les a laissés tout ce qui précède `loopStart`),
+ * reposé à `loopStart` avant les autres évènements de cet instant : chaque tour repart comme le premier. Sans cela, un tour suivant
+ * gardait ce que la fin du précédent avait laissé (`SX_1013` : canal 6 au volume 8 et sur un autre programme, `SX_1004` : pitch bend
+ * remis à zéro au lieu d'être tiré, `SX_1015`, `SX_1019` : programmes changés). Au premier tour, ces valeurs sont déjà en place.
+ */
+function chaseLoopStart(raw: readonly Raw[], loopStart: number): Raw[] {
+  const state = new Map<string, Uint8Array>();
+  const before = raw.filter((r) => r.tick < loopStart).sort((a, b) => a.tick - b.tick || a.priority - b.priority);
+  for (const { event } of before) {
+    if (event.kind !== "midi") continue;
+    const [status, first] = event.bytes;
+    const type = status & 0xf0;
+    const channel = status & 0x0f;
+    if (type === 0xc0) state.set(`${channel}:program`, event.bytes);
+    else if (type === 0xe0) state.set(`${channel}:bend`, event.bytes);
+    else if (type === 0xb0 && !UNCHASED_CONTROLLERS.has(first)) state.set(`${channel}:cc${first}`, event.bytes);
+  }
+  return [...state.values()].map((bytes) => ({ tick: loopStart, priority: PRIORITY_CHASE, event: { kind: "midi", bytes } }));
+}
+
+function parseTrack(bytes: Uint8Array, view: DataView, start: number, end: number, raw: Raw[], noteList: Note[]): TrackResult {
   if (start + TRACK_DATA_OFFSET + 4 > end || ascii(bytes, start, TRACK_SIGNATURE.length) !== TRACK_SIGNATURE) throw new Error("HMI : piste HMI-MIDITRACK absente");
   let pos = start + view.getUint32(start + TRACK_DATA_OFFSET, true);
   let tick = 0;
@@ -176,12 +256,13 @@ function parseTrack(bytes: Uint8Array, view: DataView, start: number, end: numbe
       const channel = status & 0x0f;
       switch (status & 0xf0) {
         case 0x90: {
-          const note = data();
+          const key = data();
           const velocity = data();
           const length = vlq();
           notes++;
-          push(tick, PRIORITY_ON, { kind: "midi", bytes: Uint8Array.of(status, note, velocity) });
-          push(tick + length, PRIORITY_OFF, { kind: "midi", bytes: Uint8Array.of(0x80 | channel, note, 0) });
+          // Les paires note-on / note-off sont posées par `placeNotes`, une fois toutes les pistes lues.
+          noteList.push({ channel, key, velocity, on: tick, off: tick + length });
+          maxTick = Math.max(maxTick, tick + length);
           break;
         }
         case 0xc0:
@@ -218,17 +299,20 @@ export function parseHmi(hmi: Uint8Array): HmiSong {
   const bounds = [...starts, hmi.length].sort((a, b) => a - b);
 
   const raw: Raw[] = [];
+  const notes: Note[] = [];
   const tracks: HmiTrackInfo[] = [];
   let loopStart: number | undefined;
   let loopEnd: number | undefined;
   for (const start of starts) {
     if (start >= hmi.length) throw new Error("HMI : piste hors du fichier");
     const end = bounds[bounds.indexOf(start) + 1];
-    const result = parseTrack(hmi, view, start, end, raw);
+    const result = parseTrack(hmi, view, start, end, raw, notes);
     tracks.push(result.info);
     loopStart ??= result.loopStart;
     loopEnd ??= result.loopEnd;
   }
+  placeNotes(notes, raw);
+  if (loopStart !== undefined && loopEnd !== undefined && loopStart > 0) raw.push(...chaseLoopStart(raw, loopStart));
 
   // Cadence fixe : `ticksPerSecond` ticks par seconde et par noire (division = cadence), soit 1 s par noire.
   const division = ticksPerSecond;

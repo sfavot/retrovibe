@@ -12,6 +12,10 @@
  * Labo revient tel quel), éditeur d'indices (`HINT.ITF`), conditions de réussite (`SOLVE.ITF`), but écrit dans la barre du bas, onglets
  * du bac. Les machines qui ont un but se jouent depuis le bac « Puzzles Personnels » du choix du puzzle.
  *
+ * Deux joueurs (`docs/tim3/ui.md` § Deux joueurs) : fenêtre des réglages (`HEDTOHED`), puis des parties sur les puzzles HH, à tour de
+ * rôle sur le même écran (`engine/duel.ts` : chronomètre, une pièce du bac et une de l'aire par tour, manches), tableau des joueurs
+ * sous l'aire, messages du jeu à chaque tour et à chaque manche.
+ *
  * Données : les volumes Dynamix (`RESOURCE.MAP/.001/.002` + `FRENCH.DAT`) sont chargés d'un bloc ; les voix MP3 à la demande.
  */
 import "./style.css";
@@ -56,7 +60,10 @@ import {
   snapshotWorld,
   type LabMachine,
 } from "../engine/save";
-import { DEFAULT_LAB, HOME_CATEGORY, HomeProgress, Progress, STEP_MS, Tim3Session, homePuzzleRef, homeSlot, labLevel, puzzleList, type PuzzleRef } from "../engine/session";
+import { DEFAULT_LAB, DUEL_CATEGORY, HOME_CATEGORY, HomeProgress, Progress, STEP_MS, Tim3Session, duelPuzzleList, homePuzzleRef, homeSlot, labLevel, puzzleList, type PuzzleRef } from "../engine/session";
+import { Duel, TURN_BACKGROUND, defaultDuelSettings, nextDuelPuzzle, type DuelOutcome, type DuelSettings, type Player } from "../engine/duel";
+import { formatText } from "../render/itf-draw";
+import { openDuelSetupWindow } from "./duel-window";
 import { solutionSession } from "../engine/solution";
 import { TypeTable } from "../engine/types";
 import { renderHelp } from "../help";
@@ -111,6 +118,26 @@ const LAB_SOLVED_TEXT = 31178;
 /** Puzzle réussi : son 0xE21, 18 pas après l'ouverture de PUZZSOLV (4261df : compte à rebours 0x12, 426234). */
 const SOUND_SOLVED = 0xe21;
 const SOLVED_SOUND_STEPS = 18;
+/** Mode à deux joueurs : tour qui passe (4331a4 : 0xBF8), bac fermé ou pièce interdite (418228, 42e6ed : 0xE24). */
+const SOUND_TURN = 0xbf8;
+const SOUND_DUEL_REFUSED = 0xe24;
+/** `INTRFACE.RES` du mode à deux joueurs (4213b9, 41d827, 419803, 433200, 42e706, 418246). */
+const DUEL_TEXT = {
+  player1: 2100,
+  player2: 2101,
+  turn: 31116,
+  solved: 31117,
+  next: 31118,
+  replay: 31119,
+  won: 31120,
+  rematch: 31121,
+  moved: 31152,
+  taken: 31153,
+  oneMore: 2154,
+  serious: 2155,
+} as const;
+/** Un pas de l'horloge du tour au plus par image (un onglet longtemps en arrière-plan ne vide pas le tour d'un coup). */
+const DUEL_MAX_STEP_MS = 250;
 const VOLUMES = ["RESOURCE.MAP", "RESOURCE.001", "RESOURCE.002", "FRENCH.DAT"] as const;
 /** Musique de l'option « Musique » (préférence mémorisée, activée par défaut). */
 const MUSIC_KEY = "music";
@@ -215,6 +242,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const edits = new EditStore(storage);
   const slots = labSaveSlots(storage);
   const puzzles = puzzleList();
+  const duelPuzzles = duelPuzzleList();
   let musicOn = storage.get(MUSIC_KEY) !== "0";
   sound.effectsEnabled = storage.get(EFFECTS_KEY) !== "0";
   const storedVolume = Number(storage.get(VOLUME_KEY) ?? "15");
@@ -241,6 +269,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   /** Pièce dont `SOLVE.ITF` attend un rectangle (« Position »). */
   let solvePart: Part | null = null;
   let goalEditor: { close(): void } | null = null;
+  /** Match à deux joueurs en cours (`null` hors du mode 2). */
+  let duel: Duel | null = null;
+  /** Réglages de la fenêtre des deux joueurs, gardés d'un match à l'autre (`0x472840`, noms `0x47e6dc`). */
+  let duelSettings: DuelSettings | null = null;
+  /** Fin de manche montrée, en attente du choix (« Rejouer » relance la machine puis la repose). */
+  let duelPending: DuelOutcome | null = null;
+  let lastFrameAt: number | null = null;
   let session!: Tim3Session;
   let screen!: PlayScreen;
   let dialog: ItfWindowHandle | null = null;
@@ -256,7 +291,10 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   // Démarrer, indices, options (guitare), aide (livre, « ? ») et choix du puzzle (disquette) sont dans la barre d'outils du jeu ;
   // reste ici l'entrée « Zones > Menu principal » du menu Windows d'origine.
   const menuButton = actionButton(copy.mainMenu, copy.mainMenuLabel, () => backToMainMenu());
-  shell.toggles.append(h("span", { class: "tim3-actions" }, menuButton));
+  // Mode à deux joueurs : « Terminer le Tour » de la barre (35022), aussi au clavier et pour les lecteurs d'écran.
+  const endTurnButton = actionButton(copy.duelEndTurn, copy.duelEndTurnLabel, () => endTurnNow());
+  endTurnButton.hidden = true;
+  shell.toggles.append(h("span", { class: "tim3-actions" }, endTurnButton, menuButton));
   /** Parcours d'entrée en cours (intro, ou fond des menus) ; `null` en Jeu et au Labo. */
   let front: Front | null = null;
 
@@ -277,6 +315,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     screen.solved = home ? homeProgress.isSolved(home.slot, home.savedAt) : current !== null && progress.isSolved(current.name);
     screen.test = labTest !== null;
     screen.binTab = labTab;
+    screen.duel = duel;
+    endTurnButton.hidden = duel === null;
     if (options.debug) (window as unknown as { __tim3: unknown }).__tim3 = { session: () => session, screen: () => screen, index };
   };
 
@@ -286,7 +326,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
    */
   const persistEdit = (): void => {
     // Essai : le Labo gardé est celui d'avant l'essai. Puzzle maison : l'aire n'est pas gardée (la machine peut changer d'emplacement).
-    if (!session || session.running || labTest || home) return;
+    if (!session || session.running || labTest || home || duel) return;
     try {
       if (current && baseLevel) {
         const parts = snapshotWorld(session.world, baseLevel);
@@ -304,6 +344,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   /** Ouvre un puzzle : l'aire qu'on y avait laissée, ou (`solution`, ampoule) la solution du concepteur posée. */
   const loadPuzzle = (ref: PuzzleRef, solution = false): boolean => {
     persistEdit();
+    leaveDuel();
     labTest = null;
     const slot = homeSlot(ref);
     if (slot !== null) return loadHome(ref, slot, solution);
@@ -334,8 +375,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       return true;
     }
     progress.last = ref.name;
+    // La voix du but est celle de la fiche (`enterPuzzle`, 425f6b), pas du chargement.
     music(level.info.music);
-    sound.playVoice(goalVoice(ref.index));
     announce(`${copy.categories[ref.category]} ${ref.number} : ${t?.title ?? ""}. ${t?.goal ?? ""}`);
     return true;
   };
@@ -369,6 +410,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   /** Ouvre le Labo : la machine donnée (emplacement chargé) ou, sans elle, celle qu'on y avait laissée. `false` si elle est illisible. */
   const openLab = (machine: LabMachine | null = edits.lab()): boolean => {
     persistEdit();
+    leaveDuel();
     labTest = null;
     home = null;
     let settings = machine ? machineSettings(machine) : { ...DEFAULT_LAB };
@@ -622,6 +664,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       screen.session = session;
       screen.resetFocus();
       fillLabBin();
+      // « Rejouer » d'une fin de manche : la question revient quand la machine s'arrête (4199ad).
+      if (duelPending) queueMicrotask(showDuelOutcome);
     } else {
       tip.hidden = true;
       persistEdit();
@@ -666,6 +710,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     sound.stopEffects();
     screen.session = session;
     screen.resetFocus();
+    if (duel) return duelSolved();
     // Labo et essai (419878) : GENERIC 31178, la machine est revenue à l'état d'édition.
     if (session.lab || labTest) {
       pauseFor(messageDialog(itfHost(), gameText(LAB_SOLVED_TEXT), resume));
@@ -678,11 +723,13 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     progress.markSolved(ref.name);
     screen.solved = true;
     const inCategory = puzzles.filter((p) => p.category === ref.category).map((p) => p.name);
-    // Fin de catégorie (42ccae) : BINSOLVE.ITF par-dessus PUZZSOLV, seulement à la première résolution de ce puzzle (42d210).
+    // Fin de catégorie (42ccae) : BINSOLVE.ITF par-dessus PUZZSOLV, seulement à la première résolution de ce puzzle (42d210) ; jamais
+    // pour les puzzles à deux joueurs joués seul (4261a7 : catégorie 5).
     let finished: number | "all" | null = null;
-    if (!wasSolved && progress.count(puzzles.map((p) => p.name)) === puzzles.length) finished = "all";
-    else if (!wasSolved && progress.count(inCategory) === inCategory.length) finished = ref.category;
-    const next = progress.next(ref.name);
+    const duelPuzzle = ref.category === DUEL_CATEGORY;
+    if (!duelPuzzle && !wasSolved && progress.count(puzzles.map((p) => p.name)) === puzzles.length) finished = "all";
+    else if (!duelPuzzle && !wasSolved && progress.count(inCategory) === inCategory.length) finished = ref.category;
+    const next = duelPuzzle ? nextInList(duelPuzzles, ref) : progress.next(ref.name);
     // PUZZSOLV (4260f0) ; le son 0xE21 part 18 pas après l'ouverture (426213). « Rejouer la Solution » relance la machine du
     // joueur : à la victoire, la session est revenue à l'état d'avant « Démarrer » (`Tim3Session.tick` → `stop`).
     const fanfare = window.setTimeout(() => sound.playEffect(SOUND_SOLVED), SOLVED_SOUND_STEPS * STEP_MS);
@@ -715,6 +762,187 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         }),
       );
     }
+  };
+
+  /** Puzzle suivant d'une liste : le premier non résolu après `ref`, sinon le suivant, sinon aucun. */
+  const nextInList = (list: readonly PuzzleRef[], ref: PuzzleRef): PuzzleRef | null => {
+    const i = list.findIndex((p) => p.name === ref.name);
+    return list.slice(i + 1).find((p) => !progress.isSolved(p.name)) ?? list[i + 1] ?? null;
+  };
+
+  // ------------------------------------------------------------------ deux joueurs (mode 2)
+
+  /** Réglages gardés ; au premier match, les noms par défaut du jeu (2100, 2101). */
+  const currentDuelSettings = (): DuelSettings => (duelSettings ??= defaultDuelSettings([gameText(DUEL_TEXT.player1), gameText(DUEL_TEXT.player2)]));
+
+  /** Le match s'arrête (autre mode, menu principal). */
+  const leaveDuel = (): void => {
+    duel = null;
+    duelPending = null;
+    endTurnButton.hidden = true;
+  };
+
+  /**
+   * Fenêtre des réglages (`HEDTOHED`, 41d15c) : OK lance le match sur le puzzle de 42cbad(5) ; Annuler revient au menu principal
+   * (mode 7, 422a24), d'où qu'on vienne.
+   */
+  const openDuelSetup = (): void => {
+    if (session?.running) toggleRun();
+    leaveDuel();
+    let chosen: DuelSettings | null = null;
+    pauseFor(
+      openDuelSetupWindow(itfHost(), {
+        settings: currentDuelSettings(),
+        text: gameText,
+        message: (text) => void messageDialog(itfHost(), text),
+        start: (settings) => {
+          chosen = settings;
+        },
+        cancel: () => undefined,
+        onClose: () => {
+          resume();
+          if (!chosen) return backToMainMenu(true);
+          duel = new Duel(chosen);
+          enterDuelGame(nextDuelPuzzle(duelPuzzles, current, (n) => progress.isSolved(n), () => Math.random() * 0x7fffffff));
+        },
+      }),
+    );
+  };
+
+  /**
+   * Une partie du match (43252d(puzzle, 2)) : le puzzle tel que le LEV le donne (rien n'est gardé), la règle du tour branchée sur
+   * l'éditeur, la fiche `PUZZDISP`, puis le message du tour (4330d0 : un nouveau puzzle donne le tour au joueur courant).
+   */
+  const enterDuelGame = (ref: PuzzleRef): void => {
+    const match = duel;
+    if (!match) return;
+    if (homeSlot(ref) !== null) {
+      // Les puzzles maison ne se jouent pas à deux dans le port : ils s'ouvrent en Jeu.
+      return enterPuzzle(ref);
+    }
+    front = null;
+    persistEdit();
+    labTest = null;
+    home = null;
+    duelPending = null;
+    const level = readLev(index.get(`${ref.name}.LEV`));
+    current = ref;
+    baseLevel = level;
+    session = new Tim3Session(types, level, { puzzle: ref, guard: match.round });
+    match.prepareTurn();
+    session.setBackground(TURN_BACKGROUND[match.turn]);
+    const t = texts.levels[ref.index];
+    playScreen(level, t?.goal ?? level.goal, t?.hints ?? level.hints.map((x) => x.text));
+    music(level.info.music);
+    announce(`${copy.categories[ref.category] ?? ""} ${ref.number} : ${t?.title ?? ""}. ${t?.goal ?? ""}`);
+    // Même fiche qu'en Jeu (`enterPuzzle`) : musique du début, voix du but à la 18e passe, coupée par OK.
+    sound.restartMusic();
+    const voice = goalVoice(ref.index);
+    showScreen(new PuzzleCardScreen(assets, readItf(index.get("PUZZDISP.ITF")), ref, puzzleTitle(ref), () => void sound.playVoice(voice, false)), () => {
+      sound.stopVoice();
+      sound.resumeMusic();
+      shell.focusCanvas();
+      turnMessage();
+    });
+  };
+
+  /** 4331a4 … 433200 : son 0xBF8, fond du joueur, tableau, GENERIC 31116 ; le temps du joueur part à la fermeture (433208). */
+  const turnMessage = (): void => {
+    const match = duel;
+    if (!match) return;
+    sound.playEffect(SOUND_TURN);
+    session.setBackground(TURN_BACKGROUND[match.turn]);
+    pauseFor(
+      messageDialog(itfHost(), formatText(gameText(DUEL_TEXT.turn), match.name()), () => {
+        resume();
+        if (duel !== match) return;
+        match.startTurn();
+        announce(copy.duelTurnStarted(match.name(), Math.round(match.remaining / 1000)));
+        shell.focusCanvas();
+      }),
+    );
+  };
+
+  /** « Terminer le Tour » (418e70) : l'échéance est maintenant. */
+  const endTurnNow = (): void => {
+    if (duel?.started && !dialog && !front) duel.endTurnNow();
+  };
+
+  /** 4330d0 : temps écoulé, machine arrêtée, aucune fenêtre : la pièce tenue est posée ou rendue (4301f5), le tour passe. */
+  const switchTurn = (): void => {
+    const match = duel;
+    if (!match) return;
+    screen.cancelGesture();
+    session.editor.dropHeld();
+    screen.resetFocus();
+    tip.hidden = true;
+    match.switchTurn();
+    turnMessage();
+  };
+
+  /** Bac fermé (418207 → 31153) ou pièce de l'aire interdite (42e6d3 → 31152) : son 0xE24 et le message du jeu. */
+  const duelRefused = (reason: "bin" | "moved"): void => {
+    sound.playEffect(SOUND_DUEL_REFUSED);
+    pauseFor(messageDialog(itfHost(), gameText(reason === "bin" ? DUEL_TEXT.taken : DUEL_TEXT.moved), resume));
+  };
+
+  /** Texte de fin de manche (419803 en mode 2, 41d827). */
+  const outcomeText = (match: Duel, o: DuelOutcome): string => {
+    switch (o.kind) {
+      case "match":
+        return formatText(gameText(DUEL_TEXT.won), match.name(o.winner));
+      case "game":
+        return formatText(gameText(DUEL_TEXT.solved), match.name(o.winner));
+      case "matchPoint": {
+        if (o.leader === null) return `~S3${gameText(DUEL_TEXT.serious)}`;
+        const other: Player = o.leader === 0 ? 1 : 0;
+        return `~S3${match.name(other)}, ${match.name(o.leader)} ${gameText(DUEL_TEXT.oneMore)}`;
+      }
+    }
+  };
+
+  /** La machine a résolu le puzzle : manche au joueur du tour (41993b), puis la question de fin de manche. */
+  const duelSolved = (): void => {
+    const match = duel;
+    if (!match) return;
+    if (!duelPending) {
+      duelPending = match.solved();
+      announce(copy.duelScore(match.name(0), match.wins[0], match.name(1), match.wins[1]));
+    }
+    showDuelOutcome();
+  };
+
+  /**
+   * Rejouer (premier bouton) : la machine repart, la question revient à son arrêt. Suivant : le puzzle est noté résolu (42ccae), la
+   * partie suivante s'ouvre (42cbad(5)), le vainqueur de la manche commence. Affronter : la fenêtre des réglages (419aed, mode 7 → 2).
+   */
+  const showDuelOutcome = (): void => {
+    const match = duel;
+    const outcome = duelPending;
+    if (!match || !outcome || session.running) return;
+    const last = outcome.kind === "match" ? DUEL_TEXT.rematch : DUEL_TEXT.next;
+    let replay = false;
+    pauseFor(
+      genericDialog(itfHost(), {
+        text: outcomeText(match, outcome),
+        buttons: [DUEL_TEXT.replay, last],
+        choose: (r) => {
+          replay = r === 1;
+        },
+        onClose: () => {
+          resume();
+          if (duel !== match) return;
+          if (replay) {
+            if (!session.running) toggleRun();
+            return;
+          }
+          duelPending = null;
+          if (current) progress.markSolved(current.name);
+          if (outcome.kind === "match") return openDuelSetup();
+          enterDuelGame(nextDuelPuzzle(duelPuzzles, current, (n) => progress.isSolved(n), () => Math.random() * 0x7fffffff));
+        },
+      }),
+    );
   };
 
   /** Puzzles maison qui ont un but, par emplacement. */
@@ -820,6 +1048,9 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       case "toolbar":
         toolbarAction(e.name);
         break;
+      case "duelRefused":
+        duelRefused(e.reason);
+        break;
       case "helpPick":
         helpPicked(e.target);
         break;
@@ -875,7 +1106,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const toolbarAction = (name: string): void => {
     const lab = session.lab !== null;
     const fieldEmpty = session.world.statics.head === null && session.world.mobiles.head === null;
-    const decision = toolbarDecision(name, { lab, test: labTest !== null, solved: screen.solved, running: session.running, fieldEmpty });
+    const decision = toolbarDecision(name, { lab, test: labTest !== null, duel: duel !== null, solved: screen.solved, running: session.running, fieldEmpty });
     if (decision.endTest) {
       // Mode 8 : l'essai se termine (Labo d'avant l'essai), puis le bouton agit comme au Labo.
       endTest();
@@ -892,9 +1123,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         return;
       case "play": {
         if (session.running) toggleRun();
-        const ref = puzzles.find((p) => p.name === (current?.name ?? progress.last)) ?? puzzles[0]!;
+        // Depuis les deux joueurs : le puzzle en cours du Jeu (mode 7 → 0, 42cbad(−1)).
+        const ref = duel ? currentPuzzle(puzzles, progress) : (puzzles.find((p) => p.name === (current?.name ?? progress.last)) ?? puzzles[0]!);
         return enterPuzzle(ref);
       }
+      case "duel":
+        return openDuelSetup();
+      case "endTurn":
+        return endTurnNow();
       case "lab":
         if (session.running) toggleRun();
         return void openLab();
@@ -1129,6 +1365,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         front = null;
         openLab();
         return shell.focusCanvas();
+      case "duel":
+        return openDuelSetup();
       case "help":
         return openHelp(openMainMenu);
       case "options":
@@ -1162,9 +1400,11 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   };
 
   /** « Menu principal » sous l'écran : la machine s'arrête, l'aire est gardée, le menu remplace le jeu. Pendant l'intro : la passe. */
-  const backToMainMenu = (): void => {
+  const backToMainMenu = (force = false): void => {
     if (front?.kind === "intro") return front.player.skip();
-    if (front || dialog || helpView) return;
+    if (!force && (front || dialog || helpView)) return;
+    leaveDuel();
+    if (!session) return openMainMenu();
     if (session.running) toggleRun();
     screen.helpPicking = false;
     persistEdit();
@@ -1179,7 +1419,16 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     front = null;
     if (!loadPuzzle(ref)) return;
     const title = puzzleTitle(ref);
-    showScreen(new PuzzleCardScreen(assets, readItf(index.get("PUZZDISP.ITF")), ref, title), () => shell.focusCanvas());
+    // Fiche (425edc … 425f6b) : la musique du puzzle repart du début ; la voix du but part 18 passes après, pendant la fiche, et coupe la
+    // musique ; OK coupe la voix et relance la musique (425d6f … 425daa).
+    sound.restartMusic();
+    const voice = ref.index >= 0 && homeSlot(ref) === null ? goalVoice(ref.index) : null;
+    const card = new PuzzleCardScreen(assets, readItf(index.get("PUZZDISP.ITF")), ref, title, voice ? () => void sound.playVoice(voice, false) : undefined);
+    showScreen(card, () => {
+      sound.stopVoice();
+      sound.resumeMusic();
+      shell.focusCanvas();
+    });
   };
 
   /** Titre d'un puzzle : `LEVELS.INF`, ou le nom de la machine d'un puzzle maison. */
@@ -1209,7 +1458,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const openChooser = (): void => {
     if (!current) return;
     if (session.running) toggleRun();
-    const all = [...puzzles, ...homePuzzles()];
+    const all = [...puzzles, ...duelPuzzles, ...homePuzzles()];
     showList(new PuzzleListScreen(assets, readItf(index.get("DOSBOX.ITF")), all, chooserProgress, chooserTexts, current.category, current, effect));
   };
 
@@ -1217,7 +1466,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     showScreen(list, (r) => {
       switch (r?.kind) {
         case "load":
-          return enterPuzzle(r.puzzle);
+          // Deux joueurs : le puzzle choisi devient la partie suivante (41acf0 en mode 2), scores gardés.
+          return duel ? enterDuelGame(r.puzzle) : enterPuzzle(r.puzzle);
         case "bins":
           return showBins(list);
         case "help":
@@ -1536,6 +1786,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     },
     onFrame: (now) => {
       audio.update();
+      // Deux joueurs : le temps du tour court, fenêtres ouvertes et machine en marche comprises (GetTickCount, 4330d0), pas onglet
+      // masqué ; le tour ne passe qu'une fois la machine arrêtée et les fenêtres fermées.
+      const dt = lastFrameAt === null ? 0 : Math.min(DUEL_MAX_STEP_MS, now - lastFrameAt);
+      lastFrameAt = now;
+      if (duel && !tabHidden && !front) {
+        duel.advance(dt);
+        if (duel.expired && !session.running && !dialog && !helpView) switchTurn();
+      }
       if (paused) return;
       if (front) {
         if (front.kind !== "intro") return;

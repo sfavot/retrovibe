@@ -8,14 +8,14 @@ import { MAIN_MENU, MainMenuScreen, QUIT_TEXT, mainMenuAction, quitMainMenu } fr
 import { frenchIndex, original } from "../data/real";
 
 describe("menu principal : ce que fait chaque bouton (422e31)", () => {
-  it("Jeu, Labo, manuel, aide, options, quitter ; les modes non portés répondent « non disponible »", () => {
+  it("Jeu, Labo, Duel, manuel, aide, options, quitter ; les modes non portés répondent « non disponible »", () => {
     expect(mainMenuAction(MAIN_MENU.play)).toBe("play");
     expect(mainMenuAction(MAIN_MENU.lab)).toBe("lab");
     expect(mainMenuAction(MAIN_MENU.manual)).toBe("help");
     expect(mainMenuAction(MAIN_MENU.help)).toBe("help");
     expect(mainMenuAction(MAIN_MENU.options)).toBe("options");
     expect(mainMenuAction(MAIN_MENU.quit)).toBe("quit");
-    expect(mainMenuAction(MAIN_MENU.duel)).toBe("unavailable");
+    expect(mainMenuAction(MAIN_MENU.duel)).toBe("duel");
     expect(mainMenuAction(MAIN_MENU.signIn)).toBe("unavailable");
     expect(mainMenuAction(MAIN_MENU.tutorial)).toBe("unavailable");
     expect(mainMenuAction(MAIN_MENU.text)).toBeUndefined();
@@ -78,7 +78,8 @@ describe.skipIf(!original.has)("menu principal sur les données d'origine (MAINM
     const m = make();
     const labels = m.buttons().map((b) => [b.id, m.name(b)]);
     expect(labels[0]).toEqual([MAIN_MENU.play, "Jeu: Jouer les puzzles dans l'ordre ou charger un nouveau puzzle."]);
-    expect(labels.find(([id]) => id === MAIN_MENU.duel)?.[1]).toBe("Duel: Jouer une partie contre un ami. (non disponible)");
+    expect(labels.find(([id]) => id === MAIN_MENU.duel)?.[1]).toBe("Duel: Jouer une partie contre un ami.");
+    expect(labels.find(([id]) => id === MAIN_MENU.signIn)?.[1]).toContain("(non disponible)");
     expect(labels.find(([id]) => id === MAIN_MENU.quit)?.[1]).toBe("Quitter la Partie");
     expect(labels.find(([id]) => id === MAIN_MENU.options)?.[1]).toBe("Vos Options");
     expect(m.options.defaultId).toBe(MAIN_MENU.play);
@@ -92,7 +93,10 @@ describe.skipIf(!original.has)("menu principal sur les données d'origine (MAINM
     expect(act(m.pointerUp(p.x, p.y))).toBe("lab");
     const d = center(m, MAIN_MENU.duel);
     m.pointerDown(d.x, d.y);
-    expect(act(m.pointerUp(d.x, d.y))).toBe("unavailable");
+    expect(act(m.pointerUp(d.x, d.y))).toBe("duel");
+    const t = center(m, MAIN_MENU.tutorial);
+    m.pointerDown(t.x, t.y);
+    expect(act(m.pointerUp(t.x, t.y))).toBe("unavailable");
     m.pointerDown(p.x, p.y);
     expect(act(m.pointerUp(10, 10))).toBeUndefined();
     const q = center(m, MAIN_MENU.quit);

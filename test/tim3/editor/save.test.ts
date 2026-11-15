@@ -56,16 +56,17 @@ describe("progression (D11)", () => {
     expect(again.count(puzzleList().map((p) => p.name))).toBe(2);
   });
 
-  it("ignore les noms qui ne sont pas des puzzles du jeu, à la lecture comme à l'écriture", () => {
+  it("ignore les noms qui ne sont pas des puzzles du jeu, à la lecture comme à l'écriture ; les HH se notent résolus, pas « dernier »", () => {
     const store = new MemoryStorage();
-    store.set("tim3:solved", "TLEV1,TLEV99,HH1,<b>,,XLEV2");
+    store.set("tim3:solved", "TLEV1,TLEV99,HH1,HH51,<b>,,XLEV2");
     store.set("tim3:last", "TLEV99");
     const p = new Progress(reopen(store));
-    expect(p.count(["TLEV1", "TLEV99", "HH1"])).toBe(1);
+    expect(p.count(["TLEV1", "TLEV99", "HH1", "HH51"])).toBe(2);
     expect(p.last).toBeNull();
     p.markSolved("TLEV99");
     p.last = "../x";
-    expect(store.get("tim3:solved")).toBe("TLEV1,TLEV99,HH1,<b>,,XLEV2");
+    p.last = "HH2";
+    expect(store.get("tim3:solved")).toBe("TLEV1,TLEV99,HH1,HH51,<b>,,XLEV2");
     expect(store.get("tim3:last")).toBe("TLEV99");
     p.markSolved("TLEV2");
     expect(new Progress(reopen(store)).isSolved("TLEV2")).toBe(true);

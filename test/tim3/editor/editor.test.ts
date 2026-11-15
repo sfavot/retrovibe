@@ -41,6 +41,24 @@ describe.skipIf(!original.has)("éditeur (42e660, 42f24a…)", () => {
     expect(s.editor.hover(461, 330).valid).toBe(false);
   });
 
+  it("TLEV17 : le tremplin (39) se pose au sol à gauche, sous la balle de base-ball, à la place du concepteur", () => {
+    const s = session("TLEV17");
+    const p = s.editor.binParts().find((q) => q.type === 39)!;
+    s.editor.takeFromBin(p);
+    // Pose libre au pixel (+0x14 & 8), tenu par le centre de son image.
+    const at = (x: number, y: number) => [x + s.editor.grabX, y + s.editor.grabY] as const;
+    // Bord à bord avec la colonne (56 … 72) : les boîtes se recouvrent de 1 à 2 px, les polygones ne se croisent pas (437208).
+    for (const x of [70, 71, 72, 88]) {
+      expect(s.editor.hover(...at(x, 333)).valid, `x = ${x}`).toBe(true);
+      expect([p.px, p.py]).toEqual([x, 333]);
+    }
+    expect(s.editor.hover(...at(69, 333)).valid).toBe(false); // dans la colonne
+    expect(s.editor.hover(...at(71, 334)).valid).toBe(false); // dans le sol
+    expect(s.editor.hover(...at(71, 300)).valid).toBe(false); // sur la balle de base-ball (83, 311)
+    expect(s.editor.click(...at(71, 333))).toBe("placed");
+    expect([p.px, p.py]).toEqual([71, 333]);
+  });
+
   it("les pièces verrouillées ne bougent pas", () => {
     const s = session("TLEV1");
     const wall = placed(s).find((p) => p.type === 1)!;

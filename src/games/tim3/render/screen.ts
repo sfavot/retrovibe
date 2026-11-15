@@ -241,14 +241,29 @@ export function drawBinSlots(surface: Surface, assets: RenderAssets, layout: Bin
   surface.restoreClip(old);
 }
 
-/** Barre de but : fond de `GOALBAR.ANM` (image 1), puis le texte du but dans le cadre. */
-export function drawGoalBar(surface: Surface, assets: RenderAssets, goal?: string): void {
+/** Bord droit de la barre de but (cadre et reflet de l'image 1) gardé quand la barre est réduite. */
+const GOAL_RIGHT_EDGE = 40;
+
+/**
+ * Barre de but : fond de `GOALBAR.ANM` (image 1), puis le texte du but dans le cadre. `width` : barre réduite (mode à deux joueurs,
+ * table 0x471b80 : le tableau des joueurs est à droite) ; l'image est coupée et son bord droit recollé au bout.
+ */
+export function drawGoalBar(surface: Surface, assets: RenderAssets, goal?: string, width: number = GOALBAR.width): void {
   const anm = assets.anm("GOALBAR.ANM");
   if (!anm) return;
   const f = imageFrame(anm, 1);
-  if (f) drawAnmImage(surface, assets, anm, 1, GOALBAR.x - f.x, GOALBAR.y - f.y);
+  if (f && width >= GOALBAR.width) drawAnmImage(surface, assets, anm, 1, GOALBAR.x - f.x, GOALBAR.y - f.y);
+  else if (f) {
+    const edge = Math.min(GOAL_RIGHT_EDGE, width);
+    let old = surface.setClip(GOALBAR.x, GOALBAR.y, width - edge, GOALBAR.height);
+    drawAnmImage(surface, assets, anm, 1, GOALBAR.x - f.x, GOALBAR.y - f.y);
+    surface.restoreClip(old);
+    old = surface.setClip(GOALBAR.x + width - edge, GOALBAR.y, edge, GOALBAR.height);
+    drawAnmImage(surface, assets, anm, 1, GOALBAR.x + width - GOALBAR.width - f.x, GOALBAR.y - f.y);
+    surface.restoreClip(old);
+  }
   const font = assets.font("GOALFONT.PFT");
-  if (goal && font) drawParagraph(surface, font, goal, GOALBAR.x + 20, GOALBAR.y + 9, 530, 46, mapColor(0));
+  if (goal && font) drawParagraph(surface, font, goal, GOALBAR.x + 20, GOALBAR.y + 9, Math.min(530, width - 40), 46, mapColor(0));
 }
 
 /** Écran complet 640×480. */

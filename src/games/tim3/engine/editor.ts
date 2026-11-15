@@ -15,6 +15,8 @@
  * - 42ee68 (corde, câble), 42ed3f (courroie) : liens en deux appuis (437f0d : pièce qui accepte une corde, +0x10 & 4, et
  *   point d'accroche le plus proche si +0x10 & 8 ; 438985 / 438932 : courroie entre deux pièces +0x10 & 1, à moins de 140 px).
  * - 438ea8 : une pièce à fiche (+0x14 & 1) posée se branche seule sur une prise libre (+0x14 & 2) à moins de 8 px.
+ * - Mode à deux joueurs (mode 2) : une règle du tour (`EditGuard`, `duel.ts`) limite le bac (417190, 41715f, 418207) et les pièces
+ *   de l'aire qu'on peut toucher (43013e, 4301cb) ; au bout du temps, la pièce tenue est posée ou rendue (4301f5, `dropHeld`).
  * - Labo (modes 1 et 6) : cadenas d'une pièce (43806a bits 0x10 / 0x400, poignée de 42e1e4, 42e9d8 : +0x14 ^= 0x40, la
  *   télécommande et ses explosifs ensemble), poignée « solution » des pièces +0x14 & 0x8000 (bit 0x200, 42ea99 → `SOLVE.ITF`),
  *   « Verrouiller / Déverrouiller » toutes les pièces (4209e5, 420afc), décors posés et repris (bac à onglets, `bin-tabs.ts`).
@@ -23,6 +25,7 @@
  * les atteint par `core()` (API manquante signalée, voir `docs/tim3/plan.md`, vague U).
  */
 import { labTabTypes } from "./bin-tabs";
+import type { EditGuard } from "./duel";
 import { insertSorted } from "./lists";
 import { updateGeometry } from "./move";
 import { BeltData, F0C, Part, Polygon, RopeData } from "./part";
@@ -147,7 +150,12 @@ function pointInside(part: Part, x: number, y: number): boolean {
 export interface EditorOptions {
   /** Labo : pièces en nombre illimité (palette), cadenas et poignée « solution », décors déplaçables. */
   lab?: boolean;
+  /** Mode à deux joueurs : règle du tour consultée avant de prendre ou de toucher une pièce. */
+  guard?: EditGuard;
 }
+
+/** 4301f5 : pièces qui retournent au bac quand le temps du tour finit pendant qu'on les tient (corde, câble, courroie, télécommande, explosifs). */
+const RETURNED_AT_TIMEOUT = new Set([10, 0x4c, 8, 0x16, 0x37]);
 
 export class Editor {
   /** 0x481194 en mode 9 : pièce tenue (elle est dans la liste du bac pendant ce temps, comme dans l'exe). */
@@ -160,12 +168,15 @@ export class Editor {
   /** Dernière position du pointeur sur l'aire (aperçus). */
   private pointer = { x: 0, y: 0 };
   readonly lab: boolean;
+  /** Règle du tour (mode à deux joueurs), `null` sinon. */
+  readonly guard: EditGuard | null;
 
   constructor(
     readonly world: World,
     options: EditorOptions = {},
   ) {
     this.lab = options.lab ?? false;
+    this.guard = options.guard ?? null;
     // Pièces du bac après 43267a (`World.stowUnlocked`) : deux écarts du noyau corrigés ici (signalés, `docs/tim3/ui.md`).
     // - Boîte du type nulle (+0x34 = 0 : panier 11, diable 13, prise 21, lampe 25) pour une pièce dont la taille vient de la
     //   boîte : on prend la forme du PAR (+0x64), la taille qu'écrivent les LEV pour ces pièces.
@@ -250,6 +261,24 @@ export class Editor {
   /** La pièce peut-elle être prise ou modifiée (non verrouillée ; un décor seulement au Labo) ? */
   isMovable(p: Part): boolean {
     return !(p.flags14 & LOCKED) && (this.lab || !(p.flags14 & SCENERY));
+  }
+
+  /** Mode à deux joueurs (43013e) : la pièce peut-elle être sélectionnée ce tour ? La pièce tenue l'est toujours. */
+  mayTouch(p: Part): boolean {
+    return p === this.held || !this.guard || this.guard.mayTouch(p);
+  }
+
+  /** Mode à deux joueurs (418207) : le bac donne-t-il encore une pièce ce tour ? */
+  mayTakeFromBin(): boolean {
+    return !this.guard || this.guard.mayTakeFromBin();
+  }
+
+  /** Une pièce posée est modifiée (4301cb) ; rend faux si la règle du tour l'interdit. */
+  private touch(p: Part): boolean {
+    if (p === this.held || !this.guard) return true;
+    if (!this.guard.mayTouch(p)) return false;
+    this.guard.touched(p);
+    return true;
   }
 
   /**
@@ -367,15 +396,18 @@ export class Editor {
 
   // ------------------------------------------------------------------ pièce tenue
 
-  /** Une pièce du bac est prise (clic dans le bac) : elle est tenue par son centre. */
-  takeFromBin(part: Part): void {
-    if (!(part.flags0C & F0C.IN_BIN)) return;
+  /** Une pièce du bac est prise (clic dans le bac) : elle est tenue par son centre. Rend faux si le bac la refuse (mode 2, 418207). */
+  takeFromBin(part: Part): boolean {
+    if (!(part.flags0C & F0C.IN_BIN)) return false;
+    if (!this.mayTakeFromBin()) return false;
     this.release();
     this.held = part;
     this.ropeLast = null;
     this.grabX = part.frameW >> 1;
     this.grabY = part.frameH >> 1;
     part.px = part.py = -1;
+    this.guard?.taken(part);
+    return true;
   }
 
   /** Labo : nouvelle pièce de ce type, créée dans le bac puis tenue (432d78, sans limite de nombre). */
@@ -393,7 +425,7 @@ export class Editor {
    * (4395ba). La pièce passe au bac le temps qu'on la tient.
    */
   grab(part: Part, x: number, y: number): void {
-    if (!this.isMovable(part)) return;
+    if (!this.isMovable(part) || !this.touch(part)) return;
     this.release();
     this.grabX = x - part.px;
     this.grabY = y - part.py;
@@ -500,7 +532,29 @@ export class Editor {
     if (overlapsAnother(this.world, p)) return "refused";
     this.place(p);
     this.held = null;
+    this.guard?.placed(p);
     this.pairUp(p);
+    return "placed";
+  }
+
+  /**
+   * 4301f5 : le temps du tour finit pendant qu'on tient une pièce. Corde, câble, courroie, télécommande et explosifs retournent au
+   * bac (42f978), comme une pièce qui chevaucherait (437208) ou qui n'a pas encore été montrée dans l'aire ; une autre pièce est
+   * posée là où elle est (42ebba).
+   */
+  dropHeld(): EditResult {
+    const p = this.held;
+    if (!p) return "none";
+    if (RETURNED_AT_TIMEOUT.has(p.type) || p.px === -1 || overlapsAnother(this.world, p)) {
+      this.returnHeld();
+      return "returned";
+    }
+    this.place(p);
+    this.held = null;
+    this.guard?.placed(p);
+    this.pairUp(p);
+    // Le partenaire neuf d'une télécommande n'a pas de place à lui : il retourne au bac.
+    if (this.held) this.returnHeld();
     return "placed";
   }
 
@@ -589,6 +643,7 @@ export class Editor {
     const p = this.held;
     if (!p) return;
     this.held = null;
+    this.guard?.returned(p);
     this.ropeLast = null;
     const c = core(this.world);
     if (isRope(p)) c.detachRopes(p, true);
@@ -627,6 +682,12 @@ export class Editor {
   removeToBin(p: Part): void {
     if (!this.isMovable(p)) return;
     if (p === this.held) return this.returnHeld();
+    if (!this.touch(p)) return;
+    this.stow(p);
+  }
+
+  /** 42f978 : la pièce posée quitte l'aire pour le bac. */
+  private stow(p: Part): void {
     core(this.world).remove(p);
     this.resetForBin(p);
     if (this.lab) this.world.bin.remove(p);
@@ -639,9 +700,9 @@ export class Editor {
     for (;;) {
       const p = [...this.world.staticThenMobile()].find((q) => this.isMovable(q) && !isRope(q) && !isBelt(q));
       if (!p) break;
-      this.removeToBin(p);
+      this.stow(p);
     }
-    for (const p of [...this.world.staticThenMobile()]) if (this.isMovable(p)) this.removeToBin(p);
+    for (const p of [...this.world.staticThenMobile()]) if (this.isMovable(p)) this.stow(p);
   }
 
   // ------------------------------------------------------------------ cadenas (Labo)
@@ -710,7 +771,7 @@ export class Editor {
   flip(p: Part, axis: "x" | "y" | "turn"): boolean {
     const w = this.world;
     const can = axis === "x" ? p.flags0C & 0x400 : axis === "y" ? p.flags0C & 0x200 : p.flags0C & 0x600;
-    if (!can || !this.isMovable(p) || isRope(p) || isBelt(p)) return false;
+    if (!can || !this.isMovable(p) || isRope(p) || isBelt(p) || !this.touch(p)) return false;
     if (axis === "turn" || (p.flags0C & 0x600) === 0x600) {
       // 42fae3 : quart de tour jusqu'à une position libre (pièce posée).
       if (p === this.held) {
@@ -738,7 +799,7 @@ export class Editor {
    * haute (ou une pente), hauteur sinon. Pièce posée : refusé si elle chevaucherait une autre pièce.
    */
   resize(p: Part, delta: 1 | -1): boolean {
-    if (!this.isMovable(p) || isRope(p) || isBelt(p)) return false;
+    if (!this.isMovable(p) || isRope(p) || isBelt(p) || !this.touch(p)) return false;
     const d = this.world.types.get(p.type);
     const wide = p.boxH <= p.boxW || SLOPES.has(p.type);
     const save = { w: p.boxW, h: p.boxH };
@@ -826,6 +887,7 @@ export class Editor {
    * pièce a changé.
    */
   resizeEdge(p: Part, zone: ZoneId, x: number, y: number): boolean {
+    if (!this.touch(p)) return false;
     // 42fb4a : la poignée tenue (0x4815b4 = 0x8003 … 0x8006) est lue par le slot 4 du tuyau 97 (un côté sur 16, l'autre à 38).
     const handle = this.world.resizeHandle;
     this.world.resizeHandle = 0x8000 | zone;
@@ -1092,6 +1154,7 @@ export class Editor {
     w.redraw(p, 2);
     this.held = null;
     this.ropeLast = null;
+    this.guard?.placed(p);
   }
 }
 

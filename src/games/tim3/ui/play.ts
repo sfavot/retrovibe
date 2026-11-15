@@ -11,9 +11,15 @@
  * poignées (41ffd0 : effacer en haut à gauche, tourner en bas à gauche, modifier en bas à droite ; un appui sur la main la déplace,
  * 42057e), pose d'une nouvelle main (42057e après « Nouveau »), tracé d'un rectangle (« Endroit précis » de `SOLVE.ITF`), barre du but
  * à écrire (414fc1), onglets du bac (`engine/bin-tabs.ts`, `drawBinTabs`).
+ *
+ * Deux joueurs (mode 2) : tableau des joueurs à droite de la barre du but (`H2H.ITF`, `render/duel-board.ts`) ; la règle du tour de
+ * l'éditeur (`EditGuard`) rend les pièces interdites ce tour insensibles au survol (43013e) et un appui sur elles, ou sur le bac
+ * fermé, demande le refus du jeu (`duelRefused`).
  */
 import { HELP_BIN, HELP_GOAL } from "../data/help";
 import type { Level } from "../data/lev";
+import { readItf, type Itf } from "../data/itf";
+import type { Duel } from "../engine/duel";
 import type { PartInfo } from "../data/text";
 import { FIELD_HEIGHT, FIELD_WIDTH, HANDLE_SIZE, HANDLE_STATES, Zone, type HeldPreview, type ZoneId } from "../engine/editor";
 import { LAB_TAB_COUNT } from "../engine/bin-tabs";
@@ -26,6 +32,7 @@ import {
   BIN_PLAY,
   BIN_RIGHT,
   BIN_TAB_BUTTON,
+  DUEL_GOAL_WIDTH,
   GOALBAR,
   PLAYFIELD,
   TOOLBAR,
@@ -36,6 +43,7 @@ import {
   drawBinIcon,
   drawBinOverlay,
   drawBinTabs,
+  drawDuelBoard,
   drawFieldRect,
   drawGoalBar,
   drawHandles,
@@ -106,7 +114,9 @@ export type PlayEvent =
   /** Labo : un appui sur la barre du but l'ouvre à l'écriture (414fc1). */
   | { type: "goalEdit" }
   /** Labo : onglet du bac choisi. */
-  | { type: "tab"; tab: number };
+  | { type: "tab"; tab: number }
+  /** Deux joueurs : le bac est fermé ce tour (418207 → 31153) ou la pièce n'est pas celle déjà touchée (43013e → 31152). */
+  | { type: "duelRefused"; reason: "bin" | "moved" };
 
 /**
  * Élément sous le pointeur en mode aide (41e85c) : un contrôle (son identifiant, clé de `HELP.RES`), une pièce posée (sa description,
@@ -176,6 +186,9 @@ export class PlayScreen {
   tabPicker = false;
   /** Labo : pose d'une nouvelle main d'indice, ou tracé d'un rectangle (`SOLVE.ITF`). */
   placing: "hint" | "rect" | null = null;
+  /** Mode à deux joueurs : le match en cours (tableau, barre d'outils). */
+  duel: Duel | null = null;
+  private boardItf: Itf | null = null;
   /** Main d'indice dont les poignées sont montrées (Labo). */
   private hintFocus: number | null = null;
   /** Rectangle en cours de tracé (coordonnées de l'aire). */
@@ -265,9 +278,26 @@ export class PlayScreen {
     return { x: x - PLAYFIELD.x, y: y - PLAYFIELD.y - (lift ? TOUCH_LIFT : 0) };
   }
 
+  /**
+   * Point de l'aire où va la pièce tenue, ou `null` s'il est hors de l'aire. L'original pose la pièce quand la fenêtre sous le
+   * pointeur est l'aire (42ebba → 43b047), sinon un appui la rend au bac (42f978) ; le pointeur est le point par lequel on la tient.
+   * Au doigt, ce point est `TOUCH_LIFT` au-dessus du doigt (sauf corde et courroie) : c'est lui qui doit être sur l'aire, pas le
+   * doigt, sinon une pièce au ras du sol (doigt sur la barre du but) serait hors d'atteinte.
+   */
+  private heldTarget(x: number, y: number, touch: boolean): { x: number; y: number } | null {
+    const held = this.editor.held;
+    const lift = touch && held !== null && !isLink(held);
+    return this.inField(x, lift ? y - TOUCH_LIFT : y) ? this.toField(x, y, lift) : null;
+  }
+
   /** Le point est-il dans l'aire visible (hors du bac qui la recouvre à droite) ? */
   inField(x: number, y: number): boolean {
     return x >= PLAYFIELD.x && x < BIN_PANEL.x && y >= PLAYFIELD.y && y < PLAYFIELD.y + PLAYFIELD.height;
+  }
+
+  /** Barre du but (réduite en mode à deux joueurs : le tableau occupe la droite). */
+  get goalRect(): Rect {
+    return this.duel ? { ...GOALBAR, width: DUEL_GOAL_WIDTH } : GOALBAR;
   }
 
   inBin(x: number, y: number): boolean {
@@ -297,7 +327,7 @@ export class PlayScreen {
 
   /** Boutons montrés dans le mode courant (418b78), avec leur géométrie. */
   shownButtons(): ShownButton[] {
-    const states = toolbarStates({ lab: this.session.lab !== null, test: this.test, solved: this.solved, running: this.session.running });
+    const states = toolbarStates({ lab: this.session.lab !== null, test: this.test, duel: this.duel !== null, solved: this.solved, running: this.session.running });
     return states.flatMap((st) => {
       const b = this.toolbar.find((t) => t.name === st.name);
       return b ? [{ ...b, pressed: st.pressed, disabled: st.disabled }] : [];
@@ -333,7 +363,7 @@ export class PlayScreen {
     if (inRect(BIN_LEFT, x, y)) return { kind: "control", id: BIN_HELP.left };
     if (inRect(BIN_RIGHT, x, y)) return { kind: "control", id: BIN_HELP.right };
     if (this.inBin(x, y)) return { kind: "control", id: HELP_BIN };
-    if (inRect(GOALBAR, x, y)) return { kind: "control", id: HELP_GOAL };
+    if (inRect(this.goalRect, x, y)) return { kind: "control", id: HELP_GOAL };
     const button = this.toolbarAt(x, y);
     if (button) return { kind: "control", id: button.id };
     if (this.inField(x, y)) {
@@ -371,12 +401,12 @@ export class PlayScreen {
     if (this.drag?.kind === "hint") return "grabbing";
     if (this.drag?.kind === "resize") return this.drag.zone === Zone.WidthLeft || this.drag.zone === Zone.WidthRight ? "ew-resize" : "ns-resize";
     if (this.editor.held) {
-      if (this.inField(x, y)) return this.preview.valid ? "grabbing" : "not-allowed";
+      if (this.heldTarget(x, y, this.pointer.touch)) return this.preview.valid ? "grabbing" : "not-allowed";
       return "grabbing";
     }
     if (this.toolbarAt(x, y) || inRect(BIN_PLAY, x, y) || inRect(BIN_LEFT, x, y) || inRect(BIN_RIGHT, x, y) || this.tabAt(x, y)) return "pointer";
     if (this.slotAt(x, y)) return "grab";
-    if (inRect(GOALBAR, x, y)) return this.session.lab && !this.session.running ? "default" : "pointer";
+    if (inRect(this.goalRect, x, y)) return this.session.lab && !this.session.running ? "default" : "pointer";
     if (this.session.running || !this.inField(x, y)) return "default";
     const hint = this.labHintAt(x, y);
     if (hint) return hint.zone === "body" ? "grab" : "pointer";
@@ -458,10 +488,13 @@ export class PlayScreen {
     }
     if (inRect(BIN_LEFT, x, y)) return this.scrollBin(-1);
     if (inRect(BIN_RIGHT, x, y)) return this.scrollBin(1);
-    if (inRect(GOALBAR, x, y)) {
+    // Au doigt, une pièce tenue va au-dessus du doigt : un appui sur la barre du but peut la poser au ras du sol.
+    const heldAbove = !this.session.running && this.heldTarget(x, y, touch) !== null;
+    if (inRect(this.goalRect, x, y) && !heldAbove) {
       this.emit({ type: this.session.lab && !this.session.running ? "goalEdit" : "goal" });
       return;
     }
+    if (inRect(GOALBAR, x, y) && !heldAbove) return;
     const labHint = this.labHintAt(x, y);
     if (labHint) {
       const { hint: h, zone } = labHint;
@@ -496,7 +529,10 @@ export class PlayScreen {
     const slot = this.inBin(x, y) ? this.slotAt(x, y) : null;
     if (slot) {
       const part = slot.parts[0]!;
-      ed.takeFromBin(part);
+      if (!ed.takeFromBin(part)) {
+        if (!ed.mayTakeFromBin()) this.emit({ type: "duelRefused", reason: "bin" });
+        return;
+      }
       this.focus = null;
       this.drag = { kind: "bin", part, startX: x, startY: y, moved: false, touch, fresh: true };
       this.emit({ type: "sound", name: "pick" });
@@ -507,6 +543,12 @@ export class PlayScreen {
     const { part, zone } = this.fieldTarget(f.x, f.y, touch);
     if (!part) {
       this.focus = null;
+      return;
+    }
+    if (!ed.mayTouch(part)) {
+      // 42e6d3 : la pièce n'est pas sélectionnée ; l'appui donne 0xE24 et GENERIC 31152.
+      this.focus = null;
+      this.emit({ type: "duelRefused", reason: "moved" });
       return;
     }
     switch (zone) {
@@ -611,12 +653,8 @@ export class PlayScreen {
       if (!focus || !this.inHintFrame(focus, x, y)) this.hintFocus = null;
     }
     if (ed.held) {
-      if (this.inField(x, y)) {
-        const f = this.toField(x, y, touch && !isLink(ed.held));
-        this.preview = ed.hover(f.x, f.y);
-      } else {
-        this.preview = { valid: false };
-      }
+      const f = this.heldTarget(x, y, touch);
+      this.preview = f ? ed.hover(f.x, f.y) : { valid: false };
       return;
     }
     if (this.session.running || !this.inField(x, y)) {
@@ -624,11 +662,12 @@ export class PlayScreen {
       return;
     }
     const f = this.toField(x, y, false);
-    const t = this.fieldTarget(f.x, f.y, touch);
+    const found = this.fieldTarget(f.x, f.y, touch);
+    const t = found.part && !ed.mayTouch(found.part) ? { part: null, zone: Zone.None } : found;
     if (!touch) {
-      const target = t.part && (ed.isMovable(t.part) || t.zone === Zone.Info) ? t.part : null;
+      const target = t.part && ed.mayTouch(t.part) && (ed.isMovable(t.part) || t.zone === Zone.Info) ? t.part : null;
       // Entre la pièce et une poignée éloignée (retournement, info), au-dessus du vide ou d'une pièce fixe, la pièce garde ses poignées.
-      const keep = !target && this.focus !== null && ed.isMovable(this.focus) && this.inHandleFrame(this.focus, f.x, f.y);
+      const keep = !target && this.focus !== null && ed.isMovable(this.focus) && ed.mayTouch(this.focus) && this.inHandleFrame(this.focus, f.x, f.y);
       if (!keep) this.focus = target;
     }
     this.hoverZone = t.zone;
@@ -671,8 +710,8 @@ export class PlayScreen {
     if (!ed.held) return;
     // Un appui sans glisser sur une pièce qu'on vient de prendre : elle reste en main.
     if (!d.moved && d.fresh) return;
-    if (this.inField(x, y)) {
-      const f = this.toField(x, y, d.touch && !isLink(ed.held));
+    const f = this.heldTarget(x, y, d.touch);
+    if (f) {
       const r = ed.click(f.x, f.y);
       if (r === "placed" || r === "linked") this.emit({ type: "sound", name: "drop" });
       else if (r === "refused") this.emit({ type: "sound", name: "refused" });
@@ -764,7 +803,7 @@ export class PlayScreen {
       }
       return false;
     }
-    const target = ed.held ?? (this.focus && ed.isMovable(this.focus) ? this.focus : null);
+    const target = ed.held ?? (this.focus && ed.isMovable(this.focus) && ed.mayTouch(this.focus) ? this.focus : null);
     const k = key.length === 1 ? key.toUpperCase() : key;
     switch (k) {
       case "X":
@@ -824,7 +863,8 @@ export class PlayScreen {
       toolbar: this.shownButtons(),
       binPanelOnly: true,
     });
-    drawGoalBar(screen, this.assets, goal);
+    drawGoalBar(screen, this.assets, goal, this.goalRect.width);
+    if (this.duel) this.drawBoard(screen, this.duel);
     const { x: px, y: py } = this.pointer;
     const hoverSlot = !this.pointer.touch && this.pointer.inside && !ed.held && this.inBin(px, py) ? (bin.slots.find((k) => inRect(k, px, py)) ?? null) : null;
     drawBinOverlay(screen, this.assets, { layout: bin, running: s.running, hover: hoverSlot });
@@ -845,20 +885,27 @@ export class PlayScreen {
     }
     if (this.rect) drawFieldRect(screen, this.rect);
     const focus = this.focus;
-    if (focus && !ed.held && (focus.flags0C & 0x3000) !== 0) drawHandles(screen, this.assets, this.handleViews(focus));
+    if (focus && !ed.held && (focus.flags0C & 0x3000) !== 0 && ed.mayTouch(focus)) drawHandles(screen, this.assets, this.handleViews(focus));
     const held = ed.held;
     if (held) {
       const { x, y } = this.pointer;
       if (isLink(held)) {
         if (this.preview.line) drawRubberBand(screen, this.preview.line, this.preview.valid);
         if (!this.inField(x, y) || !this.preview.line) this.drawAtPointer(screen, held);
-      } else if (this.pointer.inside && this.inField(x, y)) {
+      } else if (this.pointer.inside && this.heldTarget(x, y, this.pointer.touch)) {
         drawHeldPart(screen, this.assets, s.world, held, this.preview.valid, true);
       } else if (this.pointer.inside || this.pointer.touch) {
         this.drawAtPointer(screen, held);
       }
     }
     return screen;
+  }
+
+  /** Tableau des deux joueurs (`H2H.ITF`). */
+  private drawBoard(screen: Surface, duel: Duel): void {
+    if (!this.boardItf && this.assets.index.has("H2H.ITF")) this.boardItf = readItf(this.assets.index.get("H2H.ITF"));
+    if (!this.boardItf) return;
+    drawDuelBoard(screen, this.assets, this.boardItf, { names: duel.settings.names, turn: duel.turn, wins: duel.wins, remaining: duel.remaining });
   }
 
   /** Pièce tenue hors de l'aire (au-dessus du bac) : dessinée sous le pointeur. */

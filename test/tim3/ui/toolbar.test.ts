@@ -3,6 +3,7 @@ import { TOOLBAR_TEXT, toolbarDecision, toolbarStates, type ToolbarContext } fro
 
 const play: ToolbarContext = { lab: false, solved: false, running: false };
 const lab: ToolbarContext = { lab: true, solved: false, running: false };
+const duel: ToolbarContext = { lab: false, duel: true, solved: false, running: false };
 const names = (ctx: ToolbarContext) => toolbarStates(ctx).map((b) => b.name);
 const state = (ctx: ToolbarContext, name: string) => toolbarStates(ctx).find((b) => b.name === name);
 
@@ -48,12 +49,19 @@ describe("barre d'outils : boutons selon le mode (418b78)", () => {
     expect(toolbarStates({ ...play, running: true }).filter((b) => b.pressed).map((b) => b.name)).toEqual(["TB_GOTO_PUZ", "TB_FLAG"]);
   });
 
-  it("modes non portés grisés partout : deux joueurs, inscription, visite guidée ; le manuel ouvre l'aide", () => {
-    for (const ctx of [play, lab]) {
-      for (const n of ["TB_GOTO_H2H", "TB_GOTO_SIGNIN", "TB_GOTO_TUTORIAL"]) expect(state(ctx, n)?.disabled).toBe(true);
-      expect(state(ctx, "TB_GOTO_TOUR")?.disabled).toBe(false);
+  it("modes non portés grisés partout : inscription, visite guidée ; le manuel ouvre l'aide ; deux joueurs actif", () => {
+    for (const ctx of [play, lab, duel]) {
+      for (const n of ["TB_GOTO_SIGNIN", "TB_GOTO_TUTORIAL"]) expect(state(ctx, n)?.disabled).toBe(true);
+      for (const n of ["TB_GOTO_TOUR", "TB_GOTO_H2H"]) expect(state(ctx, n)?.disabled).toBe(false);
     }
-    expect(toolbarStates(play).filter((b) => b.disabled)).toHaveLength(3);
+    expect(toolbarStates(play).filter((b) => b.disabled)).toHaveLength(2);
+  });
+
+  it("deux joueurs (mode 2, 418cc4) : barre du Jeu plus « Terminer le Tour », sans ampoule ; chat et Tim enfoncés", () => {
+    expect(names({ ...duel, solved: true })).toEqual([...names(play).slice(0, -1), "TB_END_TURN", "TB_FLAG"]);
+    expect(names(play)).not.toContain("TB_END_TURN");
+    expect(names(lab)).not.toContain("TB_END_TURN");
+    expect(toolbarStates(duel).filter((b) => b.pressed).map((b) => b.name)).toEqual(["TB_GOTO_H2H"]);
   });
 });
 
@@ -82,8 +90,26 @@ describe("barre d'outils : clics (418ded)", () => {
     expect(at("TB_SOLUTION", play)).toEqual({ action: "none" });
   });
 
+  it("chat et Tim (4195bd) : confirmation 31399 puis la fenêtre des deux joueurs, du Jeu, du Labo et de l'essai ; rien en mode 2", () => {
+    expect(at("TB_GOTO_H2H", play)).toEqual({ action: "duel", confirm: TOOLBAR_TEXT.openDuel });
+    expect(at("TB_GOTO_H2H", lab)).toEqual({ action: "duel", confirm: TOOLBAR_TEXT.openDuel });
+    expect(at("TB_GOTO_H2H", { ...play, test: true })).toEqual({ action: "duel", confirm: TOOLBAR_TEXT.openDuel, endTest: true });
+    expect(at("TB_GOTO_H2H", duel)).toEqual({ action: "none" });
+  });
+
+  it("deux joueurs : Puzzle (31397) et clé (31398) quittent le match ; « Terminer le Tour » (418e70) ; rien ailleurs", () => {
+    expect(at("TB_GOTO_PUZ", duel)).toEqual({ action: "play", confirm: TOOLBAR_TEXT.openPlay });
+    expect(at("TB_GOTO_WORK", duel)).toEqual({ action: "lab", confirm: TOOLBAR_TEXT.openLab });
+    expect(at("TB_END_TURN", duel)).toEqual({ action: "endTurn" });
+    expect(at("TB_END_TURN", { ...duel, running: true })).toEqual({ action: "endTurn" });
+    expect(at("TB_END_TURN", play)).toEqual({ action: "none" });
+    expect(at("TB_SOLUTION", { ...duel, solved: true })).toEqual({ action: "none" });
+    expect(at("TB_DISK", duel)).toEqual({ action: "chooser" });
+    expect(at("TB_HINT", duel)).toEqual({ action: "hints" });
+  });
+
   it("boutons grisés : « non disponible » ; boutons cachés : sans effet", () => {
-    expect(at("TB_GOTO_H2H", play).action).toBe("unavailable");
+    expect(at("TB_GOTO_SIGNIN", play).action).toBe("unavailable");
     expect(at("TB_GOTO_TOUR", play).action).toBe("help");
     expect(at("TB_LOCKED", play).action).toBe("none");
     expect(at("TB_TEST", play).action).toBe("none");

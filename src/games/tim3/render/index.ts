@@ -9,3 +9,4 @@ export * from "./surface";
 export * from "./text";
 export * from "./editor-overlay";
 export * from "./itf-draw";
+export * from "./duel-board";

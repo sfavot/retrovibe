@@ -8,6 +8,7 @@ import { ItfWindow, screenOptions, type ItfScreen } from "../../../src/games/tim
 import {
   BIN_OF_CATEGORY,
   BinScreen,
+  CARD_GOAL_VOICE_PASSES,
   DOSBIN,
   DOSBOX,
   DOUBLE_CLICK_MS,
@@ -204,19 +205,19 @@ describe.skipIf(!original.has)("choix du puzzle sur les données d'origine (DOSB
     expect(diff(solved, unsolved, g.textX, g.textX + g.textWidth)).toBe(0);
   });
 
-  it("DOSBIN : bacs des catégories, deux joueurs grisé, Maison actif, focus sur la catégorie en cours", () => {
+  it("DOSBIN : bacs des catégories, deux joueurs et Maison actifs, focus sur la catégorie en cours", () => {
     const bins = new BinScreen(readItf(index.get("DOSBIN.ITF")), "Bacs", 3);
     const { m } = open(bins);
     expect(bins.options.defaultId).toBe(DOSBIN.hard);
     expect(BIN_OF_CATEGORY.slice(0, 5)).toEqual([DOSBIN.tutorial, DOSBIN.easy, DOSBIN.medium, DOSBIN.hard, DOSBIN.reallyHard]);
     expect(bins.action(DOSBIN.easy)).toEqual({ kind: "category", category: 1 });
     expect(bins.action(DOSBIN.tutorial)).toEqual({ kind: "category", category: 0 });
-    expect(bins.action(DOSBIN.duel)).toEqual({ kind: "unavailable" });
+    expect(bins.action(DOSBIN.duel)).toEqual({ kind: "category", category: 5 });
     expect(bins.action(DOSBIN.user)).toEqual({ kind: "category", category: 6 });
     expect(m.name(m.item(DOSBIN.user)!)).not.toContain("non disponible");
     expect(bins.action(DOSBIN.cancel)).toEqual({ kind: "cancel" });
     expect(bins.action(DOSBIN.help)).toEqual({ kind: "help" });
-    expect(m.name(m.item(DOSBIN.duel)!)).toBe("À Deux Joueurs (non disponible)");
+    expect(m.name(m.item(DOSBIN.duel)!)).toBe("À Deux Joueurs");
     expect(m.name(m.item(DOSBIN.reallyHard)!)).toBe("Très Difficiles");
     expect(m.escape()).toBe(DOSBIN.cancel);
   });
@@ -238,6 +239,21 @@ describe.skipIf(!original.has)("choix du puzzle sur les données d'origine (DOSB
     const t = m.rect(PUZZDISP.title)!;
     const inside = s.pixels.subarray(t.y * 640, (t.y + t.height) * 640);
     expect(new Set(inside).size).toBeGreaterThan(3);
+  });
+
+  it("PUZZDISP : la voix du but part à la 18e passe de la fiche ouverte (425f1b, 425f6b), une seule fois", () => {
+    const ref = puzzles.find((p) => p.name === "HLEV5")!;
+    let voices = 0;
+    const card = new PuzzleCardScreen(assets, readItf(index.get("PUZZDISP.ITF")), ref, "Titre", () => voices++);
+    const { m } = open(card);
+    for (let i = 1; i < CARD_GOAL_VOICE_PASSES; i++) m.pass();
+    expect(voices).toBe(0);
+    m.pass();
+    expect(voices).toBe(1);
+    for (let i = 0; i < 100; i++) m.pass();
+    expect(voices).toBe(1);
+    // Sans voix (puzzle maison) : rien.
+    expect(() => new PuzzleCardScreen(assets, readItf(index.get("PUZZDISP.ITF")), ref, "Titre").options.tick?.()).not.toThrow();
   });
 
   it("fenêtre fermée sans choix : résultat nul", () => {

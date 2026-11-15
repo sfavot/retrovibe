@@ -4,7 +4,7 @@ Jeu : *The Incredible Machine 3* (Dynamix / Sierra, 1995), **version 3.0 pour Wi
 
 C'est un jeu de puzzles mécaniques en 640×480 et 256 couleurs. On construit une machine en déposant des pièces (balles, cordes, poulies, courroies, moteurs, animaux…) dans l'aire de jeu, puis on la met en marche ; la simulation physique décide si le but est atteint. Le jeu contient :
 - **156 puzzles** répartis en cinq niveaux : 40 de travaux pratiques, 26 faciles, 30 moyens, 31 difficiles, 29 très difficiles ;
-- **50 puzzles « HH »** (à deux joueurs d'après les noms ; mode à confirmer en vague D) ;
+- **50 puzzles « HH »** (mode à deux joueurs, porté : D12, `ui.md` § Deux joueurs) ;
 - le **Labo**, un atelier libre (« Professor Tim's Workshop »).
 
 Textes en cinq langues dont le **français**. **Voix anglaises** du professeur (43 minutes : buts, indices, aide). Musique **HMI General MIDI** (24 morceaux). 121 effets WAV.
@@ -67,7 +67,7 @@ Le dépôt publie déjà d'autres abandonwares sur la même base (Zoombinis, SWI
 | D9 | **Application : `mountGameShell`, pas `point-click-app`** | **`mountGameShell` + `TickScheduler` + `bindCanvasPointer` / `PointerQueue` + `SoundPrefs` + `SaveSlots`**, comme Armaeth et SWIV 3D. | `point-click-app` est fait pour l'aventure (« Passer », clic et appui long = deux boutons, sous-titres, sauvegardes de partie). L'adapter à un jeu de construction le dévoierait. |
 | D10 | **Cadence** | **Un pas de simulation toutes les 32 ms** (`tickMs: 32`, ≈ 31 Hz), comme le minimum d'attente de la boucle d'origine. Rendu à chaque image du navigateur. | Le jeu tournait plus lentement si le dessin prenait plus de 32 ms ; on retient la cadence nominale. À confirmer sous Wine (contrôle ponctuel) si D2 est acceptée. La physique ne dépend pas de la cadence (pas fixe). |
 | D11 | **Sauvegardes et progression** | **Progression** (puzzles résolus, dernier puzzle) en stockage local, préfixe `tim3:`. **Machines du Labo** dans `SaveSlots` : 10 emplacements, JSON versionné qui reprend les champs d'un LEV, nom saisi. **Puzzle en cours** : l'état d'édition est gardé à la sortie, jamais en pleine simulation. | Le jeu d'origine sauvegarde ses machines en fichiers LEV : on garde le même contenu, sans écrire de fichier. Pas de lecture des sauvegardes d'origine (optionnel). |
-| D12 | **Puzzles HH** | **Reporté** : lu par les lecteurs (D), non proposé dans l'interface en première livraison. | Mode établi en vague D : deux joueurs sur le même poste, à tour de rôle sur le même puzzle, une action par tour (bouger une pièce ou en prendre une dans le bac) sous compte à rebours, « End Turn », match en plusieurs manches. Le reste du jeu n'en dépend pas. |
+| D12 | **Puzzles HH, mode à deux joueurs** (révisé le 15/11/2026) | **Porté** (`engine/duel.ts`, `ui/duel-window.ts`, `render/duel-board.ts`, `ui.md` § Deux joueurs), lu dans TIMWIN.EXE (mode 2) : deux joueurs sur le même écran, réglages `HEDTOHED.ITF` (parties, durée du tour de chacun, noms), à tour de rôle sur le même puzzle, **une pièce du bac et une pièce de l'aire par tour**, chronomètre, « Terminer le Tour », tableau `H2H.ITF`, match au meilleur des N parties. Le bac Deux joueurs de `DOSBIN` est actif (puzzle HH joué seul en Jeu, partie suivante en mode 2). | Première livraison : reporté. La lecture de l'exe a corrigé la règle supposée en vague D (« une action par tour ») : deux limites indépendantes (31152, 31153). Ni réseau ni ordinateur adversaire, comme l'original. |
 | D13 | **Tables tirées de l'exe** | **Générées par un script** (`scripts/tim3/gen-tables.py`, lancé à la main sur `TIMWIN.EXE`) vers `src/games/tim3/data/tables/*.ts`, avec la provenance (adresse) en tête : cosinus Q14, arctangente, constantes des types sans `.PAR` (149 à 280). Contrôle : octet pour octet identiques à l'exe. | Ces tables ne sont pas dans les ressources. Les générer évite les erreurs de recopie, comme pour BASS (D9). L'exe lui-même est versionné (D1) mais n'est pas lu à l'exécution. |
 
 ## Mutualisation (consigne : mutualiser sans trop dévoyer les jeux)
@@ -220,7 +220,6 @@ Total : **18 000 à 21 000 lignes** (autant de tests), soit **plus que Lure et B
 
 **Optionnel, à part** :
 - M2 : sinon, import tel quel de `web-sink.ts` ;
-- puzzles HH (D12) ;
 - autres langues des textes (déjà dans l'ISO, ~1,7 Mo) ;
 - lecture et écriture des fichiers LEV d'origine (importer une machine) ;
 - partage d'une machine du Labo par lien ;

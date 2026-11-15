@@ -189,7 +189,12 @@ export function musicboxWindow(assets: RenderAssets, baseItf: Itf, o: MusicboxOp
       checked: (id) => (id === MUSICBOX.musicSwitch ? s.musicOn : id === MUSICBOX.soundSwitch ? s.effectsOn : id === MUSICBOX.voiceSwitch ? s.voicesOn : undefined),
       status: () => copy.musicboxStatus(musicName(), effectName(), s.volume),
       tick: () => {
-        if (musicDelay >= 0 && --musicDelay < 0 && s.musicOn) o.playMusic(playable[musicIndex]?.id ?? 0);
+        // 4238e7 : `PlaySound(choix, 0, 0)`, sans le drapeau « ne pas relancer » : le morceau repart du début, même s'il jouait déjà
+        // (MB_MUSIC, 423a29, force ce départ).
+        if (musicDelay >= 0 && --musicDelay < 0 && s.musicOn) {
+          o.stopMusic();
+          o.playMusic(playable[musicIndex]?.id ?? 0);
+        }
         if (effectDelay >= 0 && --effectDelay < 0) {
           if (playingEffect >= 0) o.stopEffect(playingEffect);
           playingEffect = o.soundList[s.effect]?.id ?? -1;

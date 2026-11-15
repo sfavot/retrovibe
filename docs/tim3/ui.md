@@ -13,7 +13,9 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 | `engine/lab-puzzle.ts` | `LabPuzzle` : le puzzle maison du Labo (but, 8 indices, conditions de réussite tenues par leurs pièces, délai), plages d'états de `SOLVE.RES` (429cb8, 429ef4). |
 | `engine/program.ts` | `PartProgram` : fenêtre « programmer » (42ea57 → 4249f8, `PROG<type>.ITF`) des types 4, 27, 54, 58, 63, 71, 80, 81, 87, 96, 108, 137 ; choix lus dans `PROGPART.RES` (`parseProgramRows`), compteur du pistolet laser, réglettes de la balle programmable et du seau troué, boîtes et ballon refusés s'ils chevauchent. `Editor.program(pièce, lignes)`. |
 | `engine/goals.ts` | `GoalTest` (436dc6 : zones, états, conditions « nombre », délai) et `SolvedCountdown` (30 images après le premier succès, 4359a4). |
-| `engine/session.ts` | `Tim3Session` : édition / marche, Démarrer (copie de l'état d'édition), Arrêter (retour exact), puzzle réussi, sons des pièces (`drainEffects`), Labo (`LabSettings`, `labLevel`), `Progress` (clés `tim3:solved`, `tim3:last`, noms de puzzles du jeu seulement), `puzzleList` (156 puzzles, HH reportés) ; options `unlock` et `originalCount` pour reprendre une aire gardée. |
+| `engine/session.ts` | `Tim3Session` : édition / marche, Démarrer (copie de l'état d'édition), Arrêter (retour exact), puzzle réussi, sons des pièces (`drainEffects`), Labo (`LabSettings`, `labLevel`), `Progress` (clés `tim3:solved` : puzzles solo et HH, `tim3:last` : solo), `puzzleList` (156 puzzles solo), `duelPuzzleList` (50 HH, catégorie 5), `SessionOptions.guard` (règle du tour à deux joueurs, suivie à l'arrêt de la machine) ; options `unlock` et `originalCount` pour reprendre une aire gardée. |
+| `engine/duel.ts` | Mode à deux joueurs (mode 2) : réglages (`stepGames`, `stepTime`), `DuelTurn` (règle du tour, `EditGuard` de l'éditeur : 417190, 41715f, 42ebba, 4301cb, 43013e), `Duel` (tour, chronomètre, manches, fins de manche 419803 / 41d827), `nextDuelPuzzle` (42cbad(5)). |
+| `ui/duel-window.ts`, `render/duel-board.ts` | Fenêtre des réglages (`HEDTOHED.ITF`, 41d15c) ; tableau des joueurs (`H2H.ITF`, 414670, 414a93, 41495b). |
 | `engine/save.ts` | Sauvegardes (D11) : `snapshotWorld` / `snapshotLab` (inverse de `World.addFromLev`, un monde en édition → enregistrements de LEV), `parse*` (valeur inconnue → `null`), machines du Labo (`labSaveSlots`, `saveMachine`, `loadMachine`, version 2 et `migrateLabMachine`), niveau à jouer d'une machine (`puzzleLevel`), `EditStore` (état d'édition). |
 | `engine/solution.ts` | « Montrer la solution » (ampoule) : `designerSolution` verrouille à leur place les pièces du bac sans le bit 0x100 (leurres et liens vers un leurre exclus), `solutionSession` les déverrouille (`unlock`). |
 | `ui/toolbar.ts` | Barre du haut sans DOM : `toolbarStates` (boutons montrés, enfoncés, grisés selon le mode, 418b78), `toolbarDecision` (clic et confirmation, 418ded), `interfaceText` (texte de `INTRFACE.RES` par identifiant). |
@@ -40,7 +42,10 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 
 ## Barre d'outils (418b78, 418ded)
 
-- Jeu : Puzzle enfoncé ; deux joueurs, manuel, visite guidée, inscription grisés (palette atténuée, `RenderAssets.fadeTable` :
+- Deux joueurs (mode 2, 418cc4) : la barre du Jeu, chat et Tim enfoncés, « Terminer le Tour » (`TB_END_TURN`, 56 × 28 en x = 522), pas
+  d'ampoule. Chat et Tim depuis le Jeu, le Labo ou l'essai : 31399 puis la fenêtre des réglages (4195bd) ; Puzzle (31397) et clé (31398)
+  quittent le match.
+- Jeu : Puzzle enfoncé ; visite guidée, inscription grisés (palette atténuée, `RenderAssets.fadeTable` :
   l'ANM n'a que « relâché » et « enfoncé », le jeu cache ses boutons sans jamais les griser) ; cadenas et levier d'essai cachés ;
   ampoule à x = 540 si le puzzle est résolu (`Progress`), sinon vide.
 - Labo : clé enfoncée ; cadenas (`HTLOCK`), levier d'essai et main (éditeur d'indices 41f3dc) actifs ; pas d'ampoule (§ Outils du Labo).
@@ -63,7 +68,11 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
   l'éditeur traite chaque appui à sa position exacte (`PlayScreen.pointerDown(x, y)`), il ne relit pas un curseur une fois
   par image comme les moteurs de Lure ou Drascula, donc le retard du toucher n'apporte rien ici.
 - Glisser-déposer unifié (D8) : prendre, glisser, lâcher ; un appui sans glisser garde la pièce en main (deux clics de
-  l'original). Au doigt : pièce tenue 40 px au-dessus du doigt, premier appui sur une pièce posée = sélection (poignées),
+  l'original). Au doigt : pièce tenue 40 px au-dessus du doigt (sauf corde et courroie) ; l'original pose la pièce quand la
+  fenêtre sous le pointeur est l'aire (42ebba → 43b047 → 42f24a), sinon l'appui la rend au bac (42f978) : au doigt, c'est le
+  point soulevé qui doit être sur l'aire, pas le doigt (`PlayScreen.heldTarget`), pour poser au ras du sol le doigt sur la
+  barre du but (tremplin de TLEV17, qui revenait au bac) ; un doigt à moins de 40 px du haut de l'aire vise la barre
+  d'outils et rend la pièce au bac, comme la souris. Premier appui sur une pièce posée = sélection (poignées),
   appui long dans le bac = description. Bac : flèches gauche et droite d'une colonne à la fois (pas de molette dans
   l'original ni dans le port, pas de glisser pour faire défiler : un appui sur une case prend la pièce).
 - Clavier (42f63c) : X, Y, + ou =, −, Suppr, Échap.
@@ -109,17 +118,18 @@ lancement ; le port aussi, à chaque clic sur « Jouer » (la page de dev avec `
   allumée, état 36 de `BUTTONS.ANM`, ou éteinte, état 35). Clic : rangée choisie (son 0xE1B) ; double clic ou « Lancer » : charge ;
   « Autres Puzzles » (`DR_BIN`) ouvre `DOSBIN` (41ae39, 41b649 : bac de la catégorie en cours au focus, table 0x4726d4) puis revient à
   `DOSBOX` sur la catégorie choisie ; « Avancé » : sélecteur de fichiers Windows (42a088). Après chargement : `PUZZDISP` (425d20 :
-  catégorie 31048 + n, « %Fs %d » de 2064, titre, icône seule de la catégorie, musique du puzzle relancée, voix du but 18 tours
-  après si `[0x480370]` vaut « E »).
+  catégorie 31048 + n, « %Fs %d » de 2064, titre, icône seule de la catégorie, musique du puzzle relancée du début, voix du but
+  18 passes après, **pendant la fiche**, si `[0x480370]` vaut « E » ; OK la coupe et relance la musique : `audio.md` § Enchaînement).
 
 Écarts du port :
-- Deux joueurs, Inscription, Exercice : grisés (trame) et cliquables, « non disponible » du jeu, comme la barre d'outils ; Manuel
+- Duel : la fenêtre des deux joueurs (§ Deux joueurs). Inscription, Exercice : grisés (trame) et cliquables, « non disponible » du jeu, comme la barre d'outils ; Manuel
   ouvre l'aide du site ; Aide (4169c8(10) : rubrique du manuel Windows `TIMHELP.EXE`) ouvre l'aide du professeur par-dessus le menu
   (§ Aide du professeur) ; Quitter pose toujours la question 31113, puis revient à l'accueil du site (sur la page de dev : le jeu
   repart). Options : la guitare (`MUSICBOX`). Bande `MM_TEXT` : seuls les six modes ont un texte « contrôle + 100 » ; pour Aide,
   Options, Quitter et hors des boutons, elle est vide (4233a3 ne trouve rien, 423473 ne dessine rien). Le focus du clavier tient lieu
   de survol : la bande suit la dernière des deux actions.
-- `DOSBIN` : Deux joueurs (D12) grisé ; « Avancé » grisé. Maison (`DB_USER`, « Puzzles Personnels ») : les machines du Labo qui ont
+- `DOSBIN` : Deux joueurs actif (en Jeu, un puzzle HH se joue seul, comme dans l'exe : sans BINSOLVE, 4261a7 ; « Puzzle Suivant » : le HH
+  suivant non résolu) ; « Avancé » grisé. Maison (`DB_USER`, « Puzzles Personnels ») : les machines du Labo qui ont
   un but (§ Outils du Labo), au lieu des fichiers LEV du répertoire des puzzles personnels ; sans aucune, un message du site (le jeu
   dit « Le répertoire ne contient aucun puzzle », 31184). Le titre et son champ de `DOSBOX` ne servent qu'à « Enregistrer sous » (Labo) :
   cachés, comme le fait l'exe en chargement.
@@ -326,6 +336,55 @@ son auteur (les pièces du bac sans le bit 0x100, `solutionSession`).
 - Professeur de l'éditeur d'indices : pas de voix (le jeu y joue celle d'un indice du dernier puzzle joué, `[0x481600]`).
 - Une condition dont la pièce est retirée au Labo disparaît ; une main sans texte n'est pas créée.
 
+## Deux joueurs (mode 2, lu dans TIMWIN.EXE)
+
+**Entrée** : Duel du menu principal (422e31 → 42319e), chat et Tim de la barre (4195bd, 31399), « Affronter » en fin de match (419aed) ;
+les deux derniers passent par le mode 7 (422a24). 42319e : mode 2, puis la fenêtre `HEDTOHED.ITF` (41d15c, procédure 41d26d, boutons
+41d4be) : parties `[0x477984]` 1 à 9 de 2 en 2 (3), durée de chaque joueur `[0x47797c]` / `[0x477980]` 10 à 90 s de 5 en 5 (45 s), noms
+de 10 caractères (EDIT 416bb3 ; « Joueur 1 », « Joueur 2 » : 2100, 2101). OK : un nom vide → GENERIC 31179, la fenêtre reste ; sinon le
+puzzle de 42cbad(5) (premier HH non résolu à partir du puzzle en cours, puis depuis HH1 ; tous résolus : un HH au hasard, 4520a4,
+autre que celui en cours), `PUZZDISP`, joueur 1, manches à 0. Annuler (et Échap, 0xFE64) : menu principal. Les flèches écrivent les
+réglages gardés (`0x472840`) : Annuler ne les défait pas. Il n'y a pas de choix du puzzle dans la fenêtre ; la disquette (`DOSBOX`)
+reste ouverte en mode 2 et le puzzle chargé devient la partie suivante (scores gardés).
+
+**Tours** (4330d0, à chaque passe de la boucle d'édition et de la boucle de marche) : un nouveau puzzle donne la main au joueur courant
+(au début du match le joueur 1, ensuite le vainqueur de la manche) ; à l'échéance `[0x4815d8]` (« Terminer le Tour », 418e70, la met à
+maintenant), hors marche : pièce tenue posée là où elle est, ou rendue au bac pour une corde, un câble, une courroie, une télécommande, des
+explosifs ou une pièce qui chevauche (4301f5) ; son 0xBF8 ; fond de l'aire 12 (joueur 1, rouge) ou 9 (joueur 2, bleu) ; tableau ; GENERIC
+31116 « %s, c'est votre tour. » ; le temps du joueur part à la fermeture. Le temps court pendant les autres fenêtres et pendant la marche
+de la machine (GetTickCount) ; le tour ne passe qu'une fois la machine arrêtée.
+
+**Ce qu'on peut faire dans un tour** : **une pièce prise dans le bac et posée** (`0x4815c0` → `0x4815b8`, 417190, 41715f ; rendue au bac
+sans être posée, elle ne compte pas, 42ebba) : ensuite le bac refuse (418207 : son 0xE24, GENERIC 31153 « Vous avez déjà enlevé un élément
+de la Corbeille! ») ; et **une pièce de l'aire changée** (`0x4815bc`, 4301cb : saisie, rangée, retournée, étirée ; programmer ne compte
+pas) : ensuite les autres pièces ne se sélectionnent plus (43013e ; un appui : 0xE24, GENERIC 31152 « Vous avez déjà déplacé 1 élément! »).
+La pièce du bac posée ce tour reste modifiable, ainsi que le partenaire d'une télécommande ou d'explosifs. Pas de confirmation à la
+balayette (43252d(0, 2) : le puzzle est rechargé, compteurs du tour gardés), pas d'ampoule, indices comme en Jeu. Le but et les conditions
+de réussite des HH sont ceux des autres puzzles (436dc6 n'a pas de cas du mode 2).
+
+**Fin de manche** (419803 → 41993b) : le joueur du tour où la machine résout le puzzle gagne la manche (`[0x4815c8]` / `[0x4815cc]`). Match
+fini si le total atteint le nombre de parties ou si un joueur a la majorité : le vainqueur devient le joueur courant, GENERIC 31120 « %s,
+vous avez gagné!!!… » (Rejouer / Affronter). Sinon, joueur 1 puis joueur 2 à une victoire du match (41d827(1), 41d827(0)) : égalité →
+« ~S3 » 2155 « C'est du sérieux maintenant!… » ; sinon « ~S3%s, %s %s » (celui qui est mené, celui qui mène, 2154) ; Rejouer / Suivant.
+Sinon 31117 « %s, vous avez résolu le puzzle!… » (Rejouer / Suivant). Rejouer relance la machine puis repose la question ; Suivant et
+Affronter notent le puzzle résolu (42ccae : même tableau que le Jeu, d'où la progression) ; Suivant : puzzle de 42cbad(5), `PUZZDISP`,
+le vainqueur commence. Pas de son de victoire, pas de PUZZSOLV ni de BINSOLVE.
+
+**Fenêtres** : la barre du but est réduite (286 px, table 0x471b80) et une fenêtre « HeadToHead » (`H2H.ITF`, 346 × 64, 414670) montre le
+tableau : fond `GOALBAR.ANM` état 3 (joueur 1) ou 4 (joueur 2) (414a93), noms (valeurs 11098 / 11099, couleur 15 pour le joueur du tour,
+7 pour l'autre), « Wins: » (31102, une espace en français ; couleur 14 / 15), manches (état 6), temps restant en secondes et dixièmes (état
+5, 41495b). Aucune voix propre au mode (la voix du but des HH existe : `goals/156` … `205`).
+
+**Port** (`engine/duel.ts`, `ui/duel-window.ts`, `render/duel-board.ts`, `ui/app.ts`) : jeu local sur le même appareil, comme l'original.
+La règle du tour est une garde de l'éditeur (`EditGuard`) : `takeFromBin` refuse, `grab`, `removeToBin`, `flip`, `resize`, `resizeEdge`
+refusent une pièce interdite ; `PlayScreen` ne montre pas ses poignées et demande le refus du jeu (`duelRefused`). Arrêter la machine
+remplace les pièces par leur copie : la garde suit (`remap`). Écarts : tableau posé à droite de la barre du but dans l'écran 640×480
+(`DUEL_BOARD`, x = 294 ; la barre du but garde son bord droit) ; le message du tour est montré à chaque nouvelle partie (l'exe le saute si
+le même puzzle revient) ; l'horloge du tour ne court pas onglet masqué et avance d'au plus 250 ms par image ; un puzzle maison choisi à la
+disquette pendant un match quitte le match ; « Menu principal » sous l'écran termine le match ; l'aire d'un match n'est pas gardée (D11) ;
+bouton « Terminer le tour » aussi sous l'écran (clavier, lecteurs d'écran). Le nom du joueur qui attend (couleur 7) se voit à peine sur la
+moitié grise du tableau, comme dans le jeu (à vérifier sur la version Windows).
+
 ## Son
 
 `Tim3Audio` (`audio/audio.ts`) : `enterPuzzle(music)` à l'entrée d'un puzzle ou du Labo, voix du but et des indices
@@ -336,7 +395,9 @@ la machine et au puzzle réussi (ambiances en boucle). La file `World.sounds` es
 
 ## Vérification sans navigateur
 
-`npx vitest run test/tim3/editor test/tim3/ui` (moins d'une seconde ; `test/tim3/ui` : barre d'outils) : éditeur, session, Labo, conditions de victoire, progression, `lab-tools.test.ts` (cadenas, onglets, puzzle maison, but au Labo ; fenêtres `HTLOCK`, éditeur d'indices, `SOLVE`, écran du Labo), `homemade.test.ts` (puzzle maison construit par l'éditeur, sauvegardé, relu au Labo, joué et résolu ; migration des sauvegardes de la version 1), `save.test.ts` (sauvegardes : aller-retour, reprise après
+`npx vitest run test/tim3/editor test/tim3/ui` (moins d'une seconde ; `test/tim3/ui` : barre d'outils) : `duel.test.ts` (règle du tour,
+chronomètre, manches, choix du puzzle, un match complet au meilleur des 3 joué tour par tour par l'éditeur sur HH23 et HH27 ; fenêtre
+`HEDTOHED`, tableau, refus à l'écran), éditeur, session, Labo, conditions de victoire, progression, `lab-tools.test.ts` (cadenas, onglets, puzzle maison, but au Labo ; fenêtres `HTLOCK`, éditeur d'indices, `SOLVE`, écran du Labo), `homemade.test.ts` (puzzle maison construit par l'éditeur, sauvegardé, relu au Labo, joué et résolu ; migration des sauvegardes de la version 1), `save.test.ts` (sauvegardes : aller-retour, reprise après
 rechargement, données corrompues, emplacement plein, nom vide, quinze solutions reprises et résolues au même pas), et
 `professor.test.ts` (professeur, fenêtre d'aide, mode aide), `test/tim3/data/help.test.ts` (`HELP.RES`), `solution.test.ts` (ampoule : solution du concepteur posée, `TIM3_SOLUTION_ALL=1` pour les 156 : toutes résolues, HLEV9 17 pas avant le banc), `program.test.ts` et `replay.test.ts`, qui rejoue quinze solutions du concepteur **par l'API de l'éditeur** (`replay.ts` : prendre au bac, retourner,
 étirer, tourner, poser, tendre courroies et cordes, brancher, programmer) puis vérifie la victoire au pas du banc + 30.
@@ -353,7 +414,7 @@ une (4393e0) et non dans l'ordre du LEV que lit le banc. `program.test.ts` couvr
   l'autre côté à 38 px.
 - Explosifs 0x37 rangés au bac avec leur télécommande au chargement (42f978) : le bac les montre ; à vérifier dans le jeu
   s'ils y sont visibles (le Labo ne les propose pas : absents de la table du bac).
-- Professeur : le jeu baisse la musique pendant sa voix (424684 : 41177b(2, 1), 41177b(1000, 1)) ; le port la laisse à son niveau.
+- Professeur : le jeu **arrête** la musique pendant sa voix (424684 : 41177b(2, 1), 41177b(1000, 1)) et la relance du début ensuite ; le port aussi (`audio.md` § Enchaînement).
 - **Noyau (à reprendre hors de cette vague)** : `World.stowUnlocked` donne une boîte nulle aux pièces 11, 13, 21, 25 (+0x34 du
   type à 0) et appelle des slots non portés (pentes 43c62b / 43c5f6, murs 43ea14, 43e734) ; l'éditeur corrige les pièces du
   bac et traduit ces slots en repli. Les opérations de bac de `World` (42f978, 4395ba, 43909c, 4390ff, 438fe3) sont privées :

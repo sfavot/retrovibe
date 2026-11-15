@@ -90,7 +90,7 @@ npx vitest run test/tim3/solutions          # TIM3_SOLUTIONS_DIR=<dossier> pour 
 | --- | --- | --- | --- |
 | TLEV1-40 | 40 (concepteur) | 40 / 40 | 40 / 40 |
 | ELEV, MLEV, HLEV, RLEV | 116 (concepteur ; ELEV22, HLEV9 retouchés) | 116 / 116 | 116 au pas du banc sauf ELEV18, RLEV3 ; trace identique sauf 11 |
-| HH1-50 (non versionnés) | brouillons du concepteur | 47 / 50 (HH15, HH33, HH38 non résolus en mode puzzle) | non mesuré |
+| HH1-50 (HH23, HH27 versionnés pour le match de `test/tim3/editor/duel.test.ts` ; les autres non versionnés) | brouillons du concepteur | 47 / 50 (HH15, HH33, HH38 non résolus en mode puzzle) | 42 / 50 au pas du banc (brouillons du scratchpad, `TIM3_SOLUTIONS_DIR`) ; HH23, HH27 aussi posés par l'éditeur |
 
 **Chevauchement (437208)** : aux places du concepteur, les explosifs télécommandés (55) d'ELEV22 et HLEV9 chevauchent un
 mur ; l'appel de 437208 du binaire au banc (après chargement du LEV) le confirme : l'éditeur refuserait la pose. Aucune

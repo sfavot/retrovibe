@@ -16,6 +16,7 @@ import { infoWindow } from "../../../src/games/tim3/ui/info-window";
 import { ItfWindow, screenOptions, type ItfScreen, type ItfWindowOptions } from "../../../src/games/tim3/ui/itf-window";
 import { loadSaveWindow, machineListWindow } from "../../../src/games/tim3/ui/machines-window";
 import { MainMenuScreen } from "../../../src/games/tim3/ui/main-menu";
+import { duelSetupWindow } from "../../../src/games/tim3/ui/duel-window";
 import { GENERIC, genericWindow, solvedWindow } from "../../../src/games/tim3/ui/menus";
 import { MUSICBOX, musicboxWindow } from "../../../src/games/tim3/ui/musicbox-window";
 import { programWindow } from "../../../src/games/tim3/ui/program-window";
@@ -89,6 +90,10 @@ describe.skipIf(!original.has)("noms accessibles des contrôles de chaque fenêt
     ["DOSBOX (choix du puzzle)", () => screen(new PuzzleListScreen(assets, itf("DOSBOX.ITF"), puzzles, progress, chooserTexts, 0, null))],
     ["DOSBIN", () => screen(new BinScreen(itf("DOSBIN.ITF"), "Catégories de puzzles", 1))],
     ["PUZZDISP", () => screen(new PuzzleCardScreen(assets, itf("PUZZDISP.ITF"), puzzles[0]!, "Titre"))],
+    [
+      "HEDTOHED (deux joueurs)",
+      () => open(duelSetupWindow(itf("HEDTOHED.ITF"), { settings: { games: 3, times: [45_000, 45_000], names: ["Joueur 1", "Joueur 2"] }, text: () => "", message: vi.fn(), start: vi.fn(), cancel: vi.fn() })),
+    ],
   ];
 
   it("toutes les fenêtres « programmer » sont couvertes", () => {

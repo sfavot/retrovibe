@@ -25,16 +25,23 @@ export const VOICES_PREF_KEY = "retrovibe:tim3:voices";
 
 /** Ce que l'interface et le moteur demandent au son. */
 export interface Tim3Audio {
-  /** Musique (1000 à 1023, 0 = aucune) ; le morceau déjà en cours n'est pas relancé. */
+  /** Musique (1000 à 1023, 0 = aucune) ; le morceau déjà en cours n'est pas relancé (`PlaySound(music, 0, 1)`). */
   playMusic(music: number): void;
+  /** Le morceau demandé repart du début (fiche du puzzle, 425edc … 425efa). */
+  restartMusic(): void;
+  /** Relance le morceau demandé s'il ne joue plus (fin de la voix, fermeture d'une fenêtre : `PlaySound(music, 0, 1)`). */
+  resumeMusic(): void;
   stopMusic(): void;
   readonly musicNumber: number;
   /** Effet `SX_<id>.WAV` (`priority` 1 et `flags` 0 par défaut : ceux de la commande son d'une animation) ; faux s'il est abandonné. */
   playEffect(id: number, priority?: number, flags?: number): boolean;
   stopEffect(id: number): void;
   stopEffects(): void;
-  /** Voix du professeur ; faux (texte seul) si désactivées ou absente. */
-  playVoice(ref: VoiceRef): boolean;
+  /**
+   * Voix du professeur ; faux (texte seul) si désactivées ou absente. Tant qu'elle parle, la musique est arrêtée (424684) ; à sa fin, elle
+   * repart du début, sauf `resumeAtEnd` faux (fiche du puzzle : la musique attend sa fermeture, `resumeMusic`).
+   */
+  playVoice(ref: VoiceRef, resumeAtEnd?: boolean): boolean;
   stopVoice(): void;
   readonly voiceActive: boolean;
   /** Pose du professeur pour la voix en cours (bouche fermée sans voix ni synchro). */
@@ -79,6 +86,8 @@ export class WebTim3Audio implements Tim3Audio {
   private level = 15;
   effectsEnabled = true;
   private port: (GmPort & { load(): Promise<void>; close(): void }) | null = null;
+  /** La voix en cours a arrêté la musique ; `resumeAtEnd` : la relancer quand elle se tait. */
+  private voiceSilence: { resumeAtEnd: boolean } | null = null;
 
   constructor(private readonly options: Tim3AudioOptions) {
     this.output = new WebSampleOutput({ now: options.now, createContext: options.createContext });
@@ -122,6 +131,7 @@ export class WebTim3Audio implements Tim3Audio {
     const port = create(ctx, gain, onReady);
     this.port = port;
     this.music = new Tim3Music(this.options.resources, port);
+    if (this.voiceSilence) this.music.silence();
     void port.load();
     return this.music;
   }
@@ -138,6 +148,15 @@ export class WebTim3Audio implements Tim3Audio {
 
   stopMusic(): void {
     this.music?.stop();
+  }
+
+  restartMusic(): void {
+    this.music?.restart();
+  }
+
+  resumeMusic(): void {
+    this.voiceSilence = null;
+    this.music?.resume();
   }
 
   get musicNumber(): number {
@@ -176,8 +195,12 @@ export class WebTim3Audio implements Tim3Audio {
 
   // --- voix --------------------------------------------------------------------------------------------------------------
 
-  playVoice(ref: VoiceRef): boolean {
-    return this.voices.play(ref);
+  playVoice(ref: VoiceRef, resumeAtEnd = true): boolean {
+    if (!this.voices.play(ref)) return false;
+    // 424684 : 41177b(1000, 1), la musique s'arrête pendant la voix (le jeu ne baisse pas le volume : il coupe).
+    this.music?.silence();
+    this.voiceSilence = { resumeAtEnd };
+    return true;
   }
 
   stopVoice(): void {
@@ -205,12 +228,16 @@ export class WebTim3Audio implements Tim3Audio {
   enterPuzzle(music: number): void {
     this.voices.stop();
     this.effects.stopAll();
+    this.voiceSilence = null;
+    this.music?.resume();
     this.playMusic(music);
   }
 
   stopAll(): void {
     this.voices.stop();
     this.effects.stopAll();
+    this.voiceSilence = null;
+    this.music?.resume();
     this.stopMusic();
   }
 
@@ -235,6 +262,8 @@ export class WebTim3Audio implements Tim3Audio {
 
   /** À chaque image. */
   update(): void {
+    // Fin de la voix (finie ou coupée) : 424622 / 423f9d relancent la musique ; la fiche du puzzle attend sa fermeture.
+    if (this.voiceSilence && !this.voices.active && this.voiceSilence.resumeAtEnd) this.resumeMusic();
     this.music?.tick();
   }
 

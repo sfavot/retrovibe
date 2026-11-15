@@ -53,6 +53,56 @@ describe("parseHmi", () => {
     expect(kinds).toEqual([0x80, 0x90]);
   });
 
+  it("fait durer un tick une note de durée nulle (son note-off après son note-on)", () => {
+    const s = parseHmi(song([track([0x00, 0x90, 0x40, 0x7f, 0x00])]));
+    const midi = s.events.filter((e) => e.kind === "midi").map((e) => [e.tick, (e as { bytes: Uint8Array }).bytes[0]]);
+    expect(midi).toEqual([
+      [0, 0x90],
+      [1, 0x80],
+    ]);
+  });
+
+  it("une note qui repart sur une touche tenue termine la précédente ; deux au même tick n'en font qu'une", () => {
+    // touche 0x40 : 0 → 100, reprise à 10 (→ 20) ; touche 0x41 : deux notes au tick 0 (durées 5 et 30).
+    const s = parseHmi(
+      song([
+        track([0x00, 0x90, 0x40, 0x7f, 0x64, 0x00, 0x41, 0x50, 0x05, 0x0a, 0x40, 0x7f, 0x0a]),
+        track([0x00, 0x90, 0x41, 0x60, 0x1e]),
+      ]),
+    );
+    const midi = s.events.filter((e) => e.kind === "midi").map((e) => {
+      const b = (e as { bytes: Uint8Array }).bytes;
+      return [e.tick, b[0] & 0xf0, b[1]];
+    });
+    expect(midi.filter(([, , k]) => k === 0x40)).toEqual([
+      [0, 0x90, 0x40],
+      [10, 0x80, 0x40],
+      [10, 0x90, 0x40],
+      [20, 0x80, 0x40],
+    ]);
+    expect(midi.filter(([, , k]) => k === 0x41)).toEqual([
+      [0, 0x90, 0x41],
+      [30, 0x80, 0x41],
+    ]);
+  });
+
+  it("repose au début de boucle l'état des canaux laissé par l'introduction", () => {
+    // Introduction : programme 5, volume 100, pitch bend tiré ; boucle de 10 à 40 qui change le programme et le volume.
+    const s = parseHmi(
+      song([
+        track([
+          0x00, 0xc0, 0x05, 0x00, 0xb0, 0x07, 0x64, 0x00, 0xe0, 0x00, 0x30, 0x00, 0xb0, 0x65, 0x00, 0x00, 0xb0, 0x64, 0x00,
+          0x0a, 0xfe, 0x14, 0xff, 0xff, 0x00, 0x90, 0x40, 0x7f, 0x05, 0x14, 0xc0, 0x09, 0x00, 0xb0, 0x07, 0x08,
+          0x0a, 0xfe, 0x15, 0x80, 0x01, 0, 0, 0, 0,
+        ]),
+      ]),
+    );
+    expect(s.loop?.startTick).toBe(10);
+    const atStart = s.events.filter((e) => e.kind === "midi" && e.tick === 10).map((e) => [...(e as { bytes: Uint8Array }).bytes]);
+    // Rejoué avant la note du début de boucle ; les contrôleurs RPN (101, 100) ne le sont pas.
+    expect(atStart).toEqual([[0xc0, 5], [0xb0, 7, 100], [0xe0, 0x00, 0x30], [0x90, 0x40, 0x7f]]);
+  });
+
   it("a un tempo fixe de 120 ticks par seconde et la même forme qu'un Song de smf.ts", () => {
     const s = parseHmi(song([track([0x00, 0x90, 0x40, 0x7f, 0x0a])]));
     expect(s.division).toBe(120);
@@ -113,7 +163,8 @@ describe.skipIf(!original.has)("musiques HMI de TIM3", () => {
         if ((status & 0xf0) === 0x90) on++;
         if ((status & 0xf0) === 0x80) off++;
       }
-      expect(on, name).toBe(s.tracks.reduce((n, t) => n + t.notes, 0));
+      // Deux notes d'une même touche au même tick n'en font qu'une (`placeNotes` ; SX_1009 double beaucoup de ses notes).
+      expect(on, name).toBeLessThanOrEqual(s.tracks.reduce((n, t) => n + t.notes, 0));
       expect(off, name).toBe(on);
       expect(s.events.every((e, i, all) => i === 0 || all[i - 1].tick <= e.tick), name).toBe(true);
       durations.push(s.endMs / 1000);

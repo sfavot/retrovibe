@@ -6,8 +6,10 @@
  * Ce que fait chaque bouton (422e31 : le choix ferme le menu, puis 422e31(choix + 10000) lance le mode) :
  * - Jeu (16010) : mode Jeu sur le puzzle en cours (42cbad(−1)), puis la fiche `PUZZDISP` (4230e5 → 425d20) ;
  * - Labo (16011) : mode Labo (423038) ;
- * - Duel (16012), Inscription (16014), Exercice avec le professeur (16015) : deux joueurs, inscription des joueurs, travaux dirigés
- *   (mode 6) ; non portés, grisés, « non disponible » comme la barre d'outils ;
+ * - Duel (16012) : mode à deux joueurs (42319e) : fenêtre des réglages `HEDTOHED` (`ui/duel-window.ts`), puis le premier puzzle
+ *   à deux joueurs non résolu ; Annuler revient au menu ;
+ * - Inscription (16014), Exercice avec le professeur (16015) : inscription des joueurs, travaux dirigés (mode 6) ; non portés,
+ *   grisés, « non disponible » comme la barre d'outils ;
  * - Manuel on-line (16013) : le manuel (4169c8(0), `TIMHELP.EXE`) ; le port ouvre l'aide du site, comme le livre de la barre ;
  * - Aide (16008, « ? ») : 4169c8(10) ouvre la rubrique 10 du même manuel Windows. Le port ouvre à la place l'aide du professeur
  *   (`HELP.ITF`, comme le « ? » de la barre, `MainMenuHelp`) par-dessus le menu, qui reste ouvert : son « ? » passe le menu en mode
@@ -39,12 +41,12 @@ export const MAIN_MENU = {
   help: 16008,
 } as const;
 
-export type MainMenuAction = "play" | "lab" | "help" | "options" | "quit" | "unavailable";
+export type MainMenuAction = "play" | "lab" | "duel" | "help" | "options" | "quit" | "unavailable";
 
 const ACTIONS: Readonly<Record<number, MainMenuAction>> = {
   [MAIN_MENU.play]: "play",
   [MAIN_MENU.lab]: "lab",
-  [MAIN_MENU.duel]: "unavailable",
+  [MAIN_MENU.duel]: "duel",
   [MAIN_MENU.manual]: "help",
   [MAIN_MENU.signIn]: "unavailable",
   [MAIN_MENU.tutorial]: "unavailable",
@@ -54,7 +56,7 @@ const ACTIONS: Readonly<Record<number, MainMenuAction>> = {
 };
 
 /** Modes non portés (grisés). */
-export const MAIN_MENU_GREYED: readonly number[] = [MAIN_MENU.duel, MAIN_MENU.signIn, MAIN_MENU.tutorial];
+export const MAIN_MENU_GREYED: readonly number[] = [MAIN_MENU.signIn, MAIN_MENU.tutorial];
 
 /** Modes animés au survol. */
 const MODES: readonly number[] = [MAIN_MENU.play, MAIN_MENU.lab, MAIN_MENU.duel, MAIN_MENU.manual, MAIN_MENU.signIn, MAIN_MENU.tutorial];

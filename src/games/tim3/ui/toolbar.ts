@@ -2,15 +2,17 @@
  * Barre d'outils du haut (`WTOOLBAR.ITF`), sans DOM : boutons montrés selon le mode, bouton du mode enfoncé, boutons non
  * portés grisés, et ce que fait un clic (confirmation d'origine comprise).
  *
- * TIMWIN.EXE : 418b78 cache ou montre les boutons selon le mode (`[0x477988]` : 0 Jeu, 1 Labo, 8 Labo en essai) puis enfonce
- * le bouton du mode passé par l'appelant (4197c7) ; 418ded aiguille les clics (identifiants 35001 à 35022). Le port a trois
- * modes : Jeu (un puzzle ouvert, du jeu ou maison), Labo, et l'essai du Labo (mode 8).
+ * TIMWIN.EXE : 418b78 cache ou montre les boutons selon le mode (`[0x477988]` : 0 Jeu, 1 Labo, 2 deux joueurs, 8 Labo en essai)
+ * puis enfonce le bouton du mode passé par l'appelant (4197c7) ; 418ded aiguille les clics (identifiants 35001 à 35022). Le port a
+ * quatre modes : Jeu (un puzzle ouvert, du jeu ou maison), Labo, l'essai du Labo (mode 8) et deux joueurs (mode 2).
  *
  * - Toujours montrés : les six modes de gauche, musique, valeurs globales, balayette, aide, drapeau.
  * - Jeu : disquette et indices ; cadenas, essai du Labo (`TB_TEST`), visite et fin de tour cachés ; l'ampoule
  *   « Montrer la solution » (x = 540) seulement si le puzzle a déjà été résolu (42d210), sinon l'emplacement reste vide.
  * - Labo : disquette, indices, cadenas et levier d'essai montrés ; ampoule, visite et fin de tour cachées.
  * - Essai (mode 8, 418ca4) : les boutons du Labo, levier d'essai enfoncé (418d91).
+ * - Deux joueurs (mode 2, 418cc4) : comme en Jeu, avec « Terminer le Tour » (`TB_END_TURN`, x = 522) ; pas d'ampoule ; chat et Tim
+ *   (`TB_GOTO_H2H`) enfoncés.
  *
  * Le jeu ne grise jamais un bouton (il les cache) : les boutons montrés mais non portés sont grisés par le port.
  */
@@ -32,6 +34,7 @@ export const TOOLBAR_NAMES = [
   "TB_LOCKED",
   "TB_TEST",
   "TB_SOLUTION",
+  "TB_END_TURN",
   "TB_FLAG",
 ] as const;
 
@@ -43,6 +46,8 @@ export interface ToolbarContext {
   lab: boolean;
   /** Essai du puzzle maison (mode 8) : la barre du Labo, levier d'essai enfoncé. */
   test?: boolean;
+  /** Mode à deux joueurs (mode 2). */
+  duel?: boolean;
   /** Le puzzle ouvert a déjà été résolu (`Progress`) : l'ampoule apparaît. */
   solved: boolean;
   /** La machine est en marche (drapeau enfoncé). */
@@ -56,16 +61,18 @@ export interface ToolbarButtonState {
   disabled: boolean;
 }
 
-/** Modes montrés mais non portés : deux joueurs, visite guidée, inscription. Le manuel (`TIMHELP.EXE`, hors jeu) ouvre l'aide du site. */
-const UNPORTED: ReadonlySet<ToolbarName> = new Set(["TB_GOTO_H2H", "TB_GOTO_SIGNIN", "TB_GOTO_TUTORIAL"]);
+/** Modes montrés mais non portés : visite guidée, inscription. Le manuel (`TIMHELP.EXE`, hors jeu) ouvre l'aide du site. */
+const UNPORTED: ReadonlySet<ToolbarName> = new Set(["TB_GOTO_SIGNIN", "TB_GOTO_TUTORIAL"]);
 /** Boutons montrés (418b78), de gauche à droite. */
 export function toolbarStates(ctx: ToolbarContext): ToolbarButtonState[] {
   const workshop = ctx.lab || ctx.test === true;
-  const mode: ToolbarName = workshop ? "TB_GOTO_WORK" : "TB_GOTO_PUZ";
+  const duel = !workshop && ctx.duel === true;
+  const mode: ToolbarName = workshop ? "TB_GOTO_WORK" : duel ? "TB_GOTO_H2H" : "TB_GOTO_PUZ";
   const out: ToolbarButtonState[] = [];
   for (const name of TOOLBAR_NAMES) {
     if (!workshop && (name === "TB_LOCKED" || name === "TB_TEST")) continue;
-    if (name === "TB_SOLUTION" && (workshop || !ctx.solved)) continue;
+    if (name === "TB_SOLUTION" && (workshop || duel || !ctx.solved)) continue;
+    if (name === "TB_END_TURN" && !duel) continue;
     out.push({
       name,
       pressed: name === mode || (name === "TB_FLAG" && ctx.running) || (name === "TB_TEST" && ctx.test === true),
@@ -87,6 +94,8 @@ export const TOOLBAR_TEXT = {
   clearLab: 31134,
   /** 0x79a7 : première entrée en essai (41913b, `[0x481004]`, une fois par partie). */
   testIntro: 31143,
+  /** 0x7aa7 : chat et Tim depuis le Jeu ou le Labo (41960c). */
+  openDuel: 31399,
 } as const;
 
 export type ToolbarAction =
@@ -105,6 +114,8 @@ export type ToolbarAction =
   | "lock"
   | "test"
   | "solution"
+  | "duel"
+  | "endTurn"
   | "run";
 
 export interface ToolbarDecision {
@@ -118,9 +129,11 @@ export interface ToolbarDecision {
 /**
  * Clic sur un bouton (418ded). `fieldEmpty` : l'aire du Labo n'a aucune pièce (la balayette n'a rien à effacer).
  *
- * - Puzzle : rien en Jeu (419466 renfonce le bouton) ; depuis le Labo, 31397 puis le Jeu. Le jeu montre 31134 à la place
+ * - Puzzle : rien en Jeu (419466 renfonce le bouton) ; depuis le Labo ou les deux joueurs, 31397 puis le Jeu. Le jeu montre 31134 à la place
  *   quand le Labo a été modifié (`[0x477950]`), parce qu'il le perd ; le port garde la machine du Labo (D11), donc 31397.
- * - Clé : rien au Labo ; depuis le Jeu, 31398 puis le Labo.
+ * - Clé : rien au Labo ; depuis le Jeu ou les deux joueurs, 31398 puis le Labo.
+ * - Chat et Tim (4195bd) : rien en mode 2 ; ailleurs, 31399 puis la fenêtre des deux joueurs (`HEDTOHED`, par le mode 7 : 422a24).
+ * - Terminer le Tour (418e70) : l'échéance du tour est maintenant (le tour passe à la prochaine passe de 4330d0).
  * - Balayette : en Jeu, l'aire est remise sans question (43252d) ; au Labo, 31134 si l'aire n'est pas vide (419405).
  * - Ampoule : 31125 puis la solution du concepteur (43252d avec le mode 9).
  * - Disquette : en Jeu, le choix du puzzle (418f2c : `DOSBOX` en chargement seulement) ; au Labo, les machines (42289c demande
@@ -137,9 +150,13 @@ export function toolbarDecision(name: string, ctx: ToolbarContext & { fieldEmpty
   if (ctx.test) return testDecision(state.name, ctx);
   switch (state.name) {
     case "TB_GOTO_PUZ":
-      return ctx.lab ? { action: "play", confirm: TOOLBAR_TEXT.openPlay } : { action: "none" };
+      return ctx.lab || ctx.duel ? { action: "play", confirm: TOOLBAR_TEXT.openPlay } : { action: "none" };
     case "TB_GOTO_WORK":
       return ctx.lab ? { action: "none" } : { action: "lab", confirm: TOOLBAR_TEXT.openLab };
+    case "TB_GOTO_H2H":
+      return ctx.duel && !ctx.lab ? { action: "none" } : { action: "duel", confirm: TOOLBAR_TEXT.openDuel };
+    case "TB_END_TURN":
+      return { action: "endTurn" };
     case "TB_DISK":
       return { action: ctx.lab ? "machines" : "chooser" };
     case "TB_MUSIC":

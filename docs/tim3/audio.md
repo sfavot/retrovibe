@@ -20,9 +20,11 @@ Un seul contexte audio et un seul gain général (`WebSampleOutput`) : le synth�
 ### Interface proposée (`Tim3Audio`, dans `audio.ts`)
 
 ```ts
-playMusic(music) / stopMusic() / musicNumber        // 1000 à 1023, 0 = aucune ; même morceau = pas de relance
+playMusic(music) / stopMusic() / musicNumber        // 1000 à 1023, 0 = aucune ; même morceau qui joue = pas de relance
+restartMusic()                                       // le morceau demandé repart du début (fiche du puzzle)
+resumeMusic()                                        // relance le morceau demandé s'il ne joue plus (fin de voix, fermeture)
 playEffect(id, priority = 1, flags = 0): boolean    // SX_<id>.WAV ; stopEffect(id) ; stopEffects()
-playVoice(ref: VoiceRef): boolean / stopVoice() / voiceActive
+playVoice(ref, resumeAtEnd = true): boolean / stopVoice() / voiceActive   // la voix arrête la musique
 mouth(): MouthPose                                   // pose du professeur à l'instant courant
 voicesEnabled (get/set, mémorisé)                    // D4, activées par défaut
 enterPuzzle(music)                                   // coupe voix et effets, lance la musique du niveau
@@ -33,7 +35,31 @@ stopAll()
 ## Musique (D6)
 
 - Numéro de musique du puzzle : `LevInfo.music`, de 1000 à 1023 (4 puzzles à 0 : pas de musique) ; il désigne directement `SX_<n>.HMI` (classe 1 de `PlaySound`, `411b0c`). La classe 2000 à 2999 (pistes CD, repli HMI par une table de 23 entrées, `0x470088`) n'est jamais demandée par les puzzles et l'ISO n'a pas de piste CD : non portée.
-- Boucle : `FE 14` → `FE 15` du fichier (marqueurs de `parseHmi`), introduction jouée une fois ; `SX_1022` (jingle) se joue une fois. Redemander le morceau en cours ne fait rien (`449c10`). Arrêt net : `WebGmSynth.reset` coupe aussi les notes déjà planifiées.
+- Boucle : `FE 14` → `FE 15` du fichier (marqueurs de `parseHmi`), introduction jouée une fois ; `SX_1022` (jingle) se joue une fois puis silence (il ne repart qu'à la prochaine demande, comme dans le jeu : `PlaySound(music, 0, 1)` relance un morceau fini). Arrêt net : `WebGmSynth.reset` coupe aussi les notes déjà planifiées. Aucun fondu nulle part (lu : aucun appel de volume progressif).
+- Au tour de boucle, l'état des canaux du début de boucle (programme, contrôleurs hors RPN, pitch bend) est reposé (`parseHmi`, `chaseLoopStart`) : sans cela, `SX_1013` rejouait son canal 6 au volume 8 sur un autre programme, `SX_1004` perdait ses pitch bends, `SX_1015` et `SX_1019` changeaient d'instrument. Ce que fait le pilote SOS au `FE 15` n'est pas lu (16 bits) : hypothèse la plus défendable, à écouter.
+- **Notes tenues** (corrigé) : deux causes dans `parseHmi`, aucune dans le séquenceur ni dans `WebGmSynth`. (1) Des centaines de notes de **durée nulle** (`SX_1004`, `SX_1009`…) : leur note-off, posé au même tick, passait avant leur note-on ; elles durent maintenant un tick (le pilote ne peut les couper qu'à l'évènement suivant de son minuteur). (2) Une touche **rejouée alors qu'elle est tenue** (3 358 fois dans `SX_1009`) : `spessasynth` apparie chaque note-off à la plus ancienne note-on de la touche, le séquenceur ne compte qu'une note par touche, la seconde restait tenue au tour de boucle ; une note qui repart termine maintenant la précédente, et deux notes au même tick n'en font qu'une. Test : `test/tim3/audio/music-notes.test.ts` rejoue les 24 morceaux sur un synthétiseur modèle (voix comptées comme `spessasynth`, pédale CC64) : rien ne reste tenu après trois tours, la fin, un changement et un arrêt.
+
+### Enchaînement (lu dans TIMWIN.EXE)
+
+Toutes les demandes de la musique courante (`[0x481390]`, numéro du LEV, du Labo ou de la guitare) passent par `PlaySound(music, 0, 1)` (41126d) : avec le drapeau 1, un morceau qui joue déjà **continue** (449bd4 : même morceau chargé et en cours), sinon il part **du début** (449b30 : arrêt, 449c10 ne recharge pas le même fichier, départ).
+
+| Moment | Original | Port |
+| --- | --- | --- |
+| Titre (42a60a), fin de l'intro (43b19e) | 1000, continue | `playMusic(1000)` deux fois |
+| Crédits, menu principal, choix du puzzle (`DOSBOX`, `DOSBIN`) | rien | rien |
+| Chargement d'un puzzle (432594) | sa musique, continue si c'est la même | `enterPuzzle(music)` |
+| **Fiche** `PUZZDISP` (425edc … 425efa) | musique **arrêtée et relancée du début**, même inchangée ; effets coupés | `restartMusic()` à l'ouverture |
+| Fiche, 18 passes après l'ouverture (425f1b, 425f6b) | voix du but, **pendant la fiche** (`[0x472ef0]` = 18, décompté par la fenêtre) | `PuzzleCardScreen`, `CARD_GOAL_VOICE_PASSES` |
+| Fermeture de la fiche (425d6f … 425daa) | voix coupée, musique relancée (du début si la voix l'avait arrêtée, sinon elle continue) | `stopVoice()` puis `resumeMusic()` |
+| Voix du professeur (424684 : 41177b(2, 1), 41177b(1000, 1)) | la musique **s'arrête** (pas de baisse de volume) ; un morceau demandé pendant ce temps attend | `playVoice` → `Tim3Music.silence` |
+| Fin de la parole (424622) ; fermeture d'une fenêtre du professeur (423f9d) | musique relancée **du début** | `update()` voit la voix finie (ou coupée) → `resumeMusic()` |
+| Sur la fiche, voix finie avant OK | la boucle (43588a) rend la musique possible sans la relancer : silence jusqu'à OK | `playVoice(voix, false)` |
+| Victoire (PUZZSOLV 4260f0), fin de catégorie (BINSOLVE, professeur sans voix) | rien (BINSOLVE fermé : `PlaySound(music, 0, 1)`, continue) | rien |
+| Labo (pas de fiche), essai, retour de l'essai | musique du Labo, continue si c'est la même | `enterPuzzle(settings.music)` |
+| Guitare (4238e7) | `PlaySound(choix, 0, 0)` 5 passes après le choix : **repart du début** même s'il jouait ; « Relancer » (423a29) force ce départ ; à la fermeture, le choix devient la musique courante (423580) | `stopMusic()` puis `playMusic(id)` |
+| Application désactivée / réactivée (4163ce, 416a0a, 41605d) | musique coupée, puis relancée du début | **écart gardé** : onglet masqué = contexte suspendu, la musique reprend où elle était |
+
+Écarts restants : la voix du but de la page de dev `?puzzle=` (pas de fiche) n'est pas jouée ; le mode à deux joueurs (`enterDuelGame`) lance encore la voix du but au chargement, avant sa fiche (à aligner sur `enterPuzzle` ; le jeu ne la joue pas en mode `[0x481918]` = 6, sens du mode non établi). Le jeu ne lit la voix du but que si la langue (`[0x480370]`) est « E » ; le port joue les voix anglaises avec les textes français (D4). Les 18 « passes » sont des messages de la fenêtre (425f51 décompte à chaque message, pas seulement aux passes de 50 ms) : environ 0,9 s, plus tôt si la souris bouge.
 - Le synthétiseur se charge en tâche de fond : un morceau demandé avant qu'il soit prêt démarre dès qu'il l'est.
 - **Tempo : 120 ticks par seconde, confirmé par le code de la bibliothèque SOS** (non par une écoute). `SOSLIBS2.DLL` (16 bits, `0xB37C` dans le fichier) : `sosMIDISongAlterTempo` calcule le nouveau rythme du minuteur par `u16(+0xD4) × pourcentage / 100` et l'envoie à `sosTIMERAlterEventRate` ; `0xD4` est donc la cadence du minuteur à 100 % (un tick par évènement, ce qui reste supposé). `0xD2` (192, 480) ne sert qu'aux positions mesure:temps. `src/audio/hmi.ts` garde ses 120 ticks/s ; seul son commentaire a été corrigé.
 
@@ -88,7 +114,9 @@ u32 142 ; u16 initial (lu et ignoré) ; { u16 instant ; i16 valeur }* ; u16 0xFF
 | Cas | Comportement |
 | --- | --- |
 | Effets nombreux au même pas | 16 emplacements, priorité (ci-dessus) |
-| Musique changée par niveau | `enterPuzzle(music)` ; même morceau : pas de relance ; 0 : silence |
+| Musique changée par niveau | `enterPuzzle(music)` ; même morceau : pas de relance ; puis la fiche la relance du début ; 0 : silence |
+| Voix pendant la musique | musique arrêtée, relancée du début à la fin de la voix (fiche : à sa fermeture) |
+| Voix qui en remplace une autre dans la même image | la musique ne repart pas entre les deux (départ différé au `tick()` suivant) |
 | Voix coupée au changement de puzzle | `enterPuzzle`, `stopVoice`, `stopAll` |
 | « Sans son » | `setMuted(true)` : gain général à 0, rien n'est arrêté ni décalé |
 | Onglet masqué | `suspend()` / `resume()` : contexte figé, voix et musique ne vieillissent pas |
@@ -99,7 +127,10 @@ u32 142 ; u16 initial (lu et ignoré) ; { u16 instant ; i16 valeur }* ; u16 0xFF
 ## À écouter (non vérifiable sans oreille)
 
 - Tempo de chaque morceau (120 ticks/s) : durées plausibles (14 à 155 s), à comparer à l'original si possible.
-- Boucles : raccord à la fin du tour, et note tenue coupée proprement.
+- Boucles : raccord à la fin du tour, notes tenues coupées proprement, et deuxième tour identique au premier (état des canaux reposé : `SX_1013`, `SX_1004`, `SX_1015`, `SX_1019`).
+- Notes de durée nulle jouées sur un tick (`SX_1004`, `SX_1009`) : percussives ou staccato, pas de note qui « colle ».
+- Entrée dans un puzzle : la musique repart du début à la fiche ; la voix du but environ 0,9 s après, musique coupée ; OK relance la musique du début.
+- Professeur (aide, indices) : musique coupée pendant la voix, puis reprise du début.
 - Rendu General MIDI de la soundfont réduite de Mathémagique sur les 24 morceaux (instruments, batterie canal 9) : elle a été réduite pour d'autres morceaux.
 - Effets : doublons d'une même pièce (relance à chaque changement d'image ?), ambiances en boucle bien arrêtées, niveau relatif effets / musique / voix (le jeu n'a pas de réglage de volume propre : tout est à 1).
 - Voix : synchro labiale, délai de chargement du premier MP3.

@@ -107,7 +107,7 @@ export function replay(s: Tim3Session, level: Level, solution: Solution, program
  * Ordre de pose d'un joueur : une pièce à fiche ne se branche qu'en se posant près d'une prise déjà posée (438ea8), sur la
  * première sortie libre ; les prises passent donc avant leurs fiches, et la fiche de la sortie 0 avant celle de la sortie 1.
  */
-function plugOrder(parts: readonly Placement[]): Placement[] {
+export function plugOrder(parts: readonly Placement[]): Placement[] {
   const order = [...parts];
   for (const a of parts) {
     if (!a.plug) continue;

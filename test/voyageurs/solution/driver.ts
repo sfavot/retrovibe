@@ -122,6 +122,8 @@ export class Driver {
   private menuQueue: number[] = [];
   private heroLast = "";
   private heroStill = 0;
+  /** L'attente d'entrée de la pause (menu système) n'est pas levée par un clic (`pause`). */
+  private holdPause = false;
 
   constructor(options: { keepTk?: boolean } = {}) {
     this.texts = this.capture.texts;
@@ -228,6 +230,7 @@ export class Driver {
     if (!this.tracker.takeFresh()) return;
     const { x, y, left, right } = this.engine.mouse;
     const target = this.tracker.target;
+    if (source === SRC_WAIT_INPUT && this.holdPause) return;
     if (source === SRC_MESSAGE || source === SRC_INVENTORY || source === SRC_WAIT_INPUT) {
       this.modalInput(`c ${x} ${y} 1`);
       return;
@@ -403,6 +406,25 @@ export class Driver {
     this.press("k systemmenu");
     this.tick();
     if (this.menuQueue.length) throw new Error(`menu système : choix non faits (${this.menuQueue.join(", ")})\n${this.describe()}`);
+  }
+
+  /**
+   * Pause du menu système (ligne 0) tenue `steps` pas de 10 ms de temps virtuel, puis levée par un clic ; rend le nombre de ticks écoulés
+   * pendant la pause. Au banc, le clic enregistré lève la pause dès son premier tour (aucun tick ne passe non plus).
+   */
+  pause(steps: number): number {
+    this.menuQueue = [0];
+    this.holdPause = true;
+    this.press("k systemmenu");
+    const ticks = this.engine.ticks;
+    for (let i = 0; i < steps; i++) this.engine.step();
+    const elapsed = this.engine.ticks - ticks;
+    if (this.engine.banner !== "PAUSE" || this.menuQueue.length) throw new Error(`pause non ouverte\n${this.describe()}`);
+    this.holdPause = false;
+    this.modalInput(`c ${this.engine.mouse.x} ${this.engine.mouse.y} 1`);
+    this.tick();
+    if (this.engine.banner !== null) throw new Error(`pause non levée\n${this.describe()}`);
+    return elapsed;
   }
 
   /** Entrées enregistrées, au format `CINE_INPUT`. */

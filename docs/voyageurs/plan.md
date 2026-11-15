@@ -42,7 +42,7 @@ S'y ajouteront `files.md` (généré par l'extraction), puis `graphics.md` et `a
   - **Écarts d'interface** :
     - menu système au bouton du milieu, à F10 ou au bouton tactile « Système », car le navigateur ne signale pas l'appui sur deux boutons ;
     - sauvegarde refusée entre deux parties, tant que le décor n'est pas dans le bundle courant.
-  - **Morts testées** : 4. Les autres ne sont pas testées (moustiques, moines, loups, gaz, cabine, compte à rebours).
+  - **Morts testées** : 16 scénarios, toutes les morts repérées dans les scripts (`deaths.test.ts`), identiques au banc ScummVM jusqu'à la mort ; le compte à rebours est figé par la pause.
 - **Consignes de l'utilisatrice** :
   - « mutualiser avec ce qu'on a déjà, sans pour autant trop dévoyer les jeux » ;
   - le code commun aux jeux Delphine se décide avec la session *Croisière pour un cadavre* (moteur `cruise`, portage en parallèle) ;

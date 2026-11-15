@@ -82,13 +82,40 @@ vers les navettes : fin, puis générique en boucle (script 35, décor L44 ; le 
 ## Morts du héros (`deaths.test.ts`)
 
 Aucune mort ne recharge le jeu : le script affiche son message, coupe les entrées et arrête la marche. Le menu système reste ouvert (Sauver
-en moins) : Nouvelle partie relance depuis le démarrage, Charger ouvre le dialogue du site. Testées : le plafond du passage secret, la boue du
-marécage (puis reprise d'une sauvegarde d'avant la mort), la créature des égouts, le tir d'un Crughon. Repérées dans les scripts, non
-testées : les moustiques, les moines (sans habit, ou faute dans le cloître), les loups, l'alarme du labo, le gaz de la cellule, la sécurité
-du navi-port, le comité d'accueil et les Crughons de la cabine, le compte à rebours du vaisseau.
+en moins) : Nouvelle partie relance depuis le démarrage, Charger ouvre le dialogue du site. Chaque mort est atteinte en s'écartant de la
+solution ; ses entrées, rejouées au banc ScummVM (`fw-replay.sh`), donnent des lignes `TK` identiques jusqu'à la mort.
 
-**Protection (D7)** : toute comparaison de la globale 255 répond « égal ». La partie complète traverse le monastère sans « ESPION ! » ni
-« Infidèle ! » (contrôlé par `full-game.test.ts`).
+| Mort | Écart à la solution | Message | Suite testée |
+| --- | --- | --- | --- |
+| Plafond du passage secret (L4) | ne pas taper le code | « Le plafond était un peu bas » | Nouvelle partie |
+| Alarme du labo (L5, script 18) | rester après les documents, remonter sur le palier de gauche (le garde ne passe pas le creux du sol) | « La curiosité est un vilain défaut » | Nouvelle partie |
+| Boue du marécage (L6) | marcher dans la zone 4 | « GLOU GLOU » | Charger |
+| Moustiques (L6, script 8) | passer en x ≤ 124 sans insecticide | « les moustiques ont eu raison de vous » | Charger |
+| Moines du village (L8, scripts 15 et 35) | entrer sans les habits du paysan (globale 200 = 0) | « ESPION ! ESPION ! » | |
+| Loups (L12, script 45) | descendre dans la zone 3 avant la décharge | « TROP PRES ! » | |
+| Moines du monastère (PART02B) | entrer en habit de paysan (globale 200 = 1) | « ESPION ! ESPION ! » | |
+| Faute dans le cloître (PART02B, script 3) | marcher dans le sens interdit | « Infidèle ! », puis « ESPION ! » | Nouvelle partie |
+| Créature des égouts (L21) | ne pas l'arroser à temps | « elle vous a croqué » | Nouvelle partie |
+| Sécurité du navi-port (L22, script 18) | revenir du quai et descendre vers les gardes | « s'achève votre voyage » | |
+| Gaz de la cellule (L27, script 39) | ne pas boucher le conduit avec le journal | « le gaz s'est répandu » | Nouvelle partie |
+| Tir des Crughons (L34) | laisser approcher un Crughon | « C'est ici que se termine votre périple » | |
+| Comité d'accueil (L42) | ne pas aveugler la caméra du caisson | « Le comité d'accueil est déja en place » | Charger |
+| Crughons de la cabine (L42, script 47) | ne pas avaler la pilule | « c'est la fin de tous vos espoirs » | |
+| Compte à rebours (PART04B, script 34) | rester dans le labyrinthe, carte gardée | « La bombe vient de détruire le dernier pole » | |
+| Compte à rebours, bombe reprogrammée | ne pas rejoindre la navette | « Notre flotte vient d'être anéantie » | |
+
+Écarts à la règle générale, tels que dans les scripts et au banc : l'alarme du labo et le compte à rebours laissent tourner le script de
+marche 10 (seuls les scripts 36 et 37 qui déplacent le héros s'arrêtent) ; la sécurité du navi-port efface seulement la cible de marche ;
+le comité d'accueil n'affiche que son message (plus aucun script, entrées laissées permises, sauvegarde possible). Le héros ne bouge plus.
+
+**Compte à rebours** : 3 600 ticks (6 × 6 × 10 × 10, script 34), 3 606 entre la main rendue dans PART04B et le message. Il compte des
+ticks, pas du temps : la pause du menu système (attente d'entrée modale, `makeSystemMenu`), les messages et les menus le figent, dans
+ScummVM (la boucle principale est bloquée dans `manageEvents`) comme dans le portage (30 s de pause : aucun tick, même tick de mort qu'au
+banc). La pause du site (bouton, onglet masqué, fenêtre ouverte) n'appelle plus `step` : rien n'avance non plus.
+
+**Protection (D7)** : toute comparaison de la globale 255 répond « égal ». La globale n'est comparée qu'en contrôle préalable (cloître,
+cabine L42, vaisseau-bombe) : les fautes du cloître et les moines restent atteignables (testés ci-dessus) ; la partie complète traverse
+le monastère sans « ESPION ! » ni « Infidèle ! » (`full-game.test.ts`).
 
 ## Comparaison au banc ScummVM
 

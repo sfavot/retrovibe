@@ -26,12 +26,24 @@ import { drawText } from "./text";
 export const LIST_ICON = { solved: 36, unsolved: 35 } as const;
 const ICON_DX = -570;
 const ICON_DY = -18;
-const TEXT_DX = 48;
 const RIGHT_MARGIN = 8;
 const TOP_MARGIN = 8;
-const BOTTOM_MARGIN = 16;
-const SELECTED_COLOR = 14;
-const ROW_COLOR = 15;
+
+/** Mise en page et couleurs des rangées : celles de `DOSBOX` (41bf29) par défaut. */
+export interface ListStyle {
+  /** Début du texte depuis le bord gauche du contrôle. */
+  textDx: number;
+  /** Hauteur retirée avant de compter les rangées visibles. */
+  reserve: number;
+  /** Décalage ajouté sous la marge du haut. */
+  extraTop: number;
+  /** Couleurs logiques : rangée choisie, autres rangées. */
+  selected: number;
+  row: number;
+}
+
+/** 41bf29 : texte en x + 48, (hauteur − 16) / rangée, couleurs 14 et 15. */
+export const DOSBOX_LIST_STYLE: ListStyle = { textDx: 48, reserve: 16, extraTop: 0, selected: 14, row: 15 };
 
 export interface ListRow {
   /** Texte de la rangée, sans la marque de tête (« 12. Titre »). */
@@ -50,13 +62,13 @@ export interface ListGeometry {
 }
 
 /** 41bf29 : rangées de la liste posée dans `rect`. */
-export function listGeometry(font: Font, rect: Rect): ListGeometry {
+export function listGeometry(font: Font, rect: Rect, style: ListStyle = DOSBOX_LIST_STYLE): ListGeometry {
   const rowHeight = font.height + 2;
-  const avail = rect.height - BOTTOM_MARGIN;
+  const avail = rect.height - style.reserve;
   const visible = Math.max(0, Math.floor(avail / rowHeight));
   const spare = Math.trunc((avail - visible * rowHeight) / 2);
-  const textX = rect.x + TEXT_DX;
-  return { y: rect.y + TOP_MARGIN + spare, rowHeight, visible, textX, textWidth: rect.x + rect.width - textX - RIGHT_MARGIN };
+  const textX = rect.x + style.textDx;
+  return { y: rect.y + TOP_MARGIN + spare + style.extraTop, rowHeight, visible, textX, textWidth: rect.x + rect.width - textX - RIGHT_MARGIN };
 }
 
 /** Première rangée visible qui garde la rangée `selected` au milieu (41b169), ramenée dans la liste. */
@@ -89,15 +101,16 @@ export function drawList(
   rows: readonly ListRow[],
   top: number,
   selected: number,
+  style: ListStyle = DOSBOX_LIST_STYLE,
 ): void {
-  const g = listGeometry(font, rect);
+  const g = listGeometry(font, rect, style);
   const clip = surface.setClip(rect.x, rect.y, rect.width, rect.height);
   for (let k = 0; k < g.visible && top + k < rows.length; k++) {
     const i = top + k;
     const row = rows[i]!;
     const y = g.y + k * g.rowHeight;
     const textClip = surface.setClip(g.textX, rect.y, g.textWidth, rect.height);
-    drawText(surface, font, row.text, g.textX, y, mapColor(i === selected ? SELECTED_COLOR : ROW_COLOR));
+    drawText(surface, font, row.text, g.textX, y, mapColor(i === selected ? style.selected : style.row));
     surface.restoreClip(textClip);
     if (icons) {
       const image = firstImageOfState(icons, row.solved ? LIST_ICON.solved : LIST_ICON.unsolved);
@@ -119,10 +132,11 @@ export class ScrollList {
     public rect: Rect,
     /** Images devant les rangées (`BUTTONS.ANM`), `null` : sans images. */
     readonly icons: Anm | null = null,
+    readonly style: ListStyle = DOSBOX_LIST_STYLE,
   ) {}
 
   geometry(): ListGeometry | null {
-    return this.font ? listGeometry(this.font, this.rect) : null;
+    return this.font ? listGeometry(this.font, this.rect, this.style) : null;
   }
 
   /** Rangées visibles (toutes sans police). */
@@ -167,6 +181,6 @@ export class ScrollList {
   /** Dessine les rangées visibles, décalées de `dx`, `dy` (centrage de la fenêtre). */
   draw(surface: Surface, assets: RenderAssets, dx: number, dy: number): void {
     if (!this.font) return;
-    drawList(surface, assets, this.font, this.icons, { ...this.rect, x: this.rect.x + dx, y: this.rect.y + dy }, this.rows, this.top, this.selected);
+    drawList(surface, assets, this.font, this.icons, { ...this.rect, x: this.rect.x + dx, y: this.rect.y + dy }, this.rows, this.top, this.selected, this.style);
   }
 }

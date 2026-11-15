@@ -92,10 +92,11 @@
 }
 
 /* Fenêtres .ITF dessinées dans un canvas posé sur l'écran du jeu (D7) ; boutons transparents pour le clavier et les lecteurs d'écran. */
+/* Posé dans la scène du jeu (pas sur toute la page) et sous le menu du shell (z-index 50). */
 .tim3-itf-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 50;
+  z-index: 45;
 }
 
 .tim3-itf {

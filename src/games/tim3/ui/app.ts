@@ -12,6 +12,10 @@
  * Labo revient tel quel), éditeur d'indices (`HINT.ITF`), conditions de réussite (`SOLVE.ITF`), but écrit dans la barre du bas, onglets
  * du bac. Les machines qui ont un but se jouent depuis le bac « Puzzles Personnels » du choix du puzzle.
  *
+ * Inscription (`docs/tim3/ui.md` § Inscription) : registre des joueurs (`engine/players.ts`), progression et aires gardées de chacun ;
+ * l'invité « Hôte » au lancement. Visite guidée (§ Visite guidée) : un Labo vide où le professeur fait construire un puzzle maison pas à
+ * pas (`engine/walkthrough.ts`, `HELP.ITF`).
+ *
  * Deux joueurs (`docs/tim3/ui.md` § Deux joueurs) : fenêtre des réglages (`HEDTOHED`), puis des parties sur les puzzles HH, à tour de
  * rôle sur le même écran (`engine/duel.ts` : chronomètre, une pièce du bac et une de l'aire par tour, manches), tableau des joueurs
  * sous l'aire, messages du jeu à chaque tour et à chaque manche.
@@ -44,6 +48,8 @@ import { TAB_TEXT } from "../engine/bin-tabs";
 import { GOAL_MAX } from "../engine/lab-puzzle";
 import type { Part } from "../engine/part";
 import { parseProgramRows, type ProgramRow } from "../engine/program";
+import { PlayerRegistry, signInDecision } from "../engine/players";
+import { WALK_LEAVE_TEXT, Walkthrough, walkFacts, type WalkEffect } from "../engine/walkthrough";
 import {
   EditStore,
   SLOT_COUNT,
@@ -76,7 +82,8 @@ import { openItfWindow, screenOptions, type ItfHost, type ItfScreen, type ItfWin
 import { MainMenuScreen, quitMainMenu, type MainMenuAction } from "./main-menu";
 import { openBinsolveWindow } from "./binsolve-window";
 import { openGlobeWindow } from "./globe-window";
-import { openHelpWindow } from "./help-window";
+import { openHelpWindow, openWalkthroughWindow } from "./help-window";
+import { openSignInWindow } from "./signin-window";
 import { HINT_TEXT, openHintEditorWindow, openHintWindow, type HintEditorChoice } from "./hint-window";
 import { openGoalEditor } from "./goal-editor";
 import { LOCK_TEXT, openLockWindow } from "./lock-window";
@@ -140,6 +147,10 @@ const DUEL_TEXT = {
 const DUEL_MAX_STEP_MS = 250;
 const VOLUMES = ["RESOURCE.MAP", "RESOURCE.001", "RESOURCE.002", "FRENCH.DAT"] as const;
 /** Musique de l'option « Musique » (préférence mémorisée, activée par défaut). */
+/** `SYSTEM.RES` : nom de l'invité, « Hôte » (`TIM.SAV`, 42d03d). */
+const SYSTEM_GUEST_LINE = 3;
+/** `INTRFACE.RES` de l'inscription (426877) : nom inconnu (31174, Oui / Non), ni nom ni rangée (31175). */
+const SIGNIN_TEXT = { newPlayer: 31174, noName: 31175 } as const;
 const MUSIC_KEY = "music";
 /** Guitare : effets activés, volume de 0 à 15 (préférences mémorisées ; le jeu les garde par 42c8cb). */
 const EFFECTS_KEY = "effects";
@@ -178,6 +189,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let toolbar: ToolbarButton[];
   let programRows: ProgramRow[];
   let interfaceLines: string[];
+  /** Textes du professeur de la visite guidée (`PROFESOR.RES`). */
+  let professorLines: string[];
   let help: HelpTable;
   let solveParts: SolvePart[] = [];
   try {
@@ -198,6 +211,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     congratulations = readBinSolveRes(index.get("BINSOLVE.RES"));
     programRows = parseProgramRows(parseLines(index.get("PROGPART.RES")));
     interfaceLines = parseLines(index.get("INTRFACE.RES"));
+    professorLines = parseLines(index.get("PROFESOR.RES"));
     try {
       solveParts = readSolveRes(index.get("SOLVE.RES"));
     } catch (error) {
@@ -237,9 +251,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     return;
   }
   const sound: Tim3Audio = audio;
-  const progress = new Progress(storage);
-  const homeProgress = new HomeProgress(storage);
-  const edits = new EditStore(storage);
+  // Joueurs (`engine/players.ts`) : la progression et les aires gardées sont celles du joueur courant, l'invité au lancement.
+  const players = new PlayerRegistry(storage, texts.system[SYSTEM_GUEST_LINE] ?? "");
+  let progress = new Progress(players.storage());
+  let homeProgress = new HomeProgress(players.storage());
+  let edits = new EditStore(players.storage());
+  // Les machines du Labo sont communes à tous les joueurs (comme les fichiers de puzzles du jeu).
   const slots = labSaveSlots(storage);
   const puzzles = puzzleList();
   const duelPuzzles = duelPuzzleList();
@@ -271,6 +288,12 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let goalEditor: { close(): void } | null = null;
   /** Match à deux joueurs en cours (`null` hors du mode 2). */
   let duel: Duel | null = null;
+  /** Visite guidée en cours (mode 6) ; sa machine n'est jamais gardée (31136 en la quittant). */
+  let walk: Walkthrough | null = null;
+  /** Le professeur s'est déjà présenté (`[0x4728c0]`) : remis à zéro à l'inscription d'un nouveau joueur (4269fc). */
+  let professorMet = false;
+  /** Session d'un autre joueur après un changement de joueur : rien n'en est gardé jusqu'au mode suivant. */
+  let detached = false;
   /** Réglages de la fenêtre des deux joueurs, gardés d'un match à l'autre (`0x472840`, noms `0x47e6dc`). */
   let duelSettings: DuelSettings | null = null;
   /** Fin de manche montrée, en attente du choix (« Rejouer » relance la machine puis la repose). */
@@ -316,6 +339,8 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     screen.test = labTest !== null;
     screen.binTab = labTab;
     screen.duel = duel;
+    screen.walkthrough = walk !== null;
+    detached = false;
     endTurnButton.hidden = duel === null;
     if (options.debug) (window as unknown as { __tim3: unknown }).__tim3 = { session: () => session, screen: () => screen, index };
   };
@@ -326,7 +351,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
    */
   const persistEdit = (): void => {
     // Essai : le Labo gardé est celui d'avant l'essai. Puzzle maison : l'aire n'est pas gardée (la machine peut changer d'emplacement).
-    if (!session || session.running || labTest || home || duel) return;
+    if (!session || session.running || labTest || home || duel || walk || detached) return;
     try {
       if (current && baseLevel) {
         const parts = snapshotWorld(session.world, baseLevel);
@@ -345,6 +370,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const loadPuzzle = (ref: PuzzleRef, solution = false): boolean => {
     persistEdit();
     leaveDuel();
+    walk = null;
     labTest = null;
     const slot = homeSlot(ref);
     if (slot !== null) return loadHome(ref, slot, solution);
@@ -411,6 +437,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const openLab = (machine: LabMachine | null = edits.lab()): boolean => {
     persistEdit();
     leaveDuel();
+    walk = null;
     labTest = null;
     home = null;
     let settings = machine ? machineSettings(machine) : { ...DEFAULT_LAB };
@@ -822,6 +849,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
     front = null;
     persistEdit();
+    walk = null;
     labTest = null;
     home = null;
     duelPending = null;
@@ -1061,6 +1089,152 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     }
   };
 
+  // ------------------------------------------------------------------ inscription (SIGNIN.ITF, docs/tim3/ui.md § Inscription)
+
+  /** Change de joueur : l'aire en cours reste à l'ancien, la progression devient celle du nouveau. */
+  const switchPlayer = (id: number): void => {
+    persistEdit();
+    if (!players.select(id)) return;
+    const store = players.storage();
+    progress = new Progress(store);
+    homeProgress = new HomeProgress(store);
+    edits = new EditStore(store);
+    detached = true;
+    const player = players.byId(id);
+    if (player) announce(copy.playerChanged(players.nameOf(player)));
+  };
+
+  /**
+   * Écran d'inscription (426b53), depuis le menu principal ou la feuille et le stylo de la barre ; ensuite, toujours le menu principal
+   * (mode 7 vers 10) et la musique 1000 relancée (4268d8).
+   */
+  const openSignIn = (): void => {
+    let chosen: number | null = null;
+    let help = false;
+    const list = players.list();
+    const handle = openSignInWindow(itfHost(), {
+      names: () => players.list().map((p) => players.nameOf(p)),
+      current: list.findIndex((p) => p.id === players.current),
+      click: () => sound.playEffect(SOUND_PLACE),
+      done: (typed, selected) => {
+        const signedIn = (id: number): void => {
+          chosen = id;
+          handle.close();
+        };
+        const d = signInDecision(players, typed, selected);
+        switch (d.kind) {
+          case "select":
+            return signedIn(d.player.id);
+          case "noName":
+            return void messageDialog(itfHost(), gameText(SIGNIN_TEXT.noName));
+          case "ask":
+            return void confirmDialog(itfHost(), gameText(SIGNIN_TEXT.newPlayer), () => {
+              const r = players.create(d.name);
+              if (r.status === "created") professorMet = false;
+              if (r.status === "created" || r.status === "exists") return signedIn(r.player.id);
+              void messageDialog(itfHost(), r.status === "full" ? copy.signInFull : copy.signInFailed);
+            });
+        }
+      },
+      help: () => {
+        help = true;
+      },
+      onClose: () => {
+        resume();
+        if (help) return openHelp(openSignIn);
+        backToMainMenu(true);
+        if (chosen !== null) switchPlayer(chosen);
+        if (musicOn) sound.playMusic(TITLE.music);
+      },
+    });
+    pauseFor(handle);
+  };
+
+  // ------------------------------------------------------------------ visite guidée (mode 6, docs/tim3/ui.md § Visite guidée)
+
+  /** Mode 6 (42332c) : un Labo vide, chaussure enfoncée, puis la fenêtre de la visite (422b65). */
+  const enterWalkthrough = (): void => {
+    persistEdit();
+    leaveDuel();
+    labTest = null;
+    home = null;
+    current = null;
+    baseLevel = null;
+    front = null;
+    walk = new Walkthrough(professorMet);
+    session = new Tim3Session(types, labLevel(DEFAULT_LAB), { lab: { ...DEFAULT_LAB } });
+    fillLabBin();
+    playScreen(session.level, copy.labGoal, []);
+    music(DEFAULT_LAB.music);
+    shell.focusCanvas();
+    openWalkthrough();
+  };
+
+  /** La fenêtre du professeur de la visite (41d8e8(0)) : au départ, puis au portrait de la barre (41922f). */
+  const openWalkthrough = (): void => {
+    const w = walk;
+    if (!w) return;
+    if (session.running) toggleRun();
+    goalEditor?.close();
+    pauseFor(
+      openWalkthroughWindow(itfHost(), {
+        walk: w,
+        facts: () => walkFacts(session.world, session.labPuzzle),
+        lines: professorLines,
+        audio: sound,
+        confirmLeave: (leave) => void confirmDialog(itfHost(), gameText(WALK_LEAVE_TEXT), leave),
+        after: (e) => {
+          resume();
+          professorMet = w.met;
+          walkEffect(e);
+        },
+      }),
+    );
+  };
+
+  /** Ce que fait la visite une fois sa fenêtre fermée (41d9a3, 41d8e8). */
+  const walkEffect = (e: WalkEffect | null): void => {
+    const w = walk;
+    if (!e || !w) return;
+    switch (e.kind) {
+      case "close":
+        // Action 2 : la barre du but prend le focus ; 0x40 : l'éditeur d'indices (41d96f) ; sinon le joueur travaille.
+        if (e.then === "hints") return openHintEditor(null);
+        if (e.then === "goal") editGoal();
+        return announce(copy.walkthroughResume);
+      case "music":
+        return openOptions(openWalkthrough);
+      case "lockAll":
+        session.editor.lockAll(true);
+        screen.resetFocus();
+        return openWalkthrough();
+      case "save":
+        w.saved(saveWalkthrough(w));
+        return openWalkthrough();
+      case "leave":
+        // La machine de la visite est perdue (31136) : elle ne doit pas devenir celle du Labo.
+        walk = null;
+        detached = true;
+        return backToMainMenu(true);
+      default:
+        return;
+    }
+  };
+
+  /**
+   * Action 4 (41edfc) : le jeu écrit un nouveau puzzle maison `PUZB<n>.TIM` ; le port prend le premier emplacement libre des machines du
+   * Labo. Pas d'emplacement libre ou stockage plein : échec (texte 30 du professeur).
+   */
+  const saveWalkthrough = (w: Walkthrough): boolean => {
+    const machine = session.lab ? snapshotLab(session.world, session.lab, session.labPuzzle) : null;
+    const free = Array.from({ length: SLOT_COUNT }, (_, i) => i + 1).find((n) => slots.read(n) === null);
+    if (!machine || free === undefined) return false;
+    if (saveMachine(slots, free, w.name, machine, Date.now()) !== "saved") return false;
+    labName = cleanName(w.name) ?? "";
+    announce(copy.machineSaved(labName));
+    return true;
+  };
+
   // ------------------------------------------------------------------ aide du professeur (HELP.ITF, docs/tim3/ui.md)
 
   /** Texte et voix de l'aide d'un contrôle (41e7e7), « Je suis désolé… » (23200) s'il n'en a pas. */
@@ -1106,7 +1280,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   const toolbarAction = (name: string): void => {
     const lab = session.lab !== null;
     const fieldEmpty = session.world.statics.head === null && session.world.mobiles.head === null;
-    const decision = toolbarDecision(name, { lab, test: labTest !== null, duel: duel !== null, solved: screen.solved, running: session.running, fieldEmpty });
+    const decision = toolbarDecision(name, { lab, test: labTest !== null, duel: duel !== null, walkthrough: walk !== null, solved: screen.solved, running: session.running, fieldEmpty });
     if (decision.endTest) {
       // Mode 8 : l'essai se termine (Labo d'avant l'essai), puis le bouton agit comme au Labo.
       endTest();
@@ -1129,6 +1303,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       }
       case "duel":
         return openDuelSetup();
+      case "signIn":
+        if (session.running) toggleRun();
+        return openSignIn();
+      case "walkthrough":
+        if (session.running) toggleRun();
+        return enterWalkthrough();
+      case "professor":
+        return openWalkthrough();
       case "endTurn":
         return endTurnNow();
       case "lab":
@@ -1164,8 +1346,6 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         return;
       case "run":
         return toggleRun();
-      case "unavailable":
-        return pauseFor(messageDialog(itfHost(), copy.notAvailable, resume));
     }
   };
 
@@ -1367,12 +1547,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         return shell.focusCanvas();
       case "duel":
         return openDuelSetup();
+      case "signIn":
+        return openSignIn();
+      case "walkthrough":
+        return enterWalkthrough();
       case "help":
         return openHelp(openMainMenu);
       case "options":
         return openOptions(openMainMenu);
-      case "unavailable":
-        return unavailable(openMainMenu);
       case "quit":
         return quit();
       case null:
@@ -1614,7 +1796,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
 
   /** Sauvegarde dans un emplacement ; les messages s'ouvrent par-dessus la liste, qui se ferme une fois la machine gardée. */
   const saveSlot = (slot: number, name: string, list: ItfWindowHandle, replace: boolean): void => {
-    const machine = session.lab ? snapshotLab(session.world, session.lab) : null;
+    const machine = session.lab ? snapshotLab(session.world, session.lab, session.labPuzzle) : null;
     const outcome = machine ? saveMachine(slots, slot, name, machine, Date.now(), replace) : "failed";
     const clean = cleanName(name) ?? "";
     switch (outcome) {

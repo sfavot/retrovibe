@@ -244,9 +244,22 @@ export function drawBinSlots(surface: Surface, assets: RenderAssets, layout: Bin
 /** Bord droit de la barre de but (cadre et reflet de l'image 1) gardé quand la barre est réduite. */
 const GOAL_RIGHT_EDGE = 40;
 
+/** Largeur du texte du but quand la barre est pleine (cadre de l'image 1). */
+const GOAL_TEXT_WIDTH = 530;
+/**
+ * Marge à droite du texte quand la barre est réduite (mode à deux joueurs) : le reflet jaune du bord recollé commence 40 pixels avant
+ * la fin de la barre (`GOAL_RIGHT_EDGE`), le texte (qui part de x = 20) s'arrête 6 pixels avant lui.
+ */
+const GOAL_TEXT_REDUCED_MARGIN = 66;
+
 /**
  * Barre de but : fond de `GOALBAR.ANM` (image 1), puis le texte du but dans le cadre. `width` : barre réduite (mode à deux joueurs,
  * table 0x471b80 : le tableau des joueurs est à droite) ; l'image est coupée et son bord droit recollé au bout.
+ *
+ * But long : l'original ne change ni la police ni ne fait défiler. Le contrôle GB_DESCRIPTION (style 5, 421ec1 : `GOALFONT.PFT`,
+ * alignement 0x400) coupe le texte à la largeur de la fenêtre (414e26, message 5 de 414fc1) et 452ed0 / 45301c ne dessinent que les lignes
+ * entières qui tiennent dans sa hauteur : le but est coupé, dans la barre réduite comme dans la barre pleine. Le port fait de même
+ * (`drawParagraph`, 2 lignes de 46 pixels).
  */
 export function drawGoalBar(surface: Surface, assets: RenderAssets, goal?: string, width: number = GOALBAR.width): void {
   const anm = assets.anm("GOALBAR.ANM");
@@ -263,7 +276,7 @@ export function drawGoalBar(surface: Surface, assets: RenderAssets, goal?: strin
     surface.restoreClip(old);
   }
   const font = assets.font("GOALFONT.PFT");
-  if (goal && font) drawParagraph(surface, font, goal, GOALBAR.x + 20, GOALBAR.y + 9, Math.min(530, width - 40), 46, mapColor(0));
+  if (goal && font) drawParagraph(surface, font, goal, GOALBAR.x + 20, GOALBAR.y + 9, width >= GOALBAR.width ? GOAL_TEXT_WIDTH : width - GOAL_TEXT_REDUCED_MARGIN, 46, mapColor(0));
 }
 
 /** Écran complet 640×480. */

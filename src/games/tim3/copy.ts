@@ -179,7 +179,8 @@ export const copy = {
     "Livre : le manuel, c'est-à-dire cette page.",
     "Chat et Tim : le mode à deux joueurs, sur le même écran, après confirmation. On choisit le nombre de parties, la durée du tour de chacun et les noms ; les joueurs jouent chacun leur tour sur le même puzzle. À chaque tour, on peut prendre une seule pièce dans le bac et changer une seule pièce déjà posée (la déplacer, la ranger, la retourner ou l'étirer). Le joueur pendant le tour duquel la machine atteint le but gagne la partie ; le premier à remporter la majorité des parties gagne le match. Le tableau en bas à droite montre le joueur du tour, son temps restant et les parties gagnées.",
     "Terminer le tour (à côté de la main, en mode à deux joueurs, et sous l'écran) : passe la main à l'autre joueur sans attendre la fin du temps.",
-    "Chaussure, feuille et stylo : la visite guidée du Labo et l'inscription des joueurs. Grisés, ils ne sont pas disponibles dans cette version.",
+    "Chaussure : la visite guidée du Labo, après confirmation. Le professeur Tim vous accompagne pas à pas dans la construction d'un puzzle maison : pièces, musique, but, nom, solution, indices, cadenas, puis sauvegarde. Quand il vous laisse travailler, cliquez sur son portrait, en haut à droite, pour qu'il revienne.",
+    "Feuille et stylo : l'inscription des joueurs, après confirmation. Écrivez votre nom ou choisissez-le dans la liste : chaque joueur a ses puzzles résolus et ses constructions. Au lancement du jeu, c'est l'invité, « Hôte », qui joue.",
     "Disquette : en Jeu, la liste des puzzles de la catégorie (une ampoule allumée devant chaque puzzle résolu ; « Autres Puzzles » pour changer de catégorie) ; au Labo, les machines du Labo.",
     "Guitare : la musique, les sons, le volume et la voix du professeur.",
     "Globe : la gravité et la pression (réglables au Labo seulement) et la couleur du décor.",
@@ -196,6 +197,20 @@ export const copy = {
     "« Menu principal », sous l'écran, ramène au menu du jeu : Jeu, Labo, Duel, manuel, options et Quitter.",
   ],
   toolbarUnavailable: (label: string) => `${label} (non disponible)`,
+
+  // Inscription (SIGNIN.ITF) : les messages viennent d'INTRFACE.RES ; ici, les noms pour les lecteurs d'écran et les cas du site.
+  signInTitle: "Inscription des joueurs",
+  signInName: "Votre nom",
+  signInChosen: (name: string) => `Joueur choisi : ${name}.`,
+  signInNew: (name: string) => `Nouveau nom : ${name}.`,
+  signInFull: "Cent joueurs sont déjà inscrits : choisissez un nom dans la liste.",
+  signInFailed: "Le joueur n'a pas pu être inscrit : le stockage du navigateur est plein ou bloqué.",
+  playerChanged: (name: string) => `Joueur : ${name}.`,
+
+  // Visite guidée du Labo (HELP.ITF) : textes et voix de PROFESOR.RES ; ici, les noms et la consigne pour les lecteurs d'écran.
+  walkthroughTitle: "Visite guidée du professeur Tim",
+  walkthroughName: "Nom du puzzle",
+  walkthroughResume: "Visite guidée : quand vous avez fini, cliquez ou touchez le portrait du professeur, en haut à droite de la barre d'outils.",
   solutionShown: "La solution du professeur est posée : démarrez la machine pour la voir fonctionner.",
   fieldCleared: "L'aire de jeu est dégagée.",
 } as const;

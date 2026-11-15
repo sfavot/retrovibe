@@ -4,7 +4,7 @@ import { readLev } from "../../../src/games/tim3/data/lev";
 import { interfaceText, parseIdTable, parseLines } from "../../../src/games/tim3/data/text";
 import { Duel, type DuelSettings } from "../../../src/games/tim3/engine/duel";
 import { Tim3Session, duelPuzzleList } from "../../../src/games/tim3/engine/session";
-import { DUEL_BOARD, H2H, RenderAssets, Surface, drawDuelBoard, layoutItf } from "../../../src/games/tim3/render";
+import { DUEL_BOARD, DUEL_GOAL_WIDTH, GOALBAR, H2H, RenderAssets, Surface, drawDuelBoard, drawGoalBar, layoutItf, mapColor } from "../../../src/games/tim3/render";
 import { HEDTOHED, duelSetupWindow, DUEL_NAME_MISSING } from "../../../src/games/tim3/ui/duel-window";
 import { ItfWindow, type ItfInput } from "../../../src/games/tim3/ui/itf-window";
 import { PlayScreen, type PlayEvent, type ToolbarButton } from "../../../src/games/tim3/ui/play";
@@ -74,6 +74,57 @@ describe.skipIf(!original.has)("deux joueurs : fenêtres et écran (HEDTOHED.ITF
     expect(diff(a, c)).toBe(true);
     expect(a.slice(0, 640 * 414).every((v) => v === 0)).toBe(true);
     expect(H2H.board).toBe(37002);
+  });
+
+  it("tableau : le nom qui attend (couleur 7, gris sur gris dans l'original) reçoit un relief ; celui du tour reste plat", () => {
+    const itf = readItf(index.get("H2H.ITF"));
+    const names = [H2H.p1Name, H2H.p2Name].map((id) => itf.controls.find((c) => c.id === id)!);
+    const colors = (turn: 0 | 1, who: 0 | 1) => {
+      const s = new Surface(640, 480);
+      drawDuelBoard(s, assets, itf, { names: ["Ana", "Bob"], turn, wins: [1, 0], remaining: 37_400 });
+      const c = names[who]!;
+      const seen = new Set<number>();
+      for (let y = 0; y < c.height + 2; y++) for (let x = 0; x < c.width; x++) seen.add(s.pixels[(DUEL_BOARD.y + c.y + y) * 640 + DUEL_BOARD.x + c.x + x]!);
+      return seen;
+    };
+    // Joueur 2 attend : sa moitié est grise (7), son nom est en 7 avec une ombre (8) et un reflet (15).
+    const waiting = colors(0, 1);
+    expect(waiting.has(mapColor(8))).toBe(true);
+    expect(waiting.has(mapColor(15))).toBe(true);
+    // Le nom du tour garde son dessin plat : sans nom, seule la couleur 15 de ses lettres disparaît, pas d'ombre ajoutée.
+    const bare = new Surface(640, 480);
+    drawDuelBoard(bare, assets, itf, { names: ["", "Bob"], turn: 0, wins: [1, 0], remaining: 37_400 });
+    const named = new Surface(640, 480);
+    drawDuelBoard(named, assets, itf, { names: ["Ana", "Bob"], turn: 0, wins: [1, 0], remaining: 37_400 });
+    const added = new Set<number>();
+    named.pixels.forEach((v, i) => v !== bare.pixels[i] && added.add(v));
+    expect([...added]).toEqual([mapColor(15)]);
+    // Symétrique : joueur 1 attend.
+    expect(colors(1, 0).has(mapColor(8))).toBe(true);
+  });
+
+  it("barre du but réduite : un but long est coupé aux lignes entières (comme l'original), sans passer sur le reflet du bord", () => {
+    const goal = "Allumez la lampe, faites rouler la balle sur le tapis puis laissez-la tomber dans le seau avant que le chat ne s'en mêle, sans toucher au ventilateur.";
+    const draw = (text?: string) => {
+      const s = new Surface(640, 480);
+      drawGoalBar(s, assets, text, DUEL_GOAL_WIDTH);
+      return s.pixels;
+    };
+    const bare = draw();
+    const full = draw(goal);
+    let minX = 640;
+    let maxX = -1;
+    let maxY = -1;
+    full.forEach((v, i) => {
+      if (v === bare[i]) return;
+      minX = Math.min(minX, i % 640);
+      maxX = Math.max(maxX, i % 640);
+      maxY = Math.max(maxY, Math.floor(i / 640));
+    });
+    expect(maxX).toBeGreaterThan(minX);
+    // Seulement deux lignes de 21 pixels dans le cadre (y = 9 … 51), pas une de plus ; le texte s'arrête avant le bord recollé (40 px).
+    expect(maxY).toBeLessThan(GOALBAR.y + 9 + 2 * 21);
+    expect(maxX).toBeLessThan(DUEL_GOAL_WIDTH - 40);
   });
 
   it("écran de jeu : barre des deux joueurs, « Terminer le Tour », bac fermé et pièce interdite refusés", () => {

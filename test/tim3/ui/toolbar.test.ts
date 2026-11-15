@@ -4,6 +4,7 @@ import { TOOLBAR_TEXT, toolbarDecision, toolbarStates, type ToolbarContext } fro
 const play: ToolbarContext = { lab: false, solved: false, running: false };
 const lab: ToolbarContext = { lab: true, solved: false, running: false };
 const duel: ToolbarContext = { lab: false, duel: true, solved: false, running: false };
+const walk: ToolbarContext = { lab: true, walkthrough: true, solved: false, running: false };
 const names = (ctx: ToolbarContext) => toolbarStates(ctx).map((b) => b.name);
 const state = (ctx: ToolbarContext, name: string) => toolbarStates(ctx).find((b) => b.name === name);
 
@@ -49,12 +50,30 @@ describe("barre d'outils : boutons selon le mode (418b78)", () => {
     expect(toolbarStates({ ...play, running: true }).filter((b) => b.pressed).map((b) => b.name)).toEqual(["TB_GOTO_PUZ", "TB_FLAG"]);
   });
 
-  it("modes non portés grisés partout : inscription, visite guidée ; le manuel ouvre l'aide ; deux joueurs actif", () => {
-    for (const ctx of [play, lab, duel]) {
-      for (const n of ["TB_GOTO_SIGNIN", "TB_GOTO_TUTORIAL"]) expect(state(ctx, n)?.disabled).toBe(true);
-      for (const n of ["TB_GOTO_TOUR", "TB_GOTO_H2H"]) expect(state(ctx, n)?.disabled).toBe(false);
+  it("tous les boutons montrés sont portés : aucun grisé, inscription et visite guidée comprises", () => {
+    for (const ctx of [play, lab, duel, walk, { ...play, test: true }]) {
+      expect(toolbarStates(ctx).filter((b) => b.disabled)).toEqual([]);
+      for (const n of ["TB_GOTO_SIGNIN", "TB_GOTO_TUTORIAL", "TB_GOTO_TOUR", "TB_GOTO_H2H"]) expect(names(ctx)).toContain(n);
     }
-    expect(toolbarStates(play).filter((b) => b.disabled)).toHaveLength(2);
+  });
+
+  it("visite guidée (mode 6, 418c34) : barre du Labo sans disquette, main, cadenas ni levier ; portrait du professeur ; chaussure enfoncée", () => {
+    expect(names(walk)).toEqual([
+      "TB_GOTO_PUZ",
+      "TB_GOTO_WORK",
+      "TB_GOTO_H2H",
+      "TB_GOTO_TOUR",
+      "TB_GOTO_SIGNIN",
+      "TB_GOTO_TUTORIAL",
+      "TB_MUSIC",
+      "TB_GLOBAL",
+      "TB_SWEEP",
+      "TB_HELP",
+      "TB_WALKTHROUGH",
+      "TB_FLAG",
+    ]);
+    expect(toolbarStates(walk).filter((b) => b.pressed).map((b) => b.name)).toEqual(["TB_GOTO_TUTORIAL"]);
+    for (const ctx of [play, lab, duel]) expect(names(ctx)).not.toContain("TB_WALKTHROUGH");
   });
 
   it("deux joueurs (mode 2, 418cc4) : barre du Jeu plus « Terminer le Tour », sans ampoule ; chat et Tim enfoncés", () => {
@@ -108,8 +127,13 @@ describe("barre d'outils : clics (418ded)", () => {
     expect(at("TB_HINT", duel)).toEqual({ action: "hints" });
   });
 
-  it("boutons grisés : « non disponible » ; boutons cachés : sans effet", () => {
-    expect(at("TB_GOTO_SIGNIN", play).action).toBe("unavailable");
+  it("feuille et stylo (419683) : 31401 puis l'inscription ; chaussure (419712) : 31400 puis la visite ; boutons cachés : sans effet", () => {
+    for (const ctx of [play, lab, duel]) {
+      expect(at("TB_GOTO_SIGNIN", ctx)).toEqual({ action: "signIn", confirm: TOOLBAR_TEXT.openSignIn });
+      expect(at("TB_GOTO_TUTORIAL", ctx)).toEqual({ action: "walkthrough", confirm: TOOLBAR_TEXT.openWalkthrough });
+    }
+    expect(at("TB_GOTO_TUTORIAL", { ...play, test: true })).toEqual({ action: "walkthrough", confirm: TOOLBAR_TEXT.openWalkthrough, endTest: true });
+    expect(at("TB_WALKTHROUGH", play).action).toBe("none");
     expect(at("TB_GOTO_TOUR", play).action).toBe("help");
     expect(at("TB_LOCKED", play).action).toBe("none");
     expect(at("TB_TEST", play).action).toBe("none");
@@ -143,5 +167,28 @@ describe("barre d'outils : clics (418ded)", () => {
     expect(at("TB_HELP", play).action).toBe("help");
     expect(at("TB_HINT", play).action).toBe("hints");
     expect(at("TB_FLAG", play).action).toBe("run");
+  });
+});
+
+describe("barre d'outils : visite guidée (mode 6)", () => {
+  const at = (name: string, fieldEmpty: boolean) => toolbarDecision(name, { ...walk, fieldEmpty });
+
+  it("quitter la visite perd sa machine : 31134 si l'aire n'est pas vide (41948e, 419538, 4195e5, 41969e), sinon la question du mode", () => {
+    expect(at("TB_GOTO_PUZ", false)).toEqual({ action: "play", confirm: TOOLBAR_TEXT.clearLab });
+    expect(at("TB_GOTO_PUZ", true)).toEqual({ action: "play", confirm: TOOLBAR_TEXT.openPlay });
+    expect(at("TB_GOTO_WORK", false)).toEqual({ action: "lab", confirm: TOOLBAR_TEXT.clearLab });
+    expect(at("TB_GOTO_WORK", true)).toEqual({ action: "lab", confirm: TOOLBAR_TEXT.openLab });
+    expect(at("TB_GOTO_H2H", true)).toEqual({ action: "duel", confirm: TOOLBAR_TEXT.openDuel });
+    expect(at("TB_GOTO_SIGNIN", false)).toEqual({ action: "signIn", confirm: TOOLBAR_TEXT.clearLab });
+    expect(at("TB_GOTO_SIGNIN", true)).toEqual({ action: "signIn", confirm: TOOLBAR_TEXT.openSignIn });
+  });
+
+  it("chaussure sans effet ; portrait du professeur (41922f) : la fenêtre de la visite ; le reste comme au Labo", () => {
+    expect(at("TB_GOTO_TUTORIAL", false)).toEqual({ action: "none" });
+    expect(at("TB_WALKTHROUGH", false)).toEqual({ action: "professor" });
+    expect(at("TB_SWEEP", false)).toEqual({ action: "clear", confirm: TOOLBAR_TEXT.clearLab });
+    expect(at("TB_MUSIC", false)).toEqual({ action: "options" });
+    expect(at("TB_FLAG", false)).toEqual({ action: "run" });
+    for (const n of ["TB_DISK", "TB_HINT", "TB_LOCKED", "TB_TEST"]) expect(at(n, false), n).toEqual({ action: "none" });
   });
 });

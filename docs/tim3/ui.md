@@ -16,6 +16,9 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 | `engine/session.ts` | `Tim3Session` : édition / marche, Démarrer (copie de l'état d'édition), Arrêter (retour exact), puzzle réussi, sons des pièces (`drainEffects`), Labo (`LabSettings`, `labLevel`), `Progress` (clés `tim3:solved` : puzzles solo et HH, `tim3:last` : solo), `puzzleList` (156 puzzles solo), `duelPuzzleList` (50 HH, catégorie 5), `SessionOptions.guard` (règle du tour à deux joueurs, suivie à l'arrêt de la machine) ; options `unlock` et `originalCount` pour reprendre une aire gardée. |
 | `engine/duel.ts` | Mode à deux joueurs (mode 2) : réglages (`stepGames`, `stepTime`), `DuelTurn` (règle du tour, `EditGuard` de l'éditeur : 417190, 41715f, 42ebba, 4301cb, 43013e), `Duel` (tour, chronomètre, manches, fins de manche 419803 / 41d827), `nextDuelPuzzle` (42cbad(5)). |
 | `ui/duel-window.ts`, `render/duel-board.ts` | Fenêtre des réglages (`HEDTOHED.ITF`, 41d15c) ; tableau des joueurs (`H2H.ITF`, 414670, 414a93, 41495b). |
+| `engine/players.ts` | Registre des joueurs (`SIGNIN.ITF`, fichiers `TIM.SAV`, `tim01.sav` … `tim100.sav`) : `PlayerRegistry` (invité, inscription, stockage de chaque joueur `p<n>:`), `migratePlayers` (progression d'avant vers l'invité), `signInDecision` (426877). |
+| `engine/walkthrough.ts` | Visite guidée du Labo (mode 6) : `Walkthrough` (masques `done`, `visited`, `have` : 41eaaa, 41dce4), `walkFacts` (41edd7), lignes et voix de `PROFESOR.RES` / `PROFESOR.VOC`. |
+| `ui/signin-window.ts` | Écran d'inscription (`SIGNIN.ITF`, 426b53). |
 | `engine/save.ts` | Sauvegardes (D11) : `snapshotWorld` / `snapshotLab` (inverse de `World.addFromLev`, un monde en édition → enregistrements de LEV), `parse*` (valeur inconnue → `null`), machines du Labo (`labSaveSlots`, `saveMachine`, `loadMachine`, version 2 et `migrateLabMachine`), niveau à jouer d'une machine (`puzzleLevel`), `EditStore` (état d'édition). |
 | `engine/solution.ts` | « Montrer la solution » (ampoule) : `designerSolution` verrouille à leur place les pièces du bac sans le bit 0x100 (leurres et liens vers un leurre exclus), `solutionSession` les déverrouille (`unlock`). |
 | `ui/toolbar.ts` | Barre du haut sans DOM : `toolbarStates` (boutons montrés, enfoncés, grisés selon le mode, 418b78), `toolbarDecision` (clic et confirmation, 418ded), `interfaceText` (texte de `INTRFACE.RES` par identifiant). |
@@ -32,7 +35,7 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 | `ui/solve-window.ts` | Conditions de réussite d'une pièce (`SOLVE.ITF`, 426d1c). |
 | `ui/goal-editor.ts` | But du puzzle maison écrit dans la barre du but au Labo (414fc1). |
 | `ui/professor.ts` | `Professor` (sans DOM) : le professeur animé de `HELP.ITF` et `BINSOLVE.ITF` (423e50, 4241ae, 424089, 42452c), attente `PROFAMBT.ANM`, parole `PROFSPCH.ANM` synchronisée sur `mouth()`. |
-| `ui/help-window.ts` | Aide du professeur (`HELP.ITF`, 41d9a3, 41db2d, 41e567). Textes et voix : `data/help.ts` (`HelpTable`, 41e7e7). |
+| `ui/help-window.ts` | Aide du professeur (`HELP.ITF`, 41d9a3, 41db2d, 41e567). Textes et voix : `data/help.ts` (`HelpTable`, 41e7e7). Fenêtre de la visite guidée (`walkthroughWindow`, 41eaaa) : même texte défilant et même professeur. |
 | `ui/machines-window.ts` | Machines du Labo : `LOADSAVE.ITF` (42289c) puis la liste `DOSBOX.ITF` des dix emplacements. |
 | `ui/intro.ts` | `IntroPlayer` : logo Sierra et titre animé, sans DOM (surface et palette propres, sons des images, passage). |
 | `ui/main-menu.ts`, `ui/credits.ts`, `ui/chooser.ts` | Écrans de `itf-window.ts` : `MainMenuScreen` (`MAINMENU`, `quitMainMenu`), `CreditsScreen` (`CREDITS`), `PuzzleListScreen` (`DOSBOX`), `BinScreen` (`DOSBIN`), `PuzzleCardScreen` (`PUZZDISP`), `currentPuzzle` (42cbad). |
@@ -45,16 +48,21 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 - Deux joueurs (mode 2, 418cc4) : la barre du Jeu, chat et Tim enfoncés, « Terminer le Tour » (`TB_END_TURN`, 56 × 28 en x = 522), pas
   d'ampoule. Chat et Tim depuis le Jeu, le Labo ou l'essai : 31399 puis la fenêtre des réglages (4195bd) ; Puzzle (31397) et clé (31398)
   quittent le match.
-- Jeu : Puzzle enfoncé ; visite guidée, inscription grisés (palette atténuée, `RenderAssets.fadeTable` :
-  l'ANM n'a que « relâché » et « enfoncé », le jeu cache ses boutons sans jamais les griser) ; cadenas et levier d'essai cachés ;
-  ampoule à x = 540 si le puzzle est résolu (`Progress`), sinon vide.
+- Jeu : Puzzle enfoncé ; cadenas et levier d'essai cachés ; ampoule à x = 540 si le puzzle est résolu (`Progress`), sinon vide. Aucun
+  bouton grisé : tous les modes sont portés (le jeu cache ses boutons sans jamais les griser ; `RenderAssets.fadeTable` reste pour un
+  bouton non porté).
+- Visite guidée (mode 6, 418c34) : la barre du Labo sans disquette, main, cadenas ni levier d'essai ; à x = 540, le portrait du
+  professeur (`TB_WALKTHROUGH`, état 17) rouvre la fenêtre de la visite (41922f → 41d8e8(0)) ; chaussure enfoncée (4189bc(35013)).
+- Feuille et stylo (419683) : 31401 « Êtes-vous sûr de vouloir entrer votre nom? », puis l'inscription et le menu principal.
+  Chaussure (419712) : rien dans la visite ; ailleurs 31400 « Êtes-vous sûr de vouloir participer à la visite guidée du Professeur
+  Tim? », puis la visite. Dans la visite, Puzzle, clé, chat et Tim, feuille et stylo demandent 31134 si l'aire n'est pas vide (sa
+  machine est perdue, `[0x477950]` en mode 6 : 41948e, 419538, 4195e5, 41969e).
 - Labo : clé enfoncée ; cadenas (`HTLOCK`), levier d'essai et main (éditeur d'indices 41f3dc) actifs ; pas d'ampoule (§ Outils du Labo).
 - Essai (mode 8, 418ca4) : les boutons du Labo, levier d'essai enfoncé (418d91) ; chaque bouton qui touche à la machine termine d'abord
   l'essai (418e7f, 418ed1, 41928e, 41930e, 419360, 41923c), la main et le levier ne font que cela ; aide et drapeau gardent l'essai.
 - Disquette : en Jeu, le choix du puzzle (`DOSBOX`, 418f2c) ; au Labo, les machines du Labo.
 - Clics : Puzzle sans effet en Jeu, depuis le Labo 31397 puis le dernier puzzle ; clé 31398 puis le Labo ; balayette sans
-  question en Jeu (43252d), 31134 au Labo si l'aire n'est pas vide ; ampoule 31125 puis la solution du concepteur ; bouton grisé :
-  « non disponible » du jeu. Écart : le jeu montre 31134 au lieu de 31397 en quittant un Labo modifié (`[0x477950]`), le port
+  question en Jeu (43252d), 31134 au Labo si l'aire n'est pas vide ; ampoule 31125 puis la solution du concepteur. Écart : le jeu montre 31134 au lieu de 31397 en quittant un Labo modifié (`[0x477950]`), le port
   garde la machine du Labo (D11), donc pas d'avertissement de perte.
 - Infobulles : `DESCRIPT.RES`, suivi de « (non disponible) » pour un bouton grisé ; survol (600 ms) ou appui long au doigt.
 - Indices (main) : voir § Fenêtres de la vague F.
@@ -109,7 +117,8 @@ lancement ; le port aussi, à chaque clic sur « Jouer » (la page de dev avec `
 - **Menu principal** (422b70, `MAINMENU.ITF`) : boucle de 50 ms (422c1b) ; bande `MM_TEXT` = texte `DESCRIPT.RES` du contrôle survolé
   + 100 (4233a3, 423473 : `SYS12.PFT`, couleur 15, drapeaux 0x302). Le choix ferme le menu puis 422e31(choix + 10000) : Jeu → puzzle en
   cours (42cbad(−1)) puis `PUZZDISP` ; Labo ; Duel, Inscription, Exercice (mode 6) ; Manuel on-line (4169c8(0)) ; Aide (4169c8(10)) ;
-  Options (42aa60) ; Quitter → 31113 Oui / Non (422f00). Entrée : Jeu ; Échap : Quitter (450d44). Dans le jeu, le menu principal
+  Options (42aa60) ; Quitter → 31113 Oui / Non (422f00). Inscription : 422f3d vérifie qu'on peut écrire `SIGNIN.RES` (sinon 31207),
+puis 423313 → 426b53 et le menu principal ; Exercice : 42332c (mode 6, Labo vide), puis 422b65 ouvre la fenêtre de la visite. Entrée : Jeu ; Échap : Quitter (450d44). Dans le jeu, le menu principal
   revient par « Zones > Menu principal » du menu Windows (ressource TIM2MENUF), pas par la barre d'outils.
 - **Puzzle en cours** (42cbad(−1)) : à partir du dernier joué, premier non résolu de sa catégorie (jusqu'à la fin puis depuis le
   début), sinon premier non résolu du jeu, sinon le dernier joué.
@@ -122,7 +131,7 @@ lancement ; le port aussi, à chaque clic sur « Jouer » (la page de dev avec `
   18 passes après, **pendant la fiche**, si `[0x480370]` vaut « E » ; OK la coupe et relance la musique : `audio.md` § Enchaînement).
 
 Écarts du port :
-- Duel : la fenêtre des deux joueurs (§ Deux joueurs). Inscription, Exercice : grisés (trame) et cliquables, « non disponible » du jeu, comme la barre d'outils ; Manuel
+- Duel : la fenêtre des deux joueurs (§ Deux joueurs). Inscription, Exercice : § Inscription, § Visite guidée ; Manuel
   ouvre l'aide du site ; Aide (4169c8(10) : rubrique du manuel Windows `TIMHELP.EXE`) ouvre l'aide du professeur par-dessus le menu
   (§ Aide du professeur) ; Quitter pose toujours la question 31113, puis revient à l'accueil du site (sur la page de dev : le jeu
   repart). Options : la guitare (`MUSICBOX`). Bande `MM_TEXT` : seuls les six modes ont un texte « contrôle + 100 » ; pour Aide,
@@ -204,7 +213,8 @@ Rendus de contrôle (PNG) faits hors dépôt ; adresses et formules dans les en-
 ## Aide du professeur (vague F, lu dans TIMWIN.EXE)
 
 **Où le professeur apparaît.** Seules deux fenêtres le dessinent (appels de 423e50) : l'aide (`HELP.ITF`, 41e6a4) et la fin de
-catégorie (`BINSOLVE.ITF`, 419e2a, sans voix) ; un troisième appel (42a8d7) sert à la visite guidée (`TOUR.ITF`), non portée. À
+catégorie (`BINSOLVE.ITF`, 419e2a, sans voix) ; un troisième appel (42a8d7) sert à `TOUR.ITF` (démonstrations enregistrées, non
+portées : § Visite guidée) ; la visite guidée du Labo passe par `HELP.ITF` (même fenêtre, voix de `PROFESOR.VOC`). À
 l'ouverture d'un puzzle, `PUZZDISP` joue la voix du but sans professeur (425f6b → 424684) ; un indice a son propre portrait
 (`HINTPROF.ANM`, animé tant que la voix dure, 4207a4).
 
@@ -228,7 +238,7 @@ l'ouverture d'un puzzle, `PUZZDISP` joue la voix du but sans professeur (425f6b 
 **Fenêtre** (`ui/help-window.ts`, 41d9a3, contenu 41e567, boutons 41dce4) : texte de `HELP.RES` dans HP_TEXT, ▲ ▼ d'une page à la
 fois (41e52b, 41e4f3) ; texte court : flèches cachées, « Terminé » et « ? » 16 pixels plus à gauche (41e616). « ? » (HP_BHELP, défaut)
 ferme et passe en mode aide ; « Terminé » (Échap) ferme. Titre, OK, Oui, Non, Annuler ne servent qu'à la visite guidée (41eaaa) :
-cachés. Fermeture (423f9d) : voix coupée.
+cachés ici (§ Visite guidée). Fermeture (423f9d) : voix coupée.
 
 **Mode aide** (41e6b7, 41e85c), après le « ? » de la barre (41907f → 41d8e8(23100) : « Salut! Professeur Tim… ») : curseur « ? »
 (451718(5, 1), 10 sur un élément aidé) ; un appui (gauche ou droit) fait le son 0xE1B puis : bac (fenêtre à part : 11014), barre du
@@ -256,8 +266,9 @@ sans aide).
 
 ## Sauvegardes (vague S, D11)
 
-- **Progression** : `tim3:solved`, `tim3:last` (`Progress`) ; puzzles maison résolus : `tim3:homeSolved` (`HomeProgress`, « emplacement@date
-  de sauvegarde » : une autre machine enregistrée au même emplacement repart non résolue).
+- **Progression**, par joueur (§ Inscription) : `tim3:p<n>:solved`, `tim3:p<n>:last` (`Progress`) ; puzzles maison résolus :
+  `tim3:p<n>:homeSolved` (`HomeProgress`, « emplacement@date de sauvegarde » : une autre machine enregistrée au même emplacement repart
+  non résolue).
 - **Machines du Labo** : `tim3:slot01` … `slot10` (`SaveSlots`), `{ savedAt, save: { version: 2, name, machine } }` ; `machine` reprend
   les champs d'un LEV (`gravity`, `pressure`, `music`, `background`, `fixedParts`, `movingParts` de `data/lev.ts`) plus `placed`
   (index des pièces que le joueur peut déplacer : tout ce qui est posé est écrit « verrouillé » pour que `World.loadLevel` ne le
@@ -266,8 +277,9 @@ sans aide).
   pièces dans fixes puis mobiles, délai). Le nom est le titre du LEV. **Migration** : une machine de la version 1 se lit avec un puzzle
   vide (`migrateLabMachine`) et se réécrit en version 2 à la sauvegarde suivante. Version inconnue, JSON cassé ou champ invalide :
   emplacement vide, jamais d'exception. Nom : 1 à 32 caractères ; emplacement plein : confirmation (`saveMachine(..., replace)`).
-- **Puzzle en cours** : `tim3:edit:<puzzle>` (`fixedParts`, `movingParts` y compris le bac, `placed` ; versions 1 et 2 identiques) et
-  `tim3:edit:lab` (une machine, version 1 migrée comme ci-dessus). Pendant l'essai du Labo, c'est la machine d'avant l'essai qui est
+- **Puzzle en cours**, par joueur : `tim3:p<n>:edit:<puzzle>` (`fixedParts`, `movingParts` y compris le bac, `placed` ; versions 1 et 2
+  identiques) et `tim3:p<n>:edit:lab` (une machine, version 1 migrée comme ci-dessus). La machine de la visite guidée n'est jamais
+  gardée. Pendant l'essai du Labo, c'est la machine d'avant l'essai qui est
   gardée ; l'aire d'un puzzle maison n'est pas gardée (sa machine peut être remplacée dans son emplacement). Gardé
   par `persistEdit` (`ui/app.ts`) au relâchement du pointeur, aux touches, à la fermeture d'une fenêtre, avant de changer de
   puzzle, avant « Démarrer », à `pagehide` et quand l'onglet se masque ; jamais en marche, donc c'est l'état d'avant « Démarrer ».
@@ -382,8 +394,99 @@ remplace les pièces par leur copie : la garde suit (`remap`). Écarts : tableau
 (`DUEL_BOARD`, x = 294 ; la barre du but garde son bord droit) ; le message du tour est montré à chaque nouvelle partie (l'exe le saute si
 le même puzzle revient) ; l'horloge du tour ne court pas onglet masqué et avance d'au plus 250 ms par image ; un puzzle maison choisi à la
 disquette pendant un match quitte le match ; « Menu principal » sous l'écran termine le match ; l'aire d'un match n'est pas gardée (D11) ;
-bouton « Terminer le tour » aussi sous l'écran (clavier, lecteurs d'écran). Le nom du joueur qui attend (couleur 7) se voit à peine sur la
-moitié grise du tableau, comme dans le jeu (à vérifier sur la version Windows).
+bouton « Terminer le tour » aussi sous l'écran (clavier, lecteurs d'écran). **Nom du joueur qui attend** : vérifié dans l'exe
+(4214b4 / 4214ef : couleur 7 pour le joueur qui n'a pas la main, 15 pour l'autre ; `[edi] = 1`, style 1 : seuls les styles 2 et 3 sont
+enregistrés (4136c7), 452e8c rend donc le dessin plat par défaut). Or la couleur 7 est le gris de la moitié inactive du fond (état 3 /
+4 de `GOALBAR.ANM`, 414a93) : l'original écrit ce nom gris sur gris, il est invisible. Écart du port : même couleur 7, mais avec un relief
+d'un pixel (ombre en 8 en haut à gauche, reflet en 15 en bas à droite, `drawWaitingName`) ; le nom du tour reste plat. **But long** :
+l'original ne réduit pas la police et ne fait pas défiler (style 5, 421ec1 : `GOALFONT.PFT`, alignement 0x400) ; le texte est coupé à
+la largeur de la fenêtre de la barre (414e26, message 5 de 414fc1, 286 px en duel) et seules les lignes entières qui tiennent dans sa
+hauteur sont dessinées (452ed0 / 45301c) : un but long est coupé, dans la barre réduite comme dans la barre pleine. Le port garde cette
+coupure (2 lignes) ; seule la marge droite du texte est élargie en duel (66 px, `GOAL_TEXT_REDUCED_MARGIN`) pour ne pas écrire sur le
+reflet jaune du bord recollé. Hauteur exacte de la zone du but en duel (la fenêtre de 414d58 est 10 px plus haute que celle du jeu
+seul) : non vérifiée, le port garde 46 px.
+
+## Inscription (`SIGNIN.ITF`, lu dans TIMWIN.EXE)
+
+**Ce que fait le jeu.** Un joueur est un fichier de partie : `TIM.SAV` pour l'invité, dont le nom est la ligne 3 de `SYSTEM.RES`
+(« Hôte »), puis `tim01.sav` à `tim100.sav` (42d0b8 : premier numéro libre, 100 joueurs inscrits au plus). Un fichier (42c6d0 lit,
+42c8cb écrit, en-tête `SYSTEM.RES` ligne 2 et somme de contrôle) garde le nom (20 octets), un second texte de 20 octets (rôle non lu), le puzzle en cours
+(`[0x481600]`), le puzzle en cours de chaque catégorie (7 mots : 0, 40, 66, 96, 127, 156, 206 au départ, 42c664), un octet par puzzle
+(bit 0 : résolu), effets, musique et voix (octets 0x50 à 0x52), préférences (`[0x481034]`, 42a082). `SIGNIN.RES` n'est que la liste des
+noms, refaite à chaque ouverture de l'écran (42668d : nom lu dans chaque `TIM*.SAV`) et effacée en quittant (43b90d). **Au lancement,
+l'invité** (43b5cc : 42c6d0(0) → `TIM.SAV`) : le dernier joueur n'est pas retenu. **Pas d'effacement** de joueur.
+
+**Écran** (426b53, procédure 426362, commandes 4267b0) : SI_NAME, EDIT de 19 caractères blanc sur bleu (4264b3, 4264e9), prérempli avec le
+nom du joueur courant ; chaque frappe choisit la rangée du nom écrit, casse ignorée, ou aucune (426544) ; SI_LIST, les noms (rangées
+de la hauteur du texte + 2, (hauteur − 12) / rangée, texte en x + 30, couleur 12 pour la rangée choisie, 9 sinon : 426bc8), un clic
+copie le nom dans le champ (426ac2), un clic sur la rangée choisie vaut « Terminé » (426b3d) ; ▲ ▼ d'une rangée, cachées si tout tient
+(426cce) ; « Terminé » (Entrée, Échap : 4263eb) : un nom écrit désigne son joueur, inconnu → 31174 « Ce nom ne correspond pas à ceux de
+la liste. Êtes-vous un nouveau joueur? » (Oui : partie neuve, 42c608, et le professeur se présentera de nouveau, 4269fc ; Non : retour
+au champ) ; sans nom, la rangée choisie ; sans rien, 31175. Puis le menu principal (mode 7 vers 10) et la musique 1000 relancée. « ? » :
+le manuel Windows (4169c8(0xb)). Depuis la barre : 31401 d'abord (§ Barre d'outils) ; depuis le menu : 422f3d vérifie qu'on peut écrire
+(31207).
+
+**Port** (`engine/players.ts`, `ui/signin-window.ts`) : registre `tim3:players` (`{ version: 1, players: [{ id, name }] }`, invité
+implicite d'identifiant 0, joueurs 1 à 100) ; par joueur, sous `tim3:p<n>:` : `solved`, `last`, `homeSolved`, `edit:<puzzle>`,
+`edit:lab`. Changer de joueur garde d'abord l'aire en cours pour l'ancien, puis rien n'est écrit pour le nouveau tant qu'un mode n'est
+pas rouvert. Registre illisible : l'invité seul, jamais d'exception. **Migration** (`migratePlayers`, une fois, sans registre) : les
+clés d'avant l'inscription (`tim3:solved`, `last`, `homeSolved`, `edit:*`) deviennent celles de l'invité, chargé au lancement : copie
+(sans écraser une copie déjà faite), registre, puis effacement ; interrompue, elle reprend à l'ouverture suivante.
+
+Écarts :
+- Restent communs à tous les joueurs : les machines du Labo (`slot01` … `slot10`, comme les fichiers de puzzles du jeu), la musique,
+  les effets, le volume et la voix (préférences du site) ; le jeu garde son, musique et voix dans chaque partie.
+- Le second texte de 20 octets, les puzzles en cours de chaque catégorie et les préférences d'affichage ne sont pas portés (le port retient un
+  seul dernier puzzle, `last`, et `currentPuzzle` en déduit le puzzle en cours).
+- Pas de vérification d'écriture (31207) : un stockage plein ou bloqué donne un message du site à l'inscription.
+- « ? » ouvre l'aide du site, puis l'écran revient. Cent joueurs inscrits : message du site (le jeu écraserait la partie courante).
+- `ENTREZ VOTRE NOM` (texte 21145, contrôle de 85 pixels) ne tient pas sur une ligne : seul « ENTREZ » est dessiné, comme le dessine
+  le moteur des `.ITF` (à comparer au jeu).
+
+## Visite guidée du Labo (mode 6, lu dans TIMWIN.EXE)
+
+**Entrée** : « Exercice » du menu (42332c) ou la chaussure (419712, 31400). Mode 6 : un Labo vide (433830 vide l'aire, le nom, les
+indices et l'état de la visite, 41d8c4), la barre du mode 6 (§ Barre d'outils), puis la fenêtre de la visite (422b65 → 41d8e8(0)).
+
+**Fenêtre** (41d9a3 avec l'identifiant 0, procédure 41db2d, contenu 41e567 → 41eaaa, boutons 41dce4) : `HELP.ITF`, texte de
+`PROFESOR.RES` (chargé sous 10001, 41d9ac) dans HP_TEXT, voix `PROFESOR.VOC` de même rang (41eda1 : 4000 + ligne) dite par le
+professeur animé (423e50(23106)) ; « Continuer » (HP_YES, 31267, bouton par défaut), « Retourner » (HP_NO, 31268), « Salut! »
+(HP_CANCEL, 31269, Échap), « Terminé » (HP_DONE) à la fin seulement ; « ? » et OK cachés.
+
+**État** (`engine/walkthrough.ts`) : masques `done` (`[0x4728a4]`), `visited` (`[0x4728a8]`), `have` (`[0x4728a0]`) ; étape courante =
+premier bit absent de `done`. À chaque affichage (41eaaa), `have` est recalculé : 5 pièces posées au moins (41edd7 : fixes et mobiles),
+but (`[0x4811e8]`), nom (`[0x4811c0]`), indices (`[0x47eb74]`), solution (`[0x47fe30]`) ; un but ou un nom effacé rouvre son étape. Ligne
+= base + 1 si `have` + 2 si `visited` (exceptions : musique, déverrouillage, sauvegarde). « Retourner » n'est montré qu'une fois l'étape
+demandée, jamais quand le but ou le nom est vide, ni à la sauvegarde.
+
+| Étape | Lignes | « Continuer » la première fois | ensuite | « Retourner » |
+| --- | --- | --- | --- | --- |
+| 1 bienvenue | 0, puis 1 (`[0x4728c0]`) | valide | | |
+| 2 pièces | 2 à 5 | ferme : construire | 5 pièces : valide ; sinon ferme (ligne 4) | ferme |
+| 4 musique | 6, 8 | la guitare, puis la visite | valide | la guitare |
+| 8 but | 9 à 12 (11 : but vide) | ferme, barre du but au focus | but écrit : valide | ferme, barre du but |
+| 0x10 nom | 13 à 16 ; 33 pendant la saisie | saisie dans HP_TITLE (EDIT noir sur blanc, 29 car.) | nom donné : valide | saisie |
+| 0x20 solution | 21 à 24 | ferme : poignée « solution » des pièces | valide | ferme |
+| 0x40 indices | 17 à 20 | ferme, éditeur d'indices (41d96f) | valide | éditeur d'indices |
+| 0x80 tout verrouiller | 25 | verrouille tout (4209e5(0)), la visite revient | | passe l'étape |
+| 0x100 déverrouiller | 27, 28 | ferme : cadenas des pièces | valide | ferme |
+| 0x200 sauvegarde | 29 ; 30 raté ; 31 réussi | sauvegarde (41edfc : `PUZB<n>.TIM`), la visite revient | valide | |
+| 0x400 fin | 32 | | « Terminé » : menu principal | |
+
+« Salut! » avant la fin : 31136 « Le puzzle n'a pas été sauvegardé et sera effacé. Désirez-vous quitter? », Oui : menu principal (mode 7).
+Quand la fenêtre est fermée, le portrait du professeur de la barre (`TB_WALKTHROUGH`) la rouvre sur l'étape en cours. Pendant la saisie du
+nom, Entrée dans le champ (41dd5b) vaut « Continuer » ; le professeur ne repart pas (41e344 écrit la ligne 33 sans voix).
+
+Écarts :
+- Sauvegarde : le premier emplacement libre des machines du Labo (le puzzle se joue ensuite depuis « Puzzles Personnels ») au lieu d'un
+  nouveau fichier `PUZB<n>.TIM` ; sans emplacement libre, la sauvegarde échoue (ligne 30, nouvel essai possible).
+- La machine de la visite n'est jamais gardée (ni à la fermeture de la page) : le jeu la perd aussi en quittant la visite (31136). Le
+  Labo, lui, retrouve sa propre machine (D11), le jeu ouvrirait un Labo vide.
+- La ligne 7 (« déjà des mélodies ») et la ligne 26 (« déjà verrouillé certains objets ») ne sortent jamais : `have` n'a jamais ces bits
+  dans le jeu non plus.
+- `TOUR.ITF` (fenêtre des six démonstrations « Résoudre un Puzzle », « Créer un Puzzle »… : 42a7bc, appelée par la commande de menu
+  651xx de 4211d6, image `SIGN_IN.BMP` en décor 18 dessinée par 42b072, professeur 42a8d7) rejoue des enregistrements `TOUR<n>.REC`
+  (451c08) **absents du CD** ; 31141 dit d'ailleurs que cette visite n'est pas terminée. Non portée.
 
 ## Son
 
@@ -399,7 +502,9 @@ la machine et au puzzle réussi (ambiances en boucle). La file `World.sounds` es
 chronomètre, manches, choix du puzzle, un match complet au meilleur des 3 joué tour par tour par l'éditeur sur HH23 et HH27 ; fenêtre
 `HEDTOHED`, tableau, refus à l'écran), éditeur, session, Labo, conditions de victoire, progression, `lab-tools.test.ts` (cadenas, onglets, puzzle maison, but au Labo ; fenêtres `HTLOCK`, éditeur d'indices, `SOLVE`, écran du Labo), `homemade.test.ts` (puzzle maison construit par l'éditeur, sauvegardé, relu au Labo, joué et résolu ; migration des sauvegardes de la version 1), `save.test.ts` (sauvegardes : aller-retour, reprise après
 rechargement, données corrompues, emplacement plein, nom vide, quinze solutions reprises et résolues au même pas), et
-`professor.test.ts` (professeur, fenêtre d'aide, mode aide), `test/tim3/data/help.test.ts` (`HELP.RES`), `solution.test.ts` (ampoule : solution du concepteur posée, `TIM3_SOLUTION_ALL=1` pour les 156 : toutes résolues, HLEV9 17 pas avant le banc), `program.test.ts` et `replay.test.ts`, qui rejoue quinze solutions du concepteur **par l'API de l'éditeur** (`replay.ts` : prendre au bac, retourner,
+`professor.test.ts` (professeur, fenêtre d'aide, mode aide), `players.test.ts` (registre, migration, « Terminé » de l'inscription),
+`walkthrough.test.ts` (visite guidée : textes et boutons, puis la visite entière jouée par l'éditeur jusqu'au puzzle maison sauvegardé
+et rejoué), `test/tim3/ui/signin-walkthrough.test.ts` (fenêtres `SIGNIN` et de la visite), `test/tim3/data/help.test.ts` (`HELP.RES`), `solution.test.ts` (ampoule : solution du concepteur posée, `TIM3_SOLUTION_ALL=1` pour les 156 : toutes résolues, HLEV9 17 pas avant le banc), `program.test.ts` et `replay.test.ts`, qui rejoue quinze solutions du concepteur **par l'API de l'éditeur** (`replay.ts` : prendre au bac, retourner,
 étirer, tourner, poser, tendre courroies et cordes, brancher, programmer) puis vérifie la victoire au pas du banc + 30.
 `TIM3_REPLAY_ALL=1 TIM3_REPLAY_REPORT=<fichier>` les rejoue toutes (1,5 s) : **156 / 156 résolues**, 151 au pas du banc ;
 HLEV6, 7, 9, 10 et 17 finissent de 1 à 15 pas à côté, parce que les pièces posées à la main entrent dans les listes une à

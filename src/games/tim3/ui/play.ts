@@ -181,6 +181,8 @@ export class PlayScreen {
   helpPicking = false;
   /** Essai du puzzle maison (mode 8) : barre d'outils du Labo, levier enfoncé. */
   test = false;
+  /** Visite guidée (mode 6) : barre du Labo réduite, portrait du professeur, chaussure enfoncée. */
+  walkthrough = false;
   /** Labo : onglet du bac (`[0x471f90]`) et choix des onglets ouvert. */
   binTab = 0;
   tabPicker = false;
@@ -327,7 +329,7 @@ export class PlayScreen {
 
   /** Boutons montrés dans le mode courant (418b78), avec leur géométrie. */
   shownButtons(): ShownButton[] {
-    const states = toolbarStates({ lab: this.session.lab !== null, test: this.test, duel: this.duel !== null, solved: this.solved, running: this.session.running });
+    const states = toolbarStates({ lab: this.session.lab !== null, test: this.test, duel: this.duel !== null, walkthrough: this.walkthrough, solved: this.solved, running: this.session.running });
     return states.flatMap((st) => {
       const b = this.toolbar.find((t) => t.name === st.name);
       return b ? [{ ...b, pressed: st.pressed, disabled: st.disabled }] : [];

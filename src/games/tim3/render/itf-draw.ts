@@ -12,8 +12,8 @@
  *   alignement ; mise en page 45301c (mots, `\n`, lignes entières seulement, défilement = lignes sautées) et dessin 452ed0.
  * - **Image** (`image = 1`) : image de l'état `valeur` de l'ANM, origine décalée de (`unknown12`, `unknown14`) (410dcb), plus le
  *   décalage d'image courant (`ItfState.frames`, +0x4c).
- * - **Décors 5, 17, 18** : 5 = texte du but ; 17 = zone vide que remplit un rappel de dessin (`ItfState.draw`) ; 18 = visite guidée
- *   (42b072, non portée : rien n'est dessiné).
+ * - **Décors 5, 17, 18** : 5 = texte du but ; 17 = zone vide que remplit un rappel de dessin (`ItfState.draw`) ; 18 = image de `TOUR.ITF`
+ *   (42b072 dessine `SIGN_IN.BMP`, chargé par 42a8ac ; fenêtre des démonstrations enregistrées, non portée : rien n'est dessiné).
  * - **Valeurs dynamiques** (98 à 120, 154, 161, 162, 193 ; 4213b9) : textes de l'appelant, styles du jeu (`rawText`, `valueStyle`).
  *
  * Coordonnées : celles de l'ITF (espace 640×400), plus le décalage `state.dx`, `state.dy` (`itfOrigin` centre la fenêtre sur

@@ -1,20 +1,22 @@
 /**
- * Barre d'outils du haut (`WTOOLBAR.ITF`), sans DOM : boutons montrés selon le mode, bouton du mode enfoncé, boutons non
- * portés grisés, et ce que fait un clic (confirmation d'origine comprise).
+ * Barre d'outils du haut (`WTOOLBAR.ITF`), sans DOM : boutons montrés selon le mode, bouton du mode enfoncé, et ce que fait un clic
+ * (confirmation d'origine comprise).
  *
- * TIMWIN.EXE : 418b78 cache ou montre les boutons selon le mode (`[0x477988]` : 0 Jeu, 1 Labo, 2 deux joueurs, 8 Labo en essai)
- * puis enfonce le bouton du mode passé par l'appelant (4197c7) ; 418ded aiguille les clics (identifiants 35001 à 35022). Le port a
- * quatre modes : Jeu (un puzzle ouvert, du jeu ou maison), Labo, l'essai du Labo (mode 8) et deux joueurs (mode 2).
+ * TIMWIN.EXE : 418b78 cache ou montre les boutons selon le mode (`[0x477988]` : 0 Jeu, 1 Labo, 2 deux joueurs, 6 visite guidée,
+ * 8 Labo en essai) puis enfonce le bouton du mode passé par l'appelant (4197c7) ; 418ded aiguille les clics (identifiants 35001 à
+ * 35022). Le port a les mêmes cinq modes : Jeu (un puzzle ouvert, du jeu ou maison), Labo, l'essai du Labo, deux joueurs et la visite.
  *
  * - Toujours montrés : les six modes de gauche, musique, valeurs globales, balayette, aide, drapeau.
- * - Jeu : disquette et indices ; cadenas, essai du Labo (`TB_TEST`), visite et fin de tour cachés ; l'ampoule
+ * - Jeu : disquette et indices ; cadenas, essai du Labo (`TB_TEST`), professeur de la visite et fin de tour cachés ; l'ampoule
  *   « Montrer la solution » (x = 540) seulement si le puzzle a déjà été résolu (42d210), sinon l'emplacement reste vide.
  * - Labo : disquette, indices, cadenas et levier d'essai montrés ; ampoule, visite et fin de tour cachées.
  * - Essai (mode 8, 418ca4) : les boutons du Labo, levier d'essai enfoncé (418d91).
  * - Deux joueurs (mode 2, 418cc4) : comme en Jeu, avec « Terminer le Tour » (`TB_END_TURN`, x = 522) ; pas d'ampoule ; chat et Tim
  *   (`TB_GOTO_H2H`) enfoncés.
+ * - Visite guidée (mode 6, 418c34) : la barre du Labo sans disquette, main, cadenas ni levier d'essai ; à leur place, x = 540, le
+ *   portrait du professeur (`TB_WALKTHROUGH`, état 17) ; chaussure (`TB_GOTO_TUTORIAL`) enfoncée (4189bc(35013)).
  *
- * Le jeu ne grise jamais un bouton (il les cache) : les boutons montrés mais non portés sont grisés par le port.
+ * Le jeu ne grise jamais un bouton (il les cache) ; tous les boutons montrés sont portés.
  */
 
 /** Boutons que le port peut montrer, de gauche à droite ; `TB_TEST` (Labo) et `TB_SOLUTION` (Jeu) partagent x = 540. */
@@ -34,6 +36,7 @@ export const TOOLBAR_NAMES = [
   "TB_LOCKED",
   "TB_TEST",
   "TB_SOLUTION",
+  "TB_WALKTHROUGH",
   "TB_END_TURN",
   "TB_FLAG",
 ] as const;
@@ -48,35 +51,41 @@ export interface ToolbarContext {
   test?: boolean;
   /** Mode à deux joueurs (mode 2). */
   duel?: boolean;
+  /** Visite guidée du Labo (mode 6) : `lab` est vrai aussi. */
+  walkthrough?: boolean;
   /** Le puzzle ouvert a déjà été résolu (`Progress`) : l'ampoule apparaît. */
   solved: boolean;
   /** La machine est en marche (drapeau enfoncé). */
   running: boolean;
 }
 
-/** Bouton montré : enfoncé (mode courant, drapeau en marche), grisé (non porté). */
+/** Bouton montré : enfoncé (mode courant, drapeau en marche), grisé (aucun : tous sont portés). */
 export interface ToolbarButtonState {
   name: ToolbarName;
   pressed: boolean;
   disabled: boolean;
 }
 
-/** Modes montrés mais non portés : visite guidée, inscription. Le manuel (`TIMHELP.EXE`, hors jeu) ouvre l'aide du site. */
-const UNPORTED: ReadonlySet<ToolbarName> = new Set(["TB_GOTO_SIGNIN", "TB_GOTO_TUTORIAL"]);
-/** Boutons montrés (418b78), de gauche à droite. */
+/** Boutons cachés pendant la visite guidée (418c34). */
+const HIDDEN_IN_WALKTHROUGH: ReadonlySet<ToolbarName> = new Set(["TB_LOCKED", "TB_HINT", "TB_TEST", "TB_DISK"]);
+
+/** Boutons montrés (418b78), de gauche à droite. Le manuel (`TB_GOTO_TOUR`, `TIMHELP.EXE` hors jeu) ouvre l'aide. */
 export function toolbarStates(ctx: ToolbarContext): ToolbarButtonState[] {
-  const workshop = ctx.lab || ctx.test === true;
+  const walk = ctx.walkthrough === true;
+  const workshop = ctx.lab || ctx.test === true || walk;
   const duel = !workshop && ctx.duel === true;
-  const mode: ToolbarName = workshop ? "TB_GOTO_WORK" : duel ? "TB_GOTO_H2H" : "TB_GOTO_PUZ";
+  const mode: ToolbarName = walk ? "TB_GOTO_TUTORIAL" : workshop ? "TB_GOTO_WORK" : duel ? "TB_GOTO_H2H" : "TB_GOTO_PUZ";
   const out: ToolbarButtonState[] = [];
   for (const name of TOOLBAR_NAMES) {
     if (!workshop && (name === "TB_LOCKED" || name === "TB_TEST")) continue;
+    if (walk && HIDDEN_IN_WALKTHROUGH.has(name)) continue;
+    if (name === "TB_WALKTHROUGH" && !walk) continue;
     if (name === "TB_SOLUTION" && (workshop || duel || !ctx.solved)) continue;
     if (name === "TB_END_TURN" && !duel) continue;
     out.push({
       name,
       pressed: name === mode || (name === "TB_FLAG" && ctx.running) || (name === "TB_TEST" && ctx.test === true),
-      disabled: UNPORTED.has(name),
+      disabled: false,
     });
   }
   return out;
@@ -96,11 +105,14 @@ export const TOOLBAR_TEXT = {
   testIntro: 31143,
   /** 0x7aa7 : chat et Tim depuis le Jeu ou le Labo (41960c). */
   openDuel: 31399,
+  /** 0x7aa8 : chaussure, hors de la visite (419766). */
+  openWalkthrough: 31400,
+  /** 0x7aa9 : feuille et stylo (4196ca). */
+  openSignIn: 31401,
 } as const;
 
 export type ToolbarAction =
   | "none"
-  | "unavailable"
   | "play"
   | "lab"
   | "machines"
@@ -115,6 +127,9 @@ export type ToolbarAction =
   | "test"
   | "solution"
   | "duel"
+  | "signIn"
+  | "walkthrough"
+  | "professor"
   | "endTurn"
   | "run";
 
@@ -142,12 +157,17 @@ export interface ToolbarDecision {
  * - Cadenas (41927c → 420810) : la fenêtre `HTLOCK`. Levier d'essai (41908a) : le Labo passe en essai (mode 8), ou en revient.
  * - Essai (mode 8) : musique, disquette, main, globe, balayette, cadenas et levier terminent d'abord l'essai (418e7f, 418ed1,
  *   41928e, 41930e, 419360, 41923c, 41909b) ; la main s'arrête là (419297 : pas de fenêtre). Aide et drapeau gardent l'essai.
+ * - Feuille et stylo (419683) : 31401 puis l'inscription (mode 5), qui mène au menu principal ; chaussure (419712) : rien dans la
+ *   visite, ailleurs 31400 puis la visite (mode 6).
+ * - Visite guidée : la machine de la visite n'est pas gardée ; Puzzle, clé, chat et Tim, feuille et stylo demandent 31134 si l'aire
+ *   n'est pas vide (`[0x477950]` en mode 6 : 41948e, 419538, 4195e5, 41969e), sinon leur question ; le portrait du professeur
+ *   (41922f → 41d8e8(0)) rouvre la fenêtre de la visite.
  */
 export function toolbarDecision(name: string, ctx: ToolbarContext & { fieldEmpty: boolean }): ToolbarDecision {
   const state = toolbarStates(ctx).find((b) => b.name === name);
   if (!state) return { action: "none" };
-  if (state.disabled) return { action: "unavailable" };
   if (ctx.test) return testDecision(state.name, ctx);
+  if (ctx.walkthrough) return walkthroughDecision(state.name, ctx);
   switch (state.name) {
     case "TB_GOTO_PUZ":
       return ctx.lab || ctx.duel ? { action: "play", confirm: TOOLBAR_TEXT.openPlay } : { action: "none" };
@@ -155,6 +175,10 @@ export function toolbarDecision(name: string, ctx: ToolbarContext & { fieldEmpty
       return ctx.lab ? { action: "none" } : { action: "lab", confirm: TOOLBAR_TEXT.openLab };
     case "TB_GOTO_H2H":
       return ctx.duel && !ctx.lab ? { action: "none" } : { action: "duel", confirm: TOOLBAR_TEXT.openDuel };
+    case "TB_GOTO_SIGNIN":
+      return { action: "signIn", confirm: TOOLBAR_TEXT.openSignIn };
+    case "TB_GOTO_TUTORIAL":
+      return { action: "walkthrough", confirm: TOOLBAR_TEXT.openWalkthrough };
     case "TB_END_TURN":
       return { action: "endTurn" };
     case "TB_DISK":
@@ -180,7 +204,28 @@ export function toolbarDecision(name: string, ctx: ToolbarContext & { fieldEmpty
     case "TB_FLAG":
       return { action: "run" };
     default:
-      return { action: "unavailable" };
+      return { action: "none" };
+  }
+}
+
+/** Mode 6 : quitter la visite perd sa machine (31134 si l'aire n'est pas vide) ; sinon comme au Labo. */
+function walkthroughDecision(name: ToolbarName, ctx: ToolbarContext & { fieldEmpty: boolean }): ToolbarDecision {
+  const leave = (action: ToolbarAction, confirm: number): ToolbarDecision => ({ action, confirm: ctx.fieldEmpty ? confirm : TOOLBAR_TEXT.clearLab });
+  switch (name) {
+    case "TB_GOTO_PUZ":
+      return leave("play", TOOLBAR_TEXT.openPlay);
+    case "TB_GOTO_WORK":
+      return leave("lab", TOOLBAR_TEXT.openLab);
+    case "TB_GOTO_H2H":
+      return leave("duel", TOOLBAR_TEXT.openDuel);
+    case "TB_GOTO_SIGNIN":
+      return leave("signIn", TOOLBAR_TEXT.openSignIn);
+    case "TB_GOTO_TUTORIAL":
+      return { action: "none" };
+    case "TB_WALKTHROUGH":
+      return { action: "professor" };
+    default:
+      return toolbarDecision(name, { ...ctx, walkthrough: false });
   }
 }
 

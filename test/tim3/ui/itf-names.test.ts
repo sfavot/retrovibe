@@ -10,7 +10,9 @@ import { binsolveWindow } from "../../../src/games/tim3/ui/binsolve-window";
 import { BinScreen, PuzzleCardScreen, PuzzleListScreen } from "../../../src/games/tim3/ui/chooser";
 import { CreditsScreen } from "../../../src/games/tim3/ui/credits";
 import { globeWindow } from "../../../src/games/tim3/ui/globe-window";
-import { helpWindow } from "../../../src/games/tim3/ui/help-window";
+import { helpWindow, walkthroughWindow } from "../../../src/games/tim3/ui/help-window";
+import { signInWindow } from "../../../src/games/tim3/ui/signin-window";
+import { WALK_STEP, Walkthrough } from "../../../src/games/tim3/engine/walkthrough";
 import { hintWindow } from "../../../src/games/tim3/ui/hint-window";
 import { infoWindow } from "../../../src/games/tim3/ui/info-window";
 import { ItfWindow, screenOptions, type ItfScreen, type ItfWindowOptions } from "../../../src/games/tim3/ui/itf-window";
@@ -57,6 +59,17 @@ describe.skipIf(!original.has)("noms accessibles des contrôles de chaque fenêt
     musicChosen: vi.fn(),
     effectChosen: vi.fn(),
   };
+  const professorLines = parseLines(index.get("PROFESOR.RES"));
+  const walkSteps = Object.values(WALK_STEP);
+  /** La fenêtre de la visite à l'étape `step` (étapes d'avant finies, celle-ci déjà demandée). */
+  const walkthrough = (step: number, naming = false) => {
+    const walk = new Walkthrough(true);
+    walk.done = step - 1;
+    walk.visited = step;
+    walk.name = "Fusée";
+    if (naming) walk.press("no", { parts: 5, goal: "But", hints: 1, solution: true });
+    return walkthroughWindow(assets, itf("HELP.ITF"), { walk, facts: () => ({ parts: 5, goal: "But", hints: 1, solution: true }), lines: professorLines, audio: silentAudio(), confirmLeave: vi.fn(), after: vi.fn() });
+  };
   const program = (type: number) => {
     const world = new World(realTypes());
     const p = new PartProgram(world, createPart(world, type), parseProgramRows(parseLines(index.get("PROGPART.RES"))));
@@ -82,6 +95,10 @@ describe.skipIf(!original.has)("noms accessibles des contrôles de chaque fenêt
     ["HELP (texte court)", () => open(helpWindow(assets, itf("HELP.ITF"), { text: "Court.", voice: null, audio: silentAudio(), another: vi.fn() }))],
     ["HELP (texte long)", () => open(helpWindow(assets, itf("HELP.ITF"), { text: "Long. ".repeat(200), voice: null, audio: silentAudio(), another: vi.fn() }))],
     ["HINT", () => open(hintWindow(itf("HINT.ITF"), { text: "Regardez la balle.", replay: vi.fn() }))],
+    ...walkSteps.map((step): [string, () => ItfWindow] => [`HELP (visite guidée, étape ${step.toString(16)})`, () => open(walkthrough(step))]),
+    ["HELP (visite guidée, saisie du nom)", () => open(walkthrough(WALK_STEP.name, true))],
+    ["SIGNIN (invité seul)", () => open(signInWindow(assets, itf("SIGNIN.ITF"), { names: () => ["Hôte"], current: 0, done: vi.fn(), help: vi.fn() }))],
+    ["SIGNIN (liste qui défile)", () => open(signInWindow(assets, itf("SIGNIN.ITF"), { names: () => ["Hôte", ...Array.from({ length: 30 }, (_, i) => `Joueur ${i + 1}`)], current: 3, done: vi.fn(), help: vi.fn() }))],
     ["LOADSAVE", () => open(loadSaveWindow(itf("LOADSAVE.ITF"), { modified: true, choose: vi.fn() }))],
     ["DOSBOX (charger une machine)", () => open(machineListWindow(assets, itf("DOSBOX.ITF"), { mode: "load", slots: () => slots, name: "", validate: vi.fn() }))],
     ["DOSBOX (sauvegarder une machine)", () => open(machineListWindow(assets, itf("DOSBOX.ITF"), { mode: "save", slots: () => slots, name: "Ma machine", validate: vi.fn() }))],

@@ -8,7 +8,7 @@ import { MAIN_MENU, MainMenuScreen, QUIT_TEXT, mainMenuAction, quitMainMenu } fr
 import { frenchIndex, original } from "../data/real";
 
 describe("menu principal : ce que fait chaque bouton (422e31)", () => {
-  it("Jeu, Labo, Duel, manuel, aide, options, quitter ; les modes non portés répondent « non disponible »", () => {
+  it("Jeu, Labo, Duel, Inscription, Exercice (visite guidée), manuel, aide, options, quitter", () => {
     expect(mainMenuAction(MAIN_MENU.play)).toBe("play");
     expect(mainMenuAction(MAIN_MENU.lab)).toBe("lab");
     expect(mainMenuAction(MAIN_MENU.manual)).toBe("help");
@@ -16,8 +16,8 @@ describe("menu principal : ce que fait chaque bouton (422e31)", () => {
     expect(mainMenuAction(MAIN_MENU.options)).toBe("options");
     expect(mainMenuAction(MAIN_MENU.quit)).toBe("quit");
     expect(mainMenuAction(MAIN_MENU.duel)).toBe("duel");
-    expect(mainMenuAction(MAIN_MENU.signIn)).toBe("unavailable");
-    expect(mainMenuAction(MAIN_MENU.tutorial)).toBe("unavailable");
+    expect(mainMenuAction(MAIN_MENU.signIn)).toBe("signIn");
+    expect(mainMenuAction(MAIN_MENU.tutorial)).toBe("walkthrough");
     expect(mainMenuAction(MAIN_MENU.text)).toBeUndefined();
   });
 });
@@ -74,19 +74,20 @@ describe.skipIf(!original.has)("menu principal sur les données d'origine (MAINM
     expect(m.origin).toEqual({ dx: 5, dy: 38 });
   });
 
-  it("boutons dans l'ordre de lecture, avec le texte de DESCRIPT.RES ; grisés annoncés ; Entrée : Jeu, Échap : Quitter (450d44)", () => {
+  it("boutons dans l'ordre de lecture, avec le texte de DESCRIPT.RES, aucun grisé ; Entrée : Jeu, Échap : Quitter (450d44)", () => {
     const m = make();
     const labels = m.buttons().map((b) => [b.id, m.name(b)]);
     expect(labels[0]).toEqual([MAIN_MENU.play, "Jeu: Jouer les puzzles dans l'ordre ou charger un nouveau puzzle."]);
     expect(labels.find(([id]) => id === MAIN_MENU.duel)?.[1]).toBe("Duel: Jouer une partie contre un ami.");
-    expect(labels.find(([id]) => id === MAIN_MENU.signIn)?.[1]).toContain("(non disponible)");
+    for (const [, name] of labels) expect(name).not.toContain("(non disponible)");
+    expect(m.controls().filter((c) => c.kind === "button" && (c.disabled || c.unavailable))).toEqual([]);
     expect(labels.find(([id]) => id === MAIN_MENU.quit)?.[1]).toBe("Quitter la Partie");
     expect(labels.find(([id]) => id === MAIN_MENU.options)?.[1]).toBe("Vos Options");
     expect(m.options.defaultId).toBe(MAIN_MENU.play);
     expect(act(m.escape())).toBe("quit");
   });
 
-  it("clic : appui puis relâché sur le même bouton ; un mode grisé répond « non disponible »", () => {
+  it("clic : appui puis relâché sur le même bouton ; Exercice lance la visite guidée", () => {
     const m = make();
     const p = center(m, MAIN_MENU.lab);
     m.pointerDown(p.x, p.y);
@@ -96,7 +97,10 @@ describe.skipIf(!original.has)("menu principal sur les données d'origine (MAINM
     expect(act(m.pointerUp(d.x, d.y))).toBe("duel");
     const t = center(m, MAIN_MENU.tutorial);
     m.pointerDown(t.x, t.y);
-    expect(act(m.pointerUp(t.x, t.y))).toBe("unavailable");
+    expect(act(m.pointerUp(t.x, t.y))).toBe("walkthrough");
+    const i = center(m, MAIN_MENU.signIn);
+    m.pointerDown(i.x, i.y);
+    expect(act(m.pointerUp(i.x, i.y))).toBe("signIn");
     m.pointerDown(p.x, p.y);
     expect(act(m.pointerUp(10, 10))).toBeUndefined();
     const q = center(m, MAIN_MENU.quit);

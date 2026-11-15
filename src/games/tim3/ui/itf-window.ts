@@ -949,7 +949,8 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
     }
   });
 
-  host.main.append(overlay);
+  // Le calque couvre l'écran du jeu seulement : les boutons du site autour (« ≡ », son, plein écran) restent utilisables.
+  (host.canvas.parentElement ?? host.main).append(overlay);
   fit();
   queueMicrotask(() => {
     if (closed) return;

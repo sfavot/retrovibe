@@ -8,8 +8,10 @@
  * - Labo (16011) : mode Labo (423038) ;
  * - Duel (16012) : mode à deux joueurs (42319e) : fenêtre des réglages `HEDTOHED` (`ui/duel-window.ts`), puis le premier puzzle
  *   à deux joueurs non résolu ; Annuler revient au menu ;
- * - Inscription (16014), Exercice avec le professeur (16015) : inscription des joueurs, travaux dirigés (mode 6) ; non portés,
- *   grisés, « non disponible » comme la barre d'outils ;
+ * - Inscription (16014) : l'écran d'inscription (422f3d vérifie qu'on peut écrire `SIGNIN.RES`, sinon 31207 ; 423313 → 426b53,
+ *   `ui/signin-window.ts`), puis le menu principal (mode 7 vers 10) ;
+ * - Exercice (16015) : la visite guidée du Labo avec le professeur (42332c : mode 6, Labo vide, puis 422b65 ouvre la fenêtre de la
+ *   visite, `engine/walkthrough.ts`) ;
  * - Manuel on-line (16013) : le manuel (4169c8(0), `TIMHELP.EXE`) ; le port ouvre l'aide du site, comme le livre de la barre ;
  * - Aide (16008, « ? ») : 4169c8(10) ouvre la rubrique 10 du même manuel Windows. Le port ouvre à la place l'aide du professeur
  *   (`HELP.ITF`, comme le « ? » de la barre, `MainMenuHelp`) par-dessus le menu, qui reste ouvert : son « ? » passe le menu en mode
@@ -25,7 +27,6 @@ import type { RenderAssets } from "../render/assets";
 import type { FrameSound } from "../render/front";
 import { ITF_DEFAULT_FONT, drawTextBox } from "../render/itf-draw";
 import type { Surface } from "../render/surface";
-import { copy } from "../copy";
 import type { ItfScreen, ItfWindow, ItfWindowOptions } from "./itf-window";
 
 export const MAIN_MENU = {
@@ -41,22 +42,19 @@ export const MAIN_MENU = {
   help: 16008,
 } as const;
 
-export type MainMenuAction = "play" | "lab" | "duel" | "help" | "options" | "quit" | "unavailable";
+export type MainMenuAction = "play" | "lab" | "duel" | "signIn" | "walkthrough" | "help" | "options" | "quit";
 
 const ACTIONS: Readonly<Record<number, MainMenuAction>> = {
   [MAIN_MENU.play]: "play",
   [MAIN_MENU.lab]: "lab",
   [MAIN_MENU.duel]: "duel",
   [MAIN_MENU.manual]: "help",
-  [MAIN_MENU.signIn]: "unavailable",
-  [MAIN_MENU.tutorial]: "unavailable",
+  [MAIN_MENU.signIn]: "signIn",
+  [MAIN_MENU.tutorial]: "walkthrough",
   [MAIN_MENU.quit]: "quit",
   [MAIN_MENU.options]: "options",
   [MAIN_MENU.help]: "help",
 };
-
-/** Modes non portés (grisés). */
-export const MAIN_MENU_GREYED: readonly number[] = [MAIN_MENU.signIn, MAIN_MENU.tutorial];
 
 /** Modes animés au survol. */
 const MODES: readonly number[] = [MAIN_MENU.play, MAIN_MENU.lab, MAIN_MENU.duel, MAIN_MENU.manual, MAIN_MENU.signIn, MAIN_MENU.tutorial];
@@ -115,11 +113,9 @@ export class MainMenuScreen implements ItfScreen<MainMenuAction> {
     }
     this.options = {
       title: strings.title,
-      state: { disabled: MAIN_MENU_GREYED },
       defaultId: MAIN_MENU.play,
       // 450d44 : Échap choisit Quitter (drapeau 0x20), qui pose la question 31113.
       cancelId: MAIN_MENU.quit,
-      greyedActive: true,
       labels,
       hoverAnimate: { ids: MODES, ...(onSound ? { sound: onSound } : {}) },
       status: (win) => (help?.picking() ? help.prompt : this.bandText(win)),
@@ -138,14 +134,13 @@ export class MainMenuScreen implements ItfScreen<MainMenuAction> {
 
   /**
    * Texte de la bande `MM_TEXT` (4233a3) : le texte `DESCRIPT.RES` d'identifiant « contrôle + 100 » du bouton actif (survolé, sinon
-   * celui qui a le focus), suivi de « (non disponible) » s'il est grisé. Seuls les six modes en ont un (16110 à 16115) : pour Aide,
+   * celui qui a le focus). Seuls les six modes en ont un (16110 à 16115) : pour Aide,
    * Options et Quitter, ou hors des boutons, la bande est vide (423473 ne dessine rien quand 4233a3 ne trouve pas de texte).
    */
-  bandText(win: Pick<ItfWindow, "active" | "greyed">): string {
+  bandText(win: Pick<ItfWindow, "active">): string {
     const id = win.active();
     const text = id === null ? undefined : this.strings.describe(id + MAIN_MENU_TEXT_OFFSET);
-    if (id === null || !text) return "";
-    return win.greyed(id) ? copy.toolbarUnavailable(text) : text;
+    return id === null || !text ? "" : text;
   }
 
   private drawBand(surface: Surface, win: ItfWindow, assets: RenderAssets): void {

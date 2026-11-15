@@ -26,7 +26,7 @@ describe.skipIf(!original.has)("écran de jeu : barre d'outils", () => {
   const puzzle = () => new Tim3Session(realTypes(), level, { puzzle: puzzleList()[0] });
   const lab = () => new Tim3Session(realTypes(), labLevel(DEFAULT_LAB), { lab: DEFAULT_LAB });
 
-  it("les boutons des seize noms existent dans WTOOLBAR.ITF", () => {
+  it("les boutons des dix-huit noms existent dans WTOOLBAR.ITF", () => {
     expect(toolbar.map((b) => b.name)).toEqual([...TOOLBAR_NAMES]);
   });
 
@@ -39,7 +39,7 @@ describe.skipIf(!original.has)("écran de jeu : barre d'outils", () => {
     expect(screen.toolbarAt(10, 10)).toMatchObject({ name: "TB_GOTO_PUZ", pressed: true, disabled: false });
     expect(screen.toolbarAt(90, 10)).toMatchObject({ name: "TB_GOTO_H2H", disabled: false, pressed: false });
     expect(screen.toolbarAt(130, 10)).toMatchObject({ name: "TB_GOTO_TOUR", disabled: false });
-    expect(screen.toolbarAt(170, 10)).toMatchObject({ name: "TB_GOTO_SIGNIN", disabled: true });
+    expect(screen.toolbarAt(170, 10)).toMatchObject({ name: "TB_GOTO_SIGNIN", disabled: false });
   });
 
   it("Labo : cadenas et levier d'essai actifs, clé enfoncée ; en essai, le levier est enfoncé", () => {
@@ -62,7 +62,19 @@ describe.skipIf(!original.has)("écran de jeu : barre d'outils", () => {
     screen.longPress(170, 10);
     screen.pointerUp(170, 10);
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ type: "toolbarTip", button: { name: "TB_GOTO_SIGNIN", disabled: true } });
+    expect(events[0]).toMatchObject({ type: "toolbarTip", button: { name: "TB_GOTO_SIGNIN", disabled: false } });
+  });
+
+  it("visite guidée : portrait du professeur à x = 540 (état 17), chaussure enfoncée, ni disquette ni main ni cadenas", () => {
+    const { screen, events } = make(lab());
+    screen.walkthrough = true;
+    expect(screen.toolbarAt(550, 10)).toMatchObject({ name: "TB_WALKTHROUGH", pressed: false });
+    expect(screen.toolbarAt(210, 10)).toMatchObject({ name: "TB_GOTO_TUTORIAL", pressed: true });
+    expect(screen.toolbarAt(50, 10)).toMatchObject({ name: "TB_GOTO_WORK", pressed: false });
+    for (const x of [270, 470, 510]) expect(screen.toolbarAt(x, 10), String(x)).toBeNull();
+    screen.pointerDown(550, 10, false);
+    screen.pointerUp(550, 10);
+    expect(events).toEqual([{ type: "toolbar", name: "TB_WALKTHROUGH" }]);
   });
 
   it("dessin : bouton enfoncé et bouton grisé changent l'image, un bouton caché laisse l'emplacement vide", () => {

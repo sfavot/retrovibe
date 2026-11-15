@@ -239,6 +239,11 @@ const BOUNCE_LOST = [257, 261, 264, 267, 270, 274, 277, 280, 277, 270, 267, 264,
  * étagère 7 ; cible 5, seconde cible 3 ; cristal de gauche de l'écran (le Zoombini testé, tous niveaux) 8, cristal de droite (la silhouette posée, sur le cristal vide du
  * socle) 5 ; fiches comparées 5 (gauche) et 3 (droite), sans cristal de fond.
  */
+/**
+ * Cristal gauche sans Zoombini (`[941c]`, type 4 de `1158:4a01`, à tous les niveaux) : ses 4 octets sont nuls, `1140:0000` ne dessine que le cristal de fond (image 67) :
+ * une vitre verte vide, comme le cristal du socle à droite.
+ */
+const EMPTY_CRYSTAL: Attrs = [0, 0, 0, 0];
 const ORIENTATION = { left: 0, silhouette: 1, right: 2, second: 3, target: 5, shelf: 7, crystalLeft: 8, crystalRight: 5, ficheLeft: 5, ficheRight: 3 } as const;
 
 /** Voix, danse, sortie : écart de la danse de victoire (30 ticks), nombre de wagonnets qui partent au « go ». */
@@ -369,6 +374,8 @@ class SmokeRun implements SmokeProbe {
   private readonly silhouettes: Piece[] = [];
   private readonly crystals: Piece[] = [];
   private readonly ficheView: Piece[] = [];
+  /** Features des fiches comparées, créées juste après le cristal du fond (ordre de dessin de l'original). */
+  private ficheSlots: Feature[] = [];
   private crystalLeft: Piece | null = null;
   private crystalRight: Piece | null = null;
 
@@ -414,7 +421,12 @@ class SmokeRun implements SmokeProbe {
     this.lightLeft = f.create({ script: SCRB.lightLeft, delay: DELAY.default, flags: STILL_BIT });
     this.lightRight = f.create({ script: SCRB.lightRight, delay: DELAY.default, flags: STILL_BIT });
     this.crystalBack = f.create({ script: SCRB.intro, delay: DELAY.default, flags: PLAYS });
-    this.crystalFront = f.create({ script: SCRB.introFront, delay: DELAY.default, flags: PLAYS });
+    // Fiches comparées (`1158:4a01` type 5) : `2a0a(9308, 1, fiche)` les range juste devant le cristal du fond, donc derrière la couche avant (`[930a]`) qui
+    // dessine le rocher : quand le cristal remonte, elles passent sous le rocher avec lui.
+    this.ficheSlots = [0, 1].map(() => f.create({ script: 0, delay: 0, flags: 0 }));
+    // Couche avant (`[930a]`, `0xd180000`) : avec le bit `0x1000000`, elle n'est dessinée que pendant qu'elle joue (intro, séquences de résultat) ; figée sur sa
+    // dernière image, elle laissait un éclat vert sur la machine de gauche.
+    this.crystalFront = f.create({ script: SCRB.introFront, delay: DELAY.default, flags: PLAYS | F.playOnly });
     this.beamA = f.create({ script: SCRB.beamA, delay: DELAY.default, flags: STILL_BIT });
     this.beamB = f.create({ script: SCRB.beamB, delay: DELAY.default, flags: STILL_BIT });
     f.create({ script: SCRB.pulley, delay: DELAY.default, flags: STILL });
@@ -561,14 +573,12 @@ class SmokeRun implements SmokeProbe {
   // ------------------------------------------------------------------------------------------------------------------------
   // Objets de puzzle (planche 10000)
 
-  private addPiece(orientation: Piece["orientation"], place: () => Point | null, attrs: () => Attrs | null, depth: number = DEPTH.piece): Piece {
-    const piece: Piece = {
-      orientation,
-      place,
-      attrs,
-      override: null,
-      feature: this.features.create({ script: 0, delay: 0, flags: 0, depth, onAfterDraw: (_feature, screen) => this.drawPiece(piece, screen) }),
-    };
+  /** `depth` : profondeur d'une nouvelle feature, ou feature déjà créée à sa place dans l'ordre de dessin. */
+  private addPiece(orientation: Piece["orientation"], place: () => Point | null, attrs: () => Attrs | null, depth: number | Feature = DEPTH.piece): Piece {
+    const draw: NonNullable<Feature["onAfterDraw"]> = (_feature, screen) => this.drawPiece(piece, screen);
+    const feature = typeof depth === "number" ? this.features.create({ script: 0, delay: 0, flags: 0, depth, onAfterDraw: draw }) : depth;
+    feature.onAfterDraw = draw;
+    const piece: Piece = { orientation, place, attrs, override: null, feature };
     this.pieces.push(piece);
     return piece;
   }
@@ -620,10 +630,10 @@ class SmokeRun implements SmokeProbe {
         FILTER_POS.forEach((at, i) => this.addPiece(i < 2 ? ORIENTATION.left : ORIENTATION.right, () => at, () => s()?.filters[i] ?? null));
       }
       // Cristal de gauche (le Zoombini testé) et de droite (la silhouette posée), `26d7`.
-      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (s()?.current != null ? s()!.members[s()!.current!]! : null));
+      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (s()?.current != null ? s()!.members[s()!.current!]! : EMPTY_CRYSTAL));
       this.crystalRight = this.addPiece(ORIENTATION.crystalRight, () => RIGHT_CRYSTAL_POS, () => (s()?.silhouette != null ? s()!.silhouettes[s()!.silhouette!]! : null));
     } else {
-      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (this.ready && s()?.current != null ? s()!.members[s()!.current!]! : null));
+      this.crystalLeft = this.addPiece(ORIENTATION.crystalLeft, () => LEFT_CRYSTAL_POS, () => (this.ready && s()?.current != null ? s()!.members[s()!.current!]! : EMPTY_CRYSTAL));
       this.addPiece(
         ORIENTATION.target,
         () => (this.targetsShown && !s()?.second ? RIGHT_CRYSTAL_POS : null),
@@ -651,6 +661,7 @@ class SmokeRun implements SmokeProbe {
         side === 0 ? ORIENTATION.ficheLeft : ORIENTATION.ficheRight,
         () => (this.fiches ? { x: FICHE_X[side]!, y: this.ficheY } : null),
         () => (this.fiches ? (side === 0 ? this.fiches.left : this.fiches.right) : null),
+        this.ficheSlots[side],
       );
     }
   }

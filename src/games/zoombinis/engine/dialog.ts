@@ -405,7 +405,7 @@ class ListLayer extends ButtonLayer {
   hit(x: number, y: number): number | null {
     const found = this.hitButtons(x, y, [11, 12, 13, 14]);
     if (found !== null) return found;
-    if (this.mode === 2 && contains(rect(LIST.left, this.top, LIST.right, this.top + LIST.height), x, y)) return 17;
+    if (contains(rect(LIST.left, this.top, LIST.right, this.top + LIST.height), x, y)) return 17;
     return null;
   }
 
@@ -458,7 +458,11 @@ class ListLayer extends ButtonLayer {
     }
   }
 
-  /** Clic dans la liste (id 17, `11a0:3914`) : ligne = (y − haut) / 20, bornée à 19, plus le défilement ; deux clics en 30 ticks sur la même ligne la valident. */
+  /**
+   * Clic dans la liste (id 17, `11a0:3914`) : ligne = (y − haut) / 20, bornée à 19, plus le défilement ; deux clics en 30 ticks sur la même ligne la valident.
+   * À l'enregistrement (extension du port : la liste n'y était pas cliquable), le nom de la partie cliquée est recopié dans le champ, curseur à la fin, pour la
+   * remplacer ; le double clic enregistre (la question « remplacer la partie existante » suit).
+   */
   clickList(env: Env, y: number): void {
     const now = env.ctx.clock.ticks;
     let row = Math.floor((y - this.top) / LIST.rowHeight);
@@ -471,6 +475,11 @@ class ListLayer extends ButtonLayer {
     }
     this.selected = index <= this.entries.length ? index : 0;
     this.lastClick = now;
+    const entry = this.entries[this.selected - 1];
+    if (this.mode === 3 && entry) {
+      this.name = entry.name;
+      this.cursor = this.name.length;
+    }
   }
 
   /** Frappe dans le champ (`11a0:316d`) : caractère du jeu inséré au curseur (18 au plus), espaces de tête retirés, retour arrière et flèches. */

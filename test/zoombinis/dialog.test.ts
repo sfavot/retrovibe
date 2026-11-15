@@ -24,7 +24,7 @@ const MENU = {
   team: [363, 339],
 } as const;
 const LOAD = { up: [436, 132], down: [436, 255], go: [404, 319], cancel: [238, 319], row: (n: number) => [300, 120 + 20 * n] as const } as const;
-const SAVE = { go: [404, 346], cancel: [238, 346] } as const;
+const SAVE = { go: [404, 346], cancel: [238, 346], row: (n: number) => [300, 104 + 20 * n] as const } as const;
 const YES = [404, 258] as const;
 const NO = [238, 258] as const;
 const ONLY = [314, 258] as const;
@@ -224,6 +224,30 @@ describe.skipIf(!original.has)("boîte de dialogue de Zoombinis", () => {
     expect(dialogs.isOpen).toBe(false);
     expect(zb.saves.list()).toHaveLength(1);
     expect(zb.saves.load("Zoé").counters.created).toBe(4);
+  });
+
+  it("enregistrement : un clic sur une partie de la liste recopie son nom pour la remplacer, un double clic enregistre", async () => {
+    const env = await startDialogs();
+    const { dialogs, zb, str } = env;
+    zb.saves.save("Arthur", zb.game);
+    zb.saves.save("Zoé", zb.game);
+    const row = zb.saves.list().findIndex((entry) => entry.name === "Zoé");
+    env.ctrl("s");
+    await env.run(100);
+    await click(env, SAVE.row(row));
+    expect(dialogs.modes).toEqual([3]);
+    env.press("Enter", "Enter");
+    await env.run(100);
+    expect(dialogs.modes).toEqual([3, 4]);
+    expect(dialogs.prompt).toBe(`${str(2018, 28)}Zoé"?`);
+    await click(env, NO);
+    // Double clic : la question de remplacement s'ouvre tout de suite.
+    const other = zb.saves.list().findIndex((entry) => entry.name === "Arthur");
+    env.host.click(...SAVE.row(other));
+    env.host.click(...SAVE.row(other));
+    await env.run(100);
+    expect(dialogs.modes).toEqual([3, 4]);
+    expect(dialogs.prompt).toBe(`${str(2018, 28)}Arthur"?`);
   });
 
   it("refuse la 51e partie avec le message de STRL 2018 et laisse la boîte ouverte", async () => {

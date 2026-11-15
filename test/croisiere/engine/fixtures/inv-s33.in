@@ -1,0 +1,55 @@
+# Premiere piece (S33) : inventaire (CRUISE_INPUT, niveau par tick).
+# Morceau de papier (202,156) -> Prendre ; clic droit (inventaire) -> Morceau de papier -> Defroisser (message ferme par le meme
+# appui) ; inventaire -> Morceau de papier -> Lire (appui d'un tick, message ferme par un clic) ; inventaire, second clic droit
+# (sans effet), clic hors des entrees (fermeture) ; inventaire -> Heure (menu d'objet), clic droit (menu ferme, inventaire) ->
+# Carte -> Utiliser (plan du bateau).
+1 0 0 0
+3600 202 156 0
+3602 202 156 1
+3604 202 156 0
+3610 180 178 0
+3612 180 178 1
+3614 180 178 0
+3700 160 100 0
+3702 160 100 2
+3704 160 100 0
+3710 120 122 0
+3712 120 122 1
+3714 120 122 0
+3720 120 137 0
+3722 120 137 1
+3724 120 137 0
+3760 160 100 0
+3762 160 100 2
+3764 160 100 0
+3770 120 122 0
+3772 120 122 1
+3774 120 122 0
+3780 120 167 0
+3782 120 167 1
+3783 120 167 0
+3820 120 167 1
+3821 120 167 0
+3850 200 60 0
+3852 200 60 2
+3854 200 60 0
+3860 200 60 2
+3862 200 60 0
+3870 20 20 0
+3872 20 20 1
+3874 20 20 0
+3900 200 60 0
+3902 200 60 2
+3904 200 60 0
+3910 200 112 0
+3912 200 112 1
+3914 200 112 0
+3920 200 60 0
+3922 200 60 2
+3924 200 60 0
+3930 200 97 0
+3932 200 97 1
+3934 200 97 0
+3940 200 112 0
+3942 200 112 1
+3944 200 112 0

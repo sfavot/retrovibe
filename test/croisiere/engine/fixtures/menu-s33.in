@@ -1,0 +1,32 @@
+# Menu joueur, pause, sortie vers la deuxieme piece (CRUISE_INPUT, niveau par tick ; touches dans menu-s33.keys).
+# F10 (3600) : survol de Sauvegarde puis de Recommencer, clic hors du menu (fermeture) ; deux boutons a la fois (3650) : menu
+# ouvert bouton tenu, relache, clic droit (fermeture) ; P (3700) termine par un clic ; P (3750) termine par Espace ;
+# clic sur la porte (168,60) : passage dans S36 ; Colonne -> Examiner, message ferme par un clic ; F10 -> Recommencer le jeu
+# (4122) puis 280 ticks de la nouvelle partie.
+1 0 0 0
+3590 100 100 0
+3605 60 122 0
+3608 60 152 0
+3612 250 20 1
+3614 250 20 0
+3650 100 100 3
+3652 100 100 0
+3660 100 100 2
+3662 100 100 0
+3705 100 100 1
+3707 100 100 0
+3800 168 60 0
+3802 168 60 1
+3804 168 60 0
+3950 88 88 0
+3952 88 88 1
+3954 88 88 0
+3960 60 110 0
+3962 60 110 1
+3963 60 110 0
+4040 60 110 1
+4041 60 110 0
+4100 100 100 0
+4120 60 152 0
+4122 60 152 1
+4124 60 152 0

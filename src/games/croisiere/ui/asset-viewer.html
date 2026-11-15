@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Croisière pour un cadavre — ressources</title>
+    <link rel="icon" type="image/svg+xml" href="../../../ui/favicon.svg" />
+    <style>
+      @import "../../../ui/asset-viewer/shell.css";
+
+      /* Règles propres à Croisière pour un cadavre. */
+      table { border-collapse: collapse; margin: 4px 0 12px; }
+      th, td { text-align: left; padding: 1px 10px 1px 0; vertical-align: top; }
+      th { color: #7f8696; font-weight: normal; }
+      .num { text-align: right; font-variant-numeric: tabular-nums; }
+      .bar label { display: inline-flex; gap: 4px; align-items: center; }
+      .room { position: relative; display: inline-block; }
+      .room canvas { position: absolute; top: 0; left: 0; }
+      .room canvas:first-child { position: static; }
+      .glyphs { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+      .glyphs figure { margin: 0; }
+      .glyphs canvas { background: #0b0b0d; }
+      .asset-viewer > aside h3 { margin: 10px 0 2px; }
+      @media (max-width: 800px) {
+        .asset-viewer { grid-template-columns: 1fr; grid-template-rows: 40vh 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./asset-viewer.ts"></script>
+  </body>
+</html>

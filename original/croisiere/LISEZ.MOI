@@ -1,0 +1,109 @@
+                ----------------------------------------------
+                CroisiŠre pour un cadavre, version 256 couleurs
+                ----------------------------------------------
+
+        Ce fichier contient des modifications de derniŠre minute sur
+        le logiciel "CROISIERE POUR UN CADAVRE".
+
+        Pour pouvoir utiliser ce logiciel, vous devez NECESSAIREMENT
+        poss‚der :
+                   - un disque dur ayant au moins 4 Mo de libres.
+                   - un ‚cran couleur.
+                   - une carte graphique VGA ou MCGA.
+                   - 640 Ko RAM ( avec au moins 570 Ko disponibles )
+
+        Une souris est grandement recommand‚e.
+
+Installation du jeu sur disque dur :
+-----------------------------------
+
+        Il vous suffit d'ins‚rer dans votre lecteur A la premiŠre
+        disquette du logiciel, puis de taper : 'INSTALL'
+        Le programme d'installation vous guidera au fil des ‚tapes.
+
+        Vous pouvez … tout moment quitter le programme d'installation
+        en frappant la touche 'ESC'.
+
+Lancement du jeu :
+-----------------
+
+        Pour lancer le jeu, vous avez deux possibilit‚s :
+
+                - Aller dans le r‚pertoire \DELPHINE ( avec la commande
+                  'CD \DELPHINE' suivie de la touche 'Entr‚e' ), puis taper
+                  la commande 'CR256' suivie de la touche 'Entr‚e'
+
+                - Aller dans le r‚pertoire \DELPHINE\CR256 ( avec la commande
+                  'CD \DELPHINE\CR256' suivie de la touche 'Entr‚e' ) puis
+                  taper la commande 'DELPHINE' suivie de la touche 'Entr‚e' ).
+
+Detection automatique :
+----------------------
+
+        Le programme d‚tecte automatiquement votre configuration ( carte
+        graphique, carte sonore, souris etc... ).
+
+        Mais vous avez la possibilit‚ de lui indiquer exactement la
+        configuration que vous d‚sirez.
+
+        Pour cela, il vous suffit d'utiliser le programme 'INSTALL'.
+
+ProblŠme de m‚moire :
+--------------------
+
+        Il se peut qu'au cours du jeu, vous ayez le message 'OUT OF
+        MEMORY' !
+        Cela signifie que la quantit‚ m‚moire disponible est insuffisante
+        pour le programme.
+
+        Pour savoir combien de m‚moire vous disposez sur votre machine,
+        il vous suffit de taper la commande 'CHKDSK' suivie de la touche
+        'Entr‚e' sous DOS.
+
+        La derniŠre ligne affich‚e vous indiquera la quantit‚ de m‚moire
+        disponible.
+        Pour que le jeu se d‚roule correctement, il faut que vous ayez
+        au moins 570000 octets de m‚moire disponible pour le programme.
+
+        Si vous n'avez pas suffisamment de m‚moire disponible, et que
+        vous ne d‚sirez pas modifier la configuration de votre machine,
+        il vous suffit de cr‚er une disquette systŠme poss‚dant le
+        minimum possible de programmes r‚sidents, et de 'booter' sur
+        cette disquette … chaque fois que vous voudrez jouer.
+        Veuillez consulter pour cela votre manuel du DOS.
+
+        ( Cette m‚thode est recommand‚e car de plus en plus de logiciels
+        exigent une grosse quantit‚ m‚moire, et cette disquette pourra
+        vous servir quel que soit le logiciel ).
+
+        Si vos problŠmes m‚moire persistent, nous vous conseillons d'utiliser
+        la version DOS 5.0 ou sup‚rieure, voire DR DOS 6.0, qui gŠrent la
+        m‚moire de fa‡on plus optimale.
+
+                Bonne enquˆte !!
+
+
+PS : Voici un exemple de commandes pour cr‚er une disquette systeme :
+     ins‚rer une disquette vierge dans le lecteur A, puis taper :
+
+FORMAT A: /S <Entr‚e>
+
+COPY CON: A:AUTOEXEC.BAT <Entr‚e>
+
+ECHO OFF <Entr‚e>
+PROMPT $P$G <Entr‚e>
+VER <Entr‚e>
+KEYB FR,,A:\KEYBOARD.SYS /ID:189 <Entr‚e>
+MOUSE <Entr‚e>
+<Ctrl Z> <Entr‚e>
+
+COPY CON: A:CONFIG.SYS <Entr‚e>
+
+BREAK=ON <Entr‚e>
+BUFFERS=10 <Entr‚e>
+FILES=10 <Entr‚e>
+<Ctrl Z> <Entr‚e>
+
+COPY C:\DOS\KEYBOARD.SYS A:
+COPY C:\DOS\KEYB.* A:
+COPY C:\DOS\MOUSE.* A:

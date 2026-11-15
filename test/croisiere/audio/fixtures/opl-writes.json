@@ -1,0 +1,337 @@
+{
+ "_note": "Journal des ecritures OPL de sound.cpp (ScummVM 2026.4.0) via le banc a-harness : FNV-1a 32 bits sur (tick i32 LE, registre u16 LE, valeur u8), tick = -1 avant le premier tick. Voir test/croisiere/audio/sound-bitexact.test.ts.",
+ "modules": {
+  "CORP1": {
+   "writes": 1735,
+   "fnv": "fd5cbc49",
+   "playedAt": 298
+  },
+  "CORP10": {
+   "writes": 1502,
+   "fnv": "c477e9f9",
+   "playedAt": 298
+  },
+  "CORP11": {
+   "writes": 1650,
+   "fnv": "27ab9026",
+   "playedAt": 298
+  },
+  "CORP13": {
+   "writes": 973,
+   "fnv": "5bd73067",
+   "playedAt": 400
+  },
+  "CORP2": {
+   "writes": 1199,
+   "fnv": "89b93386",
+   "playedAt": 298
+  },
+  "CORP3": {
+   "writes": 2150,
+   "fnv": "913b8ddb",
+   "playedAt": 345
+  },
+  "CORP4": {
+   "writes": 632,
+   "fnv": "fc81e26a",
+   "playedAt": 298
+  },
+  "CORP5": {
+   "writes": 2132,
+   "fnv": "887d8f29",
+   "playedAt": 400
+  },
+  "CORP6": {
+   "writes": 2690,
+   "fnv": "8d57e5e5",
+   "playedAt": 298
+  },
+  "CORP7": {
+   "writes": 1979,
+   "fnv": "1145ba82",
+   "playedAt": 298
+  },
+  "CORP8": {
+   "writes": 1484,
+   "fnv": "aa43eeee",
+   "playedAt": 345
+  },
+  "CORP9": {
+   "writes": 1776,
+   "fnv": "acd1a307",
+   "playedAt": 298
+  }
+ },
+ "sfx": {
+  "ACOUBAS1.ADL": {
+   "writes": 126,
+   "fnv": "13a46609"
+  },
+  "ACOUBAS2.ADL": {
+   "writes": 126,
+   "fnv": "508dd92c"
+  },
+  "ACOUMSD_.ADL": {
+   "writes": 122,
+   "fnv": "632580c1"
+  },
+  "ACOUPIA1.ADL": {
+   "writes": 126,
+   "fnv": "0d2bf8db"
+  },
+  "ACOU_BD_.ADL": {
+   "writes": 130,
+   "fnv": "45251d7f"
+  },
+  "ACOU_SD_.ADL": {
+   "writes": 122,
+   "fnv": "75f75d6a"
+  },
+  "BASIN_ST.ADL": {
+   "writes": 126,
+   "fnv": "4b2aa704"
+  },
+  "BASS_MAR.ADL": {
+   "writes": 126,
+   "fnv": "ee013415"
+  },
+  "BRASECT1.ADL": {
+   "writes": 126,
+   "fnv": "e7a1190b"
+  },
+  "BRASECT2.ADL": {
+   "writes": 126,
+   "fnv": "c7c81789"
+  },
+  "CELLO__1.ADL": {
+   "writes": 126,
+   "fnv": "a35fd8ac"
+  },
+  "CHAT.ADL": {
+   "writes": 126,
+   "fnv": "142be16d"
+  },
+  "CLSD_HIH.ADL": {
+   "writes": 122,
+   "fnv": "fe3056af"
+  },
+  "CONTRABA.ADL": {
+   "writes": 126,
+   "fnv": "1dac7f89"
+  },
+  "CPOING.ADL": {
+   "writes": 130,
+   "fnv": "0fe457aa"
+  },
+  "CRASH_CY.ADL": {
+   "writes": 122,
+   "fnv": "f303e284"
+  },
+  "DEP_ASC.ADL": {
+   "writes": 122,
+   "fnv": "c7c8bda0"
+  },
+  "DEP_PROJ.ADL": {
+   "writes": 126,
+   "fnv": "063a694c"
+  },
+  "DOCTSOLO.ADL": {
+   "writes": 126,
+   "fnv": "a2540575"
+  },
+  "E-GUITAR.ADL": {
+   "writes": 126,
+   "fnv": "60f47092"
+  },
+  "ECHOPAN_.ADL": {
+   "writes": 126,
+   "fnv": "2b625392"
+  },
+  "ELECGTR1.ADL": {
+   "writes": 126,
+   "fnv": "d64b49ab"
+  },
+  "ELECORG1.ADL": {
+   "writes": 126,
+   "fnv": "f928489e"
+  },
+  "FOUDRE.ADL": {
+   "writes": 122,
+   "fnv": "20ad12bb"
+  },
+  "FRHORN_2.ADL": {
+   "writes": 130,
+   "fnv": "0675d26a"
+  },
+  "GIFFLE.ADL": {
+   "writes": 130,
+   "fnv": "0fe457aa"
+  },
+  "GOUTTE.ADL": {
+   "writes": 130,
+   "fnv": "ccce5cde"
+  },
+  "GUITAR_B.ADL": {
+   "writes": 126,
+   "fnv": "dbf133a1"
+  },
+  "HONKYTON.ADL": {
+   "writes": 126,
+   "fnv": "658d3318"
+  },
+  "HORLOGE1.ADL": {
+   "writes": 126,
+   "fnv": "0165c7be"
+  },
+  "HORLOGE2.ADL": {
+   "writes": 130,
+   "fnv": "d376dc1c"
+  },
+  "JAZZ_GUI.ADL": {
+   "writes": 126,
+   "fnv": "5c7a7f6e"
+  },
+  "MARIMBA_.ADL": {
+   "writes": 126,
+   "fnv": "fc1c572a"
+  },
+  "NYLON_AT.ADL": {
+   "writes": 126,
+   "fnv": "8a36a6f8"
+  },
+  "OPENHIHA.ADL": {
+   "writes": 122,
+   "fnv": "d3fcd4da"
+  },
+  "ORCHEHIT.ADL": {
+   "writes": 126,
+   "fnv": "df6c616c"
+  },
+  "POING.ADL": {
+   "writes": 130,
+   "fnv": "fdf2c35d"
+  },
+  "PORTEFER.ADL": {
+   "writes": 130,
+   "fnv": "3005dfac"
+  },
+  "PORTEOUV.ADL": {
+   "writes": 126,
+   "fnv": "21be6fb6"
+  },
+  "PORTGRIN.ADL": {
+   "writes": 126,
+   "fnv": "21be6fb6"
+  },
+  "PROJECT.ADL": {
+   "writes": 126,
+   "fnv": "c91975a5"
+  },
+  "RIM_SHOT.ADL": {
+   "writes": 130,
+   "fnv": "341f08ef"
+  },
+  "SAX____1.ADL": {
+   "writes": 130,
+   "fnv": "6fd1b20b"
+  },
+  "SPACE_FL.ADL": {
+   "writes": 126,
+   "fnv": "f8e8300c"
+  },
+  "SPACE_PI.ADL": {
+   "writes": 126,
+   "fnv": "7730bd76"
+  },
+  "STRSECT2.ADL": {
+   "writes": 126,
+   "fnv": "63afe335"
+  },
+  "TOCTOC.ADL": {
+   "writes": 130,
+   "fnv": "b003cada"
+  },
+  "VIOLIN_1.ADL": {
+   "writes": 126,
+   "fnv": "7a3f27a4"
+  },
+  "WATERBEL.ADL": {
+   "writes": 126,
+   "fnv": "44d55597"
+  }
+ },
+ "mixed": {
+  "CORP1": {
+   "adl": "ACOUPIA1.ADL",
+   "writes": 1753,
+   "fnv": "c26efa23",
+   "playedAt": 298
+  },
+  "CORP10": {
+   "adl": "CELLO__1.ADL",
+   "writes": 1520,
+   "fnv": "a405785e",
+   "playedAt": 298
+  },
+  "CORP11": {
+   "adl": "DEP_PROJ.ADL",
+   "writes": 1668,
+   "fnv": "88da7793",
+   "playedAt": 298
+  },
+  "CORP13": {
+   "adl": "FRHORN_2.ADL",
+   "writes": 995,
+   "fnv": "07be86fe",
+   "playedAt": 400
+  },
+  "CORP2": {
+   "adl": "JAZZ_GUI.ADL",
+   "writes": 1217,
+   "fnv": "f2bbd3ff",
+   "playedAt": 298
+  },
+  "CORP3": {
+   "adl": "PORTEOUV.ADL",
+   "writes": 2168,
+   "fnv": "5ebf0be0",
+   "playedAt": 345
+  },
+  "CORP4": {
+   "adl": "STRSECT2.ADL",
+   "writes": 651,
+   "fnv": "a731831c",
+   "playedAt": 298
+  },
+  "CORP5": {
+   "adl": "ACOUPIA1.ADL",
+   "writes": 2151,
+   "fnv": "001a3ddc",
+   "playedAt": 400
+  },
+  "CORP6": {
+   "adl": "CELLO__1.ADL",
+   "writes": 2708,
+   "fnv": "e2914ee4",
+   "playedAt": 298
+  },
+  "CORP7": {
+   "adl": "DEP_PROJ.ADL",
+   "writes": 1997,
+   "fnv": "064dc265",
+   "playedAt": 298
+  },
+  "CORP8": {
+   "adl": "FRHORN_2.ADL",
+   "writes": 1506,
+   "fnv": "7431ffd3",
+   "playedAt": 345
+  },
+  "CORP9": {
+   "adl": "JAZZ_GUI.ADL",
+   "writes": 1794,
+   "fnv": "cb0f39c8",
+   "playedAt": 298
+  }
+ }
+}

@@ -1,0 +1,33 @@
+# Premiere piece (S33) : menus d'objet (CRUISE_INPUT, niveau par tick).
+# Livre (60,60) -> Examiner (relation REL : gros plan S33E) ; clic sur une page puis sur Sortie (308,188) ;
+# Bibliotheque (30,40) -> survol des verbes, clic hors du menu (fermeture) ; Bibliotheque -> Examiner (relation MSG, appui
+# d'un seul tick : le message reste) ; clic d'un seul tick pour le fermer.
+1 0 0 0
+3600 60 60 0
+3602 60 60 1
+3604 60 60 0
+3610 70 82 0
+3612 70 82 1
+3614 70 82 0
+3660 120 100 0
+3662 120 100 1
+3664 120 100 0
+3700 308 188 0
+3702 308 188 1
+3704 308 188 0
+3750 30 40 0
+3752 30 40 1
+3754 30 40 0
+3760 50 62 0
+3764 50 90 0
+3768 200 150 0
+3770 200 150 1
+3772 200 150 0
+3800 30 40 0
+3802 30 40 1
+3804 30 40 0
+3810 50 62 0
+3812 50 62 1
+3813 50 62 0
+3850 50 62 1
+3851 50 62 0

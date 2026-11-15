@@ -20,9 +20,10 @@ import { localStorageStore } from "../../../ui/local-storage";
 import { bindCanvasPointer, bindKeyboard } from "../../../ui/pointer";
 import { SoundPrefs, soundPrefKey } from "../../../ui/sound-prefs";
 import { TickScheduler } from "../../../ui/tick-scheduler";
-import { WebTim3Audio, goalVoice, hintVoice, parseLipSyncJson, type Tim3Audio } from "../audio";
+import { WebTim3Audio, goalVoice, helpVoice, hintVoice, parseLipSyncJson, type Tim3Audio } from "../audio";
 import { copy } from "../copy";
 import { readAnm } from "../data/anm";
+import { HELP_INTRO, HELP_NOTHING, helpTable, type HelpTable } from "../data/help";
 import { readItf } from "../data/itf";
 import { levelParts, readLev, type Level } from "../data/lev";
 import { readPartDef } from "../data/part-def";
@@ -60,13 +61,14 @@ import { openItfWindow, screenOptions, type ItfHost, type ItfScreen, type ItfWin
 import { MainMenuScreen, quitMainMenu, type MainMenuAction } from "./main-menu";
 import { openBinsolveWindow } from "./binsolve-window";
 import { openGlobeWindow } from "./globe-window";
+import { openHelpWindow } from "./help-window";
 import { openHintWindow } from "./hint-window";
 import { openInfoWindow } from "./info-window";
 import { openLoadSaveWindow, openMachineListWindow, type LoadSaveChoice } from "./machines-window";
 import { confirmDialog, messageDialog, solvedDialog } from "./menus";
 import { openMusicboxWindow } from "./musicbox-window";
 import { openProgramWindow } from "./program-window";
-import { PlayScreen, type PlayEvent, type ShownButton, type ToolbarButton } from "./play";
+import { PlayScreen, type HelpTarget, type PlayEvent, type ShownButton, type ToolbarButton } from "./play";
 import { TOOLBAR_NAMES, toolbarDecision, type ToolbarAction } from "./toolbar";
 
 export interface AppOptions {
@@ -134,6 +136,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   let toolbar: ToolbarButton[];
   let programRows: ProgramRow[];
   let interfaceLines: string[];
+  let help: HelpTable;
   try {
     const files = await fetchGameFiles(options.base).catch((error: unknown) => {
       throw new MissingFilesError(error instanceof Error ? error.message : String(error));
@@ -152,6 +155,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     congratulations = readBinSolveRes(index.get("BINSOLVE.RES"));
     programRows = parseProgramRows(parseLines(index.get("PROGPART.RES")));
     interfaceLines = parseLines(index.get("INTRFACE.RES"));
+    help = helpTable(index);
     types = new TypeTable({
       anm: (t) => (index.has(`PART${t}.ANM`) ? readAnm(index.get(`PART${t}.ANM`)) : null),
       par: (t) => (index.has(`PART${t}.PAR`) ? readPartDef(index.get(`PART${t}.PAR`)) : null),
@@ -414,7 +418,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       const category = finished;
       queueMicrotask(() =>
         queueMicrotask(() => {
-          binsolve = openBinsolveWindow(itfHost(), category, congratulations[category === "all" ? 5 : category] ?? "", () => {
+          binsolve = openBinsolveWindow(itfHost(), sound, category, congratulations[category === "all" ? 5 : category] ?? "", () => {
             binsolve = null;
           });
         }),
@@ -458,7 +462,55 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
       case "toolbar":
         toolbarAction(e.name);
         break;
+      case "helpPick":
+        helpPicked(e.target);
+        break;
+      case "helpCancel":
+        screen.message = null;
+        announce(copy.helpPickCancelled);
+        break;
     }
+  };
+
+  // ------------------------------------------------------------------ aide du professeur (HELP.ITF, docs/tim3/ui.md)
+
+  /** Texte et voix de l'aide d'un contrôle (41e7e7), « Je suis désolé… » (23200) s'il n'en a pas. */
+  const helpFor = (id: number): { text: string; voice: ReturnType<typeof helpVoice> | null } => {
+    const entry = help.find(id) ?? help.find(HELP_NOTHING);
+    return { text: entry?.text ?? "", voice: entry ? helpVoice(entry.rank) : null };
+  };
+
+  /** Fenêtre du professeur pour un contrôle (41e798 puis 41d9a3) ; son « ? » passe l'écran en mode aide (41e6b7). */
+  const playHelp = (id: number): void => {
+    let again = false;
+    pauseFor(
+      openHelpWindow(itfHost(), {
+        ...helpFor(id),
+        audio: sound,
+        another: () => {
+          again = true;
+        },
+        onClose: () => {
+          resume();
+          if (again) startHelpPick();
+        },
+      }),
+    );
+  };
+
+  /** Mode aide de l'écran de jeu : curseur « ? » (451718(5, 1)), consigne dans la barre du but et pour les lecteurs d'écran. */
+  const startHelpPick = (): void => {
+    screen.startHelpPick();
+    screen.message = copy.helpPick;
+    announce(copy.helpPick);
+  };
+
+  /** 41e85c : son 0xE1B, puis l'aide de l'élément ; une pièce donne sa description et le mode aide continue (41ea8b). */
+  const helpPicked = (target: HelpTarget): void => {
+    screen.message = null;
+    if (target.kind === "part") return openInfo(target.partType, startHelpPick);
+    sound.playEffect(SOUND_PLACE);
+    playHelp(target.kind === "control" ? target.id : HELP_NOTHING);
   };
 
   /** Clic sur un bouton de la barre du haut (418ded, `ui/toolbar.ts`) : confirmation d'origine d'abord s'il y en a une. */
@@ -498,7 +550,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
         persistEdit();
         return announce(copy.fieldCleared);
       case "help":
-        return openHelp();
+        return playHelp(HELP_INTRO);
       case "hints":
         return showHint();
       case "solution":
@@ -512,9 +564,14 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
   };
 
   /** Description d'une pièce (INFO.ITF, 420c14) ; l'appelant du jeu joue 0xE1B à l'ouverture (41ea91, 42e979). */
-  const openInfo = (type: number): void => {
+  const openInfo = (type: number, after?: () => void): void => {
     sound.playEffect(SOUND_PLACE);
-    pauseFor(openInfoWindow(itfHost(), type, texts.parts.find((p) => p.id === type), resume));
+    pauseFor(
+      openInfoWindow(itfHost(), type, texts.parts.find((p) => p.id === type), () => {
+        resume();
+        after?.();
+      }),
+    );
   };
 
   /** Poignée « programmer » (42ea57 : son 0xC40, puis 4249f8, `PROG<type>.ITF`). */
@@ -649,13 +706,47 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     else showScreen(new CreditsScreen(assets, readItf(index.get("CREDITS.ITF")), parseLines(index.get("CREDITS.RES")), copy.creditsTitle), (r) => r && openMainMenu());
   };
 
+  /** Mode aide du menu principal (après le « ? » de la fenêtre du professeur ouverte par-dessus). */
+  let menuPicking = false;
+
+  /** Fenêtre du professeur par-dessus le menu principal, qui reste ouvert (`dialog`) ; son « ? » passe le menu en mode aide. */
+  const menuHelp = (id: number): void => {
+    let again = false;
+    openHelpWindow(itfHost(), {
+      ...helpFor(id),
+      audio: sound,
+      another: () => {
+        again = true;
+      },
+      onClose: () => {
+        menuPicking = again;
+        dialog?.refresh();
+      },
+    });
+  };
+
   const openMainMenu = (): void => {
     setBackdrop();
+    menuPicking = false;
     const menu = new MainMenuScreen(
       assets,
       readItf(index.get("MAINMENU.ITF")),
       { title: copy.mainMenu, describe: (id) => descriptions.get(id) },
       effect,
+      {
+        open: () => menuHelp(HELP_INTRO),
+        picking: () => menuPicking,
+        // 41e958 : le premier contrôle sous le pointeur qui a une aide, sinon « Je suis désolé… ».
+        pick: (ids) => {
+          menuPicking = false;
+          sound.playEffect(SOUND_PLACE);
+          menuHelp(ids.find((id) => help.find(id) !== null) ?? HELP_NOTHING);
+        },
+        cancel: () => {
+          menuPicking = false;
+        },
+        prompt: copy.helpPick,
+      },
     );
     showScreen(menu, (action) => mainMenuChoice(action));
   };
@@ -705,6 +796,7 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     if (front?.kind === "intro") return front.player.skip();
     if (front || dialog || helpView) return;
     if (session.running) toggleRun();
+    screen.helpPicking = false;
     persistEdit();
     sound.stopEffects();
     sound.stopVoice();

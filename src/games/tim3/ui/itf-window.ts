@@ -134,6 +134,12 @@ export interface ItfWindowOptions {
   frame?(now: number, win: ItfWindow): boolean;
   /** Dessin propre, par-dessus la fenêtre. */
   decorate?(surface: Surface, win: ItfWindow): void;
+  /**
+   * Mode aide (41e6b7, après le « ? » de la fenêtre du professeur) : tant que `active()` est vrai, un appui désigne les contrôles sous le
+   * pointeur (`pick`, du premier plan vers le fond, tous genres) au lieu de les actionner ; au clavier, activer un élément du calque le
+   * désigne, Échap appelle `cancel`. Curseur « aide ».
+   */
+  helpMode?: { active(): boolean; pick(ids: number[]): void; cancel(): void };
   /** Un contrôle a été choisi. Rendre `true` garde la fenêtre ouverte ; sinon elle se ferme. */
   choose(id: number): boolean | void;
   /** Fermeture, quelle qu'en soit la cause (après `choose`). */
@@ -286,6 +292,16 @@ export class ItfWindow {
   listRect(): Rect | null {
     const v = this.options.list?.view;
     return v ? { ...v.rect, x: v.rect.x + this.origin.dx, y: v.rect.y + this.origin.dy } : null;
+  }
+
+  /** Contrôles visibles sous le point (écran), du premier plan vers le fond, tous genres (41e958 : rectangle du contrôle). */
+  controlsAt(x: number, y: number): number[] {
+    const ids: number[] = [];
+    for (let i = this.layout.items.length - 1; i >= 0; i--) {
+      const it = this.layout.items[i]!;
+      if (inside(it, x, y)) ids.push(it.id);
+    }
+    return ids;
   }
 
   /** Contrôle visible (écran), `null` s'il est caché. */
@@ -622,6 +638,8 @@ const pct = (v: number, total: number): string => `${(v / total) * 100}%`;
 
 export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions): ItfWindowHandle {
   const model = new ItfWindow(host.assets, itf, options, host.descriptions);
+  const helpMode = options.helpMode;
+  const picking = (): boolean => helpMode?.active() === true;
   const titleId = `tim3-itf-${++itfCount}`;
   const previous = document.activeElement as HTMLElement | null;
   const now = (): number => performance.now();
@@ -682,7 +700,12 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
           const e = h("button", { type: "button", class: "tim3-itf-button" });
           // Sans prise au pointeur (CSS) : souris et doigt passent par les rectangles (`ItfWindow`) ; le clic ne vient ici que du
           // clavier ou d'un lecteur d'écran.
-          e.addEventListener("click", () => pick(id));
+          e.addEventListener("click", () => {
+            if (helpMode && picking()) {
+              helpMode.pick([id]);
+              refresh();
+            } else pick(id);
+          });
           e.addEventListener("focus", () => focusButton(id));
           e.addEventListener("blur", () => {
             if (model.focused === id) focusButton(null);
@@ -792,6 +815,7 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
   let closed = false;
   const refresh = (): void => {
     if (closed) return;
+    dialog.classList.toggle("tim3-itf-picking", picking());
     draw();
     sync();
   };
@@ -835,6 +859,11 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
     if (event.button !== 0 || event.target instanceof HTMLInputElement) return;
     const p = logical(event);
     event.preventDefault();
+    if (helpMode && picking()) {
+      helpMode.pick(model.controlsAt(p.x, p.y));
+      refresh();
+      return;
+    }
     dialog.setPointerCapture(event.pointerId);
     model.pointerDown(p.x, p.y, now());
     const pressed = model.pressed !== null ? model.item(model.pressed) : null;
@@ -872,6 +901,11 @@ export function openItfWindow(host: ItfHost, itf: Itf, options: ItfWindowOptions
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      if (helpMode && picking()) {
+        helpMode.cancel();
+        refresh();
+        return;
+      }
       const id = model.escape();
       if (id !== null) pick(id);
       else close();

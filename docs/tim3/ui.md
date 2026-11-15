@@ -24,6 +24,8 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
 | `ui/musicbox-window.ts` | Guitare (`MUSICBOX.ITF`, 4234ec), plus la bande « Voix du professeur » du site. |
 | `ui/binsolve-window.ts` | Fin de catégorie (`BINSOLVE.ITF`, 419c9c), par-dessus PUZZSOLV. |
 | `ui/hint-window.ts` | Un indice (`HINT.ITF`, 41f3dc). |
+| `ui/professor.ts` | `Professor` (sans DOM) : le professeur animé de `HELP.ITF` et `BINSOLVE.ITF` (423e50, 4241ae, 424089, 42452c), attente `PROFAMBT.ANM`, parole `PROFSPCH.ANM` synchronisée sur `mouth()`. |
+| `ui/help-window.ts` | Aide du professeur (`HELP.ITF`, 41d9a3, 41db2d, 41e567). Textes et voix : `data/help.ts` (`HelpTable`, 41e7e7). |
 | `ui/machines-window.ts` | Machines du Labo : `LOADSAVE.ITF` (42289c) puis la liste `DOSBOX.ITF` des dix emplacements. |
 | `ui/intro.ts` | `IntroPlayer` : logo Sierra et titre animé, sans DOM (surface et palette propres, sons des images, passage). |
 | `ui/main-menu.ts`, `ui/credits.ts`, `ui/chooser.ts` | Écrans de `itf-window.ts` : `MainMenuScreen` (`MAINMENU`, `quitMainMenu`), `CreditsScreen` (`CREDITS`), `PuzzleListScreen` (`DOSBOX`), `BinScreen` (`DOSBIN`), `PuzzleCardScreen` (`PUZZDISP`), `currentPuzzle` (42cbad). |
@@ -44,6 +46,7 @@ du site sont dans `src/games/tim3/copy.ts` ; ceux du jeu viennent de ses fichier
   garde la machine du Labo (D11), donc pas d'avertissement de perte.
 - Infobulles : `DESCRIPT.RES`, suivi de « (non disponible) » pour un bouton grisé ; survol (600 ms) ou appui long au doigt.
 - Indices (main) : voir § Fenêtres de la vague F.
+- Aide (« ? », 41907f) : fenêtre du professeur, puis mode aide (§ Aide du professeur).
 - Pas de calque accessible sur le canvas : `aria-pressed` / `aria-disabled` ne s'appliquent pas ; les actions principales sont
   aussi dans la barre DOM du pied de page.
 
@@ -103,8 +106,9 @@ lancement ; le port aussi, à chaque clic sur « Jouer » (la page de dev avec `
   après si `[0x480370]` vaut « E »).
 
 Écarts du port :
-- Deux joueurs, Inscription, Exercice : grisés (trame) et cliquables, « non disponible » du jeu, comme la barre d'outils ; Manuel et
-  Aide ouvrent l'aide du site ; Quitter pose toujours la question 31113, puis revient à l'accueil du site (sur la page de dev : le jeu
+- Deux joueurs, Inscription, Exercice : grisés (trame) et cliquables, « non disponible » du jeu, comme la barre d'outils ; Manuel
+  ouvre l'aide du site ; Aide (4169c8(10) : rubrique du manuel Windows `TIMHELP.EXE`) ouvre l'aide du professeur par-dessus le menu
+  (§ Aide du professeur) ; Quitter pose toujours la question 31113, puis revient à l'accueil du site (sur la page de dev : le jeu
   repart). Options : la guitare (`MUSICBOX`). Bande `MM_TEXT` : seuls les six modes ont un texte « contrôle + 100 » ; pour Aide,
   Options, Quitter et hors des boutons, elle est vide (4233a3 ne trouve rien, 423473 ne dessine rien). Le focus du clavier tient lieu
   de survol : la bande suit la dernière des deux actions.
@@ -161,8 +165,8 @@ Rendus de contrôle (PNG) faits hors dépôt ; adresses et formules dans les en-
   Écart : le jeu montre l'interrupteur des effets toujours sur « marche » à l'ouverture (4115e6(0, −1)), le port l'état réel.
 - **BINSOLVE** (419c9c, appelé en 4261c3 pendant l'initialisation de PUZZSOLV) : seulement à la première résolution du puzzle qui
   termine une catégorie (coupe d'argent et bac de la catégorie, texte k de `BINSOLVE.RES`) ou tout le jeu (coupe d'or, tous les bacs,
-  texte 5). BS_TEXT est dessiné bien que caché (4218d4 l'excepte). Professeur : image de repos de `PROFAMBT.ANM` (état 32) centrée
-  (supposé : l'origine de 424089 n'est pas établie ; ni voix ni synchro labiale).
+  texte 5). BS_TEXT est dessiné bien que caché (4218d4 l'excepte). Professeur animé sans voix (419e2a → 423e50(32106, 0),
+  `ui/professor.ts`), à la place établie par 424089 (§ Aide du professeur).
 - **Indices** (41eeb0, 41ef54, 4204cf, 420536, 42013d) : la main de la barre montre ou cache **toutes** les mains des indices à la
   fois (`PlayScreen.toggleHints`) : image 41 (vers le bas, `flip` ≤ 1) ou 42 (vers le haut) de `HANDLES.BMP`, en miroir et 4 pixels
   plus à gauche si `flip` est impair, au coin d'un contrôle de 44 × 43 en (x, y) de l'emplacement LEV. Un clic sur une main ouvre
@@ -178,6 +182,59 @@ Rendus de contrôle (PNG) faits hors dépôt ; adresses et formules dans les en-
 - Flèches (genre 5, 44ee9d) : l'image avance à chaque passe (50 ms, 412bec) ; au bout de l'état, la flèche agit, puis repart à
   l'image 1 si le bouton est tenu (PROGPART : toutes les 100 ms, flèches du globe : toutes les 450 ms). Au clavier, elle agit
   aussitôt. Boutons à texte : son 0xE1B à l'appui (421f5a).
+
+## Aide du professeur (vague F, lu dans TIMWIN.EXE)
+
+**Où le professeur apparaît.** Seules deux fenêtres le dessinent (appels de 423e50) : l'aide (`HELP.ITF`, 41e6a4) et la fin de
+catégorie (`BINSOLVE.ITF`, 419e2a, sans voix) ; un troisième appel (42a8d7) sert à la visite guidée (`TOUR.ITF`), non portée. À
+l'ouverture d'un puzzle, `PUZZDISP` joue la voix du but sans professeur (425f6b → 424684) ; un indice a son propre portrait
+(`HINTPROF.ANM`, animé tant que la voix dure, 4207a4).
+
+**Animation** (`ui/professor.ts`) :
+- 423e50(contrôle, voix) : charge `PROFAMBT.ANM` et `PROFSPCH.ANM`, coupe la voix en cours, prépare la voix ; le contrôle est animé à
+  chaque passe de 50 ms (rappel 4241ae) et dessiné par 424089. Voix 4564 (`help/064`, manuel on-line) : rien, le contrôle garde son
+  image d'ITF ; voix 4684 → 4000.
+- Quatre passes (`[0x47fa00]`) au repos de la parole (corps état 5, bouche état 27), puis la voix part (424684).
+- Parole : chaque passe applique les évènements de synchro passés (`mouth()`, table `0x472ba4` des bouches, `0x472b78` des gestes) ;
+  sans nouveau geste, le corps avance d'une image et revient au début de l'état 5 à la fin de l'état. Fin de la voix (4116f5) ou de
+  la synchro : 42452c enchaîne une fois la suite (63 → 184, 84 → 185, 87 → 186, 106 → 187), sinon ferme la bouche une passe, puis
+  l'attente, voix coupée.
+- Attente : état 32 de `PROFAMBT.ANM` ; au bout de 60 boucles (puis 40 + hasard % 80), un des 13 états de la table `0x472be4`
+  (32, 32, 33, 34, 31, 15, 19, 30, 22, 23, 25, 26, 27), jamais le dernier tiré.
+- Clic sur le professeur (hors des quatre passes) : la voix demandée repart. Appui sur un autre contrôle que ▲ ▼ : attente, voix
+  coupée (sans effet dans le port : ces boutons ferment la fenêtre).
+- Dessin (424089) : rectangle du contrôle rempli de la couleur logique 11 et découpé ; images **retournées de gauche à droite**
+  (argument 1 de 44b094) à l'origine (x + `unknown12` − 396, y + `unknown14`) : dans `HELP.ITF` (376, 75), le professeur occupe
+  x = 378 à 498 ; dans `BINSOLVE.ITF` (240, 37), x = 242 à 362. Cela remplace la position supposée de BINSOLVE (image centrée).
+
+**Fenêtre** (`ui/help-window.ts`, 41d9a3, contenu 41e567, boutons 41dce4) : texte de `HELP.RES` dans HP_TEXT, ▲ ▼ d'une page à la
+fois (41e52b, 41e4f3) ; texte court : flèches cachées, « Terminé » et « ? » 16 pixels plus à gauche (41e616). « ? » (HP_BHELP, défaut)
+ferme et passe en mode aide ; « Terminé » (Échap) ferme. Titre, OK, Oui, Non, Annuler ne servent qu'à la visite guidée (41eaaa) :
+cachés. Fermeture (423f9d) : voix coupée.
+
+**Mode aide** (41e6b7, 41e85c), après le « ? » de la barre (41907f → 41d8e8(23100) : « Salut! Professeur Tim… ») : curseur « ? »
+(451718(5, 1), 10 sur un élément aidé) ; un appui (gauche ou droit) fait le son 0xE1B puis : bac (fenêtre à part : 11014), barre du
+but (9000), sinon premier contrôle visible sous le pointeur qui a une aide, sinon une pièce posée → sa description (`INFO.ITF`,
+41ea8b) **et le mode continue**, sinon « Je suis désolé… » (23200). L'aide trouvée s'ouvre dans la même fenêtre, dont le « ? » relance
+le mode (41d991). Textes et voix : `data/help.ts` (41e7e7 : rang de la ligne = voix `help/<rang>`, alias 15019 → 13026, 9001 à 9999
+sans aide).
+
+Écarts du port :
+- **Identifiants** : le `HELP.RES` français a ceux de l'ancien panneau (`CNTRLPNL`, 10002 à 11010) là où l'anglais a ceux de la barre
+  Windows (35001 à 35022) ; le jeu français ne trouve donc pas l'aide des boutons de la barre. Le port cherche le rang par
+  l'identifiant anglais (`ResourceIndex.base`), puis par le français, et prend le texte français de ce rang.
+- Mode aide : la pièce tenue retourne au bac ; le panneau du bac du port a ses propres boutons (drapeau 11003, flèches 11001,
+  11002), le reste du bac est 11014 ; un bouton grisé de la barre est aidé (le jeu le cache). Échap abandonne le mode (le jeu
+  attend un clic) ; la consigne (« Aide : cliquez ou touchez… ») s'écrit dans la barre du but et pour les lecteurs d'écran : au
+  doigt, il n'y a pas de curseur.
+- Menu principal : son « ? » ouvre la même aide **par-dessus le menu**, qui reste ouvert ; le « ? » de la fenêtre passe le menu en mode
+  aide (`ItfWindowOptions.helpMode`) : un appui désigne les contrôles sous le pointeur (le premier qui a une aide, `HELP.RES` a ceux
+  du menu, 16001 à 16018), au clavier Entrée sur un bouton le désigne, Échap abandonne ; la bande `MM_TEXT` et la région d'état
+  donnent la consigne.
+- Accessibilité : la fenêtre est un `role="dialog"` de `itf-window.ts` ; le texte entier (même la partie défilée) est lu ; « ? »,
+  « Terminé », ▲ ▼ et le professeur (« Réécouter le professeur ») sont des boutons du calque. L'animation tourne sur la passe de 50 ms
+  de la fenêtre et ne bloque aucune action. Le mode aide de l'écran de jeu reste au pointeur (la barre d'outils n'a pas de calque).
+- Les « ? » des fenêtres (choix du puzzle, bacs) ouvrent toujours l'aide du site (le jeu ouvre le manuel Windows).
 
 ## Sauvegardes (vague S, D11)
 
@@ -206,7 +263,7 @@ la machine et au puzzle réussi (ambiances en boucle). La file `World.sounds` es
 
 `npx vitest run test/tim3/editor test/tim3/ui` (moins d'une seconde ; `test/tim3/ui` : barre d'outils) : éditeur, session, Labo, conditions de victoire, progression, `save.test.ts` (sauvegardes : aller-retour, reprise après
 rechargement, données corrompues, emplacement plein, nom vide, quinze solutions reprises et résolues au même pas), et
-`solution.test.ts` (ampoule : solution du concepteur posée, `TIM3_SOLUTION_ALL=1` pour les 156 : toutes résolues, HLEV9 17 pas avant le banc), `program.test.ts` et `replay.test.ts`, qui rejoue quinze solutions du concepteur **par l'API de l'éditeur** (`replay.ts` : prendre au bac, retourner,
+`professor.test.ts` (professeur, fenêtre d'aide, mode aide), `test/tim3/data/help.test.ts` (`HELP.RES`), `solution.test.ts` (ampoule : solution du concepteur posée, `TIM3_SOLUTION_ALL=1` pour les 156 : toutes résolues, HLEV9 17 pas avant le banc), `program.test.ts` et `replay.test.ts`, qui rejoue quinze solutions du concepteur **par l'API de l'éditeur** (`replay.ts` : prendre au bac, retourner,
 étirer, tourner, poser, tendre courroies et cordes, brancher, programmer) puis vérifie la victoire au pas du banc + 30.
 `TIM3_REPLAY_ALL=1 TIM3_REPLAY_REPORT=<fichier>` les rejoue toutes (1,5 s) : **156 / 156 résolues**, 151 au pas du banc ;
 HLEV6, 7, 9, 10 et 17 finissent de 1 à 15 pas à côté, parce que les pièces posées à la main entrent dans les listes une à
@@ -221,7 +278,7 @@ une (4393e0) et non dans l'ordre du LEV que lit le banc. `program.test.ts` couvr
   l'autre côté à 38 px.
 - Explosifs 0x37 rangés au bac avec leur télécommande au chargement (42f978) : le bac les montre ; à vérifier dans le jeu
   s'ils y sont visibles (le Labo ne les propose pas : absents de la table du bac).
-- Professeur : texte du but et des indices, voix ; la fenêtre animée (`PROFSPCH.ANM`, synchro labiale) n'est pas dessinée.
+- Professeur : le jeu baisse la musique pendant sa voix (424684 : 41177b(2, 1), 41177b(1000, 1)) ; le port la laisse à son niveau.
 - **Noyau (à reprendre hors de cette vague)** : `World.stowUnlocked` donne une boîte nulle aux pièces 11, 13, 21, 25 (+0x34 du
   type à 0) et appelle des slots non portés (pentes 43c62b / 43c5f6, murs 43ea14, 43e734) ; l'éditeur corrige les pièces du
   bac et traduit ces slots en repli. Les opérations de bac de `World` (42f978, 4395ba, 43909c, 4390ff, 438fe3) sont privées :

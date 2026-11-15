@@ -25,6 +25,8 @@ export interface ResourceEntry {
 
 export class ResourceIndex {
   private readonly entries = new Map<string, ResourceEntry>();
+  /** Premières versions des ressources remplacées (`add`, `overlay`) : l'anglais sous le français. */
+  private readonly shadowed = new Map<string, ResourceEntry>();
 
   /** Noms de toutes les ressources, dans l'ordre d'ajout (volume par volume, ordre de la map). */
   names(): string[] {
@@ -46,9 +48,23 @@ export class ResourceIndex {
     return e.data;
   }
 
+  /**
+   * Version d'origine d'une ressource remplacée par un volume ajouté ensuite (le `HELP.RES` anglais sous celui de `FRENCH.DAT`),
+   * sinon la ressource elle-même ; `undefined` si elle est absente.
+   */
+  base(name: string): ResourceEntry | undefined {
+    const key = name.toUpperCase();
+    return this.shadowed.get(key) ?? this.entries.get(key);
+  }
+
   /** Ajoute (ou remplace) les ressources d'une map et de ses volumes. */
   add(map: Uint8Array, volumes: (name: string) => Uint8Array): this {
-    for (const e of readMap(map, volumes)) this.entries.set(e.name.toUpperCase(), e);
+    for (const e of readMap(map, volumes)) {
+      const key = e.name.toUpperCase();
+      const before = this.entries.get(key);
+      if (before && !this.shadowed.has(key)) this.shadowed.set(key, before);
+      this.entries.set(key, e);
+    }
     return this;
   }
 

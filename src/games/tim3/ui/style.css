@@ -104,6 +104,11 @@
   outline: none;
 }
 
+/* Mode aide (« ? » du professeur) : le prochain appui désigne l'élément à expliquer. */
+.tim3-itf-picking {
+  cursor: help;
+}
+
 .tim3-itf-canvas {
   display: block;
   width: 100%;

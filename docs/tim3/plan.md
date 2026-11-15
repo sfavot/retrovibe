@@ -29,6 +29,8 @@ S'ajouteront ensuite `files.md` (généré par l'extraction), `graphics.md`, `au
 - **Verdict : faisable.** Le jeu est plus gros que BASS par son cœur, car on réécrit ~26 000 instructions de simulation, et plus simple en données (presque pas de compression, pas de scripts).
 - Seuls `docs/tim3/plan.md`, `formats.md` et `engine.md` ont été créés ; aucun code.
 - **15/11/2026** : vagues X, P (banc Unicorn, format v2), D, V, A (commun + jeu), Φ1, Φ2 et R faites ; **les 206 niveaux complets donnent des traces identiques au banc sur 600 pas** (`traces.test.ts`, 633/633). En cours : U. Rien commité.
+- **Vague F** : l'aide du professeur est portée (`HELP.ITF`, mode aide de l'écran et du menu principal, professeur animé et
+  synchronisé sur sa voix, aussi dans `BINSOLVE`) : `ui.md` § Aide du professeur.
 - **Décisions déjà prises par l'utilisatrice** :
   - on porte **TIM3**, pas TIM1 ; l'installeur de TIM1 DOS fourni ne sert que de référence éventuelle (`engine.md` § 6) ;
   - consigne générale : « mutualiser avec ce qu'on a déjà, sans pour autant trop dévoyer les jeux » ;

@@ -10,6 +10,7 @@ import { binsolveWindow } from "../../../src/games/tim3/ui/binsolve-window";
 import { BinScreen, PuzzleCardScreen, PuzzleListScreen } from "../../../src/games/tim3/ui/chooser";
 import { CreditsScreen } from "../../../src/games/tim3/ui/credits";
 import { globeWindow } from "../../../src/games/tim3/ui/globe-window";
+import { helpWindow } from "../../../src/games/tim3/ui/help-window";
 import { hintWindow } from "../../../src/games/tim3/ui/hint-window";
 import { infoWindow } from "../../../src/games/tim3/ui/info-window";
 import { ItfWindow, screenOptions, type ItfScreen, type ItfWindowOptions } from "../../../src/games/tim3/ui/itf-window";
@@ -21,6 +22,7 @@ import { programWindow } from "../../../src/games/tim3/ui/program-window";
 import { GLOBE } from "../../../src/games/tim3/ui/globe-window";
 import { frenchIndex, namesWithExtension, original } from "../data/real";
 import { realTypes } from "../engine/helpers";
+import { silentAudio } from "./professor-support";
 
 /**
  * Calque des fenêtres `.ITF` (ce que lisent le clavier et les lecteurs d'écran) : chaque contrôle de chaque fenêtre du port a un nom
@@ -75,7 +77,9 @@ describe.skipIf(!original.has)("noms accessibles des contrôles de chaque fenêt
     ["GRAVITY (Labo)", () => open(globeWindow(assets, itf("GRAVITY.ITF"), { settings: { gravity: 272, pressure: 67, background: 15 }, lab: true, change: vi.fn(), refused: vi.fn() }))],
     ["GRAVITY (Jeu)", () => open(globeWindow(assets, itf("GRAVITY.ITF"), { settings: { gravity: 272, pressure: 67, background: 15 }, lab: false, change: vi.fn(), refused: vi.fn() }))],
     ["MUSICBOX", () => open(musicboxWindow(assets, itf("MUSICBOX.ITF"), musicbox))],
-    ["BINSOLVE", () => open(binsolveWindow(assets, itf("BINSOLVE.ITF"), 1, "Bravo"))],
+    ["BINSOLVE", () => open(binsolveWindow(assets, itf("BINSOLVE.ITF"), 1, "Bravo", silentAudio()))],
+    ["HELP (texte court)", () => open(helpWindow(assets, itf("HELP.ITF"), { text: "Court.", voice: null, audio: silentAudio(), another: vi.fn() }))],
+    ["HELP (texte long)", () => open(helpWindow(assets, itf("HELP.ITF"), { text: "Long. ".repeat(200), voice: null, audio: silentAudio(), another: vi.fn() }))],
     ["HINT", () => open(hintWindow(itf("HINT.ITF"), { text: "Regardez la balle.", replay: vi.fn() }))],
     ["LOADSAVE", () => open(loadSaveWindow(itf("LOADSAVE.ITF"), { modified: true, choose: vi.fn() }))],
     ["DOSBOX (charger une machine)", () => open(machineListWindow(assets, itf("DOSBOX.ITF"), { mode: "load", slots: () => slots, name: "", validate: vi.fn() }))],

@@ -8,8 +8,11 @@
  * - Labo (16011) : mode Labo (423038) ;
  * - Duel (16012), Inscription (16014), Exercice avec le professeur (16015) : deux joueurs, inscription des joueurs, travaux dirigés
  *   (mode 6) ; non portés, grisés, « non disponible » comme la barre d'outils ;
- * - Manuel on-line (16013) : le manuel (4169c8(0)) ; le port ouvre l'aide du site, comme le livre de la barre ;
- * - Aide (16008, « ? ») : aide du professeur (4169c8(10)) ; le port ouvre aussi l'aide du site ;
+ * - Manuel on-line (16013) : le manuel (4169c8(0), `TIMHELP.EXE`) ; le port ouvre l'aide du site, comme le livre de la barre ;
+ * - Aide (16008, « ? ») : 4169c8(10) ouvre la rubrique 10 du même manuel Windows. Le port ouvre à la place l'aide du professeur
+ *   (`HELP.ITF`, comme le « ? » de la barre, `MainMenuHelp`) par-dessus le menu, qui reste ouvert : son « ? » passe le menu en mode
+ *   aide, et l'élément désigné est expliqué par le texte de `HELP.RES` du contrôle (le fichier a ceux des boutons du menu, 16001 à
+ *   16018) ;
  * - Options (16018) : fenêtre des préférences (42aa60), puis retour au menu ;
  * - Quitter (16016) : « Désirez-vous quitter? » (31113, Oui / Non, 422f00), toujours posée ; Oui : accueil du site, ou jeu relancé
  *   sur la page de dev.
@@ -76,6 +79,16 @@ export function quitMainMenu(ask: (text: number, yes: () => void, no: () => void
   ask(QUIT_TEXT, leave, stay);
 }
 
+/** Aide du professeur ouverte depuis le menu (« ? ») et mode aide du menu (`ItfWindowOptions.helpMode`). */
+export interface MainMenuHelp {
+  open(): void;
+  picking(): boolean;
+  pick(ids: number[]): void;
+  cancel(): void;
+  /** Texte annoncé pendant le mode aide. */
+  prompt: string;
+}
+
 export interface MainMenuTexts {
   title: string;
   /** Texte de `DESCRIPT.RES` par identifiant. */
@@ -90,6 +103,7 @@ export class MainMenuScreen implements ItfScreen<MainMenuAction> {
     readonly itf: Itf,
     private readonly strings: MainMenuTexts,
     onSound?: (sound: FrameSound) => void,
+    private readonly help?: MainMenuHelp,
   ) {
     // Noms du calque : le texte du mode (contrôle + 100) ; les autres boutons gardent leur infobulle.
     const labels: Record<number, string> = {};
@@ -106,12 +120,17 @@ export class MainMenuScreen implements ItfScreen<MainMenuAction> {
       greyedActive: true,
       labels,
       hoverAnimate: { ids: MODES, ...(onSound ? { sound: onSound } : {}) },
-      status: (win) => this.bandText(win),
+      status: (win) => (help?.picking() ? help.prompt : this.bandText(win)),
+      ...(help ? { helpMode: { active: () => help.picking(), pick: (ids: number[]) => help.pick(ids), cancel: () => help.cancel() } } : {}),
       decorate: (surface, win) => this.drawBand(surface, win, assets),
     };
   }
 
   action(id: number): MainMenuAction | undefined {
+    if (id === MAIN_MENU.help && this.help) {
+      this.help.open();
+      return undefined;
+    }
     return mainMenuAction(id);
   }
 

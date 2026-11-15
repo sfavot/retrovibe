@@ -18,6 +18,7 @@ import { CD_TRACKS, MUSICBOX, musicboxWindow, speakerFrame, volumeStep } from ".
 import { PlayScreen } from "../../../src/games/tim3/ui/play";
 import { PROG, PROG_SLIDERS, programWindow } from "../../../src/games/tim3/ui/program-window";
 import { frenchIndex, original } from "../data/real";
+import { silentAudio } from "./professor-support";
 import { realTypes } from "../engine/helpers";
 
 describe.skipIf(!original.has)("fenêtres .ITF de la vague F", () => {
@@ -224,7 +225,7 @@ describe.skipIf(!original.has)("fenêtres .ITF de la vague F", () => {
       expect(binsolveShown(3)).toEqual([BINSOLVE.silver, 32023]);
       expect(binsolveShown("all")).toEqual([BINSOLVE.gold, BINSOLVE.allBins]);
       const text = readBinSolveRes(index.get("BINSOLVE.RES"))[1]!;
-      const m = model(binsolveWindow(assets, itf("BINSOLVE.ITF"), 1, text));
+      const m = model(binsolveWindow(assets, itf("BINSOLVE.ITF"), 1, text, silentAudio()));
       const shown = m.layout.items.map((i) => i.id).filter((id) => id >= BINSOLVE.gold && id <= BINSOLVE.allBins);
       expect(shown.sort()).toEqual([BINSOLVE.silver, 32021]);
       expect(m.item(BINSOLVE.text)!.text).toBe(text);

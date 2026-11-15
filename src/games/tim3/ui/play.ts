@@ -7,6 +7,7 @@
  * deux clics). Au doigt, la pièce tenue est dessinée au-dessus du doigt (`TOUCH_LIFT`), un appui sur une pièce posée la
  * sélectionne (ses poignées s'affichent) et un appui long dans le bac donne le nom et la description de la pièce.
  */
+import { HELP_BIN, HELP_GOAL } from "../data/help";
 import type { Level } from "../data/lev";
 import type { PartInfo } from "../data/text";
 import { FIELD_HEIGHT, FIELD_WIDTH, HANDLE_SIZE, Zone, type HeldPreview, type ZoneId } from "../engine/editor";
@@ -71,7 +72,20 @@ export type PlayEvent =
   | { type: "goal" }
   /** Clic sur la main d'un indice (42013d) : son emplacement dans le LEV (0 à 7). */
   | { type: "hint"; slot: number }
-  | { type: "sound"; name: "pick" | "drop" | "refused" | "remove" };
+  | { type: "sound"; name: "pick" | "drop" | "refused" | "remove" }
+  /** Mode aide (41e6b7) : l'élément choisi d'un appui. */
+  | { type: "helpPick"; target: HelpTarget }
+  /** Mode aide : Échap l'abandonne (ajout du port). */
+  | { type: "helpCancel" };
+
+/**
+ * Élément sous le pointeur en mode aide (41e85c) : un contrôle (son identifiant, clé de `HELP.RES`), une pièce posée (sa description,
+ * `INFO.ITF`, 41ea8b), ou rien (« Je suis désolé… »).
+ */
+export type HelpTarget = { kind: "control"; id: number } | { kind: "part"; partType: number } | { kind: "none" };
+
+/** Contrôles du panneau du bac (`PARTSBIN.ITF`) qui ont leur aide : drapeau, flèches. */
+export const BIN_HELP = { play: 11003, left: 11001, right: 11002 } as const;
 
 export interface PlayTexts {
   goal: string;
@@ -107,6 +121,8 @@ export class PlayScreen {
   message: string | null = null;
   /** Le puzzle ouvert a déjà été résolu : l'ampoule « Montrer la solution » apparaît (42d210). */
   solved = false;
+  /** Mode aide (41e6b7) : le prochain appui choisit l'élément à expliquer au lieu d'agir. */
+  helpPicking = false;
   private drag: Drag | null = null;
   private pointer = { x: -1, y: -1, touch: false, inside: false };
   private preview: HeldPreview = { valid: true };
@@ -194,6 +210,41 @@ export class PlayScreen {
     return this.shownButtons().find((b) => inRect(b, x, y)) ?? null;
   }
 
+  /**
+   * Mode aide (41e6b7) : la pièce tenue retourne au bac, plus de poignées ni d'indices survolés ; le prochain appui choisit l'élément
+   * (`helpTargetAt`), Échap abandonne.
+   */
+  startHelpPick(): void {
+    this.cancelGesture();
+    if (this.editor.held) this.editor.returnHeld();
+    this.drag = null;
+    this.focus = null;
+    this.hoverZone = Zone.None;
+    this.helpPicking = true;
+  }
+
+  /**
+   * 41e85c : le bac (fenêtre à part dans le jeu, 11014) et la barre du but (9000) d'abord, puis les contrôles de la fenêtre principale
+   * (barre d'outils, et ici les boutons du panneau du bac), enfin une pièce posée (437cc9, décors exclus).
+   */
+  helpTargetAt(x: number, y: number): HelpTarget {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    if (inRect(BIN_PLAY, x, y)) return { kind: "control", id: BIN_HELP.play };
+    if (inRect(BIN_LEFT, x, y)) return { kind: "control", id: BIN_HELP.left };
+    if (inRect(BIN_RIGHT, x, y)) return { kind: "control", id: BIN_HELP.right };
+    if (this.inBin(x, y)) return { kind: "control", id: HELP_BIN };
+    if (inRect(GOALBAR, x, y)) return { kind: "control", id: HELP_GOAL };
+    const button = this.toolbarAt(x, y);
+    if (button) return { kind: "control", id: button.id };
+    if (this.inField(x, y)) {
+      const f = this.toField(x, y, false);
+      const part = this.editor.partAt(f.x, f.y);
+      if (part) return { kind: "part", partType: part.type };
+    }
+    return { kind: "none" };
+  }
+
   /** Le point (coordonnées de l'aire) est-il dans le cadre des poignées de la pièce (rectangle élargi d'une poignée, info en bas à droite) ? */
   private inHandleFrame(p: Part, fx: number, fy: number): boolean {
     const r = this.editor.partRect(p);
@@ -215,6 +266,7 @@ export class PlayScreen {
   /** Curseur à montrer pour la souris. */
   cursor(): CursorKind {
     const { x, y } = this.pointer;
+    if (this.helpPicking) return "help";
     if (this.drag?.kind === "resize") return this.drag.zone === Zone.WidthLeft || this.drag.zone === Zone.WidthRight ? "ew-resize" : "ns-resize";
     if (this.editor.held) {
       if (this.inField(x, y)) return this.preview.valid ? "grabbing" : "not-allowed";
@@ -253,6 +305,11 @@ export class PlayScreen {
     y = Math.floor(y);
     this.pointer = { x, y, touch, inside: true };
     this.message = null;
+    if (this.helpPicking) {
+      this.helpPicking = false;
+      this.emit({ type: "helpPick", target: this.helpTargetAt(x, y) });
+      return;
+    }
     const button = this.toolbarAt(x, y);
     if (button) {
       this.drag = { kind: "press", part: null, startX: x, startY: y, moved: false, touch, button: button.name };
@@ -368,6 +425,7 @@ export class PlayScreen {
   private updateHover(): void {
     const { x, y, touch } = this.pointer;
     const ed = this.editor;
+    if (this.helpPicking) return;
     if (ed.held) {
       if (this.inField(x, y)) {
         const f = this.toField(x, y, touch && !isLink(ed.held));
@@ -431,6 +489,7 @@ export class PlayScreen {
 
   /** Appui long (doigt) : dans le bac, nom et description de la pièce ; sur la barre, l'infobulle du bouton (sans le cliquer). */
   longPress(x: number, y: number): void {
+    if (this.helpPicking) return;
     x = Math.floor(x);
     y = Math.floor(y);
     const button = this.toolbarAt(x, y);
@@ -484,6 +543,12 @@ export class PlayScreen {
    */
   key(key: string): boolean {
     const ed = this.editor;
+    if (this.helpPicking) {
+      if (key !== "Escape") return false;
+      this.helpPicking = false;
+      this.emit({ type: "helpCancel" });
+      return true;
+    }
     if (this.session.running) {
       if (key === "Escape") {
         this.emit({ type: "stop" });

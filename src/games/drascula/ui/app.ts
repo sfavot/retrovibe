@@ -130,6 +130,8 @@ const drascula: PointClickGame<SaveData> = {
       },
       // Écrans d'origine du volume (F9) et des sauvegardes (F10, F7), à la place des fenêtres communes.
       dialogs: {
+        // Le panneau se dessine sur la pièce, avec sa palette : pendant une cinématique (écran pris par le canvas), il ne s'ouvre pas.
+        volumeRefusal: () => (engine.gfx.owner === "room" && engine.state.room ? null : copy.volumeBusy),
         volume(close) {
           const volumes: Record<VolumeKind, { key: string; get(): number; set(level: number): void }> = {
             master: { key: MASTER_VOLUME_KEY, get: () => host.masterVolume, set: (level) => host.setUserMasterVolume(level) },

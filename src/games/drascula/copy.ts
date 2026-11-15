@@ -94,6 +94,7 @@ export const copy = {
   saveDescription: (chapter: number, place: string, date: string) => `Chapitre ${chapter} – ${place} – ${date}`,
   saveDone: "Partie sauvegardée.",
   saveBusy: "Impossible de sauvegarder pendant une scène : réessayez quand vous reprenez la main.",
+  volumeBusy: "Le volume se règle en dehors des scènes : réessayez quand vous reprenez la main.",
   saveFailed: "La sauvegarde a échoué : le stockage du navigateur est plein ou bloqué.",
   loadDone: "Partie chargée.",
   loadEmpty: "Cet emplacement est vide.",

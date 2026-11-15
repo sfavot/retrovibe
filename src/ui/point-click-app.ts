@@ -120,6 +120,8 @@ export interface StageSlotsOptions {
 export interface PointClickStageDialogs {
   /** Réglage du volume ; le jeu applique et enregistre lui-même ses réglages. */
   volume?(close: () => void): HTMLElement;
+  /** Message si le réglage du volume ne peut pas s'ouvrir maintenant (une cinématique occupe l'écran) ; `null` : il s'ouvre. */
+  volumeRefusal?(): string | null;
   /** Écran unique de sauvegarde et de chargement. */
   slots?(options: StageSlotsOptions): HTMLElement;
 }
@@ -506,6 +508,11 @@ export async function mountPointClickApp<TSave>(
     openModal(renderChoiceDialog({ ...choice, choose: (answer) => then(() => choice.choose(answer))(), cancel }), cancel);
   };
   const openVolume = (): void => {
+    const refusal = loaded?.dialogs?.volumeRefusal?.() ?? null;
+    if (refusal !== null) {
+      say(refusal);
+      return;
+    }
     const stageVolume = loaded?.dialogs?.volume;
     if (stageVolume) return openStageModal(stageVolume(closeModal));
     const sliders: VolumeSlider[] = [

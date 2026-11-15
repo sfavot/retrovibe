@@ -356,14 +356,15 @@ export function king(kit: NpcKit): BehaviorHandler {
           continue;
         }
         case 1:
-          // placement fixe devant le trône (X 0xA0, Y 0x8C, P 0x6C, plan 1, Sol 2) puis animation
+          // placement fixe devant le trône (X 0xA0, Y 0x8C, P 0x6C, plan 1, Sol 2) puis l'animation 42
+          // (« couronnement » : le roi apparaît couronné ; l'id 2 serait la noyade, `characters.md` § 1.3)
           obj.presence = 2;
           obj.x = 0xa0;
           obj.y = 0x8c;
           obj.p = 0x6c;
           obj.plane = 1;
           obj.ground = 2;
-          kit.startAnimation(ctx, obj, { id: 2, gst: 7, mob: 1, ego: 2 });
+          kit.startAnimation(ctx, obj, { id: 42, gst: 7, mob: 1, ego: 2 });
           break run;
         case 2:
           if (kit.pollAnimation(ctx, obj) === 0) break run;

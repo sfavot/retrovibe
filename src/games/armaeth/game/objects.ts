@@ -1291,8 +1291,10 @@ export const toad: ObjectHandler = (ctx) => {
 /** Fin du jeu : `4b53 := 0`, `4b50 := 0`, `4b51 := 6`, puis le couronnement (module `events`). */
 const CROWN_DELAY = 6;
 
-/** Animation du couronnement (`characters.md` § 6.2 : 42 ; § 10.1 lit 18, contradiction ouverte) et message `V358`. */
-const CROWNING_ANIMATION = 42;
+/** Animation de départ du couronnement (`2c83:0004`, `characters.md` § 10.1 : 18, la téléportation) et message `V358`.
+ *  L'arrivée devant le trône (`npc-things.ts`, `Ego 1` de l'acteur `Num 333`) joue l'animation 42 (« couronnement », le roi
+ *  couronné) ; l'id 2 serait la noyade. */
+const CROWNING_ANIMATION = 18;
 
 /**
  * `27ed:0194` : la dalle du trône (`Num 104`) est replacée fermée (`Y = 0x8B`, `1a37:007f` : Gst 0, Mob 0, Ego 0, Fig 0, Dep 1, Txt 2, mode 2) ;

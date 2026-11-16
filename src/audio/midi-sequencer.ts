@@ -1,5 +1,5 @@
 /**
- * Séquenceur MIDI des jeux Mohawk (Mathémagique, Zoombinis), pur et piloté par le tick du moteur (aucun minuteur, aucun accès au navigateur).
+ * Séquenceur MIDI commun (Mathémagique, Zoombinis, The Incredible Machine 3), pur et piloté par le tick du moteur (aucun minuteur, aucun accès au navigateur).
  *
  * L'original joue le MIDI par `midiOut` avec un séquenceur logiciel (`timeSetEvent`, `docs/mathemagique/engine.md` §6) : lecture de la piste,
  * repères texte `setup end` / `loop start` / `loop end` pour boucler, et rappel du jeu à chaque repère (Rhythm Shop,
@@ -12,8 +12,8 @@
  * - Réécriture : `rewrite(events, song)` remplace la liste d'événements avant la lecture (voir `rhythm-rewrite.ts`).
  * - Tempo : `setBpm` change la vitesse en cours de route (les événements déjà planifiés gardent leur instant).
  */
-import { type MarkerEvent, type Song, type SongEvent, bpmOf, findNamedMarker, initialMicrosPerQuarter } from "../../../audio/smf";
-import type { MidiSink } from "./sink";
+import { type MarkerEvent, type Song, type SongEvent, bpmOf, findNamedMarker, initialMicrosPerQuarter } from "./smf";
+import type { MidiSink } from "./midi-sink";
 
 /** Remplace les événements d'un morceau avant sa lecture (liste triée par temps, finissant par un `end`). */
 export type SongRewrite = (events: readonly SongEvent[], song: Song) => readonly SongEvent[];

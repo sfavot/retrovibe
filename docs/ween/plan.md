@@ -1,6 +1,6 @@
 # Ween: The Prophecy : plan d'implémentation
 
-Jeu : *Ween: The Prophecy* (Coktel Vision et MDO, 1992 ; Sierra On-Line en Amérique du Nord), **version DOS sur disquettes, VGA, française, AdLib**. Source : installeur Abandonware France `setup-00126-Ween_The_Prophecy-dosbox.exe` (Inno Setup 5.3.10, à la racine du dépôt, non versionné).
+Jeu : *Ween: The Prophecy* (Coktel Vision et MDO, 1992 ; Sierra On-Line en Amérique du Nord), **version DOS sur disquettes, VGA, française, AdLib**. Source : installeur Abandonware France `archives/ween/setup-00126-Ween_The_Prophecy-dosbox.exe` (Inno Setup 5.3.10, non versionné).
 Aventure « pointer-et-cliquer » en 320 × 200, 256 couleurs : Ween, petit-fils du sorcier Ohkram, doit retrouver trois grains de sable et les déposer dans le Revuss avant la Grande Éclipse pour vaincre Kraal. Énigmes à l'écran, inventaire, bloc-notes, petites vidéos IMD, musique AdLib et bruitages échantillonnés. Pas de voix.
 
 Ce document est le brief commun aux sous-agents, sur le modèle de `docs/bass/plan.md`. Les références font foi dans cet ordre : `formats.md` (formats, vérifié / lu / supposé), `engine.md` (moteur de ScummVM, découpage), puis ce plan. S'ajouteront : `files.md` (généré par l'extraction), `graphics.md`, `audio.md`.

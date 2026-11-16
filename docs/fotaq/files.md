@@ -54,4 +54,4 @@ bash scripts/fotaq-extract.sh
 bash scripts/fotaq-voices.sh
 ```
 
-Archive par défaut : `archives/FOTAQ_Fr_Talkie_1.0.zip` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (voix).
+Archive par défaut : `archives/fotaq/FOTAQ_Fr_Talkie_1.0.zip` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (voix).

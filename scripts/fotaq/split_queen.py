@@ -127,7 +127,7 @@ def cmd_inventaire(dest, queen, sortie):
         ('Ressources de `queen.1c` non extraites (agrégées)', ec.tableau_par_categorie('Ressource', exclus)
          + [''] + ec.pourquoi_exclus(POURQUOI_EXCLUS)),
         ('Régénérer', ['```', 'bash scripts/fotaq-extract.sh', 'bash scripts/fotaq-voices.sh', '```', '',
-                       'Archive par défaut : `archives/FOTAQ_Fr_Talkie_1.0.zip` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (voix).']),
+                       'Archive par défaut : `archives/fotaq/FOTAQ_Fr_Talkie_1.0.zip` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (voix).']),
     ]
     ec.rendre_inventaire(sortie, 'Inventaire des fichiers de Flight of the Amazon Queen', 'scripts/fotaq-extract.sh', sections)
 

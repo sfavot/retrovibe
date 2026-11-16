@@ -6,7 +6,7 @@ Ce fichier n'est pas une donnee du jeu d'Alcachofa Soft : c'est un fichier de do
 `devtools/create_drascula/` (format version 7).
 
 Source : https://github.com/scummvm/scummvm/blob/master/dists/engine-data/drascula.dat
-         (archives/drascula.dat ici ; identique octet pour octet au fichier de la branche master au moment de l'extraction)
+         (archives/drascula/drascula.dat ici ; identique octet pour octet au fichier de la branche master au moment de l'extraction)
 Description : https://github.com/scummvm/scummvm/blob/master/dists/engine-data/README
 
 Licence : celle de ScummVM, GNU General Public License version 3 ou, a votre choix, toute version ulterieure

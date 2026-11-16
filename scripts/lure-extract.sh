@@ -8,15 +8,15 @@
 # Non versionnés : LURE.EXE (jamais exécuté), PROTECT.PDF (protection non portée), README de ScummVM.
 # COVER.webp (jaquette de la boîte d'origine, Wikipédia anglophone) ne vient pas du jeu : conservé tel quel s'il existe.
 # Usage : scripts/lure-extract.sh [lure-fr-1.1.zip] [lure.dat]
-#         (défauts : archives/lure-fr-1.1.zip, archives/lure.dat = dists/engine-data/lure.dat de ScummVM)
+#         (défauts : archives/lure/lure-fr-1.1.zip, archives/lure/lure.dat = dists/engine-data/lure.dat de ScummVM)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
 # L'archive est une donnée non fiable : rien n'est exécuté, python en -I.
 # Outils requis : bsdtar, python3.
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
-archive="${1:-$racine/archives/lure-fr-1.1.zip}"
-dat="${2:-$racine/archives/lure.dat}"
+archive="${1:-$racine/archives/lure/lure-fr-1.1.zip}"
+dat="${2:-$racine/archives/lure/lure.dat}"
 sortie="$racine/original/lure"
 doc="$racine/docs/lure/files.md"
 utils="$racine/scripts/lure/split_dat.py"

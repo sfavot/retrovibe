@@ -10,16 +10,16 @@
 #  - l'inventaire docs/drascula/files.md.
 # La musique (scripts/drascula-music.sh) et COVER.webp (jaquette de la boîte d'origine, Wikipédia anglophone) ne viennent pas de ces archives : conservées telles quelles.
 # Usage : scripts/drascula-extract.sh [drascula-1.0.zip [drascula-int-1.1.zip [drascula.dat]]]
-#   (défauts : archives/drascula-1.0.zip, archives/drascula-int-1.1.zip, archives/drascula.dat)
+#   (défauts : archives/drascula/drascula-1.0.zip, archives/drascula/drascula-int-1.1.zip, archives/drascula/drascula.dat)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
 # Les archives sont des données non fiables : rien n'est exécuté, les ARJ sont extraits par 7zz.
 # Outils requis : bsdtar, 7zz, python3.
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
-zip_base="${1:-$racine/archives/drascula-1.0.zip}"
-zip_int="${2:-$racine/archives/drascula-int-1.1.zip}"
-dat="${3:-$racine/archives/drascula.dat}"
+zip_base="${1:-$racine/archives/drascula/drascula-1.0.zip}"
+zip_int="${2:-$racine/archives/drascula/drascula-int-1.1.zip}"
+dat="${3:-$racine/archives/drascula/drascula.dat}"
 sortie="$racine/original/drascula"
 reference="$racine/archives/drascula"
 doc="$racine/docs/drascula/files.md"
@@ -76,11 +76,16 @@ for f in "$sortie"/track*.mp3; do [ -f "$f" ] && conserves+=("$(basename "$f")")
 ec_conserver "$sortie" "$tmp/out" "${conserves[@]}"
 
 # Substitution d'un bloc, seulement maintenant que tout a réussi (files.json est généré avant).
-mkdir -p "$racine/archives"
-rm -rf "$reference.new"
-mv "$tmp/ref" "$reference.new"
-rm -rf "$reference"
-mv "$reference.new" "$reference"
+# Seuls les dossiers extraits sont remplacés : les archives sources (zips, drascula.dat) restent dans $reference.
+mkdir -p "$reference"
+for d in base fr de es it; do
+  rm -rf "$reference/$d.new"
+  mv "$tmp/ref/$d" "$reference/$d.new"
+done
+for d in base fr de es it; do
+  rm -rf "$reference/$d"
+  mv "$reference/$d.new" "$reference/$d"
+done
 ec_publier "$tmp/out" "$sortie"
 
 py inventaire "$sortie" "$reference/base" "$doc"

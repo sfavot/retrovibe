@@ -5,14 +5,14 @@
 #  - README-FOTAQ.txt (readme d'origine, licence : à conserver intact) et files.json ;
 #  - l'inventaire docs/fotaq/files.md.
 # Les voix (voices/*.mp3) viennent de scripts/fotaq-voices.sh, COVER.webp (jaquette de la boîte d'origine, Wikipédia anglophone) : conservés tels quels.
-# Usage : scripts/fotaq-extract.sh [FOTAQ_Fr_Talkie_1.0.zip]   (défaut : archives/FOTAQ_Fr_Talkie_1.0.zip)
+# Usage : scripts/fotaq-extract.sh [FOTAQ_Fr_Talkie_1.0.zip]   (défaut : archives/fotaq/FOTAQ_Fr_Talkie_1.0.zip)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
 # L'archive est une donnée non fiable : rien n'est exécuté.
 # Outils requis : bsdtar, python3.
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
-archive="${1:-$racine/archives/FOTAQ_Fr_Talkie_1.0.zip}"
+archive="${1:-$racine/archives/fotaq/FOTAQ_Fr_Talkie_1.0.zip}"
 sortie="$racine/original/fotaq"
 doc="$racine/docs/fotaq/files.md"
 utils="$racine/scripts/fotaq/split_queen.py"

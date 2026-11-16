@@ -5,7 +5,7 @@ Les références `fichier.cpp:N` renvoient à `engines/sky/` sauf mention contra
 
 ## 1. Contenu de l'archive (vérifié)
 
-`archives/bass-cd-1.2.zip` (66,2 Mo) :
+`archives/bass/bass-cd-1.2.zip` (66,2 Mo) :
 
 | Fichier | Octets | Rôle |
 | --- | --- | --- |

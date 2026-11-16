@@ -81,7 +81,7 @@ def cmd_inventaire(dest, base, sortie):
         ('Provenance', ec.tableau(['Fichiers', 'Origine'], [
             ('`*.ALG`, `*.ALS`, `*.BIN` (sauf `QPC.BIN`)', '`Packet.001` (base, voix anglaises) du zip `drascula-1.0.zip`'),
             ('`*.ALD`, `*.CAL`, `QPC.BIN`', '`PACKET.002` (français) de `drascula-int-1.1.zip`, en remplacement de ceux de la base'),
-            ('`drascula.dat`, `drascula-dat-LICENSE.txt`', '`archives/drascula.dat` (ScummVM, version 7) ; licence : voir la note'),
+            ('`drascula.dat`, `drascula-dat-LICENSE.txt`', '`archives/drascula/drascula.dat` (ScummVM, version 7) ; licence : voir la note'),
             ('`README-ALCACHOFA.txt`, `README-ALCACHOFA-INT.txt`', '`readme.txt` des zips de base et international (licence d\'Alcachofa Soft, à conserver intacte)'),
             ('`track1.mp3` à `track31.mp3`', '`drascula-audio-2.0.zip` (OGG), convertis par `scripts/drascula-music.sh` (MP3 80 kb/s)'),
         ])),
@@ -96,7 +96,7 @@ def cmd_inventaire(dest, base, sortie):
         sections.append(('Fichiers de `Packet.001` exclus (agrégés par extension)', ec.tableau_par_categorie('Extension', exclus)
                          + [''] + ec.pourquoi_exclus(POURQUOI_EXCLUS)))
     sections.append(('Régénérer', ['```', 'bash scripts/drascula-extract.sh', 'bash scripts/drascula-music.sh', '```', '',
-                                   'Archives par défaut : `archives/drascula-1.0.zip`, `drascula-int-1.1.zip`, `drascula-audio-2.0.zip`, `drascula.dat` (non versionnées). '
+                                   'Archives par défaut : `archives/drascula/drascula-1.0.zip`, `drascula-int-1.1.zip`, `drascula-audio-2.0.zip`, `drascula.dat` (non versionnées). '
                                    'Outils requis : `bsdtar`, `7zz`, `python3`, `ffmpeg` (musique). Extractions complètes (dont les autres langues) : `archives/drascula/`.']))
     ec.rendre_inventaire(sortie, 'Inventaire des fichiers de Drascula', 'scripts/drascula-extract.sh', sections)
 

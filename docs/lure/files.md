@@ -40,4 +40,4 @@ Généré par `scripts/lure-extract.sh` (ne pas éditer à la main).
 bash scripts/lure-extract.sh
 ```
 
-Archive par défaut : `archives/lure-fr-1.1.zip` ; `lure.dat` par défaut : `archives/lure.dat` (copie de `dists/engine-data/lure.dat` de ScummVM). Aucun des deux n'est versionné. Outils requis : `bsdtar`, `python3`.
+Archive par défaut : `archives/lure/lure-fr-1.1.zip` ; `lure.dat` par défaut : `archives/lure/lure.dat` (copie de `dists/engine-data/lure.dat` de ScummVM). Aucun des deux n'est versionné. Outils requis : `bsdtar`, `python3`.

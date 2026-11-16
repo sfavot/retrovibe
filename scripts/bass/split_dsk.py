@@ -362,7 +362,7 @@ def cmd_inventaire(out, archive, dest_raw, sortie):
             '- Voix : décompressées en RNC méthode 1 (CRC de l\'entrée et de la sortie valides), en-tête de 22 octets retiré, `s_tot_size - 22` octets conservés.',
             '- `sky.cpt` : copié tel quel (419 427 octets). Contrôle fait en vague X par régénération avec `devtools/skycpt/` de ScummVM (compilé hors dépôt, `COMPACT.TXT` en entrée) : les 357 685 premiers octets sont identiques ; les 61 742 derniers (données de remise à zéro) ne sont pas régénérables sans les sept `RESET.nnn` (voir `formats.md` § 4). `skycpt` n\'est pas porté.']),
         ('Régénérer', ['```', 'bash scripts/bass-extract.sh', '```', '',
-                       'Archive par défaut : `archives/bass-cd-1.2.zip` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (`libmp3lame`).']),
+                       'Archive par défaut : `archives/bass/bass-cd-1.2.zip` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (`libmp3lame`).']),
     ]
     ec.rendre_inventaire(sortie, 'Inventaire des fichiers de Beneath a Steel Sky', 'scripts/bass-extract.sh', sections)
 

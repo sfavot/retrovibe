@@ -7,14 +7,14 @@
 #  - sky.cpt tel quel, README-BASS.txt (readme d'origine, licence : à conserver intact) et files.json ;
 #  - l'inventaire docs/bass/files.md.
 # COVER.webp (jaquette de la boîte d'origine, Wikipédia anglophone) ne vient pas du jeu : conservé tel quel s'il existe.
-# Usage : scripts/bass-extract.sh [bass-cd-1.2.zip]   (défaut : archives/bass-cd-1.2.zip)
+# Usage : scripts/bass-extract.sh [bass-cd-1.2.zip]   (défaut : archives/bass/bass-cd-1.2.zip)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
 # L'archive est une donnée non fiable : rien n'en est exécuté (python en -I, ffmpeg ne lit que des fichiers locaux).
 # Outils requis : bsdtar, python3, ffmpeg (libmp3lame).
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
-archive="${1:-$racine/archives/bass-cd-1.2.zip}"
+archive="${1:-$racine/archives/bass/bass-cd-1.2.zip}"
 sortie="$racine/original/bass"
 doc="$racine/docs/bass/files.md"
 utils="$racine/scripts/bass/split_dsk.py"

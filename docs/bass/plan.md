@@ -1,6 +1,6 @@
 # Beneath a Steel Sky : plan d'implémentation
 
-Jeu : *Beneath a Steel Sky* (Revolution Software, 1994, deuxième jeu du « Virtual Theatre »), **version CD 1.2** (`archives/bass-cd-1.2.zip`, v0.0372, freeware de Revolution, archive préparée par ScummVM en 2003).
+Jeu : *Beneath a Steel Sky* (Revolution Software, 1994, deuxième jeu du « Virtual Theatre »), **version CD 1.2** (`archives/bass/bass-cd-1.2.zip`, v0.0372, freeware de Revolution, archive préparée par ScummVM en 2003).
 Aventure « pointer-et-cliquer » en 320 × 200, 256 couleurs : Robert Foster, enlevé dans l'Outback, s'échappe dans Union City avec Joey, robot qu'il a lui-même construit. Deux boutons de souris (gauche : marcher, regarder, parler ; droit : utiliser), inventaire en haut de l'écran, choix de dialogue, panneau de contrôle (F5). **Voix anglaises** (1 h 56), **textes en huit langues dont le français**, musique AdLib, effets échantillonnés.
 
 Ce document est le brief commun aux sous-agents, sur le modèle de `docs/lure/plan.md`. Les références font foi dans cet ordre : `formats.md` (formats, vérifié / lu / supposé), `engine.md` (moteur de ScummVM, découpage), puis ce plan. S'ajouteront : `files.md` (généré par l'extraction), `graphics.md`, `audio.md`, `group-N.md`.

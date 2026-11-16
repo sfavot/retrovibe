@@ -7,7 +7,7 @@
 #  - voices/lipsync.json : synchronisation labiale (scripts/tim3/split_voc.py) ;
 #  - COVER.webp (jaquette de la boîte nord-américaine, LaunchBox Games Database) conservé s'il existe, files.json, et l'inventaire docs/tim3/files.md.
 # Usage : scripts/tim3-extract.sh [archive.7z]
-#   (défaut : jeu-00235-incredible_machine_3-pcwin.7z à la racine du dépôt, sinon dans archives/)
+#   (défaut : archives/tim3/jeu-00235-incredible_machine_3-pcwin.7z)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
 # L'archive est une donnée non fiable : rien n'en est exécuté (python en -I, ffmpeg ne lit que des fichiers locaux).
 # Outils requis : 7zz, python3, ffmpeg (libmp3lame).
@@ -15,13 +15,7 @@ set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
 nom_archive=jeu-00235-incredible_machine_3-pcwin.7z
-if [ $# -ge 1 ]; then
-  archive="$1"
-elif [ -f "$racine/$nom_archive" ]; then
-  archive="$racine/$nom_archive"
-else
-  archive="$racine/archives/$nom_archive"
-fi
+archive="${1:-$racine/archives/tim3/$nom_archive}"
 sortie="$racine/original/tim3"
 doc="$racine/docs/tim3/files.md"
 utils="$racine/scripts/tim3/split_voc.py"

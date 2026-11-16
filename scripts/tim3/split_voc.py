@@ -167,7 +167,7 @@ def cmd_inventaire(out, iso, dest_wav, sortie):
                 '`%s` %d octets `%s`' % (n, os.path.getsize(os.path.join(iso, n)), sha(os.path.join(iso, n), True)) for n in FICHIERS_TELS_QUELS),
             '- Archives VOC : table d\'offsets strictement croissante, chaque entrée finit à l\'offset de la suivante (la dernière à la fin du fichier), chaque WAV est un RIFF PCM 8 bits mono %d Hz dont les chunks tiennent dans l\'entrée.' % FREQUENCE]),
         ('Régénérer', ['```', 'bash scripts/tim3-extract.sh [archive.7z]', '```', '',
-                       'Archive par défaut : `jeu-00235-incredible_machine_3-pcwin.7z` à la racine, sinon dans `archives/` (non versionnée). Outils requis : `7zz`, `python3`, `ffmpeg` (`libmp3lame`).']),
+                       'Archive par défaut : `archives/tim3/jeu-00235-incredible_machine_3-pcwin.7z` (non versionnée). Outils requis : `7zz`, `python3`, `ffmpeg` (`libmp3lame`).']),
     ]
     ec.rendre_inventaire(sortie, 'Inventaire des fichiers de The Incredible Machine 3', 'scripts/tim3-extract.sh', sections)
 

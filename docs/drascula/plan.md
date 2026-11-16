@@ -133,7 +133,7 @@ Comme les autres jeux : fichiers extraits à plat par un script, servis tels que
 | `*.ALS` (voix et sons) | `Packet.001` | 783 | 32,2 Mo | oui (bruts) |
 | `*.BIN` (vidéos) | `Packet.001`, avec `QPC.BIN` de `PACKET.002` | 33 | 23,0 Mo | oui |
 | `*.ALD`, `OP_*.CAL` | `PACKET.002` (français), en remplacement de ceux de `Packet.001` | 57 + 13 | 23 Ko | oui |
-| `drascula.dat` | `archives/drascula.dat` | 1 | 253,5 Ko | oui, avec sa note de provenance |
+| `drascula.dat` | `archives/drascula/drascula.dat` | 1 | 253,5 Ko | oui, avec sa note de provenance |
 | musique `track1.mp3` à `track31.mp3` | `drascula-audio-2.0.zip` (`audio/track1..31.ogg`), convertie en MP3 80 kb/s | 31 | 29 Mo (mesuré) | oui |
 | `README-ALCACHOFA.txt`, `README-ALCACHOFA-INT.txt` | `readme.txt` du zip de base (licence d'Alcachofa Soft) et du pack international | 2 | 6 Ko | oui, **obligatoire** (la licence interdit de le retirer) |
 | `COVER.webp` | jaquette de la boîte d'origine (Wikipédia anglophone) | 1 | 31 Ko | oui |

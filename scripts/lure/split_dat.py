@@ -179,7 +179,7 @@ def cmd_inventaire(dest, dossier, dat, sortie):
             '- Bloc français : `heywow`, numéro 0, %d ressources `0x3F01` à `0x3F1A` consécutives, %d octets utiles.' % (len(table), utiles)]),
         ('Non versionnés', ec.pourquoi_exclus(exclus)),
         ('Régénérer', ['```', 'bash scripts/lure-extract.sh', '```', '',
-                       'Archive par défaut : `archives/lure-fr-1.1.zip` ; `lure.dat` par défaut : `archives/lure.dat` (copie de `dists/engine-data/lure.dat` de ScummVM). Aucun des deux n\'est versionné. Outils requis : `bsdtar`, `python3`.']),
+                       'Archive par défaut : `archives/lure/lure-fr-1.1.zip` ; `lure.dat` par défaut : `archives/lure/lure.dat` (copie de `dists/engine-data/lure.dat` de ScummVM). Aucun des deux n\'est versionné. Outils requis : `bsdtar`, `python3`.']),
     ]
     ec.rendre_inventaire(sortie, 'Inventaire des fichiers de Lure of the Temptress', 'scripts/lure-extract.sh', sections)
 

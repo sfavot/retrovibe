@@ -3,7 +3,7 @@
 # 11 840 Hz) en MP3 pour le web (Safari et iOS ne lisent pas tous le Vorbis), dans original/fotaq/voices/<NOM>.mp3.
 # MP3 mono 22 050 Hz, 24 kb/s CBR (11 840 Hz n'est pas un taux MP3) ; métadonnées retirées, -fflags +bitexact,
 # sans filtre : durée conservée, sans padding ni coupe. Noms identiques à ceux de queen.1c, sans extension .SB.
-# Usage : scripts/fotaq-voices.sh [FOTAQ_Fr_Talkie_1.0.zip]   (défaut : archives/FOTAQ_Fr_Talkie_1.0.zip)
+# Usage : scripts/fotaq-voices.sh [FOTAQ_Fr_Talkie_1.0.zip]   (défaut : archives/fotaq/FOTAQ_Fr_Talkie_1.0.zip)
 # Idempotent : les MP3 sont reconstruits à côté puis substitués ; files.json et l'inventaire sont régénérés.
 # À lancer après (ou avant) scripts/fotaq-extract.sh : celui-ci conserve voices/.
 # L'archive est une donnée non fiable : rien n'est exécuté (ffmpeg ne lit que des fichiers locaux, -protocol_whitelist file).
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
-archive="${1:-$racine/archives/FOTAQ_Fr_Talkie_1.0.zip}"
+archive="${1:-$racine/archives/fotaq/FOTAQ_Fr_Talkie_1.0.zip}"
 sortie="$racine/original/fotaq"
 doc="$racine/docs/fotaq/files.md"
 utils="$racine/scripts/fotaq/split_queen.py"

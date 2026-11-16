@@ -4,7 +4,7 @@ Généré par `scripts/drascula-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/drascula/`) : **85.1 Mo** (89280268 octets), 1147 fichiers (hors `files.json`)
+- Total versionné (`original/drascula/`) : **85.1 Mo** (89280277 octets), 1147 fichiers (hors `files.json`)
 - Musique : 26.8 Mo ; voix et sons `.ALS` : 30.7 Mo ; reste : 27.6 Mo
 - Hors extraction, conservés d'une exécution à l'autre : `COVER.webp` (jaquette de la boîte d'origine), `track*.mp3` (`scripts/drascula-music.sh`)
 
@@ -28,7 +28,7 @@ Généré par `scripts/drascula-extract.sh` (ne pas éditer à la main).
 |---|---|
 | `*.ALG`, `*.ALS`, `*.BIN` (sauf `QPC.BIN`) | `Packet.001` (base, voix anglaises) du zip `drascula-1.0.zip` |
 | `*.ALD`, `*.CAL`, `QPC.BIN` | `PACKET.002` (français) de `drascula-int-1.1.zip`, en remplacement de ceux de la base |
-| `drascula.dat`, `drascula-dat-LICENSE.txt` | `archives/drascula.dat` (ScummVM, version 7) ; licence : voir la note |
+| `drascula.dat`, `drascula-dat-LICENSE.txt` | `archives/drascula/drascula.dat` (ScummVM, version 7) ; licence : voir la note |
 | `README-ALCACHOFA.txt`, `README-ALCACHOFA-INT.txt` | `readme.txt` des zips de base et international (licence d'Alcachofa Soft, à conserver intacte) |
 | `track1.mp3` à `track31.mp3` | `drascula-audio-2.0.zip` (OGG), convertis par `scripts/drascula-music.sh` (MP3 80 kb/s) |
 
@@ -59,4 +59,4 @@ bash scripts/drascula-extract.sh
 bash scripts/drascula-music.sh
 ```
 
-Archives par défaut : `archives/drascula-1.0.zip`, `drascula-int-1.1.zip`, `drascula-audio-2.0.zip`, `drascula.dat` (non versionnées). Outils requis : `bsdtar`, `7zz`, `python3`, `ffmpeg` (musique). Extractions complètes (dont les autres langues) : `archives/drascula/`.
+Archives par défaut : `archives/drascula/drascula-1.0.zip`, `drascula-int-1.1.zip`, `drascula-audio-2.0.zip`, `drascula.dat` (non versionnées). Outils requis : `bsdtar`, `7zz`, `python3`, `ffmpeg` (musique). Extractions complètes (dont les autres langues) : `archives/drascula/`.

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Convertit la musique de Drascula (drascula-audio-2.0.zip : audio/track1.ogg ... track31.ogg, OGG Vorbis stéréo 44,1 kHz)
 # en MP3 pour le web (les navigateurs d'Apple ne lisent pas tous l'OGG), dans original/drascula/track<N>.mp3.
-# Usage : scripts/drascula-music.sh [drascula-audio-2.0.zip]   (défaut : archives/drascula-audio-2.0.zip)
+# Usage : scripts/drascula-music.sh [drascula-audio-2.0.zip]   (défaut : archives/drascula/drascula-audio-2.0.zip)
 # Idempotent : les MP3 sont reconstruits à côté puis substitués ; files.json et l'inventaire sont régénérés.
 # À lancer après (ou avant) scripts/drascula-extract.sh : celui-ci conserve les track*.mp3 existants.
 # Outils requis : bsdtar, ffmpeg (libmp3lame), python3.
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
-archive="${1:-$racine/archives/drascula-audio-2.0.zip}"
+archive="${1:-$racine/archives/drascula/drascula-audio-2.0.zip}"
 sortie="$racine/original/drascula"
 utils="$racine/scripts/drascula/extract_utils.py"
 

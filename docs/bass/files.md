@@ -40,4 +40,4 @@ Généré par `scripts/bass-extract.sh` (ne pas éditer à la main).
 bash scripts/bass-extract.sh
 ```
 
-Archive par défaut : `archives/bass-cd-1.2.zip` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (`libmp3lame`).
+Archive par défaut : `archives/bass/bass-cd-1.2.zip` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (`libmp3lame`).

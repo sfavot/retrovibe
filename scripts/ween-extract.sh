@@ -6,7 +6,7 @@
 #  - l'inventaire docs/ween/files.md.
 # Le reste de l'installeur (LOADER.EXE, *.GDR, ALL.ASK, *.INF, DOSBox, DLL...) n'est pas lu par le port : écarté.
 # Usage : scripts/ween-extract.sh [installeur]
-#   défaut : archives/ween/setup-00126-Ween_The_Prophecy-dosbox.exe, sinon le même fichier à la racine du dépôt.
+#   défaut : archives/ween/setup-00126-Ween_The_Prophecy-dosbox.exe.
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
 # L'installeur est une donnée non fiable : il n'est JAMAIS exécuté (innoextract seul, dans un dossier vide neuf).
 # Outils requis : innoextract, python3.
@@ -14,13 +14,7 @@ set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
 nom="setup-00126-Ween_The_Prophecy-dosbox.exe"
-if [ $# -gt 0 ]; then
-  installeur="$1"
-elif [ -f "$racine/archives/ween/$nom" ]; then
-  installeur="$racine/archives/ween/$nom"
-else
-  installeur="$racine/$nom"
-fi
+installeur="${1:-$racine/archives/ween/$nom}"
 sortie="$racine/original/ween"
 doc="$racine/docs/ween/files.md"
 

@@ -5,7 +5,7 @@ Référence : moteur `lure` de ScummVM (`engines/lure/`, GPL v3 ou ultérieure) 
 
 ## 1. Contenu de l'archive (vérifié)
 
-`archives/lure-fr-1.1.zip` (3,4 Mo), dossier `lure-fr/` :
+`archives/lure/lure-fr-1.1.zip` (3,4 Mo), dossier `lure-fr/` :
 
 | Fichier | Octets | Rôle | À versionner |
 | --- | --- | --- | --- |

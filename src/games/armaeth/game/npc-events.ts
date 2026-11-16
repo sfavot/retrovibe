@@ -26,8 +26,9 @@ export function bearEvent(kit: NpcKit): EventHandler {
         ctx.events.operate(target, 9, EventOp.Set, BEAR_WATCH, NUM.bear);
         return;
       }
-      const fur = kit.spawn(ctx, bear, 5, { gst: 0, mob: 0, ego: 0, fig: 0 });
-      const carcass = kit.spawn(ctx, bear, NUM.carcass, { gst: 0, mob: 0, ego: 0, fig: 0 });
+      // `26da:0800` (relu dans le désassemblage) crée la fourrure ramassable (`Ram` = 7), valant 20, pesant 30 ; la carcasse pèse 100.
+      const fur = kit.spawn(ctx, bear, NUM.fur, { gst: 0, mob: 0, ego: 0, fig: 0, pickable: 7, value: 20, weight: 30 });
+      const carcass = kit.spawn(ctx, bear, NUM.carcass, { gst: 0, mob: 0, ego: 0, fig: 0, weight: 100 });
       if (carcass) carcass.p -= 1;
       void fur;
       kit.destroy(ctx, bear, true);

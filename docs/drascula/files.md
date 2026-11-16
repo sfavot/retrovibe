@@ -4,7 +4,7 @@ Généré par `scripts/drascula-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/drascula/`) : **85.1 Mo** (89280514 octets), 1147 fichiers (hors `files.json`)
+- Total versionné (`original/drascula/`) : **85.1 Mo** (89280268 octets), 1147 fichiers (hors `files.json`)
 - Musique : 26.8 Mo ; voix et sons `.ALS` : 30.7 Mo ; reste : 27.6 Mo
 - Hors extraction, conservés d'une exécution à l'autre : `COVER.webp` (jaquette de la boîte d'origine), `track*.mp3` (`scripts/drascula-music.sh`)
 
@@ -16,8 +16,8 @@ Généré par `scripts/drascula-extract.sh` (ne pas éditer à la main).
 | .ALG | 225 | 5.4 Mo |
 | .ALS | 783 | 30.7 Mo |
 | .BIN | 33 | 21.9 Mo |
-| .CAL | 13 | 2.6 Ko |
-| .DAT | 1 | 254.0 Ko |
+| .CAL | 13 | 2.5 Ko |
+| .DAT | 1 | 253.8 Ko |
 | .TXT | 3 | 7.6 Ko |
 | .WEBP | 1 | 30.7 Ko |
 | .mp3 (musique) | 31 | 26.8 Mo |

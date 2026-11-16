@@ -1,6 +1,6 @@
-# Drascula : propositions de style (à trancher)
+# Drascula : réécritures de style (appliquées)
 
-Liste de réécritures possibles (calques, blagues perdues, incohérences) pour la VF, à choisir ligne par ligne ; rien n'a été modifié dans les données du jeu. Les propositions respectent la police (majuscules, pas de « », Ï Ë Ü Œ ni …). Quand une ligne `OP_*.CAL[n]` est citée avec une ligne `text[n]`, les deux doivent recevoir la même chose.
+Réécritures de style de la VF (calques, blagues perdues, incohérences), validées en novembre 2026 et appliquées dans `scripts/drascula/fr-corrections.tsv`. Les textes sont écrits ici avec des espaces avant `! ? : ;` ; dans `drascula.dat`, c'est `º` (espace insécable du jeu). Ajustements faits à l'application, d'après les versions anglaise et espagnole : `text[256]` devient « JE NE SAIS PAS SEULEMENT INFLIGER LA TORTURE : JE SAIS AUSSI L'ENDURER », `text[286]` et `OP_6.CAL[3]` « EH BIEN ! BONNES AFFAIRES, ALORS » (« que se dé bien la renta »), `text[107]` « MAIS COMMENT JE VAIS ATTRAPER ÇA ! » (« coger ») et `text[457]` « DANS LE SCRIPT, C'ÉTAIT CENSÉ BOUGER… ».
 
 ## Calques et tournures
 
@@ -69,11 +69,10 @@ Liste de réécritures possibles (calques, blagues perdues, incohérences) pour 
 |---|---|---|---|
 | text[42] | IL DOIT êTRE Là DEPUIS QUE MAZINGUER-Z PASSAIT à LA TéLé. | IL DOIT ÊTRE LÀ DEPUIS QUE GOLDORAK PASSAIT À LA TÉLÉ. | Mazinger Z est peu connu en France, Goldorak joue le même rôle |
 | text[447] | REGARDE ! MIGUEL BOSE ! | REGARDE ! JOHNNY HALLYDAY ! | référence espagnole obscure pour un lecteur français |
-| text[262] | DEBOUT LES PAUVRES DU MOOONDE.... ! | DEBOUT, LES DAMNÉS DE LA TERRE.... ! | on retrouve les paroles françaises de l'Internationale |
+| text[262] | DEBOUT LES PAUVRES DU MOOONDE.... ! | DEBOUT, LES DAMNÉS DE LA TERRE... ! | on retrouve les paroles françaises de l'Internationale |
 | text[188] | SALUT, LUNE ! LUNÉE ET ÉTOURDIE | SALUT, LUNE ! TOUJOURS AUSSI LUNATIQUE ? | jeu de mots perdu, "lunatique" fait la blague |
 | text[345] | PETIT MIROIR, DIS-MOI QUI EST LE PLUS BEAU DU ROYAUME ? | MIROIR, MON BEAU MIROIR, DIS-MOI QUI EST LE PLUS BEAU DU ROYAUME ? | citation reconnaissable de Blanche-Neige |
 | textmisc[2] | GOOOOOOOAAAAAAAL ! | BUUUUUUUUT ! | le commentateur de foot français crie "but" |
-| textvb[44] | AH ! TRÈS BIEN ! JE VAIS PRÉPARER LE PÉT... LA POTION. JE N'EN AI QUE POUR UN MOMENT | AH ! TRÈS BIEN ! JE VAIS PRÉPARER LE PÉTARD... LA POTION. JE N'EN AI QUE POUR UN MOMENT | "pét..." ne fait pas rire ; "pétard" (joint) prépare le gag de la police en vb[62] |
 | text[169] | BONJOUR, TÊTE DE MORT, TU ME RAPPELLES L'ONCLE HAMLET | BONJOUR, TÊTE DE MORT, TU ME RAPPELLES CE PAUVRE YORICK | la référence qu'un Français reconnaît est Yorick, pas "l'oncle Hamlet" (à trancher : garder le gag de la parenté) |
 | textmisc[1] | Transilvania, 1993 d.c. | TRANSYLVANIE, 1993 AP. J.-C. | "d.c." espagnol (después de Cristo) ; orthographe "Transylvanie" comme partout ailleurs |
 | text[58] | REGARDE ! UN PAQUET DE CLINEX. ET IL Y EN A UN INUTILISé ! | REGARDE ! UN PAQUET DE KLEENEX. ET IL Y EN A UN D'INUTILISÉ ! | la marque s'écrit Kleenex |

@@ -97,8 +97,8 @@ describe.skipIf(!hasOriginalFiles)("drascula.dat du jeu", () => {
     expect(new TextDecoder().decode(bytes.subarray(0, 8))).toBe("DRASCULA");
     expect(dat.version).toBe(7);
     // 259 625 octets chez ScummVM ; plus long ici à cause des textes français corrigés (scripts/drascula/fr-corrections.tsv).
-    expect(bytes.length).toBe(260065);
-    expect(dat.bytesRead).toBe(260065);
+    expect(bytes.length).toBe(259873);
+    expect(dat.bytesRead).toBe(259873);
   });
 
   it("a six langues dont le français à l'index 3", () => {
@@ -135,9 +135,9 @@ describe.skipIf(!hasOriginalFiles)("drascula.dat du jeu", () => {
 
   it("lit le français : accents CP850, majuscules accentuées et minuscules codées pour la police", () => {
     const fr = (name: (typeof DAT_TEXT_NAMES)[number]) => dat.texts[name].fr!;
-    expect(fr("text")[1]).toBe("C'EST LA DEUXIèME PORTE LA PLUS GRANDE QUE J'AI VUE DANS MA VIE.");
+    expect(fr("text")[1]).toBe("C'EST LA DEUXIÈME PLUS GRANDE PORTE QUE J'AIE VUE DE MA VIE.");
     expect(fr("textd")[1]).toBe("HÉ, IGOR, COMMENT ÇA AVANCEº?");
-    expect(fr("textsys")[0]).toBe("APPUYEZ À NOUVEAU SUR 'SUPR' POUR RECOMMENCER");
+    expect(fr("textsys")[0]).toBe("APPUYEZ DE NOUVEAU SUR 'SUPPR' POUR RECOMMENCER");
     expect(fr("textverbs")).toEqual(["regarder", "ramasser", "ouvrir", "fermer", "parler", "pousser"]);
     expect(fr("textmisc")[0]).toBe("BOSSU");
     // Premières lignes lisibles du français dans chaque section : non vides, en français.

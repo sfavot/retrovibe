@@ -124,7 +124,7 @@ describe.skipIf(!hasOriginalFiles)("chapitre 2 : le laboratoire (pièce 18)", ()
 
     it("après la scène des bouchons d'oreilles : le menu OP_5 ; la troisième réponse devient « J'ai tous les ingrédients » quand tout est prêt", () => {
       const w = startIn(18, { flags: { [Flag.EarplugsScene]: 1 } });
-      expect(w.engine.dialogs.choices(5).phrases[2]).toContain("MAUVAISE POSITION");
+      expect(w.engine.dialogs.choices(5).phrases[2]).toContain("DORMIR TORDU");
       w.engine.flags[Flag.AllIngredients] = 1;
       w.engine.flags[Flag.BlindSpokeTwice] = 1;
       const choices = w.engine.dialogs.choices(5);

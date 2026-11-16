@@ -8,8 +8,8 @@ import { MohawkArchive, TAG_SND } from "../../src/data/mohawk/mohawk";
 import { loadPcm, pcmFromWave } from "../../src/engine/mohawk/audio/pcm";
 import { collectPrograms, presetKey } from "../../src/engine/mohawk/audio/programs";
 import { rhythmRewrite } from "../../src/games/mathemagique/audio/rhythm-rewrite";
-import { MidiPlayer, parsePrograms, parseSysx, type PlayOptions } from "../../src/engine/mohawk/audio/sequencer";
-import type { MidiSink } from "../../src/engine/mohawk/audio/sink";
+import { MidiPlayer, parsePrograms, parseSysx, type PlayOptions } from "../../src/audio/midi-sequencer";
+import type { MidiSink } from "../../src/audio/midi-sink";
 import { type Song, bpmOf, isNoteOn, parseSong } from "../../src/audio/smf";
 import { hasOriginalFiles, readOriginal } from "./helpers";
 

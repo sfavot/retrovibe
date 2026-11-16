@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { MohawkArchive } from "../../src/data/mohawk/mohawk";
 import { parseMidi } from "../../src/data/mohawk/midi";
 import { keepFirstMeasure } from "../../src/games/mathemagique/audio/rhythm-rewrite";
-import { MidiPlayer, parsePrograms, parseSysx } from "../../src/engine/mohawk/audio/sequencer";
-import type { MidiSink } from "../../src/engine/mohawk/audio/sink";
+import { MidiPlayer, parsePrograms, parseSysx } from "../../src/audio/midi-sequencer";
+import type { MidiSink } from "../../src/audio/midi-sink";
 import { type MarkerEvent, type Song, parseSong } from "../../src/audio/smf";
 import { MsvcRandom } from "../../src/engine/mohawk/rng";
 import {

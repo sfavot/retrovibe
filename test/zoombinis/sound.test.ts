@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MohawkArchive, TAG_SND } from "../../src/data/mohawk/mohawk";
-import type { AudioSink, MidiSink, PcmSound } from "../../src/engine/mohawk/audio/sink";
+import type { MidiSink } from "../../src/audio/midi-sink";
+import type { AudioSink, PcmSound } from "../../src/engine/mohawk/audio/sink";
 import { TAG_SYSX, TAG_TMID } from "../../src/games/zoombinis/data/archives";
 import { QUEUE_SIZE, soundIdForSnoid, ZOOMBINIS_SOUND, ZoombinisSound } from "../../src/games/zoombinis/engine/sound";
 import { originalFiles } from "../support/original";

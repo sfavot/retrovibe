@@ -1,0 +1,39 @@
+@import "../../../ui/asset-viewer/shell.css";
+
+/* Règles propres à la visionneuse de Gabriel Knight : onglets, liste de ressources, tableaux, désassemblage. */
+body { height: 100vh; }
+#app { height: 100%; }
+.gk1-viewer { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.gk1-viewer > header { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #2a2c33; }
+.gk1-viewer > header h1 { margin: 0 8px 0 0; font-size: 14px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; }
+.tabs button[aria-selected="true"] { background: #2d4a7a; border-color: #6aa2ff; }
+.gk1-body { display: grid; grid-template-columns: 200px 1fr; min-height: 0; }
+.gk1-body > aside { overflow: auto; border-right: 1px solid #2a2c33; padding: 8px; }
+.gk1-body > aside ul { list-style: none; margin: 0; padding: 0; }
+.gk1-body > aside .file small { color: #7f8696; margin-left: 6px; }
+.gk1-body > main { overflow: auto; padding: 16px; min-width: 0; }
+.table-wrap { overflow-x: auto; margin: 4px 0 12px; }
+table { border-collapse: collapse; }
+th, td { text-align: left; padding: 2px 12px 2px 0; vertical-align: top; }
+th { color: #9aa1b2; font-weight: normal; border-bottom: 1px solid #2a2c33; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.text { display: inline-block; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 80ch; }
+.bar label { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.bar label.grow { flex: 1 1 320px; }
+.bar label.grow input { flex: 1; min-width: 0; }
+.bar input[type="range"] { padding: 0; flex: 1 1 160px; max-width: 360px; }
+.bar output { color: #9aa1b2; font-variant-numeric: tabular-nums; min-width: 9ch; }
+.bar button, .tabs button, td button { min-height: 24px; }
+.preview { display: inline-block; max-width: 100%; }
+.preview canvas { max-width: none; }
+ul.plain { list-style: none; margin: 0 0 12px; padding: 0; }
+pre.code { max-height: 70vh; overflow: auto; padding: 8px; background: #0b0b0d; white-space: pre; tab-size: 2; }
+pre.code:focus-visible { outline: 2px solid #6aa2ff; }
+.empty, .loading { color: #9aa1b2; }
+.note { color: #e8c268; }
+audio { display: block; margin: 8px 0; max-width: 100%; }
+@media (max-width: 800px) {
+  .gk1-body { grid-template-columns: 1fr; grid-template-rows: 28vh 1fr; }
+  .gk1-body > aside { border-right: 0; border-bottom: 1px solid #2a2c33; }
+}

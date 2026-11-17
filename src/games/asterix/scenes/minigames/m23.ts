@@ -129,14 +129,14 @@ export function* barde(play: Play): Script {
     do {
       show(x);
       eachFrame?.();
-      yield* waitFrame(FRAME_TICKS);
+      yield* waitFrame(rt, FRAME_TICKS);
     } while (bard.rank !== 0);
   };
 
   rt.startChrono(2);
   select(ANIM_IDLE);
   show();
-  beginPlay(rt, MODULE, s);
+  beginPlay(rt, MODULE, s, false);
   let elapsed = 0;
   do {
     // Une corde de plus. Niveau Réflexion 1 : jamais trois fois de suite la même ; niveau 2 : jamais deux fois de suite.

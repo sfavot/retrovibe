@@ -197,7 +197,7 @@ export function* hieroglyphes(play: Play): Script {
     s.cursor = s.guess[column];
   };
 
-  beginPlay(rt, MODULE, s);
+  beginPlay(rt, MODULE, s, false);
   let moved = false;
   let answered = false;
   for (;;) {

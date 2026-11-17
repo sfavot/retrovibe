@@ -271,7 +271,7 @@ export function* ciel(play: Play): Script {
     while (voice.voicePlaying) {
       rt.restore();
       stepHero(0);
-      yield* waitFrame(LOST_TICKS);
+      yield* waitFrame(rt, LOST_TICKS);
     }
   }
   if (s.won) yield* changeSesterces(rt, player, GAIN, true);

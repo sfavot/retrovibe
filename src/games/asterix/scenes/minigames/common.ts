@@ -329,37 +329,44 @@ export function* fadeSoundOut(rt: Runtime): Script {
 /**
  * Début de la phase jouable d'un mini-jeu : `rt.screen` vaut `"minigame"` et `rt.hint` porte le numéro du module et
  * l'état vivant du mini-jeu (`state`), que les robots de test lisent pour jouer (`test/asterix/minigames/players.ts`).
- * Sans effet sur le jeu.
+ * Sans effet sur le jeu, sauf en démo : `paced` dit si la boucle de l'original est cadencée (attente `1831:030a` ou
+ * rappel d'image d'une vidéo : une lecture d'entrées par image, annoncée par `waitFrame` ou par la vidéo) ou sans
+ * cadence (M24, M25, M33), ce qui règle le rythme du clic simulé (`Runtime.demoRead`).
  */
-export function beginPlay(rt: Runtime, module: number, state: object): void {
+export function beginPlay(rt: Runtime, module: number, state: object, paced = true): void {
   rt.screen = "minigame";
   rt.hint = { module, state };
+  if (paced) rt.beginFrames();
 }
 
 /** Fin de la phase jouable (résultat, vidéo de fin, gains : plus rien à jouer). */
 export function endPlay(rt: Runtime): void {
   rt.screen = "";
   rt.hint = {};
+  rt.endFrames();
 }
 
 // --- Cadence --------------------------------------------------------------------------------------
 
 /**
  * `1831:030a(n, rappel)` après le travail d'une image : attend `n` ticks en appelant `each` à chaque tick (rappel de
- * l'original, ou lecture des clics du portage, qui ne restent en file qu'un tick).
+ * l'original, ou lecture des clics du portage, qui ne restent en file qu'un tick). L'image suivante commence à son
+ * retour (`Runtime.nextFrame` : en démo, une lecture d'entrées comptée par image).
  */
-export function* waitFrame(ticks: number, each?: () => void): Script {
+export function* waitFrame(rt: Runtime, ticks: number, each?: () => void): Script {
   for (let i = 0; i < ticks; i++) {
     yield;
     each?.();
   }
+  rt.nextFrame();
 }
 
 // --- MUK (segment `19b9`) -------------------------------------------------------------------------
 
 /**
  * Cadence des MUK. L'original les déroule sans temporisation (`19b9:019f` : au rythme du lecteur de CD et du décodeur) ;
- * le portage prend la cadence par défaut du moteur commun pour une vidéo sans en-tête, 11 images par seconde.
+ * le portage prend 11 images par seconde, la cadence par défaut du moteur commun pour une vidéo sans en-tête. Mesuré
+ * sur l'original : 10 à 11,6 images par seconde sur un 486 DX2-66 à lecteur double vitesse (`docs/asterix/engine.md`, §2.5).
  */
 export const MUK_FPS = 11;
 

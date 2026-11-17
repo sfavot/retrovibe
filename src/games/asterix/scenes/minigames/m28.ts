@@ -285,6 +285,7 @@ export function* script(play: Play, entry: MinigameEntry): Script {
       if (rt.click() !== null) shot ??= input.validateAt ?? { x: input.mouseX, y: input.mouseY };
       present();
     }
+    rt.nextFrame();
   } while (s.phase !== PHASE_IDLE || (!s.missed && rt.chrono(2) < DURATION));
   endPlay(rt);
 

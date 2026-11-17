@@ -282,7 +282,7 @@ export function* fakir(play: Play): Script {
     stepHero(up, click);
     s.frames++;
     screen.set(surface.work);
-    yield* waitFrame(FRAME_TICKS, () => {
+    yield* waitFrame(rt, FRAME_TICKS, () => {
       const zone = rt.click(TOUCH);
       if (zone === 0) touchedUp = true;
       else if (zone !== null) clicked = true;
@@ -300,7 +300,7 @@ export function* fakir(play: Play): Script {
     rt.restore();
     stepCarpets();
     screen.set(surface.work);
-    yield* waitFrame(FRAME_TICKS);
+    yield* waitFrame(rt, FRAME_TICKS);
   }
   surface.work.set(screen);
   voice.setMusic(null);

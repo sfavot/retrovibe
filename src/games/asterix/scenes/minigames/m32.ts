@@ -367,7 +367,7 @@ export function* bagarre(play: Play): Script {
     gameFrame();
     present();
     if (!s.won && s.romans.every((roman) => roman.active)) s.won = true;
-    yield* waitFrame(FALLBACK_TICKS);
+    yield* waitFrame(rt, FALLBACK_TICKS);
   }
   endPlay(rt);
 

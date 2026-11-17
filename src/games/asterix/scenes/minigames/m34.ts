@@ -326,7 +326,7 @@ export function* idefix(rt: Runtime, player: Player | null): Script {
     spawnDecor();
     // Au bout de la course, l'image où Idéfix repasse par le sprite 0 n'est pas attendue.
     if (s.frame <= LAST_FRAME || dog.sprite !== 0) {
-      yield* waitFrame(FRAME_TICKS, () => {
+      yield* waitFrame(rt, FRAME_TICKS, () => {
         touched |= touchDirs(rt, TOUCH);
       });
     }

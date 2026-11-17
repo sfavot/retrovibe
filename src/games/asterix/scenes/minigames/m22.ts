@@ -239,7 +239,7 @@ export function* poissons(play: Play): Script {
     } else restoreRects(rt, HIT_RECT);
     stepHero(directions);
     screen.set(surface.work);
-    yield* waitFrame(FRAME_TICKS, () => {
+    yield* waitFrame(rt, FRAME_TICKS, () => {
       dazedLoop.pump();
       touched |= touchDirs(rt, TOUCH);
     });

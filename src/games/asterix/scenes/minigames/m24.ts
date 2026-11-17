@@ -155,7 +155,7 @@ export function* loupe(play: Play): Script {
   const arrow = arrowCursor(rt);
   rt.startChrono(2);
 
-  beginPlay(rt, MODULE, s);
+  beginPlay(rt, MODULE, s, false);
   for (;;) {
     movePointer(rt);
     const clicked = rt.click() !== null;

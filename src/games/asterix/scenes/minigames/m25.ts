@@ -89,7 +89,7 @@ export function* anachronismes(play: Play): Script {
   const cursor = libraryCursor(rt);
 
   // `1a93:01c3(limite)` : jusqu'au premier clic gauche ou à la fin du temps, le curseur suit le pointeur.
-  beginPlay(rt, MODULE, s);
+  beginPlay(rt, MODULE, s, false);
   const end = rt.cs + s.limit * 100;
   let clicked = false;
   for (;;) {

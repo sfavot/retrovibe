@@ -51,7 +51,7 @@ export function* script(play: Play, entry: MinigameEntry): Script {
   beginPlay(rt, MODULE, state);           // phase jouable : rt.screen = "minigame"
   do {
     // une image : entrées, restauration du fond, logique, dessin
-    yield* waitFrame(TICKS, () => { /* lecture des clics, à chaque tick */ });
+    yield* waitFrame(rt, TICKS, () => { /* lecture des clics, à chaque tick */ });
   } while (!fini);
   endPlay(rt);
   // 3. fin : sons, nettoyage (rt.cleanup), vidéo ou voix de résultat
@@ -92,11 +92,11 @@ Le script est appelé par `minigameSquare` (`scenes/minigame.ts`) **après l'ann
 | Curseurs : `arrowCursor(rt)` (flèche 9 × 15, couleur 255 à poser avec `ARROW_RGB`), `libraryCursor(rt)` (16 × 16) ; `SoftCursor` : `draw`, `drawAtPointer`, `erase`, `forget` | `153c:05b4` (`DS:114c`), `18a1:0262` (`DS:11d4`) |
 | `waitReading(rt, cs, lire, retenu)` : attente qui retient un clic | portage |
 | `openMuk(rt, nom)`, `playMuk(rt, nom, rappel)`, `MUK_FPS` | `19b9:000c`, `19b9:019f` |
-| `waitFrame(ticks, chaqueTick)` | `1831:030a(n, rappel)` |
+| `waitFrame(rt, ticks, chaqueTick)` | `1831:030a(n, rappel)` ; annonce l'image suivante (`rt.nextFrame`) |
 | `touchDirs(rt, zones)`, `TOP_HALF`, `BOTTOM_HALF`, `LEFT_HALF`, `RIGHT_HALF` : direction par clic ou toucher | D11 |
 | `EffectLoop` : bruitage en boucle | `16cb:0a4f` option `0x200000` |
 | `fadeSoundOut(rt)` : fondu sonore (20 cs par cran, l'argument de l'original est ignoré) puis voie coupée | `13e5:0039` |
-| `beginPlay(rt, module, état)`, `endPlay(rt)` : repère des robots | portage |
+| `beginPlay(rt, module, état, cadencée = true)`, `endPlay(rt)` : repère des robots ; `cadencée` règle le clic simulé de la démo | portage |
 
 Pièges relevés sur le pilote :
 
@@ -121,6 +121,7 @@ L'écart est noté dans `mNN.md`. Aucun texte n'est ajouté à l'écran du jeu ;
 ## Robot et tests
 
 - `beginPlay(rt, MODULE, state)` expose l'état vivant du mini-jeu : `rt.screen === "minigame"`, `rt.hint = { module, state }`. Le robot le lit mais ne l'écrit jamais : il joue au clavier et à la souris (`run.tap("ArrowUp")`, `run.click(x, y)`).
+- **Démo** : `beginPlay` déclare aussi la cadence des lectures d'entrées de l'original. Par défaut la boucle est cadencée (attente `1831:030a` ou rappel d'image d'une vidéo) : une lecture comptée par image, annoncée par `waitFrame`, par le rappel `frame` de `rt.video`, ou par `rt.nextFrame()` dans une boucle écrite à la main (M28) ; le clic simulé revient toutes les 100 images. Passer `false` quand l'original attend une entrée dans une boucle sans cadence (M23, M24, M25, M33, M35) : le clic simulé arrive alors à chaque tick (`engine.md` §2.5).
 - `test/asterix/minigames/harness.ts` : `launchMinigame({ module, action, reflexion }, { seed })` (niveaux 0 par défaut, les plus simples) lance le mini-jeu seul par sa case (annonce comprise) et s'arrête au début de la phase jouable ; `minigameState<T>(run)`, `minigamePlayer(run)` (ses sesterces), `untilMinigameOver(run)`.
 - `mNN-player.ts` exporte `playMNN: MinigamePlayer = async (run, win) => …` : joue jusqu'à la fin de la phase jouable, pour gagner ou pour perdre. Inscrit dans `players.ts`, il sert aussi au **parcours** (`test/asterix/playthrough.test.ts`) : à l'écran `"minigame"`, le robot du parcours appelle le robot du module, ou répond à l'écran provisoire s'il n'y en a pas. Le rapport du parcours compte les mini-jeux portés joués.
 - `mNN.test.ts` couvre au moins : la case lance bien le script inscrit ; victoire à chaque niveau (0, 1, 2) avec l'effet du niveau mesuré ; défaite ; gains et pertes exacts ; clic ou toucher direct ; `run.rt.missing` vide. Le temps est simulé : une partie de 30 s coûte quelques dizaines de millisecondes.

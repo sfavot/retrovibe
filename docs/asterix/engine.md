@@ -102,7 +102,7 @@ Chaque vidéo est interruptible séparément (bouton ou Échap) ; une interrupti
 |---|---|
 | `1831:011c(drapeau)` et `1831:014d(drapeau)` | **pompe**, sans aucune attente : flux sonore (`16cb:0744`), lecture des entrées si `drapeau`, recalibrage de la manette (touche J), volume F1/F2 |
 | `1831:02fd()` | repère de cadence : `DS:6250 = DS:6104` |
-| `1831:030a(n, rappel)` | attend que `DS:6104 >= DS:6250 + n` (ticks bruts de 1/60 s) en pompant et en appelant `rappel` ; le repère n'est pas remis à jour : période = max(n ticks, durée du travail) |
+| `1831:030a(n, rappel)` | attend que `DS:6104 >= DS:6250 + n` (ticks bruts de 1/60 s) en pompant et en appelant `rappel` ; le repère n'est pas remis à jour : période = max(n ticks, durée du travail) ; **mesuré** : la période vaut `n` ticks (§2.5) |
 | `1a93:0101(n)` | attend `n` cs en pompant ; redessine le curseur 9×15 s'il est actif (`DS:0146`) |
 | `1a93:013d(n)` | attend `n` cs, sans curseur |
 | `1a93:016d(k)` / `1a93:0186(k)` | démarre le chrono `k` (départ en cs dans `DS:6495 + 4k`) / secondes entières écoulées |
@@ -131,6 +131,46 @@ Chronos utilisés : **0** = délai de l'écran courant (relancé par presque cha
 | Clignotement d'annonce (`1abf:01b4`) | 10 cs par pas | 5 clignotements/s |
 | Générique (`15d7:02cf`) | 1 tick par pixel | 60 px/s au plus (§12.1) |
 | Vidéos | cadence du fichier | voir `formats.md` |
+
+### 2.5 Mesures sur l'original (DOSBox-X, 18/11/2026)
+
+**Banc.** `ASTERIX.EXE` du CD, lancé sans fenêtre sous DOSBox-X 2026.10.01 (`core=normal`, cycles fixes, EMS, dossier du jeu monté en disque dur), depuis une copie hors dépôt. Sonde : un résident (`INT F1h` à `F5h`) et une copie de l'exécutable où le prologue de quelques fonctions (`1831:02fd`, `1831:030a`, `1831:011c`, `19b9:000c`, `1abf:0f99`) et l'instruction du clic simulé (`153c:0264`) sont remplacés par un `INT` ; le résident écrit le compteur de ticks `DS:6104` et quelques variables sur le port E9h (journal de DOSBox-X), rejoue l'instruction remplacée et, au besoin, pose une direction ou un clic dans `DS:403c` et `DS:4046` à un tick donné du menu. L'introduction est sautée (`DS:19db = 1`) ; un mini-jeu est lancé hors partie en déroutant l'appel du jeu d'Idéfix du menu (`19e2:0aca`). Les durées sont comptées en ticks du jeu (1/60 s) : elles ne dépendent pas de la vitesse de l'hôte.
+
+**Machine de référence.** Un 486 DX2-66 avec un lecteur de CD double vitesse (300 Ko/s), la machine multimédia courante à la sortie du jeu (mai 1995) : 23 880 cycles dans la table de DOSBox-X. Recoupé par un 386 DX-33 (6 075 cycles), un 486 DX-33 (12 010) et un Pentium 100 (60 000). Le jeu se juge lui-même « rapide » (`DS:19e1 = 1`, §1.1) aux trois premières vitesses.
+
+**Cadence de `1831:030a(n)` : l'hypothèse tient.** La période d'une image vaut `n` ticks : le travail d'une image tient dans le tick courant sur un 486 DX2-66, et en 0 à 2 ticks sur un 386 DX-33.
+
+| Boucle | `n` | 486 DX2-66 | 386 DX-33 |
+|---|---:|---|---|
+| Menu M07 | 4 | 4 ticks sur 898 images | 4 ticks |
+| M22, Poissons | 6 | 6 ticks sur 495 images | 5,99 en moyenne sur 238 images (5 à 8) |
+| M23, démonstration du barde | 6 | 6 ticks sur 28 images | 5 à 7 sur 28 images |
+| M28 et M29 (quatre attentes d'un tick) | 4 | 4 ticks sur 885 images | 4 ticks sur 874 images |
+| M31, Fakir | 4 | 4 ticks sur 1 878 images | 4 ticks sur 1 874 images |
+
+Limite : DOSBox-X compte des instructions et ne ralentit pas les écritures en mémoire vidéo ; sur une carte VGA lente (ISA), la recopie de l'écran coûte plus cher qu'ici. La marge reste large (le jeu ne se déclare « lent » qu'au-delà de 2,5 ticks par recopie plein écran).
+
+**MUK de M26 : 11 images par seconde, conforme pour un lecteur double vitesse.** `19b9:019f` n'a aucune temporisation : la durée d'un MUK de 16 images (33 enregistrements, 300 à 390 Ko selon la scène) est celle de la lecture du fichier et du décodage. Aux cycles d'un 486 DX2-66, en bornant le débit du disque émulé :
+
+| Débit du disque | Durée des 16 images | Cadence |
+|---|---|---|
+| 150 Ko/s (simple vitesse) | 138 à 173 ticks | 5,5 à 7 images/s |
+| **300 Ko/s (double vitesse)** | **83 à 96 ticks** | **10 à 11,6 images/s** |
+| 600 Ko/s (quadruple vitesse) | 47 à 58 ticks | 16,5 à 20 images/s |
+| sans borne (décodage seul) | 19 à 22 ticks | 44 à 50 images/s |
+
+Sur un 386 DX-33 sans borne de débit : 67 à 74 ticks. Le portage (11 images par seconde, 87 ticks) est dans la plage du lecteur double vitesse.
+
+**REJOUER sans partie préalable : 120 minutes et 9 objets.** REJOUER choisi dès le premier menu (direction « bas » puis clic injectés) : au premier tour, `DS:1f9d = 7200` et `DS:1f9f = 9`, un joueur (`DS:648f = 1`), Astérix, Réflexion 1, Action 1, 2 gourdes, `DS:64ad = 1`, et `DS:1a02` passe à 0 ; la partie enchaîne les tours. Le DOS fait donc bien 120 minutes, et non les 90 du manuel Macintosh. L'écran de score n'a pas été capturé (banc sans image) : ce sont les valeurs en mémoire pendant la partie.
+
+**Clic simulé de la démo : immédiat sur les écrans sans cadence.** `153c:01c0` pose un clic toutes les 100 lectures sans entrée (§3.4). Lectures par tick mesurées pendant une partie de démonstration :
+
+| Boucle | 386 DX-33 | 486 DX2-66 | Pentium 100 |
+|---|---:|---:|---:|
+| Attente d'une voix (`135a:02ac`) | 390 | 1 510 | 3 650 |
+| Dé (`1abf:0016`) | 560 | 2 260 | 5 390 |
+
+Soit 4 à 54 clics simulés **par tick** : sur un écran sans cadence (menu du tour, joueurs, réglages, quiz, oui/non), le clic arrive dès le premier tick de la boucle. Dans une boucle cadencée, il revient toutes les 100 images (606 ticks mesurés entre deux clics pendant une vidéo). Seules les boucles lourdes sans cadence dépendent de la machine (M24 : un clic toutes les 59 ticks sur un 386 DX-33, toutes les 6 sur un Pentium 100). **Portage corrigé d'après cette mesure** (`Runtime.demoRead`) : une lecture comptée par image dans une boucle cadencée (clic toutes les 100 images), et, sur un écran sans cadence, 100 tirages puis le clic à la première lecture de chaque tick. Le nombre de tirages par tick d'une machine donnée et le rythme des boucles lourdes ne sont pas reproduits (`plan.md`, « Écarts de la vague E »).
 
 ## 3. Entrées
 
@@ -171,7 +211,7 @@ Aucun écran du socle ne teste la position du clic. Tout se pilote par les quatr
 
 ### 3.4 Démo : clic simulé (sûr)
 
-En mode démo (`DS:64b2`), `153c:01c0` compte dans `DS:64ae` les lectures sans entrée réelle ; au-delà de 100, il pose `DS:4b6b = 1` (un clic simulé) et remet le compteur à 0. La branche « direction au hasard » qui suit est morte (`rnd() % 20 == 20`), et le drapeau `DS:64b0` qui l'autorise n'a donc aucun effet. Une vraie entrée met `DS:64b1 = 1` : chaque écran teste ce drapeau et rend la main, jusqu'au menu principal. Un clic simulé n'interrompt ni les voix ni les vidéos. Chaque lecture sans clic consomme un tirage `rnd()` (`153c:0272`, test `% 20 == 20` jamais vrai). Portage : `Runtime.demoRead`, une lecture comptée par tick au plus (`docs/asterix/plan.md`, « Écarts de la vague E »). Dans M08 rien n'est scripté : le curseur se pose seul sur l'emplacement libre le plus à droite, puis sur JOUER à quatre inscrits, et chaque clic simulé valide l'élément courant. Une entrée réelle vaut ANNULER dans M08 (`1abf:18d6`, `1d6d`, `1eb9`), fait quitter M09 sans validation (`1abf:2347`), arrête la partie à la fin du tour en cours (`1abf:10cd`, `1141`, `1199`, `13b8`, `25c5`) sans écran de fin (`1abf:2607`), et arrête la règle du jeu après la vidéo en cours (`15d7:0ec3`, `0f01`). En démo l'annonce du tour n'est pas coupée (`1abf:0233`) et le défilement du plateau ne se saute pas (`1d24:052d`, `05d9`).
+En mode démo (`DS:64b2`), `153c:01c0` compte dans `DS:64ae` les lectures sans entrée réelle ; au-delà de 100, il pose `DS:4b6b = 1` (un clic simulé) et remet le compteur à 0. La branche « direction au hasard » qui suit est morte (`rnd() % 20 == 20`), et le drapeau `DS:64b0` qui l'autorise n'a donc aucun effet. Une vraie entrée met `DS:64b1 = 1` : chaque écran teste ce drapeau et rend la main, jusqu'au menu principal. Un clic simulé n'interrompt ni les voix ni les vidéos. Chaque lecture sans clic consomme un tirage `rnd()` (`153c:0272`, test `% 20 == 20` jamais vrai). **Mesuré** (§2.5) : sur un écran sans cadence l'original fait 390 à 5 400 lectures par tick selon la machine, donc plusieurs clics simulés par tick ; dans une boucle cadencée, une lecture par image. Portage : `Runtime.demoRead` (`beginFrames`, `nextFrame`, `endFrames`), une lecture comptée par image dans une boucle cadencée, un tour complet du compteur (100 tirages, puis le clic) par tick sur un écran sans cadence (`docs/asterix/plan.md`, « Écarts de la vague E »). Dans M08 rien n'est scripté : le curseur se pose seul sur l'emplacement libre le plus à droite, puis sur JOUER à quatre inscrits, et chaque clic simulé valide l'élément courant. Une entrée réelle vaut ANNULER dans M08 (`1abf:18d6`, `1d6d`, `1eb9`), fait quitter M09 sans validation (`1abf:2347`), arrête la partie à la fin du tour en cours (`1abf:10cd`, `1141`, `1199`, `13b8`, `25c5`) sans écran de fin (`1abf:2607`), et arrête la règle du jeu après la vidéo en cours (`15d7:0ec3`, `0f01`). En démo l'annonce du tour n'est pas coupée (`1abf:0233`) et le défilement du plateau ne se saute pas (`1d24:052d`, `05d9`).
 
 Le manuel dit qu'un clic interrompt la démo et que « le retour au menu se fait à la fin du jeu en cours » : conforme au dépilage observé.
 
@@ -1228,7 +1268,7 @@ Le manuel disponible est celui de l'édition Macintosh ; il sert à recouper, pa
 | Nombre de cases | **54** | `DS:1d81` | 54 (9 pays, 15 jeux, 4 prisons, 4 potions, 6 pièges, 4 repos, 10 rencontres, 2 surprises) | aucun (le plan parle de 50 cases : à corriger) |
 | Durées et objets | 30, 60, 90, 120 min ; 3, 5, 7, 9 objets ; 90 min proposées par défaut | `1abf:1f3e` | idem | aucun |
 | Ajustement des objets | table par nombre de joueurs et durée ; appliqué à l'ouverture et à chaque changement de durée | `DS:201a` | « s'ajuste automatiquement » ; captures : 90 donne 7, 30 donne 3, 60 donne 7 | « 60 donne 7 » n'est vrai qu'en solo : cohérent |
-| REJOUER en solo sans partie préalable | Astérix, niveaux moyens, **120 min, 9 objets** | `1abf:13e5`, `DS:1f9d` | « 90 minutes, niveau moyen, avec Astérix » | **écart** : 120 contre 90 (le code DOS fait foi) |
+| REJOUER en solo sans partie préalable | Astérix, niveaux moyens, **120 min, 9 objets** | `1abf:13e5`, `DS:1f9d` | « 90 minutes, niveau moyen, avec Astérix » | **écart** : 120 contre 90 (le code DOS fait foi ; **mesuré** sur l'original, §2.5) |
 | Gourdes de départ | `3 - niveau Réflexion` | `1abf:1532`, `1abf:13e5` | facile 3, moyen 2, difficile 1, « selon le niveau » | précision : c'est le niveau Réflexion |
 | Maximum de gourdes | 5 | `20fa:1223` | 5 | aucun |
 | Dé | un dé, faces 1 à 6, défilement cyclique arrêté 3 à 6 crans après le clic, arrêt automatique à 10 s | `1abf:0016` | un clic pour lancer, un second pour arrêter | aucun (l'inertie n'est pas dite) |
@@ -1263,7 +1303,7 @@ Le manuel disponible est celui de l'édition Macintosh ; il sert à recouper, pa
 **À vérifier sous DOSBox-X**
 
 1. Délai de 60 s du menu principal compté depuis l'entrée, navigation comprise (lu ainsi).
-2. REJOUER sans partie préalable : 120 minutes et 9 objets à l'écran de score.
+2. REJOUER sans partie préalable : **mesuré** (§2.5), 120 minutes et 9 objets en mémoire pendant la partie ; l'écran de score lui-même n'a pas été capturé.
 3. Vitesse réelle du générique (1 tick par pixel dans le code) et durée de `m47m.voc` par rapport au texte (pas de boucle).
 4. Sens de la copie des rappels de vignette : **tranché en vague D** (désassemblage de `20fa:0112`, `053e`, `0e83`, `11b0`, et rendu vérifié) : la vidéo est décodée dans le tampon A et le rappel recopie le rectangle (sx, 3) de A vers l'écran en (dx, 66 × rang + 3). Prison : (2, 3) vers x = 3, 98 ou 172, 76 × 62. Potion : (2, 3) vers x = 3, 86 ou 166, 83 × 62. Repos, par position 16, 25, 33, 45 : source x = 83, 98, 2, 2, écran x = 84, 99, 3, 3, largeur 81, 78, 79, 90. Pièges, par module 14 à 19 : source x = 107, 178, 2, 2, 167, 2, écran x = 108, 179, 3, 3, 168, 3, largeur 81, 70, 246, 246, 81, 76.
 5. Positions 23 et 37 : le rectangle restauré sous le pion (`1d24:1c6e`) est-il bien un morceau de décor qui passe devant ?

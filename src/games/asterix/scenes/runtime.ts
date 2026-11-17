@@ -162,7 +162,8 @@ const TEXT_COLOR = 0x7e;
 
 /**
  * Démo : `153c:01c0` compte dans `DS:64ae` les lectures d'entrées sans entrée réelle, et pose un clic simulé à la
- * lecture qui suit la centième (`153c:0263`).
+ * lecture qui suit la centième (`153c:0263`). Une boucle cadencée lit les entrées une fois par image ; une boucle sans
+ * cadence les lit à la vitesse de la machine, plusieurs centaines de fois par tick (`Runtime.demoRead`).
  */
 export const DEMO_CLICK_READS = 100;
 
@@ -202,6 +203,9 @@ export class Runtime {
   /** `DS:64ae` : lectures sans entrée réelle depuis le dernier clic simulé, et tick de la dernière lecture comptée. */
   private idleReads = 0;
   private idleTick = -1;
+  /** Boucle cadencée en cours (`beginFrames`), et lecture déjà comptée pour l'image courante. */
+  private paced = false;
+  private frameRead = false;
   /** Clic simulé posé par une lecture de la démo (`DS:4b6b = 1`), en attente du prochain `click`. */
   private simulated = false;
   /**
@@ -339,6 +343,25 @@ export class Runtime {
     this.simulated = false;
   }
 
+  /**
+   * Début d'une boucle cadencée de l'original (attente `1831:030a` ou rappel d'image d'une vidéo), qui ne lit les
+   * entrées qu'une fois par image : jusqu'à `endFrames`, la démo compte une lecture par image, annoncée par `nextFrame`.
+   */
+  beginFrames(): void {
+    this.paced = true;
+    this.frameRead = false;
+  }
+
+  /** Une nouvelle image de la boucle cadencée commence. Sans effet hors d'une boucle cadencée. */
+  nextFrame(): void {
+    this.frameRead = false;
+  }
+
+  /** Fin de la boucle cadencée : les lectures redeviennent celles d'un écran sans cadence. */
+  endFrames(): void {
+    this.paced = false;
+  }
+
   /** Démo interrompue par une entrée réelle (`DS:64b2 && DS:64b1`) : l'écran courant doit rendre la main. */
   get demoStopped(): boolean {
     return this.demo && this.demoInterrupted;
@@ -347,19 +370,32 @@ export class Runtime {
   /**
    * Lecture des entrées en démo (`153c:0252`), faite par `dirs` et par `click` : sans entrée réelle, elle compte dans
    * `DS:64ae` ; les `DEMO_CLICK_READS` premières consomment un tirage (`153c:0272` : le test `rnd() % 20 == 20` qui suit
-   * n'est jamais vrai), la suivante pose un clic simulé et remet le compteur à zéro. Une lecture par tick au plus : les
-   * écrans du portage relisent les entrées à chaque tick, là où une boucle d'écran de l'original les lit une fois par
-   * passage. Le clic posé attend le prochain `click` (l'original le garde dans `DS:4b6b` jusqu'à la lecture suivante).
+   * n'est jamais vrai), la suivante pose un clic simulé et remet le compteur à zéro. Le clic posé attend le prochain
+   * `click` (l'original le garde dans `DS:4b6b` jusqu'à la lecture suivante).
+   *
+   * Le portage relit les entrées à chaque tick, l'original une fois par passage de sa boucle
+   * (`docs/asterix/engine.md`, §2.5) :
+   * - boucle cadencée (`beginFrames`) : une lecture comptée par image, donc un clic toutes les 100 images ;
+   * - écran sans cadence : l'original y fait 390 à 5 400 lectures par tick selon la machine. Le premier appel de chaque
+   *   tick vaut donc un tour complet du compteur : 100 tirages, puis le clic. Le nombre de tirages par tick d'une
+   *   machine donnée n'est pas reproduit.
    */
   private demoRead(): void {
     if (!this.demo) return;
-    const { ticks } = this.ctx.clock;
-    if (ticks === this.idleTick) return;
-    this.idleTick = ticks;
-    if (this.realInput()) return;
-    if (++this.idleReads <= DEMO_CLICK_READS) {
-      this.rnd();
-      return;
+    if (this.paced) {
+      if (this.frameRead) return;
+      this.frameRead = true;
+      if (this.realInput()) return;
+      if (++this.idleReads <= DEMO_CLICK_READS) {
+        this.rnd();
+        return;
+      }
+    } else {
+      const { ticks } = this.ctx.clock;
+      if (ticks === this.idleTick) return;
+      this.idleTick = ticks;
+      if (this.realInput()) return;
+      for (let read = 0; read < DEMO_CLICK_READS; read++) this.rnd();
     }
     this.idleReads = 0;
     this.simulated = true;
@@ -736,6 +772,8 @@ export class Runtime {
           video.marker = marker;
           options.block?.(video, index);
           if (read !== null) video.marker = read;
+          // Rappel d'image : dans un mini-jeu mené par sa vidéo, c'est le début d'une image de la boucle cadencée.
+          this.nextFrame();
           if (options.frame?.(video, index) === true) stop = true;
           marker = video.marker;
         }

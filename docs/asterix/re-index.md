@@ -63,7 +63,7 @@ La méthode est celle de `SMURF.EXE` (voir `docs/teleportaschtroumpf/re-index.md
 - **Code du jeu.** Les segments `19e2` à `288f` n'ont aucun équivalent dans `SMURF.EXE`. Le cœur (`19e2`, `1a93`, `1abf`, `1d24`, `20fa`, `25f1`, `288f`) a été lu en entier, arguments des appels repris dans le désassemblage. Les 14 segments de mini-jeux ne sont pas lus (vague E).
 - **Faux positifs de Ghidra.** `20fa:1198` et `20fa:146d` sont des tables de sauts (pièges et mini-jeux), pas du code : leur décompilation est sans valeur. `20fa:000d`, `000e`, `05d9` et quelques autres petites fonctions sans appelant sont des rappels passés au lecteur MUX par pointeur.
 - **Arguments perdus.** Ghidra perd souvent les arguments des appels lointains et colle deux mots de 16 bits en une constante (`0x800004` = les mots 4 et 0x80). En cas de doute, le désassemblage fait foi.
-- **Rien n'a été exécuté.** Tout est statique. Les points qui demandent une mesure sous DOSBox-X ou une écoute sont listés à la fin de `engine.md`.
+- **Rien n'a été exécuté.** Tout est statique. Les points qui demandent une mesure sous DOSBox-X ou une écoute sont listés à la fin de `engine.md`. Depuis, quatre points ont été mesurés sur l'original (18/11/2026, `engine.md` §2.5).
 
 ## Répartition du code et état de lecture
 

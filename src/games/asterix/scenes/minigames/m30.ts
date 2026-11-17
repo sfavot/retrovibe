@@ -169,7 +169,7 @@ export function* olympiques(play: Play): Script {
       rt.restore();
       javelin.step();
       javelin.draw(rt, THROW_X, THROW_Y);
-      yield* waitFrame(FRAME_TICKS);
+      yield* waitFrame(rt, FRAME_TICKS);
     } while (!javelin.wrapped);
     surface.background.set(field.pixels);
     rt.restore();
@@ -183,7 +183,7 @@ export function* olympiques(play: Play): Script {
       rt.restore();
       javelin.step();
       javelin.draw(rt, x - 0x20, y - 0x28);
-      yield* waitFrame(FRAME_TICKS);
+      yield* waitFrame(rt, FRAME_TICKS);
     } while (!javelin.wrapped);
     yield* rt.waitSound();
     const gain = gainFor(GAUGE_VALUES, s.level);

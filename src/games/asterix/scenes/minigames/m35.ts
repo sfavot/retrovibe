@@ -207,7 +207,7 @@ export function* coloriages(play: Play): Script {
   redraw(true);
   const keyPointerShift = input.keyPointerShift;
   input.keyPointerShift = KEY_POINTER_SHIFT;
-  beginPlay(rt, MODULE, s);
+  beginPlay(rt, MODULE, s, false);
   do {
     let click = takeClick();
     while (click === null && rt.chrono(2) < s.limit) {
@@ -226,7 +226,7 @@ export function* coloriages(play: Play): Script {
       }
     }
     redraw(true);
-    yield* waitFrame(FRAME_TICKS, pointer);
+    yield* waitFrame(rt, FRAME_TICKS, pointer);
   } while (!s.lost && !s.won && rt.chrono(2) < s.limit);
   endPlay(rt);
   input.keyPointerShift = keyPointerShift;

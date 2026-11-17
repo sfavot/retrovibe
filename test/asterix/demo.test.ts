@@ -31,6 +31,25 @@ async function untilDemo(run: Launched): Promise<number> {
   return run.host.time - from;
 }
 
+/**
+ * Écrans interactifs traversés depuis l'appel. En démo, un écran sans cadence est validé dès sa première lecture
+ * d'entrées (clic simulé au premier tick) : il ne dure pas assez pour être vu d'un tick à l'autre.
+ */
+function recordScreens(run: Launched): Set<string> {
+  const seen = new Set<string>();
+  const { rt } = run;
+  let current = rt.screen;
+  Object.defineProperty(rt, "screen", {
+    configurable: true,
+    get: () => current,
+    set: (screen: string) => {
+      current = screen;
+      seen.add(screen);
+    },
+  });
+  return seen;
+}
+
 function idefixState(run: Launched): IdefixState {
   return run.rt.hint.state as IdefixState;
 }
@@ -65,7 +84,8 @@ describe.skipIf(!hasOriginalFiles)("menu principal d'Astérix : Idéfix et démo
     expect(loaded(run, "M44AC.MUX")).toBe(false);
     // La règle du jeu a fait avancer la rotation : la démo suivante est une partie.
     await untilDemo(run);
-    await run.untilScreen("players", 20_000);
+    const seen = recordScreens(run);
+    await run.until(() => seen.has("players"), 20_000);
     expect(run.rt.demo).toBe(true);
   });
 
@@ -90,27 +110,64 @@ describe.skipIf(!hasOriginalFiles)("menu principal d'Astérix : Idéfix et démo
     expect(idefixState(run).inGame).toBe(false);
   });
 
-  it("démo : cent lectures d'entrées consomment chacune un tirage, la suivante pose le clic simulé", async () => {
+  it("démo, écran sans cadence : cent tirages et le clic simulé dès la première lecture du tick", async () => {
     const run = await launch({ seed: 3 });
     await run.untilScreen("menu");
-    // Le menu lit les entrées à chaque tick et tire un nombre par image (4 ticks) pour l'animation d'Idéfix.
-    const { rng } = run.rt.ctx;
+    const { rt } = run;
+    const { rng } = rt.ctx;
     const next = rng.next.bind(rng);
     let draws = 0;
     rng.next = () => {
       draws++;
       return next();
     };
-    run.rt.startDemo();
-    const from = run.frames;
-    await run.until(() => run.screen !== "menu", 5_000);
-    const ticks = run.frames - from;
-    // `153c:0252` : le clic part à la 101e lecture (ici une par tick), et valide le choix courant du menu.
-    expect(ticks).toBeGreaterThanOrEqual(DEMO_CLICK_READS + 1);
-    expect(ticks).toBeLessThanOrEqual(DEMO_CLICK_READS + 3);
-    const menuDraws = Math.ceil(ticks / 4);
-    expect(draws).toBeGreaterThanOrEqual(DEMO_CLICK_READS + menuDraws - 1);
-    expect(draws).toBeLessThanOrEqual(DEMO_CLICK_READS + menuDraws + 1);
+    // Lectures faites ici même, entre deux ticks : le script du menu ne tourne pas, aucun autre tirage ne s'y mêle.
+    rt.startDemo();
+    rt.dirs();
+    // `153c:0252` : la boucle d'origine fait plus de cent lectures par tick, donc un tour complet du compteur.
+    expect(draws).toBe(DEMO_CLICK_READS);
+    expect(rt.click()).toBe("current");
+    // Une seule lecture comptée par tick : les suivantes ne tirent rien et ne posent pas d'autre clic.
+    rt.dirs();
+    expect(draws).toBe(DEMO_CLICK_READS);
+    expect(rt.click()).toBeNull();
+    // Au tick suivant, de nouveau cent tirages et un clic.
+    draws = 0;
+    await run.frame();
+    expect(draws).toBeGreaterThanOrEqual(DEMO_CLICK_READS);
+    rt.endDemo();
+  });
+
+  it("démo, boucle cadencée : une lecture comptée par image, le clic simulé toutes les cent images", async () => {
+    const run = await launch({ seed: 3 });
+    await run.untilScreen("menu");
+    const { rt } = run;
+    const { rng } = rt.ctx;
+    const next = rng.next.bind(rng);
+    let draws = 0;
+    rng.next = () => {
+      draws++;
+      return next();
+    };
+    rt.startDemo();
+    rt.beginFrames();
+    for (let frame = 0; frame < DEMO_CLICK_READS; frame++) {
+      // Les lectures d'une même image (directions, puis clic relu à chaque tick) n'en font qu'une.
+      rt.dirs();
+      expect(rt.click()).toBeNull();
+      rt.dirs();
+      expect(draws).toBe(frame + 1);
+      rt.nextFrame();
+    }
+    // La 101e image pose le clic sans tirage ; le compteur repart à l'image suivante.
+    rt.dirs();
+    expect(draws).toBe(DEMO_CLICK_READS);
+    expect(rt.click()).toBe("current");
+    rt.nextFrame();
+    rt.dirs();
+    expect(draws).toBe(DEMO_CLICK_READS + 1);
+    rt.endFrames();
+    rt.endDemo();
   });
 
   it("60 s sans entrée : Idéfix, puis la règle du jeu, puis une partie que la première entrée réelle ramène au menu", { timeout: 600_000 }, async () => {
@@ -137,12 +194,8 @@ describe.skipIf(!hasOriginalFiles)("menu principal d'Astérix : Idéfix et démo
     // Troisième démo : une partie. Les clics simulés inscrivent quatre personnages aux niveaux moyens, puis JOUER et
     // les réglages proposés (90 minutes).
     await untilDemo(run);
-    const seen = new Set<string>();
-    const note = (): boolean => {
-      seen.add(run.screen);
-      return run.screen === "turn";
-    };
-    await run.until(note, 600_000);
+    const seen = recordScreens(run);
+    await run.until(() => seen.has("turn"), 600_000);
     expect(run.rt.demo).toBe(true);
     expect(run.rt.demoInterrupted).toBe(false);
     expect(run.rt.game.players.map((p) => [p.character, p.reflexion, p.action])).toEqual([
@@ -153,18 +206,15 @@ describe.skipIf(!hasOriginalFiles)("menu principal d'Astérix : Idéfix et démo
     ]);
     expect(run.rt.game.duration).toBe(5400);
     expect([...seen]).toEqual(expect.arrayContaining(["players", "levels", "settings", "score", "turn"]));
-    // La démo joue toute seule : le dé part au clic simulé.
-    await run.untilScreen("die", 60_000);
+    // La démo joue toute seule : le dé part au clic simulé, dès le premier tick du menu du tour.
+    await run.until(() => seen.has("die"), 60_000);
     expect(run.host.storage.get(SAVE_KEY) ?? "").toBe("");
 
     // Une entrée réelle : le tour s'arrête après le déplacement et le menu revient, sans écran de fin.
     await run.tap("ArrowUp");
     expect(run.rt.demoStopped).toBe(true);
     seen.clear();
-    await run.until(() => {
-      seen.add(run.screen);
-      return run.screen === "menu";
-    }, 60_000);
+    await run.untilScreen("menu", 60_000);
     expect(seen.has("end")).toBe(false);
     expect(run.rt.demo).toBe(false);
     expect(run.host.storage.get(SAVE_KEY) ?? "").toBe("");
@@ -193,8 +243,10 @@ describe.skipIf(!hasOriginalFiles)("menu principal d'Astérix : Idéfix et démo
     await run.tap("Space");
     await run.untilScreen("menu", 20_000);
     await untilDemo(run);
-    // Un premier personnage est inscrit par clic simulé, puis une direction est enfoncée à l'écran des niveaux suivant.
-    await run.until(() => run.screen === "levels" && run.rt.game.players.length === 1, 60_000);
+    // Un premier personnage est inscrit par clic simulé (ses écrans sont validés au premier tick) ; une direction est
+    // enfoncée pendant l'inscription du suivant, qui n'aboutit pas.
+    const seen = recordScreens(run);
+    await run.until(() => seen.has("players") && run.rt.game.players.length === 1, 60_000);
     await run.tap("ArrowLeft");
     await run.untilScreen("menu", 20_000);
     expect(run.rt.game.players.length).toBe(1);

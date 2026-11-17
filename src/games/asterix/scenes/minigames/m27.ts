@@ -195,7 +195,7 @@ export function* tempete(play: Play): Script {
       rt.restore();
       boat.step();
       boat.draw(rt, boatX(s.pos), BOAT_Y);
-      yield* waitFrame(HIT_TICKS);
+      yield* waitFrame(rt, HIT_TICKS);
     }
     yield* rt.waitSound();
     s.over = true;

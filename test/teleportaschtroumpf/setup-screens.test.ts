@@ -1,7 +1,8 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import { STORAGE_KEY, loadOptions } from "../../src/games/teleportaschtroumpf/engine/options";
-import type { Scene, SceneContext } from "../../src/games/teleportaschtroumpf/engine/scene";
+import { Engine } from "../../src/engine/infogrames/engine";
+import { loadOptions, parentOptions, STORAGE_KEY } from "../../src/games/teleportaschtroumpf/engine/options";
+import type { Scene, SceneContext } from "../../src/engine/infogrames/scene";
 import type { GameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
 import { createMenuScene } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
 import { createCharactersScene, type CharactersResult } from "../../src/games/teleportaschtroumpf/scenes/s08-characters";
@@ -16,7 +17,7 @@ import { longPress, swipe, tap, touchDown, touchUp } from "./touch";
 async function startScene(scene: Scene, { audio = false, seed = 7 } = {}) {
   const host = new TestHost();
   host.audio.enabled = audio;
-  const engine = new Engine(host, { seed });
+  const engine = new Engine(host, GAME_CONFIG, { seed });
   await engine.start(scene);
   const top = () => engine.ctx.scenes.top?.constructor.name;
   /** Attend la scène `name`, la fin des chargements et des fondus. */
@@ -47,8 +48,8 @@ async function startScene(scene: Scene, { audio = false, seed = 7 } = {}) {
 /** Abscisses des silhouettes de `s09a001d.mcg` (pour poser le pointeur ailleurs que sur le choix courant). */
 const SILHOUETTE_X = [82, 132, 182, 232];
 
-const playedVoc = async (t: Awaited<ReturnType<typeof startScene>>, name: string) => (await t.ctx.resources.voc(name)).samples;
-const lastPlayed = (t: Awaited<ReturnType<typeof startScene>>) => t.host.audio.plays.at(-1)?.sound.samples;
+const playedVoc = async (t: Awaited<ReturnType<typeof startScene>>, name: string) => (await t.ctx.resources.sound(name)).data;
+const lastPlayed = (t: Awaited<ReturnType<typeof startScene>>) => t.host.audio.plays.at(-1)?.sound.data;
 
 describe.skipIf(!hasOriginalFiles)("S09 : nombre de joueurs", () => {
   async function players(options?: Parameters<typeof startScene>[1]) {
@@ -121,13 +122,13 @@ describe.skipIf(!hasOriginalFiles)("S09 : nombre de joueurs", () => {
     const t = await players({ audio: true });
     expect(t.host.audio.plays.length).toBeGreaterThanOrEqual(2); // accueil et « 1 joueur »
     const hint = await playedVoc(t, "s09v004t.voc");
-    expect(t.host.audio.plays.map((p) => p.sound.samples)).toContain(hint);
+    expect(t.host.audio.plays.map((p) => p.sound.data)).toContain(hint);
     // Pas de musique à l'écran : la boucle de la voie ne relance rien.
     expect(t.host.audio.plays.every((p) => !p.loop)).toBe(true);
     await t.press("ArrowRight");
     await runFor(t.engine, t.host, 8000);
     const two = await playedVoc(t, "s09v005t.voc");
-    expect(t.host.audio.plays.some((p) => p.sound.samples === two)).toBe(true);
+    expect(t.host.audio.plays.some((p) => p.sound.data === two)).toBe(true);
     const before = t.host.audio.plays.length;
     await t.press("Space");
     expect(t.host.audio.plays.length).toBe(before + 1);
@@ -367,7 +368,7 @@ describe.skipIf(!hasOriginalFiles)("S08 : personnages et niveaux", () => {
     const mcg = await t.ctx.resources.mcg("s08a001d.mcg");
     expect(color()).toEqual([...mcg.palette.subarray(119 * 3, 119 * 3 + 3)]);
     expect(t.host.audio.effects.length).toBe(effects + 1);
-    expect(t.host.audio.effects.at(-1)?.sound.samples).toBe(await playedVoc(t, "s07a001b.voc"));
+    expect(t.host.audio.effects.at(-1)?.sound.data).toBe(await playedVoc(t, "s07a001b.voc"));
   }, 60_000);
 
   it("la capsule se pose : le fond garde le personnage, la couleur de niveau est copiée sur l'emplacement", async () => {
@@ -389,8 +390,8 @@ describe.skipIf(!hasOriginalFiles)("S04 : menu parents", () => {
     let done = 0;
     const host = new TestHost();
     host.audio.enabled = false;
-    const engine = new Engine(host, { seed: 3 });
-    Object.assign(engine.ctx.options, seed);
+    const engine = new Engine(host, GAME_CONFIG, { seed: 3 });
+    Object.assign(parentOptions(engine.ctx), seed);
     await engine.start(createParentsScene(() => void done++));
     const t = {
       host,
@@ -465,7 +466,7 @@ describe.skipIf(!hasOriginalFiles)("S04 : menu parents", () => {
     await t.press("ArrowRight"); // 0 → 1
     await t.press("Space");
     expect(saved(t)).toEqual({ durationIndex: 0, pauseIndex: 0, messageIndex: 1, lastGameMinutes: 12345 });
-    expect(t.ctx.options.messageIndex).toBe(1);
+    expect(parentOptions(t.ctx).messageIndex).toBe(1);
     expect(t.host.storage.get(STORAGE_KEY)).not.toBeNull();
   });
 
@@ -547,7 +548,7 @@ describe.skipIf(!hasOriginalFiles)("S04 : menu parents", () => {
     expect(t.lit()).toEqual([119]);
     expect(effects()).toBe(before + 3);
     expect(t.done).toBe(0);
-    expect(t.ctx.options).toMatchObject({ durationIndex: 1, pauseIndex: 2, messageIndex: 3 });
+    expect(parentOptions(t.ctx)).toMatchObject({ durationIndex: 1, pauseIndex: 2, messageIndex: 3 });
     expect(t.host.storage.get(STORAGE_KEY)).toBeNull();
   }, 60_000);
 
@@ -601,7 +602,7 @@ describe.skipIf(!hasOriginalFiles)("parcours S07 → Jouer → S09 → S08 → p
   it("enchaîne les vrais écrans et aboutit à la partie", async () => {
     const host = new TestHost();
     host.audio.enabled = false;
-    const engine = new Engine(host, { seed: 11 });
+    const engine = new Engine(host, GAME_CONFIG, { seed: 11 });
     await engine.start(createMenuScene());
     const top = () => engine.ctx.scenes.top?.constructor.name;
     const settle = async (name: string) => {

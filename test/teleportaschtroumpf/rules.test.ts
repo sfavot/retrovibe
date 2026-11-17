@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../src/engine/infogrames/rng";
 import { DEFAULT_OPTIONS } from "../../src/games/teleportaschtroumpf/engine/options";
 import { arrival, doorAt, doorClassAt, resolveEdges, settleX } from "../../src/games/teleportaschtroumpf/game/board";
 import { Game, newGame, type GameEvent, type GameSetup } from "../../src/games/teleportaschtroumpf/game/rules";

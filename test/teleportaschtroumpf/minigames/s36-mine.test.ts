@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Hy8 } from "../../../src/games/teleportaschtroumpf/data/hy8";
-import { parseHy8 } from "../../../src/games/teleportaschtroumpf/data/hy8";
+import type { Hy8 } from "../../../src/engine/infogrames/data/hy8";
+import { parseHy8 } from "../../../src/engine/infogrames/data/hy8";
 import { MutFlag, parseMut, parsePrc } from "../../../src/games/teleportaschtroumpf/data/mut";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   MINE_FRAME_TICKS,
@@ -382,13 +382,13 @@ describe.skipIf(!hasOriginalFiles)("S36 La Mine Désaffectée : niveaux, choc, r
   it("sans rien toucher : choc, son s36a003b, fondu, vidéo d'échec s36b, ingrédient raté et rien de donné", async () => {
     const run = await seedFor("s36e", { level: 2, audio: true });
     const scene = run.scene as MineScene;
-    const crashVoc = await run.ctx.resources.voc("s36a003b.voc");
+    const crashVoc = await run.ctx.resources.sound("s36a003b.voc");
     expect(scene.stage).toBe("run");
     await run.run(1000);
     run.shot("s36-depart");
     await run.until(() => scene.hasCrashed, 60_000);
     run.shot("s36-choc");
-    expect(run.host.audio.plays.at(-1)?.sound.samples).toEqual(crashVoc.samples);
+    expect(run.host.audio.plays.at(-1)?.sound.data).toEqual(crashVoc.data);
     const stages = new Set<string>();
     await run.until(() => {
       stages.add(scene.stage);
@@ -456,7 +456,7 @@ describe.skipIf(!hasOriginalFiles)("S36 La Mine Désaffectée : niveaux, choc, r
   it("commandes : haut / bas déplacent le chariot de 5 px par image ; une touche sans aiguillage joue le son de refus ; les images viennent toutes les 5 ticks", async () => {
     const run = await seedFor("s36e", { level: 2, audio: true });
     const scene = run.scene as MineScene;
-    const refuse = await run.ctx.resources.voc("s36a002b.voc");
+    const refuse = await run.ctx.resources.sound("s36a002b.voc");
     expect(MINE_FRAME_TICKS).toBe(5);
     await run.until(() => scene.course.frames >= 1);
     const frame = scene.course.frames;
@@ -471,7 +471,7 @@ describe.skipIf(!hasOriginalFiles)("S36 La Mine Désaffectée : niveaux, choc, r
     run.host.input.keyDown("ArrowLeft");
     await run.run(200);
     run.host.input.keyUp("ArrowLeft");
-    expect(run.host.audio.plays.some((p) => p.sound.samples === refuse.samples)).toBe(true);
+    expect(run.host.audio.plays.some((p) => p.sound.data === refuse.data)).toBe(true);
     expect(scene.course.x).toBe(LANE_CENTER);
   }, 60_000);
 

@@ -1,12 +1,12 @@
-import type { PfnFont } from "../data/font";
-import type { Hy8 } from "../data/hy8";
-import { SCREEN_WIDTH, type Mcg } from "../data/mcg";
-import type { Voc } from "../data/voc";
-import { SWIPE_MIN, type TouchGesture } from "../engine/input";
-import { BorlandRandom } from "../engine/rng";
-import type { SceneContext } from "../engine/scene";
-import { boundsOf, placeFrame } from "../engine/sprites";
-import { TICKS_PER_SECOND } from "../engine/clock";
+import type { PfnFont } from "../../../engine/infogrames/data/font";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import { SCREEN_WIDTH, type Mcg } from "../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
+import { SWIPE_MIN, type TouchGesture } from "../../../engine/infogrames/input";
+import { BorlandRandom } from "../../../engine/infogrames/rng";
+import type { SceneContext } from "../../../engine/infogrames/scene";
+import { boundsOf, placeFrame } from "../../../engine/infogrames/sprites";
+import { TICKS_PER_SECOND } from "../../../engine/infogrames/clock";
 import type { Game, GameEvent } from "../game/rules";
 import { EDGE_RIGHT, HAZARDS, ROW_Y, SCREEN_COUNT, TURN_AUTO_SECONDS, type Position, type Row } from "../game/tables";
 import { loadDefaultFont } from "./common/text";
@@ -72,8 +72,8 @@ export interface BoardResources {
   sprites: Hy8;
   hud: Hy8;
   font: PfnFont;
-  iceSound: Voc;
-  bridgeSound: Voc;
+  iceSound: Sound;
+  bridgeSound: Sound;
 }
 
 /** Charge tout ce que le plateau dessine (les 9 fonds restent en mémoire : on change d'écran sans attendre). */
@@ -83,8 +83,8 @@ export async function loadBoardResources(ctx: SceneContext): Promise<BoardResour
     ctx.resources.hy8("s01a000s.hy8"),
     ctx.resources.hy8("s01a001s.hy8"),
     loadDefaultFont(ctx),
-    ctx.resources.voc("s18a001b.voc"),
-    ctx.resources.voc("s16a001b.voc"),
+    ctx.resources.sound("s18a001b.voc"),
+    ctx.resources.sound("s16a001b.voc"),
   ]);
   return { backgrounds, sprites, hud, font, iceSound, bridgeSound };
 }

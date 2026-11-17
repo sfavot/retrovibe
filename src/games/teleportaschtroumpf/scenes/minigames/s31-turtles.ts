@@ -1,7 +1,7 @@
-import type { Hy8 } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import { Clip, SoundHush, goalClip, ingredientOutcome, minigameLevel, minigameRequest, sceneIngredient, type MinigameDone, type MinigameFactory } from "./common";
 import { LEVELS, SMURF_FALLING, Smurf, placeTurtles, touchedHop, type LevelSpec, type SmurfState, type Turtle, type TurtlePhase } from "./s31/turtles";
@@ -50,8 +50,8 @@ export class TurtlesScene implements Scene {
   private mcg!: Mcg;
   private smurfSprites!: Hy8;
   private turtleSprites!: Hy8;
-  private jumpSound!: Voc;
-  private splashSound!: Voc;
+  private jumpSound!: Sound;
+  private splashSound!: Sound;
   private win!: Clip;
   private lose!: Clip;
   private result: Clip | null = null;
@@ -141,8 +141,8 @@ export class TurtlesScene implements Scene {
       ctx.resources.mcg(this.spec.background),
       ctx.resources.hy8("s31a000s.hy8"),
       ctx.resources.hy8("s31a001s.hy8"),
-      ctx.resources.voc("s31a002b.voc"),
-      ctx.resources.voc("s31a003b.voc"),
+      ctx.resources.sound("s31a002b.voc"),
+      ctx.resources.sound("s31a003b.voc"),
       this.win.load(ctx),
       this.lose.load(ctx),
     ]);

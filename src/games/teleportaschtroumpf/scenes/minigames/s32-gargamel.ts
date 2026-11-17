@@ -1,4 +1,4 @@
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import { Clip, goalClip, ingredientOutcome, minigameRequest, sceneIngredient, type MinigameDone, type MinigameFactory } from "./common";
 

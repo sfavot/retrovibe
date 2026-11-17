@@ -1,10 +1,10 @@
-import type { Hy8 } from "../data/hy8";
-import { SCREEN_WIDTH, type Mcg } from "../data/mcg";
-import type { Voc } from "../data/voc";
-import { TICKS_PER_SECOND } from "../engine/clock";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import { SCREEN_WIDTH, type Mcg } from "../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
+import { TICKS_PER_SECOND } from "../../../engine/infogrames/clock";
 import { AREA_MARGIN, Menu, paletteBounds, paletteHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
 import { CLICK_SOUND } from "./setup/common";
 
@@ -53,7 +53,7 @@ class PauseScene implements Scene {
   readonly step = 1;
   private mcg!: Mcg;
   private sprites!: Hy8;
-  private voices: Voc[] = [];
+  private voices: Sound[] = [];
   private idleSince = 0;
   private done = false;
   private readonly snapshot = new ScreenSnapshot();
@@ -76,7 +76,7 @@ class PauseScene implements Scene {
     const [mcg, sprites, voices] = await Promise.all([
       ctx.resources.mcg("s48a001d.mcg"),
       ctx.resources.hy8("s48a000s.hy8"),
-      Promise.all(Array.from({ length: VOICE_COUNT }, (_, i) => ctx.resources.voc(voiceName("s48v", i + 1)))),
+      Promise.all(Array.from({ length: VOICE_COUNT }, (_, i) => ctx.resources.sound(voiceName("s48v", i + 1)))),
     ]);
     this.mcg = mcg;
     this.sprites = sprites;

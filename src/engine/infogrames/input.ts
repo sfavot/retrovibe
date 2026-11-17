@@ -1,0 +1,286 @@
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "./data/mcg";
+
+/**
+ * Actions abstraites du jeu (engine.md §4 et §9.6). Clavier et boutons de souris sont deux sources de ces mêmes actions :
+ * l'original émule les boutons de la souris au clavier (Espace = gauche, Entrée = droit). Dans l'original, la position du
+ * pointeur ne désigne rien hors des scènes à pointeur libre (`mouseX`, `mouseY`) ; le port la lit aussi dans les menus à
+ * zones (toucher ou cliquer une entrée la valide).
+ */
+export type Action =
+  | "up"
+  | "down"
+  | "left"
+  | "right"
+  /** Clic gauche, Espace. */
+  | "validate"
+  /** Clic droit, Entrée (voix d'aide / annuler). */
+  | "cancel"
+  /** Échap : passe une vidéo, une attente. */
+  | "skip"
+  /** P : pause du plateau. */
+  | "pause"
+  | "volumeUp"
+  | "volumeDown";
+
+export const ACTIONS: readonly Action[] = ["up", "down", "left", "right", "validate", "cancel", "skip", "pause", "volumeUp", "volumeDown"];
+
+/**
+ * Touche physique (`KeyboardEvent.code`, positions QWERTY comme les scancodes de l'original) → actions.
+ * Flèches et Q/A/Z/X = haut/bas/gauche/droite, Espace = clic gauche, Entrée = clic droit,
+ * Échap = saut, P = pause, F1/F2 = volume −/+.
+ */
+const KEY_ACTIONS: Readonly<Record<string, Action>> = {
+  ArrowUp: "up",
+  KeyQ: "up",
+  ArrowDown: "down",
+  KeyA: "down",
+  ArrowLeft: "left",
+  KeyZ: "left",
+  ArrowRight: "right",
+  KeyX: "right",
+  Space: "validate",
+  Enter: "cancel",
+  NumpadEnter: "cancel",
+  Escape: "skip",
+  KeyP: "pause",
+  F1: "volumeDown",
+  F2: "volumeUp",
+};
+
+export function actionForKey(code: string): Action | undefined {
+  return KEY_ACTIONS[code];
+}
+
+/** Boutons de souris du navigateur (`MouseEvent.button`) : 0 = gauche, 2 = droit. */
+const BUTTON_ACTIONS: Readonly<Record<number, Action>> = { 0: "validate", 2: "cancel" };
+
+/** Position initiale du pointeur (centre de l'écran). */
+const CENTER_X = 0xa0;
+const CENTER_Y = 100;
+
+/**
+ * Geste du doigt reconnu au relâchement (ou au bout de l'appui long), en pixels 320×200. Ajout du port pour jouer au tactile
+ * sans flèches : seuls les doigts en produisent, la souris et le clavier gardent les entrées d'origine.
+ *
+ * - `tap` : doigt posé puis levé sans glisser ni s'attarder, en (x, y) ;
+ * - `long` : doigt resté en place `LONG_PRESS_MS` (le relâchement ne produit plus rien) ;
+ * - `swipe` : doigt glissé de (x, y) de (dx, dy), d'au moins `SWIPE_MIN` pixels.
+ */
+export type TouchGesture = { kind: "tap" | "long"; x: number; y: number } | { kind: "swipe"; x: number; y: number; dx: number; dy: number };
+
+/** Distance (pixels 320×200) au-delà de laquelle un doigt levé a glissé plutôt que touché. */
+export const SWIPE_MIN = 12;
+
+/** Gestes mémorisés au plus : comme pour les appuis, un doigt qui s'emballe n'accumule pas de retard. */
+const MAX_PENDING_GESTURES = 4;
+
+/** Appuis rapides mémorisés au plus par action : au-delà, un clavier qui s'emballe n'accumule pas de retard. */
+const MAX_PENDING_PRESSES = 4;
+
+/**
+ * État des entrées. L'hôte l'alimente (`keyDown`, `mouseDown`…), le moteur et les scènes le lisent.
+ *
+ * - `pressed(a)` : l'action est tenue maintenant ;
+ * - `justPressed(a)` : l'action a été enfoncée et cet appui n'a pas encore été consommé par une mise à jour de scène.
+ *   Les appuis sont comptés : plusieurs appuis rapides pendant un même pas de scène sont rendus un par un aux mises à
+ *   jour suivantes (au plus `MAX_PENDING_PRESSES`), aucun n'est perdu ni fusionné. Le moteur appelle `endUpdate()` après
+ *   chaque `update`.
+ */
+export class Input {
+  /** Position de la souris en coordonnées 320×200 : scènes qui dessinent leur curseur HY8 et menus à zones (ajout du port). */
+  mouseX = CENTER_X;
+  mouseY = CENTER_Y;
+  /**
+   * Décalage du pas du curseur au clavier (`DS:3FD0`, lu par `3134:03c8`) : une flèche déplace le curseur de `1 << keyPointerShift`
+   * pixels par tick. Valeur initiale 2 (4 px) ; les six mini-jeux à pointeur libre (S24, S25, S26, S35, S41, S51) l'écrivent à 1
+   * (2 px) à leur mise en place et rien ne le remet : le puits aux vœux (S13, qui active le même pilote mais ne l'écrit pas) va donc
+   * à 4 px par tick tant qu'aucun de ces mini-jeux n'a été joué, puis à 2 px. L'état vit ici car il dure autant que l'hôte, comme
+   * la variable dure autant que le processus.
+   */
+  keyPointerShift = 2;
+  /**
+   * Une vraie souris survole l'écran (l'hôte le tient à jour) : sa position est celle du pointeur du navigateur, qu'aucun jeu ne
+   * peut déplacer. La souris de l'original était relative : le jeu la recentrait sans que rien ne bouge sous la main du joueur.
+   */
+  pointerHovering = false;
+  /**
+   * Position (320×200) du dernier appui « valider » s'il vient du pointeur (clic gauche, doigt) ; `null` s'il vient du clavier.
+   * Les menus à zones (`Menu`, option `areas`) s'en servent pour valider l'entrée touchée.
+   */
+  validateAt: { x: number; y: number } | null = null;
+  /**
+   * Le dernier appui « valider » vient d'un doigt (et non de la souris ou du clavier). Les scènes à gestes ignorent cet appui,
+   * qui part dès que le doigt se pose, et lisent `touchGesture` à la place.
+   */
+  validateByTouch = false;
+
+  private readonly held = new Map<Action, Set<string>>();
+  /** Appuis pas encore consommés, par action. */
+  private readonly pending = new Map<Action, number>();
+  /** Le bouton gauche tenu vient d'un doigt. */
+  private touching = false;
+  private touchStart: { x: number; y: number } | null = null;
+  private touchLongDone = false;
+  private readonly gestures: TouchGesture[] = [];
+
+  pressed(action: Action): boolean {
+    return (this.held.get(action)?.size ?? 0) > 0;
+  }
+
+  /** Le bouton gauche de la souris (ou un doigt) est tenu : « valider » vient du pointeur, pas d'Espace. */
+  get pointerHeld(): boolean {
+    return this.held.get("validate")?.has("mouse:0") ?? false;
+  }
+
+  /** Position du doigt posé sur l'écran (pas la souris), ou `null`. */
+  get touchHeldAt(): { x: number; y: number } | null {
+    return this.pointerHeld && this.touching ? { x: this.mouseX, y: this.mouseY } : null;
+  }
+
+  /** Geste du doigt pas encore consommé (voir `TouchGesture`) ; un par mise à jour de scène, comme les appuis. */
+  get touchGesture(): TouchGesture | null {
+    return this.gestures[0] ?? null;
+  }
+
+  /** Appui « valider » de ce pas venu de la souris ou du clavier, pas d'un doigt (les scènes à gestes lisent le doigt à part). */
+  get validateNotTouch(): boolean {
+    return this.justPressed("validate") && !this.validateByTouch;
+  }
+
+  justPressed(action: Action): boolean {
+    return (this.pending.get(action) ?? 0) > 0;
+  }
+
+  /** Vrai si l'une des actions vient d'être enfoncée. */
+  anyJustPressed(...actions: Action[]): boolean {
+    return actions.some((a) => this.justPressed(a));
+  }
+
+  /** À appeler après chaque `update` de scène : consomme un appui de chaque action (les suivants attendent leur tour). */
+  endUpdate(): void {
+    this.gestures.shift();
+    for (const [action, count] of this.pending) {
+      if (count > 1) this.pending.set(action, count - 1);
+      else this.pending.delete(action);
+    }
+  }
+
+  /** Oublie tous les appuis pas encore consommés, sans relâcher les touches tenues (changement de scène). */
+  discardPresses(): void {
+    this.pending.clear();
+    this.gestures.length = 0;
+  }
+
+  /** Relâche tout et oublie les appuis récents (perte du focus). */
+  reset(): void {
+    this.held.clear();
+    this.pending.clear();
+    this.gestures.length = 0;
+    this.touchStart = null;
+    this.touching = false;
+  }
+
+  /**
+   * `source` identifie l'origine (touche, bouton) : l'action reste tenue tant qu'une source la tient. La répétition
+   * automatique du clavier (même source déjà tenue) ne compte pas comme un nouvel appui.
+   */
+  press(action: Action, source: string): void {
+    let sources = this.held.get(action);
+    if (!sources) this.held.set(action, (sources = new Set()));
+    if (sources.has(source)) return;
+    if (sources.size === 0) {
+      this.pending.set(action, Math.min(MAX_PENDING_PRESSES, (this.pending.get(action) ?? 0) + 1));
+      if (action === "validate") {
+        this.validateAt = source === "mouse:0" ? { x: this.mouseX, y: this.mouseY } : null;
+        this.validateByTouch = source === "mouse:0" && this.touching;
+      }
+    }
+    sources.add(source);
+  }
+
+  release(action: Action, source: string): void {
+    this.held.get(action)?.delete(source);
+  }
+
+  /** Renvoie vrai si la touche est utilisée par le jeu (l'hôte peut alors empêcher son comportement par défaut). */
+  keyDown(code: string): boolean {
+    const action = actionForKey(code);
+    if (!action) return false;
+    this.press(action, `key:${code}`);
+    return true;
+  }
+
+  keyUp(code: string): boolean {
+    const action = actionForKey(code);
+    if (!action) return false;
+    this.release(action, `key:${code}`);
+    return true;
+  }
+
+  /** `touch` : le bouton vient d'un doigt (l'hôte suit alors le geste avec `touchStarted` / `touchEnded`). */
+  mouseDown(button: number, touch = false): void {
+    const action = BUTTON_ACTIONS[button];
+    if (!action) return;
+    if (button === 0) this.touching = touch;
+    this.press(action, `mouse:${button}`);
+  }
+
+  mouseUp(button: number): void {
+    const action = BUTTON_ACTIONS[button];
+    if (action) this.release(action, `mouse:${button}`);
+  }
+
+  /** Un doigt se pose en (x, y) (pixels 320×200). */
+  touchStarted(x: number, y: number): void {
+    this.touchStart = { x: Math.round(x), y: Math.round(y) };
+    this.touchLongDone = false;
+  }
+
+  /** Le doigt posé est resté en place assez longtemps : appui long, le relâchement ne produira rien. */
+  touchLongPressed(): void {
+    if (!this.touchStart || this.touchLongDone) return;
+    this.touchLongDone = true;
+    this.pushGesture({ kind: "long", ...this.touchStart });
+  }
+
+  /** Le doigt se lève en (x, y) : toucher ou glissement, sauf après un appui long. */
+  touchEnded(x: number, y: number): void {
+    const start = this.touchStart;
+    this.touchStart = null;
+    if (!start || this.touchLongDone) return;
+    const dx = Math.round(x - start.x);
+    const dy = Math.round(y - start.y);
+    this.pushGesture(Math.hypot(dx, dy) >= SWIPE_MIN ? { kind: "swipe", ...start, dx, dy } : { kind: "tap", ...start });
+  }
+
+  /** Geste interrompu (le navigateur a repris le doigt) : aucun geste. */
+  touchCancelled(): void {
+    this.touchStart = null;
+  }
+
+  private pushGesture(gesture: TouchGesture): void {
+    if (this.gestures.length < MAX_PENDING_GESTURES) this.gestures.push(gesture);
+  }
+
+  /** Pilote clavier du curseur (`3134:03bb`) : les flèches tenues déplacent la position de la souris de `1 << keyPointerShift` pixels. */
+  moveMouseByKeys(): void {
+    const step = 1 << this.keyPointerShift;
+    const dx = (this.pressed("right") ? step : 0) - (this.pressed("left") ? step : 0);
+    const dy = (this.pressed("down") ? step : 0) - (this.pressed("up") ? step : 0);
+    if (dx !== 0 || dy !== 0) this.mouseMove(this.mouseX + dx, this.mouseY + dy);
+  }
+
+  /**
+   * `14b3:0039` : le jeu replace la souris (au centre, le plus souvent). Sans effet quand une vraie souris survole l'écran : le curseur
+   * dessiné sauterait loin du pointeur, et un clic sans bouger viserait un endroit que le joueur ne montre pas.
+   */
+  warpMouse(x: number, y: number): void {
+    if (!this.pointerHovering) this.mouseMove(x, y);
+  }
+
+  /** Position absolue du pointeur, en pixels 320×200 (bornée à l'écran). */
+  mouseMove(x: number, y: number): void {
+    this.mouseX = Math.min(SCREEN_WIDTH - 1, Math.max(0, Math.round(x)));
+    this.mouseY = Math.min(SCREEN_HEIGHT - 1, Math.max(0, Math.round(y)));
+  }
+}

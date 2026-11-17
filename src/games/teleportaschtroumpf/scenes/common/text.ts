@@ -1,5 +1,5 @@
-import { measureText, type PfnFont } from "../../data/font";
-import type { SceneContext } from "../../engine/scene";
+import { measureText, type PfnFont } from "../../../../engine/infogrames/data/font";
+import type { SceneContext } from "../../../../engine/infogrames/scene";
 
 /** Police par défaut du jeu (`305a:0071`, `S52D001F.PFN`, 16 px) et sa couleur de texte (`32f4:0123(…, 0x7e)`). */
 export const DEFAULT_FONT = "s52d001f.pfn";

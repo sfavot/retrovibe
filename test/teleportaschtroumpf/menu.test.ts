@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { longPress, tap, touchDown, touchUp } from "./touch";
 import { Menu, paletteHighlight, type MenuEvent, type MenuItem, type MenuOptions } from "../../src/games/teleportaschtroumpf/engine/menu";
-import { Input } from "../../src/games/teleportaschtroumpf/engine/input";
-import { Palette } from "../../src/games/teleportaschtroumpf/engine/palette";
-import type { SceneContext } from "../../src/games/teleportaschtroumpf/engine/scene";
+import { Input } from "../../src/engine/infogrames/input";
+import { Palette } from "../../src/engine/infogrames/palette";
+import type { SceneContext } from "../../src/engine/infogrames/scene";
 
 const HOVER = [0x10, 0xa4, 0xcc] as const;
 
@@ -48,7 +48,7 @@ async function harness(
         return busy.effect;
       },
     },
-    resources: { voc: async (name: string) => ({ name }) },
+    resources: { sound: async (name: string) => ({ name }) },
   } as unknown as SceneContext;
   const menu = new Menu({ items: ITEMS, axis, highlight: paletteHighlight(120, HOVER), ...options });
   await menu.load(ctx);

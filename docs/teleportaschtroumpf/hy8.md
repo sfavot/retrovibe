@@ -1,6 +1,6 @@
 # Format `.HY8` (sprites)
 
-Note technique du décodeur `src/games/teleportaschtroumpf/data/hy8.ts` (`parseHy8`). 33 fichiers dans `DATA/Sxx/SxxY/`, tous décodés. Les adresses `seg:off` renvoient à `archives/teleportaschtroumpf/re/` (`decomp/`, `disasm.txt`).
+Note technique du décodeur `src/engine/infogrames/data/hy8.ts` (`parseHy8`). 33 fichiers dans `DATA/Sxx/SxxY/`, tous décodés. Les adresses `seg:off` renvoient à `archives/teleportaschtroumpf/re/` (`decomp/`, `disasm.txt`).
 
 Un HY8 contient des images indexées (palette de la scène), des **sprites composés** (listes d'images avec position) et des **animations** (listes de sprites). Le moteur ne manipule jamais une image seule : il dessine un sprite par son index.
 
@@ -76,5 +76,5 @@ nb frames × 8 octets { [u16 sprite|drapeaux][u16 = 1][i16 dx][i16 dy] }
 
 ## Vérifications
 
-- `test/teleportaschtroumpf/hy8.test.ts` : 33 fichiers décodés, 138 / 17 / 1 images pour S01A000S / S08A000S / S25A000S, dimensions, SHA-1 de pixels croisés avec `scripts/teleportaschtroumpf/proto/hy8.py`, sprites et animations de S02A000S, S22A000S, S33A001S, données invalides.
+- `test/infogrames/hy8.test.ts` : 33 fichiers décodés, 138 / 17 / 1 images pour S01A000S / S08A000S / S25A000S, dimensions, SHA-1 de pixels croisés avec `scripts/teleportaschtroumpf/proto/hy8.py`, sprites et animations de S02A000S, S22A000S, S33A001S, données invalides.
 - Contrôle exhaustif hors dépôt sur les 33 fichiers : tables de sprites et d'animations contiguës et sans trou, références d'image / de sprite / d'animation toutes valides.

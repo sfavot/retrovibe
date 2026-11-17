@@ -1,9 +1,9 @@
-import type { Hy8 } from "../../data/hy8";
-import { parsePal } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Input } from "../../engine/input";
-import { AnimationPlayer, boundsOf, placeFrame } from "../../engine/sprites";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import { parsePal } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Input } from "../../../../engine/infogrames/input";
+import { AnimationPlayer, boundsOf, placeFrame } from "../../../../engine/infogrames/sprites";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import {
   Clip,
@@ -409,8 +409,8 @@ export type StorkPhase = "ride" | "hitSound" | "fadeOut" | "result" | "done";
 export class StorkScene implements Scene {
   readonly step = 1;
   private hy8!: Hy8;
-  private hitVoc!: Voc;
-  private flapVoc!: Voc;
+  private hitVoc!: Sound;
+  private flapVoc!: Sound;
   /** `s34a.pal` : entrées 0 à 127, chargées par l'original avant la vidéo (`1523:0235(pal, 0, 0x80)`, la vidéo ne touche pas à la palette). */
   private palette!: Uint8Array;
   private ride!: Clip;
@@ -468,8 +468,8 @@ export class StorkScene implements Scene {
     this.win = new Clip(storkWinClip(this.game), (c) => this.finish(c));
     const [hy8, hitVoc, flapVoc, palette] = await Promise.all([
       ctx.resources.hy8("s34a001s.hy8"),
-      ctx.resources.voc("s34a004b.voc"),
-      ctx.resources.voc("s34a001b.voc"),
+      ctx.resources.sound("s34a004b.voc"),
+      ctx.resources.sound("s34a001b.voc"),
       ctx.resources.bytes("s34a.pal"),
       this.ride.load(ctx),
       this.fail.load(ctx),

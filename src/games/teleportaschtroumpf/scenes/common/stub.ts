@@ -1,7 +1,7 @@
-import type { Action } from "../../engine/input";
-import { TICKS_PER_SECOND } from "../../engine/clock";
-import type { Scene, SceneContext } from "../../engine/scene";
-import type { Mcg } from "../../data/mcg";
+import type { Action } from "../../../../engine/infogrames/input";
+import { TICKS_PER_SECOND } from "../../../../engine/infogrames/clock";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
 
 export interface StubOptions {
   /** Fond MCG de l'écran (sa palette est chargée) ; sans lui, l'écran reste tel quel. */

@@ -1,5 +1,5 @@
 import { BinaryReader } from "../../../data/reader";
-import { MuxVideoDecoder } from "./mux";
+import { MuxVideoDecoder } from "../../../engine/infogrames/data/mux";
 
 /** Taille d'un tronçon de voie décodé : 140 lignes de 320 pixels (0x8c lignes dans `23c9:0004`). */
 export const MUT_TILE_WIDTH = 320;

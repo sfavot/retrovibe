@@ -63,7 +63,7 @@ Les joueurs jouent chacun leur tour, à tour de rôle. Un tour se termine quand 
 | Départ | pour les 4 emplacements : écran 1, x = `0x0B`, y = `0x38`, regard droit, ingrédients 0, points 0, état 0 ; joueur courant 0, tour de plateau (`DS:8C74`) 1. | `28a3:00ad` | sûr |
 | Objectif | `1e52:0271` : lit `DS:19E0` (64 o) à `16 × (durée/1800 − 1) + 4 × (joueurs − 1)` : `u16` nombre d'ingrédients, `u8` points (→ `DS:19B9`). Les ingrédients (masque `DS:19B8`) sont tirés par `rand × 8 / 0x8000`, puis suivants libres en rotation (`(r+1) % 8`). | `1e52:0271` (désassemblé) | sûr |
 | Durée, message, pause | options parents : `DS:6EA4` = `(index+1) × 1800` s, `DS:6EA2` message 0..8, `DS:6EA0` pause (`engine/options.ts`). | `engine.md` §6.3 | sûr |
-| Hasard | `BorlandRandom` (`engine/rng.ts`), injecté. | `1000:07a7` | sûr |
+| Hasard | `BorlandRandom` (`src/engine/infogrames/rng.ts`), injecté. | `1000:07a7` | sûr |
 
 Table de l'objectif (`DS:19E0`, ingrédients / points) :
 

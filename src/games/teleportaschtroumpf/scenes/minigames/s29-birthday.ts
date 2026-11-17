@@ -1,9 +1,9 @@
-import type { Hy8, Hy8Frame } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import { TICKS_PER_SECOND, type Timer } from "../../engine/clock";
-import type { Scene, SceneContext } from "../../engine/scene";
-import { AnimationPlayer } from "../../engine/sprites";
+import type { Hy8, Hy8Frame } from "../../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import { TICKS_PER_SECOND, type Timer } from "../../../../engine/infogrames/clock";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import { AnimationPlayer } from "../../../../engine/infogrames/sprites";
 import type { Game } from "../../game/rules";
 import { Clip, SoundHush, levelTimeLimit, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
 
@@ -114,9 +114,9 @@ export class BirthdayScene implements Scene {
   private readonly level: number;
   private mcg!: Mcg;
   private sprites!: Hy8;
-  private blowVoc!: Voc;
-  private missVoc!: Voc;
-  private relightVoc!: Voc;
+  private blowVoc!: Sound;
+  private missVoc!: Sound;
+  private relightVoc!: Sound;
   private win!: Clip;
   private fail!: Clip;
   private result: Clip | null = null;
@@ -201,9 +201,9 @@ export class BirthdayScene implements Scene {
     [this.mcg, this.sprites, this.blowVoc, this.missVoc, this.relightVoc] = await Promise.all([
       ctx.resources.mcg("s29a001d.mcg"),
       ctx.resources.hy8("s29a000s.hy8"),
-      ctx.resources.voc("s29a001b.voc"),
-      ctx.resources.voc("s29a002b.voc"),
-      ctx.resources.voc("s29a003b.voc"),
+      ctx.resources.sound("s29a001b.voc"),
+      ctx.resources.sound("s29a002b.voc"),
+      ctx.resources.sound("s29a003b.voc"),
       this.win.load(ctx),
       this.fail.load(ctx),
     ]);

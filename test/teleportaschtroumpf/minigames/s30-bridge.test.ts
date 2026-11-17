@@ -72,7 +72,7 @@ describe.skipIf(!hasOriginalFiles)("S30 Pont de la rivière", () => {
     const b = await launchMinigame(30, { seed: 9, audio: true });
     await play(a, null);
     await play(b, null);
-    expect(a.host.audio.plays.at(-1)!.sound.samples.length).toBe(b.host.audio.plays.at(-1)!.sound.samples.length);
+    expect(a.host.audio.plays.at(-1)!.sound.sampleCount).toBe(b.host.audio.plays.at(-1)!.sound.sampleCount);
   }, 240_000);
 
   it("captures", async () => {

@@ -1,7 +1,8 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import { EffectWait } from "../../src/games/teleportaschtroumpf/engine/effect-wait";
-import type { SceneContext } from "../../src/games/teleportaschtroumpf/engine/scene";
+import { Engine } from "../../src/engine/infogrames/engine";
+import { EffectWait } from "../../src/engine/infogrames/effect-wait";
+import type { SceneContext } from "../../src/engine/infogrames/scene";
 import { MagicianScene, ZONES } from "../../src/games/teleportaschtroumpf/scenes/minigames/s41-magician";
 import { MapScene } from "../../src/games/teleportaschtroumpf/scenes/s02-map";
 import { TestHost } from "./engine-test-host";
@@ -58,7 +59,7 @@ describe.skipIf(!hasOriginalFiles)("carte S02 : attente de fin de bruitage (`1a3
   async function launchMap(results: number[]) {
     const host = new TestHost();
     host.audio.enabled = true;
-    const engine = new Engine(host, { seed: 7 });
+    const engine = new Engine(host, GAME_CONFIG, { seed: 7 });
     const map = new MapScene({ mode: "free" }, (_c, k) => results.push(k));
     await engine.start(map);
     await advance(engine, host, 600);

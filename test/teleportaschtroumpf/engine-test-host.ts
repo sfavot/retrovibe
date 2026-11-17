@@ -1,18 +1,19 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { AudioBackend, PcmSound } from "../../src/games/teleportaschtroumpf/audio/backend";
+import type { AudioBackend } from "../../src/engine/infogrames/audio/backend";
+import { soundDuration, type Sound } from "../../src/engine/infogrames/audio/sound";
 import { GameFiles, type GameFileEntry } from "../../src/games/teleportaschtroumpf/data/files";
-import type { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import type { Host } from "../../src/games/teleportaschtroumpf/engine/host";
+import type { Engine } from "../../src/engine/infogrames/engine";
+import type { Host } from "../../src/engine/infogrames/host";
 import { FakeStorage } from "../support/fake-host";
-import { Input } from "../../src/games/teleportaschtroumpf/engine/input";
+import { Input } from "../../src/engine/infogrames/input";
 import { resolveGameFile } from "../../src/games/teleportaschtroumpf/engine/paths";
 
 const ORIGINAL = resolve(import.meta.dirname, "../../original/teleportaschtroumpf");
 
 /** Un son lancé sur la voie factice. */
 export interface PlayedSound {
-  sound: PcmSound;
+  sound: Sound;
   loop: boolean;
   /** Temps (ms) du lancement. */
   at: number;
@@ -48,6 +49,9 @@ export class FakeAudio implements AudioBackend {
     this.unlocked = true;
   }
 
+  /** Rien à décoder : la voie factice ne connaît un son que par sa durée d'origine (`soundDuration`). */
+  async prepare(): Promise<void> {}
+
   setMuted(muted: boolean): void {
     this.muted = muted;
   }
@@ -69,7 +73,7 @@ export class FakeAudio implements AudioBackend {
     return (this.suspended ? this.suspendedAt : this.nowMs()) - this.pausedMs;
   }
 
-  play(sound: PcmSound, loop: boolean): void {
+  play(sound: Sound, loop: boolean): void {
     this.current = null;
     if (!this.enabled) return;
     this.current = { sound, loop, at: this.time() };
@@ -81,7 +85,7 @@ export class FakeAudio implements AudioBackend {
     this.current = null;
   }
 
-  playEffect(sound: PcmSound): void {
+  playEffect(sound: Sound): void {
     this.currentEffect = null;
     if (!this.enabled) return;
     this.currentEffect = { sound, loop: false, at: this.time() };
@@ -95,7 +99,7 @@ export class FakeAudio implements AudioBackend {
 
   get effectPlaying(): boolean {
     const e = this.currentEffect;
-    return !!e && (this.time() - e.at) / 1000 < e.sound.samples.length / e.sound.sampleRate;
+    return !!e && (this.time() - e.at) / 1000 < soundDuration(e.sound);
   }
 
   private elapsed(): number {
@@ -105,13 +109,13 @@ export class FakeAudio implements AudioBackend {
   get playing(): boolean {
     const c = this.current;
     if (!c) return false;
-    return c.loop || this.elapsed() < c.sound.samples.length / c.sound.sampleRate;
+    return c.loop || this.elapsed() < soundDuration(c.sound);
   }
 
   get position(): number {
     const c = this.current;
     if (!c) return 0;
-    const duration = c.sound.samples.length / c.sound.sampleRate;
+    const duration = soundDuration(c.sound);
     return c.loop ? this.elapsed() % duration : Math.min(this.elapsed(), duration);
   }
 
@@ -145,9 +149,13 @@ export class TestHost implements Host {
   exited = false;
   private files: GameFiles | null = null;
 
-  async loadFile(name: string): Promise<Uint8Array> {
+  filePath(name: string): string | undefined {
     this.files ??= new GameFiles(JSON.parse(readFileSync(resolve(ORIGINAL, "files.json"), "utf8")) as GameFileEntry[]);
-    const path = resolveGameFile(this.files, name);
+    return resolveGameFile(this.files, name);
+  }
+
+  async loadFile(name: string): Promise<Uint8Array> {
+    const path = this.filePath(name);
     if (!path) throw new Error(`fichier introuvable : ${name}`);
     this.loaded.push(path);
     return new Uint8Array(readFileSync(resolve(ORIGINAL, path)));

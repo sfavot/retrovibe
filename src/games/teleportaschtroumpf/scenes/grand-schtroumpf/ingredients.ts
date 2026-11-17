@@ -1,8 +1,8 @@
-import { measureText, type PfnFont } from "../../data/font";
-import type { Hy8 } from "../../data/hy8";
-import { TICKS_PER_SECOND } from "../../engine/clock";
+import { measureText, type PfnFont } from "../../../../engine/infogrames/data/font";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import { TICKS_PER_SECOND } from "../../../../engine/infogrames/clock";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import { INGREDIENT_COUNT } from "../../game/tables";
 import { BASE_Y, ICON_STEP, ICON_X, SPRITE_DROP_EMPTY, SPRITE_MISSING, TEXT_Y } from "../board/hud";

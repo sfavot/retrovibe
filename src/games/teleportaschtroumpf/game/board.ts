@@ -1,4 +1,4 @@
-import type { BorlandRandom } from "../engine/rng";
+import type { BorlandRandom } from "../../../engine/infogrames/rng";
 import {
   ARRIVALS,
   ARRIVE_FROM_RIGHT_X,

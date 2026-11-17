@@ -1,5 +1,5 @@
 import { voiceName } from "../../engine/paths";
-import type { BorlandRandom } from "../../engine/rng";
+import type { BorlandRandom } from "../../../../engine/infogrames/rng";
 import type { GameEvent } from "../../game/rules";
 import type { Position } from "../../game/tables";
 

@@ -1,4 +1,4 @@
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import type { Game, GameEvent } from "../game/rules";
 import { createStubMinigame, type AftermathFactory, type MinigameDone, type MinigameFactory } from "./minigames/common";
 import { createDragon } from "./minigames/s22-dragon";

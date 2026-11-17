@@ -1,7 +1,7 @@
-import { measureText } from "../../../data/font";
-import type { Voc } from "../../../data/voc";
+import { measureText } from "../../../../../engine/infogrames/data/font";
+import type { Sound } from "../../../../../engine/infogrames/audio/sound";
 import { voiceName } from "../../../engine/paths";
-import type { Scene, SceneContext } from "../../../engine/scene";
+import type { Scene, SceneContext } from "../../../../../engine/infogrames/scene";
 import type { Game } from "../../../game/rules";
 import { hasIngredient } from "../../../game/state";
 import { INGREDIENT_COUNT } from "../../../game/tables";
@@ -85,7 +85,7 @@ export class TransferScene implements Scene {
   readonly step = 1;
   private info!: InfoResources;
   private video!: OverlayVideo;
-  private voices = new Map<string, Voc>();
+  private voices = new Map<string, Sound>();
   private before!: Game;
   private phase: TransferPhase = "fadeIn";
   private infoPalette = new Uint8Array(768);
@@ -119,7 +119,7 @@ export class TransferScene implements Scene {
     const [info, video, ...vocs] = await Promise.all([
       loadInfo(ctx),
       OverlayVideo.load(ctx, item === POINT_ITEM ? "s38c.mux" : "s38e.mux"),
-      ...names.map((n) => ctx.resources.voc(n)),
+      ...names.map((n) => ctx.resources.sound(n)),
     ]);
     this.info = info;
     this.video = video;

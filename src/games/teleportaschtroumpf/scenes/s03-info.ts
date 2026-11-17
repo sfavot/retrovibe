@@ -1,10 +1,10 @@
-import type { PfnFont } from "../data/font";
-import type { Hy8 } from "../data/hy8";
-import type { Mcg } from "../data/mcg";
+import type { PfnFont } from "../../../engine/infogrames/data/font";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../engine/infogrames/data/mcg";
 import type { Game } from "../game/rules";
 import { hasIngredient } from "../game/state";
 import { INGREDIENT_COUNT } from "../game/tables";
-import type { SceneContext } from "../engine/scene";
+import type { SceneContext } from "../../../engine/infogrames/scene";
 import { TEXT_COLOR, loadDefaultFont } from "./common/text";
 
 /** Nombre de graduations de la barre de temps (`1e20:0007`). */

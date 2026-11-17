@@ -1,7 +1,7 @@
 import { musicName, voiceName } from "../engine/paths";
-import { PictureScene, WaitScene } from "../engine/picture";
-import type { Scene } from "../engine/scene";
-import { VideoScene } from "../engine/video";
+import { PictureScene, WaitScene } from "../../../engine/infogrames/picture";
+import type { Scene } from "../../../engine/infogrames/scene";
+import { VideoScene } from "../../../engine/infogrames/video";
 import { goMainMenu } from "./flow";
 
 /** Attente après la vidéo du logo : jusqu'à 3 s (`1f33:02c0(3)`), passable. */

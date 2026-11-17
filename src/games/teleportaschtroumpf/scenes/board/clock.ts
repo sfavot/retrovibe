@@ -1,5 +1,5 @@
-import { TICKS_PER_SECOND } from "../../engine/clock";
-import type { SceneContext } from "../../engine/scene";
+import { TICKS_PER_SECOND } from "../../../../engine/infogrames/clock";
+import type { SceneContext } from "../../../../engine/infogrames/scene";
 
 /**
  * Chrono de la partie (`1f33:0181(0)` / `1f33:019a(0)`) en secondes entières de jeu : convertit les ticks écoulés en

@@ -1,0 +1,199 @@
+01Fquelle ville s'appelle aujourd'hui paris ?
+01 lutetia,alesia,parisii/1
+02Fquelle est la couleur des fruits du gui ?
+02 noir,rouge,blanc/3
+03Fqu'est-ce qu'un dolmen ?
+03 une chambre fun‚raire,un abri contre le tonnerre,le totem d'un village/1
+04Fcombien de pierres constituent un menhir ?
+04 une,deux,trois/1
+05Fquel fleuve coule … lugdunum ?
+05 la seine,la loire,le rh“ne/3
+06Fqu'est-ce qu'un druide ?
+06 un ermite,un prˆtre celte,un m‚galithe/2
+07Fqu'est-ce qu'un barde ?
+07 un poŠte chanteur,une sentinelle,un crieur public/1
+08Fqu'utilise le druide pour cueillir le gui ?
+08 un poignard,une serpe,ses mains/2
+09Fcomment se nomme le petit du sanglier ?
+09 un cochonnet,un marcassin,un loir/2
+10Fcomment se nomme la femelle du sanglier ?
+10 la laie,la sangliŠre,la hure/1
+11Fqu'est-ce qu'un ast‚risque ?
+11 un signe en forme d'‚toile,un tiret,un chiffre romain/1
+12Fque craignaient les gaulois ?
+12 que la terre explose,que la mer d‚borde,que le ciel leur tombe dessus/3
+13Fquel pays n'a jamais ‚t‚ gaulois ?
+13 l'italie,la france,la belgique/1
+14Fcomment s'appelle un troupeau de sangliers ?
+14 une harde,une horde,une hure/1
+15Fcomment se nomme le museau du sanglier ?
+15 la truffe,le groin,les naseaux/2
+16Fcomment se nomme le cri du sanglier ?
+16 le beuglement,le mugissement,le grognement/3
+17Fqu'est-ce que la cervoise ?
+17 de la biŠre,une plante toxique,une sorte de rat/1
+18Fcombien existait-il de peuples gaulois ?
+18 un,quatre-vingt dix,plus de sept cents/2
+19Fqui ‚taient les carnutes ?
+19 des tisserands,les fossoyeurs,un peuple gaulois/3
+20Fque trouve-t-on sous un tumulus ?
+20 une s‚pulture,des ordures,rien/1
+21Fquel fleuve tient son nom de la d‚esse sequana ?
+21 la loire,la seine,la garonne/2
+22Fquelle ville s'appelle aujourd'hui marseille ?
+22 telamon,avaricum,massilia/3
+23Fque firent connaŒtre les celtes aux romains ?
+23 le savon,la toge,le maquillage/1
+24Fquel ‚tait le plat favori des celtes ?
+24 la soupe aux choux,le sanglier,la poule au pot/2
+25Fcomment ‚taient enterr‚s les rois celtes ?
+25 une ‚p‚e … la main,tout nus,face contre terre/1
+26Fquelle tactique employa vercing‚torix contre c‚sar ?
+26 le combat singulier,la terre br–l‚e,le blocus/2
+27Fcombien de temps durait l'apprentissage d'un druide ?
+27 un an,dix ans,vingt ans/3
+28Fque signifie la locution "dura lex, sed lex" ?
+28 la loi est la loi,pas de quartier,r‚gner dur mais bien/1
+29Fque signifie la locution "ad vitam aeternam" ?
+29 l'esprit est ‚ternel,pour toujours,par le fer/2
+30F… qui ‚tait r‚serv‚ le vin en gaule ?
+30 aux druides,aux romains,aux riches/3
+31Msur quel arbre le druide cueille-t-il le gui ?
+31 platane,chˆne,hˆtre/2
+32Mo— cesar vainquit-il vercing‚torix ?
+32 al‚sia,gergovie,avaricum/1
+33Mqu'est-ce que l'armorique ?
+33 du vin,une arme familiale,une province gauloise/3
+34Mque sont les braies ?
+34 des fruits,des chaussettes,un pantalon/3
+35Mqu'est-ce que la diorite ?
+35 une roche,un parfum,une sauce … base de chou/1
+36Mquelle est la sp‚cialit‚ de la ville appel‚e jadis camaracum ?
+36 les bˆtises,les pruneaux,le jambon/1
+37Mcombien de sesterces valent un aur‚us ?
+37 10,35,100/3
+38Mcombien de dieux v‚n‚raient les gaulois ?
+38 un,plus de 400,plus de 700/2
+39Mdans quelle ville hannibal vainquit-il les romains ?
+39 nice,saint-tropez,cannes(italie)/3
+40Mcombien de temps vercing‚torix fut-il captif de c‚sar ?
+40 un mois,six ans,treize ans/2
+41Mqu'est-ce qu'une diaule ?
+41 une fl–te,une canne … pˆche,un chant de guerre/1
+42Mcombien de gaulois p‚rirent durant la guerre des gaules ?
+42 environ 30 000,environ 400 000,plus d'un million/3
+43Mqu'est-ce qu'un torque ?
+43 un poisson,un collier,un cavalier/2
+44Mcomment s'appelle le second ƒge du fer ?
+44 la tŠne,l'ƒge de l'‚tain,le chrys‚l‚phantisme/1
+45Mo— se r‚unissaient les druides chaque ann‚e ?
+45 … bourges,… karnak,… chartres/3
+46Mqui inventa le fer … cheval ?
+46 les grecs,les celtes,les romains/2
+47Md'o— la ville de paris tient-elle son nom ?
+47 d'une tribu celte,d'un consul romain,d'un h‚ros de "l'iliade"/1
+48Mquelle part du sanglier ‚tait r‚serv‚e aux h‚ros ?
+48 le coeur,le foie,la cuisse/3
+49Mchez les gaulois, qui ‚tait le dieu des sources thermales ?
+49 borvo,taranis,b‚l‚nos/1
+50Mqu'organisa l'empereur  auguste en gaule ?
+50 la coupe de cheveux,le recensement,l'abattage des chˆnes/2
+51Mcomment se battirent les lanciers celtes … telamon ?
+51 peints en noir,le crƒne ras‚,tout nus/3
+52Mquelle ville devint la capitale des trois gaules ?
+52 lyon,paris,marseille/1
+53Mavec quoi les gaulois tondaient-ils les moutons ?
+53 des serpes,des gallicae,des ciseaux … ressort/3
+54Mquels dieux gaulois protŠgent la famille ?
+54 les mƒnes,les lares,les matrae/1
+55Mquel oiseau ‚tait appel‚ "alauda" par les gaulois ?
+55 le rouge-gorge,l'alouette,la pie/2
+56Mquel type de gladiateur ‚tait appel‚ "gaulois" ?
+56 le thrace,l'ess‚daire,le mirmillon/3
+57Mqui fonda la ville de marseille ?
+57 les phoc‚ens,les romains,les ph‚niciens/1
+58Mque fit vercing‚torix aux civils d'al‚sia ?
+58 il les tua,il les envoya … c‚sar,il les r‚quisitionna/2
+59Men quelle ann‚e d‚buta la guerre des gaules ?
+59 58 av.j.c.,55 av.j.c.,52 av.j.c./1
+60Mque signifie l'appellation "gallia comata" ?
+60 guerre des gaules,gaule cisalpine,gaule chevelue/3
+61Mcombien de romains furent tu‚s … gergovie ?
+61 environ 700,environ 3000,environ 7000/1
+62Mque sont les gallicae ?
+62 des poules,des lois druidiques,des chaussures/3
+63Mqui ‚tait toutatis ?
+63 le dieu de la guerre,le dieu des vignes,le dieu du tonnerre/1
+64Mqu'est-ce qu'un oppidum ?
+64 un rat musqu‚,un temple,un lieu fortifi‚/3
+65Mcomment se nommait le chef des eburons ?
+65 indutiomaros,ambiorix,vercing‚torix/2
+66Mqu'est-ce que la saie ?
+66 un harpon,une saison,un petit manteau/3
+67Mcombien de passants comportaient les braies ?
+67 six,vingt,environ cent/1
+68Mquel peuple se r‚volta en premier contre c‚sar ?
+68 les eduens,les carnutes,les v‚nŠtes/2
+69Mquelle province n'appartenait pas aux trois gaules ?
+69 l'aquitaine,la gaule belgique,la narbonnaise/3
+70Mquelle fut la premiŠre colonie romaine en gaule ?
+70 narbonne,lyon,arcachon/1
+71Dqu'est-ce que la korma ?
+71 l'ƒme,de la biŠre,une fˆte religieuse/2
+72Dqu'est-ce qu'un pavois ?
+72 un bouclier de c‚r‚monie,une toile de tente,un poste de guet/1
+73Dqui est le dieu du soleil ?
+73 belisama,toutatis,belenos/3
+74Dqui fit arracher la moiti‚ du vignoble gaulois ?
+74 domitien,vespasien,titus/1
+75D… quelle famille de plantes appartient le gui ?
+75 les loranthac‚es,les malvac‚es,les euphorbiac‚es/1
+76Dqu'est-ce qu'une fibule ?
+76 une petite arm‚e,une ‚pingle de s–ret‚,une cape/2
+77Dquelle bataille c‚lŠbre eut lieu en 52 av. jc ?
+77 gergovie,telamon,quadech/1
+78Dqu'est-ce qu'une siste ?
+78 une ‚p‚e,une aiguille,un instrument de musique/3
+79Dchez les gaulois, qui ‚tait taranis ?
+79 le dieu du tonnerre,la d‚esse de la guerre,le dieu de la vie/1
+80Dchez les gaulois, qui ‚tait le dieu des morts ?
+80 b‚l‚nos,sucellus,esus/2
+81Dqui ‚tait cernunnos ?
+81 un chef arverne,un druide carnute,un dieu gaulois/3
+82Dquelle r‚gion n'appartenait pas … la gaule chevelue ?
+82 la provence,la gaule celtique,l'aquitaine/1
+83Den quelle ann‚e d‚bute le second ƒge du fer ?
+83 700 avant j.c.,650 avant j.c.,450 avant j.c./3
+84Dquelle ‚tait la capitale des bituriges ?
+84 avaricum,bibracte,cabilonnum/1
+85Dquelle d‚esse celte possŠde un corps de cheval ?
+85 epona,belisama,rosmerta/1
+86Dcombien de grandes batailles c‚sar livra-t-il en gaule ?
+86 7,30,132/2
+87Dcombien de cit‚s gauloises furent prises par c‚sar ?
+87 environ 300,environ 550,environ 800/3
+88Dcombien de temps dura la campagne de c‚sar en gaule ?
+88 9 mois,6 ans,8 ans/3
+89Dquel empereur romain fut surnomm‚ "l'empereur gaulois" ?
+89 claude,hadrien,tibŠre/1
+90Den quelle ann‚e la gaule chevelue entra dans l'empire romain ?
+90 52 av.j.c.,51 av.j.c.,49  av.j.c./2
+91Dquel peuple gaulois ‚tait voisin des volques ?
+91 les s‚quanes,les ambiens,les allobroges/3
+92Dquel peuple gaulois vivait dans la province d'aquitaine ?
+92 les pictons,les v‚nŠtes,les nerviens/1
+93Dquelle ville fran‡aise s'appelait jadis rotomagus ?
+93 reims,rouen,roanne/2
+94Dqui ‚taient les dieux protecteurs des tribus ?
+94 les matrae,les totemis,les teutates/3
+95Dquel dieu gaulois est l'‚quivalent de jupiter ?
+95 taranis,mullo,gofannon/1
+96Dqu'est-ce qu'un bulga ?
+96 un chariot … boeufs,un petit sac en cuir,un voleur r‚cidiviste/2
+97Dque faisaient les gaulois avec de l'‚peautre ?
+97 des statuettes,des braies,de la biŠre/3
+98Dquelle tribu gauloise vivait … al‚sia ?
+98 les mandubiens,les rutŠnes,les arvernes/1
+99Do— vivaient les arvernes ?
+99 au nord des v‚nŠtes,au sud des bituriges,… l'est des carnutes/2
+

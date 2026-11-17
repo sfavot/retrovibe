@@ -1,11 +1,11 @@
-import type { Hy8, Hy8Frame } from "../../data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Timer } from "../../engine/clock";
-import type { Action, Input } from "../../engine/input";
+import type { Hy8, Hy8Frame } from "../../../../engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Timer } from "../../../../engine/infogrames/clock";
+import type { Action, Input } from "../../../../engine/infogrames/input";
 import type { MenuArea } from "../../engine/menu";
-import type { Scene, SceneContext } from "../../engine/scene";
-import { AnimationPlayer, boundsOf, placeFrame } from "../../engine/sprites";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import { AnimationPlayer, boundsOf, placeFrame } from "../../../../engine/infogrames/sprites";
 import type { Game } from "../../game/rules";
 import { Clip, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
 
@@ -112,8 +112,8 @@ export class MusicianScene implements Scene {
   private readonly goal: number;
   private mcg!: Mcg;
   private sprites!: Hy8;
-  private rightVocs: Voc[] = [];
-  private wrongVocs: Voc[] = [];
+  private rightVocs: Sound[] = [];
+  private wrongVocs: Sound[] = [];
   private intro!: Clip;
   private win!: Clip;
   private fail!: Clip;
@@ -221,8 +221,8 @@ export class MusicianScene implements Scene {
     [this.mcg, this.sprites, this.rightVocs, this.wrongVocs] = await Promise.all([
       ctx.resources.mcg("s23a001d.mcg"),
       ctx.resources.hy8("s23a000s.hy8"),
-      Promise.all(RIGHT_SOUNDS.map((name) => ctx.resources.voc(name))),
-      Promise.all(WRONG_SOUNDS.map((name) => ctx.resources.voc(name))),
+      Promise.all(RIGHT_SOUNDS.map((name) => ctx.resources.sound(name))),
+      Promise.all(WRONG_SOUNDS.map((name) => ctx.resources.sound(name))),
       this.intro.load(ctx),
       this.win.load(ctx),
       this.fail.load(ctx),

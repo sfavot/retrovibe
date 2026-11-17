@@ -1,0 +1,198 @@
+01Fqu'est stonehenge ?
+01 un monument,une r‚gion,une Œle/1
+02Fqu'est-ce qu'un calice ?
+02 une ‚toffe,une coupe,un emblˆme/2
+03Fqu'appelait-on "mare brittanicum" ?
+03 le loch ness,la mer d'irlande,la manche/3
+04Fcombien de pouces vaut un pied ?
+04 cinq,douze,quatorze/2
+05Fde quoi est compos‚ le smog ?
+05 de fum‚e et de brouillard,de tabac et de th‚,de biŠre et de lait/1
+06Fen matiŠre de rugby, que d‚signe le grand chelem ?
+06 le championnat du monde,4 victoires cons‚cutives,un ‚cart de 30 points/2
+07Fqu'est-ce qu'un kilt ?
+07 un chapeau,un pendentif,une jupe/3
+08Fque sont les cornouailles ?
+08 une p‚ninsule,une Œle,un isthme/1
+09Fcomment s'appelle un joueur de cornemuse ?
+09 un cornettiste,un cornemuseur,un cornier/2
+10Fqu'est-ce qu'une cornemuse ?
+10 un instrument … vent,un instrument … cordes,une trompe/1
+11Fd'o— le rugby tient-il son nom ?
+11 d'une tribu celte,d'une ville anglaise,d'un chef gallois/2
+12Fcombien y-a-t-il d'arriŠres dans une ‚quipe de rugby ?
+12 un,deux,trois/1
+13Fen irlande, qu'arrivait-il aux rois trop vieux ?
+13 ils ‚taient enferm‚s,ils ‚taient chass‚s,ils ‚taient tu‚s/3
+14Fo— est situ‚ le pays de galles ?
+14 au nord de l'angleterre,… l'ouest de l'angleterre,… l'est de l'angleterre/2
+15Fqui fonda la ville de londres ?
+15 les celtes,les romains,les vikings/3
+16Fcomment s'appelait la londres romaine ?
+16 londinium,londoneum,lundoleum/1
+17Fde quel pays provient le th‚ ?
+17 ‚cosse,chine,soudan/2
+18Fd'o— l'angleterre tient-elle son nom ?
+18 d'un g‚n‚ral romain,d'une tribu celte,d'un peuple germanique/3
+19Fquels ‚taient les premiers peuples d'angleterre ?
+19 les celtes,les angles,les saxons/1
+20Fque sont les highlands ?
+20 des citadelles,une r‚gion montagneuse,des chants ‚cossais/2
+21Fqu'est le royaume-uni ?
+21 une Œle,une p‚ninsule,un archipel/3
+22Fs'il est midi … londres, quelle heure est-il … rome ?
+22 11 heures,13 heures,14 heures/2
+23Fselon la l‚gende, qui est enterr‚ … stonehenge ?
+23 le roi des cornovii,cu chulainn,le pŠre du roi arthur/3
+24Fqu'est-ce qu'un cairn ?
+24 un tumulus,une croix celte,une borne/1
+25Fquel est le nom ga‚lique de l'irlande ?
+25 ulster,eire,welsh/2
+26Fquand l'angleterre fut-elle s‚par‚e du continent ?
+26 vers 70 000 av.j.c.,vers 7000 av.j.c.,vers 700 av.j.c./2
+27Fquelle est l'origine principale de la langue anglaise ?
+27 latine,celte,germanique/3
+28Fquel est le nom actuel de la province de bretagne ?
+28 angleterre,‚cosse,royaume-uni/1
+29Fqu'appelle-t-on nessiteras rhombopteryx ?
+29 le th‚,le monstre du loch ness,les coliques n‚phr‚tiques/2
+30Fd'o— provenaient les premiers peuples d'angleterre ?
+30 de scandinavie,de gaule,d'espagne/3
+31Mo— est situ‚ stonehenge ?
+31 en angleterre,en ‚cosse,en irlande/1
+32Mqu'est-ce qu'une chƒsse ?
+32 un cercueil,un reliquaire,un gouvernail/2
+33Mquel sport est l'ancˆtre du rugby ?
+33 le pancrace,le pugilat,la phainindra/3
+34Mquelle est la longueur d'un ballon de rugby ?
+34 environ 25 cm,environ 30 cm,environ 35 cm/2
+35Mquelle ‚toffe est utilis‚e pour confectionner un kilt ?
+35 le tartan,le tweed,le cachemire/1
+36Mquelle distance s‚pare deux poteaux de rugby ?
+36 3m60,4m60,5m60/3
+37Mqui a construit la ville de dublin ?
+37 les romains,les vikings,les celtes/2
+38Mqu'‚tait halloween pour les celtes ?
+38 le nouvel an,le solstice d'‚t‚,le jour des fous/1
+39Mcomment s'appelait l'‚cosse ?
+39 l'ulster,la cal‚donie,l'hibernie/2
+40Mquand d‚bute le printemps en irlande ?
+40 le 1er f‚vrier,le 21 f‚vrier,le 22 mars/1
+41Mlequel de ces dieux n'est pas irlandais ?
+41 dagda,mazda,lug/2
+42Mqui ‚tait cu chulainn ?
+42 le roi des iceni,un druide-guerrier,un h‚ros irlandais/3
+43Mquelle ville tient son nom d'un dieu irlandais ?
+43 lugdunum,londonium,g”teborg/1
+44Mo— se trouve l'Œle de man ?
+44 dans la mer du nord,dans la mer d'irlande,dans l'oc‚an atlantique/2
+45Mquel motif est constitu‚ par une triple spirale ?
+45 la croix ans‚e,la triskŠle,le triglyphe/2
+46Mque sont les grampians ?
+46 des Œles,un groupe de lacs,un massif montagneux/3
+47Mque trouve-t-on entre l'irlande et l'angleterre ?
+47 l'Œle de man,les Œles shetland,jersey/1
+48Mqui ‚taient les brigantes ?
+48 un peuple de marins,une tribu celte,des mauvais g‚nies/2
+49Mcombien de raids effectua c‚sar en angleterre ?
+49 deux,sept,douze/1
+50Mquand parla-t-on pour la premiŠre fois de nessie ?
+50 en 53 av.j.c.,en 565,en 1972/2
+51Msous quelle forme ‚tait transport‚ l'‚tain ?
+51 en rouleaux,en poudre,en lingots/3
+52Mo— se trouvait le plus grand centre d'extraction d'‚tain ?
+52 en cornouailles,au pays de galles,en irlande du nord/1
+53Mqui entreprit la conquˆte de l'angleterre ?
+53 hadrien,claude,marc aurŠle/2
+54Mquel lieu est surnomm‚ "choeur des g‚ants" ?
+54 maiden castle,le tumulus de newgrange,stonehenge/3
+55Mque construisit le g‚n‚ral romain antonin en ‚cosse ?
+55 une muraille en terre,la ville de glasgow,une statue de bouddica/1
+56Mcomment se nomme la pointe sud de l'angleterre ?
+56 st david's head,land's end,pentland firth/2
+57Mque faisaient les ‚pouses celtes en cas de guerre ?
+57 elles ‚migraient,elles se mutilaient,elles se battaient/3
+58Mde quelle couleur ‚taient les cheveux de bouddica ?
+58 roux,blonds,bruns/1
+59Mqu'est-ce qu'une cetra ?
+59 un casque,un petit bouclier,une ceinture/2
+60Mqui ‚taient les plus nombreux ?
+60 les ‚pidii,les selgovae,les brigantes/3
+61Mcomment s'appelaient les Œles britanniques ?
+61 les Œles p‚traniques,les Œles b‚traniques,les Œles pritaniques/1
+62Mqui ‚tait caventina ?
+62 une reine,une d‚esse,une sorciŠre l‚gendaire/2
+63Mqui ‚tait le dieu irlandais de la musique ?
+63 cornus,fifrus,maponus/3
+64Mqu'est-ce que le poteen ?
+64 du whisky irlandais,une espŠce de pain,une maladie des pieds/1
+65Md'o— proviennent les pierres de stonehenge ?
+65 d'‚cosse,du pays de galles,de cornouailles/2
+66Mqu'est-ce que le hurley ?
+66 un vent du nord,une race de chiens,un sport/3
+67Men irlande, qu'‚tait un filid ?
+67 une sorte de druide,un bateau de pˆche,un tablier en cuir/1
+68Mqui utilisa l'‚criture oghamique ?
+68 les ‚cossais,les irlandais et les gallois,les gallois/2
+69Men ‚cosse, qu'est-ce qu'un crannog ?
+69 un cimetiŠre,un casque … cornes,une ferme fortifi‚e/3
+70Mqu'appelle-t-on whiskey ?
+70 le whisky irlandais,du whisky et de la biŠre,du whisky ƒg‚ de 16 ans/1
+71Dqu'est-ce qu'un cromlech ?
+71 un cercle de menhirs,une enceinte fortifi‚e,un v‚g‚tal ligueux/1
+72Dquel pays de grande-bretagne s'appelait hibernie ?
+72 l'‚cosse,l'irlande,l'angleterre/2
+73Dau rugby, qu'est-ce qu'un maul ?
+73 un hors-jeu,une obstruction,une mˆl‚e ouverte/3
+74Dqu'est-ce que le go‹del ?
+74 une langue celtique,un fromage,un chant populaire/1
+75Dqu'est-ce qu'un curragh ?
+75 un peigne,une faux,un bateau/3
+76Den irlande, qu'‚tait l'imbolc ?
+76 une colline sacr‚e,la fˆte du printemps,un prˆtre/2
+77Dqu'est-ce qu'un naomhog ?
+77 une barque de pˆche,un tombeau,une hache de guerre/1
+78Dque firent les iceni en l'an 60 ?
+78 ils ‚migrŠrent en ‚cosse,ils br–lŠrent londres,ils vainquirent varus/2
+79Dsous le rŠgne de quel empereur fut fond‚e londres ?
+79 octavien,n‚ron,claude/3
+80Den quelle ann‚e fut fond‚e la ville de londres ?
+80 103 av.j.c.,43 av.j.c.,2 av.j.c./2
+81Dqui ‚tait bouddica ?
+81 une prˆtresse,une reine-guerriŠre,une druidesse/2
+82Dqu'‚tait la l‚gendaire fiana ?
+82 une sorciŠre,une troupe d'‚lite,une citadelle/2
+83Dqu'est-ce qu'un fomoir‚ ?
+83 un fromage,une tour de guet,un g‚nie malfaisant/3
+84Dquelle langue n'est pas ga‚lique ?
+84 le manx,le gallois,le cornique/1
+85Dquelle ville est devenue la capitale de l'‚cosse ?
+85 ardagh,dunedin,burghead/2
+86Do— se trouve l'anneau de brogar ?
+86 sur l'Œle de man,sur les Œles shetland,sur les Œles orkney/3
+87Dqui acheva la conquˆte de l'angleterre ?
+87 agricola,claude,pomp‚e/1
+88Do— se trouve le mur d'hadrien ?
+88 en angleterre,en ‚cosse,entre les deux/1
+89Dqu'est-ce qu'un firth ?
+89 une lance,un estuaire,un rongeur/2
+90Dqu'est-ce que le sid ?
+90 un poŠme ‚pique,une boisson,le monde de l'au-del…/3
+91Do— est situ‚ stonehenge ?
+91 dans le wiltshire,dans le devonshire,dans le kent/1
+92Dselon la l‚gende, qui ‚tait aoife ?
+92 la d‚esse du feu,une sorciŠre,une naufrageuse/2
+93Dquel est la longueur du mur d'hadrien ?
+93 120 km,170 km,225 km/1
+94Dcombien valent 59 degr‚s fahrenheit ?
+94 0 degr‚s celsius,15 degr‚s celsius,17.8 degr‚s celsius/2
+95Dquelle tribu celte occupait l'‚cosse ?
+95 les bituriges,les ‚duens,les pictes/3
+96Dquelle langue n'appartient pas au groupe brittonique ?
+96 le ga‚lique d'‚cosse,le cornouaillais,le gallois/1
+97Do— vivaient les domoni ?
+97 au pays de galles,en cornouailles,dans le devon/2
+98Dquelle ville s'appelait venta belgarum ?
+98 belfast,bradford,winchester/3
+99Dquel peuple celte affronta c‚sar en angleterre ?
+99 les cantii,les cornovii,les iceni/1

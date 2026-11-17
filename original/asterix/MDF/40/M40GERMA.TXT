@@ -1,0 +1,199 @@
+01Fquel est le surnom actuel de la belgique ?
+01 le plat pays,le levant,la ligne claire/1
+02Fcomment les grecs appelaient-ils les germains ?
+02 barbares,loups,chevelus/1
+03Fd'o— l'helv‚tie tient-elle son nom ?
+03 d'un fromage,d'une ville romaine,d'une tribu celte/3
+04Fen suisse, qu'est-ce qu'un canton ?
+04 un d‚partement,une r‚gion,un ‚tat/3
+05Fd'o— provenaient les goths ?
+05 du p‚loponnŠse,de scandinavie,d'asie/2
+06Fqu'‚taient les teutons ?
+06 un peuple germanique,des dieux germaniques,des prˆtres-guerriers/1
+07Fquel h‚ros symbolise l'ind‚pendance de la suisse ?
+07 till l'espiŠgle,guillaume tell,midas/2
+08Fselon la mythologie, que sont les nibelungen ?
+08 des chevaux ail‚s,des marins fant“mes,des nains/3
+09Fquel peuple est c‚lŠbre pour avoir pill‚ rome ?
+09 les vandales,les burgondes,les cimbres/1
+10Fquel est le nom actuel de augusta vindelicorum ?
+10 wrzburg,augsburg,berlin/2
+11Fquel est l'ancien nom de vienne ?
+11 vindelicum,wien,vindobona/3
+12Fqu'‚tait le prachmantel ?
+12 un vˆtement,une arme,un casque … pointe/1
+13Fcombien de familles vivaient dans un einzelh”fe ?
+13 une,trois ou quatre,une dizaine/1
+14Fpour les cimbres, quelle denr‚e avait le plus de valeur ?
+14 le bois,le sel,le bl‚/2
+15Fqu'est-ce que le einkorn ?
+15 de l'orge,de l'avoine,du bl‚/3
+16Fquelle arme n'ont jamais utilis‚ les goths ?
+16 l'arbalŠte,la pique,l'arc/1
+17Fqu'‚tait l'helv‚tie ?
+17 un ‚tat f‚d‚ral,un ensemble de tribus,une monarchie/2
+18Fqui n'‚tait pas germain ?
+18 civilis,chariovalda,germanicus/3
+19Fquel type de religion pratiquaient les goths ?
+19 polyth‚iste,monoth‚iste,chr‚tienne/1
+20Fpour quoi ‚taient renomm‚s les germains ?
+20 leurs mines de fer,leur artisanat,leur barbarie/3
+21F… quelle souche appartenaient les celtes ?
+21 indo-europ‚enne,asiatique,sum‚rienne/1
+22Fsur quoi ‚crivaient les germains ?
+22 des peaux d'animaux,du bois,du papier/2
+23Flequel de ces 3 fromages est suisse ?
+23 le gruyŠre,le comt‚,l'edam/1
+24Fque signifie le nom "ostrogoth" ?
+24 goth du nord,goth de l'est,goth sanguinaire/2
+25Fquel sont les ancˆtres des suisses ?
+25 les cimbres,les ostrogoths,les helvetes/3
+26Fquel fleuve ne coule pas en germanie ?
+26 le rhin,le danube,l'euphrate/3
+27Fqui succ‚da aux romains en autriche ?
+27 les gaulois,les alamans,les belgae/2
+28Fqui occupait l'allemagne avant les germains ?
+28 personne,les ases,les celtes/3
+29Fde quoi faisait partie la belgique au temps de c‚sar ?
+29 de la gaule,de la germanie,de la bretagne/1
+30Fqui ‚tait le chef des ‚burons ?
+30 c‚tautomatix,ambiorix,vitalstatistix/2
+31Mavec quoi est fabriqu‚ l'hydromel ?
+31 des pommes,du raisin,du miel/3
+32Mavec quoi est fabriqu‚e la biŠre ?
+32 du bl‚,de l'avoine,de l'orge/3
+33M… quelle hauteur poussent les ‚delweiss ?
+33 … partir de 500 m,… partir de 1000 m,… partir de 2000 m/2
+34Mquel ‚tait le surnom des wisigoths ?
+34 goths sages,goths destructeurs,goths sans peur/1
+35Mquel peuple germanique est originaire de vendel ?
+35 les vandales,les goths,les burgondes/1
+36Mselon la mythologie, qui sont les enfants de la brume ?
+36 les elfes,les nibelungen,les trolls/2
+37Mo— vivaient … l'origine les vandales ?
+37 en bretagne,prŠs du lac l‚man,en sil‚sie/3
+38Mde quelle forme ‚taient les boucliers germains ?
+38 ovale ou rectangulaire,carr‚e ou ronde,en losange/1
+39Md'o— les clans germains prenaient-ils leur nom ?
+39 de leur lieu d'habitation,du nom de leur chef,du nom d'un dieu/2
+40Mquelle ‚tait l'arme pr‚f‚r‚e des germains ?
+40 l'‚p‚e longue,l'arc,la dague/3
+41Mcomment les teutons honoraient-ils leurs dieux ?
+41 par des sacrifices,par des priŠres,par leur travail/1
+42Mquel ‚tait la premiŠre utilisation des runes ?
+42 le calcul,la magie,le r‚cit/2
+43Mquel ‚tait le mode de vie des germains ?
+43 s‚dentaire,nomade,semi-nomade/3
+44Mquels animaux ‚levaient surtout les goths ?
+44 des bovins,des ovins,des porcins/1
+45Mqu'est-ce qu'une bandkeramik ?
+45 un panier,une poterie,un tissu/2
+46Mcombien de caractŠres contient l'alphabet germain ?
+46 8,16,24/3
+47Mquelle ‚tendue d'eau borde la belgique ?
+47 la mer du nord,la mer baltique,la manche/1
+48Mo— ne sont jamais all‚s les vandales ?
+48 carthage,alexandrie,rome/2
+49Mdans quel pays actuel se trouve hallstatt ?
+49 l'allemagne,la suisse,l'autriche/3
+50Mo— se trouve le "d‚sert des helvŠtes" ?
+50 en allemagne,en suisse,en roumanie/1
+51Mqu'est-ce qu'un palafitte ?
+51 une civiŠre,un village sur pilotis,une croix peinte en rouge/2
+52Mqu'est-ce que le limes ?
+52 un barrage,un camp nomade,une fortification/3
+53Mqu'est-ce que le romanche ?
+53 une langue,un fromage,une faux/1
+54Mquel est le motif traditionnel de l'art celte ?
+54 la feuille de chˆne,la spirale,la patte d'ours/2
+55Mqu'‚taient les bellovaques ?
+55 des germains,des celtes de belgique,des celtes d'helv‚tie/2
+56Mquel est l'autre nom des suŠves ?
+56 les suessions,les pleumoxii,les souaves/3
+57Mo— vivaient les ‚burons ?
+57 en belgique,en suisse,en autriche/1
+58Men combien de temps c‚sar vainquit-il les belges ?
+58 7 mois,5 ans,13 ans/2
+59Mqu'est rgen ?
+59 un dieu germain,la capitale des alamans,une Œle/3
+60Mqu'est-ce qu'un polder ?
+60 une avanc‚e de mer,un village lacustre,un mur d'enceinte/1
+61Msous quel nom est rest‚ c‚lŠbre le chef arminius ?
+61 mark,hermann,helmut/2
+62Mqu'est-ce qu'un landgrave ?
+62 un cimetiŠre h‚lvŠte,un poste-frontiŠre,un prince germanique/3
+63Mqu'est-ce qu'un b‚zirk ?
+63 un territoire,un objet d'art,un poŠme/1
+64Mque consommaient le plus les suŠves ?
+64 le bl‚,l'orge,le ma‹s/2
+65Mquel est l'autre nom du lac l‚man ?
+65 lac de neufchƒtel,lac de constance,lac de genŠve/3
+66Mavec qui les cimbres se sont-ils alli‚s ?
+66 les teutons,les vandales,les carthaginois/1
+67Mque signifie la locution "para bellum" ?
+67 pour les braves,pr‚pare la guerre,pas de quartiers/2
+68Mquelle r‚gion n'‚tait pas germanique ?
+68 la r‚tie,la norique,la b‚tique/3
+69Mquelle ville se trouve au bord du bodensee ?
+69 rorschach,montreux,zurich/1
+70Mquelle tribu germaine n'a jamais ‚migr‚ ?
+70 les suŠves,les burgondes,aucune/3
+71Dqui est wotan ?
+71 le dieu de la guerre,le dieu des forˆts,le dieu des voleurs/1
+72Dqu'est-ce que la vis comica ?
+72 la dr“lerie,la vis sans fin,un automate/1
+73Davec qui les teutons envahirent-ils la gaule ?
+73 les ostrogoths,les cimbres,les burgondes/2
+74Dqui ‚tait alaric 1er ?
+74 un roi vandale,un roi burgonde,un roi wisigoth/3
+75Dquel g‚n‚ral romain fut battu par arminius ?
+75 varus,germanicus,drusus/1
+76Dqui ‚tait th‚odoric le grand ?
+76 un roi cimbre,un roi wisigoth,un roi ostrogoth/3
+77Dde quelle r‚gion germanique provenaient les angles ?
+77 le schleswig,la rh‚nanie,la westphalie/1
+78Dqui ‚tait l'ostrogoth nomm‚ jordanes ?
+78 un g‚n‚ral,un historien,un homme politique/2
+79Dpar quel peuple la dacie a-t-elle ‚t‚ conquise ?
+79 les ostrogoths,les wisigoths,les got0hs/3
+80Dquel g‚n‚ral fut vaincu par les ostrogoths ?
+80 c‚sar,v‚gŠce,odoacre/3
+81Dqui a ‚crit "si vis pacem, para bellum" ?
+81 v‚gŠce,c‚sar,germanicus/1
+82D… quel peuple appartenait le g‚n‚ral gens‚ric ?
+82 les goths,les burgondes,les vandales/3
+83Dqu'est-ce que le kampfmesser ?
+83 une ‚p‚e courte,un fromage,une liturgie/1
+84Dqui ‚tait le chef des bataves de germanicus ?
+84 maroboduus,chariovalda,alaric 1er/2
+85Dde quelle r‚gion provenaient les saxons ?
+85 la rh‚nanie,la vall‚e du danube,l'holstein/3
+86Dqui ‚tait ganna ?
+86 une reine,une espionne,une proph‚tesse/3
+87Dpour qui travaillait ganna ?
+87 domitien,varius,c‚sar/1
+88Do— les cimbres furent-ils extermin‚s ?
+88 aquae sextiae,vercellae,telarum/2
+89Do— marius vainquit-il les teutons ?
+89 brigantium,‚mona,aquae sextiae/3
+90Dqu'est-ce qu'une pflug ?
+90 une charrue,un gƒteau,une barque/1
+91Dquel chef de guerre a combattu les romains ?
+91 germanicus,maroboduus,chariovalda/2
+92Dqui ‚tait tiwaz ?
+92 un g‚n‚ral burgonde,le fils de civilis,le dieu de la guerre/3
+93D… qui les romains comparaient-ils donar ?
+93 hercule,atlas,v‚nus/1
+94Dqui ‚tait le frŠre jumeau du dieu ‚rik ?
+94 ulrik,alrik,derik/2
+95Dcomment s'appelle aujourd'hui octodurum ?
+95 zurich,bƒle,martigny/3
+96D… l'embouchure de quel fleuve ‚taient install‚s les goths ?
+96 le danube,la vistule,l'oder/1
+97Dquelle ‚tait la capitale des helvŠtes ?
+97 augusta raurica,aventicum,durocortorum/2
+98Dquelle province romaine correspondait … l'autriche ?
+98 la b‚tique,la moesie,la norique/3
+99Dquel pays correspond … la dacie ?
+99 la roumanie,l'autriche,la belgique/1
+

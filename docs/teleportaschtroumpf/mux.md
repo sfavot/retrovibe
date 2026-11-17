@@ -1,7 +1,7 @@
 # Vidéos MUX du Téléportaschtroumpf
 
-Décodeur : `src/games/teleportaschtroumpf/data/mux.ts`. Spec de référence : <https://wiki.multimedia.cx/index.php/MUX>.
-Validé contre le prototype `scripts/teleportaschtroumpf/proto/mux.py` (hash des pixels, voir `test/teleportaschtroumpf/mux.test.ts`).
+Décodeur : `src/engine/infogrames/data/mux.ts`. Spec de référence : <https://wiki.multimedia.cx/index.php/MUX>.
+Validé contre le prototype `scripts/teleportaschtroumpf/proto/mux.py` (hash des pixels, voir `test/infogrames/mux.test.ts`).
 
 ## Format (tel qu'implémenté)
 
@@ -67,7 +67,7 @@ L'image est conservée d'une image à l'autre (nécessaire pour l'inter).
 
 ### Vidéos en surimpression (`179a:0673` avec `0x1000`, sûr)
 
-105 fichiers commencent par une image inter, sans image complète : S38A..E, les 30 vidéos de S39 et les 70 de S42 (habillage et vidéos de `154c:097b`). Ce ne sont que des deltas du personnage sur un fond. Avec `0x1000`, après chaque image, le lecteur recopie A à l'écran puis restaure A depuis le fond B (`179a:04e7`..`0501`, `12ec:037c` dans le sens de `13fc:0411`) : l'image suivante se décode sur le fond, et non sur l'image précédente. Seules les 128 premières couleurs de la vidéo sont chargées (`179a:023e`, 0x180 octets). Avant, l'appelant a passé l'écran courant en 128..255 (`13fc:0002(+1)` : couleurs 0..127 recopiées en 128..255, pixels + 0x80) et l'a figé en B (`265b:007c`, `154c:09fb`). Décodées image sur image, ces vidéos laissent une traînée. Port : `VideoBackdrop` (`engine/video.ts`), et `OverlayVideo` pour S38, dont le fond change en cours de vidéo.
+105 fichiers commencent par une image inter, sans image complète : S38A..E, les 30 vidéos de S39 et les 70 de S42 (habillage et vidéos de `154c:097b`). Ce ne sont que des deltas du personnage sur un fond. Avec `0x1000`, après chaque image, le lecteur recopie A à l'écran puis restaure A depuis le fond B (`179a:04e7`..`0501`, `12ec:037c` dans le sens de `13fc:0411`) : l'image suivante se décode sur le fond, et non sur l'image précédente. Seules les 128 premières couleurs de la vidéo sont chargées (`179a:023e`, 0x180 octets). Avant, l'appelant a passé l'écran courant en 128..255 (`13fc:0002(+1)` : couleurs 0..127 recopiées en 128..255, pixels + 0x80) et l'a figé en B (`265b:007c`, `154c:09fb`). Décodées image sur image, ces vidéos laissent une traînée. Port : `VideoBackdrop` (`src/engine/infogrames/video.ts`), et `OverlayVideo` pour S38, dont le fond change en cours de vidéo.
 
 ## Relevé (233 fichiers)
 

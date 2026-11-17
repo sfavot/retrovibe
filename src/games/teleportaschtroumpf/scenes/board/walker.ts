@@ -1,5 +1,5 @@
-import type { Hy8, Hy8Frame } from "../../data/hy8";
-import { TICKS_PER_SECOND } from "../../engine/clock";
+import type { Hy8, Hy8Frame } from "../../../../engine/infogrames/data/hy8";
+import { TICKS_PER_SECOND } from "../../../../engine/infogrames/clock";
 
 /**
  * Poses du Schtroumpf sur le plateau (`DS:28A0`, `2bd4:02bd` pour le choix, `2bd4:0093` pour le dessin et le déplacement).

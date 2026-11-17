@@ -1,7 +1,7 @@
-import type { Input } from "../../src/games/teleportaschtroumpf/engine/input";
+import type { Input } from "../../src/engine/infogrames/input";
 
 /**
- * Doigts simulés, comme l'hôte du navigateur les transmet (`ui/browser-host.ts`) : position, bouton gauche venu d'un doigt,
+ * Doigts simulés, comme l'hôte du navigateur les transmet (`src/engine/infogrames/ui/browser-host.ts`) : position, bouton gauche venu d'un doigt,
  * puis le geste au relâchement. Coordonnées en pixels 320×200. Entre le posé et le relâchement, la scène voit le doigt tenu
  * (`touchHeldAt`) et l'appui « valider » venu du doigt (`validateByTouch`).
  */

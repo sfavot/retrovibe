@@ -1,4 +1,4 @@
-import type { Scene } from "../../../src/games/teleportaschtroumpf/engine/scene";
+import type { Scene } from "../../../src/engine/infogrames/scene";
 import { BlackSmurfsScene, TARGETS, TARGET_UP } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s28-black-smurfs";
 import { BirthdayScene, CANDLE_LIT } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s29-birthday";
 import { BridgeScene } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s30-bridge";

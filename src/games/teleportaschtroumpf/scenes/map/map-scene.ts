@@ -1,13 +1,13 @@
-import type { Hy8 } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import { TICKS_PER_SECOND } from "../../engine/clock";
-import { EffectWait } from "../../engine/effect-wait";
-import { SWIPE_MIN, type Input } from "../../engine/input";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import { TICKS_PER_SECOND } from "../../../../engine/infogrames/clock";
+import { EffectWait } from "../../../../engine/infogrames/effect-wait";
+import { SWIPE_MIN, type Input } from "../../../../engine/infogrames/input";
 import { insideArea, type MenuArea } from "../../engine/menu";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
-import { boundsOf, placeSprite } from "../../engine/sprites";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import { boundsOf, placeSprite } from "../../../../engine/infogrames/sprites";
 import { VoiceLine } from "../board/voices";
 import { MapImage } from "./image";
 import {
@@ -55,7 +55,7 @@ export class MapScene implements Scene {
   private frame: Mcg | null = null;
   private image: MapImage | null = null;
   private sprites: Hy8 | null = null;
-  private beep: Voc | null = null;
+  private beep: Sound | null = null;
 
   private phase: Phase = "browse";
   private k: number;
@@ -108,7 +108,7 @@ export class MapScene implements Scene {
       ctx.resources.mcg(this.frameFile()),
       MapImage.load(ctx),
       ctx.resources.hy8("s02a000s.hy8"),
-      ctx.resources.voc("s07a001b.voc"),
+      ctx.resources.sound("s07a001b.voc"),
     ]);
     const sprites = this.sprites;
     this.anchors = locationAnchors((sprite) => boundsOf(placeSprite(sprites, sprite, false)));

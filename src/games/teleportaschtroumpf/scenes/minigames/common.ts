@@ -1,9 +1,9 @@
-import type { Hy8 } from "../../data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../data/mcg";
-import type { Action } from "../../engine/input";
-import type { Scene, SceneContext } from "../../engine/scene";
-import type { Surface } from "../../engine/surface";
-import { VideoScene, type VideoBackdrop } from "../../engine/video";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
+import type { Action } from "../../../../engine/infogrames/input";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import type { Surface } from "../../../../engine/infogrames/surface";
+import { VideoScene, type VideoBackdrop } from "../../../../engine/infogrames/video";
 import type { Game, GameEvent } from "../../game/rules";
 import { hasIngredient, type MinigameOutcome, type MinigameRequest } from "../../game/state";
 import { INGREDIENT_COUNT, minigameInfo } from "../../game/tables";

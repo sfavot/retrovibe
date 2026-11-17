@@ -1,4 +1,4 @@
-import type { BorlandRandom } from "../../engine/rng";
+import type { BorlandRandom } from "../../../../engine/infogrames/rng";
 import type { Game } from "../../game/rules";
 import { hasIngredient, popcount } from "../../game/state";
 

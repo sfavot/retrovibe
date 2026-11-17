@@ -1,11 +1,11 @@
-import type { PfnFont } from "../data/font";
-import type { Hy8 } from "../data/hy8";
-import type { Mcg } from "../data/mcg";
+import type { PfnFont } from "../../../engine/infogrames/data/font";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../engine/infogrames/data/mcg";
 import { encodeCp437 } from "../../../data/cp437";
-import type { Input } from "../engine/input";
+import type { Input } from "../../../engine/infogrames/input";
 import { insideArea, Menu, type MenuArea, paletteHighlight } from "../engine/menu";
-import { saveOptions } from "../engine/options";
-import type { Scene, SceneContext } from "../engine/scene";
+import { parentOptions, saveOptions } from "../engine/options";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { CLICK_SOUND } from "./setup/common";
 
 /** Nombre de valeurs de chaque réglage : durée 0..3, pause 0..4, message 0..8 (`21ee:1525..153e`). */
@@ -62,7 +62,7 @@ const TOUCH_ROWS: readonly { label: MenuArea; value: MenuArea; centerX: number }
 /**
  * S04 : menu parents (engine.md §6.3, `21ee:13a1`).
  *
- * - reçoit : rien (lit et écrit `ctx.options` : `saveOptions(ctx.host.storage, ctx.options)`) ;
+ * - reçoit : rien (lit et écrit `parentOptions(ctx)` : `saveOptions(ctx.host.storage, parentOptions(ctx))`) ;
  * - rend : `onDone(ctx)` quand l'écran est quitté, une fois les options enregistrées ;
  * - écran suivant (décidé par `flow.ts`) : S07 ;
  * - fonds : `s04a001d.mcg`, `s04a000s.hy8` ; bip `s07a001b.voc`.
@@ -119,7 +119,7 @@ class ParentsScene implements Scene {
   }
 
   enter(ctx: SceneContext): void {
-    const { options } = ctx;
+    const options = parentOptions(ctx);
     this.values = [options.durationIndex, options.pauseIndex, options.messageIndex];
     this.shownDuration = this.values[DURATION];
     this.menu.select(ctx, 0);
@@ -215,10 +215,11 @@ class ParentsScene implements Scene {
   /** `21ee:1bd7..1c4f` : les options sont enregistrées (la date de la dernière partie ne change pas). */
   private finish(ctx: SceneContext): void {
     this.done = true;
-    ctx.options.durationIndex = this.values[DURATION];
-    ctx.options.pauseIndex = this.values[PAUSE];
-    ctx.options.messageIndex = this.values[MESSAGE];
-    saveOptions(ctx.host.storage, ctx.options);
+    const options = parentOptions(ctx);
+    options.durationIndex = this.values[DURATION];
+    options.pauseIndex = this.values[PAUSE];
+    options.messageIndex = this.values[MESSAGE];
+    saveOptions(ctx.host.storage, options);
     this.onDone(ctx);
   }
 }

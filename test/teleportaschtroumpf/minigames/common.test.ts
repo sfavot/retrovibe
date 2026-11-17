@@ -1,10 +1,11 @@
+import { GAME_CONFIG } from "../../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../../src/games/teleportaschtroumpf/engine/engine";
-import type { Scene, SceneContext } from "../../../src/games/teleportaschtroumpf/engine/scene";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
-import type { Hy8 } from "../../../src/games/teleportaschtroumpf/data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../src/games/teleportaschtroumpf/data/mcg";
-import { Surface } from "../../../src/games/teleportaschtroumpf/engine/surface";
+import { Engine } from "../../../src/engine/infogrames/engine";
+import type { Scene, SceneContext } from "../../../src/engine/infogrames/scene";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
+import type { Hy8 } from "../../../src/engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../src/engine/infogrames/data/mcg";
+import { Surface } from "../../../src/engine/infogrames/surface";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import { MINIGAMES } from "../../../src/games/teleportaschtroumpf/game/tables";
 import {
@@ -119,7 +120,7 @@ class Probe implements Scene {
 async function launch(scene: Scene, audio = false) {
   const host = new TestHost();
   host.audio.enabled = audio;
-  const engine = new Engine(host, { seed: 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: 7 });
   await engine.start(scene);
   await runUntil(engine, host, () => !engine.ctx.scenes.transitioning);
   return { host, engine };

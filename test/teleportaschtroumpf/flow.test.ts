@@ -1,6 +1,7 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import { isLocked, saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
+import { Engine } from "../../src/engine/infogrames/engine";
+import { isLocked, parentOptions, saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
 import type { GameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
 import { paletteBounds } from "../../src/games/teleportaschtroumpf/engine/menu";
 import { GAUGE_DELAY_SECONDS, MENU_PARENTS, MENU_QUIT, PARENTS_HOLD_SECONDS, createMenuScene } from "../../src/games/teleportaschtroumpf/scenes/s07-menu";
@@ -12,7 +13,7 @@ const HOVER = [0x10, 0xa4, 0xcc];
 /** Moteur sur le menu S07, avec les gestes de l'utilisateur. */
 async function startMenu() {
   const host = new TestHost();
-  const engine = new Engine(host, { seed: 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: 7 });
   await engine.start(createMenuScene());
   const top = () => engine.ctx.scenes.top?.constructor.name;
   /** Attend une scène (par le nom de sa classe), la fin des chargements et des fondus. */
@@ -73,8 +74,8 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
   it("joue le bip s07a001b à chaque changement de bouton, pas à l'entrée", async () => {
     const t = await startMenu();
     await t.settle("MenuScene");
-    const beep = (await t.engine.ctx.resources.voc("s07a001b.voc")).samples;
-    const beeps = () => t.host.audio.effects.filter((p) => p.sound.samples === beep).length;
+    const beep = (await t.engine.ctx.resources.sound("s07a001b.voc")).data;
+    const beeps = () => t.host.audio.effects.filter((p) => p.sound.data === beep).length;
     expect(beeps()).toBe(0);
     await t.press("ArrowDown");
     expect(beeps()).toBe(1);
@@ -158,7 +159,7 @@ describe.skipIf(!hasOriginalFiles)("flux des écrans depuis le menu S07", () => 
 
   it("Jouer est bloqué par le verrou parental", async () => {
     const t = await startMenu();
-    const { options } = t.engine.ctx;
+    const options = parentOptions(t.engine.ctx);
     options.pauseIndex = 2;
     options.lastGameMinutes = Math.floor(t.host.unixSeconds() / 60) - 10;
     saveOptions(t.host.storage, options);

@@ -1,6 +1,7 @@
+import { GAME_CONFIG } from "../../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../../src/games/teleportaschtroumpf/engine/engine";
-import type { Scene } from "../../../src/games/teleportaschtroumpf/engine/scene";
+import { Engine } from "../../../src/engine/infogrames/engine";
+import type { Scene } from "../../../src/engine/infogrames/scene";
 import { newGame, type GameEvent } from "../../../src/games/teleportaschtroumpf/game/rules";
 import { BESPECTACLED_DESTINATIONS } from "../../../src/games/teleportaschtroumpf/game/tables";
 import { createGlasses, createGlassesAftermath, GlassesScene, transferOf } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s38-glasses";
@@ -23,7 +24,7 @@ async function play38(players: PlayerSpec[], want: (e: Bespectacled) => boolean,
   for (let seed = 1; seed < 400; seed++) {
     const host = new TestHost();
     host.audio.enabled = false;
-    const engine = new Engine(host, { seed });
+    const engine = new Engine(host, GAME_CONFIG, { seed });
     const game = newGame({ players: players.map((p, i) => ({ character: p.character ?? i, level: 0 })) }, engine.ctx.rng);
     players.forEach((spec, i) => {
       for (const k of spec.ingredients ?? []) {

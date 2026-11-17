@@ -1,4 +1,4 @@
-import type { HostStorage } from "../engine/host";
+import type { HostStorage } from "../../../engine/infogrames/host";
 import {
   SoundPrefs as SharedSoundPrefs,
   soundPrefKey,

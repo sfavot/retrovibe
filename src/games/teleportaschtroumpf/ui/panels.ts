@@ -1,16 +1,16 @@
 import { decodeCp437, encodeCp437 } from "../../../data/cp437";
 import { extensionOf, baseName } from "../data/files";
-import { LETTER_SPACING, advance, parsePfn } from "../data/font";
-import { parseHy8, type Hy8 } from "../data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH, parseMcg, parsePal } from "../data/mcg";
-import { MuxDecoder } from "../data/mux";
+import { LETTER_SPACING, advance, parsePfn } from "../../../engine/infogrames/data/font";
+import { audioDuration, parseAudioIndex } from "../../../engine/infogrames/data/audio-index";
+import { parseHy8, type Hy8 } from "../../../engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, parseMcg, parsePal } from "../../../engine/infogrames/data/mcg";
+import { MuxDecoder } from "../../../engine/infogrames/data/mux";
 import { MutFlag, parseMut, parsePrc } from "../data/mut";
 import { parseDescription, parseKeyedTexts } from "../data/text";
-import { parseVoc, vocToFloat32 } from "../data/voc";
-import { boundsOf, placeFrame, placeSprite, type Bounds, type PlacedImage } from "../engine/sprites";
+import { boundsOf, placeFrame, placeSprite, type Bounds, type PlacedImage } from "../../../engine/infogrames/sprites";
 import { formatSize, h, hexDump, paletteSwatch } from "../../../ui/asset-viewer/helpers";
 import type { Panel, PanelContext } from "../../../ui/asset-viewer/viewer";
-import { indexedCanvas, makeCanvas, paintIndexed, paintPlaced, paletteTable } from "./render";
+import { indexedCanvas, makeCanvas, paintIndexed, paintPlaced, paletteTable } from "../../../engine/infogrames/ui/render";
 
 /** Rendu d'un fichier : un panneau de la visionneuse est un `Render` associé à ses extensions (voir `PANELS`). */
 type Render = (ctx: PanelContext) => Promise<HTMLElement> | HTMLElement;
@@ -355,9 +355,17 @@ const muxPanel: Render = (ctx) => {
   );
 };
 
-const vocPanel: Render = (ctx) => {
-  const voc = parseVoc(ctx.bytes);
-  const data = vocToFloat32(voc);
+/**
+ * Son du jeu : un VOC d'origine versionné en MP3 (`<nom>.VOC.mp3`). Sa fréquence et sa longueur d'origine viennent de
+ * l'index `audio.json` ; la lecture s'arrête à cette durée, comme dans le jeu.
+ */
+const soundPanel: Render = async (ctx) => {
+  const index = parseAudioIndex(new TextDecoder().decode(await ctx.fetchBytes("audio.json")));
+  const entry = index.get(ctx.path);
+  // Décodage hors du contexte de sortie : possible avant tout geste, et `decodeAudioData` détache le tampon qu'on lui passe.
+  const decoded = await new OfflineAudioContext(1, 1, 22050).decodeAudioData(ctx.bytes.slice().buffer);
+  const data = decoded.getChannelData(0);
+  const duration = entry ? audioDuration(entry) : decoded.duration;
   const wave = makeCanvas(640, 80);
   const g = wave.getContext("2d")!;
   g.fillStyle = "#8cf";
@@ -384,17 +392,20 @@ const vocPanel: Render = (ctx) => {
   const play = button("lecture", () => {
     stop();
     const actx = ctx.audio();
-    const buffer = actx.createBuffer(1, data.length, voc.sampleRate);
-    buffer.copyToChannel(new Float32Array(data), 0);
     source = actx.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = decoded;
     source.connect(actx.destination);
-    source.start();
+    source.start(0, 0, duration);
   });
   return h(
     "div",
     {},
-    info(["Fréquence", `${voc.sampleRate} Hz`], ["Échantillons", voc.samples.length], ["Durée", `${(voc.samples.length / voc.sampleRate).toFixed(2)} s`]),
+    info(
+      ["Fréquence d'origine", entry ? `${entry.sampleRate} Hz` : "inconnue (absent de audio.json)"],
+      ["Échantillons d'origine", entry ? entry.samples : "inconnu"],
+      ["Durée", `${duration.toFixed(2)} s`],
+      ["Fichier", `MP3, ${formatSize(ctx.bytes.length)}`],
+    ),
     wave,
     h("div", { class: "bar" }, play, button("stop", stop)),
   );
@@ -520,7 +531,7 @@ const BY_EXTENSION: Record<string, Render> = {
   PAL: palPanel,
   HY8: hy8Panel,
   MUX: muxPanel,
-  VOC: vocPanel,
+  MP3: soundPanel,
   PFN: pfnPanel,
   MUT: mutPanel,
   PRC: prcPanel,

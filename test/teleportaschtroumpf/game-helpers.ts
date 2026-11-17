@@ -1,6 +1,7 @@
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import type { Action } from "../../src/games/teleportaschtroumpf/engine/input";
-import { saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
+import { Engine } from "../../src/engine/infogrames/engine";
+import type { Action } from "../../src/engine/infogrames/input";
+import { parentOptions, saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
 import type { PlayerSetup } from "../../src/games/teleportaschtroumpf/game/rules";
 import type { Position } from "../../src/games/teleportaschtroumpf/game/tables";
 import { GameScene, createGameScene, resumeGameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
@@ -59,8 +60,8 @@ export class Session {
   static async start(options: SessionOptions = {}): Promise<Session> {
     const host = new TestHost();
     host.audio.enabled = options.audio ?? false;
-    const engine = new Engine(host, { seed: options.seed ?? 7 });
-    const { options: parent } = engine.ctx;
+    const engine = new Engine(host, GAME_CONFIG, { seed: options.seed ?? 7 });
+    const parent = parentOptions(engine.ctx);
     parent.durationIndex = options.durationIndex ?? 0;
     parent.messageIndex = options.messageIndex ?? 0;
     saveOptions(host.storage, parent);
@@ -78,7 +79,7 @@ export class Session {
   static async resume(save: GameSave, seed = 12345): Promise<Session> {
     const host = new TestHost();
     host.audio.enabled = false;
-    const engine = new Engine(host, { seed });
+    const engine = new Engine(host, GAME_CONFIG, { seed });
     const holder: { session?: Session } = {};
     const scene = resumeGameScene(save, () => {
       if (holder.session) holder.session.finished = true;

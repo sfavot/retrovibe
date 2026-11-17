@@ -1,6 +1,7 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import { saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
+import { Engine } from "../../src/engine/infogrames/engine";
+import { parentOptions, saveOptions } from "../../src/games/teleportaschtroumpf/engine/options";
 import { createGameScene, resumeGameScene } from "../../src/games/teleportaschtroumpf/scenes/game";
 import { forceMinigameStubs } from "../../src/games/teleportaschtroumpf/scenes/minigames";
 import { SAVE_KEY, readSave, type GameSave } from "../../src/games/teleportaschtroumpf/scenes/save";
@@ -35,7 +36,7 @@ async function resumed(save: GameSave, seed = 12345) {
   const host = new TestHost();
   host.audio.enabled = false;
   host.storage.set(SAVE_KEY, JSON.stringify(save));
-  const engine = new Engine(host, { seed });
+  const engine = new Engine(host, GAME_CONFIG, { seed });
   let finished = false;
   const scene = resumeGameScene(save, () => (finished = true));
   await engine.start(scene);
@@ -149,9 +150,9 @@ describe.skipIf(!hasOriginalFiles)("sauvegarde : partie", () => {
     const host = new TestHost();
     host.audio.enabled = false;
     host.storage.set(SAVE_KEY, stale);
-    const engine = new Engine(host, { seed: 9 });
-    saveOptions(host.storage, engine.ctx.options);
-    const scene = createGameScene({ players: [{ character: 2 }], options: engine.ctx.options }, () => undefined);
+    const engine = new Engine(host, GAME_CONFIG, { seed: 9 });
+    saveOptions(host.storage, parentOptions(engine.ctx));
+    const scene = createGameScene({ players: [{ character: 2 }], options: parentOptions(engine.ctx) }, () => undefined);
     await engine.start(scene);
     await untilEntered(engine, host, () => scene.game !== undefined);
     // Dès l'entrée dans la partie, avant le moindre tour : plus de sauvegarde de l'ancienne partie.

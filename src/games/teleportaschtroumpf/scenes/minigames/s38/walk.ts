@@ -1,8 +1,8 @@
-import type { Hy8 } from "../../../data/hy8";
-import { parsePal, type Mcg } from "../../../data/mcg";
-import type { Voc } from "../../../data/voc";
+import type { Hy8 } from "../../../../../engine/infogrames/data/hy8";
+import { parsePal, type Mcg } from "../../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../../engine/infogrames/audio/sound";
 import { voiceName } from "../../../engine/paths";
-import type { Scene, SceneContext } from "../../../engine/scene";
+import type { Scene, SceneContext } from "../../../../../engine/infogrames/scene";
 import { OverlayVideo } from "./overlay-video";
 
 /**
@@ -32,7 +32,7 @@ export class WalkScene implements Scene {
   private mcg!: Mcg;
   private map!: Mcg;
   private sprites!: Hy8;
-  private voice!: Voc;
+  private voice!: Sound;
   private pal!: Uint8Array;
   private video!: OverlayVideo;
   private phase: WalkPhase = "fadeIn";
@@ -74,7 +74,7 @@ export class WalkScene implements Scene {
       ctx.resources.mcg(`s38a00${n}d.mcg`),
       ctx.resources.mcg(`s02a00${WALK_MAPS[index]}d.mcg`),
       ctx.resources.hy8("s02a000s.hy8"),
-      ctx.resources.voc(voiceName("s38a", 1 + WALK_VOICES[this.character])),
+      ctx.resources.sound(voiceName("s38a", 1 + WALK_VOICES[this.character])),
       OverlayVideo.load(ctx, this.choice === "a" ? "s38a.mux" : "s38b.mux"),
       ctx.resources.bytes(`s38a0${n}${k}d.pal`).then(parsePal),
     ]);

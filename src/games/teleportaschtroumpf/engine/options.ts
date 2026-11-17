@@ -1,4 +1,5 @@
-import type { HostStorage } from "./host";
+import type { HostStorage } from "../../../engine/infogrames/host";
+import type { SceneContext } from "../../../engine/infogrames/scene";
 
 /**
  * Options parents (S04, engine.md §6.3 et §9.10), qui remplacent `c:\smurf.cfg` : durée de la partie,
@@ -59,6 +60,21 @@ export function loadOptions(storage: HostStorage): ParentOptions {
   } catch {
     return { ...DEFAULT_OPTIONS };
   }
+}
+
+const loaded = new WeakMap<SceneContext, ParentOptions>();
+
+/**
+ * Options parents du moteur en cours : lues une fois dans le stockage de l'hôte, au premier appel, puis partagées par
+ * toutes les scènes. Les modifier puis `saveOptions(ctx.host.storage, parentOptions(ctx))`.
+ */
+export function parentOptions(ctx: SceneContext): ParentOptions {
+  let options = loaded.get(ctx);
+  if (!options) {
+    options = loadOptions(ctx.host.storage);
+    loaded.set(ctx, options);
+  }
+  return options;
 }
 
 /** Écrit les options ; renvoie faux si le stockage refuse. */

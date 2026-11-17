@@ -1,7 +1,9 @@
 import "./style.css";
 import { fetchGameFiles } from "../data/files";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../data/mcg";
-import { Engine } from "../engine/engine";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../engine/infogrames/data/mcg";
+import { Engine } from "../../../engine/infogrames/engine";
+import { GAME_CONFIG } from "../engine/config";
+import { resolveGameFile } from "../engine/paths";
 import { createBootScene } from "../scenes/boot";
 import { goMainMenu } from "../scenes/flow";
 import { resumeGameScene } from "../scenes/game";
@@ -9,7 +11,7 @@ import { readSave } from "../scenes/save";
 import { canvasMayTakeFocus, leaveGame, mountGameShell } from "../../../ui/game-shell";
 import { MissingFilesError } from "../../../ui/files";
 import { localStorageStore as createLocalStorageStore } from "../../../ui/local-storage";
-import { BrowserHost } from "./browser-host";
+import { BrowserHost } from "../../../engine/infogrames/ui/browser-host";
 import { SOUND_KEY, SoundPrefs } from "./prefs";
 
 export { canvasMayTakeFocus };
@@ -91,10 +93,10 @@ export async function mountApp(container: HTMLElement, options: AppOptions): Pro
     const files = await fetchGameFiles(options.base).catch((error: unknown) => {
       throw new MissingFilesError(error instanceof Error ? error.message : String(error));
     });
-    host = new BrowserHost(options.base, files, shell.canvas, () => leave(container, options));
+    host = new BrowserHost(options.base, (name) => resolveGameFile(files, name), shell.canvas, () => leave(container, options));
     // Débloque le son tant que l'activation du clic (« Jouer », « Reprendre la partie ») est valable : logo et intro seront sonores.
     host.audio.unlock();
-    engine = new Engine(host);
+    engine = new Engine(host, GAME_CONFIG);
     // Reprise : directement sur le plateau, sans logo, introduction ni menu (une sauvegarde devenue invalide est effacée par `readSave`).
     const save = options.resume ? readSave(localStorageStore) : null;
     await engine.start(save ? resumeGameScene(save, goMainMenu) : createBootScene());

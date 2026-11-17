@@ -1,8 +1,8 @@
-import type { Hy8 } from "../data/hy8";
-import type { Mcg } from "../data/mcg";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../engine/infogrames/data/mcg";
 import { AREA_MARGIN, Menu, spriteArea, type MenuHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
 import { CLICK_SOUND } from "./setup/common";
 import { askConfirmation } from "./flow";

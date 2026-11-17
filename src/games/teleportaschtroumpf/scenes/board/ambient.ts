@@ -1,6 +1,6 @@
-import type { Hy8 } from "../../data/hy8";
-import type { BorlandRandom } from "../../engine/rng";
-import type { Surface } from "../../engine/surface";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { BorlandRandom } from "../../../../engine/infogrames/rng";
+import type { Surface } from "../../../../engine/infogrames/surface";
 
 /**
  * Décor animé des écrans du plateau (routines de dessin `2bd4:07e2..149c`, une par écran, appelées à chaque image par

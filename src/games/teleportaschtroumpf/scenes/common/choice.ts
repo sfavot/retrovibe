@@ -1,4 +1,4 @@
-import type { SceneContext } from "../../engine/scene";
+import type { SceneContext } from "../../../../engine/infogrames/scene";
 
 /** Couleur de survol des boutons à palette (RVB 8 bits `10 A4 CC`, la même que le menu S07). */
 export const HOVER_COLOR = [0x10, 0xa4, 0xcc] as const;

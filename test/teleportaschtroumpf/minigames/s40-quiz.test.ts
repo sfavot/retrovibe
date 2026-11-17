@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { encodeCp437 } from "../../../src/data/cp437";
-import { measureText, parsePfn } from "../../../src/games/teleportaschtroumpf/data/font";
+import { measureText, parsePfn } from "../../../src/engine/infogrames/data/font";
 import { parseQuiz } from "../../../src/games/teleportaschtroumpf/data/text";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   ANSWER_ROWS,
@@ -209,11 +209,11 @@ describe.skipIf(!hasOriginalFiles)("S40 Le Quizz : au doigt (ajout du port)", ()
   it("appui long sur une proposition : surlignée puis lue à voix haute, sans valider (le clic droit du doigt)", async () => {
     const run = await launch({ seed: 5, audio: true });
     const scene = run.scene as QuizScene;
-    const answerVoice = await run.ctx.resources.voc(`s40a${String(answerVoiceNumber(scene.questionIndex, scene.rowAnswers[2])).padStart(3, "0")}t.voc`);
+    const answerVoice = await run.ctx.resources.sound(`s40a${String(answerVoiceNumber(scene.questionIndex, scene.rowAnswers[2])).padStart(3, "0")}t.voc`);
     longPress(run.host.input, ...(await rowPoint(run, 2)));
     await run.until(() => scene.stage === "read");
     expect(scene.selection).toBe(2);
-    expect(run.host.audio.plays.at(-1)!.sound.samples).toEqual(answerVoice.samples);
+    expect(run.host.audio.plays.at(-1)!.sound.data).toEqual(answerVoice.data);
     await run.until(() => scene.stage === "choose");
     await run.run(300);
     expect(scene.stage).toBe("choose");
@@ -286,7 +286,7 @@ describe.skipIf(!hasOriginalFiles)("S40 Le Quizz : déroulé, réponses, temps",
     const scene = run.scene as QuizScene;
     await run.until(() => scene.stage === "ask");
     const played = run.host.audio.plays.at(-1)!;
-    expect(played.sound.samples.length).toBeGreaterThan(8000);
+    expect(played.sound.sampleCount).toBeGreaterThan(8000);
     await run.run(300);
     expect(scene.stage).toBe("ask");
     expect(scene.seconds).toBe(0);

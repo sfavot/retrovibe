@@ -1,7 +1,8 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { parseMcg } from "../../src/games/teleportaschtroumpf/data/mcg";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import { Palette } from "../../src/games/teleportaschtroumpf/engine/palette";
+import { parseMcg } from "../../src/engine/infogrames/data/mcg";
+import { Engine } from "../../src/engine/infogrames/engine";
+import { Palette } from "../../src/engine/infogrames/palette";
 import { LOGO_WAIT_SECONDS, createBootScene } from "../../src/games/teleportaschtroumpf/scenes/boot";
 import { TestHost, runFor } from "./engine-test-host";
 import { hasOriginalFiles, readData } from "./helpers";
@@ -9,7 +10,7 @@ import { hasOriginalFiles, readData } from "./helpers";
 describe.skipIf(!hasOriginalFiles)("démarrage headless", () => {
   it("logo → intro (passée par Échap) → titre → fond du menu, avec les pixels de S07A001D.MCG", async () => {
     const host = new TestHost();
-    const engine = new Engine(host, { seed: 42 });
+    const engine = new Engine(host, GAME_CONFIG, { seed: 42 });
     await engine.start(createBootScene());
 
     /** Scènes rencontrées, dans l'ordre, avec le temps simulé (ms) de leur entrée. */
@@ -81,7 +82,6 @@ describe.skipIf(!hasOriginalFiles)("démarrage headless", () => {
     // Musique de fond : un des trois s52m00Nm.voc, en boucle.
     const music = host.audio.plays[host.audio.plays.length - 1];
     expect(music.loop).toBe(true);
-    const sizes = [1430214, 456503, 501701];
-    expect(sizes.some((size) => Math.abs(size - music.sound.samples.length) < 200)).toBe(true);
+    expect([1430181, 456470, 501668]).toContain(music.sound.sampleCount);
   }, 120_000);
 });

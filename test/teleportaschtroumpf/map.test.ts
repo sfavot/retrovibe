@@ -1,11 +1,12 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it, vi } from "vitest";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import type { Scene, SceneContext } from "../../src/games/teleportaschtroumpf/engine/scene";
+import { Engine } from "../../src/engine/infogrames/engine";
+import type { Scene, SceneContext } from "../../src/engine/infogrames/scene";
 import type { Game } from "../../src/games/teleportaschtroumpf/game/rules";
 import { MAP_CELLS, MAP_LOCATIONS } from "../../src/games/teleportaschtroumpf/game/tables";
 import { FreeModeScene, MapScene, createFreeModeScene, createMapScene } from "../../src/games/teleportaschtroumpf/scenes/s02-map";
 import { BACK_BUTTON } from "../../src/games/teleportaschtroumpf/scenes/map/map-scene";
-import { boundsOf, placeSprite } from "../../src/games/teleportaschtroumpf/engine/sprites";
+import { boundsOf, placeSprite } from "../../src/engine/infogrames/sprites";
 import {
   MAP_ROWS,
   MAP_SEGMENTS,
@@ -91,7 +92,7 @@ describe("carte S02 : tables et géométrie (pur)", () => {
 async function launch(scene: Scene, { audio = false } = {}) {
   const host = new TestHost();
   host.audio.enabled = audio;
-  const engine = new Engine(host, { seed: 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: 7 });
   await engine.start(scene);
   await advance(engine, host, 600);
   const press = async (code: string, ms = 120) => {
@@ -181,13 +182,13 @@ describe.skipIf(!hasOriginalFiles)("carte S02 : sélection (mode libre et puits)
 
   it("le bip de navigation (s07a001b) accompagne chaque changement de lieu, pas une butée", async () => {
     const t = await launch(new MapScene({ mode: "free" }, () => undefined), { audio: true });
-    const beep = (await t.engine.ctx.resources.voc("s07a001b.voc")).samples;
+    const beep = (await t.engine.ctx.resources.sound("s07a001b.voc")).data;
     const before = t.host.audio.effects.length;
     await t.press("ArrowDown"); // butée basse
     expect(t.host.audio.effects.length).toBe(before);
     await t.press("ArrowUp");
     expect(t.host.audio.effects.length).toBe(before + 1);
-    expect(t.host.audio.effects.at(-1)?.sound.samples).toBe(beep);
+    expect(t.host.audio.effects.at(-1)?.sound.data).toBe(beep);
   }, 60_000);
 
   it("Entrée joue la voix d'aide s45v du lieu ; rien sur « retour »", async () => {
@@ -201,8 +202,8 @@ describe.skipIf(!hasOriginalFiles)("carte S02 : sélection (mode libre et puits)
     const afterBeep = plays();
     await t.press("Enter");
     expect(plays()).toBe(afterBeep + 1);
-    const voice = (await t.engine.ctx.resources.voc("s45v023t.voc")).samples;
-    expect(t.host.audio.plays.at(-1)?.sound.samples).toBe(voice);
+    const voice = (await t.engine.ctx.resources.sound("s45v023t.voc")).data;
+    expect(t.host.audio.plays.at(-1)?.sound.data).toBe(voice);
   }, 60_000);
 
   it("puits : démarre sur le premier lieu, pas de retour dans la sélection, sortie d'office à 36 s avec k = 1", async () => {
@@ -270,8 +271,8 @@ describe.skipIf(!hasOriginalFiles)("mode libre « Schtroumpf »", () => {
     await t.press("Space");
     expect(launched.list).toEqual([]);
     await t.idle();
-    const voices = await Promise.all(["s23a001t.voc", "s23a002t.voc"].map((n) => t.engine.ctx.resources.voc(n)));
-    expect(voices.some((v) => t.host.audio.plays.some((p) => p.sound.samples === v.samples))).toBe(true);
+    const voices = await Promise.all(["s23a001t.voc", "s23a002t.voc"].map((n) => t.engine.ctx.resources.sound(n)));
+    expect(voices.some((v) => t.host.audio.plays.some((p) => p.sound.data === v.data))).toBe(true);
     await advance(t.engine, t.host, 15_000);
     await t.idle();
     expect(launched.list).toHaveLength(1);
@@ -352,7 +353,7 @@ describe.skipIf(!hasOriginalFiles)("carte S02 : au doigt", () => {
     await gesture(t, () => longPress(t.host.input, cake.x, cake.y));
     expect(map.selection).toBe(2);
     expect(map.stage).toBe("voice");
-    expect(t.host.audio.plays.at(-1)?.sound.samples).toBe((await t.engine.ctx.resources.voc("s45v023t.voc")).samples);
+    expect(t.host.audio.plays.at(-1)?.sound.data).toBe((await t.engine.ctx.resources.sound("s45v023t.voc")).data);
     await gesture(t, () => tap(t.host.input, cake.x, cake.y)); // coupe la voix sans valider
     expect(map.stage).toBe("browse");
     expect(results).toEqual([]);

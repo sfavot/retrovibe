@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseHy8, type Hy8 } from "../../../src/games/teleportaschtroumpf/data/hy8";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { parseHy8, type Hy8 } from "../../../src/engine/infogrames/data/hy8";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   BIRD_LEAVE_X,
@@ -457,7 +457,7 @@ describe.skipIf(!hasOriginalFiles)("S34 La Cigogne : la traversée, l'issue", ()
   it("sans rien toucher : elle tombe au sol, un oiseau la touche ; chute, fondu, vidéo s34b, aucun ingrédient", async () => {
     const run = await launchMinigame(34, { level: 1, seed: 1, audio: true });
     const scene = run.scene as StorkScene;
-    const hit = await run.ctx.resources.voc("s34a004b.voc");
+    const hit = await run.ctx.resources.sound("s34a004b.voc");
     expect(scene.stage).toBe("ride");
     await run.run(1500);
     run.shot("s34-depart");
@@ -474,7 +474,7 @@ describe.skipIf(!hasOriginalFiles)("S34 La Cigogne : la traversée, l'issue", ()
     }, 60_000);
     expect([...stages]).toEqual(expect.arrayContaining(["hitSound", "fadeOut", "result"]));
     expect(scene.state.end).toBe("failure");
-    expect(run.host.audio.effects.some((p) => p.sound.samples === hit.samples)).toBe(true);
+    expect(run.host.audio.effects.some((p) => p.sound.data === hit.data)).toBe(true);
     await run.run(1000);
     run.shot("s34-echec-video");
     const outcome = await run.finish(60_000);

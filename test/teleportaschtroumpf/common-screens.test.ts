@@ -1,10 +1,11 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
 import { encodeCp437 } from "../../src/data/cp437";
-import { parsePfn } from "../../src/games/teleportaschtroumpf/data/font";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import { PictureScene } from "../../src/games/teleportaschtroumpf/engine/picture";
-import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
-import type { Scene } from "../../src/games/teleportaschtroumpf/engine/scene";
+import { parsePfn } from "../../src/engine/infogrames/data/font";
+import { Engine } from "../../src/engine/infogrames/engine";
+import { PictureScene } from "../../src/engine/infogrames/picture";
+import { BorlandRandom } from "../../src/engine/infogrames/rng";
+import type { Scene } from "../../src/engine/infogrames/scene";
 import { parseConfirmationTexts } from "../../src/games/teleportaschtroumpf/data/text";
 import { CHARACTER_NAMES } from "../../src/games/teleportaschtroumpf/game/tables";
 import { quitGame } from "../../src/games/teleportaschtroumpf/scenes/flow";
@@ -46,7 +47,7 @@ class NoDocHost extends TestHost {
 }
 
 async function session(host = new TestHost()) {
-  const engine = new Engine(host, { seed: 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: 7 });
   await engine.start(new Board());
   const top = () => engine.ctx.scenes.top?.constructor.name;
   const settle = async (name: string) => {
@@ -79,7 +80,7 @@ async function session(host = new TestHost()) {
     await runFor(engine, host, 100);
   };
   const lastSound = () => host.audio.plays.at(-1)?.sound;
-  const voc = (name: string) => engine.ctx.resources.voc(name);
+  const voc = (name: string) => engine.ctx.resources.sound(name);
   /** Entrées de palette en couleur de survol, parmi `entries`. */
   const lit = (entries: number[]) =>
     entries.filter((e) => HOVER_COLOR.every((v, k) => engine.ctx.palette.colors[e * 3 + k] === v));

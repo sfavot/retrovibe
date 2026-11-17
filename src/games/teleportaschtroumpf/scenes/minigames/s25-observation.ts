@@ -1,7 +1,7 @@
-import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Timer } from "../../engine/clock";
-import type { Scene, SceneContext } from "../../engine/scene";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Timer } from "../../../../engine/infogrames/clock";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import { FRAME_LINE, FRAME_SHADOW, OBJECT_ORIGIN_X, OBJECT_ORIGIN_Y, Pointer, SoundHush, drawFrame, isObjectHit, levelTimeLimit, minigameLevel, minigameRequest, pointsForTime, pointsOutcome, type ObjectRect, type MinigameDone, type MinigameFactory } from "./common";
 
@@ -74,9 +74,9 @@ export class ObservationScene implements Scene {
   private readonly level: number;
   private mcg!: Mcg;
   private pointer!: Pointer;
-  private click!: Voc;
-  private winVoices: Voc[] = [];
-  private failVoices: Voc[] = [];
+  private click!: Sound;
+  private winVoices: Sound[] = [];
+  private failVoices: Sound[] = [];
   private letter = 0;
   private digit = 0;
   private phase: ObservationPhase = "intro";
@@ -152,11 +152,11 @@ export class ObservationScene implements Scene {
     this.letter = letter;
     this.digit = digit;
     const numbered = (prefix: string, count: number, first = 1) =>
-      Promise.all(Array.from({ length: count }, (_, i) => ctx.resources.voc(`${prefix}${String(first + i).padStart(3, "0")}t.voc`)));
+      Promise.all(Array.from({ length: count }, (_, i) => ctx.resources.sound(`${prefix}${String(first + i).padStart(3, "0")}t.voc`)));
     const [mcg, sprites, click, winVoices, failVoices] = await Promise.all([
       ctx.resources.mcg(pictureFile(letter, digit)),
       ctx.resources.hy8("s25a000s.hy8"),
-      ctx.resources.voc("s25a001b.voc"),
+      ctx.resources.sound("s25a001b.voc"),
       numbered("s25c", WIN_VOICES),
       numbered("s25b", MISS_VOICE_BASE + FAIL_VOICES - 1),
     ]);

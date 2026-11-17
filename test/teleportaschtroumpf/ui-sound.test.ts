@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WebAudioBackend } from "../../src/games/teleportaschtroumpf/audio/web-audio";
-import { MAX_VOLUME, VoiceChannel } from "../../src/games/teleportaschtroumpf/audio/voice";
-import { Input } from "../../src/games/teleportaschtroumpf/engine/input";
+import { WebAudioBackend } from "../../src/engine/infogrames/audio/web-audio";
+import { MAX_VOLUME, VoiceChannel } from "../../src/engine/infogrames/audio/voice";
+import { Input } from "../../src/engine/infogrames/input";
 import { SOUND_KEY, SoundPrefs } from "../../src/games/teleportaschtroumpf/ui/prefs";
 import { FakeAudio, MemoryStorage } from "./engine-test-host";
+import { pcmSound } from "../../src/engine/infogrames/audio/sound";
 
 class FakeNode {
   connect(): void {}
@@ -45,7 +46,7 @@ class FakeContext {
   }
 }
 
-const sound = (seconds: number) => ({ samples: new Uint8Array(seconds * 4000).fill(128), sampleRate: 4000 });
+const sound = (seconds: number) => pcmSound(new Uint8Array(seconds * 4000).fill(128), 4000);
 
 describe("coupure du son (Web Audio)", () => {
   beforeEach(() => vi.stubGlobal("AudioContext", FakeContext));

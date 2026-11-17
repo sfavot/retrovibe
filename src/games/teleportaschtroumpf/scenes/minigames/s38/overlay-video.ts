@@ -1,7 +1,7 @@
-import { MuxDecoder } from "../../../data/mux";
-import { TICKS_PER_SECOND } from "../../../engine/clock";
-import type { SceneContext } from "../../../engine/scene";
-import { scanMux } from "../../../engine/video";
+import { MuxDecoder } from "../../../../../engine/infogrames/data/mux";
+import { TICKS_PER_SECOND } from "../../../../../engine/infogrames/clock";
+import type { SceneContext } from "../../../../../engine/infogrames/scene";
+import { scanMux } from "../../../../../engine/infogrames/video";
 
 /**
  * Vidéo MUX « en surimpression » (`179a:0673` avec `0x1000`, utilisée par S38 : `1fc6:085f` et `1fc6:0c20`). À chaque image l'original recopie le fond B

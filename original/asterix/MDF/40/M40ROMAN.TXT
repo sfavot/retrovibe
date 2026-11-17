@@ -1,0 +1,198 @@
+01Fcombien d'hommes contient une centurie ?
+01 10,100,101/2
+02Fcomment se nomme l'officier qui commande une centurie ?
+02 un centurion,un sergent,un l‚gionnaire/1
+03Fcomment se pr‚nomme c‚sar ?
+03 caius julius,marcus julius,crassus julius/1
+04Fqui disait "ave cesar, morituri te salutant" ?
+04 les gladiateurs,les personnes ƒg‚es,caius et crassus morituri/1
+05Fveni vidi... quelle est la fin de cette phrase ?
+05 vici,vinci,voici/1
+06Fquelle est la valeur du chiffre romain }|{ ?
+06 7,11,14/3
+07Fqu'est-ce qu'un glaive ?
+07 une ‚p‚e courte,un bouclier,un casque/1
+08Fqui est l'auteur de "la guerre des gaules" ?
+08 jules c‚sar,ren‚ goscinny,pomp‚e/1
+09Fqu'est-ce qu'une agora ?
+09 une place,un amphith‚ƒtre,une porcherie/1
+10Fquelle ‚tait la couleur de la cape de c‚sar ?
+10 bleue,blanche,rouge/3
+11Fque faut-il rendre … c‚sar ?
+11 l'‚p‚e de vercing‚torix,ce qui appartient … c‚sar,le clef des thermes/2
+12Fqu'est-ce qu'un sesterce ?
+12 une hache de guerre,une piŠce de monnaie,un sceau/2
+13Fcomment se nomme une prˆtresse de la d‚esse vesta ?
+13 une vespasienne,une vestalie,une vestale/3
+14Fdans les jeux du cirque, que signifiait le pouce baiss‚ ?
+14 tuez le perdant,‚pargnez le perdant,lƒchez les lions/1
+15Fcombien d'hommes commande un d‚curion ?
+15 10,100,1000/1
+16Fcombien de d‚curies contient une centurie ?
+16 2,5,10/3
+17Fcombien d'anses comporte une amphore ?
+17 deux,trois,quatre/1
+18Fque signifie la phrase "in vino veritas" ?
+18 je dis la v‚rit‚,la v‚rit‚ est dans le vin,vin de qualit‚ sup‚rieure/2
+19Fde quoi ‚tait faite la couronne de c‚sar ?
+19 d'aub‚pine,de laurier,de houx/2
+20Fque signifie l'expression "cave canem" ?
+20 tel pŠre tel fils,attention au chien,marqu‚ par la honte/2
+21Fcomment se nommait le frŠre jumeau de romulus ?
+21 remus,romus,ramus/1
+22Fque fit romulus … son frŠre ?
+22 il en fit son esclave,il le tua,il l'exila/2
+23Fselon la l‚gende, qui fonda rome ?
+23 tullus hostilius,romulus,numa pompilius/2
+24Fquels animaux hannibal utilisa-t-il pour faire la guerre ?
+24 des ‚l‚phants,des girafes,des mouches ts‚-ts‚/1
+25Fquel est le dieu protecteur du chef de famille ?
+25 le patron,le martinet,le g‚nie/3
+26Fqui soup‡onne-t-on d'avoir fait incendier rome ?
+26 caligula,n‚ron,pomp‚e/2
+27Fde quel mal souffrait l'empereur caligula ?
+27 de folie,de la lŠpre,de la peste bubonique/1
+28Fqu'est-ce qu'une toge ?
+28 un vˆtement,un chapeau,une m‚daille/1
+29Fque fut l'empereur n‚ron ?
+29 un architecte g‚nial,un cruel tyran,un grand historien/2
+30Fquels dieux ‚taient responsables du mobilier ?
+30 les mƒnes,les g‚nies,les p‚nates/3
+31Mque doit-on … appius claudius ?
+31 une grande route romaine,l'invention du vin,la 1Šre carte de l'europe/1
+32Mque signifie "alea jacta est" ?
+32 o— suis-je ?,ma parole est d'or,le sort en est jet‚/3
+33Mqu'appelait-on "mer des t‚nŠbres" ?
+33 la mer du nord,la mer noire,l'oc‚an atlantique/3
+34Mquelle est la valeur du chiffre romain ~}{| ?
+34 37,66,116/2
+35Mcomment dit-on "qui va l… ?" en latin ?
+35 quomodo vales ?,quid ?,quo vadis ?/3
+36Mqu'est-ce qu'un pilum ?
+36 un javelot,une enclume,un engin de torture/1
+37Mqu'est-ce qu'un triumvirat ?
+37 un groupe de 3 chefs,un groupe de 3 villes,un trio de conspirateurs/1
+38Mqu'est-ce qu'une phalange ?
+38 une formation de combat,une femme-soldat,une ‚quipe de gladiateurs/1
+39Mqu'est-ce qu'un delator ?
+39 un juge,un avocat,un procureur/3
+40Mquel est le nom de la monnaie d'or frapp‚e par c‚sar ?
+40 aureus,sesterce,lire/1
+41Mqu'est-ce qu'un atrium ?
+41 une arŠne,une chemin‚e,une grande piŠce/3
+42Mlaquelle de ces 3 armes n'est pas une catapulte ?
+42 onagre,baliste,rondache/3
+43Mqu'‚taient les dieux lares ?
+43 les dieux de la guerre,les protecteurs du foyer,les protecteurs des morts/2
+44Mde quel mal souffrait jules c‚sar ?
+44 ‚pilepsie,coliques n‚phr‚tiques,an‚mie/1
+45Mcombien de dieux ‚taient honor‚s par les romains ?
+45 1,47,plus de 25 000/3
+46Mque sont les mƒnes ?
+46 les ancˆtres d‚funts,les paysans,les muletiers/1
+47Mqu'est-ce qu'un pontife ?
+47 un g‚n‚ral d'arm‚e,un membre du clerg‚,un orateur/2
+48M… qui aimait parler l'empereur caligula ?
+48 … son cheval,… son reflet,… cic‚ron/1
+49Mqu'est-ce qu'un esclave affranchi ?
+49 un enfant d'esclave,un esclave redevenu libre,un esclave tatou‚/2
+50Mqu'est-ce que la plŠbe ?
+50 une priŠre,une maladie de peau,la classe populaire/3
+51Mquel fleuve franchit c‚sar avant de s'emparer de rome ?
+51 le rubicon,le tibre,l'adige/1
+52Mo— fut assassin‚ c‚sar ?
+52 chez lui,en campagne,au s‚nat/3
+53Mquel membre du 2Šme triumvirat ‚pousa cl‚opƒtre ?
+53 octavien,antoine,l‚pide/2
+54Mqui ‚tait cic‚ron ?
+54 un avocat,un empereur,un poŠte/1
+55Mquel empereur succ‚da … jules c‚sar ?
+55 tibŠre,n‚ron,octavien/3
+56Mcombien de temps durait le service dans les l‚gions romaines ?
+56 deux ans,vingt ans,toute la vie/2
+57Mque fit agrippine, la mŠre de n‚ron ?
+57 elle ‚crivit trois livres,elle empoisonna son mari,elle inventa la jupe/2
+58Mqu'arriva-t-il … agrippine, la mŠre de n‚ron ?
+58 elle fut tu‚e par n‚ron,elle fut jet‚e aux lions,elle ‚pousa c‚sar/1
+59Mque sont les thermes ?
+59 des trait‚s de paix,les bains publics,les dieux du sommeil/2
+60Mquel est l'‚quivalent romain de l'olympe ?
+60 le mont capitole,le mont palatin,le mont aventin/1
+61Mavec quelle arme repr‚sente-t-on la d‚esse diane ?
+61 une lance,un arc,une fronde/2
+62Mqui est cupidon ?
+62 un mauvais g‚nie,une muse,le dieu de l'amour/3
+63Mqu'est-ce qu'un optione ?
+63 un texte de loi,un chef de garnison,un chemin de ronde/2
+64M… quel dieu ‚taient d‚di‚es les orgies ?
+64 bacchus,mars,jupiter/1
+65Mqu'est-ce qu'un belluaire ?
+65 un tailleur,un gladiateur,un joueur de lyre/2
+66Mqu'est-ce qu'un buccin ?
+66 un d‚cret,un signal d'alerte,une trompette/3
+67Mcomment se nomme l'ensemble des rameurs d'une galŠre ?
+67 la chiourme,la rˆme,la plŠbe/1
+68Mquelle manoeuvre s'effectue avec le bouclier sur la tˆte ?
+68 la phalange,la tortue,la retraite/2
+69Mqu'est-ce qu'un magister navis ?
+69 un magistrat,un g‚n‚ral en campagne,un capitaine de navire/3
+70Mque signifie "cogito ergo sum" ?
+70 je pense donc je suis,du pain et des jeux,brillant comme le soleil/1
+71Dqu'est-ce qu'un haruspice ?
+71 un marchand de vin,un devin,un s‚nateur/2
+72Dqui est marcus junius brutus ?
+72 le fondateur de rome,le fianc‚ de cl‚opƒtre,l'un des assassins de c‚sar/3
+73Dlequel de ces 3 personnages n'est pas un gladiateur ?
+73 le retiaire,le mirmillon,le delator/3
+74Dquel sorte de gladiateur ‚tait spartacus ?
+74 un r‚tiaire,un belluaire,un mirmillon/3
+75Dquelle arme utilisait le mirmillon ?
+75 ‚p‚e,trident,poignard/1
+76Dquelle arme n'utilisait pas le r‚tiaire ?
+76 filet,‚p‚e,trident/2
+77Dcombien d'hommes contient une l‚gion ?
+77 environ 2000,environ 4000,environ 6000/3
+78Dcombien d'hommes contient une cohorte ?
+78 environ 200,environ 400,environ 600/3
+79Dcombien de cohortes contient une l‚gion ?
+79 10,50,100/1
+80Dsur combien de collines fut bƒtie rome ?
+80 trois,cinq,sept/3
+81Dcombien de centuries contient une manipule ?
+81 2,20,100/1
+82Dcombien de centuries contient une cohorte ?
+82 4,6,10/2
+83Dcombien d'aur‚i vaut un aureus ?
+83 un,dix,treize/1
+84Dcombien d'hommes contient une manipule ?
+84 100,200,300/2
+85Dqu'appelait-on frigidarium ?
+85 une piscine d'eau froide,l'hiver,la neige/1 
+86Dqui ‚tait virgile ?
+86 un poŠte,un homme politique,un riche marchand/1
+87Den quelle ann‚e mourut jules c‚sar ?
+87 52 av.jc,48 av.jc,44 av.jc/3
+88Dpar quelle phrase caton l'ancien terminait-il ses discours ?
+88 alea jacta est,delenda carthago,homo homini lupus/2
+89Dquelle est la valeur du chiffre romain €~|{ ?
+89 1154,1604,1874/1
+90Dqui ‚tait pomp‚e ?
+90 le frŠre de c‚sar,le fils de c‚sar,un adversaire de c‚sar/3
+91Dqu'est-ce qu'un prˆteur ?
+91 un gouverneur,le gardien d'un temple,un armurier/1
+92Dqu'est-ce qu'une palestre ?
+92 une catapulte,un gymnase,un treuil/2
+93Dqu'est-ce qu'une contorniate ?
+93 un combat d'entraŒnement,une m‚daille,un groupe de disciples/2
+94Dcombien de d‚curies contient une manipule ?
+94 10,20,30/2
+95Dqu'est-ce qu'un triclinium ?
+95 un lit … 3 places,un groupe de 3 m‚decins,un trident/1
+96Dqui ‚tait mercure ?
+96 le dieu du feu,le dieu du commerce,le dieu des voleurs/2
+97Dquelle d‚esse est l'‚quivalent romain d'ath‚na ?
+97 minerve,junon,v‚nus/1
+98Dqu'est-ce qu'une calende ?
+98 le 1er jour du mois,la 1ere semaine du mois,le 1er mois de l'ann‚e/1
+99Dqu'est-ce qu'un valetudinarium ?
+99 la chambre des esclaves,un h“pital,les bains publics/2

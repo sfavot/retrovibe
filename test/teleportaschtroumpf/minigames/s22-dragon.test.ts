@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Hy8 } from "../../../src/games/teleportaschtroumpf/data/hy8";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import type { Hy8 } from "../../../src/engine/infogrames/data/hy8";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import { DragonScene, SMURF_MIDDLE_Y, createDragon, dragonClip, dragonTouchKey } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s22-dragon";
 import {
@@ -209,8 +209,10 @@ describe("S22 : requête", () => {
 describe.skipIf(!hasOriginalFiles)("S22 : ressources", () => {
   it("fichiers présents", () => {
     const names = new Set(listData(() => true).map((p) => p.split("/").pop()!.toLowerCase()));
+    // Un son `x.voc` est versionné en `x.voc.mp3`.
+    const has = (name: string) => names.has(name.endsWith(".voc") ? `${name}.mp3` : name);
     for (const name of ["s22a000s.hy8", "s22a001s.hy8", "s22a001d.mcg", "s22a001b.voc", "s22a002b.voc", "s22a003c.voc", "s22a004c.voc", "s22a005b.voc", "s22c1.mux", "s22c2.mux"]) {
-      expect(names.has(name), name).toBe(true);
+      expect(has(name), name).toBe(true);
     }
   });
 });

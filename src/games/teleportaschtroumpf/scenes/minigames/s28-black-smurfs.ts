@@ -1,9 +1,9 @@
-import type { Hy8, Hy8Frame } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Timer } from "../../engine/clock";
-import type { Scene, SceneContext } from "../../engine/scene";
-import { AnimationPlayer } from "../../engine/sprites";
+import type { Hy8, Hy8Frame } from "../../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Timer } from "../../../../engine/infogrames/clock";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import { AnimationPlayer } from "../../../../engine/infogrames/sprites";
 import type { Game } from "../../game/rules";
 import {
   Clip,
@@ -132,8 +132,8 @@ export class BlackSmurfsScene implements Scene {
   private mcg!: Mcg;
   private spritesA!: Hy8;
   private spritesB!: Hy8;
-  private hitVoc!: Voc;
-  private missVoc!: Voc;
+  private hitVoc!: Sound;
+  private missVoc!: Sound;
   private win!: Clip;
   private fail!: Clip;
   private result: Clip | null = null;
@@ -252,8 +252,8 @@ export class BlackSmurfsScene implements Scene {
       ctx.resources.mcg("s28a001d.mcg"),
       ctx.resources.hy8("s28a000s.hy8"),
       ctx.resources.hy8("s28a001s.hy8"),
-      ctx.resources.voc("s28a002b.voc"),
-      ctx.resources.voc("s28a003b.voc"),
+      ctx.resources.sound("s28a002b.voc"),
+      ctx.resources.sound("s28a003b.voc"),
       this.win.load(ctx),
       this.fail.load(ctx),
     ]);

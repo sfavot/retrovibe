@@ -1,11 +1,11 @@
 import { encodeCp437 } from "../../../data/cp437";
 import { parseConfirmationTexts } from "../data/text";
-import { measureText, type PfnFont } from "../data/font";
-import type { Mcg } from "../data/mcg";
-import type { Voc } from "../data/voc";
+import { measureText, type PfnFont } from "../../../engine/infogrames/data/font";
+import type { Mcg } from "../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
 import { Menu, paletteAreas, paletteHighlight } from "../engine/menu";
 import { voiceName } from "../engine/paths";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { HOVER_COLOR, ScreenSnapshot } from "./common/choice";
 import { CLICK_SOUND } from "./setup/common";
 import { TEXT_COLOR, loadDefaultFont, wrapText } from "./common/text";
@@ -47,7 +47,7 @@ class ConfirmScene implements Scene {
   private mcg!: Mcg;
   private font!: PfnFont;
   private lines: Uint8Array[] = [];
-  private entryVoice!: Voc;
+  private entryVoice!: Sound;
   private done = false;
   private readonly snapshot = new ScreenSnapshot();
   private readonly menu = new Menu({
@@ -74,7 +74,7 @@ class ConfirmScene implements Scene {
       ctx.resources.mcg("s49a001d.mcg"),
       loadDefaultFont(ctx),
       ctx.resources.bytes("s49a.dat").then(parseConfirmationTexts),
-      ctx.resources.voc(voiceName("s49v", this.n + 1)),
+      ctx.resources.sound(voiceName("s49v", this.n + 1)),
       this.menu.load(ctx),
     ]);
     this.mcg = mcg;

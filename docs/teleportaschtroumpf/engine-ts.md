@@ -2,31 +2,36 @@
 
 Brief pour les phases 3 (écrans) et 4 (mini-jeux). Spec de comportement : `engine.md` (surtout §9). Ce document décrit le code : où est quoi, comment écrire une scène, comment tester sans navigateur.
 
-## Carte du code (`src/games/teleportaschtroumpf/`)
+## Carte du code
+
+Le moteur générique (formats, tampons, palette, entrées, scènes, son, hôte du navigateur) est dans `src/engine/infogrames/`, partagé avec les autres jeux Infogrames du même moteur ; il ne sait rien des Schtroumpfs. Le reste est dans `src/games/teleportaschtroumpf/`. Dans le tableau, les chemins qui commencent par `infogrames/` sont relatifs à `src/engine/`, les autres à `src/games/teleportaschtroumpf/`.
 
 | Fichier | Rôle |
 |---|---|
-| `engine/host.ts` | `Host` : la seule frontière avec l'extérieur (fichiers, temps, entrées, son, stockage, affichage). Le moteur ne touche ni au DOM, ni à `fetch`, ni à `Date`. |
-| `engine/engine.ts` | `Engine` : assemble tout ; `engine.frame(now)` à chaque image, `engine.start(scene)`. |
-| `engine/clock.ts` | `Clock` (60 ticks/s, pas fixe), `Timer` (chrono gelable). |
-| `engine/rng.ts` | `BorlandRandom` : `next()` (0..32767) et `below(n)` = `rand() × n / 0x8000`. |
-| `engine/scene.ts` | `Scene`, `SceneContext`, `SceneManager` (remplacement, pile, fondu, chargement asynchrone). |
-| `engine/surface.ts` | `Surface` : tampons A/B/C 320×200 indexés, `drawMcg`, `blitImage`, `drawSprite`, `drawFrame`, `drawText`. |
-| `engine/sprites.ts` | `placeSprite` (composition de sprites HY8, ancrage bas-gauche, miroir), `AnimationPlayer`. Partagé avec la visionneuse (`ui/panels.ts`). |
-| `engine/palette.ts` | `Palette` (256 × RVB 8 bits, entrée 0 noire, conversion VGA) et `Fade` (fondus). |
+| `infogrames/host.ts` | `Host` : la seule frontière avec l'extérieur (fichiers, temps, entrées, son, stockage, affichage). Le moteur ne touche ni au DOM, ni à `fetch`, ni à `Date`. |
+| `infogrames/engine.ts` | `Engine` : assemble tout ; `engine.frame(now)` à chaque image, `engine.start(scene)`. Reçoit la configuration du jeu (`GameConfig` : les bips à précharger). |
+| `engine/config.ts` | `GAME_CONFIG` : la configuration des Schtroumpfs passée à `Engine` (`BEEP_FILES`). |
+| `infogrames/clock.ts` | `Clock` (60 ticks/s, pas fixe), `Timer` (chrono gelable). |
+| `infogrames/rng.ts` | `BorlandRandom` : `next()` (0..32767) et `below(n)` = `rand() × n / 0x8000`. |
+| `infogrames/scene.ts` | `Scene`, `SceneContext`, `SceneManager` (remplacement, pile, fondu, chargement asynchrone). |
+| `infogrames/surface.ts` | `Surface` : tampons A/B/C 320×200 indexés, `drawMcg`, `blitImage`, `drawSprite`, `drawFrame`, `drawText`. |
+| `infogrames/sprites.ts` | `placeSprite` (composition de sprites HY8, ancrage bas-gauche, miroir), `AnimationPlayer`. Partagé avec la visionneuse (`ui/panels.ts`). |
+| `infogrames/palette.ts` | `Palette` (256 × RVB 8 bits, entrée 0 noire, conversion VGA) et `Fade` (fondus). |
 | `engine/menu.ts` | `Menu` : liste d'éléments (clavier, validation, voix d'aide, bip, rebouclage optionnel), surbrillance par palette ou sprite. |
-| `engine/input.ts` | `Input` : actions abstraites, « tenu » / « vient d'être appuyé », position de la souris 320×200 (pointeur libre seulement). |
-| `engine/options.ts` | Options parents (`localStorage` via `host.storage`), verrou parental. |
-| `engine/resources.ts` | `Resources` : MCG / HY8 / PFN / VOC décodés et gardés, MUX non gardés, `prefetch`. |
-| `engine/paths.ts` | `resolveGameFile` (nom d'origine → chemin `DATA/…`), `voiceName`, `musicName`. |
-| `engine/video.ts` | `VideoPlayer` (MUX synchronisé sur le son) et `VideoScene` générique. |
-| `engine/picture.ts` | `PictureScene` (image fixe, fondus, attente) et `WaitScene`. |
-| `audio/backend.ts`, `audio/voice.ts`, `audio/web-audio.ts` | `AudioBackend` abstrait, `VoiceChannel` (voie + musique + bips + canal de bruitages), implémentation Web Audio (deux sources sur le même `GainNode`, somme écrêtée à la sortie). |
+| `infogrames/input.ts` | `Input` : actions abstraites, « tenu » / « vient d'être appuyé », position de la souris 320×200 (pointeur libre seulement). |
+| `engine/options.ts` | Options parents (`localStorage` via `host.storage`, lues par `parentOptions(ctx)`), verrou parental. |
+| `infogrames/resources.ts` | `Resources` : MCG / HY8 / PFN décodés et gardés, sons (`sound()` : MP3 + index `audio.json`), MUX non gardés, `prefetch`. |
+| `engine/paths.ts` | Résolveur de chemins du jeu, donné aux hôtes : `resolveGameFile` (nom d'origine → chemin `DATA/…`) ; `voiceName`, `musicName`. |
+| `infogrames/video.ts` | `VideoPlayer` (MUX synchronisé sur le son) et `VideoScene` générique. |
+| `infogrames/picture.ts` | `PictureScene` (image fixe, fondus, attente) et `WaitScene`. |
+| `infogrames/audio/sound.ts`, `backend.ts`, `voice.ts`, `web-audio.ts` | `Sound` (données + longueur d'origine), `AudioBackend` abstrait, `VoiceChannel` (voie + musique + bips + canal de bruitages), implémentation Web Audio (deux sources sur le même `GainNode`, somme écrêtée à la sortie). |
 | `scenes/boot.ts` | Séquence de démarrage. |
 | `scenes/flow.ts`, `scenes/s07-menu.ts`, `scenes/sNN-*.ts` | Flux entre écrans, menu principal S07 et les écrans (voir « Menus et flux »). |
 | `game/` | Logique pure de la partie et du plateau (`Game`, tables), sans rendu (`rules.md`). |
 | `scenes/game.ts`, `scenes/s01-board.ts`, `scenes/board/` | Partie (`28a3:00ad`) et plateau S01 (`291e:0401`) ; écrans empilés `s02-map.ts`, `events.ts`, `grand-schtroumpf.ts` et `minigames.ts` + `minigames/` (voir « Partie et plateau » et « Écrire un mini-jeu »). |
-| `ui/app.ts`, `ui/browser-host.ts`, `ui/dev.html`, `ui/dev.ts`, `ui/style.css` | Hôte navigateur, canvas à l'échelle entière, boucle `requestAnimationFrame`, page de dev. |
+| `infogrames/ui/browser-host.ts`, `infogrames/ui/render.ts` | `BrowserHost` (fichiers par `fetch` avec le résolveur du jeu, canvas, Web Audio, clavier, souris, doigts) ; dessin d'images indexées pour la visionneuse. |
+| `infogrames/data/` | Lecteurs `mux.ts`, `hy8.ts`, `mcg.ts`, `font.ts` (PFN), `audio-index.ts` (`audio.json`) ; `voc.ts` (Creative Voice) ne sert plus au jeu, dont les VOC sont versionnés en MP3. Ceux propres au jeu restent dans `data/` (`mut.ts`, `text.ts`, `files.ts`). |
+| `ui/app.ts`, `ui/dev.html`, `ui/dev.ts`, `ui/style.css` | Montage du jeu dans la page, canvas à l'échelle entière, boucle `requestAnimationFrame`, page de dev. |
 | `scenes/save.ts` | Sauvegarde de la partie en cours (voir « Reprise d'une partie interrompue »). |
 | `index.ts` | `GameDefinition` `teleportaschtroumpf`. |
 
@@ -49,7 +54,7 @@ Pas (`step`) : 5 ticks (12 i/s) par défaut, 4 pour le plateau, 3 pour la carte 
 
 ## Écrire une scène
 
-Interface (`engine/scene.ts`) :
+Interface (`src/engine/infogrames/scene.ts`) :
 
 ```ts
 interface Scene {
@@ -72,9 +77,9 @@ Les appuis faits avant l'entrée d'une scène sont oubliés (un Échap ne passe 
 ### Exemple minimal : un fond, un sprite qui bouge, un retour
 
 ```ts
-import type { Hy8 } from "../data/hy8";
-import type { Mcg } from "../data/mcg";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../engine/infogrames/data/mcg";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 
 export class DemoScene implements Scene {
   readonly step = 4;                 // 15 i/s comme le plateau
@@ -125,7 +130,7 @@ Scènes toutes faites : `PictureScene` (MCG + fondu + attente + `onEnd`), `WaitS
 
 ## Entrées
 
-Actions (`engine/input.ts`) : `up down left right validate cancel skip pause volumeUp volumeDown`. Sources : flèches et Q/A/Z/X (haut/bas/gauche/droite, positions physiques QWERTY comme les scancodes d'origine), Espace / clic gauche = `validate`, Entrée / clic droit = `cancel` (voix d'aide) ; la position du pointeur ne désigne un élément que dans les menus à zones (`Menu`, option `areas`, ajout du port pour le doigt : S07, S08, S09, S41, S46, S48, S49), et les doigts produisent des gestes (`touchGesture` : toucher, appui long, glissement ; `touchHeldAt`) que les écrans lisent pour se jouer sans flèches (le « valider » du doigt posé est marqué `validateByTouch`), Échap = `skip`, P = `pause`, F1/F2 = volume −/+ (géré par le moteur).
+Actions (`src/engine/infogrames/input.ts`) : `up down left right validate cancel skip pause volumeUp volumeDown`. Sources : flèches et Q/A/Z/X (haut/bas/gauche/droite, positions physiques QWERTY comme les scancodes d'origine), Espace / clic gauche = `validate`, Entrée / clic droit = `cancel` (voix d'aide) ; la position du pointeur ne désigne un élément que dans les menus à zones (`Menu`, option `areas`, ajout du port pour le doigt : S07, S08, S09, S41, S46, S48, S49), et les doigts produisent des gestes (`touchGesture` : toucher, appui long, glissement ; `touchHeldAt`) que les écrans lisent pour se jouer sans flèches (le « valider » du doigt posé est marqué `validateByTouch`), Échap = `skip`, P = `pause`, F1/F2 = volume −/+ (géré par le moteur).
 
 - `ctx.input.pressed(a)` : tenu ; `justPressed(a)` : enfoncé depuis le dernier `update` (mémorisé, un appui plus court que le pas n'est pas perdu) ; `anyJustPressed(...)`.
 - `ctx.input.mouseX/mouseY` : position 320×200, lue seulement par les scènes à pointeur libre qui dessinent leur curseur HY8 (E2). Le recentrage de l'original (`14b3:0039`) passe par `ctx.input.warpMouse(x, y)`, sans effet quand une vraie souris survole le canvas (`Input.pointerHovering`, tenu par l'hôte) : la souris DOS était relative, celle du navigateur ne se déplace pas, et le curseur dessiné sauterait loin du pointeur. Aucun écran de menu n'a de zone cliquable : clavier d'origine seul (décision `plan.md`), les boutons de la souris sont les actions `validate` (gauche) et `cancel` (droit).
@@ -133,12 +138,14 @@ Actions (`engine/input.ts`) : `up down left right validate cancel skip pause vol
 
 ## Son
 
-Deux canaux, qui passent par le même volume (`ctx.voice`, `audio/voice.ts`) : la **voie** (`15f9:089f` : voix, musique, vidéo ; un son en coupe un autre) et le **bruitage mélangé** (`348d:0b42(2, ptr)`, `engine.md` §5.2 bis : un seul emplacement, additionné à la voie sans la couper, volume commun). Les sons de S23, S26, S30, S36 et S40 restent sur la voie. La liste exacte des sons du canal de bruitages est le tableau de recensement de `engine.md` §5.2 bis.
+Deux canaux, qui passent par le même volume (`ctx.voice`, `src/engine/infogrames/audio/voice.ts`) : la **voie** (`15f9:089f` : voix, musique, vidéo ; un son en coupe un autre) et le **bruitage mélangé** (`348d:0b42(2, ptr)`, `engine.md` §5.2 bis : un seul emplacement, additionné à la voie sans la couper, volume commun). Les sons de S23, S26, S30, S36 et S40 restent sur la voie. La liste exacte des sons du canal de bruitages est le tableau de recensement de `engine.md` §5.2 bis.
 
 
-- `voice.play(voc)` (voix ; `voc` = résultat de `ctx.resources.voc("s07v004t.voc")`) coupe ce qui jouait sur la voie, musique comprise ; `voice.playEffect(voc)` : bruitage mélangé, **remplace le bruitage précédent** sans couper ni la voix ni la musique ni la vidéo ; `voice.effectPlaying` : un bruitage sonne encore (`0b42(1, 0) != 0`, à utiliser pour « seulement si rien ne sonne » à la place de `voicePlaying`) ; `voice.stopEffect()` (`voice.stop()` ne coupe que la voie) ; `voice.playBeep(0..2)` joue un des 3 bips préchargés (`s52d001b`, `s01a002b`, `s01a001b`) sur la même voie ; `voice.stop()`.
-- `voice.setMusic(voc | null)` : musique de fond (`musicName(1 + ctx.rng.below(3))` → `s52m00Nm.voc`). Elle repart **au début, en boucle**, dès que la voie est libre (vérifié à chaque tick) : pas de reprise à la position où la voix l'a coupée. `voice.holdMusic(true)` la retient (vidéos).
+- `voice.play(sound)` (voix ; `sound` = résultat de `ctx.resources.sound("s07v004t.voc")`, un `Sound`) coupe ce qui jouait sur la voie, musique comprise ; `voice.playEffect(sound)` : bruitage mélangé, **remplace le bruitage précédent** sans couper ni la voix ni la musique ni la vidéo ; `voice.effectPlaying` : un bruitage sonne encore (`0b42(1, 0) != 0`, à utiliser pour « seulement si rien ne sonne » à la place de `voicePlaying`) ; `voice.stopEffect()` (`voice.stop()` ne coupe que la voie) ; `voice.playBeep(0..2)` joue un des 3 bips préchargés (`s52d001b`, `s01a002b`, `s01a001b`) sur la même voie ; `voice.stop()`.
+- `voice.setMusic(sound | null)` : musique de fond (`musicName(1 + ctx.rng.below(3))` → `s52m00Nm.voc`). Elle repart **au début, en boucle**, dès que la voie est libre (vérifié à chaque tick) : pas de reprise à la position où la voix l'a coupée. `voice.holdMusic(true)` la retient (vidéos).
 - `voiceName("s07v", 4)` → `s07v004t.voc`. `voice.volume` 0–15 (défaut 15).
+- **Sons versionnés en MP3.** Les 975 VOC du CD sont convertis par `scripts/teleportaschtroumpf-extract.sh` en `<nom d'origine>.VOC.mp3` (mono 22 050 Hz, 32 kb/s) ; `audio.json` garde `[échantillons, fréquence]` du PCM d'origine de chacun (`data/audio-index.ts`). Les scènes demandent toujours le nom d'origine : `ctx.resources.sound("s07a001b.voc")` lit `S07A001B.VOC.mp3` et rend un `Sound` `{ format: "mp3", data, sampleCount, sampleRate }`. Toute durée (fin d'une voix, tour de boucle de la musique, `position`) vaut `sampleCount / sampleRate` (`soundDuration`), donc exactement celle du VOC : les attentes tombent sur les mêmes ticks qu'avec le PCM. Le son d'une vidéo MUX reste du PCM (`pcmSound`, `voice.playPcm`).
+- Décodage : `Resources.sound` attend `AudioBackend.prepare(sound)`. Dans le navigateur, `WebAudioBackend` décode le MP3 une fois avec `decodeAudioData` (sur un `OfflineAudioContext`, donc possible avant le premier geste), puis le joue borné à la durée d'origine. Sous node (hôte de test), `prepare` ne fait rien : la voie factice ne connaît un son que par sa durée, aucun MP3 n'est décodé.
 - `voice.voicePlaying` : vrai tant qu'une voix sort (pour attendre la fin d'une voix avant d'enchaîner, comme `1f33:03a7`).
 - Navigateur : le contexte audio ne démarre qu'au premier geste (`WebAudioBackend.unlock()` sur `pointerdown` / `keydown`). Avant, `play` et `playEffect` ne font rien et `playing` et `effectPlaying` restent faux : le moteur n'attend donc jamais un son qui ne sortira pas (les vidéos retombent sur l'horloge).
 - Pas de CD audio.
@@ -149,15 +156,15 @@ Deux canaux, qui passent par le même volume (`ctx.voice`, `audio/voice.ts`) : l
 
 ## Options parents
 
-`ctx.options` (`ParentOptions` : `durationIndex` 0..3, `pauseIndex` 0..4, `messageIndex` 0..8, `lastGameMinutes`) est chargé au démarrage. Pour modifier : changer les champs puis `saveOptions(ctx.host.storage, ctx.options)`. `gameSeconds(o)` = `(durationIndex + 1) × 1800`, `pauseMinutes(o)` = `pauseIndex × 30`, `isLocked(o, nowMinutes)` avec `nowMinutes = Math.floor(ctx.host.unixSeconds() / 60)`. Clé de stockage `retrovibe:teleportaschtroumpf:options`. Pas de sauvegarde de partie.
+`parentOptions(ctx)` (`engine/options.ts`, `ParentOptions` : `durationIndex` 0..3, `pauseIndex` 0..4, `messageIndex` 0..8, `lastGameMinutes`) est lu dans le stockage au premier appel, puis partagé par toutes les scènes du moteur (le moteur commun n'en sait rien : `SceneContext` n'a pas de champ `options`). Pour modifier : changer les champs puis `saveOptions(ctx.host.storage, parentOptions(ctx))`. `gameSeconds(o)` = `(durationIndex + 1) × 1800`, `pauseMinutes(o)` = `pauseIndex × 30`, `isLocked(o, nowMinutes)` avec `nowMinutes = Math.floor(ctx.host.unixSeconds() / 60)`. Clé de stockage `retrovibe:teleportaschtroumpf:options`. Pas de sauvegarde de partie.
 
 ## Ressources
 
-`ctx.resources.mcg(name)`, `.hy8`, `.pfn`, `.voc`, `.bytes(name)` : par nom d'origine en minuscules (`s22a001d.mcg`) ou chemin `DATA/…` ; décodés une fois et gardés. Charger dans `Scene.load`, pas dans `update`. `prefetch(...names)` lance des lectures en tâche de fond (utile pour enchaîner sans attendre). Les `.mux` ne sont pas gardés. `ctx.resources.clear()` libère tout (changement de famille de scènes).
+`ctx.resources.mcg(name)`, `.hy8`, `.pfn`, `.sound`, `.bytes(name)` : par nom d'origine en minuscules (`s22a001d.mcg`) ou chemin `DATA/…` ; décodés une fois et gardés. Charger dans `Scene.load`, pas dans `update`. `prefetch(...names)` lance des lectures en tâche de fond (utile pour enchaîner sans attendre). Les `.mux` ne sont pas gardés. `ctx.resources.clear()` libère tout (changement de famille de scènes).
 
-Résolution (§9.11) : `sNNxXXX.ext` → `DATA/SNN/SNNx/SNNXXX.EXT` s'il est dans le manifeste, sinon recherche par nom (`GameFiles.resolve`). Un nom présent dans plusieurs dossiers (`S36A000S.HY8` dans `S36A` et `S36E`) : passer le chemin complet `DATA/S36/S36E/S36A000S.HY8`.
+Résolution (§9.11) : `sNNxXXX.ext` → `DATA/SNN/SNNx/SNNXXX.EXT` s'il est dans le manifeste (casse indifférente : un son est rangé en `SNNXXX.VOC.mp3`), sinon recherche par nom (`GameFiles.resolve`). `host.filePath(name)` donne ce chemin, qui est la clé de `audio.json`. Un nom présent dans plusieurs dossiers (`S36A000S.HY8` dans `S36A` et `S36E`) : passer le chemin complet `DATA/S36/S36E/S36A000S.HY8`.
 
-Hasard : `ctx.rng.below(n)` (graine `unixSeconds & 0xFFFF`, injectable par `new Engine(host, { seed })`).
+Hasard : `ctx.rng.below(n)` (graine `unixSeconds & 0xFFFF`, injectable par `new Engine(host, GAME_CONFIG, { seed })`).
 
 ## Tester sans navigateur
 
@@ -168,7 +175,7 @@ Hasard : `ctx.rng.below(n)` (graine `unixSeconds & 0xFFFF`, injectable par `new 
 
 ```ts
 const host = new TestHost();
-const engine = new Engine(host, { seed: 1 });
+const engine = new Engine(host, GAME_CONFIG, { seed: 1 });
 engine.ctx.scenes.replace(new MaScene());   // ou await engine.start(scene) (charge aussi les bips)
 await runFor(engine, host, 2000);
 host.input.keyDown("Space");
@@ -199,7 +206,7 @@ Logo S52D0 : image `s52d00.mcg` en fondu d'entrée → vidéo `s52d0.mux` (≈ 1
 
 `host.exit()` (« Quitter » après le générique). Navigateur (`ui/app.ts`) : retour à l'accueil (`location.hash = "#/"`) si le jeu est monté depuis le site, redémarrage du jeu sur la page de dev. Hôte de test : `host.exited`.
 
-### UI navigateur (`ui/app.ts`, `ui/prefs.ts`, `ui/browser-host.ts`)
+### UI navigateur (`ui/app.ts`, `ui/prefs.ts`, `src/engine/infogrames/ui/browser-host.ts`)
 
 - **Bouton « Son »** sous l'écran (classe partagée `toggle`, `aria-pressed`) : coupe et rétablit toute la sortie (voie, musique, vidéos, bruitages) via `AudioBackend.setMuted`, qui met le gain général Web Audio à 0 sans arrêter les sons (`playing`, `effectPlaying`, `position` inchangés : moteur et vidéos restent synchronisés). **Indépendant** du volume 0 à 15 (F1/F2, `setGain`). Préférence `SoundPrefs` (`ui/prefs.ts`, clé `retrovibe:teleportaschtroumpf:sound`, localStorage protégé), relue sur l'événement `storage` (autre onglet). Un clic débloque l'audio et rend le focus au canvas.
 - **Onglet masqué** : `Engine.setPaused(true)` : `frame` ne fait plus rien, `AudioBackend.suspend()` fige le contexte (`currentTime`, donc `position`) ; au retour, `setPaused(false)` relance le contexte et `Clock.resync()` oublie l'absence (pas de rattrapage) : le jeu repart au même point. Rien à voir avec la touche « pause » du jeu.
@@ -238,7 +245,7 @@ Chaque écran garde la **signature** de sa fabrique exportée (documentée en t�
 |---|---|---|---|
 | `s09-players.ts` | `createPlayersScene(onDone)` | rien | `(ctx, players: 1..4)` |
 | `s08-characters.ts` | `createCharactersScene(players, onDone)` | nombre de joueurs | `(ctx, CharactersResult)` : `play` + `PlayerSetup[]`, `back` (S09) ou `menu` (S07) |
-| `s04-parents.ts` | `createParentsScene(onDone)` | rien (lit / sauve `ctx.options`) | `(ctx)` |
+| `s04-parents.ts` | `createParentsScene(onDone)` | rien (lit / sauve `parentOptions(ctx)`) | `(ctx)` |
 | `s49-confirm.ts` | `createConfirmScene(n, onDone)` | numéro du message 0..11 | `(ctx, yes: boolean)` ; gauche / droite choisissent, Espace valide, Échap sans effet |
 | `s48-pause.ts` | `createPauseScene(onDone)` | rien (empilée) | `(ctx, PauseChoice)` : `resume`, `abandon`, `map`, `help` |
 | `s46-abandon.ts` | `createAbandonScene(players: number \| readonly number[], onDone)` | nombre de joueurs (0..n−1) ou personnages (0..5) des joueurs restants, 1 à 4 (empilée) | `(ctx, AbandonResult)` : `cancel`, `player` + index (dans le tableau reçu), `all` |
@@ -302,7 +309,7 @@ Recette pour les agents qui écrivent un mini-jeu en parallèle des autres. Exem
 ### Ce qui est à toi, ce qui ne l'est pas
 
 - À toi : **ton fichier** `scenes/minigames/sNN-nom.ts` (déjà inscrit dans `minigames.ts` : tu remplaces le corps de la souche et gardes l'export de la fabrique), `test/teleportaschtroumpf/minigames/sNN-nom.test.ts` (à créer), `docs/teleportaschtroumpf/minigames/sNN.md` (à créer), et d'éventuels fichiers à toi dans un sous-dossier `scenes/minigames/sNN/` ou `sNN-*.ts`. S38 et S39 gardent aussi leur `createXxxAftermath` (présentation de l'issue, inscrite dans `AFTERMATHS`).
-- Pas à toi, jamais en parallèle : `minigames.ts`, `minigames/common.ts`, `engine/**`, `game/**`, `registry.ts`, les autres mini-jeux et leurs tests. Si un outil manque dans `common.ts`, écris-le dans ton fichier et signale-le (le lot suivant le rangera en commun) ; avant d'écrire un chrono, un calcul de points ou un rectangle, vérifie la liste ci-dessous. Si `game/` est faux (règle prouvée par la RE), signale-le sans le corriger.
+- Pas à toi, jamais en parallèle : `minigames.ts`, `minigames/common.ts`, `engine/**`, `src/engine/infogrames/**`, `game/**`, `registry.ts`, les autres mini-jeux et leurs tests. Si un outil manque dans `common.ts`, écris-le dans ton fichier et signale-le (le lot suivant le rangera en commun) ; avant d'écrire un chrono, un calcul de points ou un rectangle, vérifie la liste ci-dessous. Si `game/` est faux (règle prouvée par la RE), signale-le sans le corriger.
 - Le rapport de chaque mini-jeu dit : ce qui est reproduit, les écarts, ce qui n'a pas pu être vérifié.
 
 ### Lire d'abord

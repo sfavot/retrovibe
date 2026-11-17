@@ -1,0 +1,199 @@
+01Fquel est le nom grec de jupiter ?
+01 arŠs,h‚pha‹stos,zeus/3
+02Fqui est le h‚ros de "l'odyss‚e" ?
+02 ulysse,agamemnon,achille/1
+03Fquel est le nom grec d'hercule ?
+03 herculanum,h‚raklŠs,zeus/2
+04Fquel est le domaine des dieux dans la mythologie ?
+04 l'Œle de k‚a,l'atlantide,le mont olympe/3
+05Fquel animal garde les enfers ?
+05 un serpent … 2 tˆtes,un chien … 3 tˆtes,un singe … 4 tˆtes/2
+06Fle pugilat est l'ancˆtre de quel sport ?
+06 la boxe,la lutte,le catch/1
+07Fque recevaient les vainqueurs des olympiades ?
+07 une couronne d'olivier,des sandales et du vin,rien/1
+08Fquelle est la 2Šme lettre de l'alphabet grec ?
+08 alpha,delta,bˆta/3
+09Fqu'‚tait p‚gase ?
+09 un taureau ail‚,un homme ail‚,un cheval ail‚/3
+10Fquelle ‚tait la fr‚quence des olympiades ?
+10 tous les ans,tous les 2 ans,tous les 4 ans/3
+11Fquand avaient lieu les olympiades ?
+11 en ‚t‚,au printemps,… l'automne/1
+12Fcomment se nomme le fils du dieu hermŠs ?
+12 pin,pan,poun/2
+13Fquel homme c‚lŠbre pronon‡a le mot "eurˆka" ?
+13 socrate,platon,archimŠde/3
+14Fqui ‚tait archimŠde ?
+14 un clochard,un savant,un poŠte/2
+15Fque signifie le mot "eurˆka" ?
+15 j'ai trouv‚,racine carr‚e,l'eau d‚borde/1
+16Fqui ‚tait ajax ?
+16 l'inventeur de l'ammoniaque,un esclave trŠs propre,un h‚ros/3
+17Fqui tua le minotaure ?
+17 th‚s‚e,ariane,‚g‚e/1
+18Fcomment se nomme une cr‚ature mi-homme mi-cheval ?
+18 une licorne,une harpie,un centaure/3
+19Fo— est expos‚e aujourd'hui la v‚nus de milo ?
+19 … athŠnes,au louvre,au british museum/2
+20F… la recherche de quoi partit jason ?
+20 la toison d'or,le graal,la corne d'abondance/1
+21Fcomment se nommaient les compagnons de jason ?
+21 les amazones,les argonautes,les doliones/2
+22Fqu'‚tait l'argo ?
+22 la langue des voleurs,un bateau,un phare/2
+23Fquel ‚tait le point faible d'achille ?
+23 son talon,son coeur,ses yeux/1
+24Fcomment ‚tait le minotaure ?
+24 mi-homme mi-cheval,mi-homme mi-b‚lier,mi-homme mi-taureau/3
+25Fcombien de travaux hercule accomplit-il ?
+25 sept,onze,douze/3
+26Fo— vivait diogŠne ?
+26 dans une grotte en fumier,dans un tonneau,dans une ‚curie/2
+27Fselon la l‚gende, que voulut faire icare ?
+27 voler jusqu'au soleil,tuer le minotaure,d‚couvrir la toison d'or/1
+28Fqui ‚tait le pŠre d'icare ?
+28 d‚dale,minos,‚g‚e/1
+29Fqui construisit le labyrinthe o— ‚tait enferm‚ le minotaure ?
+29 le roi minos,d‚dale,icare/2
+30Fcomment icare s'‚chappa-t-il du labyrinthe ?
+30 en fabriquant des ailes,avec le fil d'ariane,en suivant une fourmi/1
+31Mqui n'avait pas le droit d'assister aux olympiades ?
+31 les femmes mari‚es,les marchands,les infirmes/1
+32Mcomment se nommaient les premiers grecs ?
+32 les ach‚ens,les spartiates,les atlantes/1
+33Mde qui hercule est-il le fils ?
+33 dionysos,hermŠs,zeus/3
+34Mchez les grecs, qui est l'‚quivalent de bacchus ?
+34 dionysos,ares,hermŠs/1
+35Mqui est le dieu des enfers ?
+35 arŠs,hadŠs,hermŠs/2
+36Mcomment se nomme le gardien des enfers ?
+36 chiourme,satanas,cerbŠre/3
+37Mquelle est l'orthographe exacte de cette devise ?
+37 mens sano in corpore sano,mens sana in corpore sano,men sana in corpo sano/2
+38Mquelle est la 5Šme lettre de l'alphabet grec ?
+38 delta,‚psilon,lambda/2
+39Mqu'est-ce qu'un cratŠre ?
+39 un vase,un urinoir,un amphith‚atre/1
+40Men quoi ‚taient chang‚s ceux qui regardaient une gorgone ?
+40 en statue de pierre,en statue de sel,en serpent de pierre/1
+41Mde quoi ‚tait faite la chevelure des gorgones ?
+41 de serpents,de bras de pieuvres,de vers g‚ants/1
+42Mqu'est-ce que l'obsidienne ?
+42 un pot de chambre,un portique,une roche volcanique/3
+43Mde quelle infirmit‚ souffrait homŠre ?
+43 c‚cit‚,surdit‚,mutisme/1
+44Mcomment se nommait l'‚pouse d'ulysse ?
+44 t‚l‚maque,circ‚,p‚n‚lope/3
+45Mde quel animal provient la toison d'or ?
+45 d'un b‚lier ail‚,d'un mouton … 5 pattes,du veau d'or/1
+46Mquelles cr‚atures ont un corps d'oiseau et une tˆte de femme ?
+46 les gorgones,les furies,les harpies/3
+47Mde quelle d‚esse le parth‚non est-il le temple ?
+47 art‚mis,ath‚na,aphrodite/2
+48Mo— est situ‚ le parth‚non ?
+48 … athŠnes,… sparte,… marathon/1
+49Mqui ‚taient les trois grƒces ?
+49 des courtisanes,les compagnes d'aphrodite,les filles de p‚riclŠs/2
+50Mchez les grecs, comment se nommait le dieu du soleil ?
+50 h‚lios,parthos,acros/1
+51Mque sont les titans ?
+51 les ancˆtres des dieux,les fils des dieux,les dieux/1
+52Mque sont les g‚ants ?
+52 les ancˆtres des dieux,les fils des dieux,les dieux/2
+53Mcomment se nomme une fˆte en l'honneur de bacchus ?
+53 une bacchanale,une bacchante,une gigantomachie/1
+54Mquel ‚tait le surnom de diogŠne ?
+54 le pauvre,le vertueux,le cynique/3
+55Mque sont les cyclades ?
+55 des Œles,des mois de l'ann‚e,des fortifications/1
+56Mqu'arriva-t-il au coureur qui annon‡a la victoire de marathon ?
+56 il fut bless‚ en chemin,il mourut d'‚puisement,il devint g‚n‚ral/2
+57Mquel fut le premier marathon ?
+57 marathon-athŠnes,marathon-sparte,sparte-athŠnes/1
+58Mqui ‚tait cens‚ porter le monde sur ses ‚paules ?
+58 zeus,hercule,atlas/3
+59Mqu'‚tait le colosse de rhodes ?
+59 un paysan,une statue,un lutteur/2
+60Mcombien mesurait le colosse de rhodes ?
+60 1m98,2m10,32m/3
+61Mcomment se nomme le port d'athŠnes ?
+61 le pir‚e,rhodes,pharos/1
+62Mcomment appelait-on un vainqueur des olympiades ?
+62 un olympionique,un laur‚at,un dop‚/1
+63Mquelle est la longueur d'un marathon ?
+63 42195 m,42345 m,42825 m/1
+64Mqu'est-ce que l'h‚catomb‚on ?
+64 un cimetiŠre militaire,un mois de l'‚t‚,une catapulte/2
+65Mque sont les calendes grecques ?
+65 le dernier jour de l'an,les solstices,une date qui n'existe pas/3
+66Mquelle est la cause de la disparition du colosse de rhodes ?
+66 un tremblement de terre,une ‚pid‚mie de peste,une conspiration/1
+67Mqu'arriva-t-il au philosophe socrate ?
+67 il gouverna athŠnes,il dut se suicider,il devint fou/2
+68Mqu'est-ce que la cigu‰ ?
+68 une dague,une antichambre,une plante toxique/3
+69Mquel titre portait le gouverneur d'athŠnes ?
+69 stratŠge,h‚liaste,bouleute/1
+70Msous p‚riclŠs, qu'arrivait-il aux politiciens trop ambitieux ?
+70 ils ‚taient tu‚s,ils ‚taient bannis,ils ‚taient d‚shabill‚s/2
+71Den quelle ann‚e eut lieu la 1Šre olympiade ?
+71 776 av. jc,72 av. jc,52/1
+72Dquel culte est c‚l‚br‚ … olympie ?
+72 le culte d'apollon,le culte d'hercule,le culte de zeus/3
+73Dquel culte est c‚l‚br‚ … delphes ?
+73 le culte d'apollon,le culte d'art‚mis,le culte de zeus/1
+74Dqu'est-ce que le pancrace ?
+74 un organe du corps humain,un monument,un sport de combat/3
+75Dqu'est-ce que le boulent‚rion ?
+75 la maison du m‚decin,une maladie,le s‚nat olympique/3
+76Dqu'est-ce qu'un hoplite ?
+76 un brancard,un soldat,un poŠme/2
+77Dquelle est la 16Šme lettre de l'alphabet grec ?
+77 pi,sigma,omicron/1
+78Dcombien ‚taient les gorgones ?
+78 une,trois,sept/2
+79Dqui n'‚tait pas une gorgone ?
+79 medusa,stheno,gorgonzolla/3
+80Dquelle d‚esse est repr‚sent‚e par la v‚nus de milo ?
+80 aphrodite,art‚mis,d‚m‚ter/1
+81Dcombien d'oboles valent une drachme ?
+81 trois,six,dix/2
+82Dcomment appelait-on les juges des olympiades ?
+82 hellanodices,prytanes,aliptes/1
+83Dcombien y avait-il de juges aux olympiades ?
+83 un,dix,entre quinze et trente/2
+84Dqu'‚tait pline le jeune ?
+84 fils de pline l'ancien,neveu de pline l'ancien,frŠre de pline l'ancien/2
+85Dqu'‚taient les ides de mars ?
+85 un chant de guerre,le 15Šme jour de mars,des offrandes/2
+86Dpar qui fut bƒti le parth‚non ?
+86 d‚mosthŠne,phidias,mithridate/2
+87Dqu'est-ce qu'un prytane ?
+87 un magistrat,un mercenaire,un casque/1
+88Dquelle ‚tait la longueur approximative du 1er stade olympique ?
+88 100 m,143 m,192 m/3
+89Dqu'‚tait praxitŠle ?
+89 un sculpteur,une ville engloutie,un athlŠte/1
+90Dqu'est-ce que la corne d'amalth‚e ?
+90 le rostre d'une licorne,la corne d'abondance,la trompe des olympiades/2
+91Dqu'est-ce qu'un alipte ?
+91 un poŠme de sept lignes,un soldat … cheval,un entraŒneur sportif/3
+92Dqu'est-ce qu'une m‚tope ?
+92 une ‚p‚e ouvrag‚e,un panneau sculpt‚,un insecte nuisible/2
+93Dlequel de ces 3 grecs est un historien c‚lŠbre ?
+93 h‚rodote,diogŠne,p‚riclŠs/1
+94Dselon la l‚gende, o— ‚tait situ‚ le labyrinthe ?
+94 … gortyre,… cnossos,… pha‹stos/2
+95Dcomment appelle-t-on une file de colonnes ?
+95 un p‚ristyle,une acropole,un acrotŠre/1
+96Dquelle science fut fond‚e par archimŠde ?
+96 la balistique,l'hydrostatique,l'astronomie/2
+97Dcomment s'appelle l'enceinte sacr‚e d'olympie ?
+97 le prytan‚on,l'hellanodik‚on,l'atlis/3
+98Dquelles cr‚atures s'affrontent dans une gigantomachie ?
+98 les dieux et les g‚ants,les g‚ants et les titans,les dieux et les titans/1
+99Dentre quels pays eurent lieu les guerres m‚diques ?
+99 la grŠce et la perse,la grŠce et l'‚gypte,la grŠce et rome/1
+

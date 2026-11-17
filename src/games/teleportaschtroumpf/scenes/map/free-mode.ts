@@ -1,4 +1,4 @@
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import { newGame } from "../../game/rules";
 import type { Game } from "../../game/rules";
 import { VoiceLine, introVoice } from "../board/voices";

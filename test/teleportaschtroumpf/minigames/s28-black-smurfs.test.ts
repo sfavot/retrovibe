@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import { sceneIngredient } from "../../../src/games/teleportaschtroumpf/scenes/minigames/common";
 import {
@@ -291,11 +291,11 @@ describe.skipIf(!hasOriginalFiles)("S28 Les Schtroumpfs Noirs : cibles, viseur, 
   it("tir sur la cible : son s28a002b, la cible tombe puis la suivante attend 2 s ; tir à côté : son s28a003b, impact, rien de perdu", async () => {
     const run = await launch({ seed: 7, audio: true });
     const scene = run.scene as BlackSmurfsScene;
-    const hit = await run.ctx.resources.voc("s28a002b.voc");
-    const miss = await run.ctx.resources.voc("s28a003b.voc");
+    const hit = await run.ctx.resources.sound("s28a002b.voc");
+    const miss = await run.ctx.resources.sound("s28a003b.voc");
     // Un tir à vide, avant toute cible : raté.
     await run.tap("Space", 120);
-    expect(run.host.audio.effects.at(-1)?.sound.samples).toEqual(miss.samples);
+    expect(run.host.audio.effects.at(-1)?.sound.data).toEqual(miss.data);
     expect(scene.missCount).toBe(1);
     expect(scene.hasFailed).toBe(false);
     run.shot("s28-tir-rate");
@@ -304,7 +304,7 @@ describe.skipIf(!hasOriginalFiles)("S28 Les Schtroumpfs Noirs : cibles, viseur, 
       act();
       return scene.targetState === TARGET_HIT;
     }, 30_000);
-    expect(run.host.audio.effects.at(-1)?.sound.samples).toEqual(hit.samples);
+    expect(run.host.audio.effects.at(-1)?.sound.data).toEqual(hit.data);
     expect(scene.hitCount).toBe(1);
     run.shot("s28-touche");
     await run.until(() => scene.targetState === TARGET_WAITING, 5000);

@@ -1,6 +1,6 @@
 import { OBJECT_ORIGIN_X as ORIGIN_X, OBJECT_ORIGIN_Y as ORIGIN_Y } from "../../../src/games/teleportaschtroumpf/scenes/minigames/common";
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   BASE_TIME_LIMIT,
@@ -65,12 +65,14 @@ describe("S26 : règles du jeu sonore (pur, `1ed0:000b`)", () => {
 describe.skipIf(!hasOriginalFiles)("S26 : ressources", () => {
   it("les 12 bruits (1..4, 5..8, 11..14), l'erreur, 6 voix d'échec et 6 de réussite existent", () => {
     const names = new Set(listData(() => true).map((p) => p.split("/").pop()!.toLowerCase()));
+    // Un son `x.voc` est versionné en `x.voc.mp3`.
+    const has = (name: string) => names.has(name.endsWith(".voc") ? `${name}.mp3` : name);
     for (const picture of [1, 4, 7]) {
-      for (let target = 1; target <= 4; target++) expect(names.has(soundFile(picture, target)), soundFile(picture, target)).toBe(true);
+      for (let target = 1; target <= 4; target++) expect(has(soundFile(picture, target)), soundFile(picture, target)).toBe(true);
     }
-    for (const name of ["s26a099b.voc", "s26a000s.hy8", "s26a000s.pal"]) expect(names.has(name), name).toBe(true);
+    for (const name of ["s26a099b.voc", "s26a000s.hy8", "s26a000s.pal"]) expect(has(name), name).toBe(true);
     for (const prefix of ["s26b", "s26c"]) {
-      for (let i = 1; i <= 6; i++) expect(names.has(`${prefix}00${i}t.voc`)).toBe(true);
+      for (let i = 1; i <= 6; i++) expect(has(`${prefix}00${i}t.voc`)).toBe(true);
     }
   });
 });
@@ -146,7 +148,7 @@ describe.skipIf(!hasOriginalFiles)("S26 Jeu Sonore : décor, bruit, recherche, r
     await run.until(() => scene.stage === "listen");
     expect(run.ctx.palette.black).toBe(true);
     const played = run.host.audio.plays.at(-1)!;
-    expect(played.sound.samples.length).toBeGreaterThan(2000);
+    expect(played.sound.sampleCount).toBeGreaterThan(2000);
     await run.until(() => scene.stage === "hunt");
     expect(run.ctx.palette.black).toBe(false);
     expect(run.ctx.input.mouseX).toBe(0xa0);

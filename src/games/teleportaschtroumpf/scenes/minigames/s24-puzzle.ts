@@ -1,10 +1,10 @@
-import type { Hy8 } from "../../data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Timer } from "../../engine/clock";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Timer } from "../../../../engine/infogrames/clock";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
-import type { Surface } from "../../engine/surface";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import type { Surface } from "../../../../engine/infogrames/surface";
 import type { Game } from "../../game/rules";
 import { FRAME_LINE, FRAME_SHADOW, Pointer, SoundHush, copyRect, drawFrame, fillRect, levelTimeLimit, minigameLevel, minigameRequest, pointsForTime, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
 
@@ -110,11 +110,11 @@ export class PuzzleScene implements Scene {
   private mcg!: Mcg;
   private sprites!: Hy8;
   private pointer!: Pointer;
-  private goodSound!: Voc;
-  private badSound!: Voc;
-  private wrongVoices: Voc[] = [];
-  private timeoutVoices: Voc[] = [];
-  private successVoices: Voc[] = [];
+  private goodSound!: Sound;
+  private badSound!: Sound;
+  private wrongVoices: Sound[] = [];
+  private timeoutVoices: Sound[] = [];
+  private successVoices: Sound[] = [];
   private pictureIndex = 1;
   private holeList: Hole[] = [];
   private found: boolean[] = [];
@@ -209,7 +209,7 @@ export class PuzzleScene implements Scene {
   async load(ctx: SceneContext): Promise<void> {
     // Premier tirage de l'original (`2e6a:006a..008b`) : `rand × 5000 / 0x8000 % 5 + 1`.
     this.pictureIndex = (ctx.rng.below(5000) % PICTURE_COUNT) + 1;
-    const voc = (name: string) => ctx.resources.voc(name);
+    const voc = (name: string) => ctx.resources.sound(name);
     const numbered = (prefix: string, first: number, length: number) =>
       Promise.all(Array.from({ length }, (_, i) => voc(voiceName(prefix, first + i))));
     [this.mcg, this.sprites, this.goodSound, this.badSound, this.wrongVoices, this.timeoutVoices, this.successVoices] = await Promise.all([
@@ -398,7 +398,7 @@ export class PuzzleScene implements Scene {
     ctx.voice.holdMusic(true);
     // Les secondes sont lues ici, après le fondu sonore (`2e6a:0699`).
     this.measured = this.seconds;
-    let voice: Voc;
+    let voice: Sound;
     if (this.reason === "won") {
       // Le tableau est restitué sans cadre avant la voix `s24c` (`2e6a:0741`).
       this.framesShown = false;

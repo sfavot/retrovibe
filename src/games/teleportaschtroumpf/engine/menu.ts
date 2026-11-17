@@ -1,9 +1,9 @@
-import type { Hy8 } from "../data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../data/mcg";
-import type { Voc } from "../data/voc";
-import { EffectWait } from "./effect-wait";
-import type { SceneContext } from "./scene";
-import { boundsOf, placeSprite } from "./sprites";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
+import { EffectWait } from "../../../engine/infogrames/effect-wait";
+import type { SceneContext } from "../../../engine/infogrames/scene";
+import { boundsOf, placeSprite } from "../../../engine/infogrames/sprites";
 
 export interface MenuItem {
   /** Voix d'aide jouée par le clic droit / Entrée (nom d'origine, ex. `s07v004t.voc`) ; absente : rien ne se passe. */
@@ -168,8 +168,8 @@ export interface MenuEvent {
  */
 export class Menu {
   private current: number;
-  private voices: (Voc | null)[] = [];
-  private beep: Voc | null = null;
+  private voices: (Sound | null)[] = [];
+  private beep: Sound | null = null;
   private areas: readonly (MenuArea | null)[] = [];
   /** Dernière position de survol traitée : la souris immobile ne reprend pas la sélection changée au clavier. */
   private hoverX = -1;
@@ -193,8 +193,8 @@ export class Menu {
   async load(ctx: SceneContext): Promise<void> {
     const { changeSound } = this.options;
     const [beep, ...voices] = await Promise.all([
-      changeSound ? ctx.resources.voc(changeSound) : null,
-      ...this.options.items.map((item) => (item.voice ? ctx.resources.voc(item.voice) : null)),
+      changeSound ? ctx.resources.sound(changeSound) : null,
+      ...this.options.items.map((item) => (item.voice ? ctx.resources.sound(item.voice) : null)),
     ]);
     this.beep = beep;
     this.voices = voices;

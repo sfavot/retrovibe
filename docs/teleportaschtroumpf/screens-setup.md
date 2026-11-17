@@ -59,7 +59,7 @@ Souris dans l'original : gauche valide, droit joue la voix, sans tenir compte de
 
 ## S04 : menu parents (`21ee:13a1`)
 
-Ressources : `s04a001d.mcg` (`13fc:0084`, palette `DS:57C0`), `s04a000s.hy8`, `s07a001b.voc` (bip), police `DS:19AD` = `s52d001f.pfn`, `c:\smurf.cfg` (remplacé par `ctx.options` / `host.storage`). Sûr.
+Ressources : `s04a001d.mcg` (`13fc:0084`, palette `DS:57C0`), `s04a000s.hy8`, `s07a001b.voc` (bip), police `DS:19AD` = `s52d001f.pfn`, `c:\smurf.cfg` (remplacé par `parentOptions(ctx)` / `host.storage`). Sûr.
 
 - Trois lignes : 0 durée (0..3, `d304 = (v+1) × 0x708` s), 1 pause avant de rejouer (0..4), 2 motif d'arrêt (0..8). Valeurs initiales lues dans le fichier (3 mots).
 - Affichage (un `restoreBackground` par image) : cadran de durée = sprite `6 × v` de `s04a000s.hy8` en (73, 72) ; jauge de pause = sprite `19 + v` en (192, 110) ; message = texte en (43, 180) avec `s52d001f.pfn`, indice de couleur 0 (noir), police 16 px. Messages (version française, `21ee:1fc7..2071`) : voir `END_MESSAGES`. Les versions allemande et anglaise existent (`DS:617B` = `g`, `a`) ; seule la française est reproduite.

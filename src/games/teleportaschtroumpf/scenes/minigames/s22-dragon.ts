@@ -1,7 +1,7 @@
-import type { Hy8 } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import {
   Clip,
@@ -80,8 +80,8 @@ export class DragonScene implements Scene {
   private mcg!: Mcg;
   private dragonSheet!: Hy8;
   private smurfSheet!: Hy8;
-  private music!: Voc;
-  private voices!: Record<DragonSound, Voc>;
+  private music!: Sound;
+  private voices!: Record<DragonSound, Sound>;
   private win!: Clip;
   private deathAnim!: Anim;
   private run!: DragonRun;
@@ -139,11 +139,11 @@ export class DragonScene implements Scene {
       resources.mcg("s22a001d.mcg"),
       resources.hy8("s22a000s.hy8"),
       resources.hy8("s22a001s.hy8"),
-      resources.voc("s22a001b.voc"),
-      resources.voc("s22a002b.voc"),
-      resources.voc("s22a003c.voc"),
-      resources.voc("s22a004c.voc"),
-      resources.voc("s22a005b.voc"),
+      resources.sound("s22a001b.voc"),
+      resources.sound("s22a002b.voc"),
+      resources.sound("s22a003c.voc"),
+      resources.sound("s22a004c.voc"),
+      resources.sound("s22a005b.voc"),
       this.win.load(ctx),
     ]);
     this.mcg = mcg;

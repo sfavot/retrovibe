@@ -1,11 +1,11 @@
-import type { Hy8 } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import { BIRD_HINT_SCENES } from "../../game/tables";
-import { VideoBackdrop } from "../../engine/video";
+import { VideoBackdrop } from "../../../../engine/infogrames/video";
 import { Clip, minigameRequest, type AftermathFactory, type MinigameDone, type MinigameFactory } from "./common";
 
 /**
@@ -187,7 +187,7 @@ export class BirdAftermathScene implements Scene {
   readonly step = 1;
   private mcg!: Mcg;
   private hand!: Hy8;
-  private voc!: Voc;
+  private voc!: Sound;
   private stage: "intro" | "voice" | "pause" | "done" = "intro";
   private pauseStart = 0;
   private voiceStarted = false;
@@ -211,7 +211,7 @@ export class BirdAftermathScene implements Scene {
     [this.mcg, this.hand, this.voc] = await Promise.all([
       ctx.resources.mcg(`s02a00${place.region + 4}d.mcg`),
       ctx.resources.hy8("s25a000s.hy8"),
-      ctx.resources.voc(voiceName("s39v", 6 + place.voice)),
+      ctx.resources.sound(voiceName("s39v", 6 + place.voice)),
     ]);
   }
 

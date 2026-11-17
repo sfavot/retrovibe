@@ -1,8 +1,9 @@
+import { GAME_CONFIG } from "../../../src/games/teleportaschtroumpf/engine/config";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
-import { Engine } from "../../../src/games/teleportaschtroumpf/engine/engine";
-import type { Scene, SceneContext } from "../../../src/games/teleportaschtroumpf/engine/scene";
+import { Engine } from "../../../src/engine/infogrames/engine";
+import type { Scene, SceneContext } from "../../../src/engine/infogrames/scene";
 import { type Game, newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import type { MinigameOutcome } from "../../../src/games/teleportaschtroumpf/game/state";
 import { DOORS, MAP_LOCATIONS, minigameInfo, type Position } from "../../../src/games/teleportaschtroumpf/game/tables";
@@ -151,7 +152,7 @@ export class LaunchedMinigame {
 export async function launchMinigame(id: number, options: LaunchOptions = {}): Promise<LaunchedMinigame> {
   const host = new TestHost();
   host.audio.enabled = options.audio ?? false;
-  const engine = new Engine(host, { seed: options.seed ?? 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: options.seed ?? 7 });
   const game = newGame({ players: [{ character: options.character ?? 0, level: options.level ?? 0 }] }, engine.ctx.rng);
   options.setup?.(game);
   if (options.bonus) game.state.bonusTag = minigameInfo(id)!.bonusTag!;
@@ -211,7 +212,7 @@ export async function enterFromFreeMode(id: number, options: { seed?: number } =
   if (!location) throw new RangeError(`aucun lieu de la carte ne mène à la scène ${id}`);
   const host = new TestHost();
   host.audio.enabled = false;
-  const engine = new Engine(host, { seed: options.seed ?? 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: options.seed ?? 7 });
   const free = createFreeModeScene(() => undefined) as FreeModeScene;
   await engine.start(free);
   const settle = () => runUntil(engine, host, () => !engine.loading && !engine.ctx.scenes.transitioning && !engine.ctx.fade.active);

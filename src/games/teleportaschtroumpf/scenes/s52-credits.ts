@@ -1,9 +1,9 @@
-import { measureText, type PfnFont } from "../data/font";
-import type { Mcg } from "../data/mcg";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../data/mcg";
-import type { Voc } from "../data/voc";
-import { TICKS_PER_SECOND } from "../engine/clock";
-import type { Scene, SceneContext } from "../engine/scene";
+import { measureText, type PfnFont } from "../../../engine/infogrames/data/font";
+import type { Mcg } from "../../../engine/infogrames/data/mcg";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
+import { TICKS_PER_SECOND } from "../../../engine/infogrames/clock";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 
 /** Fonds, polices, texte et musique de `154c:052e`. */
 const BACKGROUND = "s52d001d.mcg";
@@ -83,7 +83,7 @@ class CreditsScene implements Scene {
   private mcg!: Mcg;
   private regular!: PfnFont;
   private bold!: PfnFont;
-  private music!: Voc;
+  private music!: Sound;
   private lines: Uint8Array[] = [];
   private phase: Phase = "fadeIn";
   /** Index de la ligne du haut de la page, et décalage en pixels (0 à 11) de la montée. */
@@ -101,7 +101,7 @@ class CreditsScene implements Scene {
       ctx.resources.mcg(BACKGROUND),
       ctx.resources.pfn(FONT_REGULAR),
       ctx.resources.pfn(FONT_BOLD),
-      ctx.resources.voc(MUSIC),
+      ctx.resources.sound(MUSIC),
       // Repli défensif : fichier illisible, texte vide (voir l'en-tête).
       ctx.resources.bytes(TEXT_FILE).catch(() => new Uint8Array(0)),
     ]);

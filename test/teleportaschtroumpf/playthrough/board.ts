@@ -3,7 +3,7 @@ import type { Game } from "../../../src/games/teleportaschtroumpf/game/rules";
 import { hasIngredient } from "../../../src/games/teleportaschtroumpf/game/state";
 import { DOORS, HAZARDS, JUMP_STEP, minigameInfo, type Row } from "../../../src/games/teleportaschtroumpf/game/tables";
 import { MINIGAME_IDS } from "../../../src/games/teleportaschtroumpf/scenes/minigames";
-import type { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import type { BorlandRandom } from "../../../src/engine/infogrames/rng";
 
 /**
  * Visée des portes : le plateau est un seul chemin de 18 segments (écran 1 haut, écran 1 bas, écran 2 haut…), chacun de

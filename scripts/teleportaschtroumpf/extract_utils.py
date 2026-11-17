@@ -5,7 +5,14 @@ Sous-commandes :
   pistes <cue>                       -> affiche le nombre de secteurs de la piste 1 (données)
   iso <bin> <iso> <nb_secteurs>      -> secteurs bruts MODE1/2352 -> ISO 2048
   extraire <iso> <dest>              -> extrait l'ISO 9660 (scripts/lib/extract_common.py)
-  copier <racine_iso> <dest> <stats> -> filtre et copie DATA/JEU_F + SMURF.EXE ; stats JSON
+  copier <racine_iso> <dest> <pcm> <stats>
+      filtre et copie DATA/JEU_F + SMURF.EXE dans <dest> ; les VOC ne sont pas copiés : leur son est écrit en PCM brut
+      dans <pcm>/<fréquence>/DATA/.../<nom>.VOC.u8 (encodé ensuite en MP3 par le script) et décrit par l'index
+      <dest>/audio.json ; stats JSON ; affiche le nombre de sons
+
+audio.json : {"DATA/.../<nom d'origine>.mp3": [échantillons, fréquence en Hz]}, trié (`ecrire_index_audio` de
+scripts/lib/extract_common.py) : le nombre d'échantillons et la fréquence du PCM d'origine, avant l'encodage. Le moteur
+en tire la durée exacte de chaque son (échantillons / fréquence), qu'un MP3 décodé ne redonne pas à l'échantillon près.
   inventaire <dest> <stats> <sortie_md>
   manuel <html_textutil> <html_propre> -> met en page la notice (HTML de textutil) avant l'impression en PDF
 """
@@ -50,11 +57,24 @@ def cmd_extraire(iso, dest):
     ec.extraire_iso(iso, dest)
 
 
-def cmd_copier(racine, dest, stats_json):
-    gardes, exclus = ec.copier_filtre(os.path.join(racine, 'DATA', 'JEU_F'), dest, classer, 'DATA')
+def cmd_copier(racine, dest, pcm, stats_json):
+    index = {}  # audio.json
+
+    def voc(chemin, rel):
+        rel = 'DATA/' + rel.replace(os.sep, '/')
+        with open(chemin, 'rb') as f:
+            son, frequence = ec.lire_voc(f.read(), rel)
+        if not son:
+            sys.exit('%s : VOC sans échantillon' % rel)
+        ec.ecrire_pcm(pcm, frequence, rel, son)
+        index[rel + '.mp3'] = [len(son), frequence]
+
+    gardes, exclus = ec.copier_filtre(os.path.join(racine, 'DATA', 'JEU_F'), dest, classer, 'DATA', {'.VOC': voc})
     shutil.copyfile(os.path.join(racine, 'SMURF.EXE'), os.path.join(dest, 'SMURF.EXE'))
+    ec.ecrire_index_audio(dest, index)
     with open(stats_json, 'w') as o:
-        json.dump({'gardes': gardes, 'exclus': exclus}, o)
+        json.dump({'gardes': gardes, 'exclus': exclus, 'index': index}, o, sort_keys=True)
+    print(len(index))
 
 
 def cmd_inventaire(dest, stats_json, sortie):
@@ -68,12 +88,33 @@ def cmd_inventaire(dest, stats_json, sortie):
         m = re.match(r'(S\d+)', g['rel'].split(os.sep)[0].upper())
         scene = m.group(1) if m else '(racine)'
         par_scene[scene] = par_scene.get(scene, 0) + 1
+    index = st['index']
+    origine = ec.agreger_gardes(gardes)
+    mp3 = [os.path.getsize(os.path.join(dest, *rel.split('/'))) for rel in index]
+    duree = sum(n / f for n, f in index.values())
+    frequences = {}
+    for _, f in index.values():
+        frequences[f] = frequences.get(f, 0) + 1
     ec.rendre_inventaire(sortie, 'Inventaire des fichiers du Téléportaschtroumpf',
                          'scripts/teleportaschtroumpf-extract.sh', [
         ('Taille', [
             '- Total versionné (`original/teleportaschtroumpf/`) : **%s** (%d octets)' % (mo(total), total),
-            '- Fichiers de données (`DATA/`) : %d ; `SMURF.EXE` : %s' % (len(gardes), mo(smurf))]),
-        ('Par extension (fichiers gardés)', ec.tableau_par_categorie('Extension', ec.agreger_gardes(gardes))),
+            '- Fichiers de données (`DATA/`) : %d ; `SMURF.EXE` : %s' % (len(gardes), mo(smurf)),
+            '- Fichiers d\'origine repris : %s ; les `.VOC` sont versionnés en MP3 (voir « Son »), le reste tel quel.'
+            % mo(sum(g['taille'] for g in gardes) + smurf)]),
+        ('Par extension (fichiers d\'origine repris, taille d\'origine)', ec.tableau_par_categorie('Extension', origine)),
+        ('Son', [
+            '- `*.VOC` (voix, musiques, bruitages) : %d fichiers, %s à l\'origine ; versionnés en `*.VOC.mp3` '
+            '(nom d\'origine suivi de `.mp3`) : %d fichiers, %s.'
+            % (origine['.VOC'][0], mo(origine['.VOC'][1]), len(mp3), mo(sum(mp3))),
+            '- MP3 mono 22 050 Hz, 32 kb/s CBR, sans métadonnées (`ec_encoder_voix` de `scripts/lib/extract-common.sh`), '
+            'à partir du PCM 8 bits non signé d\'origine (fichiers par fréquence : %s).'
+            % ', '.join('%d à %d Hz' % (n, f) for f, n in sorted(frequences.items())),
+            '- `audio.json` : `{"DATA/.../<nom>.VOC.mp3": [échantillons, fréquence]}`, %d entrées : nombre '
+            'd\'échantillons et fréquence du PCM d\'origine, avant l\'encodage (durée exacte = échantillons / fréquence). '
+            'Le moteur attend la fin des sons d\'après cet index, pas d\'après le MP3 décodé.' % len(index),
+            '- Durée totale : %d min %02d s.' % (duree // 60, duree % 60),
+            '- Le son des vidéos (`.MUX`) reste dans les fichiers MUX, tels quels.']),
         ('Par scène', ec.tableau(['Scène', 'Fichiers'], sorted(par_scene.items()), droite=(1,))),
         ('Fichiers exclus (agrégés par catégorie)', ec.tableau_par_categorie('Catégorie', st['exclus'])),
         ('Pistes audio du CD', [
@@ -85,7 +126,8 @@ def cmd_inventaire(dest, stats_json, sortie):
             'tailles). Elle n\'est pas lue par le jeu.']),
         ('Régénérer', ['```', 'bash scripts/teleportaschtroumpf-extract.sh [archive.rar]', '```', '',
             'Archive par défaut : `archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar` '
-            '(non versionnée). Outils requis : `bsdtar`, `python3` ; pour la notice, `textutil` et Google Chrome (macOS).']),
+            '(non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (libmp3lame) ; pour la notice, `textutil` et '
+            'Google Chrome (macOS). Hors notice, le résultat est le même à chaque exécution, avec la même version de `ffmpeg`.']),
     ])
 
 

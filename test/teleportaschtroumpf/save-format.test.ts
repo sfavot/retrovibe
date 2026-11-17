@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../src/engine/infogrames/rng";
 import { newGame } from "../../src/games/teleportaschtroumpf/game/rules";
 import { Commentary } from "../../src/games/teleportaschtroumpf/scenes/grand-schtroumpf/commentary";
 import { SAVE_KEY, SAVE_VERSION, captureSave, clearSave, parseSave, readSave, writeSave } from "../../src/games/teleportaschtroumpf/scenes/save";

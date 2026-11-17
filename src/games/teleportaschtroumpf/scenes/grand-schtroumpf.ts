@@ -1,5 +1,5 @@
-import type { Scene, SceneContext } from "../engine/scene";
-import { VideoScene } from "../engine/video";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
+import { VideoScene } from "../../../engine/infogrames/video";
 import type { Game } from "../game/rules";
 import { isCommentVideo } from "./grand-schtroumpf/commentary";
 import { IngredientsScene } from "./grand-schtroumpf/ingredients";

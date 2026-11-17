@@ -1,4 +1,4 @@
-import type { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import type { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import type { Pilot } from "./pilots";
 import type { RobotHost } from "./host";
 

@@ -1,7 +1,7 @@
-import type { Hy8 } from "../../data/hy8";
-import type { Voc } from "../../data/voc";
-import { AnimationPlayer } from "../../engine/sprites";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import { AnimationPlayer } from "../../../../engine/infogrames/sprites";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import {
   Clip,
@@ -145,8 +145,8 @@ export type SledPhase = "ride" | "crash" | "fadeOut" | "result" | "done";
 export class SledScene implements Scene {
   readonly step = 1;
   private sprites!: Hy8;
-  private crashVoc!: Voc;
-  private stepVoc!: Voc;
+  private crashVoc!: Sound;
+  private stepVoc!: Sound;
   private ride!: Clip;
   private fail!: Clip;
   private win!: Clip;
@@ -215,8 +215,8 @@ export class SledScene implements Scene {
     this.win = new Clip(sledWinClip(this.game), (c) => this.finish(c));
     [this.sprites, this.crashVoc, this.stepVoc] = await Promise.all([
       ctx.resources.hy8("s27a000s.hy8"),
-      ctx.resources.voc("s27a003b.voc"),
-      ctx.resources.voc("s27a002b.voc"),
+      ctx.resources.sound("s27a003b.voc"),
+      ctx.resources.sound("s27a002b.voc"),
       this.ride.load(ctx),
       this.fail.load(ctx),
       this.win.load(ctx),

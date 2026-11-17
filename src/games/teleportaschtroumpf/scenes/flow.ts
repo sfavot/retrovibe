@@ -1,6 +1,7 @@
+import { parentOptions } from "../engine/options";
 import type { GameSetup } from "../game/rules";
-import type { Scene, SceneContext, TransitionOptions } from "../engine/scene";
-import { VideoScene } from "../engine/video";
+import type { Scene, SceneContext, TransitionOptions } from "../../../engine/infogrames/scene";
+import { VideoScene } from "../../../engine/infogrames/video";
 import { createGameScene } from "./game";
 import { createFreeModeScene } from "./s02-map";
 import { createMenuScene } from "./s07-menu";
@@ -62,7 +63,7 @@ export function goCharacters(ctx: SceneContext, players: number): void {
   go(
     ctx,
     createCharactersScene(players, (c, result) => {
-      if (result.action === "play") startGame(c, { players: result.players, options: c.options });
+      if (result.action === "play") startGame(c, { players: result.players, options: parentOptions(c) });
       else if (result.action === "back") goPlayers(c);
       else goMainMenu(c);
     }),

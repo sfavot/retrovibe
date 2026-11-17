@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Hy8 } from "../../src/games/teleportaschtroumpf/data/hy8";
+import type { Hy8 } from "../../src/engine/infogrames/data/hy8";
 import {
   BEEP_ARRIVE,
   BEEP_JUMP,
@@ -21,14 +21,14 @@ import {
   type WalkerStep,
 } from "../../src/games/teleportaschtroumpf/scenes/board/walker";
 import { hintVoice, introVoice, zoneHelpVoice } from "../../src/games/teleportaschtroumpf/scenes/board/voices";
-import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../src/engine/infogrames/rng";
 import { zoneIndex } from "../../src/games/teleportaschtroumpf/game/board";
 import { DOORS, SCREEN_COUNT, TURN_AUTO_SECONDS } from "../../src/games/teleportaschtroumpf/game/tables";
 import { TIMER_BLINK_SECONDS, timerBlinkOff } from "../../src/games/teleportaschtroumpf/scenes/s01-board";
 import { Session } from "./game-helpers";
 import { hasOriginalFiles, readData } from "./helpers";
 import { longPress, swipe, tap, touchDown, touchUp } from "./touch";
-import { parseHy8 } from "../../src/games/teleportaschtroumpf/data/hy8";
+import { parseHy8 } from "../../src/engine/infogrames/data/hy8";
 
 /** Longueur des animations de pose de `s01a000s.hy8` (0..7, 9, 0xB, 0xC). */
 const ANIMATION_FRAMES: Record<number, number> = { 0: 1, 1: 1, 2: 8, 3: 8, 4: 10, 5: 10, 6: 8, 7: 8, 9: 9, 0xb: 9, 0xc: 8 };

@@ -4,6 +4,7 @@ Module importable : les scripts `python3 -I` ignorent PYTHONPATH et le dossier c
 explicitement `scripts/lib` à sys.path avant `import extract_common`. Les données extraites ne sont pas de
 confiance : rien n'en est exécuté, les noms de fichiers sont validés avant toute écriture.
 """
+import json
 import os
 import re
 import shutil
@@ -191,10 +192,11 @@ def taille_dossier(racine):
     return sum(os.path.getsize(c) for c, _ in liste_fichiers(racine))
 
 
-def copier_filtre(source, dest, classer, sous_dossier=''):
+def copier_filtre(source, dest, classer, sous_dossier='', convertir=None):
     """Copie dans dest/<sous_dossier>/ les fichiers de source retenus par classer(chemin, rel, nom) -> (catégorie,
     gardé). Retourne (gardes, exclus) : gardes = [{'rel', 'cat', 'taille'}], exclus = {catégorie: [nombre, octets]}.
-    `rel` est relatif à source, avec le séparateur de l'OS."""
+    `rel` est relatif à source, avec le séparateur de l'OS. `convertir` : {catégorie: fonction(chemin, rel)} appelée à
+    la place de la copie pour les fichiers gardés de cette catégorie (repris sous une autre forme)."""
     gardes, exclus = [], {}
     for dossier, _, fichiers in os.walk(source):
         for nom in sorted(fichiers):
@@ -202,7 +204,10 @@ def copier_filtre(source, dest, classer, sous_dossier=''):
             rel = os.path.relpath(chemin, source)
             taille = os.path.getsize(chemin)
             categorie, garde = classer(chemin, rel, nom)
-            if garde:
+            if garde and convertir and categorie in convertir:
+                convertir[categorie](chemin, rel)
+                gardes.append({'rel': rel, 'cat': categorie, 'taille': taille})
+            elif garde:
                 cible = os.path.join(dest, sous_dossier, rel)
                 os.makedirs(os.path.dirname(cible), exist_ok=True)
                 shutil.copyfile(chemin, cible)
@@ -212,6 +217,57 @@ def copier_filtre(source, dest, classer, sous_dossier=''):
                 e[0] += 1
                 e[1] += taille
     return gardes, exclus
+
+
+SIGNATURE_VOC = b'Creative Voice File\x1a'
+
+
+def lire_voc(b, rel):
+    """(PCM 8 bits non signé mono, fréquence en Hz) d'un fichier Creative Voice à un seul bloc de données, suivi du
+    terminateur et de rien d'autre : type 1 (fréquence = round(1 000 000 / (256 − constante de temps)), comme la lisent
+    les moteurs) ou type 9 (fréquence écrite en clair). Tout le reste (plusieurs blocs, silence, codec compressé,
+    16 bits, stéréo) arrête l'extraction : `rel` nomme le fichier dans le message."""
+    if b[:20] != SIGNATURE_VOC:
+        sys.exit('%s : signature VOC absente' % rel)
+    pos, = struct.unpack_from('<H', b, 20)
+    if pos + 4 > len(b) or b[pos] not in (1, 9):
+        sys.exit('%s : premier bloc VOC inattendu' % rel)
+    taille = b[pos + 1] | b[pos + 2] << 8 | b[pos + 3] << 16
+    debut, fin = pos + 4, pos + 4 + taille
+    entete = 2 if b[pos] == 1 else 12
+    if taille < entete or fin > len(b):
+        sys.exit('%s : bloc VOC tronqué' % rel)
+    if b[pos] == 1:
+        constante, codec = b[debut], b[debut + 1]
+        if codec != 0:
+            sys.exit('%s : bloc VOC non géré (codec %d)' % (rel, codec))
+        frequence = round(1000000 / (256 - constante))
+    else:
+        frequence, bits, canaux, codec = struct.unpack_from('<IBBH', b, debut)
+        if (bits, canaux, codec) != (8, 1, 0) or frequence == 0:
+            sys.exit('%s : bloc VOC non géré (%d bits, %d canaux, codec %d)' % (rel, bits, canaux, codec))
+    # Après le bloc de données : le terminateur (un octet nul) et rien d'autre.
+    if b[fin:] != b'\x00':
+        sys.exit('%s : %d octets inattendus après le bloc de données' % (rel, len(b) - fin))
+    return b[debut + entete:fin], frequence
+
+
+def ecrire_pcm(pcm, frequence, rel, son):
+    """Écrit le PCM `son` dans <pcm>/<fréquence>/<rel>.u8, la disposition qu'encode `ec_encoder_pcm`
+    (scripts/lib/extract-common.sh). `rel` : chemin du fichier d'origine dans le dossier de sortie, séparateur `/`."""
+    chemin = os.path.join(pcm, str(frequence), *rel.split('/')) + '.u8'
+    os.makedirs(os.path.dirname(chemin), exist_ok=True)
+    with open(chemin, 'wb') as o:
+        o.write(son)
+
+
+def ecrire_index_audio(dest, index):
+    """Écrit <dest>/audio.json : {"<chemin du MP3 dans dest>": [échantillons, fréquence en Hz]}, trié. Les échantillons
+    sont ceux du PCM d'origine (8 bits non signé, mono), avant l'encodage : durée exacte = échantillons / fréquence.
+    Lu par src/engine/infogrames/data/audio-index.ts."""
+    with open(os.path.join(dest, 'audio.json'), 'w', encoding='ascii') as o:
+        json.dump(index, o, sort_keys=True, separators=(',', ':'))
+        o.write('\n')
 
 
 def tableau(entetes, lignes, droite=()):

@@ -1,7 +1,8 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it, vi } from "vitest";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
-import type { Scene } from "../../src/games/teleportaschtroumpf/engine/scene";
+import { Engine } from "../../src/engine/infogrames/engine";
+import { BorlandRandom } from "../../src/engine/infogrames/rng";
+import type { Scene } from "../../src/engine/infogrames/scene";
 import { Game, newGame } from "../../src/games/teleportaschtroumpf/game/rules";
 import { createGrandSchtroumpfScene } from "../../src/games/teleportaschtroumpf/scenes/grand-schtroumpf";
 import { Commentary, elapsedPercent, isCommentVideo } from "../../src/games/teleportaschtroumpf/scenes/grand-schtroumpf/commentary";
@@ -61,7 +62,7 @@ describe("S19 : déroulé de l'annonce des ingrédients (1e52:0324)", () => {
 async function launch(scene: Scene) {
   const host = new TestHost();
   host.audio.enabled = false;
-  const engine = new Engine(host, { seed: 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: 7 });
   await engine.start(scene);
   const loaded = (pattern: RegExp) => host.loaded.filter((f) => pattern.test(f)).map((f) => f.split("/").at(-1)!.toUpperCase());
   return { host, engine, loaded };
@@ -76,7 +77,7 @@ describe.skipIf(!hasOriginalFiles)("scènes du Grand Schtroumpf", () => {
     expect(done).toBe(false);
     await advance(engine, host, 9000);
     expect(done).toBe(true);
-    expect(loaded(/S19V/i)).toEqual(["S19V001T.VOC", "S19V008T.VOC", "S19V007T.VOC", "S19V002T.VOC", "S19V003T.VOC", "S19V005T.VOC", "S19V010T.VOC", "S19V018T.VOC", "S19V020T.VOC"]);
+    expect(loaded(/S19V/i)).toEqual(["S19V001T.VOC.MP3", "S19V008T.VOC.MP3", "S19V007T.VOC.MP3", "S19V002T.VOC.MP3", "S19V003T.VOC.MP3", "S19V005T.VOC.MP3", "S19V010T.VOC.MP3", "S19V018T.VOC.MP3", "S19V020T.VOC.MP3"]);
     // Les six icônes (x = 0x50 + 0x12 × rang, au-dessus de la ligne 0xB6) et le texte sont à l'écran.
     const { surface } = host.lastPresentation;
     const inked = (x0: number, x1: number, y0: number, y1: number) => {
@@ -146,7 +147,7 @@ describe.skipIf(!hasOriginalFiles)("scènes du Grand Schtroumpf", () => {
     let done = false;
     const { host, engine, loaded } = await launch(createGrandSchtroumpfScene({ kind: "comment", code: 0x82 }, () => (done = true)));
     await advance(engine, host, 1000);
-    expect(loaded(/S42V/i)).toEqual(["S42V130T.VOC"]);
+    expect(loaded(/S42V/i)).toEqual(["S42V130T.VOC.MP3"]);
     expect(done).toBe(true);
   }, 60_000);
 

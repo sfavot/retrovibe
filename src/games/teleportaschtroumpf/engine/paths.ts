@@ -13,18 +13,16 @@ export function expandName(name: string): string | undefined {
 
 /**
  * Chemin (relatif à `original/teleportaschtroumpf/`) d'un fichier demandé par nom d'origine ou chemin `DATA/...`.
- * Ordre : chemin explicite (casse indifférente), puis nom développé par `expandName` s'il est dans le manifeste,
- * puis recherche par nom de fichier. `undefined` si introuvable.
+ * Ordre : chemin explicite, puis nom développé par `expandName` s'il est dans le manifeste, puis recherche par nom
+ * de fichier ; casse indifférente partout. `undefined` si introuvable.
  */
 export function resolveGameFile(files: GameFiles, name: string): string | undefined {
   const normalized = name.replace(/\\/g, "/");
-  if (normalized.includes("/")) {
-    const wanted = normalized.toUpperCase();
-    return files.resolveAll(normalized).find((path) => path.toUpperCase() === wanted);
-  }
-  const expanded = expandName(normalized);
-  if (expanded && files.size(expanded) !== undefined) return expanded;
-  return files.resolve(normalized);
+  const explicit = normalized.includes("/");
+  // La casse du manifeste fait foi : les sons sont rangés en `S07A001B.VOC.mp3` (nom d'origine, puis `.mp3`).
+  const wanted = (explicit ? normalized : expandName(normalized))?.toUpperCase();
+  const exact = wanted === undefined ? undefined : files.resolveAll(normalized).find((path) => path.toUpperCase() === wanted);
+  return exact ?? (explicit ? undefined : files.resolve(normalized));
 }
 
 /** Voix parlée `sNNv` + numéro sur 3 chiffres + `t.voc` (`15f9:0db1`) : `voiceName("s07v", 4)` → `s07v004t.voc`. */

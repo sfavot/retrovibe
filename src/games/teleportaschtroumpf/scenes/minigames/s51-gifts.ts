@@ -1,8 +1,8 @@
-import type { Hy8 } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import type { MinigameRequest } from "../../game/state";
 import { Clip, Pointer, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
@@ -142,10 +142,10 @@ export class GiftsScene implements Scene {
   private mcg!: Mcg;
   private sprites!: Hy8;
   private pointer!: Pointer;
-  private openSound!: Voc;
-  private tadaSound!: Voc;
-  private successVoices: Voc[] = [];
-  private failureVoices: Voc[] = [];
+  private openSound!: Sound;
+  private tadaSound!: Sound;
+  private successVoices: Sound[] = [];
+  private failureVoices: Sound[] = [];
   private fail!: Clip;
   private layoutIndex = 0;
   private gifts: Gift[] = [];
@@ -236,11 +236,11 @@ export class GiftsScene implements Scene {
     [this.mcg, this.sprites, this.openSound, this.tadaSound, this.successVoices, this.failureVoices] = await Promise.all([
       ctx.resources.mcg(`s51a00${this.layoutIndex + 1}d.mcg`),
       ctx.resources.hy8("s51a000s.hy8"),
-      ctx.resources.voc("s51a001b.voc"),
+      ctx.resources.sound("s51a001b.voc"),
       // Le son de fin est celui de S29 (`s29a002b.voc`, chaîne en `DS:1450`).
-      ctx.resources.voc("s29a002b.voc"),
-      Promise.all([1, 2, 3].map((n) => ctx.resources.voc(voiceName("s51c", n)))),
-      Promise.all([0, 1].map((roll) => ctx.resources.voc(voiceName("s51b", failureVoice(this.request.character, roll))))),
+      ctx.resources.sound("s29a002b.voc"),
+      Promise.all([1, 2, 3].map((n) => ctx.resources.sound(voiceName("s51c", n)))),
+      Promise.all([0, 1].map((roll) => ctx.resources.sound(voiceName("s51b", failureVoice(this.request.character, roll))))),
       this.fail.load(ctx),
     ]);
     this.pointer = new Pointer({ sprites: this.sprites, sprite: CURSOR_SPRITE, bounds: POINTER_BOUNDS });

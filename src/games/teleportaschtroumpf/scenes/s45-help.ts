@@ -1,7 +1,7 @@
-import type { Voc } from "../data/voc";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
 import type { Game } from "../game/rules";
 import { voiceName } from "../engine/paths";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { ScreenSnapshot } from "./common/choice";
 import { drawInfo, loadInfo, type InfoResources } from "./s03-info";
 
@@ -24,7 +24,7 @@ export function createHelpScene(game: Game, onDone: (ctx: SceneContext) => void)
 class HelpScene implements Scene {
   readonly step = 1;
   private info!: InfoResources;
-  private voice!: Voc;
+  private voice!: Sound;
   private done = false;
   private readonly snapshot = new ScreenSnapshot();
 
@@ -34,7 +34,7 @@ class HelpScene implements Scene {
   ) {}
 
   async load(ctx: SceneContext): Promise<void> {
-    [this.info, this.voice] = await Promise.all([loadInfo(ctx), ctx.resources.voc(voiceName("s45v", 3))]);
+    [this.info, this.voice] = await Promise.all([loadInfo(ctx), ctx.resources.sound(voiceName("s45v", 3))]);
   }
 
   enter(ctx: SceneContext): void {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   HIDDEN_OBJECTS,
@@ -60,12 +60,14 @@ describe("S25 : règles de l'observation (pur, `260f:000e`)", () => {
 describe.skipIf(!hasOriginalFiles)("S25 : ressources", () => {
   it("les 25 décors, le curseur, le son du clic et 12 voix de chaque série existent", () => {
     const names = new Set(listData(() => true).map((p) => p.split("/").pop()!.toLowerCase()));
+    // Un son `x.voc` est versionné en `x.voc.mp3`.
+    const has = (name: string) => names.has(name.endsWith(".voc") ? `${name}.mp3` : name);
     for (let letter = 0; letter < 5; letter++) {
-      for (let digit = 0; digit < 5; digit++) expect(names.has(pictureFile(letter, digit)), pictureFile(letter, digit)).toBe(true);
+      for (let digit = 0; digit < 5; digit++) expect(has(pictureFile(letter, digit)), pictureFile(letter, digit)).toBe(true);
     }
-    for (const name of ["s25a000s.hy8", "s25a000s.pal", "s25a001b.voc", "s25a002b.voc"]) expect(names.has(name), name).toBe(true);
+    for (const name of ["s25a000s.hy8", "s25a000s.pal", "s25a001b.voc", "s25a002b.voc"]) expect(has(name), name).toBe(true);
     for (const prefix of ["s25b", "s25c"]) {
-      for (let i = 1; i <= 12; i++) expect(names.has(`${prefix}${String(i).padStart(3, "0")}t.voc`), `${prefix}${i}`).toBe(true);
+      for (let i = 1; i <= 12; i++) expect(has(`${prefix}${String(i).padStart(3, "0")}t.voc`), `${prefix}${i}`).toBe(true);
     }
   });
 });

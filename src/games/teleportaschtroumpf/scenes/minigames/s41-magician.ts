@@ -1,10 +1,10 @@
-import type { Hy8 } from "../../data/hy8";
-import { parsePal, type Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import { EffectWait } from "../../engine/effect-wait";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import { parsePal, type Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import { EffectWait } from "../../../../engine/infogrames/effect-wait";
 import { Menu, paletteAreas, paletteHighlight } from "../../engine/menu";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import { hasIngredient, type MinigameRequest } from "../../game/state";
 import { ALL_INGREDIENTS, INGREDIENT_COUNT, MAGICIAN_HAT_CHOICE } from "../../game/tables";
@@ -149,16 +149,16 @@ export class MagicianScene implements Scene {
     waitEffectEnd: true,
   });
   private branchKind: MagicianBranch = "closed";
-  private beep!: Voc;
+  private beep!: Sound;
   private sprites!: Hy8;
   private pointer!: Pointer;
   private palette!: Uint8Array;
   private choiceMcg!: Mcg;
   private questionMcg!: Mcg;
   private confirmMcg!: Mcg;
-  private questionVoice!: Voc;
-  private remarks: (Voc | null)[] = [];
-  private voices: (Voc | null)[] = [];
+  private questionVoice!: Sound;
+  private remarks: (Sound | null)[] = [];
+  private voices: (Sound | null)[] = [];
   private incoming: Clip | null = null;
   private incomingReady = false;
   private failure: unknown = null;
@@ -173,7 +173,7 @@ export class MagicianScene implements Scene {
   private zone = -1;
   private previousZone = -1;
   private counts: number[] = [];
-  private pending: Voc | null = null;
+  private pending: Sound | null = null;
   private chosenZone: number | null = null;
   private answeredYes: boolean | null = null;
   private confirmed: boolean | null = null;
@@ -248,7 +248,7 @@ export class MagicianScene implements Scene {
       this.incomingReady = true;
       return;
     }
-    const optional = (name: string) => ctx.resources.voc(name).catch(() => null);
+    const optional = (name: string) => ctx.resources.sound(name).catch(() => null);
     const [, sprites, pal, choiceMcg, questionMcg, confirmMcg, beep, questionVoice, remarks, voices] = await Promise.all([
       first.load(ctx),
       ctx.resources.hy8("s41a000s.hy8"),
@@ -256,8 +256,8 @@ export class MagicianScene implements Scene {
       ctx.resources.mcg("s41a160a.mcg"),
       ctx.resources.mcg("s41b003d.mcg"),
       ctx.resources.mcg("s41b035a.mcg"),
-      ctx.resources.voc("s07a001b.voc"),
-      ctx.resources.voc(voiceName("s49v", QUESTION_VOICE)),
+      ctx.resources.sound("s07a001b.voc"),
+      ctx.resources.sound(voiceName("s49v", QUESTION_VOICE)),
       // `s41a007t.voc` et `s41v006t.voc` n'existent pas dans les données : l'original demande alors un fichier absent, la voix est muette.
       Promise.all(Array.from({ length: REMARK_COUNT }, (_, i) => optional(voiceName("s41a", REMARK_FIRST + i)))),
       Promise.all(Array.from({ length: CHOICE_VOICE_COUNT }, (_, i) => optional(voiceName("s41v", i + 1)))),
@@ -570,7 +570,7 @@ export class MagicianScene implements Scene {
   }
 
   /** Joue la voix `voice` (muette si le fichier manque) et passe à `phase`. */
-  private speak(ctx: SceneContext, voice: Voc | null, phase: MagicianPhase): void {
+  private speak(ctx: SceneContext, voice: Sound | null, phase: MagicianPhase): void {
     if (voice) ctx.voice.play(voice);
     this.phase = phase;
   }

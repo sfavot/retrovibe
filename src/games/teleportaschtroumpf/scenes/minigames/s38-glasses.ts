@@ -1,4 +1,4 @@
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game, GameEvent } from "../../game/rules";
 import { minigameRequest, type AftermathFactory, type MinigameDone, type MinigameFactory } from "./common";
 import { POINT_ITEM, TransferScene, type Transfer } from "./s38/transfer";

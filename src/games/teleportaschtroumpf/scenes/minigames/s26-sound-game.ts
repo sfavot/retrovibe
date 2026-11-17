@@ -1,8 +1,8 @@
-import type { Hy8 } from "../../data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH, parsePal, type Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Timer } from "../../engine/clock";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, parsePal, type Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Timer } from "../../../../engine/infogrames/clock";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import { FRAME_LINE, FRAME_SHADOW, OBJECT_ORIGIN_X, OBJECT_ORIGIN_Y, Pointer, drawFrame, isObjectHit, minigameRequest, pointsForTime, pointsOutcome, type ObjectRect, type MinigameDone, type MinigameFactory } from "./common";
 
@@ -88,10 +88,10 @@ export class SoundGameScene implements Scene {
   private spritePalette!: Uint8Array;
   private sprites!: Hy8;
   private pointer!: Pointer;
-  private sound!: Voc;
-  private buzzer!: Voc;
-  private failVoices: Voc[] = [];
-  private winVoices: Voc[] = [];
+  private sound!: Sound;
+  private buzzer!: Sound;
+  private failVoices: Sound[] = [];
+  private winVoices: Sound[] = [];
   private picture = 1;
   private target = 1;
   private phase: SoundGamePhase = "view";
@@ -175,7 +175,7 @@ export class SoundGameScene implements Scene {
     this.target = ctx.rng.below(4) + 1;
     // Un troisième tirage (`rand × 4 / 0x8000` rangé en `DS:6F4E`, jamais relu) : gardé pour que la suite des tirages reste celle de l'original.
     ctx.rng.below(4);
-    const voc = (name: string) => ctx.resources.voc(name);
+    const voc = (name: string) => ctx.resources.sound(name);
     const numbered = (prefix: string) => Promise.all(Array.from({ length: VOICE_COUNT }, (_, i) => voc(`${prefix}00${i + 1}t.voc`)));
     const [mcg, picturePal, spritePal, sprites, sound, buzzer, failVoices, winVoices] = await Promise.all([
       ctx.resources.mcg(`s26a00${this.picture}d.mcg`),

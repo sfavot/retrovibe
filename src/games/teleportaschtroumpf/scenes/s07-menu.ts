@@ -1,11 +1,11 @@
-import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../data/mcg";
-import type { Voc } from "../data/voc";
-import { TICKS_PER_SECOND } from "../engine/clock";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
+import { TICKS_PER_SECOND } from "../../../engine/infogrames/clock";
 import { Menu, paletteBounds, paletteHighlight, type MenuArea } from "../engine/menu";
 import { fillRect } from "./minigames/common";
-import { isLocked } from "../engine/options";
+import { isLocked, parentOptions } from "../engine/options";
 import { musicName, voiceName } from "../engine/paths";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { goFreeMap, goIntro, goParents, goPlayers, goRules, quitGame } from "./flow";
 
 /** Boutons de S07, de haut en bas (engine.md §1.2). */
@@ -68,7 +68,7 @@ export function createMenuScene(): Scene {
 class MenuScene implements Scene {
   readonly step = 1;
   private mcg!: Mcg;
-  private music: Voc | null = null;
+  private music: Sound | null = null;
   private holdStart: number | null = null;
   /** Texte du bouton Parents (sans marge), relevé à l'entrée : la jauge se dessine dessous. */
   private parentsText: MenuArea | null = null;
@@ -84,7 +84,7 @@ class MenuScene implements Scene {
 
   async load(ctx: SceneContext): Promise<void> {
     // La musique est tirée une fois : au retour d'un écran, celle qui est déjà réglée sur la voie est gardée.
-    const music = ctx.voice.hasMusic ? null : ctx.resources.voc(musicName(1 + ctx.rng.below(3)));
+    const music = ctx.voice.hasMusic ? null : ctx.resources.sound(musicName(1 + ctx.rng.below(3)));
     const [mcg, picked] = await Promise.all([ctx.resources.mcg("s07a001d.mcg"), music, this.menu.load(ctx)]);
     this.mcg = mcg;
     this.music = picked;
@@ -164,7 +164,7 @@ class MenuScene implements Scene {
         break;
       case MENU_PLAY:
         // Verrouillé : rien ne se passe (aucun message dans l'original).
-        if (!isLocked(ctx.options, Math.floor(ctx.host.unixSeconds() / 60))) goPlayers(ctx);
+        if (!isLocked(parentOptions(ctx), Math.floor(ctx.host.unixSeconds() / 60))) goPlayers(ctx);
         break;
       case MENU_PARENTS:
         // Valider ne fait rien : voir `updateParentsHold`.

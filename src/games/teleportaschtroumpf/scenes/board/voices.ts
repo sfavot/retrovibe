@@ -1,7 +1,7 @@
-import { TICKS_PER_SECOND } from "../../engine/clock";
+import { TICKS_PER_SECOND } from "../../../../engine/infogrames/clock";
 import { voiceName } from "../../engine/paths";
-import type { BorlandRandom } from "../../engine/rng";
-import type { SceneContext } from "../../engine/scene";
+import type { BorlandRandom } from "../../../../engine/infogrames/rng";
+import type { SceneContext } from "../../../../engine/infogrames/scene";
 import { zoneOf } from "../../game/board";
 import { CHARACTER_TEXT_INDEX, DOORS, WELL_S14_SCREEN, type Row } from "../../game/tables";
 
@@ -72,7 +72,7 @@ export function introVoice(scene: number, rng: BorlandRandom): VoiceFile | null 
  */
 export class VoiceLine {
   private state: "loading" | "playing" | "done";
-  private voc: Awaited<ReturnType<SceneContext["resources"]["voc"]>> | null = null;
+  private voc: Awaited<ReturnType<SceneContext["resources"]["sound"]>> | null = null;
   private failed = false;
 
   constructor(ctx: SceneContext, file: VoiceFile | null) {
@@ -81,7 +81,7 @@ export class VoiceLine {
       return;
     }
     this.state = "loading";
-    ctx.resources.voc(file).then(
+    ctx.resources.sound(file).then(
       (voc) => {
         this.voc = voc;
       },

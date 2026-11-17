@@ -1,11 +1,11 @@
-import type { Hy8 } from "../data/hy8";
-import { SCREEN_HEIGHT, type Mcg } from "../data/mcg";
-import type { Voc } from "../data/voc";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, type Mcg } from "../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
 import type { PlayerSetup } from "../game/rules";
-import type { TouchGesture } from "../engine/input";
+import type { TouchGesture } from "../../../engine/infogrames/input";
 import { AREA_MARGIN, insideArea, Menu, type MenuArea, paletteHighlight, spriteArea } from "../engine/menu";
 import { voiceName } from "../engine/paths";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { CLICK_SOUND, centisecondsToTicks } from "./setup/common";
 
 /** Issue de S08 (`21ee:0c19`, engine.md §6.2) : 0 = jouer, 1 = retour à S09, 2 = retour au menu S07. */
@@ -120,10 +120,10 @@ class CharactersScene implements Scene {
   private readonly layout: SlotLayout;
   private mcg!: Mcg;
   private sprites!: Hy8;
-  private voices: Voc[] = [];
-  private click!: Voc;
-  private capsuleSound!: Voc;
-  private landingSound!: Voc;
+  private voices: Sound[] = [];
+  private click!: Sound;
+  private capsuleSound!: Sound;
+  private landingSound!: Sound;
   private menu!: Menu;
   private phase: Phase = "fadeIn";
   private phaseStart = 0;
@@ -150,10 +150,10 @@ class CharactersScene implements Scene {
     const [mcg, sprites, click, capsuleSound, landingSound, ...voices] = await Promise.all([
       ctx.resources.mcg("s08a001d.mcg"),
       ctx.resources.hy8("s08a000s.hy8"),
-      ctx.resources.voc(CLICK_SOUND),
-      ctx.resources.voc("s08a001b.voc"),
-      ctx.resources.voc("s08a002b.voc"),
-      ...Array.from({ length: VOICE_COUNT }, (_, i) => ctx.resources.voc(voiceName("s08v", i + 1))),
+      ctx.resources.sound(CLICK_SOUND),
+      ctx.resources.sound("s08a001b.voc"),
+      ctx.resources.sound("s08a002b.voc"),
+      ...Array.from({ length: VOICE_COUNT }, (_, i) => ctx.resources.sound(voiceName("s08v", i + 1))),
     ]);
     this.mcg = mcg;
     this.sprites = sprites;
@@ -280,7 +280,7 @@ class CharactersScene implements Scene {
     }
   }
 
-  private voice(n: number): Voc {
+  private voice(n: number): Sound {
     return this.voices[n - 1];
   }
 

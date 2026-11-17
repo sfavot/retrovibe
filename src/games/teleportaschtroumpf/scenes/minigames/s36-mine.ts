@@ -1,8 +1,8 @@
-import type { Hy8 } from "../../data/hy8";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
 import { type Mut, parseMut, parsePrc } from "../../data/mut";
-import { parsePal } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import type { Scene, SceneContext } from "../../engine/scene";
+import { parsePal } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import {
   Clip,
@@ -97,7 +97,7 @@ export class MineScene implements Scene {
   private mut!: Mut;
   private sequence!: number[];
   private palette!: Uint8Array;
-  private voices!: Record<MineSound, Voc>;
+  private voices!: Record<MineSound, Sound>;
   private win!: Clip;
   private fail!: Clip;
   private result: Clip | null = null;
@@ -152,9 +152,9 @@ export class MineScene implements Scene {
       resources.bytes(`${this.name}.mut`),
       resources.bytes(`${this.name}.prc`),
       resources.bytes(`${this.name}.pal`),
-      resources.voc("s36a001b.voc"),
-      resources.voc("s36a002b.voc"),
-      resources.voc("s36a003b.voc"),
+      resources.sound("s36a001b.voc"),
+      resources.sound("s36a002b.voc"),
+      resources.sound("s36a003b.voc"),
       this.win.load(ctx),
       this.fail.load(ctx),
     ]);

@@ -4,10 +4,11 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 
 ## Taille
 
-- Total versionné (`original/teleportaschtroumpf/`) : **192.6 Mo** (201964058 octets)
+- Total versionné (`original/teleportaschtroumpf/`) : **129.7 Mo** (136005588 octets)
 - Fichiers de données (`DATA/`) : 1423 ; `SMURF.EXE` : 0.2 Mo
+- Fichiers d'origine repris : 192.1 Mo ; les `.VOC` sont versionnés en MP3 (voir « Son »), le reste tel quel.
 
-## Par extension (fichiers gardés)
+## Par extension (fichiers d'origine repris, taille d'origine)
 
 | Extension | Fichiers | Taille |
 |---|---:|---:|
@@ -23,6 +24,14 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 | .PFN | 9 | 0.0 Mo |
 | .PRC | 8 | 0.0 Mo |
 | .VOC | 975 | 82.0 Mo |
+
+## Son
+
+- `*.VOC` (voix, musiques, bruitages) : 975 fichiers, 82.0 Mo à l'origine ; versionnés en `*.VOC.mp3` (nom d'origine suivi de `.mp3`) : 975 fichiers, 19.1 Mo.
+- MP3 mono 22 050 Hz, 32 kb/s CBR, sans métadonnées (`ec_encoder_voix` de `scripts/lib/extract-common.sh`), à partir du PCM 8 bits non signé d'origine (fichiers par fréquence : 1 à 11025 Hz, 959 à 18868 Hz, 15 à 19231 Hz).
+- `audio.json` : `{"DATA/.../<nom>.VOC.mp3": [échantillons, fréquence]}`, 975 entrées : nombre d'échantillons et fréquence du PCM d'origine, avant l'encodage (durée exacte = échantillons / fréquence). Le moteur attend la fin des sons d'après cet index, pas d'après le MP3 décodé.
+- Durée totale : 81 min 24 s.
+- Le son des vidéos (`.MUX`) reste dans les fichiers MUX, tels quels.
 
 ## Par scène
 
@@ -112,4 +121,4 @@ Généré par `scripts/teleportaschtroumpf-extract.sh` (ne pas éditer à la mai
 bash scripts/teleportaschtroumpf-extract.sh [archive.rar]
 ```
 
-Archive par défaut : `archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar` (non versionnée). Outils requis : `bsdtar`, `python3` ; pour la notice, `textutil` et Google Chrome (macOS).
+Archive par défaut : `archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar` (non versionnée). Outils requis : `bsdtar`, `python3`, `ffmpeg` (libmp3lame) ; pour la notice, `textutil` et Google Chrome (macOS). Hors notice, le résultat est le même à chaque exécution, avec la même version de `ffmpeg`.

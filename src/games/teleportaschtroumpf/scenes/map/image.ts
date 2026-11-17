@@ -1,7 +1,7 @@
-import type { Hy8 } from "../../data/hy8";
-import { SCREEN_WIDTH } from "../../data/mcg";
-import type { SceneContext } from "../../engine/scene";
-import { placeSprite } from "../../engine/sprites";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import { SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
+import type { SceneContext } from "../../../../engine/infogrames/scene";
+import { placeSprite } from "../../../../engine/infogrames/sprites";
 import { MAP_ROWS, MAP_SEGMENTS, VIEW_ROWS, VIEW_TOP, markerOfCell, type Marker } from "./view";
 
 /** Lignes de la bande sauvegardée autour du marqueur (`0x3E80` octets, `DS:C82C`) : elle finit sur la ligne du bas du marqueur. */

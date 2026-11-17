@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   GAME_LIMIT_SECONDS,
@@ -202,7 +202,7 @@ describe.skipIf(!hasOriginalFiles)("S23 Le Schtroumpf Musicien : manches, notes,
     const run = await launch({ seed: 4, audio: true });
     const scene = run.scene as MusicianScene;
     const act = bot(scene, run.host);
-    const rightSounds = await Promise.all(RIGHT_SOUNDS.map((name) => run.ctx.resources.voc(name)));
+    const rightSounds = await Promise.all(RIGHT_SOUNDS.map((name) => run.ctx.resources.sound(name)));
     const lengths: number[] = [];
     const animated = new Set<number>();
     await run.until(() => {
@@ -213,7 +213,7 @@ describe.skipIf(!hasOriginalFiles)("S23 Le Schtroumpf Musicien : manches, notes,
     }, 120_000);
     expect(lengths).toEqual([0, 1, 2, 3, 4]);
     // La démonstration de la manche 4 a joué ses quatre notes dans l'ordre, au-dessus des sons des manches précédentes.
-    const demo = run.host.audio.plays.map((p) => rightSounds.findIndex((s) => s.samples === p.sound.samples));
+    const demo = run.host.audio.plays.map((p) => rightSounds.findIndex((s) => s.data === p.sound.data));
     const lastRound = demo.slice(-4);
     expect(lastRound).toEqual([...scene.sequence]);
     expect(animated.size).toBeGreaterThan(0);
@@ -274,13 +274,13 @@ describe.skipIf(!hasOriginalFiles)("S23 Le Schtroumpf Musicien : manches, notes,
   it("une note fausse : son d'erreur de l'instrument pressé, 0 goutte, vidéo s23b, même après plusieurs manches réussies", async () => {
     const run = await launch({ seed: 7, audio: true });
     const scene = run.scene as MusicianScene;
-    const wrongSounds = await Promise.all(WRONG_SOUNDS.map((name) => run.ctx.resources.voc(name)));
+    const wrongSounds = await Promise.all(WRONG_SOUNDS.map((name) => run.ctx.resources.sound(name)));
     // Parfait jusqu'à la manche 4, puis une erreur à la deuxième note.
     await play(run, { pick: (expected, s) => (s.sequence.length === 4 && s.progress === 1 ? (expected + 1) % 4 : expected) });
     expect(scene.hasFailed).toBe(true);
     expect(scene.score).toBe(3);
     const played = run.host.audio.plays.at(-1)!;
-    expect(wrongSounds.some((s) => s.samples === played.sound.samples)).toBe(true);
+    expect(wrongSounds.some((s) => s.data === played.sound.data)).toBe(true);
     run.shot("s23-erreur");
     const outcome = await run.finish(120_000);
     expect(outcome).toEqual({ kind: "points", points: 0 });
@@ -293,12 +293,12 @@ describe.skipIf(!hasOriginalFiles)("S23 Le Schtroumpf Musicien : manches, notes,
     for (const shift of [1, 2, 3]) {
       const run = await launch({ seed: 7 + shift, audio: true });
       const scene = run.scene as MusicianScene;
-      const wrongSounds = await Promise.all(WRONG_SOUNDS.map((name) => run.ctx.resources.voc(name)));
+      const wrongSounds = await Promise.all(WRONG_SOUNDS.map((name) => run.ctx.resources.sound(name)));
       let pressed = -1;
       await play(run, { pick: (expected) => (pressed = (expected + shift) % 4) });
       expect(scene.hasFailed).toBe(true);
       expect(scene.lastNote).toBe("wrong");
-      expect(run.host.audio.plays.at(-1)!.sound.samples).toEqual(wrongSounds[pressed].samples);
+      expect(run.host.audio.plays.at(-1)!.sound.data).toEqual(wrongSounds[pressed].data);
     }
   }, 240_000);
 
@@ -434,12 +434,12 @@ describe.skipIf(!hasOriginalFiles)("S23 Le Schtroumpf Musicien : au doigt (ajout
   it("toucher un autre musicien : son d'erreur de celui qui est touché, comme sa flèche", async () => {
     const run = await launch({ seed: 8, audio: true });
     const scene = run.scene as MusicianScene;
-    const wrongSounds = await Promise.all(WRONG_SOUNDS.map((name) => run.ctx.resources.voc(name)));
+    const wrongSounds = await Promise.all(WRONG_SOUNDS.map((name) => run.ctx.resources.sound(name)));
     let touched = -1;
     await play(run, { touch: true, pick: (expected) => (touched = (expected + 1) % 4) });
     expect(scene.hasFailed).toBe(true);
     expect(scene.lastNote).toBe("wrong");
-    expect(run.host.audio.plays.at(-1)!.sound.samples).toEqual(wrongSounds[touched].samples);
+    expect(run.host.audio.plays.at(-1)!.sound.data).toEqual(wrongSounds[touched].data);
   }, 120_000);
 
   it("toucher hors des musiciens, un appui long ou un glissement sur un musicien ne jouent rien", async () => {

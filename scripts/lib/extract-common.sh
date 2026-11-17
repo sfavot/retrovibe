@@ -56,3 +56,25 @@ ec_encoder_voix() {
     ec_nb_voix=$((ec_nb_voix + 1))
   done
 }
+
+# ec_encoder_pcm <pcm> <sortie> [débit] : encode avec ec_encoder_voix le PCM 8 bits non signé mono rangé en
+# <pcm>/<fréquence en Hz>/<sous-dossiers>/<nom>.u8 (`ecrire_pcm` de extract_common.py) vers
+# <sortie>/<sous-dossiers>/<nom>.mp3. Un ffmpeg par son, les dossiers étant répartis sur autant de processus que de
+# cœurs ; le résultat ne dépend pas de la répartition. Arrête le script si un encodage échoue.
+ec_encoder_pcm() {
+  local pcm="$1" sortie="$2" debit="${3:-24k}" procs g pid d dossiers=() pids=()
+  procs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
+  while IFS= read -r d; do dossiers+=("$d"); done < <(find "$pcm" -type f -name '*.u8' -exec dirname {} \; | LC_ALL=C sort -u)
+  for ((g = 0; g < procs; g++)); do
+    (
+      local i rel frequence
+      for ((i = g; i < ${#dossiers[@]}; i += procs)); do
+        rel="${dossiers[$i]#"$pcm"/}"
+        frequence="${rel%%/*}"
+        ec_encoder_voix "${dossiers[$i]}" u8 "$sortie/${rel#*/}" "$debit" -f u8 -ar "$frequence" -ac 1
+      done
+    ) &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do wait "$pid" || { echo "Échec de l'encodage MP3" >&2; exit 1; }; done
+}

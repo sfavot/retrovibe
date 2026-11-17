@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseHy8 } from "../../../src/games/teleportaschtroumpf/data/hy8";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { parseHy8 } from "../../../src/engine/infogrames/data/hy8";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import { TURTLES_LOSE_CLIP, TurtlesScene, createTurtles, turtlesWinClip } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s31-turtles";
 import {
@@ -424,11 +424,11 @@ describe.skipIf(!hasOriginalFiles)("S31 Les Tortues : commandes", () => {
   it("haut : saut en avant d'une case avec le bruit de saut ; bas : retour ; Espace : saut sur place", async () => {
     const run = await launch({ audio: true });
     const scene = turtlesScene(run);
-    const jump = await run.ctx.resources.voc("s31a002b.voc");
+    const jump = await run.ctx.resources.sound("s31a002b.voc");
     await hopForward(run);
     expect(scene.position).toBe(LEVELS[0].start + 1);
     run.shot("s31-sur-tortue");
-    expect(run.host.audio.effects.some((p) => p.sound.samples === jump.samples)).toBe(true);
+    expect(run.host.audio.effects.some((p) => p.sound.data === jump.data)).toBe(true);
     run.host.input.keyDown("ArrowDown");
     await run.run(100);
     run.host.input.keyUp("ArrowDown");
@@ -484,7 +484,7 @@ describe.skipIf(!hasOriginalFiles)("S31 Les Tortues : issue", () => {
   it("échec : le saut atterrit loin des tortues → chute, vidéo s31b, aucun ingrédient", async () => {
     const run = await launch({ audio: true });
     const scene = turtlesScene(run);
-    const splash = await run.ctx.resources.voc("s31a003b.voc");
+    const splash = await run.ctx.resources.sound("s31a003b.voc");
     const next = scene.allTurtles[scene.position + 1];
     next.x = scene.coordinates.x + HOP_DX + 60;
     next.phase = "glideRight";
@@ -493,7 +493,7 @@ describe.skipIf(!hasOriginalFiles)("S31 Les Tortues : issue", () => {
     await run.run(100);
     run.host.input.keyUp("ArrowUp");
     await run.until(() => scene.smurfState === SMURF_FALLING, 5000);
-    expect(run.host.audio.effects.some((p) => p.sound.samples === splash.samples)).toBe(true);
+    expect(run.host.audio.effects.some((p) => p.sound.data === splash.data)).toBe(true);
     run.shot("s31-chute-0");
     await run.run(600);
     run.shot("s31-chute-1");

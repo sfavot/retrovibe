@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { type Game, newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   CHOICE_TIME_UP,
@@ -196,9 +196,9 @@ describe.skipIf(!hasOriginalFiles)("S41 Le Magicien : question", () => {
   it("le bip de changement ne sonne au premier tour que si le dernier état connu n'est pas Oui (mémoire par partie)", async () => {
     const run = await launch({}, { audio: true });
     const scene = run.scene as MagicianScene;
-    const beep = await run.ctx.resources.voc("s07a001b.voc");
+    const beep = await run.ctx.resources.sound("s07a001b.voc");
     await playUntil(run, scene, () => scene.stage === "question");
-    expect(run.host.audio.effects.at(-1)?.sound.samples).toEqual(beep.samples);
+    expect(run.host.audio.effects.at(-1)?.sound.data).toEqual(beep.data);
   }, 180_000);
 });
 

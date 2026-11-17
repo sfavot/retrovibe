@@ -19,8 +19,8 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     expect(s.game.state.current).toBe(0);
     expect(s.board.shown).toMatchObject({ player: 0, screen: 1, row: "top", x: 0x0b });
     // Voix d'annonce du personnage (s01v 1..5 pour Costaud) jouée au début du tour.
-    const announce = await Promise.all([1, 2, 3, 4, 5].map((n) => s.ctx.resources.voc(`s01v00${n}t.voc`)));
-    expect(s.host.audio.plays.some((p) => announce.some((v) => v.samples === p.sound.samples))).toBe(true);
+    const announce = await Promise.all([1, 2, 3, 4, 5].map((n) => s.ctx.resources.sound(`s01v00${n}t.voc`)));
+    expect(s.host.audio.plays.some((p) => announce.some((v) => v.data === p.sound.data))).toBe(true);
     expect(s.game.state.paused).toBe(false);
   }, 60_000);
 
@@ -67,9 +67,9 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     const s = await Session.start({ players: TWO, audio: true });
     await s.ready();
     s.place({ screen: 2, row: "top", x: 0x20 }); // S35
-    const intro = await Promise.all([1, 2].map((n) => s.ctx.resources.voc(`s35a00${n}t.voc`)));
+    const intro = await Promise.all([1, 2].map((n) => s.ctx.resources.sound(`s35a00${n}t.voc`)));
     await s.tap("Space");
-    expect(s.host.audio.plays.some((p) => intro.some((v) => v.samples === p.sound.samples))).toBe(true);
+    expect(s.host.audio.plays.some((p) => intro.some((v) => v.data === p.sound.data))).toBe(true);
     // La voix est dite en entier avant le mini-jeu.
     expect(s.ctx.voice.voicePlaying).toBe(true);
     expect(s.top()).toBe("GameScene");
@@ -240,9 +240,9 @@ describe.skipIf(!hasOriginalFiles)("partie : tours, portes et mini-jeux", () => 
     // `2a78:0039` ne redessine pas le plateau : la dernière image de S21A (Schtroumpf endormi) reste jusqu'au tour suivant.
     expect(afterCapture).toEqual(lastVideoFrame);
     // Tour passé (siphon), puis tour de la libération : le plateau montre le siphon pendant l'annonce et la voix 5.
-    const plays = s.host.audio.plays.map((p) => p.sound.samples);
-    const voice5 = await Promise.all([4, 5].map((n) => s.ctx.resources.voc(`s21v00${n}t.voc`)));
-    expect(plays.some((x) => voice5.some((v) => v.samples === x))).toBe(true);
+    const plays = s.host.audio.plays.map((p) => p.sound.data);
+    const voice5 = await Promise.all([4, 5].map((n) => s.ctx.resources.sound(`s21v00${n}t.voc`)));
+    expect(plays.some((x) => voice5.some((v) => v.data === x))).toBe(true);
     // La libération (S21B) est la dernière vidéo, juste avant que le joueur ait la main : plus de siphon ni de fondu après.
     expect(trace.slice(trace.lastIndexOf("BoardEventScene siphon"))).toEqual(["BoardEventScene siphon", "GameScene normal"]);
     expect(s.host.loaded.some((f) => /S21B\.MUX/i.test(f))).toBe(true);
@@ -326,25 +326,25 @@ describe.skipIf(!hasOriginalFiles)("partie : voix et temps", () => {
     const s = await Session.start({ audio: true });
     await s.ready();
     await s.run(1000);
-    const hint = (from: number, to: number) => Promise.all(Array.from({ length: to - from + 1 }, (_, i) => s.ctx.resources.voc(`s01v0${from + i}t.voc`)));
+    const hint = (from: number, to: number) => Promise.all(Array.from({ length: to - from + 1 }, (_, i) => s.ctx.resources.sound(`s01v0${from + i}t.voc`)));
     const first = await hint(31, 35);
     const second = await hint(36, 40);
-    const played = () => s.host.audio.plays.map((p) => p.sound.samples);
-    expect(played().some((x) => first.some((v) => v.samples === x))).toBe(false);
+    const played = () => s.host.audio.plays.map((p) => p.sound.data);
+    expect(played().some((x) => first.some((v) => v.data === x))).toBe(false);
     await s.run(12_000);
-    expect(played().some((x) => first.some((v) => v.samples === x))).toBe(true);
-    expect(played().some((x) => second.some((v) => v.samples === x))).toBe(false);
+    expect(played().some((x) => first.some((v) => v.data === x))).toBe(true);
+    expect(played().some((x) => second.some((v) => v.data === x))).toBe(false);
     await s.run(25_000);
-    expect(played().some((x) => second.some((v) => v.samples === x))).toBe(true);
+    expect(played().some((x) => second.some((v) => v.data === x))).toBe(true);
   }, 120_000);
 
   it("pas d'indice quand le joueur a bougé", async () => {
     const s = await Session.start({ audio: true });
     await s.ready();
     await s.tap("ArrowRight", 300);
-    const first = await Promise.all([31, 32, 33, 34, 35].map((n) => s.ctx.resources.voc(`s01v0${n}t.voc`)));
+    const first = await Promise.all([31, 32, 33, 34, 35].map((n) => s.ctx.resources.sound(`s01v0${n}t.voc`)));
     await s.run(20_000);
-    expect(s.host.audio.plays.some((p) => first.some((v) => v.samples === p.sound.samples))).toBe(false);
+    expect(s.host.audio.plays.some((p) => first.some((v) => v.data === p.sound.data))).toBe(false);
   }, 120_000);
 
   it("à plusieurs, l'action automatique de 36 s enclenche la porte où se trouve le pion", async () => {

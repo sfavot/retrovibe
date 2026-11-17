@@ -1,6 +1,6 @@
 # Polices `.PFN` du Téléportaschtroumpf
 
-Décodeur : `src/games/teleportaschtroumpf/data/font.ts` (`parsePfn`, `measureText`). Tests : `test/teleportaschtroumpf/font.test.ts`.
+Décodeur : `src/engine/infogrames/data/font.ts` (`parsePfn`, `measureText`). Tests : `test/infogrames/font.test.ts`.
 
 Format établi par la RE des routines de texte du segment `32f4` (bibliothèque de police), adresses `segment:offset` de `archives/teleportaschtroumpf/re/`.
 

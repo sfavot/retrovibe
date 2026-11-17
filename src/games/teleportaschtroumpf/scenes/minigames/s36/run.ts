@@ -1,6 +1,6 @@
-import type { Hy8, Hy8Frame } from "../../../data/hy8";
+import type { Hy8, Hy8Frame } from "../../../../../engine/infogrames/data/hy8";
 import { MutFlag } from "../../../data/mut";
-import { AnimationPlayer } from "../../../engine/sprites";
+import { AnimationPlayer } from "../../../../../engine/infogrames/sprites";
 
 /**
  * Logique de la course de S36 « La Mine Désaffectée » (boucle de `23c9:0004`, RE : `docs/teleportaschtroumpf/minigames/s36.md`),

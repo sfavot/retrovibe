@@ -1,4 +1,4 @@
-import type { Input } from "../../engine/input";
+import type { Input } from "../../../../engine/infogrames/input";
 
 /**
  * Doigt lu comme des flèches tenues (ajout du port, S22, S27, S36) : la scène compare la position du doigt à celle de son personnage

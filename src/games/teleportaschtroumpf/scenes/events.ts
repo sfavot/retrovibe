@@ -1,6 +1,6 @@
-import type { Voc } from "../data/voc";
-import type { Scene, SceneContext } from "../engine/scene";
-import { VideoScene } from "../engine/video";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
+import { VideoScene } from "../../../engine/infogrames/video";
 import type { Game, GameEvent } from "../game/rules";
 import type { Position } from "../game/tables";
 import { pickClip, type EventClip } from "./events/clips";
@@ -65,7 +65,7 @@ export class BoardEventScene implements Scene {
   readonly step = 1;
   private clip: EventClip | null = null;
   private video: VideoScene | null = null;
-  private voc: Voc | null = null;
+  private voc: Sound | null = null;
   private phase: Phase = "video";
   private kept: Uint8Array | null = null;
 
@@ -94,7 +94,7 @@ export class BoardEventScene implements Scene {
       },
     });
     const voice = this.clip.voice;
-    const [, voc] = await Promise.all([this.video.load(ctx), voice ? ctx.resources.voc(voice).catch(() => null) : null]);
+    const [, voc] = await Promise.all([this.video.load(ctx), voice ? ctx.resources.sound(voice).catch(() => null) : null]);
     this.voc = voc;
   }
 

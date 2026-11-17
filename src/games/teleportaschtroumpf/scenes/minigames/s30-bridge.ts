@@ -1,9 +1,9 @@
-import type { Hy8 } from "../../data/hy8";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
-import { AnimationPlayer } from "../../engine/sprites";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import { AnimationPlayer } from "../../../../engine/infogrames/sprites";
 import type { Game } from "../../game/rules";
 import { Clip, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
 
@@ -53,7 +53,7 @@ export class BridgeScene implements Scene {
   private mcg!: Mcg;
   private video!: Clip;
   private fallClip!: Clip;
-  private voices: Voc[] = [];
+  private voices: Sound[] = [];
   private phase: BridgePhase = "video";
   private latch = false;
   private consumed = false;
@@ -100,9 +100,9 @@ export class BridgeScene implements Scene {
     const [sprites, mcg, c3, c2, c1, b1, b2] = await Promise.all([
       ctx.resources.hy8("s30c001s.hy8"),
       ctx.resources.mcg("s30c001d.mcg"),
-      ...names.map((n) => ctx.resources.voc(n)),
-      ctx.resources.voc(voiceName("s30b", 1)),
-      ctx.resources.voc(voiceName("s30b", 2)),
+      ...names.map((n) => ctx.resources.sound(n)),
+      ctx.resources.sound(voiceName("s30b", 1)),
+      ctx.resources.sound(voiceName("s30b", 2)),
     ]);
     await Promise.all([this.video.load(ctx), this.fallClip.load(ctx)]);
     this.sprites = sprites;
@@ -111,7 +111,7 @@ export class BridgeScene implements Scene {
     this.badVoices = [b1, b2];
   }
 
-  private badVoices: Voc[] = [];
+  private badVoices: Sound[] = [];
 
   enter(ctx: SceneContext): void {
     this.phase = "video";
@@ -253,7 +253,7 @@ export class BridgeScene implements Scene {
     this.playVoice(ctx, this.badVoices[ctx.rng.below(2)], true);
   }
 
-  private playVoice(ctx: SceneContext, voc: Voc, skippable: boolean): void {
+  private playVoice(ctx: SceneContext, voc: Sound, skippable: boolean): void {
     this.phase = "voice";
     this.skipVoice = skippable;
     ctx.voice.play(voc);

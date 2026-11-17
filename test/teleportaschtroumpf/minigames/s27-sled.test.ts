@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { MuxDecoder } from "../../../src/games/teleportaschtroumpf/data/mux";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { MuxDecoder } from "../../../src/engine/infogrames/data/mux";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   LANE_LEFT_LIMIT,
@@ -23,7 +23,7 @@ import {
 } from "../../../src/games/teleportaschtroumpf/scenes/minigames/s27-sled";
 import { hasOriginalFiles, listData } from "../helpers";
 import { tap, touchDown, touchMove, touchUp } from "../touch";
-import type { Scene } from "../../../src/games/teleportaschtroumpf/engine/scene";
+import type { Scene } from "../../../src/engine/infogrames/scene";
 import type { TestHost } from "../engine-test-host";
 import { enterFromBoard, enterFromFreeMode, launchMinigame, type LaunchedMinigame, type LaunchOptions } from "./harness";
 
@@ -226,14 +226,14 @@ describe.skipIf(!hasOriginalFiles)("S27 La Luge : descente en vidéo, obstacles,
   it("la chute : animation de 2 images au quart de seconde, son s27a003b, fondu, puis la vidéo d'échec s27b", async () => {
     const run = await seedFor("s27e.mux", { level: 0, audio: true });
     const scene = run.scene as SledScene;
-    const crash = await run.ctx.resources.voc("s27a003b.voc");
+    const crash = await run.ctx.resources.sound("s27a003b.voc");
     await run.until(() => scene.stage === "crash", 30_000);
     run.shot("s27-chute-0");
     await run.run(300);
     run.shot("s27-chute-1");
     await run.run(300);
     run.shot("s27-chute-2");
-    expect(run.host.audio.plays.at(-1)?.sound.samples).toEqual(crash.samples);
+    expect(run.host.audio.plays.at(-1)?.sound.data).toEqual(crash.data);
     const stages = new Set<string>();
     await run.until(() => {
       stages.add(scene.stage);

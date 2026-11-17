@@ -1,10 +1,10 @@
 import { decodeCp437, encodeCp437 } from "../../../../data/cp437";
-import { measureText, type PfnFont } from "../../data/font";
-import type { Mcg } from "../../data/mcg";
+import { measureText, type PfnFont } from "../../../../engine/infogrames/data/font";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
 import { parseQuiz, type Quiz } from "../../data/text";
-import type { Voc } from "../../data/voc";
-import type { Timer } from "../../engine/clock";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import type { Timer } from "../../../../engine/infogrames/clock";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import { DEFAULT_FONT } from "../common/text";
 import { levelTimeLimit, minigameLevel, minigameRequest, pointsOutcome, type MinigameDone, type MinigameFactory } from "./common";
@@ -156,11 +156,11 @@ export class QuizScene implements Scene {
   private font!: PfnFont;
   private mcg!: Mcg;
   private quiz!: Quiz;
-  private moveSound!: Voc;
-  private questionVoice!: Voc;
-  private answerVoices: Voc[] = [];
-  private wrongVoice!: Voc;
-  private rightVoices: Voc[] = [];
+  private moveSound!: Sound;
+  private questionVoice!: Sound;
+  private answerVoices: Sound[] = [];
+  private wrongVoice!: Sound;
+  private rightVoices: Sound[] = [];
   private question = 0;
   private lines: Uint8Array[] = [];
   private answers: Uint8Array[] = [];
@@ -235,7 +235,7 @@ export class QuizScene implements Scene {
       ctx.resources.pfn(DEFAULT_FONT),
       ctx.resources.mcg("s40a001d.mcg"),
       ctx.resources.bytes("s40a.dat"),
-      ctx.resources.voc(MOVE_SOUND),
+      ctx.resources.sound(MOVE_SOUND),
     ]);
     this.font = font;
     this.mcg = mcg;
@@ -244,7 +244,7 @@ export class QuizScene implements Scene {
     // Tirage de la question avant tout le reste (comme l'original) : ses voix en dépendent.
     this.question = drawQuestion(this.game, this.quiz.questions.length, (n) => ctx.rng.below(n));
     const q = this.question;
-    const voc = (name: string) => ctx.resources.voc(name);
+    const voc = (name: string) => ctx.resources.sound(name);
     [this.questionVoice, this.wrongVoice, this.answerVoices, this.rightVoices] = await Promise.all([
       voc(`s40a${pad3(questionVoiceNumber(q))}t.voc`),
       voc(`s40b${pad3(wrongVoiceNumber(q))}t.voc`),

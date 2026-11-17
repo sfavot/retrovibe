@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseMcg, type Mcg } from "../../../src/games/teleportaschtroumpf/data/mcg";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { parseMcg, type Mcg } from "../../../src/engine/infogrames/data/mcg";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   BRUSH_ENTRY,
@@ -455,11 +455,11 @@ describe.skipIf(!hasOriginalFiles)("S35 Le Coloriage : aperçu, jeu, issue", () 
     const { run, scene, steps } = await ready({ level: 0, seed: 4, audio: true });
     const wrong = steps.find((s) => s.swatch !== 0)!;
     run.host.input.mouseMove(wrong.x, wrong.y);
-    const wrongVoc = await run.ctx.resources.voc("s35a002b.voc");
+    const wrongVoc = await run.ctx.resources.sound("s35a002b.voc");
     run.host.input.mouseDown(0);
     await run.until(() => scene.stage === "flash", 2000);
     run.host.input.mouseUp(0);
-    expect(run.host.audio.effects.at(-1)?.sound.samples).toEqual(wrongVoc.samples);
+    expect(run.host.audio.effects.at(-1)?.sound.data).toEqual(wrongVoc.data);
     const colors = new Set<string>();
     let frames = 0;
     await run.until(() => {

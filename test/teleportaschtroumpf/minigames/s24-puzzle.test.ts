@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   HOLE_HEIGHT,
@@ -228,12 +228,12 @@ describe.skipIf(!hasOriginalFiles)("S24 Le Puzzle : parties", () => {
   it("un clic sur un autre trou met fin à la partie : 0 point, bruit faux, trous restants encadrés", async () => {
     const run = await launch({ seed: 5, audio: true });
     const scene = run.scene as PuzzleScene;
-    const bad = await run.ctx.resources.voc("s24a002b.voc");
+    const bad = await run.ctx.resources.sound("s24a002b.voc");
     const [first, second] = order(scene);
     await clickHole(run, second);
     expect(scene.ending).toBe("wrong");
     expect(scene.foundCount).toBe(0);
-    expect(run.host.audio.effects.at(-1)?.sound.samples).toEqual(bad.samples);
+    expect(run.host.audio.effects.at(-1)?.sound.data).toEqual(bad.data);
     expect(scene.stage).toBe("fade");
     await run.run(200);
     const hole = scene.holes[first];

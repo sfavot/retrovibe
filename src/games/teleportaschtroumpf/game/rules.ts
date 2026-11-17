@@ -1,5 +1,5 @@
 import { DEFAULT_OPTIONS, gameSeconds, type ParentOptions } from "../engine/options";
-import type { BorlandRandom } from "../engine/rng";
+import type { BorlandRandom } from "../../../engine/infogrames/rng";
 import { arrival, doorAt, doorClassAt, resolveEdges, settleX } from "./board";
 import {
   type GameResult,

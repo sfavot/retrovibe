@@ -129,17 +129,17 @@ Réimplémentation du jeu de plateau et de mini-jeux *Le Téléportaschtroumpf* 
 
 ### Fichiers de données
 
-Ils viennent du CD : `scripts/teleportaschtroumpf-extract.sh [archive.rar]` lit l'archive placée dans `archives/` (non versionnée), en extrait la piste de données et ne garde que les fichiers utiles dans `original/teleportaschtroumpf/`. Ce dossier contient `SMURF.EXE`, `DATA/` (images MCG, sprites HY8, vidéos et sons MUX, voix et effets VOC, polices PFN), `files.json` (liste des fichiers, pour la résolution des noms sans tenir compte de la casse) `COVER.webp` (la jaquette du jeu, conservée par le script d'extraction) et `MANUEL.pdf` (la notice d'Infogrames, `Lisez moi.doc` sur le CD, convertie par le script avec `textutil` et Chrome ; lien « Manuel d'origine » de l'écran de présentation). Le script régénère aussi l'inventaire `docs/teleportaschtroumpf/files.md`.
+Ils viennent du CD : `scripts/teleportaschtroumpf-extract.sh [archive.rar]` lit l'archive placée dans `archives/` (non versionnée), en extrait la piste de données et ne garde que les fichiers utiles dans `original/teleportaschtroumpf/`. Ce dossier contient `SMURF.EXE`, `DATA/` (images MCG, sprites HY8, vidéos et sons MUX, polices PFN ; voix, musiques et effets VOC convertis en MP3, `<nom>.VOC.mp3`, pour tenir dans la taille du site), `audio.json` (nombre d'échantillons et fréquence d'origine de chaque son : le moteur en tire les durées exactes), `files.json` (liste des fichiers, pour la résolution des noms sans tenir compte de la casse), `COVER.webp` (la jaquette du jeu, conservée par le script d'extraction) et `MANUEL.pdf` (la notice d'Infogrames, `Lisez moi.doc` sur le CD, convertie par le script avec `textutil` et Chrome ; lien « Manuel d'origine » de l'écran de présentation). Le script régénère aussi l'inventaire `docs/teleportaschtroumpf/files.md`.
 
 ### Architecture
 
-- `src/games/teleportaschtroumpf/data/` — lecteurs des formats du jeu (MCG, HY8, MUX, VOC, PFN…).
-- `src/games/teleportaschtroumpf/engine/` — moteur : boucle, tampons d'image et palette, entrées, pile de scènes.
-- `src/games/teleportaschtroumpf/audio/` — voix, effets et musiques (Web Audio).
+- `src/engine/infogrames/` — moteur commun aux jeux Infogrames de cette famille : lecteurs des formats (`data/` : MCG, HY8, MUX, VOC, PFN, index des sons `audio.json`), boucle, tampons d'image et palette, entrées, pile de scènes, voix, effets et musiques (`audio/`, Web Audio), hôte du navigateur (`ui/`).
+- `src/games/teleportaschtroumpf/data/` — lecteurs des formats propres au jeu (MUT, textes) et manifeste des fichiers.
+- `src/games/teleportaschtroumpf/engine/` — ce que le jeu fournit au moteur : chemins des fichiers, bips, options parents, menus.
 - `src/games/teleportaschtroumpf/game/` — règles : plateau, joueurs, objectif et gains.
 - `src/games/teleportaschtroumpf/scenes/` — les écrans (menus, préparation de partie, plateau, carte, événements, Grand Schtroumpf).
 - `src/games/teleportaschtroumpf/scenes/minigames/` — les mini-jeux.
-- `src/games/teleportaschtroumpf/ui/` — page du jeu (canvas), hôte du navigateur et pages de développement.
+- `src/games/teleportaschtroumpf/ui/` — page du jeu (canvas) et pages de développement.
 
 ### Pages de développement
 

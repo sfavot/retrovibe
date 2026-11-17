@@ -1,6 +1,8 @@
-import { Engine } from "../../../src/games/teleportaschtroumpf/engine/engine";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
-import type { Scene } from "../../../src/games/teleportaschtroumpf/engine/scene";
+import { GAME_CONFIG } from "../../../src/games/teleportaschtroumpf/engine/config";
+import { parentOptions } from "../../../src/games/teleportaschtroumpf/engine/options";
+import { Engine } from "../../../src/engine/infogrames/engine";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
+import type { Scene } from "../../../src/engine/infogrames/scene";
 import type { Game } from "../../../src/games/teleportaschtroumpf/game/rules";
 import type { MinigameOutcome } from "../../../src/games/teleportaschtroumpf/game/state";
 import { minigameInfo } from "../../../src/games/teleportaschtroumpf/game/tables";
@@ -140,7 +142,7 @@ export class Robot {
 
   constructor(private readonly options: RobotOptions) {
     this.host.audio.enabled = false;
-    this.engine = new Engine(this.host, { seed: options.seed });
+    this.engine = new Engine(this.host, GAME_CONFIG, { seed: options.seed });
     this.rng = new BorlandRandom(options.seed * 7919 + 13);
     const players = 1 + (options.seed % 4);
     this.report = {
@@ -533,7 +535,7 @@ export class Robot {
         const result = gs.game.state.result;
         report.outcome = result?.kind === "victory" ? "victoire" : result?.kind === "timeout" ? "temps écoulé" : "abandon";
         await this.run(500);
-        report.returnedToMenu = this.top() === "MenuScene" && this.engine.ctx.options.lastGameMinutes > 0;
+        report.returnedToMenu = this.top() === "MenuScene" && parentOptions(this.engine.ctx).lastGameMinutes > 0;
         const loaded = this.host.loaded.join("\n");
         report.endVideo = result?.kind === "victory" ? /S11A\.MUX/i.test(loaded) : result?.kind === "timeout" ? /S42A0[4-7]\d\.MUX/i.test(loaded) : true;
       }

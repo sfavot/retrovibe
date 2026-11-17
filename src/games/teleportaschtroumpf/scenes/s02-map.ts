@@ -1,4 +1,4 @@
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { FreeModeScene } from "./map/free-mode";
 import { MapScene, type MapMode, type MapRequest } from "./map/map-scene";
 

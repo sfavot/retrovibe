@@ -1,0 +1,199 @@
+01Favec quoi sont faites les castagnettes ?
+01 deux petites pierres,deux coquilles d'huŒtre,deux morceaux de bois/3
+02Fque signifie le mot "castagnette" ?
+02 petite chƒtaigne,petite bagarre,cliquetis/1
+03Fqu'est-ce qu'un pelotari ?
+03 un joueur de pelote,un berger,un tisserand/1
+04Fque signifie la phrase "errare humanum est" ?
+04 heureux les imb‚ciles,l'erreur est humaine,l'homme est une erreur/2
+05Favec quelle partie du porc fait-on le vrai jambon ?
+05 les pattes arriŠres,les c“tes,tout/1
+06Fcombien de vrais jambons peut-on faire avec un porc ?
+06 un,deux,quatre/2
+07Fcombien de pays contient la p‚ninsule ib‚rique ?
+07 un,deux,trois/2
+08Fqu'est-ce qu'un novillero ?
+08 une corrida portuguaise,un jeune taureau,un jeune torero/3
+09Fde quelle couleur est la muleta d'un matador ?
+09 rouge,blanche,noire/1
+10Fcomment travaille un picador ?
+10 … pied,… cheval,en voiture/2
+11Fqu'appelle-t-on "habit de lumiŠre" ?
+11 le manteau du roi,la robe de la vierge,la tenue du matador/3
+12Fo— est situ‚ le mus‚e du prado ?
+12 … madrid,… barcelone,… s‚ville/1
+13Fcomment se pr‚nomme le compagnon de don quichotte ?
+13 pancho,sancho,tonto/2
+14Fquel g‚n‚ral romain traversa les pyr‚n‚es ?
+14 pomp‚e,germanicus,hannibal/3
+15Fqu'est-ce qu'une sierra ?
+15 une chaŒne de montagnes,le lit d'un fleuve,un chapeau … larges bords/1
+16Fselon la l‚gende, qui bƒtit la ville d'avila ?
+16 pers‚e,hercule,minos/2
+17Fquelle est la couleur dominante d'un azulejo ?
+17 le rouge,le vert,le bleu/3
+18Fquel g‚n‚ral romain v‚cut et mourut en espagne ?
+18 sertorius,hannibal,pomp‚e/1
+19Fque sont les latifundia ?
+19 des fortifications,des domaines agricoles,des tranch‚es/2
+20Fd'o— l'espagne a-t-elle h‚rit‚ la passion du taureau ?
+20 de la perse,de l'‚gypte,de la grŠce/3
+21Fqu'est-ce que le guadalquivir ?
+21 un fleuve,un pic montagneux,un lac/1
+22Fquelle province correspondait au portugal ?
+22 la b‚tique,la lusitanie,l'espagne cit‚rieure/2
+23Fqu'est-ce qu'un castro ?
+23 un cigare,un verrat,un fort/3
+24Fquelle mer ne borde pas la p‚ninsule ib‚rique ?
+24 la mer adriatique,l'oc‚an atlantique,la mer m‚diterran‚e/1
+25Fcomment s'appelle la langue des basques ?
+25 le castillan,l'euskara,le galicien/2
+26Fqui fonda carthagŠne ?
+26 les romains,les ph‚niciens,les carthaginois/3
+27Fquel arbre trouve-t-on le plus en hispanie ?
+27 l'olivier,le chˆne,le hˆtre/1
+28Fqu'est-ce que le porto ?
+28 un filet de pˆche,un vin,de la chaux/2
+29Fqu'est-ce qu'une portugaise ?
+29 une v‚randa,un chant traditionnel,une huŒtre/3
+30Fs'il est midi … rome, quelle heure est-il … barcelone ?
+30 11 heures,midi,13 heures/1
+31Mcomment s'appelaient les premiers celtes ib‚riques ?
+31 les celtibŠres,les carthaginois,les hispanii/1
+32Mqu'est-ce qu'un ib‚rico ?
+32 un poŠme,un petit cochon,une barque/2
+33Mqu'est-ce qu'un hospitium ?
+33 un poste-frontiŠre,un pacte d'hospitalit‚,un h“pital/2
+34Mdans l'antiquit‚, qu'‚tait le taureaubole ?
+34 une arŠne,une statue de taureau,le sacrifice d'un taureau/3
+35Mqui succ‚da aux romains en andalousie ?
+35 les vandales,les wisigoths,les arabes/1
+36Mqu'est-ce que le zˆzere ?
+36 un chant traditionnel,un fleuve,une fˆte religieuse/2
+37Md'o— provenaient les ibŠres ?
+37 de gaule,d'assyrie,de lybie/3
+38Mo— se trouve une des colonnes d'hercule ?
+38 … gibraltar,… cadix,… carthagŠne/1
+39Mque signifie la locution "vae victis !" ?
+39 n‚s pour vaincre !,malheur aux vaincus !,‚pargnez les vaincus !/2
+40Mqui entama la conquˆte de l'espagne ?
+40 c‚sar,hamilcar barca,scipion l'africain/3
+41Mquelle est la longueur du d‚troit de gibraltar ?
+41 3 km,13 km,102 km/2
+42Mquelle Œle ne fait pas partie des bal‚ares ?
+42 majorque,ibiza,lanzarote/3
+43Mcombien de fleuves coulent en espagne ?
+43 deux,cinq,sept/1
+44Mcombien de temps dura la conquˆte romaine de l'espagne ?
+44 huit ans,environ 50 ans,environ 2 siŠcles/3
+45Mque bƒtirent les romains … s‚govie ?
+45 un arc-de-triomphe,un aqueduc,une acropole/2
+46Mqu'est-ce que la saudade ?
+46 la m‚lancolie,un poisson,une manoeuvre militaire/1
+47Mcomment ‚tait surnomm‚e la ville de cordoue ?
+47 l'irr‚ductible,la 2Šme rome,la ville des oliviers/2
+48Mcomment se nomme la fillette qui d‚fia rome ?
+48 barricada,hispanica,eulalia/3
+49Mquel grand philosophe est n‚ en hispanie ?
+49 s‚nŠque,cic‚ron,platon/1
+50Mcontre qui auguste fit-il sa derniŠre campagne ?
+50 les b‚tiques,les lusitaniens,les cantabres/3
+51Mqui ‚tait le fils d'hamilcar barca ?
+51 hannibal,scipion l'africain,hadrien/1
+52Mqui d‚clencha la 2Šme guerre punique ?
+52 hamilcar,hannibal,tibŠre/2
+53Mo— se trouve saragosse ?
+53 au bord du jucar,au bord du tage,au bord de l'Šbre/3
+54Mqui ‚tait hasdrubal ?
+54 le fils d'hannibal,le petit-fils d'hannibal,le frŠre d'hannibal/3
+55Mcomment mourut hannibal ?
+55 il se suicida,il fut assassin‚,de maladie/1
+56Mo— mourut hannibal ?
+56 en astrurie,en bythinie,… carthage/2
+57Msous c‚sar, de qui d‚pendait la ville de sagonte ?
+57 des romains,des carthaginois,de personne/3
+58Mcombien de temps sertorius gouverna-t-il en espagne ?
+58 2 ans,5 ans,7 ans/3
+59Mde quelle province ‚tait originaire viriathe ?
+59 lusitanie,b‚tique,alm‚ria/1
+60Mqui s'empara de cadix en 206 av.j.c. ?
+60 scipion l'africain,scipion ‚milien,hamilcar barca/2
+61Mcombien de temps dura la guerre contre les cantabres ?
+61 dix ans,vingt ans,cent ans/1
+62Mquelle locution est synonyme de "mauvaise foi" ?
+62 nunc est bibendum,per fas et nefas,punica fides/3
+63Mqu'est la meseta ?
+63 un plateau,une riviŠre,un code d'honneur/1
+64Mqui succ‚da aux vandales en hispanie ?
+64 les romains,les wisigoths,les arabes/2
+65Mquel peuple n'a jamais travers‚ les pyr‚n‚es ?
+65 les ligures,les carthaginois,les burgondes/3
+66Mquel est le surnom du pŠre de s‚nŠque ?
+66 le rh‚teur,l'ancien,le cynique/1
+67Mquel fleuve coule en lusitanie ?
+67 l'Šbre,l'ouad,le tage/3
+68Mpour quoi est c‚lŠbre la grotte d'altamira ?
+68 sa profondeur,ses peintures,sa source/2
+69Mcombien de romains assiŠgŠrent numance ?
+69 2 l‚gions,60 000 hommes,9 centuries/2
+70Mque firent les assi‚g‚s de numance ?
+70 ils se rendirent,il se mangŠrent,ils se suicidŠrent/3
+71Dquand eut lieu la bataille de munda ?
+71 131 av.j.c.,72 av.j.c.,45 av.j.c./3
+72Dqu'est-ce qu'un alcarazas ?
+72 un palais,une cruche,un village de montagne/2
+73Dquel empereur romain est d'origine ib‚rique ?
+73 tibŠre,n‚ron,hadrien/3
+74Do— naquit le pŠre du pr‚cepteur de n‚ron ?
+74 … cordoue,… gibraltar,… lisbonne/1
+75Dcomment s'appelaient autrefois les Œles canaries ?
+75 les cyclades,les h‚sp‚rides,les h‚brydes/2
+76Dqu'est-ce que le manzanilla ?
+76 un saucisson,un petit taureau,un vin/3
+77Dde quelle couleur est la cape d'un picador ?
+77 rose et jaune,rouge et noir,jaune et noir/1
+78Dqu'est-ce qu'un rejoneador ?
+78 un ‚leveur de taureaux,un matador … cheval,un gladiateur/2
+79Do— vivaient les laietani ?
+79 prŠs de malaga,prŠs de valladolid,prŠs de barcelone/3
+80Dquelle ville portait le nom de caesar-augusta ?
+80 saragosse,pampelune,san sebastian/1
+81Dqui fonda la ville d'alm‚ria ?
+81 les romains,les ph‚niciens,les carthaginois/2
+82Dcomment s'appelait autrefois s‚ville ?
+82 hispaniola,tiberia,hispalis/3
+83Dcomment s'appelait autrefois pampelune ?
+83 pompaleo,pomp‚i,pompelaneum/1
+84Dde quelle origine est le nom "hispania" ?
+84 grŠque,s‚mitique,latine/2
+85Dque signifie le nom "iberia" ?
+85 terres farouches,derriŠre les montagnes,pays des riviŠres/3
+86Dquand fut instaur‚e la pax romana en espagne ?
+86 76 av.j.c.,47 av.j.c.,19 av.j.c./3
+87Dquelle ville ‚tait la capitale de la lusitanie ?
+87 lisbonne,porto,cadix/1
+88Den quelle ann‚e prit fin la r‚volte des celtibŠres ?
+88 141 av.j.c.,131 av.j.c.,11 av.j.c./2
+89Do— prit fin la r‚volte des celtibŠres ?
+89 … brigantium,… nemetobriga,… numance/3
+90Dcontre quelle arm‚e se battit c‚sar … munda ?
+90 l'arm‚e de pomp‚e,l'arm‚e d'hannibal,l'arm‚e de sertorius/1
+91Dquel type de province ‚tait l'espagne cit‚rieure ?
+91 une province imp‚riale,une province s‚natoriale,un protectorat/1
+92Dque signifie le nom "hispania" ?
+92 rebelle,cach‚,ensoleill‚/2
+93Dque fit auguste aux chefs cantabriques ?
+93 il les br–la,il les d‚capita,il les crucifia/3
+94Dquelle ville se trouve au pied de la sierra guadarrama ?
+94 madrid,seville,murcie/1
+95Dquelle ‚tait la capitale de la b‚tique ?
+95 pampelune,cordoue,cadix/2
+96Dqui ‚tait viriathe … l'origine ?
+96 un prˆtre,un barde,un berger/3
+97Den quelle ann‚e fut fond‚e la ville de m‚rida ?
+97 225 av.j.c.,125 av.j.c.,25 av.j.c./3
+98Dqui mit fin … la guerre lusitanienne ?
+98 brutus,c‚sar,crassus/1
+99Dqui gouverna la lusitanie en 60 av. j.c. ?
+99 viriathe,c‚sar,hannibal/2
+

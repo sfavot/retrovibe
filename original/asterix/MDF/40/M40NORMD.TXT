@@ -1,0 +1,199 @@
+01Fque signifie le mot "normand" ?
+01 homme du nord,navigateur,homme fort/1
+02Fqu'appelle-t-on "r‚ponse de normand" ?
+02 une r‚ponse enthousiaste,une r‚ponse ambigue,un refus/2
+03Fcomment s'appelle un bateau de guerre viking ?
+03 une galŠre,un destroyaar,un drakkar/3
+04F… quelle famille d'animaux appartient le renne ?
+04 les cervid‚s,les bovid‚s,les ovid‚s/1
+05Fqui est thor ?
+05 le dieu des arts,le dieu du tonnerre,le dieu de la guerre/2
+06Fquel est l'emblŠme de thor ?
+06 un casque … trois cornes,une ‚p‚e runique,un marteau/3
+07Fquelle est la signification du nom norvŠge ?
+07 route vers le nord,longue nuit,pays du renne/1
+08Fquelle langue est l'ancˆtre des langues nordiques ?
+08 le gaelique,le norrois,le copte/2
+09Fcombien de mƒts comportait un drakkar ?
+09 un,deux,trois/1
+10Fquel mot viking d‚signe un r‚cit ?
+10 edda,saga,vadhmal/2
+11Fque sont les elfes ?
+11 des fant“mes,des d‚mons,des g‚nies/3
+12Fque signifie le mot "viking" ?
+12 exp‚dition maritime,cheveux longs,guerrier/1
+13Fqu'est-ce qu'un fjord ?
+13 un fromage,une vall‚e en auge,un estuaire/2
+14Fchez les vikings, quel dieu ‚tait une crapule ?
+14 heimdal,njord,loki/3
+15Fde quel pays ‚tait originaire ‚rik le rouge ?
+15 norvŠge,suŠde,danemark/1
+16Fque signifie le nom groenland ?
+16 terre blanche,terre verte,terre froide/2
+17Fqu'est-ce que l'harfang des neiges ?
+17 un rongeur,un boeuf musqu‚,un oiseau/3
+18Fcomment se nommait autrefois la scandinavie ?
+18 skandia,bor‚as,norrland/1
+19Fselon la l‚gende, qui vivait … thul‚ ?
+19 des nains,des g‚ants,des f‚es/2
+20Fqu'est-ce qu'un inlandsis ?
+20 un canal,une vari‚t‚ de conifŠre,un glacier gigantesque/3
+21Fcomment s'appelle la v‚g‚tation arctique ?
+21 toundra,ta‹ga,tounga/1
+22Fqui sont les messagŠres d'odin ?
+22 les ases,les aurores bor‚ales,les walkyries/3
+23Fquelle est la couleur des cheveux des walkyries ?
+23 blond,rouge,blanc/1
+24Flequel de ces animaux n'est pas migrateur ?
+24 le renne,l'ours,le lemming/2
+25Fquel pays n'est pas travers‚ par le cercle polaire ?
+25 la suŠde,la norvŠge,le danemark/3
+26Fquel est le contraire du mot "bor‚al" ?
+26 austral,‚quatorial,m‚diterran‚en/1
+27Fque fit thor sur les conseils de loki ?
+27 il gifla odin,il se d‚guisa en femme,il se maria/2
+28Fde quoi est compos‚e essentiellement la ta‹ga ?
+28 de bouleaux,de chˆnes,de conifŠres/3
+29Fquelle est la signification du nom ‚riksson ?
+29 fils d'‚rik,de la tribu d'‚rik,du pays d'‚rik/1
+30Fquel dieu a inspir‚ le lancer de marteau ?
+30 odin,thor,balder/2
+31Mque repr‚sente la figure de proue d'un drakkar ?
+31 une tˆte de dragon,une tˆte de lion,une tˆte d'aigle/1
+32Mqu'est-ce qu'un auroch ?
+32 un cochon sauvage,un boeuf sauvage,un mammouth/2
+33Mcomment se nomme le paradis des vikings ?
+33 walhalla,kalevaala,asgard/1
+34Mqu'est-ce que le calvados ?
+34 de l'eau-de-vie de prune,de l'eau-de-vie de poire,de l'eau-de-vie de cidre/3
+35Mcomment ‚tait la coque des premiers drakkars ?
+35 … double quille,… fond plat,… double corps/2
+36Mcombien d'Œles compte le danemark ?
+36 moins de 100,plus de 200,plus de 700/2
+37Mcomment ‚tait surnomm‚ le roi harald ?
+37 le fils du serpent,le d‚couvreur,le roi aux beaux cheveux/3
+38Mselon les vikings, qui soutenait le monde ?
+38 un arbre,odin,les ases/1
+39Mcomment se nomme le domaine des dieux vikings ?
+39 varna,asgard,nibelung/2
+40Mcombien de pattes possŠde le cheval d'odin ?
+40 trois,quatre,huit/3
+41Mchez les vikings, qu'‚tait un traell ?
+41 un esclave,un gnome,un traŒneau/1
+42Mselon la l‚gende, combien de portes contient le walhalla ?
+42 140,340,540/3
+43Mcomment se nomme le marteau de thor ?
+43 antea,mj”llnir,sigurd/2
+44Mqu'est-ce qu'un fjeld ?
+44 une crique,une ‚clipse,un plateau rocheux/3
+45Mcomment ‚taient coup‚s les cheveux des esclaves vikings ?
+45 courts,en crˆte,ras‚s sur le c“t‚ droit/1
+46Mlors d'un procŠs viking, qui ‚tait l'avocat ?
+46 l'accus‚,le pŠre de l'accus‚,la mŠre de l'accus‚/1
+47Mselon la l‚gende, quels oiseaux escortent odin ?
+47 deux corbeaux,trois aigles,quatre chouettes/1
+48Mselon la l‚gende, qui est brynhild ?
+48 une reine,une walkyrie,l'‚pouse de thor/1
+49Mquel fut le premier duc de normandie ?
+49 ‚rik le rouge,leif ‚riksson,rollon/3
+50Mqu'appelait-on vinland ?
+50 la baie du labrador,l'islande,le groenland/1
+51Mo— vivaient les varŠgues ?
+51 en norvŠge,en suŠde,au danemark/2
+52Mquel est l'autre nom d'asgard ?
+52 vangard,urmgard,mitgard/3
+53Mquel ‚tait le surnom de thul‚ ?
+53 l'Œle blanche,le palais des neiges,le toit du monde/1
+54Mqu'est le ragnar”k pour les vikings ?
+54 la fˆte du printemps,la fin du monde,l'enterrement d'un roi/2
+55Mque d‚couvrit ‚rik le rouge ?
+55 le pakistan,les cyclades,le groenland/3
+56Mqui s'installa en islande avant les vikings ?
+56 des irlandais,des germains,des asiatiques/1
+57Mqu'est-ce qu'une rune ?
+57 une sorciŠre,une exp‚dition punitive,un caractŠre alphab‚tique/3
+58Mqui est odin ?
+58 le dieu de la guerre,le dieu des forgerons,le dieu du tonnerre/1
+59Mselon la l‚gende, combien de mŠres eut heimdal ?
+59 aucune,trois,neuf/3
+60Mselon la l‚gende, qu'est-ce qui mŠne … asgard ?
+60 un arc-en-ciel,un fleuve de sang,un frˆne g‚ant/1
+61Mquelle ‚tendue d'eau borde la suŠde ?
+61 l'oc‚an atlantique,la mer baltique,l'oc‚an glacial arctique/2
+62Mqu'est-ce qu'un lur ?
+62 un bouclier triangulaire,un elfe,une trompe/3
+63Mquel est le singulier du mot "drakkar" ?
+63 dreki,drak,drakki/1
+64Mcomment appelait-on un viking pris de fr‚n‚sie ?
+64 un wino,un berserkir,un brandi/2
+65Mque signifie le mot danois "kong" ?
+65 g‚ant,barbu,roi/3
+66Mquel animal a donn‚ son nom aux Œles f‚ro‚ ?
+66 le mouton,le phoque,le morse/1
+67Mqu'est-ce qu'une herminette ?
+67 une fille de roi,une hache,une laniŠre en cuir/2
+68Mo— se trouve le jutland ?
+68 en islande,en norvŠge,au danemark/3
+69Mqu'est-ce qu'une snoripa ?
+69 une poule des neiges,un renard argent‚,une vieille femme/1
+70Mquel sport viking ‚tait appel‚ st„ngst”t ?
+70 le lancer de poids,le lancer de tronc,le duel … la hache/2
+71Dqui sont les sƒm‚s ?
+71 les lapons,les finnois,les islandais/1
+72Dqu'est-ce que le bor‚e ?
+72 une c‚r‚monie fun‚raire,un vent du nord,une espŠce de soupe/2
+73Dqu'est-ce qu'une bract‚ate ?
+73 un urinoir,une piŠce d'or,un collier d'esclave/2
+74Dchez les vikings, qui est le frŠre de la d‚esse freyja ?
+74 freyr,peyr,meyr/1
+75Dqu'est-ce que le nabib ?
+75 le chef de famille,un crƒne ouvrag‚,une boisson/3
+76Dqu'est-ce que le vadhmal ?
+76 l'ƒme,un tissu,une boisson ferment‚e/2
+77Dqu'est-ce qu'un edda ?
+77 un poŠme,une loi,un raid/1
+78Dque sont les ases dans la mythologie viking ?
+78 les portes du walhalla,les chevaux des walkyries,les principaux dieux/3
+79Dquel peuple fonda la suŠde avec les goths ?
+79 les svears,les burgondes,les cimbres/1
+80Ddans quel bois ‚taient taill‚s les mƒts des drakkars ?
+80 chˆne,pin,hˆtre/2
+81Dselon la l‚gende, quel arbre g‚ant pousse … asgard ?
+81 un chˆne,un acacia,un frˆne/3
+82Dquel est le nom du cheval d'odin ?
+82 sleipnir,mj”llnir,hugin/1
+83Dchez les vikings, comment se nommaient les hommes libres ?
+83 traells,bondis,eddas/2
+84Dcomment se nomme la d‚esse de la beaut‚ chez les vikings ?
+84 brynhild,frigga,freyja/3
+85Dcomment se nomme l'arbre l‚gendaire qui pousse … asgard ?
+85 yggdrasil,jord,ahvenainen/1
+86Dque n'est pas la d‚esse freyja ?
+86 l'‚pouse d'odin,la mŠre de thor,la mŠre de balder/2
+87Ddans la mythologie viking, qu'est la terre ?
+87 la mŠre de tous les ases,la mŠre d'odin,une ‚pouse d'odin/3
+88Dque repr‚sente l'oiseau l‚gendaire appel‚ munin ?
+88 la m‚moire,la pens‚e,la vengeance/1
+89Dqui fonda le premier ‚tat russe ?
+89 un ase,un chef varŠgue,un chef goth/2
+90D… quel peuple appartenait le fils du viking riourik ?
+90 les svears,les goths,les varŠgues/3
+91Dcomment se nommait le fils du viking riourik ?
+91 igor,boris,heimdal/1
+92Dqu'est-ce qu'une snekkja ?
+92 une fˆte religieuse,un drakkar,une veuve/2
+93Dqui est le gardien d'asgard ?
+93 thor,balder,heimdal/3
+94Dqui est le pŠre du h‚ros mythique siegfried ?
+94 sigmund,sigurd,fafnir/1
+95Dqui ‚tait le pŠre de leif ‚riksson ?
+95 riourik,‚rik le rouge,le roi harald/2
+96Dquel est l'autre nom de la d‚esse freyja ?
+96 fafnir,crom,vanadis/3
+97Dquel animal symbolise le dieu freyr ?
+97 un cochon,un ours,un loup/1
+98Dquel animal symbolise la d‚esse freyja ?
+98 un renne,un chat,une chouette/2
+99Dqu'est la gylfaginning ?
+99 une r‚gion d'islande,une c‚r‚monie nuptiale,une saga/3
+

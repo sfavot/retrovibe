@@ -1,8 +1,8 @@
-import type { Hy8 } from "../../data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
 import type { Game } from "../../game/rules";
 import {
   Pointer,
@@ -284,9 +284,9 @@ export class ColoringScene implements Scene {
   readonly step = 1;
   private mcg!: Mcg;
   private sprites!: Hy8;
-  private paintedVoc!: Voc;
-  private wrongVoc!: Voc;
-  private voices = new Map<string, Voc>();
+  private paintedVoc!: Sound;
+  private wrongVoc!: Sound;
+  private voices = new Map<string, Sound>();
   private palette!: Uint8Array;
   private pointer!: Pointer;
   private run!: ColoringRun;
@@ -385,9 +385,9 @@ export class ColoringScene implements Scene {
     const [mcg, sprites, painted, wrong, ...voices] = await Promise.all([
       ctx.resources.mcg(`${picture.name}.mcg`),
       ctx.resources.hy8("s35a000s.hy8"),
-      ctx.resources.voc("s35a001b.voc"),
-      ctx.resources.voc("s35a002b.voc"),
-      ...voiceFiles.map((file) => ctx.resources.voc(file)),
+      ctx.resources.sound("s35a001b.voc"),
+      ctx.resources.sound("s35a002b.voc"),
+      ...voiceFiles.map((file) => ctx.resources.sound(file)),
     ]);
     this.mcg = mcg;
     this.sprites = sprites;

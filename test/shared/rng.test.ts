@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Lcg, borlandRand, msvcRand, msvcRand16, randomSeed, scummvmRandom } from "../../src/engine/rng";
 import { Rng } from "../../src/engine/desktop-adventures/rng";
 import { MsvcRandom } from "../../src/engine/mohawk/rng";
-import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../src/engine/infogrames/rng";
 
 const SEEDS = [0, 1, 42, 0x1234, 0xffff, 0x7fffffff, 0xdeadbeef, 123456789];
 

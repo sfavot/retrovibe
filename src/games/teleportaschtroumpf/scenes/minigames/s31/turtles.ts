@@ -1,4 +1,4 @@
-import type { BorlandRandom } from "../../../engine/rng";
+import type { BorlandRandom } from "../../../../../engine/infogrames/rng";
 
 /**
  * Logique pure de S31 « Les Tortues » (`2f87:0008`, `2f87:0656`, `2f87:0950` ; RE : `docs/teleportaschtroumpf/minigames/s31.md`),

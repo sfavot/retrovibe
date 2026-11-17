@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # Extrait du CD du Téléportaschtroumpf uniquement les fichiers utiles au jeu
 # (original/teleportaschtroumpf/) et génère l'inventaire docs/teleportaschtroumpf/files.md.
+# Les sons (975 VOC : voix, musiques, bruitages) sont trop lourds pour être versionnés tels quels (docs/asterix/plan.md,
+# décision D3) : chacun devient <nom d'origine>.VOC.mp3 (MP3 mono 22 050 Hz à 32 kb/s), et audio.json garde le nombre
+# d'échantillons et la fréquence du PCM d'origine (durées exactes pour le moteur). Le reste est copié tel quel.
 # Usage : scripts/teleportaschtroumpf-extract.sh [archive.rar]
 #   (défaut : archives/teleportaschtroumpf/jeu-01592-teleportaschtroumpf-pcdos.rar)
 # Idempotent : le dossier de sortie est régénéré à côté puis substitué d’un bloc, sauf la jaquette de l'accueil
 # (original/teleportaschtroumpf/COVER.webp), qui ne vient pas du CD et est conservée telle quelle.
 # La notice d'origine (« Lisez moi.doc » à la racine du CD) est convertie en MANUEL.pdf : textutil (macOS) la lit en
 # HTML, Chrome en mode headless l'imprime. En cas d’échec ou sans l’un des deux, l’éventuel MANUEL.pdf existant est conservé.
-# Briques communes : scripts/lib/ (extraction ISO 9660, inventaire, remplacement atomique).
-# Outils requis : bsdtar (7zz ne sait pas lire ce RAR), python3.
+# Déterministe hors MANUEL.pdf (même résultat à chaque exécution avec la même version de ffmpeg).
+# L'archive est une donnée non fiable : rien n'en est exécuté (python en -I, ffmpeg ne lit que des fichiers locaux).
+# Briques communes : scripts/lib/ (extraction ISO 9660, VOC -> MP3 et index des sons, inventaire, remplacement atomique).
+# Outils requis : bsdtar (7zz ne sait pas lire ce RAR), python3, ffmpeg (libmp3lame).
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,9 +23,11 @@ doc="$racine/docs/teleportaschtroumpf/files.md"
 utils="$racine/scripts/teleportaschtroumpf/extract_utils.py"
 chrome="${CHROME_BIN:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 
+NB_SONS=975
+
 # shellcheck source=lib/extract-common.sh
 source "$racine/scripts/lib/extract-common.sh"
-ec_verifier_outils bsdtar python3
+ec_verifier_outils bsdtar python3 ffmpeg
 [ -f "$archive" ] || { echo "Archive introuvable : $archive" >&2; exit 1; }
 
 ec_init_tmp
@@ -42,7 +49,14 @@ py extraire "$tmp/data.iso" "$tmp/iso"
 # Tout est construit dans $tmp/out ; original/ n'est remplacé qu'à la fin, une fois files.json généré.
 [ -f "$sortie/MANUEL.pdf" ] && cp "$sortie/MANUEL.pdf" "$tmp/MANUEL.old.pdf"
 mkdir "$tmp/out"
-py copier "$tmp/iso" "$tmp/out" "$tmp/stats.json"
+nb="$(py copier "$tmp/iso" "$tmp/out" "$tmp/pcm" "$tmp/stats.json")"
+[ "$nb" -eq "$NB_SONS" ] || { echo "$NB_SONS sons attendus, $nb décodés" >&2; exit 1; }
+
+# Son : PCM 8 bits non signé -> MP3 32 kb/s, de $tmp/pcm/<fréquence>/DATA/... vers DATA/...
+echo "Encodage MP3 de $nb sons..."
+ec_encoder_pcm "$tmp/pcm" "$tmp/out" 32k
+total="$(find "$tmp/out/DATA" -type f -name '*.mp3' | wc -l | tr -d ' ')"
+[ "$total" -eq "$NB_SONS" ] || { echo "$NB_SONS MP3 attendus, $total encodés" >&2; exit 1; }
 ec_conserver "$sortie" "$tmp/out" COVER.webp
 
 # Notice d'origine -> MANUEL.pdf (le nom de fichier du CD contient une espace et la casse varie).

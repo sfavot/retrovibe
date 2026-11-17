@@ -1,6 +1,6 @@
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
-import { VideoBackdrop, VideoScene } from "../../engine/video";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import { VideoBackdrop, VideoScene } from "../../../../engine/infogrames/video";
 import { VoiceLine } from "../board/voices";
 
 /** Une vidéo d'une séquence, passable (Échap, Espace, clic) ou non. */

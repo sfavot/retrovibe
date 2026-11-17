@@ -1,13 +1,13 @@
-import type { Hy8, Hy8Frame } from "../../data/hy8";
-import { type Input, SWIPE_MIN } from "../../engine/input";
-import type { Mcg } from "../../data/mcg";
-import type { Voc } from "../../data/voc";
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../data/mcg";
+import type { Hy8, Hy8Frame } from "../../../../engine/infogrames/data/hy8";
+import { type Input, SWIPE_MIN } from "../../../../engine/infogrames/input";
+import type { Mcg } from "../../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
-import { AnimationPlayer } from "../../engine/sprites";
-import type { Surface } from "../../engine/surface";
-import type { Timer } from "../../engine/clock";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import { AnimationPlayer } from "../../../../engine/infogrames/sprites";
+import type { Surface } from "../../../../engine/infogrames/surface";
+import type { Timer } from "../../../../engine/infogrames/clock";
 import type { Game } from "../../game/rules";
 import { Clip, SoundHush, drawFrame, goalClip, ingredientOutcome, minigameLevel, minigameRequest, sceneIngredient, type MinigameDone, type MinigameFactory } from "./common";
 
@@ -175,10 +175,10 @@ export class MagicFormulaScene implements Scene {
   private mcg!: Mcg;
   private sprites!: Hy8;
   private sparks!: Hy8;
-  private moveSound!: Voc;
-  private exactSound!: Voc;
-  private otherSound!: Voc;
-  private nameVoices: Voc[] = [];
+  private moveSound!: Sound;
+  private exactSound!: Sound;
+  private otherSound!: Sound;
+  private nameVoices: Sound[] = [];
   private win!: Clip;
   private lose!: Clip;
   private result: Clip | null = null;
@@ -312,10 +312,10 @@ export class MagicFormulaScene implements Scene {
       ctx.resources.mcg("s33a001d.mcg"),
       ctx.resources.hy8("s33a000s.hy8"),
       ctx.resources.hy8("s33a001s.hy8"),
-      ctx.resources.voc("s33a001b.voc"),
-      ctx.resources.voc("s33a003b.voc"),
-      ctx.resources.voc("s33a004b.voc"),
-      Promise.all(secretVoices.map((name) => ctx.resources.voc(name))),
+      ctx.resources.sound("s33a001b.voc"),
+      ctx.resources.sound("s33a003b.voc"),
+      ctx.resources.sound("s33a004b.voc"),
+      Promise.all(secretVoices.map((name) => ctx.resources.sound(name))),
       this.win.load(ctx),
       this.lose.load(ctx),
     ]);

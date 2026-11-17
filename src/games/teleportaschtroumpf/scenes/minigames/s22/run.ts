@@ -1,5 +1,5 @@
-import type { Hy8, Hy8Frame } from "../../../data/hy8";
-import { AnimationPlayer } from "../../../engine/sprites";
+import type { Hy8, Hy8Frame } from "../../../../../engine/infogrames/data/hy8";
+import { AnimationPlayer } from "../../../../../engine/infogrames/sprites";
 
 /**
  * Logique de S22 « Le Dragon » (boucle de `1c78:0005`, RE : `docs/teleportaschtroumpf/minigames/s22.md`), sans écran ni son :

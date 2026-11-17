@@ -1,7 +1,8 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
-import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
-import type { Scene } from "../../src/games/teleportaschtroumpf/engine/scene";
+import { Engine } from "../../src/engine/infogrames/engine";
+import { BorlandRandom } from "../../src/engine/infogrames/rng";
+import type { Scene } from "../../src/engine/infogrames/scene";
 import { Game, newGame, type GameEvent } from "../../src/games/teleportaschtroumpf/game/rules";
 import type { MinigameOutcome } from "../../src/games/teleportaschtroumpf/game/state";
 import { createBoardEventScene, createWellScene } from "../../src/games/teleportaschtroumpf/scenes/events";
@@ -19,7 +20,7 @@ function oneGame(seed = 7): Game {
 async function launch(scene: Scene) {
   const host = new TestHost();
   host.audio.enabled = false;
-  const engine = new Engine(host, { seed: 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: 7 });
   await engine.start(scene);
   await advance(engine, host, 600);
   const press = async (code: string) => {

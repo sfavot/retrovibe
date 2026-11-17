@@ -1,0 +1,198 @@
+01Fde quoi est fait un papyrus ?
+01 bois,pierre,roseau/3
+02Fquel est l'animal le plus v‚n‚r‚ en ‚gypte ?
+02 le chat,le cochon,le ver de terre/1
+03Fquelle partie du visage du sphinx de gizeh est cass‚e ?
+03 les oreilles,le menton,le nez/3
+04Fcombien de fleuves coulent en ‚gypte ?
+04 1,37,124/1
+05Fqu'est-ce qu'un sarcophage ?
+05 un caveau,un cercueil,un masque fun‚raire/2
+06Fqu'‚tait la femme dans la soci‚t‚ ‚gyptienne ?
+06 l'‚gale de son mari,l'esclave de son mari,l'esclave de ses enfants/1
+07Fqu'est-ce qui s‚pare l'‚gypte africaine de l'‚gypte asiatique ?
+07 le canal de panama,le d‚troit de gibraltar,le canal de suez/3
+08Fqu'est-ce que le sina‹ ?
+08 un isthme,une presqu'Œle,une Œle/2
+09Fquel empereur romain aima cl‚opƒtre ?
+09 jules c‚sar,tibŠre,marc aurŠle/1
+10Fcomment mourut cl‚opƒtre ?
+10 de vieillesse,assassin‚e,elle se suicida/3
+11Fcombien de c“t‚s possŠde un ob‚lisque ?
+11 trois,quatre,six/2
+12Fcomment se termine un ob‚lisque ?
+12 par une pyramide,par un globe,par un disque/1
+13Fqu'est-ce qu'un scribe ?
+13 un architecte,un fonctionnaire,un embaumeur/2
+14Fcomment sont souvent repr‚sent‚s les humains sur les hi‚roglyphes ?
+14 de face,de profil,de dos/2
+15Fquelle est la signification du mot "ob‚lisque" ?
+15 rayon solaire,pierre dress‚e,broche/3
+16Fqu'est-ce que les ‚gyptiens nommaient "m‚tal blanc" ?
+16 l'argent,l'‚lectrum,l'albƒtre/1
+17Fquelle ‚tait la boisson nationale ‚gyptienne ?
+17 le lait,la biŠre,le serdab/2
+18Fcombien de jours comptait le calendrier ‚gyptien ?
+18 200,365,401/2
+19Fqui fonda la ville d'alexandrie ?
+19 ramsŠs ||,cl‚opƒtre,alexandre le grand/3
+20Fcomment s'appelle la croix ans‚e ‚gyptienne ?
+20 ankh,ra,brako/1
+21Fo— se trouve aujourd'hui l'ob‚lisque de louqsor ?
+21 … rome,… paris,… athŠnes/2
+22Fen ‚gypte, qui ‚tait le repr‚sentant des dieux ?
+22 le prˆtre,le scribe,le pharaon/3
+23Fqu'‚tait cl‚opƒtre ?
+23 une reine,une pharaonne,une prˆtresse/1
+24Fquelle est la capitale actuelle de l'‚gypte ?
+24 alexandrie,le caire,memphis/2
+25Fqui ‚tait le ph‚nix ?
+25 le premier pharaon,le disque solaire,un oiseau de l‚gende/3
+26Fqui fut le premier … d‚chiffrer l'‚criture ‚gyptienne ?
+26 champollion,schliemann,napol‚on/1
+27Flaquelle de ces 3 orthographes est exacte ?
+27 hi‚roglyphe,hy‚rogliphe,hy‚roglyphe/1
+28Fcomment se nommait le fils de cl‚opƒtre et de c‚sar ?
+28 ptol‚m‚e,c‚sarion,octave/2
+29Fcomment s'appelle le sommet d'une pyramide ?
+29 le naos,l'hypostyle,le pyramidion/3
+30Fen quoi ‚taient confectionn‚s les pagnes ‚gyptiens ?
+30 en lin,en laine,en soie/1
+31Mde ces 3 pyramides, quelle est la plus grande ?
+31 kh‚ops,ch‚phren,myk‚rinos/1
+32Mcomment cl‚opƒtre rencontra-t-elle c‚sar ?
+32 cach‚e dans un tapis,… la tˆte de 100 000 hommes,devant le sphinx de gizeh/1
+33Men quelle ann‚e fut fond‚e alexandrie ?
+33 603 av.j.c.,482 av.j.c.,332 av.j.c./3
+34Mle sphinx a le corps de quel animal ?
+34 panthŠre,lion,tigre/2
+35Mquel ‚tait le surnom de la ville de thŠbes ?
+35 thŠbes aux 100 portes,thŠbes ville ouverte,la cit‚ des lumiŠres/1
+36Mqui est osiris ?
+36 le dieu des morts,le dieu du soleil,le dieu du mal/1
+37M… quelle p‚riode a lieu la crue du nil ?
+37 toute l'ann‚e,ao–t-septembre,avril/2
+38Men ‚gypte, que faisait-on aux chats aprŠs leur mort ?
+38 on les br–lait,on les enterrait,on les momifiait/3
+39Mpar qui ‚tait gouvern‚e l'‚gypte au ||Šme siŠcle av.jc ?
+39 la grŠce,rome,personne/1
+40Mqui a ‚crit "l'‚gypte est le don du nil" ?
+40 homŠre,cic‚ron,h‚rodote/3
+41Mlequel de ces 3 pays est limitrophe … l'‚gypte ?
+41 la tunisie,la lybie,le maroc/2
+42M… quel continent appartient l'‚gypte ?
+42 … l'asie,… l'afrique,… l'asie et … l'afrique/3
+43Mo— le nil prend-il sa source ?
+43 prŠs du lac nasser,prŠs du lac karoun,prŠs du lac tanganyka/3
+44Mo— se trouve le delta du nil ?
+44 en basse-‚gypte,en haute-‚gypte,dans le sina‹/1
+45Mqu'est-ce qu'un fellah ?
+45 un prˆtre,un paysan,un lettr‚/2
+46Mquel monument fut bƒti … la demande de ramsŠs || ?
+46 la pyramide de kh‚ops,le temple d'abou-simbel,le barrage d'assouan/2
+47Mde quel pharaon le sphinx de gizeh a-t-il le visage ?
+47 ramsŠs ||,k‚phren,kh‚ops/2
+48Mcomment se suicida cl‚opƒtre ?
+48 avec un serpent,avec du poison,en se jetant dans le nil/1
+49Mqu'est-ce qu'un ibis ?
+49 une statuette,une plaque pectorale,un ‚chassier/3
+50M… quel ƒge mourut toutankhamon ?
+50 18 ans,28 ans,38 ans/1
+51Mqui ‚tait le dieu du mal en ‚gypte ?
+51 osiris,seth,ptah/2
+52Mcombien de lignes d'hi‚roglyphes contient la pierre de rosette ?
+52 14,21,171/1
+53Mo— fut enterr‚e la reine nefertari ?
+53 dans la vall‚e des rois,dans la vall‚e des reines,… el-kattara/2
+54Mo— est situ‚e la vall‚e des rois ?
+54 dans le delta du nil,prŠs du lac nasser,prŠs de thŠbes/3
+55Mqu'est-ce que la glyptique ?
+55 l'art de tailler la pierre,la poterie,la pes‚e du coeur/1
+56Mqu'est-ce qu'une intaille ?
+56 une m‚lop‚e fun‚raire,une pierre grav‚e,un canal d'irrigation/2
+57Mqu'est-ce qu'une mastaba ?
+57 un petit tambour,une voile triangulaire,un monument fun‚raire/3
+58Mcombien sont les colosses de memnon ?
+58 deux,six,dix/1
+59Mqu'est-ce qu'un ostracon ?
+59 un novice,un d‚bris de poterie,une felouque sans voile/2
+60Mquelle est la longueur du sphinx de chephren ?
+60 100 m,150 m,200 m/3
+61Mqu'est-ce qu'une syringe ?
+61 une s‚pulture,un vase … long col,un pagne/1
+62Mquel dieu ‚gyptien rempla‡a le dieu amon ?
+62 horus,aton,ptah/2
+63Mquel dieu ‚gyptien a une tˆte de singe ?
+63 thot,osiris,horus/1
+64Mo— mourut cl‚opƒtre ?
+64 rome,thŠbes,alexandrie/3
+65Mquel mot ‚gyptien d‚signe un ob‚lisque ?
+65 theken,noun,hotep/1
+66Mqui appelait-on akh‚naton ?
+66 am‚nophis |{,touthmŠs ||,djoser/1
+67Mquel pharaon fit percer le premier canal de suez ?
+67 touthmŠs ||,n‚chao ||,am‚nophis |||/2
+68Mquel peuple saccagea thŠbes en 663 av. j.c. ?
+68 les perses,les grecs,les assyriens/3
+69Mcomment les egyptiens nommaient-ils l'ƒme ?
+69 ba,ra,ka/3
+70Men combien de temps fut construite la pyramide de kh‚ops ?
+70 vingt ans,un siŠcle,cent vingt ans/1
+71Dqu'est-ce qu'un serdab ?
+71 un petit ‚difice,un pagne,un cartouche/1
+72Dquel peuple fut vaincu par ramsŠs || … quadech ?
+72 les perses,les hittites,les grecs/2
+73Dquelle ‚tait la hauteur d'origine de la pyramide de kh‚ops ?
+73 140 m,148 m,152 m/2
+74Dquelle est la hauteur actuelle de la pyramide de kh‚ops ?
+74 moins de 128 m,moins de 138 m,plus de 148 m/2
+75Dqui est le fils d'|sis et d'osiris ?
+75 anubis,horus,seth/2
+76Dcomment s'appelle la coiffe du pharaon ?
+76 uraeus,pschent,heqa/2
+77Do— ‚tait couronn‚ le pharaon ?
+77 … alexandrie,… thŠbes,… memphis/3
+78Den quelle ann‚e rome annexa-t-elle l'‚gypte ?
+78 -264 av.jc,-53 av.jc,-30 av.jc/3
+79Dqu'est-ce qu'une wadi ?
+79 une profonde vall‚e,une lance de c‚r‚monie,une jeune esclave/1
+80Dsous la forme de quel animal ‚tait repr‚sent‚e la d‚esse bastet ?
+80 une chatte,une lionne,une vache/1
+81Dqui ‚tait l'‚poux de nefertiti ?
+81 toutankhamon,akh‚naton,ramsŠs ||/2
+82Dlaquelle de ces 3 mers ne touche pas l'‚gypte ?
+82 la m‚diterran‚e,la mer rouge,la mer noire/3
+83Dcombien d'‚pagomŠnes contenait le calendrier ‚gyptien ?
+83 2 ou 3,5 ou 6,12 ou 13/2
+84Dgrƒce … quel objet put-on d‚chiffrer les hi‚roglyphes ?
+84 la pierre de rosette,l'ob‚lisque de louxor,le sarcophage d'akh‚naton/1
+85Dpendant combien de temps ramsŠs || r‚gna-t-il ?
+85 26 ans,46 ans,66 ans/3
+86Dqui est cens‚ avoir r‚dig‚ le "livre de la fondation des temples" ?
+86 imhotep,hapou,m‚nŠs/1
+87Dlequel de ces 3 dieux n'appartient pas … la triade th‚baine ?
+87 amon,hapis,mout/2
+88Dquelle est la forme d'une mastaba ?
+88 pyramidale,t‚tra‚drique,trap‚zo‹dale/3
+89Dqu'est-ce que le khamsin ?
+89 un sirop … base de figues,un vent chaud,un encens/2
+90Dcombien y eut-il de reines appel‚es cl‚opƒtre ?
+90 une,trois,sept/3
+91Dquelle est la longueur du nil ?
+91 1280 km,3420 km,6670 km/3
+92Dquelle est la superficie du delta du nil ?
+92 moins de 25 000 km2,plus de 32 000 km2,plus de 41 000 km2/2
+93Dquelle est la 7Šme merveille du monde ?
+93 le phare d'alexandrie,la pyramide de kh‚ops,le sphinx de giseh/1
+94Dqu'est-ce qu'une hypog‚e ?
+94 une barque,un diadŠme,une tombe/3
+95D… quelle dynastie appartient am‚nophis ||| ?
+95 la |Šre,la }|Šme,la }{|||Šme/3
+96Dqui sont cens‚s repr‚senter les colosses de memnon ?
+96 touthmŠs ||,am‚nophis |||,ramsŠs ||/2
+97Dqui est le 9Šme pharaon de la }{|||Šme dynastie ?
+97 am‚nophis |||,akh‚naton,djoser/1
+98Dcomment s'appelle aujourd'hui le pays de koush ?
+98 le maroc,le soudan,la tunisie/2
+99Dqui est le fils d'am‚nophis ||| ?
+99 akh‚naton,ramsŠs ||,toutankhamon/1

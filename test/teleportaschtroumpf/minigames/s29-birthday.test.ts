@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   BirthdayScene,
@@ -154,8 +154,8 @@ describe.skipIf(!hasOriginalFiles)("S29 L'Anniversaire : bougies, souffle, temps
     const run = await launch({ seed: 5, audio: true });
     const scene = run.scene as BirthdayScene;
     const at = scene.position - 1;
-    const blow = await run.ctx.resources.voc("s29a001b.voc");
-    const miss = await run.ctx.resources.voc("s29a002b.voc");
+    const blow = await run.ctx.resources.sound("s29a001b.voc");
+    const miss = await run.ctx.resources.sound("s29a002b.voc");
     const voiceStarts = run.host.audio.plays.length;
     await run.tap("Space", 120);
     expect(scene.states[at]).toBe(CANDLE_BLOWING);
@@ -163,7 +163,7 @@ describe.skipIf(!hasOriginalFiles)("S29 L'Anniversaire : bougies, souffle, temps
     expect(run.host.audio.plays.length).toBe(voiceStarts);
     expect(run.host.audio.stops).toBe(0);
     expect(scene.states.filter((s) => s === CANDLE_LIT)).toHaveLength(7);
-    expect(run.host.audio.effects.at(-1)?.sound.samples).toEqual(blow.samples);
+    expect(run.host.audio.effects.at(-1)?.sound.data).toEqual(blow.data);
     run.shot("s29-souffle-0");
     await run.run(500);
     run.shot("s29-souffle-1");
@@ -171,7 +171,7 @@ describe.skipIf(!hasOriginalFiles)("S29 L'Anniversaire : bougies, souffle, temps
     run.shot("s29-eteinte");
     await run.tap("Space", 120);
     expect(scene.states[at]).toBe(CANDLE_OUT);
-    expect(run.host.audio.effects.at(-1)?.sound.samples).toEqual(miss.samples);
+    expect(run.host.audio.effects.at(-1)?.sound.data).toEqual(miss.data);
   }, 60_000);
 
   it("une bougie soufflée se rallume 3 à 8 s plus tard (animation de rallumage 1 s, son s29a003b), toujours seule", async () => {
@@ -180,12 +180,12 @@ describe.skipIf(!hasOriginalFiles)("S29 L'Anniversaire : bougies, souffle, temps
       const run = await launch({ seed, audio: true });
       const scene = run.scene as BirthdayScene;
       const at = scene.position - 1;
-      const relight = await run.ctx.resources.voc("s29a003b.voc");
+      const relight = await run.ctx.resources.sound("s29a003b.voc");
       await run.tap("Space", 120);
       const start = run.ctx.clock.ticks;
       await run.until(() => scene.states[at] === CANDLE_RELIGHTING, 12_000);
       delays.push((run.ctx.clock.ticks - start) / 60);
-      expect(run.host.audio.effects.at(-1)?.sound.samples).toEqual(relight.samples);
+      expect(run.host.audio.effects.at(-1)?.sound.data).toEqual(relight.data);
       await run.until(() => scene.states[at] === CANDLE_LIT, 3000);
     }
     expect(Math.min(...delays)).toBeGreaterThan(2.9);

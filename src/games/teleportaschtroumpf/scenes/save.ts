@@ -1,5 +1,5 @@
-import type { BorlandRandom } from "../engine/rng";
-import type { HostStorage } from "../engine/host";
+import type { BorlandRandom } from "../../../engine/infogrames/rng";
+import type { HostStorage } from "../../../engine/infogrames/host";
 import type { Game } from "../game/rules";
 import type { GameState } from "../game/state";
 import type { CommentarySnapshot } from "./grand-schtroumpf/commentary";

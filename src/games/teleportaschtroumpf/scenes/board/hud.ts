@@ -1,6 +1,6 @@
-import { measureText, type PfnFont } from "../../data/font";
-import type { Hy8 } from "../../data/hy8";
-import type { Surface } from "../../engine/surface";
+import { measureText, type PfnFont } from "../../../../engine/infogrames/data/font";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Surface } from "../../../../engine/infogrames/surface";
 import type { Player } from "../../game/state";
 import { hasIngredient } from "../../game/state";
 import { INGREDIENT_COUNT } from "../../game/tables";

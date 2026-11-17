@@ -1,8 +1,9 @@
+import { GAME_CONFIG } from "../../src/games/teleportaschtroumpf/engine/config";
 import { describe, expect, it } from "vitest";
-import { Engine } from "../../src/games/teleportaschtroumpf/engine/engine";
+import { Engine } from "../../src/engine/infogrames/engine";
 import { expandName } from "../../src/games/teleportaschtroumpf/engine/paths";
-import { BorlandRandom } from "../../src/games/teleportaschtroumpf/engine/rng";
-import type { Scene } from "../../src/games/teleportaschtroumpf/engine/scene";
+import { BorlandRandom } from "../../src/engine/infogrames/rng";
+import type { Scene } from "../../src/engine/infogrames/scene";
 import { Game, newGame, type GameEvent } from "../../src/games/teleportaschtroumpf/game/rules";
 import { hasIngredient } from "../../src/games/teleportaschtroumpf/game/state";
 import type { MinigameOutcome } from "../../src/games/teleportaschtroumpf/game/state";
@@ -31,7 +32,7 @@ const release = (from: Release["from"]): Release => ({ type: "release", player: 
 async function launch(scene: Scene, audio = false) {
   const host = new TestHost();
   host.audio.enabled = audio;
-  const engine = new Engine(host, { seed: 7 });
+  const engine = new Engine(host, GAME_CONFIG, { seed: 7 });
   await engine.start(scene);
   return { host, engine };
 }
@@ -124,7 +125,7 @@ describe("choix de la vidéo et de la voix (pur)", () => {
     }
     for (const video of videos) expect(present.has(muxPath(video).toUpperCase()), video).toBe(true);
     // `s17a004t` et `s18a004t` n'existent pas : l'original les demande aussi (tirage 1 à 4 pour 3 fichiers), la voix est alors muette.
-    const missing = [...voices].filter((v) => !present.has(muxPath(v).toUpperCase()));
+    const missing = [...voices].filter((v) => !present.has(`${muxPath(v)}.mp3`.toUpperCase()));
     expect(missing.sort()).toEqual(["s17a004t.voc", "s18a004t.voc"]);
     // Les 54 vidéos S13 à S21 : 6 + 2 + 14 + 2 + 1 + 2 + 15 + 12, soit toutes celles de ces scènes.
     expect(videos.size).toBe(54);
@@ -156,7 +157,7 @@ describe.skipIf(!hasOriginalFiles)("BoardEventScene : la vidéo de l'événement
     const { host, engine } = await launch(scene);
     await advanceUntil(engine, host, () => done, 60_000);
     expect(host.loaded.map((f) => f.toUpperCase())).toContain(`DATA/${video}`);
-    const voices = host.loaded.filter((f) => /\.VOC$/i.test(f) && !/S52M|S52D|S01A00/i.test(f));
+    const voices = host.loaded.filter((f) => /\.VOC\.mp3$/i.test(f) && !/S52M|S52D|S01A00/i.test(f));
     // `undefined` : voix tirée parmi 4 pour 3 fichiers (S17, S18), éventuellement muette.
     if (voice) expect(voices.some((f) => voice.test(f))).toBe(true);
     else if (voice === null) expect(voices).toEqual([]);
@@ -338,7 +339,7 @@ describe.skipIf(!hasOriginalFiles)("puits aux vœux S13", () => {
       await advance(engine, host, 100);
       await click(host, engine);
       await advanceUntil(engine, host, () => outcomes.length > 0, 60_000);
-      const wanted = `S13C0${String(7 + SPOKEN_OFFSET[target]).padStart(2, "0")}T.VOC`;
+      const wanted = `S13C0${String(7 + SPOKEN_OFFSET[target]).padStart(2, "0")}T.VOC.MP3`;
       expect(host.loaded.some((f) => f.toUpperCase().endsWith(wanted))).toBe(true);
     }
   }, 180_000);

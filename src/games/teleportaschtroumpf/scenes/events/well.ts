@@ -1,10 +1,10 @@
-import type { Hy8 } from "../../data/hy8";
-import type { Voc } from "../../data/voc";
-import { TICKS_PER_SECOND } from "../../engine/clock";
-import { EffectWait } from "../../engine/effect-wait";
+import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
+import type { Sound } from "../../../../engine/infogrames/audio/sound";
+import { TICKS_PER_SECOND } from "../../../../engine/infogrames/clock";
+import { EffectWait } from "../../../../engine/infogrames/effect-wait";
 import { voiceName } from "../../engine/paths";
-import type { Scene, SceneContext } from "../../engine/scene";
-import { VideoScene } from "../../engine/video";
+import type { Scene, SceneContext } from "../../../../engine/infogrames/scene";
+import { VideoScene } from "../../../../engine/infogrames/video";
 import type { Game } from "../../game/rules";
 import { hasIngredient, type MinigameOutcome } from "../../game/state";
 import { VoiceLine } from "../board/voices";
@@ -70,7 +70,7 @@ export class WellScene implements Scene {
   private line: VoiceLine | null = null;
   private video: VideoScene | null = null;
   private sprites: Hy8 | null = null;
-  private beep: Voc | null = null;
+  private beep: Sound | null = null;
   /** `s13g.pal` : la vidéo laisse le magenta de transparence aux couleurs 128 et 129 du curseur ; l'original charge cette palette. */
   private palette: Uint8Array | null = null;
   private pickStart = 0;
@@ -108,7 +108,7 @@ export class WellScene implements Scene {
     [, this.sprites, this.beep, this.palette] = await Promise.all([
       this.video.load(ctx),
       ctx.resources.hy8("s13a000s.hy8"),
-      ctx.resources.voc("s07a001b.voc"),
+      ctx.resources.sound("s07a001b.voc"),
       ctx.resources.bytes("s13g.pal"),
     ]);
   }

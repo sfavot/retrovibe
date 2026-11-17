@@ -1,9 +1,9 @@
-import type { Hy8 } from "../data/hy8";
-import type { Mcg } from "../data/mcg";
-import type { Voc } from "../data/voc";
+import type { Hy8 } from "../../../engine/infogrames/data/hy8";
+import type { Mcg } from "../../../engine/infogrames/data/mcg";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
 import { Menu, spriteArea } from "../engine/menu";
 import { voiceName } from "../engine/paths";
-import type { Scene, SceneContext } from "../engine/scene";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
 import { centisecondsToTicks } from "./setup/common";
 
 /** Nombre de joueurs minimal et maximal (silhouettes du fond). */
@@ -50,7 +50,7 @@ class PlayersScene implements Scene {
   readonly step = 1;
   private mcg!: Mcg;
   private sprites!: Hy8;
-  private voices: Voc[] = [];
+  private voices: Sound[] = [];
   private phase: Phase = "fadeIn";
   private waitStart = 0;
   /** Gauche / droite : 1 à 4 joueurs, bornés (l'original ne reboucle pas). */
@@ -69,7 +69,7 @@ class PlayersScene implements Scene {
     const [mcg, sprites, ...voices] = await Promise.all([
       ctx.resources.mcg("s09a001d.mcg"),
       ctx.resources.hy8("s09a000s.hy8"),
-      ...Array.from({ length: VOICE_COUNT }, (_, i) => ctx.resources.voc(voiceName("s09v", i + 1))),
+      ...Array.from({ length: VOICE_COUNT }, (_, i) => ctx.resources.sound(voiceName("s09v", i + 1))),
     ]);
     this.mcg = mcg;
     this.sprites = sprites;
@@ -138,7 +138,7 @@ class PlayersScene implements Scene {
     return MIN_PLAYERS + this.menu.index;
   }
 
-  private voice(n: number): Voc {
+  private voice(n: number): Sound {
     return this.voices[n - 1];
   }
 

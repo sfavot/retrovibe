@@ -1,9 +1,9 @@
-import type { Voc } from "../data/voc";
-import { TICKS_PER_SECOND } from "../engine/clock";
+import type { Sound } from "../../../engine/infogrames/audio/sound";
+import { TICKS_PER_SECOND } from "../../../engine/infogrames/clock";
 import { musicName } from "../engine/paths";
-import { saveOptions } from "../engine/options";
-import type { Scene, SceneContext } from "../engine/scene";
-import { VideoScene } from "../engine/video";
+import { parentOptions, saveOptions } from "../engine/options";
+import type { Scene, SceneContext } from "../../../engine/infogrames/scene";
+import { VideoScene } from "../../../engine/infogrames/video";
 import { zoneIndex } from "../game/board";
 import { Game, newGame, type GameEvent, type GameSetup } from "../game/rules";
 import type { GameResult, MinigameOutcome, MinigameRequest } from "../game/state";
@@ -74,7 +74,7 @@ const VOICE_SIPHON_RELEASE = 5;
 export class GameScene implements Scene {
   readonly step = 4;
   private resources!: BoardResources;
-  private musics: Voc[] = [];
+  private musics: Sound[] = [];
   /** La partie et le plateau, lisibles (jamais à modifier) par les tests et les écrans qui les montrent. */
   game!: Game;
   board!: Board;
@@ -102,7 +102,7 @@ export class GameScene implements Scene {
   ) {}
 
   async load(ctx: SceneContext): Promise<void> {
-    [this.resources, this.musics] = await Promise.all([loadBoardResources(ctx), Promise.all([1, 2, 3].map((n) => ctx.resources.voc(musicName(n))))]);
+    [this.resources, this.musics] = await Promise.all([loadBoardResources(ctx), Promise.all([1, 2, 3].map((n) => ctx.resources.sound(musicName(n))))]);
   }
 
   enter(ctx: SceneContext): void {
@@ -443,8 +443,9 @@ export class GameScene implements Scene {
     if (result?.kind === "victory") yield* this.grandSchtroumpf(ctx, { kind: "victory", winner: result.winner }, true);
     else if (result?.kind === "timeout") yield* this.grandSchtroumpf(ctx, { kind: "timeout", video: result.video }, true);
     // `21ee:1c92` : l'heure de fin sert au verrou parental (pause entre deux parties).
-    ctx.options.lastGameMinutes = Math.floor(ctx.host.unixSeconds() / 60);
-    saveOptions(ctx.host.storage, ctx.options);
+    const options = parentOptions(ctx);
+    options.lastGameMinutes = Math.floor(ctx.host.unixSeconds() / 60);
+    saveOptions(ctx.host.storage, options);
     ctx.voice.stop();
     ctx.voice.setMusic(null);
     this.onDone(ctx);

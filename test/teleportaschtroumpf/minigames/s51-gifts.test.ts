@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BorlandRandom } from "../../../src/games/teleportaschtroumpf/engine/rng";
+import { BorlandRandom } from "../../../src/engine/infogrames/rng";
 import { newGame } from "../../../src/games/teleportaschtroumpf/game/rules";
 import {
   GIFT_CLOSED,
@@ -254,11 +254,11 @@ describe.skipIf(!hasOriginalFiles)("S51 Les Cadeaux : issue", () => {
     run.shot("s51-sortie-1");
     expect([...seen].some((s) => s !== null && s >= 11 && s <= 15)).toBe(true);
     await run.until(() => scene.stage === "voice");
-    const voice = await run.ctx.resources.voc("s51c002t.voc");
-    expect(run.host.audio.plays.at(-1)?.sound.samples).toEqual(voice.samples);
+    const voice = await run.ctx.resources.sound("s51c002t.voc");
+    expect(run.host.audio.plays.at(-1)?.sound.data).toEqual(voice.data);
     run.shot("s51-voix");
-    const tada = await run.ctx.resources.voc("s29a002b.voc");
-    expect(run.host.audio.effects.some((p) => p.sound.samples === tada.samples || p.sound.samples.length === tada.samples.length)).toBe(true);
+    const tada = await run.ctx.resources.sound("s29a002b.voc");
+    expect(run.host.audio.effects.some((p) => p.sound.data === tada.data || p.sound.sampleCount === tada.sampleCount)).toBe(true);
     const outcome = await run.finish();
     expect(outcome).toEqual({ kind: "points", points: 3 });
     const before = run.game.player.points;
@@ -270,8 +270,8 @@ describe.skipIf(!hasOriginalFiles)("S51 Les Cadeaux : issue", () => {
     const run = await launch({ audio: true });
     await stop(run);
     await run.until(() => (run.scene as GiftsScene).stage === "voice");
-    const voice = await run.ctx.resources.voc("s51c001t.voc");
-    expect(run.host.audio.plays.at(-1)?.sound.samples).toEqual(voice.samples);
+    const voice = await run.ctx.resources.sound("s51c001t.voc");
+    expect(run.host.audio.plays.at(-1)?.sound.data).toEqual(voice.data);
     expect(await run.finish()).toEqual({ kind: "points", points: 0 });
   }, 120_000);
 
@@ -325,8 +325,8 @@ describe.skipIf(!hasOriginalFiles)("S51 Les Cadeaux : issue", () => {
     run.shot("s51-piege-video-2");
     await run.until(() => scene.stage === "voice", 60_000);
     run.shot("s51-piege-voix");
-    const voices = await Promise.all(["s51b001t.voc", "s51b002t.voc"].map((n) => run.ctx.resources.voc(n)));
-    expect(voices.map((v) => v.samples)).toContainEqual(run.host.audio.plays.at(-1)?.sound.samples);
+    const voices = await Promise.all(["s51b001t.voc", "s51b002t.voc"].map((n) => run.ctx.resources.sound(n)));
+    expect(voices.map((v) => v.data)).toContainEqual(run.host.audio.plays.at(-1)?.sound.data);
     const outcome = await run.finish();
     expect(outcome).toEqual({ kind: "points", points: 0 });
     const before = run.game.player.points;
@@ -342,8 +342,8 @@ describe.skipIf(!hasOriginalFiles)("S51 Les Cadeaux : issue", () => {
     await run.run(500);
     await run.tap("Escape", 120);
     await run.until(() => scene.stage === "voice", 10_000);
-    const voices = await Promise.all(["s51b003t.voc", "s51b004t.voc"].map((n) => run.ctx.resources.voc(n)));
-    expect(voices.map((v) => v.samples)).toContainEqual(run.host.audio.plays.at(-1)?.sound.samples);
+    const voices = await Promise.all(["s51b003t.voc", "s51b004t.voc"].map((n) => run.ctx.resources.sound(n)));
+    expect(voices.map((v) => v.data)).toContainEqual(run.host.audio.plays.at(-1)?.sound.data);
     expect(await run.finish()).toEqual({ kind: "points", points: 0 });
   }, 180_000);
 

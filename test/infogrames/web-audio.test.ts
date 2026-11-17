@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebAudioBackend } from "../../src/engine/infogrames/audio/web-audio";
-import { pcmSound, type Sound } from "../../src/engine/infogrames/audio/sound";
+import { pcmSound, soundFrom, type Sound } from "../../src/engine/infogrames/audio/sound";
 
 /** Nœud audio minimal : enregistre ses connexions. */
 class FakeNode {
@@ -169,6 +169,22 @@ describe("WebAudioBackend : sons MP3", () => {
     expect(backend.playing).toBe(true);
     ctx.currentTime = 5;
     expect(backend.position).toBe(2); // bornée à la durée d'origine, pas à celle du tampon décodé
+  });
+
+  it("un son repris en cours de route (soundFrom) démarre à l'échantillon sauté et dure ce qui reste", async () => {
+    const backend = new WebAudioBackend();
+    const sound = mp3();
+    await backend.prepare(sound);
+    backend.unlock();
+    const resumed = soundFrom(sound, 9434);
+    expect(resumed).toMatchObject({ format: "mp3", sampleCount: 37_736 - 9434, skipSamples: 9434 });
+    expect(resumed.data).toBe(sound.data);
+    backend.play(resumed, false);
+    expect(FakeContext.last.sources[0].startArgs).toEqual([0, 0.5, 1.5]);
+    // PCM : une vue sur la fin des échantillons, sans rien à sauter.
+    const pcm = soundFrom(pcmSound(Uint8Array.of(1, 2, 3, 4), 4000), 3);
+    expect([[...pcm.data], pcm.sampleCount, pcm.skipSamples]).toEqual([[4], 1, undefined]);
+    expect(soundFrom(sound, 0)).toBe(sound);
   });
 
   it("en boucle, le tour dure la durée d'origine", async () => {

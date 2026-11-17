@@ -1,5 +1,5 @@
 import type { Hy8, Hy8Animation, Hy8Frame, Hy8Image } from "./data/hy8";
-import { HY8_FLAG_MIRROR_X, HY8_PART_IMAGE, HY8_PART_SUB_SPRITE } from "./data/hy8";
+import { HY8_FLAG_MIRROR_X, HY8_PART_IMAGE, HY8_PART_RECT, HY8_PART_SUB_SPRITE, type Hy8Part } from "./data/hy8";
 
 /** Rectangle d'une image posée (coordonnées relatives à l'ancre du sprite). */
 export interface PlacedImage {
@@ -7,6 +7,41 @@ export interface PlacedImage {
   left: number;
   top: number;
   mirror: boolean;
+  /** Tous les pixels sont écrits, l'index 0 compris (rectangle plein d'une partie `HY8_PART_RECT`). Absent : 0 est transparent. */
+  opaque?: boolean;
+}
+
+/** Images des rectangles pleins déjà construites (une par partie : la taille ne dépend pas du miroir). */
+const rectImages = new WeakMap<Hy8Part, Hy8Image>();
+
+/**
+ * Rectangle plein d'une partie `HY8_PART_RECT` (`2bdb:0774`) : coins = position + points 0 et 1, remis dans l'ordre ;
+ * `2c66:0028` remplit du coin haut-gauche au coin bas-droit compris, et ne dessine rien si le rectangle n'a qu'un pixel
+ * de large ou de haut ; `2c8b:000c` trace ensuite le cadre (s'il y en a un) sur le bord du même rectangle.
+ * En miroir, les x des points sont inversés comme pour les autres parties (hypothèse : aucun rectangle en miroir dans les données).
+ */
+function placeRect(part: Hy8Part, frameMirror: boolean, ox: number, oy: number): PlacedImage | null {
+  const [a, b] = part.points;
+  const rect = part.rect;
+  if (!a || !b || !rect) throw new Error("rectangle HY8 incomplet");
+  const ax = frameMirror ? -a.x : a.x;
+  const bx = frameMirror ? -b.x : b.x;
+  const width = Math.abs(bx - ax) + 1;
+  const height = Math.abs(b.y - a.y) + 1;
+  const filled = width > 1 && height > 1;
+  if (!filled && rect.outline === null) return null;
+  let image = rectImages.get(part);
+  if (!image) {
+    const pixels = new Uint8Array(width * height).fill(rect.fill);
+    if (rect.outline !== null) {
+      pixels.fill(rect.outline, 0, width);
+      pixels.fill(rect.outline, (height - 1) * width);
+      for (let y = 0; y < height; y++) pixels[y * width] = pixels[y * width + width - 1] = rect.outline;
+    }
+    image = { width, height, pixels };
+    rectImages.set(part, image);
+  }
+  return { image, left: ox + Math.min(ax, bx), top: oy + Math.min(a.y, b.y), mirror: false, opaque: true };
 }
 
 /** Bit 0x8000 du mot d'indice d'un sprite / d'une frame : miroir horizontal (`31fe:0481`). */
@@ -34,6 +69,9 @@ export function placeSprite(hy8: Hy8, spriteIndex: number, frameMirror: boolean,
       const image = hy8.images[part.target];
       if (!image) throw new Error(`image ${part.target} absente (${hy8.images.length} images)`);
       placed.push({ image, left: mirror && !image.storedMirrored ? x - image.width : x, top: y - image.height + 1, mirror });
+    } else if (part.kind === HY8_PART_RECT) {
+      const rect = placeRect(part, frameMirror, ox, oy);
+      if (rect) placed.push(rect);
     } else if (part.kind === HY8_PART_SUB_SPRITE) {
       placed.push(...placeSprite(hy8, part.target, frameMirror, x, y, depth + 1));
     }

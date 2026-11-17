@@ -1,7 +1,7 @@
 # Astérix : le défi de César : plan d'implémentation
 
 Jeu : *Astérix : le défi de César* (Infogrames Multimedia, réalisation Bertrand Brocard ; adaptation PC IKOS S.A. ; Philips et Pathé, 1995), **version CD DOS française, voix françaises** (`ASTERIX.EXE` « Version 2.5 », « May 30 1995 », MD5 `0b826e68e191b7c25d4416d2d824681d`), identifiant `asterix`. Source : `archives/asterix/` (non versionnée ; le 7z et l'installeur Inno Setup contiennent les mêmes 1 163 fichiers, octet pour octet).
-Jeu de plateau de 50 cases dans l'esprit du jeu de l'oie : César défie les Gaulois de rapporter un souvenir de chaque province. Six personnages (Astérix, Obélix, Bonemine, Agecanonix, Falbala, Goudurix), réglages de durée (30 à 120) et de nombre d'objets (3 à 9), difficulté par joueur sur deux axes (réflexion, action). Les cases mènent à une quinzaine de mini-jeux d'action, des jeux d'observation, un jeu de pari, un quiz par pays et des jeux d'ambiance hors écran annoncés par Panoramix.
+Jeu de plateau de 54 cases dans l'esprit du jeu de l'oie : César défie les Gaulois de rapporter un souvenir de chaque province. Six personnages (Astérix, Obélix, Bonemine, Agecanonix, Falbala, Goudurix), réglages de durée (30 à 120) et de nombre d'objets (3 à 9), difficulté par joueur sur deux axes (réflexion, action). Les cases mènent à une quinzaine de mini-jeux d'action, des jeux d'observation, un jeu de pari, un quiz par pays et des jeux d'ambiance hors écran annoncés par Panoramix.
 
 Ce document est le brief commun aux sous-agents. Les références font foi dans cet ordre : `formats.md`, `engine.md` (à écrire en vague B), puis ce plan. **Il n'existe aucune implémentation de référence** : la référence de comportement est le désassemblage de `ASTERIX.EXE` (décision de l'utilisatrice du 17/11/2026 : « désassemblage exact »), vérifié au besoin contre l'original sous DOSBox-X.
 
@@ -11,8 +11,11 @@ Ce document est le brief commun aux sous-agents. Les références font foi dans 
   - inventaire des fichiers et des formats (notes : `scratchpad/asterix/inventaire.md`, à reverser dans `formats.md` en vague A) ;
   - comparaison avec `SMURF.EXE` (*Le Téléportaschtroumpf*, déjà porté dans `src/games/teleportaschtroumpf/`) : **même moteur**, Astérix en est l'ancêtre direct (notes : `scratchpad/asterix/comparaison.md`, Ghidra headless dans `scratchpad/asterix/re/`).
 - **Verdict : portage moyen-gros, environ deux tiers de l'effort des Schtroumpfs.** Le socle est déjà écrit ; le poste dominant est le désassemblage d'environ 65 Ko de code de jeu propre à Astérix.
-- **Décisions prises par l'utilisatrice** : portage par désassemblage exact (17/11/2026) ; **D1 à D10 validées le 17/11/2026**, telles que recommandées.
-- Vague A (formats et extraction) et premier temps de la vague B (déplacement pur du moteur commun) lancés en parallèle le 17/11/2026.
+- **Décisions prises par l'utilisatrice** : portage par désassemblage exact (17/11/2026) ; **D1 à D13 validées le 17/11/2026**, telles que recommandées.
+- **Vague A faite** (17/11/2026) : `scripts/asterix-extract.sh`, `original/asterix/` (56 Mo : sons en MP3 + `audio.json`, vidéos MUX et MUK en conteneur `.vid` sans perte, LZMA), lecteurs `src/games/asterix/data/`, `src/data/lzma.ts`, `docs/asterix/formats.md`, `files.md`, tests `test/asterix/`.
+- **Vague B, temps 1 et 2 faits** (D1) : moteur commun `src/engine/infogrames/`, Schtroumpfs rebranchés (résolveur de chemins injecté dans l'hôte, `GameConfig` pour les bips, options parents sorties du contexte). **D3 faite** : sons des Schtroumpfs en MP3 + `audio.json` (−66 Mo), API commune « son = MP3 + durée exacte » (`audio/sound.ts`, `data/audio-index.ts`). Commit `61d6df5c`.
+- **Vague B, temps 3 fait** (D1) : ajouts d'Astérix au moteur commun. Conteneur `.vid` et MCC déplacés dans `src/engine/infogrames/data/` ; `video.ts` lit MUX et `.vid` par une même interface (`VideoSource`), son MP3 à part, marqueur `08`, trois compositions ; HY8 type 5 (rectangle plein) ; blocs `05` vides ignorés ; résolveur de chemins `src/games/asterix/engine/paths.ts` ; visionneuse `src/games/asterix/ui/asset-viewer.html` sur des panneaux communs (`src/engine/infogrames/ui/panels.ts`).
+- **Vague C faite** (17/11/2026) : `scripts/asterix/re/` (Ghidra headless), `docs/asterix/engine.md` (règles du plateau, tour, cases, quiz, moteur), `re-index.md` (504 fonctions, table des 15 mini-jeux). Les 14 segments de mini-jeux ne sont pas lus (vague E).
 
 ## Ce que l'étude a établi
 
@@ -47,6 +50,9 @@ Ce document est le brief commun aux sous-agents. Les références font foi dans 
 | D8 | **Jeux d'ambiance hors écran** | Portés tels quels : le jeu annonce l'épreuve et les joueurs désignent eux-mêmes le gagnant. | Fidèle à l'original ; l'aide du site explique le principe. |
 | D9 | **Menu de débogage, triche, langues** | Non portés : le menu `FRANCAIS/ALLEMAND/…`, `CheatMode`, `JOYSTICK` est caché dans l'original et seules les données françaises existent. La langue est fixée au français. | Documenté dans `engine.md`. |
 | D10 | **Banc de comparaison** | **DOSBox-X** (déjà installé) avec un dossier de jeu dans le scratchpad : captures et mesures pour les cas ambigus (vitesses, probabilités, difficulté des mini-jeux). | Comme pour l'enveloppe de GK1 : sondes ciblées, jamais de modification du dépôt. |
+| D11 | **Clic et toucher directs** | **Ajoutés**, comme pour les Schtroumpfs : un clic ou un toucher sur un élément (bouton, case de réglage, réponse du quiz, dé) équivaut à y aller aux flèches puis à valider. Écart documenté. | L'exe DOS ne teste aucune position : tout passe par les directions et la validation (`engine.md`). Le manuel Mac décrit le clic direct. Sans lui, le jeu est injouable au doigt. |
+| D12 | **Aide au clic droit** | **Muette, comme l'original** : les 24 voix de `MDF/45` restent inutilisées. | Le code existe mais sort en mode 2 (`135a:02ac`) : l'aide n'a jamais été audible dans cette version. |
+| D13 | **Mémoires gardées entre deux parties** | **Conservées tant que la page reste ouverte**, comme l'original le fait entre deux parties d'une même séance (`DS:7592`, `7182`, `2aa6`…) ; remises à zéro au rechargement. | Fidèle, sans effet visible à documenter de plus. |
 
 ## Vagues
 

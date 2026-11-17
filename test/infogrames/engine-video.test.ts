@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MuxDecoder } from "../../src/engine/infogrames/data/mux";
 import { Engine } from "../../src/engine/infogrames/engine";
 import { Palette } from "../../src/engine/infogrames/palette";
-import { VideoBackdrop, VideoPlayer, VideoScene, scanMux } from "../../src/engine/infogrames/video";
+import { VideoBackdrop, VideoPlayer, VideoScene, muxClip, scanMux } from "../../src/engine/infogrames/video";
 import { TestHost, runFor, runUntil } from "../teleportaschtroumpf/engine-test-host";
 import { hasOriginalFiles, readData } from "../teleportaschtroumpf/helpers";
 
@@ -43,7 +43,7 @@ describe.skipIf(!hasOriginalFiles)("lecture MUX", () => {
 
   it("VideoPlayer : image = floor(temps × cadence), décodage dans l'ordre", () => {
     const bytes = new Uint8Array(readData(LOGO));
-    const player = new VideoPlayer(bytes);
+    const player = new VideoPlayer(muxClip(bytes));
     expect(player.fps).toBeCloseTo(7, 1);
     expect(player.sampleRate).toBe(19230);
     expect(player.frameCount).toBe(80);
@@ -174,8 +174,8 @@ describe.skipIf(!hasOriginalFiles)("lecture MUX", () => {
     backdrop.capture(ctx);
     expect(backdrop.pixels.every((p) => p === 0x85)).toBe(true);
     const bytes = new Uint8Array(readData("S39/S39A/S39A1.MUX"));
-    const plain = new VideoPlayer(bytes);
-    const overlay = new VideoPlayer(bytes, backdrop);
+    const plain = new VideoPlayer(muxClip(bytes));
+    const overlay = new VideoPlayer(muxClip(bytes), backdrop);
     plain.seek(plain.frameCount - 1);
     overlay.seek(overlay.frameCount - 1);
     // Sans fond, les images de l'oiseau s'accumulent ; avec, seule la dernière recouvre le fond.

@@ -13,11 +13,11 @@ Tout est little-endian. Les images font toujours 320 × 200 en 8 bits indexés (
 
 | Origine | Nb | Rôle | Versionné | Lecteur |
 |---|---:|---|---|---|
-| `.MUX` | 117 | vidéos et calques animés, avec son | `.MUX.vid` + `.MUX.mp3` | `src/games/asterix/data/video.ts` |
-| `.MUK` | 31 | animations sans son | `.MUK.vid` | `video.ts` (structure d'origine : `muk.ts`) |
+| `.MUX` | 117 | vidéos et calques animés, avec son | `.MUX.vid` + `.MUX.mp3` | moteur commun : `data/vid.ts`, lu par `video.ts` |
+| `.MUK` | 31 | animations sans son | `.MUK.vid` | moteur commun : `data/vid.ts` (structure d'origine : `src/games/asterix/data/muk.ts`) |
 | `.VOC` | 736 | voix, musiques, bruitages | `.VOC.mp3` + `audio.json` | `audio-index.ts` |
 | `.MCG` | 106 | images brutes | tel quel | moteur commun (`src/engine/infogrames/`) |
-| `.MCC` | 80 | images compressées par séries | tel quel | `mcc.ts` |
+| `.MCC` | 80 | images compressées par séries | tel quel | moteur commun : `data/mcc.ts` |
 | `.HY8` | 30 | banques de sprites | tel quel | moteur commun |
 | `.PFN` | 4 | polices | tel quel | moteur commun |
 | `.PAL` | 1 | palette | tel quel | moteur commun |
@@ -115,7 +115,7 @@ Lecteur : `parseMcc` rend la palette, les pixels et le débordement ; il refuse 
 
 ### HY8, PFN, PAL
 
-- **HY8** (30 fichiers) : format de `docs/teleportaschtroumpf/hy8.md` ; dessin `2b57:01d2`, sprite composé `2bdb:0477` (100 % identiques). En-tête de six u32, le premier valant `0x18` et le dernier la taille du fichier [vérifié, 30/30]. `32/M32SA000.HY8` (sprite 60) utilise une **partie de type 5** que le lecteur des Schtroumpfs ne gère pas encore ; le code qui la traite est dans la table de sauts de `2bdb:0477` [lu, à porter dans le moteur commun].
+- **HY8** (30 fichiers) : format de `docs/teleportaschtroumpf/hy8.md` ; dessin `2b57:01d2`, sprite composé `2bdb:0477` (100 % identiques). En-tête de six u32, le premier valant `0x18` et le dernier la taille du fichier [vérifié, 30/30]. `32/M32SA000.HY8` (sprite 60) utilise une **partie de type 5** : un rectangle plein, routine `2bdb:0774` de la table de sauts de `2bdb:0477` (= `31fe:077e` de SMURF) [lu]. Les deux points de la partie, ajoutés à la position du sprite, sont deux coins opposés (compris) ; l'octet 3 est la couleur de remplissage (`2c66:0028`, qui ne dessine rien si le rectangle n'a qu'un pixel de large ou de haut), l'octet 2 la couleur d'un cadre tracé par-dessus (`2c8b:000c`), `0xFF` = pas de cadre. Ici : (0, 0)-(59, 99), couleur 0, sans cadre, soit un cache noir opaque de 60 × 100. `23/M23S.HY8` est le seul fichier à utiliser des **sous-sprites** (type 0, 26 parties) [vérifié].
 - **PFN** (4 fichiers) : format de `docs/teleportaschtroumpf/pfn.md`, segment `2cd0`. `M52D0` et `M52D3` : hauteur 12, 253 glyphes à partir du code 1 ; `M52D1` et `M52D2` : hauteur 10, 223 glyphes à partir de `0x20` [vérifié par le lecteur des Schtroumpfs pendant l'étude].
 - **PAL** : `27/M27S.PAL`, une palette de 768 octets [vérifié].
 
@@ -154,7 +154,7 @@ Clé : chemin du MP3 ; valeur : `[échantillons, fréquence en Hz]` du PCM d'ori
 
 ### Vidéo : conteneur `.vid`
 
-Écrit par `scripts/asterix/video.py`, lu par `src/games/asterix/data/video.ts`. Un fichier `.vid` est un flux **LZMA « alone »** (`lzma.FORMAT_ALONE` de Python : 13 octets d'en-tête, taille inconnue, marqueur de fin ; `lc = 3`, `lp = 0`, `pb = 2`, dictionnaire de 8 Mio au plus, ramené à la puissance de deux qui couvre le fichier). Décodeur : `src/data/lzma.ts`.
+Écrit par `scripts/asterix/video.py`, lu par `src/engine/infogrames/data/vid.ts` (`VidDecoder`). Un fichier `.vid` est un flux **LZMA « alone »** (`lzma.FORMAT_ALONE` de Python : 13 octets d'en-tête, taille inconnue, marqueur de fin ; `lc = 3`, `lp = 0`, `pb = 2`, dictionnaire de 8 Mio au plus, ramené à la puissance de deux qui couvre le fichier). Décodeur : `src/data/lzma.ts`.
 
 Contenu décompressé :
 
@@ -184,7 +184,7 @@ Puis, pour chaque image : `u8 drapeaux, u16 numéro, u32 échantillons audio lus
 
 - Le **numéro** est la charge utile du bloc `05` d'un MUX, ou le rang de l'image dans un MUK.
 - L'**horodatage** est le cumul des octets de son que le MUX avait fournis avant le bloc `05` de l'image : avec la cadence de l'en-tête et la fréquence, il permet de caler l'image sur l'horloge du son, comme le lecteur d'origine (une image tant que la position du son la dépasse).
-- **Masque** : sans `0x08`, aucun pixel n'est écrit ; avec `0x08` et sans `0x04`, tous le sont. Le masque rend le conteneur équivalent au bloc vidéo d'origine quel que soit le tampon sur lequel on le décode : `VideoDecoder.pixels` donne l'image cumulée (celle du décodeur MUX), `VideoDecoder.compose(fond)` ne recopie que les pixels écrits. Vérifié sur 5 fichiers : la composition sur un fond quelconque égale le décodage du bloc d'origine sur ce fond.
+- **Masque** : sans `0x08`, aucun pixel n'est écrit ; avec `0x08` et sans `0x04`, tous le sont. Le masque rend le conteneur équivalent au bloc vidéo d'origine quel que soit le tampon sur lequel on le décode : `VidDecoder.pixels` donne l'image cumulée (celle du décodeur MUX), `VidDecoder.compose(fond)` ne recopie que les pixels écrits. Vérifié sur 5 fichiers : la composition sur un fond quelconque égale le décodage du bloc d'origine sur ce fond.
 - Rien n'est perdu sauf : la table d'offsets et les tailles de tampons de l'en-tête MUX (inutiles hors DOS), le découpage du son en blocs (remplacé par l'horodatage), les blocs `05` vides de `07/M07A.MUX`, et le codage d'origine des images (remplacé par leur résultat).
 
 **Sans perte, vérifié** : le script relit chaque conteneur et compare ses images à celles qu'il vient de décoder (SHA-1). Indépendamment, `test/asterix/data/video.test.ts` compare les images de 15 conteneurs aux SHA-1 obtenus sur les fichiers d'origine par le `MuxDecoder` TypeScript des Schtroumpfs ; pendant la mise au point, les 116 MUX que ce décodeur lit ont été comparés (116/116 identiques).
@@ -195,14 +195,20 @@ Puis, pour chaque image : `u8 drapeaux, u16 numéro, u32 échantillons audio lus
 
 | Fichier | Particularité | Traitement |
 |---|---|---|
-| `07/M07A.MUX` | 144 blocs `05` vides (taille 0) dans la dernière image (n° 356), entre son bloc vidéo et son vrai bloc `05` ; le fichier finit bien par un bloc `04`. Le lecteur des Schtroumpfs s'arrête sur le premier (« fin d'image sans numéro »). | Blocs vides ignorés : 357 images. Comportement du lecteur d'origine [supposé], à lire dans `1948:04cc`. |
+| `07/M07A.MUX` | 144 blocs `05` vides (taille 0) dans la dernière image (n° 356), entre son bloc vidéo et son vrai bloc `05` ; le fichier finit bien par un bloc `04`. | Blocs vides ignorés : 357 images, dans le conteneur comme dans `MuxDecoder` (moteur commun). Conforme au lecteur d'origine [probable, `engine.md` §4.5]. |
 | `36/M36A.MUX` | 19 blocs de son après la dernière image. | Son gardé en entier dans le MP3 ; `audioSamples` dépasse l'horodatage de la dernière image. |
 | `23/M23AA.MUX` | Pas de son (fréquence 0). | Pas de MP3, pas d'entrée dans `audio.json`. |
 | `44/M44AB.MUX` et 57 autres | Images sans bloc vidéo. | Image sans drapeau `0x08`. |
 | `34/M34AG.MUK` | Première image partielle. | Masque ; à composer sur l'écran du module 34. |
 | `49/M49DA005.MCC` | Séries de 64 014 pixels. | Dernière série coupée, comme `1481:01ff`. |
 | MCC de 1 280 octets | Aplats. | Rien de particulier. |
-| `32/M32SA000.HY8` | Partie de sprite de type 5. | À ajouter au lecteur HY8 du moteur commun. |
+| `32/M32SA000.HY8` | Partie de sprite de type 5 (sprite 60). | Rectangle plein (`2bdb:0774`) : géré par le lecteur HY8 du moteur commun. |
+
+## Lecture par le moteur commun
+
+- `Resources.video("m06ab.mux")` (ou `"m34ag.muk"`) lit le conteneur `<nom>.vid` et, s'il existe, le son `<nom>.mp3` avec sa durée exacte (`audio.json`) ; `Resources.picture("x.mcc")` décode un MCC comme un MCG. Chemins : `src/games/asterix/engine/paths.ts` (`13ef:011b`).
+- `VideoPlayer` cale l'image sur la position du son (`floor(temps × cadence)`) comme pour les MUX des Schtroumpfs, expose `marker` (la globale `DS:6425` : `atoi` du dernier marqueur `08`, ou dernière valeur de type 0 d'un MUK) et les trois compositions d'`engine.md` §4.6 : plein écran, surimpression (`VideoBackdrop`), rappel d'image (`VideoSceneOptions.draw`, `VideoPlayer.compose`, `keepPalette` pour `0x4`).
+- Constaté dans la visionneuse (`src/games/asterix/ui/asset-viewer.html`) : le fond magenta ou noir d'un calque n'est écrit que par sa première image ; les suivantes n'écrivent que le personnage, qui se pose donc sur le décor sans couleur clé (`06/M06AC` sur `M06DC002`, `42/M42AD` en surimpression). `34/M34AG.MUK` n'a pas de palette : il se lit avec celle de `M34DA000.MCC`.
 
 ## Ce qui reste à établir (vague C)
 

@@ -20,17 +20,17 @@ Le moteur générique (formats, tampons, palette, entrées, scènes, son, hôte 
 | `engine/menu.ts` | `Menu` : liste d'éléments (clavier, validation, voix d'aide, bip, rebouclage optionnel), surbrillance par palette ou sprite. |
 | `infogrames/input.ts` | `Input` : actions abstraites, « tenu » / « vient d'être appuyé », position de la souris 320×200 (pointeur libre seulement). |
 | `engine/options.ts` | Options parents (`localStorage` via `host.storage`, lues par `parentOptions(ctx)`), verrou parental. |
-| `infogrames/resources.ts` | `Resources` : MCG / HY8 / PFN décodés et gardés, sons (`sound()` : MP3 + index `audio.json`), MUX non gardés, `prefetch`. |
+| `infogrames/resources.ts` | `Resources` : MCG / MCC / HY8 / PFN décodés et gardés, sons (`sound()` : MP3 + index `audio.json`), vidéos (`video()` : MUX d'origine ou conteneur `.vid`, non gardées), `prefetch`. |
 | `engine/paths.ts` | Résolveur de chemins du jeu, donné aux hôtes : `resolveGameFile` (nom d'origine → chemin `DATA/…`) ; `voiceName`, `musicName`. |
-| `infogrames/video.ts` | `VideoPlayer` (MUX synchronisé sur le son) et `VideoScene` générique. |
+| `infogrames/video.ts` | `VideoSource` / `VideoClip` (images et son d'une vidéo, MUX d'origine ou conteneur `.vid`), `VideoPlayer` (synchronisé sur le son, marqueur, trois compositions) et `VideoScene` générique. |
 | `infogrames/picture.ts` | `PictureScene` (image fixe, fondus, attente) et `WaitScene`. |
 | `infogrames/audio/sound.ts`, `backend.ts`, `voice.ts`, `web-audio.ts` | `Sound` (données + longueur d'origine), `AudioBackend` abstrait, `VoiceChannel` (voie + musique + bips + canal de bruitages), implémentation Web Audio (deux sources sur le même `GainNode`, somme écrêtée à la sortie). |
 | `scenes/boot.ts` | Séquence de démarrage. |
 | `scenes/flow.ts`, `scenes/s07-menu.ts`, `scenes/sNN-*.ts` | Flux entre écrans, menu principal S07 et les écrans (voir « Menus et flux »). |
 | `game/` | Logique pure de la partie et du plateau (`Game`, tables), sans rendu (`rules.md`). |
 | `scenes/game.ts`, `scenes/s01-board.ts`, `scenes/board/` | Partie (`28a3:00ad`) et plateau S01 (`291e:0401`) ; écrans empilés `s02-map.ts`, `events.ts`, `grand-schtroumpf.ts` et `minigames.ts` + `minigames/` (voir « Partie et plateau » et « Écrire un mini-jeu »). |
-| `infogrames/ui/browser-host.ts`, `infogrames/ui/render.ts` | `BrowserHost` (fichiers par `fetch` avec le résolveur du jeu, canvas, Web Audio, clavier, souris, doigts) ; dessin d'images indexées pour la visionneuse. |
-| `infogrames/data/` | Lecteurs `mux.ts`, `hy8.ts`, `mcg.ts`, `font.ts` (PFN), `audio-index.ts` (`audio.json`) ; `voc.ts` (Creative Voice) ne sert plus au jeu, dont les VOC sont versionnés en MP3. Ceux propres au jeu restent dans `data/` (`mut.ts`, `text.ts`, `files.ts`). |
+| `infogrames/ui/browser-host.ts`, `infogrames/ui/render.ts`, `infogrames/ui/panels.ts` | `BrowserHost` (fichiers par `fetch` avec le résolveur du jeu, canvas, Web Audio, clavier, souris, doigts) ; dessin d'images indexées et panneaux communs des visionneuses (images, sprites, vidéos, sons, polices). |
+| `infogrames/data/` | Lecteurs `mux.ts`, `vid.ts` (conteneur vidéo sans perte, Astérix), `hy8.ts`, `mcg.ts`, `mcc.ts` (Astérix), `font.ts` (PFN), `audio-index.ts` (`audio.json`) ; `voc.ts` (Creative Voice) ne sert plus au jeu, dont les VOC sont versionnés en MP3. Ceux propres au jeu restent dans `data/` (`mut.ts`, `text.ts`, `files.ts`). |
 | `ui/app.ts`, `ui/dev.html`, `ui/dev.ts`, `ui/style.css` | Montage du jeu dans la page, canvas à l'échelle entière, boucle `requestAnimationFrame`, page de dev. |
 | `scenes/save.ts` | Sauvegarde de la partie en cours (voir « Reprise d'une partie interrompue »). |
 | `index.ts` | `GameDefinition` `teleportaschtroumpf`. |
@@ -154,13 +154,17 @@ Deux canaux, qui passent par le même volume (`ctx.voice`, `src/engine/infograme
 
 `VideoScene({ file: "s06a.mux", skippable, fadeOutAtEnd, onEnd })`. L'image affichée est `floor(temps × cadence de l'en-tête)`, avec `temps` = position audio de la voie (son 8 bits non signé à la fréquence de l'en-tête, lancé sur la voie à l'entrée), ou l'horloge si rien ne sort. Les images sont décodées dans l'ordre (codage inter). La fin attend la dernière image **et** la fin du son. Échap ou `validate` passent la vidéo si `skippable` (défaut oui ; le titre S05 est non passable). La palette de la vidéo est chargée (entrée 0 noire), la musique est retenue pendant la lecture.
 
+Le fichier est demandé par son nom d'origine à `ctx.resources.video(name)`, qui rend un `VideoClip` : une source d'images (`VideoSource` : le `.MUX` d'origine, ou son conteneur `<nom>.vid` si le jeu le versionne ainsi, comme Astérix) et la piste son entière (`Sound` : PCM des blocs du MUX, ou MP3 `<nom>.mp3` avec la durée exacte d'`audio.json`). Une lecture qui démarre en cours de route (son débloqué après le début) joue `soundFrom(son, échantillon)`.
+
+Compositions (`docs/asterix/engine.md` §4.6) : plein écran par défaut ; `backdrop` (`VideoBackdrop`) pour la surimpression `0x1000` ; `draw(ctx, video)` pour le rappel d'image `0x80`, où la scène compose elle-même (`video.pixels`, `video.compose(cible)` qui ne pose que les pixels codés par l'image courante), avec `keepPalette` pour `0x4`. `VideoPlayer.marker` est la globale des marqueurs `08` (`atoi` du dernier lu) ; `onFrame` reçoit toujours les marqueurs bruts.
+
 ## Options parents
 
 `parentOptions(ctx)` (`engine/options.ts`, `ParentOptions` : `durationIndex` 0..3, `pauseIndex` 0..4, `messageIndex` 0..8, `lastGameMinutes`) est lu dans le stockage au premier appel, puis partagé par toutes les scènes du moteur (le moteur commun n'en sait rien : `SceneContext` n'a pas de champ `options`). Pour modifier : changer les champs puis `saveOptions(ctx.host.storage, parentOptions(ctx))`. `gameSeconds(o)` = `(durationIndex + 1) × 1800`, `pauseMinutes(o)` = `pauseIndex × 30`, `isLocked(o, nowMinutes)` avec `nowMinutes = Math.floor(ctx.host.unixSeconds() / 60)`. Clé de stockage `retrovibe:teleportaschtroumpf:options`. Pas de sauvegarde de partie.
 
 ## Ressources
 
-`ctx.resources.mcg(name)`, `.hy8`, `.pfn`, `.sound`, `.bytes(name)` : par nom d'origine en minuscules (`s22a001d.mcg`) ou chemin `DATA/…` ; décodés une fois et gardés. Charger dans `Scene.load`, pas dans `update`. `prefetch(...names)` lance des lectures en tâche de fond (utile pour enchaîner sans attendre). Les `.mux` ne sont pas gardés. `ctx.resources.clear()` libère tout (changement de famille de scènes).
+`ctx.resources.mcg(name)`, `.picture` (MCG ou MCC), `.hy8`, `.pfn`, `.sound`, `.video`, `.bytes(name)` : par nom d'origine en minuscules (`s22a001d.mcg`) ou chemin `DATA/…` ; décodés une fois et gardés. Charger dans `Scene.load`, pas dans `update`. `prefetch(...names)` lance des lectures en tâche de fond (utile pour enchaîner sans attendre). Les vidéos (`.mux`, `.muk`, `.vid`) ne sont pas gardées. `ctx.resources.clear()` libère tout (changement de famille de scènes).
 
 Résolution (§9.11) : `sNNxXXX.ext` → `DATA/SNN/SNNx/SNNXXX.EXT` s'il est dans le manifeste (casse indifférente : un son est rangé en `SNNXXX.VOC.mp3`), sinon recherche par nom (`GameFiles.resolve`). `host.filePath(name)` donne ce chemin, qui est la clé de `audio.json`. Un nom présent dans plusieurs dossiers (`S36A000S.HY8` dans `S36A` et `S36E`) : passer le chemin complet `DATA/S36/S36E/S36A000S.HY8`.
 

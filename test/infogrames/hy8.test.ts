@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { HY8_PART_IMAGE, parseHy8 } from "../../src/engine/infogrames/data/hy8";
+import { HY8_PART_IMAGE, HY8_PART_RECT, parseHy8 } from "../../src/engine/infogrames/data/hy8";
+import { Surface } from "../../src/engine/infogrames/surface";
 import { placeSprite } from "../../src/engine/infogrames/sprites";
 import { hasOriginalFiles, listData, readData, withExtension } from "../teleportaschtroumpf/helpers";
 
@@ -47,6 +48,42 @@ describe("HY8 : données invalides", () => {
     bytes.set([0x00, 0x80], 36 + 4); // mot d'attributs de l'image, juste avant elle
     const mirrored = parseHy8(bytes).images[0].pixels;
     expect([...mirrored]).toEqual([...plain].reverse());
+  });
+
+  it("partie de type 5 : rectangle plein entre deux points, couleur 0 comprise, cadre facultatif", () => {
+    // La partie du sprite minimal (4 octets + 1 point) est remplacée par deux sprites à rectangle de deux points.
+    const rect = (outline: number, fill: number, points: number[]): Uint8Array => {
+      const base = minimal();
+      const bytes = new Uint8Array(base.length + 2);
+      const view = new DataView(bytes.buffer);
+      bytes.set(base.subarray(0, 28));
+      bytes.set([0x10, 0x01, HY8_PART_RECT, 0x02, outline, fill, ...points], 28);
+      bytes.set(base.subarray(36), 38);
+      [24, 38, base.length + 2 - 18, base.length + 2 - 12, 0, base.length + 2].forEach((v, i) => view.setUint32(i * 4, v, true));
+      return bytes;
+    };
+    const plain = parseHy8(rect(0xff, 0, [3, 4, 0, -2]));
+    expect(plain.sprites[0].parts).toEqual([
+      { kind: HY8_PART_RECT, target: 0, flags: 0, points: [{ x: 3, y: 4 }, { x: 0, y: -2 }], rect: { fill: 0, outline: null } },
+    ]);
+    // Coins remis dans l'ordre, compris tous les deux : 4 × 7 pixels à partir de (0, -2), opaques.
+    const [placed] = placeSprite(plain, 0, false);
+    expect(placed).toMatchObject({ left: 0, top: -2, mirror: false, opaque: true });
+    expect([placed.image.width, placed.image.height]).toEqual([4, 7]);
+    expect(placed.image.pixels.every((p) => p === 0)).toBe(true);
+    const surface = new Surface();
+    surface.work.fill(9);
+    surface.drawSprite(plain, 0, 10, 20);
+    expect(surface.work[20 * 320 + 10]).toBe(0);
+    expect(surface.work[(20 - 2) * 320 + 13]).toBe(0);
+    expect(surface.work[(20 + 4) * 320 + 13]).toBe(0);
+    expect(surface.work.filter((p) => p === 0).length).toBe(28);
+
+    const framed = placeSprite(parseHy8(rect(7, 2, [0, 0, 3, 2])), 0, false)[0];
+    expect([...framed.image.pixels]).toEqual([7, 7, 7, 7, 7, 2, 2, 7, 7, 7, 7, 7]);
+    // Un seul pixel de large : `2c66:0028` ne remplit rien ; sans cadre, rien n'est dessiné.
+    expect(placeSprite(parseHy8(rect(0xff, 2, [5, 0, 5, 9])), 0, false)).toEqual([]);
+    expect(() => parseHy8(rect(0xff, 0, [3, 4, 0, -2]).fill(1, 31, 32))).toThrow(/rectangle à 1 point/);
   });
 
   it("refuse un fichier plus court que l'en-tête", () => {

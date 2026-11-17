@@ -32,13 +32,13 @@ export function paintPlaced(canvas: HTMLCanvasElement, placed: PlacedImage[], bo
   const ctx = canvas.getContext("2d")!;
   const data = ctx.createImageData(width, height);
   const out = new Uint32Array(data.data.buffer);
-  for (const { image, left, top, mirror } of placed) {
+  for (const { image, left, top, mirror, opaque } of placed) {
     for (let y = 0; y < image.height; y++) {
       const dy = top + y - bounds.minY;
       if (dy < 0 || dy >= height) continue;
       for (let x = 0; x < image.width; x++) {
         const value = image.pixels[y * image.width + (mirror ? image.width - 1 - x : x)];
-        if (value === 0) continue;
+        if (value === 0 && !opaque) continue;
         const dx = left + x - bounds.minX;
         if (dx >= 0 && dx < width) out[dy * width + dx] = table[value];
       }

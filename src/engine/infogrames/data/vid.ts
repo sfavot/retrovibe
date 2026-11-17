@@ -1,8 +1,10 @@
 import { LzmaDecoder } from "../../../data/lzma";
 
 /**
- * Lecteur des vidéos `.vid` d'Astérix : le conteneur maison qui remplace les `.MUX` et les `.MUK` d'origine, réencodés
- * sans perte par `scripts/asterix-extract.sh` (voir `docs/asterix/formats.md`).
+ * Lecteur des vidéos `.vid` : le conteneur maison du moteur Infogrames pour des `.MUX` (et les `.MUK` d'Astérix)
+ * réencodés sans perte, bien plus légers que les fichiers d'origine. Seul Astérix en a aujourd'hui
+ * (`scripts/asterix-extract.sh`, `scripts/asterix/video.py` ; format : `docs/asterix/formats.md`) ; le
+ * Téléportaschtroumpf garde ses MUX. `video.ts` lit les deux par la même interface (`VideoSource`).
  *
  * Le fichier est un flux LZMA « alone » ; décompressé (little-endian) :
  *  - en-tête de 24 octets : `"AVID"`, u16 version, u8 origine (0 = MUX, 1 = MUK), u8 0, u16 largeur, u16 hauteur,
@@ -33,7 +35,7 @@ const FLAG_VALUES = 0x20;
 const FLAG_FIELD = 0x40;
 const KNOWN_FLAGS = 0x7f;
 
-export interface VideoHeader {
+export interface VidHeader {
   /** Format d'origine du fichier. */
   source: "mux" | "muk";
   width: number;
@@ -49,7 +51,7 @@ export interface VideoHeader {
   frameCount: number;
 }
 
-export interface VideoFrame {
+export interface VidFrame {
   /** Numéro de l'image : celui du bloc de fin d'image du MUX, ou le rang de l'image dans le MUK. */
   index: number;
   /** Échantillons audio que le fichier d'origine avait fournis avant la fin de cette image (horodatage du son). */
@@ -60,7 +62,7 @@ export interface VideoFrame {
   changed: boolean;
   /**
    * Ce que le bloc vidéo d'origine écrivait : rien (pas de bloc), toute l'image, ou une partie (voir
-   * `VideoDecoder.written`).
+   * `VidDecoder.written`).
    */
   coverage: "none" | "all" | "partial";
   /** Charges utiles des marqueurs MUX de type 08 (1 ou 2 octets ASCII). */
@@ -71,8 +73,9 @@ export interface VideoFrame {
   mukField: number | null;
 }
 
-export class VideoDecoder {
-  readonly header: VideoHeader;
+/** Décodeur d'un conteneur `.vid` (`VidDecoder` et non `VideoDecoder`, qui est une classe du navigateur). */
+export class VidDecoder {
+  readonly header: VidHeader;
   /** Image courante (indices de palette), cumulée d'une image à l'autre comme le fait le décodeur MUX. */
   readonly pixels: Uint8Array;
   /** Palette courante, 768 octets RVB 8 bits. */
@@ -131,7 +134,7 @@ export class VideoDecoder {
   }
 
   /** Décode l'image suivante ; `null` après la dernière (la fin du flux est alors contrôlée). */
-  nextFrame(): VideoFrame | null {
+  nextFrame(): VidFrame | null {
     if (this.decoded >= this.header.frameCount) {
       if (!this.lzma.finished && (this.lzma.read(this.scratch, 0, 1) !== 0 || !this.lzma.finished)) {
         throw new Error("Vidéo : octets après la dernière image");
@@ -170,7 +173,7 @@ export class VideoDecoder {
       mukField = (scratch[0] | (scratch[1] << 8) | (scratch[2] << 16) | (scratch[3] << 24)) >>> 0;
     }
 
-    let coverage: VideoFrame["coverage"] = "none";
+    let coverage: VidFrame["coverage"] = "none";
     if (flags & FLAG_MASK) {
       if (!(flags & FLAG_VIDEO)) throw new Error("Vidéo : masque sans bloc vidéo");
       coverage = "partial";

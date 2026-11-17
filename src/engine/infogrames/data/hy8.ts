@@ -24,6 +24,8 @@ export interface Hy8Point {
 /** Type d'une partie de sprite : ce qu'elle dessine (`31fe:0481`, table de sauts en `CS:0x19`). */
 export const HY8_PART_SUB_SPRITE = 0;
 export const HY8_PART_IMAGE = 1;
+/** Rectangle plein (`31fe:077e` = `2bdb:0774` d'Astérix), seule routine vectorielle rencontrée : `32/M32SA000.HY8`. */
+export const HY8_PART_RECT = 5;
 
 /**
  * Mot d'attributs (u16) qui précède chaque image : le blit `317b:01cc` le combine (XOR, `317b:0279`) au mot d'index reçu,
@@ -42,6 +44,9 @@ export const HY8_FLAG_MIRROR_X = 0x80;
  * - `kind` `HY8_PART_SUB_SPRITE` : `target` est l'index d'un autre sprite, dessiné à `points[0]`
  *   (jamais utilisé par les 33 fichiers).
  *
+ * - `kind` `HY8_PART_RECT` : rectangle plein entre `points[0]` et `points[1]` (coins compris, relatifs à la position
+ *   du sprite, sans l'ancrage par la ligne du bas des images), décrit par `rect` ; `target` et `flags` valent 0.
+ *
  * `flags` : octet 3 de la partie masqué par `0xf0`, seul `HY8_FLAG_MIRROR_X` (0x80) apparaît.
  * Les 4 bits bas de cet octet sont les bits 8 à 11 de `target`.
  */
@@ -50,6 +55,12 @@ export interface Hy8Part {
   target: number;
   flags: number;
   points: Hy8Point[];
+  /**
+   * Partie `HY8_PART_RECT` seulement. `fill` : octet 3 de la partie, couleur du rectangle plein (`2c66:0028`), écrite
+   * telle quelle, **0 compris** (ce n'est pas un pixel transparent). `outline` : octet 2, couleur du cadre tracé
+   * par-dessus (`2c8b:000c`), `null` s'il vaut 0xff (pas de cadre).
+   */
+  rect?: { fill: number; outline: number | null };
 }
 
 /**
@@ -173,9 +184,10 @@ function readSprite(bytes: Uint8Array, start: number, limit: number, index: numb
     const pointCount = reader.u8();
     const low = reader.u8();
     const high = reader.u8();
-    if (kind !== HY8_PART_SUB_SPRITE && kind !== HY8_PART_IMAGE) {
+    if (kind !== HY8_PART_SUB_SPRITE && kind !== HY8_PART_IMAGE && kind !== HY8_PART_RECT) {
       fail(`sprite ${index} : partie de type ${kind} non gérée`);
     }
+    if (kind === HY8_PART_RECT && pointCount < 2) fail(`sprite ${index} : rectangle à ${pointCount} point(s)`);
     const points: Hy8Point[] = [];
     need(pointCount * (mode === 0x10 ? 2 : 4));
     for (let k = 0; k < pointCount; k++) {
@@ -189,7 +201,8 @@ function readSprite(bytes: Uint8Array, start: number, limit: number, index: numb
         points.push({ x, y });
       }
     }
-    parts.push({ kind, target: low | ((high & 0x0f) << 8), flags: high & 0xf0, points });
+    if (kind === HY8_PART_RECT) parts.push({ kind, target: 0, flags: 0, points, rect: { fill: high, outline: low === 0xff ? null : low } });
+    else parts.push({ kind, target: low | ((high & 0x0f) << 8), flags: high & 0xf0, points });
   }
   return { mode, parts };
 }
@@ -246,6 +259,7 @@ export function parseHy8(bytes: Uint8Array): Hy8 {
   }
   for (const [i, sprite] of sprites.entries()) {
     for (const part of sprite.parts) {
+      if (part.kind === HY8_PART_RECT) continue;
       const count = part.kind === HY8_PART_IMAGE ? images.length : sprites.length;
       if (part.target >= count) fail(`sprite ${i} : cible ${part.target} inexistante`);
     }

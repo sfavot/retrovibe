@@ -1,0 +1,4 @@
+/* Règles des panneaux communs aux visionneuses du moteur Infogrames (`panels.ts`). */
+.glyphs .blank { width: 24px; height: 24px; display: grid; place-items: center; color: #555; }
+.markers { margin: 0; padding-left: 28px; columns: 6; color: #9aa1b2; }
+.markers:empty::before { content: "aucun"; color: #7f8696; margin-left: -28px; }

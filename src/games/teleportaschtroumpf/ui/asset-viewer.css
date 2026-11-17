@@ -1,7 +1,7 @@
 @import "../../../ui/asset-viewer/shell.css";
+@import "../../../engine/infogrames/ui/panels.css";
 
 /* Règles propres au Téléportaschtroumpf. */
 .tiles { display: flex; flex-direction: column; gap: 8px; }
 .tiles figure { margin: 0; }
-.glyphs .blank { width: 24px; height: 24px; display: grid; place-items: center; color: #555; }
 .prc { columns: 8; }

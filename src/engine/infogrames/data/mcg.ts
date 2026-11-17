@@ -7,13 +7,21 @@ export const PALETTE_BYTES = 768;
 const HEADER_BYTES = 2;
 const MCG_BYTES = HEADER_BYTES + PALETTE_BYTES + SCREEN_WIDTH * SCREEN_HEIGHT;
 
+/** Image plein écran, quel que soit son format (`.MCG`, `.MCC`) : ce que le moteur affiche et dont il charge la palette. */
+export interface Picture {
+  /** Palette, 768 octets RVB 8 bits. */
+  palette: Uint8Array;
+  /** 64 000 indices de palette, ligne par ligne. */
+  pixels: Uint8Array;
+}
+
 /**
  * Écran `.MCG` : u16 little-endian d'en-tête, palette RGB 8 bits (pas 6 bits VGA, 768 octets),
  * puis 320x200 pixels 8 bpp ligne par ligne.
  *
  * `palette` et `pixels` sont des vues (`subarray`) sur les octets fournis, pas des copies.
  */
-export interface Mcg {
+export interface Mcg extends Picture {
   /**
    * En-tête lu en u16 little-endian : 0x0000 (107 fichiers), 0x00ff (octets `ff 00`, 10 fichiers)
    * ou 0xff00 (octets `00 ff`, S38A001D.MCG seul).

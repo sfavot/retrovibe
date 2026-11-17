@@ -79,16 +79,20 @@ export class WebAudioBackend implements AudioBackend {
     this.buffers.set(data, await this.decoder.decodeAudioData(copy));
   }
 
-  /** Tampon du son et durée à jouer (s) ; `null` si le son est vide ou si c'est un MP3 qui n'a pas été préparé. */
-  private playable(ctx: AudioContext, sound: Sound): { buffer: AudioBuffer; duration: number } | null {
+  /**
+   * Tampon du son, début (s, non nul pour un son repris en cours de route : `Sound.skipSamples`) et durée à jouer (s) ;
+   * `null` si le son est vide ou si c'est un MP3 qui n'a pas été préparé.
+   */
+  private playable(ctx: AudioContext, sound: Sound): { buffer: AudioBuffer; offset: number; duration: number } | null {
     if (sound.sampleCount === 0) return null;
     let buffer = this.buffers.get(sound.data);
-    if (sound.format === "mp3") return buffer ? { buffer, duration: soundDuration(sound) } : null;
+    const offset = (sound.skipSamples ?? 0) / sound.sampleRate;
+    if (sound.format === "mp3") return buffer ? { buffer, offset, duration: soundDuration(sound) } : null;
     if (!buffer) {
       buffer = createMonoBuffer(ctx, u8ToFloat32(sound.data), sound.sampleRate);
       this.buffers.set(sound.data, buffer);
     }
-    return { buffer, duration: buffer.duration };
+    return { buffer, offset, duration: buffer.duration - offset };
   }
 
   play(sound: Sound, loop: boolean): void {
@@ -105,10 +109,11 @@ export class WebAudioBackend implements AudioBackend {
     };
     if (loop) {
       source.loop = true;
-      source.loopEnd = ready.duration;
-      source.start();
+      source.loopStart = ready.offset;
+      source.loopEnd = ready.offset + ready.duration;
+      source.start(0, ready.offset);
     } else {
-      source.start(0, 0, ready.duration);
+      source.start(0, ready.offset, ready.duration);
     }
     this.source = source;
     this.startedAt = ctx.currentTime;
@@ -129,7 +134,7 @@ export class WebAudioBackend implements AudioBackend {
     source.onended = () => {
       if (this.effectSource === source) this.effectActive = false;
     };
-    source.start(0, 0, ready.duration);
+    source.start(0, ready.offset, ready.duration);
     this.effectSource = source;
     this.effectActive = true;
   }

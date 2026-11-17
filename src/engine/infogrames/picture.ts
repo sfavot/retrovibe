@@ -1,9 +1,9 @@
-import type { Mcg } from "./data/mcg";
+import type { Picture } from "./data/mcg";
 import { TICKS_PER_SECOND } from "./clock";
 import type { Scene, SceneContext } from "./scene";
 
 export interface PictureSceneOptions {
-  /** Nom d'origine du MCG, par ex. `s05a.mcg`. Sa palette est chargée avec l'image. */
+  /** Nom d'origine de l'image (MCG, ou MCC d'Astérix), par ex. `s05a.mcg`. Sa palette est chargée avec l'image. */
   mcg: string;
   /** Fondu d'entrée depuis le noir. Sans lui, l'image apparaît à pleine luminosité. */
   fadeIn?: boolean;
@@ -28,14 +28,14 @@ export interface PictureSceneOptions {
 export class PictureScene implements Scene {
   readonly step = 1;
 
-  private mcg: Mcg | null = null;
+  private mcg: Picture | null = null;
   private phase: "fadeIn" | "hold" | "fadeOut" | "done" = "hold";
   private holdStart = 0;
 
   constructor(private readonly options: PictureSceneOptions) {}
 
   async load(ctx: SceneContext): Promise<void> {
-    const [mcg] = await Promise.all([ctx.resources.mcg(this.options.mcg), this.options.load?.(ctx)]);
+    const [mcg] = await Promise.all([ctx.resources.picture(this.options.mcg), this.options.load?.(ctx)]);
     this.mcg = mcg;
   }
 

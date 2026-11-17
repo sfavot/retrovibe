@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { VideoDecoder, type VideoFrame } from "../../../src/games/asterix/data/video";
+import { VidDecoder, type VidFrame } from "../../../src/engine/infogrames/data/vid";
 import { fromBase64, hasOriginalFiles, listOriginal, readOriginal, withSuffix } from "../helpers";
 import { VIDEO_VECTOR } from "./lzma-vectors";
 
@@ -9,7 +9,7 @@ const PIXELS = 64000;
 /**
  * SHA-1 de toutes les images décodées à la suite (64 000 octets chacune), et nombre d'images. Valeurs de référence
  * obtenues sur les fichiers d'origine (non versionnés) par un décodeur indépendant du script d'extraction : le
- * `MuxDecoder` TypeScript des Schtroumpfs pour les MUX (même code machine dans les deux jeux), son `MuxVideoDecoder`
+ * `MuxDecoder` TypeScript des Schtroumpfs pour les MUX (même code machine dans les deux jeux), son `MuxVidDecoder`
  * appliqué aux enregistrements pour les MUK. Le conteneur, lui, est produit par le décodeur Python du script : l'égalité
  * prouve que le réencodage est sans perte, pixel à pixel.
  */
@@ -35,7 +35,7 @@ const REFERENCE_MUK: Record<string, { frames: number; sha1: string }> = {
   "MDF/34/M34AG.MUK.vid": { frames: 50, sha1: "8f76833d" },
 };
 
-function hashFrames(decoder: VideoDecoder): { frames: number; sha1: string } {
+function hashFrames(decoder: VidDecoder): { frames: number; sha1: string } {
   const hash = createHash("sha1");
   let frames = 0;
   while (decoder.nextFrame()) {
@@ -45,8 +45,8 @@ function hashFrames(decoder: VideoDecoder): { frames: number; sha1: string } {
   return { frames, sha1: hash.digest("hex") };
 }
 
-describe("VideoDecoder (conteneur de 4 images produit par Python)", () => {
-  const open = () => new VideoDecoder(fromBase64(VIDEO_VECTOR));
+describe("VidDecoder (conteneur de 4 images produit par Python)", () => {
+  const open = () => new VidDecoder(fromBase64(VIDEO_VECTOR));
 
   it("lit l'en-tête", () => {
     expect(open().header).toEqual({
@@ -63,7 +63,7 @@ describe("VideoDecoder (conteneur de 4 images produit par Python)", () => {
 
   it("décode les images, les palettes, les marqueurs et le masque", () => {
     const video = open();
-    const first = video.nextFrame() as VideoFrame;
+    const first = video.nextFrame() as VidFrame;
     expect(first).toEqual({
       index: 0,
       audioEnd: 6860,
@@ -78,12 +78,12 @@ describe("VideoDecoder (conteneur de 4 images produit par Python)", () => {
     expect(video.palette.every((c, i) => c === i % 256)).toBe(true);
     expect(video.written.every((w) => w === 1)).toBe(true);
 
-    const second = video.nextFrame() as VideoFrame;
+    const second = video.nextFrame() as VidFrame;
     expect(second).toMatchObject({ index: 1, audioEnd: 13720, paletteChanged: false, changed: false, coverage: "none" });
     expect(video.written.every((w) => w === 0)).toBe(true);
     expect(video.pixels.every((p, i) => p === i % 251)).toBe(true);
 
-    const third = video.nextFrame() as VideoFrame;
+    const third = video.nextFrame() as VidFrame;
     expect(third).toMatchObject({ index: 2, changed: true, coverage: "partial", values: [0x1234, 7], mukField: 0xdeadbeef });
     expect(video.pixels.every((p, i) => p === (i >= 3200 && i < 3520 ? 200 : i % 251))).toBe(true);
     expect(video.written.every((w, i) => w === (i === 7 || (i >= 3200 && i < 3520) ? 1 : 0))).toBe(true);
@@ -93,7 +93,7 @@ describe("VideoDecoder (conteneur de 4 images produit par Python)", () => {
     video.compose(backdrop);
     expect(backdrop.every((p, i) => p === (i === 7 ? 7 : i >= 3200 && i < 3520 ? 200 : 99))).toBe(true);
 
-    const fourth = video.nextFrame() as VideoFrame;
+    const fourth = video.nextFrame() as VidFrame;
     expect(fourth).toMatchObject({ index: 770, paletteChanged: true, changed: false, coverage: "partial" });
     expect(video.written.every((w) => w === 0)).toBe(true);
     expect(video.palette.every((c, i) => c === 255 - (i % 256))).toBe(true);
@@ -113,17 +113,17 @@ describe("VideoDecoder (conteneur de 4 images produit par Python)", () => {
 
   it("refuse un fichier qui n'est pas un conteneur ou qui est tronqué", () => {
     const bytes = fromBase64(VIDEO_VECTOR);
-    expect(() => hashFrames(new VideoDecoder(bytes.subarray(0, bytes.length - 20)))).toThrow();
-    expect(() => new VideoDecoder(new Uint8Array(64))).toThrow();
+    expect(() => hashFrames(new VidDecoder(bytes.subarray(0, bytes.length - 20)))).toThrow();
+    expect(() => new VidDecoder(new Uint8Array(64))).toThrow();
   });
 });
 
-describe.skipIf(!hasOriginalFiles)("VideoDecoder (original/asterix)", () => {
+describe.skipIf(!hasOriginalFiles)("VidDecoder (original/asterix)", () => {
   const files = () => listOriginal(withSuffix(".vid"));
 
   it("retrouve, pixel à pixel, les images décodées des MUX et des MUK d'origine", { timeout: 120_000 }, () => {
     for (const [path, expected] of Object.entries({ ...REFERENCE, ...REFERENCE_MUK })) {
-      const got = hashFrames(new VideoDecoder(readOriginal(path)));
+      const got = hashFrames(new VidDecoder(readOriginal(path)));
       expect({ path, frames: got.frames, sha1: got.sha1.slice(0, expected.sha1.length) }).toEqual({ path, ...expected });
     }
   });
@@ -136,7 +136,7 @@ describe.skipIf(!hasOriginalFiles)("VideoDecoder (original/asterix)", () => {
     let markers = 0;
     let lastAudio = 0;
     for (const path of list) {
-      const video = new VideoDecoder(readOriginal(path));
+      const video = new VidDecoder(readOriginal(path));
       const isMux = path.endsWith(".MUX.vid");
       expect(video.header.source, path).toBe(isMux ? "mux" : "muk");
       expect([video.header.width, video.header.height], path).toEqual([320, 200]);

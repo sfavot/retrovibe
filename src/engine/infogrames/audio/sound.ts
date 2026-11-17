@@ -16,6 +16,11 @@ export interface Sound {
   sampleCount: number;
   /** Fréquence du PCM d'origine, en Hz. */
   sampleRate: number;
+  /**
+   * Échantillons d'origine à sauter au début des données (`soundFrom` sur un MP3, qu'on ne peut pas découper) ;
+   * `sampleCount` est alors ce qui reste à jouer. Absent : 0.
+   */
+  skipSamples?: number;
 }
 
 /** Son à partir de PCM 8 bits non signé mono. */
@@ -23,7 +28,18 @@ export function pcmSound(samples: Uint8Array, sampleRate: number): Sound {
   return { format: "pcm-u8", data: samples, sampleCount: samples.length, sampleRate };
 }
 
-/** Durée exacte du son d'origine, en secondes. */
+/**
+ * Le même son à partir de l'échantillon d'origine `start` (piste d'une vidéo reprise en cours de route) : une vue pour
+ * du PCM, le même MP3 avec `skipSamples` sinon. Sa durée est ce qui reste.
+ */
+export function soundFrom(sound: Sound, start: number): Sound {
+  const skip = Math.min(Math.max(0, Math.floor(start)), sound.sampleCount);
+  if (skip === 0) return sound;
+  if (sound.format === "pcm-u8") return pcmSound(sound.data.subarray(skip), sound.sampleRate);
+  return { ...sound, sampleCount: sound.sampleCount - skip, skipSamples: (sound.skipSamples ?? 0) + skip };
+}
+
+/** Durée exacte du son d'origine (de ce qu'il en reste à jouer après `soundFrom`), en secondes. */
 export function soundDuration(sound: Sound): number {
   return sound.sampleCount / sound.sampleRate;
 }

@@ -1,5 +1,5 @@
 """Génère test/asterix/data/lzma-vectors.ts : les vecteurs de test du décodeur LZMA (src/data/lzma.ts) et du lecteur
-de conteneur vidéo (src/games/asterix/data/video.ts), compressés par le module `lzma` de Python.
+de conteneur vidéo (src/engine/infogrames/data/vid.ts), compressés par le module `lzma` de Python.
 
 Usage : python3 -I scripts/asterix/lzma_vectors.py > test/asterix/data/lzma-vectors.ts
 Les données en clair ne sont pas dans le fichier généré : le test les reconstruit avec les mêmes règles (voir

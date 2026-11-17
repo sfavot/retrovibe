@@ -7,16 +7,14 @@
  * 14 pixels).
  */
 
+import type { Picture } from "./mcg";
+
 export const MCC_WIDTH = 320;
 export const MCC_HEIGHT = 200;
 const PALETTE_BYTES = 768;
 const PIXELS = MCC_WIDTH * MCC_HEIGHT;
 
-export interface Mcc {
-  /** Palette, 768 octets RVB 8 bits. */
-  palette: Uint8Array;
-  /** 64 000 indices de palette, ligne par ligne. */
-  pixels: Uint8Array;
+export interface Mcc extends Picture {
   /** Pixels de la dernière série qui dépassaient la fin de l'image (0 presque toujours). */
   overflow: number;
 }

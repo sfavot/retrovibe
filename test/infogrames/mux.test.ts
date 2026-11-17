@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { MuxDecoder } from "../../src/engine/infogrames/data/mux";
 import { hasOriginalFiles, listData, readData, withExtension } from "../teleportaschtroumpf/helpers";
+import { scanMux } from "../../src/engine/infogrames/video";
 
 const sha1 = (bytes: Uint8Array, length = 40) => createHash("sha1").update(bytes).digest("hex").slice(0, length);
 
@@ -131,5 +132,65 @@ describe.skipIf(!hasOriginalFiles)("MuxDecoder (fichiers originaux)", () => {
       for (const chunk of frame.audio) audioBytes += chunk.length;
     }
     expect(audioBytes).toBeGreaterThan(0);
+  });
+});
+
+describe("MUX de synthèse", () => {
+  /** MUX 4×2 : en-tête, table d'un offset, puis les chunks donnés (`[type, charge utile]`). */
+  function build(chunks: [number, number[]][]): Uint8Array {
+    const out: number[] = new Array(0x24).fill(0);
+    const u16 = (offset: number, value: number) => out.splice(offset, 2, value & 0xff, value >> 8);
+    out.splice(0, 4, 0x07, 0xaa, 0, 0);
+    u16(0x0c, 9039);
+    u16(0x1c, 4);
+    u16(0x1e, 2);
+    out[0x20] = 0x24;
+    for (const [type, payload] of chunks) out.push(type, 0, payload.length & 0xff, payload.length >> 8, 0, 0, ...payload);
+    return Uint8Array.from(out);
+  }
+  /** Chunk vidéo intra sans compression : 8 pixels, un par bit de contrôle à 0. */
+  const video = (colors: number[]): [number, number[]] => [0x6f, [0, 0, 0, 0, 0, 4, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, ...colors]];
+  /** Chunk vidéo inter : saute `skip` pixels (bits 11111 + octet), puis des pixels isolés. */
+  const inter = (skip: number, colors: number[]): [number, number[]] => [
+    0x6f,
+    [2, 0, 0, 0, 0, 5, 0, 0, 0, colors.length, 0, 0, 0, 0, 0, 0, 0xf8, skip, ...colors],
+  ];
+
+  it("ignore un bloc de fin d'image vide (07/M07A.MUX d'Astérix) : ni image en plus, ni erreur", () => {
+    const bytes = build([
+      video([1, 2, 3, 4, 5, 6, 7, 8]),
+      [0x05, [0, 0]],
+      inter(6, [9, 9]),
+      [0x05, []],
+      [0x05, []],
+      [0x08, [0x2d, 0x31]],
+      [0x05, [1, 0]],
+      [0x04, []],
+    ]);
+    const decoder = new MuxDecoder(bytes);
+    expect(decoder.nextFrame()).toMatchObject({ index: 0 });
+    const second = decoder.nextFrame()!;
+    expect(second.index).toBe(1);
+    expect(second.markers.map((marker) => [...marker])).toEqual([[0x2d, 0x31]]);
+    expect([...decoder.pixels]).toEqual([1, 2, 3, 4, 5, 6, 9, 9]);
+    expect(decoder.nextFrame()).toBeNull();
+    expect(scanMux(bytes, decoder.header.firstChunkOffset).frameCount).toBe(2);
+  });
+
+  it("compose : repose l'image courante sur un autre tampon, sans toucher aux pixels sautés", () => {
+    const decoder = new MuxDecoder(build([video([1, 2, 3, 4, 5, 6, 7, 8]), [0x05, [0, 0]], inter(6, [9, 9]), [0x05, [1, 0]], [0x05, [2, 0]], [0x04, []]]));
+    const target = new Uint8Array(8).fill(0x80);
+    decoder.nextFrame();
+    decoder.compose(target);
+    expect([...target]).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    target.fill(0x80);
+    decoder.nextFrame();
+    decoder.compose(target);
+    expect([...target]).toEqual([0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 9, 9]);
+    // Image sans chunk vidéo : rien à reposer.
+    target.fill(0x80);
+    decoder.nextFrame();
+    decoder.compose(target);
+    expect([...target]).toEqual(new Array(8).fill(0x80));
   });
 });

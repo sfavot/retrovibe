@@ -1,6 +1,6 @@
 import { LETTER_SPACING, SPACE_WIDTH, measureText, type PfnFont } from "./data/font";
 import type { Hy8, Hy8Frame, Hy8Image } from "./data/hy8";
-import { SCREEN_HEIGHT, SCREEN_WIDTH, type Mcg } from "./data/mcg";
+import { SCREEN_HEIGHT, SCREEN_WIDTH, type Picture } from "./data/mcg";
 import { SPRITE_INDEX_MASK, SPRITE_MIRROR_X, placeSprite } from "./sprites";
 
 export const SCREEN_PIXELS = SCREEN_WIDTH * SCREEN_HEIGHT;
@@ -63,8 +63,8 @@ export class Surface {
     this.work.fill(color);
   }
 
-  /** Copie les pixels d'un MCG dans A ; la palette (`mcg.palette`) se charge à part avec `Palette.load`. */
-  drawMcg(mcg: Mcg, options: { asBackground?: boolean } = {}): void {
+  /** Copie les pixels d'une image plein écran (MCG, MCC) dans A ; sa palette se charge à part avec `Palette.load`. */
+  drawMcg(mcg: Picture, options: { asBackground?: boolean } = {}): void {
     this.work.set(mcg.pixels);
     if (options.asBackground) this.commitBackground();
   }
@@ -104,7 +104,7 @@ export class Surface {
   drawSprite(hy8: Hy8, index: number, x: number, y: number, options: { mirrorX?: boolean; opaque?: boolean } = {}): void {
     const mirror = (index & SPRITE_MIRROR_X) !== 0 !== (options.mirrorX ?? false);
     for (const placed of placeSprite(hy8, index & SPRITE_INDEX_MASK, mirror)) {
-      this.blitImage(placed.image, x + placed.left, y + placed.top, { mirrorX: placed.mirror, opaque: options.opaque });
+      this.blitImage(placed.image, x + placed.left, y + placed.top, { mirrorX: placed.mirror, opaque: options.opaque || placed.opaque });
     }
   }
 

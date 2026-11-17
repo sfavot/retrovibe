@@ -43,7 +43,7 @@ nb parties × {
 ```
 
 - `mode` : 0x10 = coordonnées sur 8 bits signés, 0x00 = sur 16 bits. Dans `31fe:0411`, chaque différence d'octet de mode (`CS:0x16`) corrige à chaud le code : le bit 0x10 transforme `LODSW` (`AD`) en `LODSB` (`AC`) + `CBW` (`98`) aux adresses `31fe:04e6`/`04de` (XOR de `0x0801`). Les bits 0x80 et 0x20 insèrent `NEG AX` sur x / y (XOR de `0x4867`) : ils proviennent surtout des bits 0x8000 / 0x2000 du premier paramètre (miroirs). Dans les fichiers, `mode` ne vaut que 0x10 (806 sprites) ou 0x00 (25 sprites).
-- `type` : indice dans la table de sauts en `CS:0x19` de `31fe` (octets `17 08 54 08 b2 08 b2 08 3e 07 7e 07 c2 07 ed 07`) : 0 = `31fe:0817` (sous-sprite, rappelle `31fe:0481` avec `a` et `b`), 1 = `31fe:0854` (image), 2 et 3 = `31fe:08b2`, 4 à 7 = routines vectorielles (`073e`, `077e`, `07c2`, `07ed` : segments, rectangle, polygones, via `32xx`/`31d5`). Les 1441 parties des 33 fichiers sont toutes de type 1 avec un seul point. Le décodeur ne gère que les types 0 et 1 et refuse les autres.
+- `type` : indice dans la table de sauts en `CS:0x19` de `31fe` (octets `17 08 54 08 b2 08 b2 08 3e 07 7e 07 c2 07 ed 07`) : 0 = `31fe:0817` (sous-sprite, rappelle `31fe:0481` avec `a` et `b`), 1 = `31fe:0854` (image), 2 et 3 = `31fe:08b2`, 4 à 7 = routines vectorielles (`073e`, `077e`, `07c2`, `07ed` : segments, rectangle, polygones, via `32xx`/`31d5`). Les 1441 parties des 33 fichiers sont toutes de type 1 avec un seul point. Le décodeur gère les types 0, 1 et 5 (rectangle plein, utilisé par Astérix : `docs/asterix/formats.md` § HY8) et refuse les autres.
 - Type 1 (image, `31fe:0854`) : `a` = poids faible de l'index d'image, `b` = bits 8 à 11 de l'index (4 bits bas) + drapeaux (4 bits hauts). Le moteur passe `AX = a | ((b ^ drapeaux_sprite) << 8)` au blit, qui masque l'index par `0xfff` (`317b:01f5`). Seul le drapeau 0x80 (miroir x) apparaît dans les données (40 parties). Le point est relatif à la position demandée : x = bord gauche, y = **ligne du bas** de l'image (`317b:024b` : `ligne du haut = y - hauteur + 1`). Si miroir x, `x -= largeur` (`31fe:087b`, `32a1:0006` renvoie 16 × largeur/16), si miroir y, `y += hauteur` (`32a1:004e`). **Sauf pour une image stockée en miroir** (mot d'attributs 0x8000) : son point reste le bord gauche, miroir ou non. Constaté sur les données (2026-10-24), pas relu dans le code : avec `x -= largeur` partout, toutes les poses tournées à gauche de `s01a000s.hy8` qui utilisent ces images (saut, course, impatience, arrivée) et l'oiseau du décor qui vole vers la droite étaient décalés de 32 pixels (l'impatience à gauche sautait de 45 pixels d'une image à l'autre) ; sans ce décalage, chaque animation gauche est le miroir exact de celle de droite (test `hy8.test.ts`). Probable.
 - Le moteur ne lit que le premier point d'une partie ; `Hy8Part.points` expose tous les points du fichier.
 
@@ -72,7 +72,7 @@ nb frames × 8 octets { [u16 sprite|drapeaux][u16 = 1][i16 dx][i16 dy] }
 - Rôle de `u16[1]`, `dx`, `dy` des frames d'animation, et de l'octet 0 d'une animation (toujours 0).
 - Section finale de 12 octets.
 - Drapeau 0x2000 d'un index de sprite ou d'une partie (miroir y) : défini dans `31fe`, absent des données ; non vérifié dans le blit.
-- Les types de partie 2 à 7 (jamais utilisés par les fichiers) : sémantique déduite de la table de sauts seulement.
+- Les types de partie 2 à 4, 6 et 7 (jamais utilisés par les fichiers des deux jeux) : sémantique déduite de la table de sauts seulement.
 
 ## Vérifications
 

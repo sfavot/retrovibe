@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { parseMcc } from "../../../src/games/asterix/data/mcc";
+import { parseMcc } from "../../../src/engine/infogrames/data/mcc";
 import { hasOriginalFiles, listOriginal, readOriginal, withSuffix } from "../helpers";
 
 const sha1 = (bytes: Uint8Array) => createHash("sha1").update(bytes).digest("hex");

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { audioDuration, parseAudioIndex } from "../../../src/engine/infogrames/data/audio-index";
-import { VideoDecoder } from "../../../src/games/asterix/data/video";
+import { parsePfn } from "../../../src/engine/infogrames/data/font";
+import { HY8_PART_IMAGE, HY8_PART_RECT, HY8_PART_SUB_SPRITE, parseHy8 } from "../../../src/engine/infogrames/data/hy8";
+import { parseMcg, parsePal } from "../../../src/engine/infogrames/data/mcg";
+import { VidDecoder } from "../../../src/engine/infogrames/data/vid";
+import { boundsOf, placeFrame, placeSprite } from "../../../src/engine/infogrames/sprites";
 import { hasOriginalFiles, listOriginal, readOriginal, withSuffix } from "../helpers";
 
 describe("parseAudioIndex (sans fichier)", () => {
@@ -20,11 +24,13 @@ describe("parseAudioIndex (sans fichier)", () => {
 });
 
 /**
- * Inventaire de `original/asterix/` : chaque fichier a un lecteur ou un contrôle. Les lecteurs du moteur commun aux
- * Schtroumpfs (MCG, HY8, PFN, PAL) ne sont pas importés ici tant qu'ils ne sont pas dans `src/engine/infogrames/` : ces
- * formats n'ont qu'un contrôle de structure (ils ont été lus en entier par ces lecteurs pendant l'étude). Les MCC, les
- * conteneurs vidéo, le quiz et le générique sont lus jusqu'au dernier octet dans leurs propres tests.
+ * Inventaire de `original/asterix/` : chaque fichier a un lecteur. Les MCG, HY8, PFN et PAL sont lus ici jusqu'au dernier
+ * octet par les lecteurs du moteur commun (`src/engine/infogrames/`) ; les MCC, les conteneurs vidéo, le quiz et le
+ * générique le sont dans leurs propres tests.
  */
+/** Totaux des 30 HY8 (mesurés par ce test ; une seule partie n'est pas une image : le rectangle de `M32SA000`). */
+const HY8_TOTALS = { images: 476, sprites: 636, animations: 112, imageParts: 661, subSprites: 26, empty: 10 };
+
 describe.skipIf(!hasOriginalFiles)("original/asterix", () => {
   const SUFFIXES: Record<string, number> = {
     ".VOC.mp3": 736,
@@ -86,7 +92,7 @@ describe.skipIf(!hasOriginalFiles)("original/asterix", () => {
     const index = parseAudioIndex(new TextDecoder().decode(readOriginal("audio.json")));
     const silent: string[] = [];
     for (const path of listOriginal(withSuffix(".MUX.vid"))) {
-      const { header } = new VideoDecoder(readOriginal(path));
+      const { header } = new VidDecoder(readOriginal(path));
       const entry = index.get(path.replace(/\.vid$/, ".mp3"));
       expect(header.framesPerSecond, path).toBeGreaterThan(3);
       expect(header.framesPerSecond, path).toBeLessThan(14);
@@ -99,25 +105,72 @@ describe.skipIf(!hasOriginalFiles)("original/asterix", () => {
     }
     expect(silent).toEqual(["MDF/23/M23AA.MUX.vid"]);
     for (const path of listOriginal(withSuffix(".MUK.vid"))) {
-      const { header } = new VideoDecoder(readOriginal(path));
+      const { header } = new VidDecoder(readOriginal(path));
       expect([header.frameDivisor, header.audioFrequency, header.audioSamples], path).toEqual([0, 0, 0]);
     }
   });
 
-  it("garde tels quels les fichiers lus par le moteur commun (contrôle de structure)", () => {
+  it("lit les 106 MCG avec le lecteur du moteur commun", () => {
+    const list = listOriginal(withSuffix(".MCG"));
+    expect(list).toHaveLength(106);
+    for (const path of list) {
+      // `parseMcg` refuse toute autre taille que 2 + 768 + 64 000 octets : le fichier est lu en entier.
+      const mcg = parseMcg(readOriginal(path));
+      expect([mcg.header, mcg.palette.length, mcg.pixels.length], path).toEqual([0, 768, 64000]);
+    }
+  });
+
+  it("lit les 30 HY8 avec le lecteur du moteur commun, et pose chaque sprite et chaque image d'animation", () => {
     const u32 = (bytes: Uint8Array, offset: number) => new DataView(bytes.buffer, bytes.byteOffset).getUint32(offset, true);
-    for (const path of listOriginal(withSuffix(".MCG"))) {
+    const list = listOriginal(withSuffix(".HY8"));
+    expect(list).toHaveLength(30);
+    const totals = { images: 0, sprites: 0, animations: 0, imageParts: 0, subSprites: 0, empty: 0 };
+    const withRect: string[] = [];
+    for (const path of list) {
       const bytes = readOriginal(path);
-      // En-tête nul de 2 octets, palette de 768 octets, 64 000 pixels.
-      expect([bytes.length, bytes[0], bytes[1]], path).toEqual([64770, 0, 0]);
-    }
-    for (const path of listOriginal(withSuffix(".HY8"))) {
-      const bytes = readOriginal(path);
-      // Six u32 : début de la table (0x18) … taille du fichier.
+      // Six u32 : début de la table (0x18) … fin de la dernière section, qui est la fin du fichier.
       expect([u32(bytes, 0), u32(bytes, 20)], path).toEqual([0x18, bytes.length]);
+      const hy8 = parseHy8(bytes);
+      expect(hy8.trailer.byteOffset + hy8.trailer.length - bytes.byteOffset, path).toBe(bytes.length);
+      totals.images += hy8.images.length;
+      totals.sprites += hy8.sprites.length;
+      totals.animations += hy8.animations.length;
+      hy8.sprites.forEach((sprite, index) => {
+        for (const part of sprite.parts) {
+          if (part.kind === HY8_PART_IMAGE) totals.imageParts++;
+          else if (part.kind === HY8_PART_SUB_SPRITE) totals.subSprites++;
+          else {
+            expect(part.kind, `${path} sprite ${index}`).toBe(HY8_PART_RECT);
+            withRect.push(`${path}#${index}`);
+          }
+        }
+        const bounds = boundsOf(placeSprite(hy8, index, false));
+        if (sprite.parts.length === 0) totals.empty++;
+        else expect(bounds.maxX > bounds.minX && bounds.maxY > bounds.minY, `${path} sprite ${index}`).toBe(true);
+      });
+      for (const animation of hy8.animations) for (const frame of animation.frames) placeFrame(hy8, frame);
     }
-    expect(readOriginal("MDF/27/M27S.PAL").length).toBe(768);
-    expect(listOriginal(withSuffix(".PFN"))).toEqual(["MDF/52/M52D0.PFN", "MDF/52/M52D1.PFN", "MDF/52/M52D2.PFN", "MDF/52/M52D3.PFN"]);
+    expect(totals).toEqual(HY8_TOTALS);
+    expect(withRect).toEqual(["MDF/32/M32SA000.HY8#60"]);
+  });
+
+  it("lit les 4 PFN et la palette PAL avec les lecteurs du moteur commun", () => {
+    const fonts = listOriginal(withSuffix(".PFN")).map((path) => {
+      // `parsePfn` impose que la table des glyphes aille de la fin de la bande à la fin du fichier.
+      const font = parsePfn(readOriginal(path));
+      return [path, font.height, font.firstChar, font.glyphs.size];
+    });
+    expect(fonts).toEqual([
+      ["MDF/52/M52D0.PFN", 12, 1, 253],
+      ["MDF/52/M52D1.PFN", 10, 0x20, 223],
+      ["MDF/52/M52D2.PFN", 10, 0x20, 223],
+      ["MDF/52/M52D3.PFN", 12, 1, 253],
+    ]);
+    expect(listOriginal(withSuffix(".PAL"))).toEqual(["MDF/27/M27S.PAL"]);
+    expect(parsePal(readOriginal("MDF/27/M27S.PAL")).length).toBe(768);
+  });
+
+  it("garde l'exécutable tel quel", () => {
     const exe = readOriginal("ASTERIX.EXE");
     expect([exe.length, String.fromCharCode(exe[0], exe[1])]).toEqual([153328, "MZ"]);
   });

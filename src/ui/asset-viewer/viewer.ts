@@ -46,7 +46,8 @@ export interface AssetViewer {
   open(path: string): Promise<void>;
 }
 
-function extensionOf(path: string): string {
+/** Extension en majuscules, sans le point (`VID` pour `M06AB.MUX.vid`) ; chaîne vide s'il n'y en a pas. */
+export function extensionOf(path: string): string {
   const name = path.slice(path.lastIndexOf("/") + 1);
   const dot = name.lastIndexOf(".");
   return dot < 0 ? "" : name.slice(dot + 1).toUpperCase();

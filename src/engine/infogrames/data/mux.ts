@@ -1,5 +1,6 @@
 /**
- * Décodeur des vidéos `.MUX` du Téléportaschtroumpf (voir `docs/teleportaschtroumpf/mux.md`).
+ * Décodeur des vidéos `.MUX` du moteur Infogrames (Téléportaschtroumpf, Astérix ; voir `docs/teleportaschtroumpf/mux.md`
+ * et `docs/asterix/formats.md`).
  *
  * Un MUX est un conteneur : une table d'offsets, puis une suite de chunks (audio PCM, palette,
  * vidéo, fin d'image). La vidéo est en 8 bits indexés, 320×200, codée par séquences de pixels
@@ -135,6 +136,8 @@ export class MuxDecoder {
   private pos = 0;
   private finished = false;
   private readonly video = new MuxVideoDecoder();
+  /** Chunks vidéo de l'image courante (vues sur le fichier), pour `compose`. */
+  private lastVideo: Uint8Array[] = [];
 
   constructor(bytes: Uint8Array) {
     if (bytes.length < HEADER_BYTES + 4) throw new Error("MUX : fichier trop court");
@@ -174,6 +177,16 @@ export class MuxDecoder {
     this.finished = false;
     this.pixels.fill(0);
     this.palette.fill(0);
+    this.lastVideo = [];
+  }
+
+  /**
+   * Redécode les chunks vidéo de l'image courante sur `target`, comme le lecteur d'origine quand sa cible est un autre
+   * tampon (fond restauré d'une surimpression, décor posé par le rappel d'un module) : seuls les pixels codés sont
+   * écrits, les « sauts » d'une image inter laissent `target` intact. Sans effet si l'image n'avait pas de chunk vidéo.
+   */
+  compose(target: Uint8Array): void {
+    for (const payload of this.lastVideo) this.video.decode(payload, target, this.header.width, this.header.height);
   }
 
   /** Décode jusqu'à la prochaine fin d'image ; `null` à la fin du fichier. */
@@ -184,6 +197,7 @@ export class MuxDecoder {
     const audio: Uint8Array[] = [];
     const markers: Uint8Array[] = [];
     let paletteChanged = false;
+    this.lastVideo = [];
 
     while (this.pos + CHUNK_HEADER_BYTES <= bytes.length) {
       const type = bytes[this.pos];
@@ -207,11 +221,15 @@ export class MuxDecoder {
         case CHUNK_VIDEO:
         case CHUNK_VIDEO_FIRST:
           this.video.decode(bytes.subarray(start, end), this.pixels, this.header.width, this.header.height);
+          this.lastVideo.push(bytes.subarray(start, end));
           break;
         case CHUNK_MARKER:
           markers.push(bytes.subarray(start, end));
           break;
         case CHUNK_END_OF_FRAME:
+          // Bloc de fin d'image vide (`07/M07A.MUX` d'Astérix en a 144 avant le vrai) : le lecteur d'origine l'avale sans
+          // effet (`1948:018e`, docs/asterix/engine.md §4.5).
+          if (size === 0) break;
           if (size < 2) throw new Error("MUX : fin d'image sans numéro");
           return { index: view.getUint16(start, true), paletteChanged, audio, markers };
         case CHUNK_END_OF_FILE:

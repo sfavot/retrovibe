@@ -115,7 +115,7 @@ Chaque vidéo est interruptible séparément (bouton ou Échap) ; une interrupti
 | `1a93:003a()` | présente : tampon A vers l'écran |
 | `1a93:0051()` | l'écran courant devient le fond (A vers B), présentation, retour vertical, envoi de la palette `DS:576e` |
 
-Chronos utilisés : **0** = délai de l'écran courant (relancé par presque chaque écran), **1** = temps de partie (§9.8), **2** = temps de réponse du quiz.
+Chronos utilisés : **0** = délai de l'écran courant (relancé par presque chaque écran), **1** = temps de partie (§9.8), **2** = temps de réponse du quiz et durée d'un mini-jeu, **3** = minuterie interne des mini-jeux (M22 : délai entre deux poissons). La table `DS:6495` a quatre entrées.
 
 ### 2.3 Pendant une vidéo (probable)
 
@@ -750,7 +750,7 @@ Une voix d'annonce n'est jouée que s'il y a **plusieurs joueurs** et que le jou
 - tours de table 1 et 2 : `v = 5 + perso + 6 × (rnd() % 6)` ;
 - ensuite : une fois sur huit (`rnd() & 7 == 0`), `v = rnd() % 5` (`K61TE01` à `05`, phrases courtes non nominatives) ; sinon `v = 5 + perso + 6 × (rnd() & 15)` (16 variantes par personnage, `K61TE06` à `K61TE101`).
 
-`1abf:01b4(v)` lance la voix **sans attendre** et fait clignoter le pion (une image sur deux sans le pion) par pas de 10 cs : 8 pas au moins, puis jusqu'à la fin de la voix. Un clic coupe la voix (hors démo). En solo, ou pour un prisonnier qui a une gourde : `1abf:01b4(-1)`, 8 pas de clignotement sans voix, non interruptibles.
+`1abf:01b4(v)` lance la voix **sans attendre** et fait clignoter le pion (une image sur deux sans le pion) par pas de 10 cs : 8 pas au moins, puis jusqu'à la fin de la voix. Un clic coupe la voix (hors démo). En solo, ou pour un prisonnier qui a une gourde : `1abf:01b4(-1)`, 8 pas de clignotement sans voix ; un clic gauche les arrête aussitôt (`1abf:022f` : avec `v < 0` le clic saute à la sortie ; corrigé en vague D, le premier relevé les disait non interruptibles).
 
 Ce bloc ne fait que choisir une phrase : il n'a aucun effet sur l'état du jeu.
 
@@ -955,7 +955,7 @@ Les joueurs désignent eux-mêmes le perdant ou le gagnant ; le joueur courant p
 
 1. Carte `M02DA000.MCG` (fondu), sons `m13b0000/1/2.voc`.
 2. **`pos = (pos + 1) % 54` d'office** : le curseur part de la case suivante.
-3. Introduction : `n = rnd() & 3`, retiré tant qu'il égale la précédente (`DS:6b56`), vidéo `M13A{'A' + n}` (`15d7:06eb(0x0d, n, 0, 0x20000)`). La toute première n'est jamais `M13AA` (la mémoire vaut 0 au lancement).
+3. Introduction : `n = rnd() & 3`, retiré tant qu'il égale la précédente (`DS:6b56`), vidéo `M13A{'A' + n}` (`15d7:06eb(0x0d, n, 0, 0x20000)`). La toute première n'est jamais `M13AA` (la mémoire vaut 0 au lancement). Ces vidéos sont une image fixe de la carte avec une voix (image 0 complète, aucune image ensuite : vérifié sur `M13AA`), jouées plein écran.
 4. Son `m13b0000`, 25 cs, chrono 0, musique `m13m.voc` en boucle.
 5. Choix (`20fa:09c7` à chaque image) jusqu'au **clic** ou à **30 s**. Au délai : voix `K63TE38` et la case sous le curseur est retenue (au pire la case suivante).
 
@@ -1156,7 +1156,7 @@ Le jeu d'Idéfix est aussi lancé du menu principal avec l'argument 0 (hors part
 
 **Annonce** (`20fa:130f(i)`, clé 400, dossier 60) : chaque jeu a trois annonces, `K60TE{3i + 1}` à `K60TE{3i + 3}`. La voix jouée est `K60TE{3i + 1 + DS:2aa6[i]}` ; puis `DS:2aa6[i]` passe de 0 à `1 + (rnd() & 1)`, et ensuite alterne entre 1 et 2. La première annonce (sans doute la plus complète) n'est donc entendue qu'**une fois par jeu et par lancement du programme**, la table n'étant jamais remise à zéro.
 
-**Les mini-jeux eux-mêmes ne sont pas lus** : règles, vitesses, effet des trois niveaux, gains en sesterces, rappels vidéo et sens de leurs marqueurs relèvent de la vague E. Ce qui est établi : ils reçoivent la main après l'annonce, modifient les sesterces par `1d24:0912`, et le tour se termine à leur retour (après le test de victoire).
+**Les mini-jeux sont lus un par un en vague E** : chaque segment a sa fiche dans `minigames/` (`minigames/README.md` : gabarit et avancement ; `minigames/m22.md` : les Poissons, lus et portés). Pour les autres, règles, vitesses, effet des trois niveaux, gains en sesterces, rappels vidéo et sens de leurs marqueurs restent à établir. Ce qui est établi : ils reçoivent la main après l'annonce, modifient les sesterces par `1d24:0912`, et le tour se termine à leur retour (après le test de victoire).
 
 ### 10.12 Ce qui change en solo (récapitulatif)
 
@@ -1265,7 +1265,7 @@ Le manuel disponible est celui de l'édition Macintosh ; il sert à recouper, pa
 1. Délai de 60 s du menu principal compté depuis l'entrée, navigation comprise (lu ainsi).
 2. REJOUER sans partie préalable : 120 minutes et 9 objets à l'écran de score.
 3. Vitesse réelle du générique (1 tick par pixel dans le code) et durée de `m47m.voc` par rapport au texte (pas de boucle).
-4. Sens de la copie des rappels de vignette (`1481:045e` vers `2bac:0004`) : position exacte des animations de prison, repos, potion et pièges dans la case.
+4. Sens de la copie des rappels de vignette : **tranché en vague D** (désassemblage de `20fa:0112`, `053e`, `0e83`, `11b0`, et rendu vérifié) : la vidéo est décodée dans le tampon A et le rappel recopie le rectangle (sx, 3) de A vers l'écran en (dx, 66 × rang + 3). Prison : (2, 3) vers x = 3, 98 ou 172, 76 × 62. Potion : (2, 3) vers x = 3, 86 ou 166, 83 × 62. Repos, par position 16, 25, 33, 45 : source x = 83, 98, 2, 2, écran x = 84, 99, 3, 3, largeur 81, 78, 79, 90. Pièges, par module 14 à 19 : source x = 107, 178, 2, 2, 167, 2, écran x = 108, 179, 3, 3, 168, 3, largeur 81, 70, 246, 246, 81, 76.
 5. Positions 23 et 37 : le rectangle restauré sous le pion (`1d24:1c6e`) est-il bien un morceau de décor qui passe devant ?
 6. Ordre visuel de la porte de prison (dessinée dans le fond) et du pion (dessiné par-dessus).
 7. Bruitages lancés par `16cb:0a4f` alors que la voie principale est muette : inaudibles dans l'original ; à repérer dans les mini-jeux avant de décider du comportement du portage.
@@ -1274,7 +1274,7 @@ Le manuel disponible est celui de l'édition Macintosh ; il sert à recouper, pa
 
 **À vérifier à l'image**
 
-10. Écran des niveaux `M08DB00x.mcc` : la bulle de gauche est-elle bien « Réflexion » ?
+10. Écran des niveaux `M08DB00x.mcc` : **vérifié à l'image en vague D**, la bulle de gauche est « REFLEXION », celle de droite « ACTION ».
 11. Noms exacts des 9 objets (marbre `M03DA00x`, étal `M41DA000`) ; le dessin du manuel suggère une palette de peintre et une outre là où la lecture de l'étal donne un fromage et des castagnettes.
 12. Libellés et ordre des pancartes de M07 et des boutons du marbre (déduits du manuel et de la logique).
 13. `07/M07A.MUX` : aucune référence dans l'exécutable ; fichier sans doute inutilisé (le menu anime `M07s.HY8`).

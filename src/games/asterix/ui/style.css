@@ -1,0 +1,17 @@
+/* Astérix : écran du jeu, canvas 320×200 à l'échelle entière, pixels nets. */
+
+.asterix-canvas {
+  /* Le jeu n'a pas de pointeur à lui (curseur flèche déplacé aux directions) : le pointeur du navigateur reste visible pour le clic direct. */
+  cursor: pointer;
+}
+
+/* Écran de présentation : note de reprise, contrôles et règles. */
+.asterix-title-note {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.asterix-title-heading {
+  margin: 0.4rem 0 0;
+  font-size: 1rem;
+}

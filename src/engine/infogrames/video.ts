@@ -275,9 +275,10 @@ export interface VideoSceneOptions {
   /**
    * Rappel par image décodée (le rappel `cb_image` de `179a:0673`) : numéro de l'image (0 = la première) et marqueurs de
    * l'image. Rendre `"stop"` interrompt la vidéo sur cette image (l'original lève le drapeau d'arrêt `DS:6337`) : `onEnd`
-   * est alors appelé comme pour une fin normale.
+   * est alors appelé comme pour une fin normale. `video` est le lecteur, positionné sur cette image : un rappel qui
+   * décode lui-même sur son tampon (`0x80`) y appelle `video.compose(cible)`, image par image.
    */
-  onFrame?(ctx: SceneContext, frame: number, markers: readonly Uint8Array[]): "stop" | void;
+  onFrame?(ctx: SceneContext, frame: number, markers: readonly Uint8Array[], video: VideoPlayer): "stop" | void;
   /** Dessiné par-dessus chaque image affichée (sprites posés par `onFrame`, comme le rappel de l'original dessine dans le tampon). */
   overlay?(ctx: SceneContext): void;
   /** Vidéo en surimpression (`0x1000`) : fond capturé par l'appelant avant le début de la lecture. */
@@ -333,7 +334,7 @@ export class VideoScene implements Scene {
     this.ending = false;
     this.done = false;
     const { onFrame } = this.options;
-    player.seek(0, onFrame && ((index, markers) => void onFrame(ctx, index, markers)));
+    player.seek(0, onFrame && ((index, markers) => void onFrame(ctx, index, markers, player)));
   }
 
   /**
@@ -380,7 +381,7 @@ export class VideoScene implements Scene {
     const framesOver = player.endedAt(time) && !(this.usingAudio && ctx.voice.voicePlaying);
     const { onFrame } = this.options;
     let stopped = false;
-    player.seek(player.frameAt(time), onFrame && ((index, markers) => (stopped = onFrame(ctx, index, markers) === "stop")));
+    player.seek(player.frameAt(time), onFrame && ((index, markers) => (stopped = onFrame(ctx, index, markers, player) === "stop")));
     if (skip || stopped || framesOver || player.shown >= player.frameCount) this.end(ctx);
   }
 

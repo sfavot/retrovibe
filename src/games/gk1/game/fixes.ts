@@ -103,7 +103,8 @@ export const GK1_FIXES: GameFixes = {
   missingParams: [
     // `getTheEnvelope` (script 210, jour 6) et `startOfDay4` (script 214) envoient `getPoints` sans le nombre de points :
     // la méthode additionnait au score la case de pile où elle venait d'empiler ce score, et le doublait. Un point, comme
-    // les autres ramassages. Écart volontaire, sans équivalent dans ScummVM (`docs/gk1/engine.md` § 8).
+    // les autres ramassages. Écart volontaire et validé : l'interpréteur d'origine et ScummVM doublent tous deux le score
+    // (mesuré, `docs/gk1/engine.md` § 8).
     { script: 18, object: "GKEgo", method: "getPoints", index: 2, value: 1 },
   ],
   messageRemaps: [

@@ -365,10 +365,10 @@ sans test de `argc` ni `&rest` par les méthodes de ce nom) :
 - **L'enveloppe du jour 6 doublait le score** (159, puis 318 sur 342). Ce n'est pas un défaut du moteur : `getTheEnvelope`
   (script 210) envoie `getPoints(-999)` sans le nombre de points, et `GKEgo::getPoints` (script 18) empile le score
   (`lsg global15`) dans la case même où il lit ensuite ce second paramètre (`lap param2`). La lecture du code de ScummVM
-  (`read_var`, `send_selector`) donne le même résultat, et aucun de ses correctifs ne s'en occupe ; l'interpréteur
-  d'origine n'a pas pu être consulté. Un score de 318 au jour 6 n'est pas tenable : `GameFixes.missingParams`
-  (`engine/patches.ts`, lu par `Vm.readVariable` pour un paramètre au-delà de `argc`) rend 1 point, comme les autres
-  ramassages. **Écart volontaire à faire valider** (voir « Ouverts »). Tests : `patches.test.ts` (la table),
+  (`read_var`, `send_selector`) donne le même résultat, et aucun de ses correctifs ne s'en occupe. Mesuré le 17/11/2026 : le
+  `SIERRA.EXE` du CD français (DOSBox-X) et ScummVM 2026.4.0 doublent aussi (`engine.md` § 8). Un score de 318 au jour 6
+  n'est pas tenable : `GameFixes.missingParams` (`engine/patches.ts`, lu par `Vm.readVariable` pour un paramètre au-delà
+  de `argc`) rend 1 point, comme les autres ramassages. **Écart volontaire, validé le 17/11/2026.** Tests : `patches.test.ts` (la table),
   `playthrough.test.ts` (un point avec, score doublé sans).
 
 Aucun bogue du moteur rencontré aux jours 2 à 10 (45 étapes) : les ajustements faits sont dans le banc
@@ -386,10 +386,6 @@ loupe ou de `SetCursor`.
 
 Aucun bogue du moteur connu sur le chemin joué.
 
-- **Points de l'enveloppe du jour 6, à trancher** : 1 point (choix fait, par analogie) ou le comportement brut des
-  scripts (score doublé, celui que donnerait ScummVM d'après son code). À confirmer sur l'original (DOSBox, D6) : noter
-  le score avant et après le ramassage de l'enveloppe. Le second envoi sans points, `startOfDay4` (script 214, drapeau
-  455), est sur un chemin que le parcours ne prend pas.
 - **« Cette note pourrait me servir. »** quand Gabriel vide le tiroir de Mosely (traqueur et émetteurs) : texte du jeu
   pour ce verbe, à comparer à l'original.
 

@@ -478,7 +478,7 @@ RENOMMES = {'VERSION.': 'VERSION'}
 ORIGINES = {
     'ALT.MAP': '`ALT.MAP` du CD, tel quel (répertoire de `RESOURCE.ALT`)',
     'BD.pdf': 'bande dessinée de la boîte, « … (Bande dessinée).pdf » de l\'archive des manuels, telle quelle',
-    'COVER.webp': 'jaquette, ne vient pas du CD : conservée d\'une exécution à l\'autre',
+    'COVER.webp': 'jaquette de la boîte, prise en couverture de `BD.pdf` (`scripts/gk1/cover.mts`) : conservée d\'une exécution à l\'autre',
     'MANUEL.pdf': 'manuel, « … (Manuel).pdf » de l\'archive des manuels, tel quel',
     'PATCHES/316.SND': '`PATCHES/316.SND` du CD, tel quel (patch de la ressource sound 316)',
     'PATCHES/803.SND': '`PATCHES/803.SND` du CD, tel quel (patch de la ressource sound 803)',
@@ -616,8 +616,8 @@ def cmd_inventaire(out, cd, dest_pcm, dest_wav, sortie):
             '0xFFFF exactement à sa fin (dans `RESOURCE.AUD`), ticks croissants, pas de synchronisation sans audio ; '
             'chaque bruitage est un RIFF WAVE PCM mono 22 050 Hz dont les chunks tiennent dans la ressource.']),
         ('Régénérer', ['```', 'bash scripts/gk1-extract.sh [jeu.7z] [manuels.7z]', '```', '',
-                       'Archives par défaut : `archives/jeu-00686-gabriel_knight_cd-pcdos.7z` (contient `GabK.iso`) '
-                       'et `archives/man-00686-gabriel_knight.7z` (non versionnées). Outils requis : `7zz`, '
+                       'Archives par défaut : `archives/gk1/jeu-00686-gabriel_knight_cd-pcdos.7z` (contient `GabK.iso`) '
+                       'et `archives/gk1/man-00686-gabriel_knight.7z` (non versionnées). Outils requis : `7zz`, '
                        '`python3`, `ffmpeg` (`libmp3lame`).']),
     ]
     ec.rendre_inventaire(sortie, 'Inventaire des fichiers de Gabriel Knight: Sins of the Fathers',

@@ -18,15 +18,15 @@
 # Non versionnés : RESOURCE.SFX et AUD/ (convertis), SIERRA.EXE, pilotes, installeur.
 # Formats et choix (variante du DPCM, forme de sync.json et d'index.json, arrondi en ticks) : en-tête de scripts/gk1/extract_utils.py.
 # Usage : scripts/gk1-extract.sh [jeu.7z] [manuels.7z]
-#   (défauts : archives/jeu-00686-gabriel_knight_cd-pcdos.7z, archives/man-00686-gabriel_knight.7z)
+#   (défauts : archives/gk1/jeu-00686-gabriel_knight_cd-pcdos.7z, archives/gk1/man-00686-gabriel_knight.7z)
 # Idempotent : tout est construit dans un dossier temporaire, puis substitué d'un bloc en fin de script.
 # Les archives sont des données non fiables : rien n'en est exécuté (python en -I, ffmpeg ne lit que des fichiers locaux).
 # Outils requis : 7zz, python3, ffmpeg (libmp3lame). Compter quelques minutes et ~1,5 Go d'espace temporaire.
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
-archive="${1:-$racine/archives/jeu-00686-gabriel_knight_cd-pcdos.7z}"
-manuels="${2:-$racine/archives/man-00686-gabriel_knight.7z}"
+archive="${1:-$racine/archives/gk1/jeu-00686-gabriel_knight_cd-pcdos.7z}"
+manuels="${2:-$racine/archives/gk1/man-00686-gabriel_knight.7z}"
 sortie="$racine/original/gk1"
 doc="$racine/docs/gk1/files.md"
 utils="$racine/scripts/gk1/extract_utils.py"

@@ -15,7 +15,7 @@ Généré par `scripts/gk1-extract.sh` (ne pas éditer à la main).
 |---|---:|---|---|
 | ALT.MAP | 364 | `bf0df81184693334` | `ALT.MAP` du CD, tel quel (répertoire de `RESOURCE.ALT`) |
 | BD.pdf | 10228022 | `ac8eacd7c2bd8a84` | bande dessinée de la boîte, « … (Bande dessinée).pdf » de l'archive des manuels, telle quelle |
-| COVER.webp | 19478 | `283c92d23e6a837f` | jaquette, ne vient pas du CD : conservée d'une exécution à l'autre |
+| COVER.webp | 28804 | `1be86c62b7f2aeca` | jaquette de la boîte, prise en couverture de `BD.pdf` (`scripts/gk1/cover.mts`) : conservée d'une exécution à l'autre |
 | MANUEL.pdf | 4112295 | `699035b9d876c665` | manuel, « … (Manuel).pdf » de l'archive des manuels, tel quel |
 | PATCHES/316.SND | 98 | `526f90dfb948d1eb` | `PATCHES/316.SND` du CD, tel quel (patch de la ressource sound 316) |
 | PATCHES/803.SND | 98 | `526f90dfb948d1eb` | `PATCHES/803.SND` du CD, tel quel (patch de la ressource sound 803) |
@@ -144,4 +144,4 @@ Généré par `scripts/gk1-extract.sh` (ne pas éditer à la main).
 bash scripts/gk1-extract.sh [jeu.7z] [manuels.7z]
 ```
 
-Archives par défaut : `archives/jeu-00686-gabriel_knight_cd-pcdos.7z` (contient `GabK.iso`) et `archives/man-00686-gabriel_knight.7z` (non versionnées). Outils requis : `7zz`, `python3`, `ffmpeg` (`libmp3lame`).
+Archives par défaut : `archives/gk1/jeu-00686-gabriel_knight_cd-pcdos.7z` (contient `GabK.iso`) et `archives/gk1/man-00686-gabriel_knight.7z` (non versionnées). Outils requis : `7zz`, `python3`, `ffmpeg` (`libmp3lame`).

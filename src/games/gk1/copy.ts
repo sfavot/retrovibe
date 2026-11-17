@@ -9,7 +9,7 @@ export const copy = {
   title: "Gabriel Knight: Sins of the Fathers",
   description:
     "L'aventure en pointer-et-cliquer de Jane Jensen (Sierra On-Line, 1993), dans sa version CD française : textes en français, voix en anglais. Gabriel Knight, libraire et romancier à La Nouvelle-Orléans, enquête sur les « meurtres vaudous ». Le jeu se joue en entier, du premier jour au générique.",
-  coverAlt: "Écran titre de Gabriel Knight: Sins of the Fathers.",
+  coverAlt: "Jaquette de Gabriel Knight: Sins of the Fathers : un visage peint au fond d'une boîte en bois, entre des clous, des chaînes et des statuettes de jaguars.",
   sound: "Son",
 
   // Écran de présentation.

@@ -197,7 +197,10 @@ def cmd_inventaire(dest, stats_json, sortie):
             % (mo(total), total, len(tailles)),
             '- Fichiers d\'origine repris : %s' % mo(sum(o for _, o in origine.values()) + tailles['ASTERIX.EXE']),
             '- Hors `MDF/` : %s' % ', '.join('`%s` (%s)' % (r, mo(tailles[r], ko=True)) for r in autres),
-            '- `COVER.webp` (jaquette) ne vient pas de l\'archive : conservé d\'une exécution à l\'autre s\'il existe.']),
+            '- `MANUEL.pdf` (manuel, édition Macintosh, partie française) et `CARTE.pdf` (carte du jeu : le plan du '
+            'plateau) : « … (Manuel).pdf » et « … (Carte du Jeu).pdf » de l\'archive des manuels, tels quels.',
+            '- `COVER.webp` (jaquette, couverture du manuel réduite à 280 pixels de large par `scripts/asterix/cover.mts`) '
+            'ne vient pas de l\'extraction : conservé d\'une exécution à l\'autre s\'il existe.']),
         ('Par lot', ec.tableau(['Origine', 'Fichiers', 'Taille d\'origine', 'Versionné'], lignes, droite=(1, 2))),
         ('Son', [
             '- `*.VOC.mp3` et `*.MUX.mp3` : MP3 mono 22 050 Hz, 32 kb/s CBR, sans métadonnées (`ec_encoder_voix` de '
@@ -219,10 +222,12 @@ def cmd_inventaire(dest, stats_json, sortie):
                                   droite=(1, 2))),
         ('Fichiers exclus', ec.tableau_par_categorie('Catégorie', st['exclus']) + [
             '', 'L\'archive contient aussi `Lisez-Moi.txt` (Abandonware France), hors du dossier `Asterix/` : non repris.']),
-        ('Régénérer', ['```', 'bash scripts/asterix-extract.sh [archive.7z]', '```', '',
-                       'Archive par défaut : `archives/asterix/jeu-00700-asterix_defi_de_cesar-pcdos.7z` (non versionnée). '
-                       'Outils requis : `7zz`, `python3` (module `lzma`), `ffmpeg` (libmp3lame). Le résultat est le même '
-                       'à chaque exécution, avec les mêmes versions de `ffmpeg` et de liblzma.']),
+        ('Régénérer', ['```', 'bash scripts/asterix-extract.sh [jeu.7z] [manuels.rar]', '```', '',
+                       'Archives par défaut : `archives/asterix/jeu-00700-asterix_defi_de_cesar-pcdos.7z` et '
+                       '`archives/asterix/man-00700-asterix_le_defi_de_cesar-nt.rar` (non versionnées). '
+                       'Outils requis : `7zz`, `unar`, `python3` (module `lzma`), `ffmpeg` (libmp3lame). Le résultat est le '
+                       'même à chaque exécution, avec les mêmes versions de `ffmpeg` et de liblzma. Jaquette : '
+                       '`npx vite-node scripts/asterix/cover.mts` (`pdfimages`, `magick`, `cwebp`).']),
     ])
 
 

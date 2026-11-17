@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { IdefixState } from "../../src/games/asterix/scenes/minigames/m34";
+import { DEMO_CLICK_READS } from "../../src/games/asterix/scenes/runtime";
 import { SAVE_KEY } from "../../src/games/asterix/scenes/save";
 import { launch, type Launched } from "./game-helpers";
 import { hasOriginalFiles } from "./helpers";
@@ -87,6 +88,29 @@ describe.skipIf(!hasOriginalFiles)("menu principal d'Astérix : Idéfix et démo
     await run.untilScreen("minigame", 20_000);
     expect(run.rt.hint.module).toBe(MODULE_IDEFIX);
     expect(idefixState(run).inGame).toBe(false);
+  });
+
+  it("démo : cent lectures d'entrées consomment chacune un tirage, la suivante pose le clic simulé", async () => {
+    const run = await launch({ seed: 3 });
+    await run.untilScreen("menu");
+    // Le menu lit les entrées à chaque tick et tire un nombre par image (4 ticks) pour l'animation d'Idéfix.
+    const { rng } = run.rt.ctx;
+    const next = rng.next.bind(rng);
+    let draws = 0;
+    rng.next = () => {
+      draws++;
+      return next();
+    };
+    run.rt.startDemo();
+    const from = run.frames;
+    await run.until(() => run.screen !== "menu", 5_000);
+    const ticks = run.frames - from;
+    // `153c:0252` : le clic part à la 101e lecture (ici une par tick), et valide le choix courant du menu.
+    expect(ticks).toBeGreaterThanOrEqual(DEMO_CLICK_READS + 1);
+    expect(ticks).toBeLessThanOrEqual(DEMO_CLICK_READS + 3);
+    const menuDraws = Math.ceil(ticks / 4);
+    expect(draws).toBeGreaterThanOrEqual(DEMO_CLICK_READS + menuDraws - 1);
+    expect(draws).toBeLessThanOrEqual(DEMO_CLICK_READS + menuDraws + 1);
   });
 
   it("60 s sans entrée : Idéfix, puis la règle du jeu, puis une partie que la première entrée réelle ramène au menu", { timeout: 600_000 }, async () => {

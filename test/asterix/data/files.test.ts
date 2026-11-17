@@ -45,7 +45,8 @@ describe.skipIf(!hasOriginalFiles)("original/asterix", () => {
     ".DAT": 1,
     ".PAL": 1,
   };
-  const OUTSIDE = ["ASTERIX.EXE", "COVER.webp", "audio.json", "files.json"];
+  // Hors `MDF/` : l'exécutable, la jaquette, le manuel et la carte du jeu (archive des manuels), les index.
+  const OUTSIDE = ["ASTERIX.EXE", "CARTE.pdf", "COVER.webp", "MANUEL.pdf", "audio.json", "files.json"];
 
   it("ne contient que les fichiers prévus, rangés par module", () => {
     const counts: Record<string, number> = {};

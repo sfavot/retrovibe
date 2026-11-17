@@ -227,10 +227,11 @@ function* mainMenu(rt: Runtime): Script {
           rt.effect("bark");
         }
       }
-      // Cadence du menu : 4 ticks, 15 images par seconde.
-      for (let tick = 0; tick < 4 && !pressed; tick++) {
+      // Cadence du menu `1831:030a` : 4 ticks (15 images par seconde), 2 pendant l'animation 4 (`19e2:0885`).
+      const period = state === 4 ? 2 : 4;
+      for (let tick = 0; tick < period && !pressed; tick++) {
         yield;
-        if (tick < 3) pressed = readClick();
+        if (tick < period - 1) pressed = readClick();
       }
       if (moved) yield* rt.wait(0x1e);
       // Validation `1a93:02a5(60)` : un clic gauche, ou 60 s au chrono 0.
@@ -251,14 +252,14 @@ function* mainMenu(rt: Runtime): Script {
     } else if (choice !== CHOICE_IDEFIX) rt.sound("menuValidate");
     yield* rt.waitRelease();
     if (choice === CHOICE_IDEFIX) {
-      // Animation de départ d'Idéfix, avec son aboiement.
+      // Animation de départ d'Idéfix, avec son aboiement : une image tous les 2 ticks (`19e2:09ac`).
       yield* rt.wait(10);
       animate(2);
       rt.sound("bark");
       do {
         animation.advance();
         drawIdefix(0x78);
-        yield* rt.ticks(4);
+        yield* rt.ticks(2);
       } while (!animation.looped);
     }
     yield* rt.waitSound();

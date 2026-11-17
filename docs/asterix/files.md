@@ -4,10 +4,11 @@ Généré par `scripts/asterix-extract.sh` (ne pas éditer à la main).
 
 ## Taille
 
-- Total versionné (`original/asterix/`) : **53.6 Mo** (56210190 octets), 1233 fichiers (hors `files.json`)
+- Total versionné (`original/asterix/`) : **58.5 Mo** (61352887 octets), 1236 fichiers (hors `files.json`)
 - Fichiers d'origine repris : 180.7 Mo
-- Hors `MDF/` : `audio.json` (32.4 Ko)
-- `COVER.webp` (jaquette) ne vient pas de l'archive : conservé d'une exécution à l'autre s'il existe.
+- Hors `MDF/` : `CARTE.pdf` (245.1 Ko), `COVER.webp` (25.1 Ko), `MANUEL.pdf` (4.6 Mo), `audio.json` (32.4 Ko)
+- `MANUEL.pdf` (manuel, édition Macintosh, partie française) et `CARTE.pdf` (carte du jeu : le plan du plateau) : « … (Manuel).pdf » et « … (Carte du Jeu).pdf » de l'archive des manuels, tels quels.
+- `COVER.webp` (jaquette, couverture du manuel réduite à 280 pixels de large par `scripts/asterix/cover.mts`) ne vient pas de l'extraction : conservé d'une exécution à l'autre s'il existe.
 
 ## Par lot
 
@@ -108,7 +109,7 @@ L'archive contient aussi `Lisez-Moi.txt` (Abandonware France), hors du dossier `
 ## Régénérer
 
 ```
-bash scripts/asterix-extract.sh [archive.7z]
+bash scripts/asterix-extract.sh [jeu.7z] [manuels.rar]
 ```
 
-Archive par défaut : `archives/asterix/jeu-00700-asterix_defi_de_cesar-pcdos.7z` (non versionnée). Outils requis : `7zz`, `python3` (module `lzma`), `ffmpeg` (libmp3lame). Le résultat est le même à chaque exécution, avec les mêmes versions de `ffmpeg` et de liblzma.
+Archives par défaut : `archives/asterix/jeu-00700-asterix_defi_de_cesar-pcdos.7z` et `archives/asterix/man-00700-asterix_le_defi_de_cesar-nt.rar` (non versionnées). Outils requis : `7zz`, `unar`, `python3` (module `lzma`), `ffmpeg` (libmp3lame). Le résultat est le même à chaque exécution, avec les mêmes versions de `ffmpeg` et de liblzma. Jaquette : `npx vite-node scripts/asterix/cover.mts` (`pdfimages`, `magick`, `cwebp`).

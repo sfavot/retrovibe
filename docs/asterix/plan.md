@@ -20,6 +20,7 @@ Ce document est le brief commun aux sous-agents. Les références font foi dans 
 
 - **Vague E faite** (17/11/2026) : les quinze mini-jeux sont portés (M22 à M36 ; M28 et M29 partagent le segment `24e3`), chacun avec sa fiche `docs/asterix/minigames/mNN.md`, son robot et ses tests (`test/asterix/minigames/`). Mise en commun faite après coup : pointeur libre, curseurs `153c:05b4` et `18a1`, lecteur MUK, attente qui retient un clic et fondu sonore dans `scenes/minigames/common.ts` ; rappels vidéo par image (`cb_bloc`, `cb_image`), vidéo nommée `15d7:08e9` et image gardée à l'écran après un nettoyage dans `scenes/runtime.ts` ; tables des mini-jeux lues dans l'exécutable par `data/exe.ts` (D4) ; mémoires `DS:2a00`, `DS:245a`, `DS:6ad8` dans `Session` (D13). Menu principal : jeu d'Idéfix hors partie (`23d1:09c1(0)`) et démonstration automatique (60 s sans clic : Idéfix, règle du jeu, partie de démonstration), tests `test/asterix/demo.test.ts` et scénario « Idéfix au menu » du parcours. Écarts : voir « Écarts de la vague E ».
 - Détail du début de la vague E : mini-jeu pilote **M22, les Poissons** (`scenes/minigames/m22.ts`, `docs/asterix/minigames/m22.md`) et gabarit de portage des 14 autres (`docs/asterix/minigames/README.md`) : outils communs `scenes/minigames/common.ts`, inscription `scenes/minigames/index.ts`, banc et robots `test/asterix/minigames/`, lancement direct `dev.html?direct&minigame=NN`. Gain réel de M22 : 1 sesterce, aucune perte.
+- **Vague F préparée, jeu non publié** (18/11/2026) : tout est prêt sauf l'inscription dans `src/games/registry.ts`, qui attend la décision de publication de l'utilisatrice. Détail : « Vague F : publication ».
 
 ## Écarts de la vague D
 
@@ -41,9 +42,27 @@ Chaque fiche `minigames/mNN.md` détaille les écarts de son mini-jeu. Ceux qui 
 - **MUK** (M26, M34) : l'original les déroule au rythme du lecteur de CD ; ici 11 images par seconde (M26) ou la cadence du jeu (M34).
 - **Bruitage en boucle** (`16cb:0a4f`, option `0x200000`) : relancé dès qu'il se tait, un tick de silence au plus entre deux tours.
 - **Nettoyage `1a93:000e`** : l'original restaure le fond dans le tampon A sans le présenter ; le portage, qui présente A, garde à l'écran l'image d'avant le nettoyage tant que rien n'est redessiné (`Runtime.cleanup`, tous les écrans).
-- **Démo** : le clic simulé part après 400 ticks sans entrée réelle (l'original : 100 lectures d'entrées, une par image d'écran, soit le même délai pour un écran à 15 images par seconde, mais un délai lié à la vitesse de la machine dans les attentes) ; le tirage `rnd()` que l'original consomme à chaque lecture sans clic n'est pas fait (la suite des tirages d'une démo n'est pas celle de l'original) ; la démo n'écrit ni la sauvegarde du navigateur (D6), ni la configuration de REJOUER, ni `DS:1a02`. Après une démo, un REJOUER sans partie préalable reprend la durée et les objets réglés par la démo, comme l'original.
+- **Démo** : le clic simulé part à la lecture d'entrées qui suit la centième sans entrée réelle, et chacune de ces cent lectures consomme un tirage `rnd()`, comme l'original (`153c:0252`, `0272` ; `Runtime.demoRead`, compté par `dirs` et par `click`). Reste un écart de cadence : le portage lit les entrées une fois par tick au plus, alors qu'une boucle d'écran de l'original les lit une fois par passage, à la vitesse de la machine dans les écrans sans cadence (menu du tour, joueurs, réglages, quiz, attentes) et une fois par image dans les jeux cadencés. Le délai du clic simulé est donc de 100 ticks (1,7 s) partout ; dans un mini-jeu cadencé qui relit le clic à chaque tick, il revient plus souvent que dans l'original (toutes les 100 images), et le nombre de tirages consommés par seconde n'est pas celui d'une machine donnée : la suite des tirages d'une démo n'est pas celle de l'original. La démo n'écrit ni la sauvegarde du navigateur (D6), ni la configuration de REJOUER, ni `DS:1a02`. Après une démo, un REJOUER sans partie préalable reprend la durée et les objets réglés par la démo, comme l'original.
 - **Menu** : un clic sur une pancarte ou sur Idéfix lu entre deux images du menu choisit bien l'élément cliqué (il validait le choix courant).
-- **Dette relevée, non traitée** : l'animation de départ d'Idéfix au menu avance tous les 4 ticks, l'original tous les 2 (`19e2:09ac`), comme l'animation 4 (`19e2:0885`) ; les compteurs du bloc `GEN:stats` de `re-index.md` ne seront à jour qu'à la prochaine régénération (quatre lignes du tableau corrigées à la main, comme `keyfuncs.def.tsv`).
+- **Dette relevée, non traitée** : les compteurs du bloc `GEN:stats` de `re-index.md` ne seront à jour qu'à la prochaine régénération (quatre lignes du tableau corrigées à la main, comme `keyfuncs.def.tsv`). Corrigé en vague F : l'animation de départ d'Idéfix au menu et son animation 4 avancent tous les 2 ticks (`19e2:09ac`, `19e2:0885`).
+
+## Vague F : publication
+
+**Prêt** (18/11/2026) :
+
+- **Jaquette** `original/asterix/COVER.webp` (280 × 275) : la pochette du CD, prise en couverture du manuel (`npx vite-node scripts/asterix/cover.mts`) ; l'extraction la conserve.
+- **Manuel et carte du jeu** : `MANUEL.pdf` (4,9 Mo, édition Macintosh, partie française ; le scan porte le filigrane de son site d'origine) et `CARTE.pdf` (0,25 Mo, le plan du plateau), copiés tels quels de `archives/asterix/man-00700-asterix_le_defi_de_cesar-nt.rar` par `scripts/asterix-extract.sh` (taille et SHA-256 contrôlés, outil `unar`). Poids des fichiers suivis de `original/` : 895,8 Mio avant, 900,7 Mio après (limite du site : ~1 Go).
+- **Écran de présentation** (`ui/title.ts`) : jaquette, titre, description, « Continuer » et « Jouer », « Aide et crédits », « Manuel d'origine ». **Aide et crédits** (`ui/help.ts`, page commune `renderHelpPage`) : le jeu, souris et toucher, clavier, sauvegarde, à propos et droits (Infogrames Multimedia, Bertrand Brocard, IKOS, Philips, Pathé Interactive ; Les Éditions Albert René / Goscinny-Uderzo), liens vers le manuel, la carte et le code source. Textes dans `ui/copy.ts`.
+- **`GameDefinition`** complète (`src/games/asterix/index.ts` : identifiant, titre, description, jaquette et ses dimensions, texte alternatif, `start`).
+- **Section du README** rédigée dans `docs/asterix/readme-section.md` (ligne du tableau des jeux et section), à coller au moment de la publication.
+- **Corrections** : cadence des animations d'Idéfix au menu, lecture des entrées de la démo (« Écarts de la vague E »).
+
+**Reste, sur décision de l'utilisatrice** :
+
+1. **Licence** (risque 5) : Astérix est une licence exploitée (Les Éditions Albert René) ; aucun droit de redistribution des données. Même situation que les Schtroumpfs déjà publiés ; à trancher avant de publier.
+2. **Inscription** : dans `src/games/registry.ts`, `import { asterix } from "./asterix";` et l'entrée `asterix` dans la liste des jeux (le jeu apparaît alors sur l'accueil, à l'adresse `#/asterix`).
+3. **README** : coller `docs/asterix/readme-section.md` dans `README.md` (ligne du tableau, section après celle du Téléportaschtroumpf).
+4. **Validation de publication** : `npm test`, `typecheck`, `build`, poids de `dist/`, recette navigateur du jeu inscrit (accueil, carte du jeu, téléphone).
 
 ## Ce que l'étude a établi
 
@@ -92,7 +111,7 @@ Chaque fiche `minigames/mNN.md` détaille les écarts de son mini-jeu. Ceux qui 
 | **C** | Désassemblage du socle d'Astérix | Ghidra headless adapté (`scripts/asterix/re/`, sorties dans `archives/asterix/re/`), `docs/asterix/engine.md`, `re-index.md` : `main`, boucle, table des modules, menus, réglages, plateau, règles (dés, cases, objets, durée, fin) | chaque règle citée par son adresse ; niveau de confiance (sûr, probable, hypothèse) |
 | **D** | Jeu jouable sans mini-jeux | titre, réglages, choix des joueurs, plateau, déplacements, cases spéciales, quiz, fin de partie, carte et score ; mini-jeux remplacés par un écran provisoire | parcours sans tête d'une partie complète ; recette navigateur |
 | **E** (faite) | Mini-jeux, un par un, selon le gabarit `minigames/README.md` | un module par mini-jeu (`scenes/minigames/mNN.ts`), avec ses tables et ses trois difficultés ; sa fiche `minigames/mNN.md` | test par mini-jeu (victoire, défaite, chaque difficulté) ; parcours du robot ; comparaison DOSBox-X pour les vitesses ambiguës |
-| **F** | Publication | entrée dans `src/games/registry.ts`, `README.md`, jaquette, aide | `npm test`, `typecheck`, `build`, poids de `dist/` sous la limite ; recette navigateur complète, téléphone compris |
+| **F** (préparée) | Publication | jaquette, manuel et carte du jeu, écran de présentation, aide et crédits, section du README (`readme-section.md`) ; **reste** l'entrée dans `src/games/registry.ts` et le collage dans `README.md`, sur décision de l'utilisatrice | `npm test`, `typecheck`, `build`, poids de `dist/` sous la limite ; recette navigateur complète, téléphone compris |
 
 Les mini-jeux de la vague E sont indépendants les uns des autres : un sous-agent par mini-jeu, jamais deux sur les mêmes fichiers.
 

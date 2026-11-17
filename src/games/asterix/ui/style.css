@@ -5,13 +5,8 @@
   cursor: pointer;
 }
 
-/* Écran de présentation : note de reprise, contrôles et règles. */
-.asterix-title-note {
+/* Écran de présentation : description, note de reprise et note du manuel. */
+.asterix-title-text {
   margin: 0;
   font-size: 0.9rem;
-}
-
-.asterix-title-heading {
-  margin: 0.4rem 0 0;
-  font-size: 1rem;
 }

@@ -1,23 +1,36 @@
 import { copy as shared } from "../../ui/copy";
 import type { GameDefinition } from "../types";
 import { copy, mountApp } from "./ui/app";
-import { hasSavedGame, renderTitle } from "./ui/title";
+import { COVER_SIZE, COVER_URL, GAME_URL, hasSavedGame, renderTitle } from "./ui/title";
 
 /**
- * Astérix : le défi de César. Le jeu n'est pas encore inscrit dans `src/games/registry.ts` (publication : vague F, avec
- * la jaquette) ; d'ici là il se lance par la page de dev `ui/dev.html`.
+ * Astérix : le défi de César. Le jeu est prêt à être publié mais n'est pas inscrit dans `src/games/registry.ts`
+ * (`docs/asterix/plan.md`, vague F) : d'ici là il se lance par la page de dev `ui/dev.html`.
  */
 export const asterix: GameDefinition = {
   id: "asterix",
   title: copy.title,
   description: copy.description,
+  cover: COVER_URL,
+  coverSize: COVER_SIZE,
   coverAlt: copy.coverAlt,
   async start(container) {
-    // Écran de présentation, puis le jeu au clic sur « Jouer » (ce geste débloque aussi le son).
+    // Écran de présentation, puis le jeu au clic sur « Jouer » ou « Continuer » (ce geste débloque aussi le son).
     const launch = (resume: boolean): void => {
-      void mountApp(container, { base: `${import.meta.env.BASE_URL}asterix`, backLabel: shared.backToGames, resume });
+      void mountApp(container, { base: GAME_URL, backLabel: shared.backToGames, resume });
     };
-    // Partie interrompue : « Continuer » passe devant « Jouer » (qui repart du début et remplace la sauvegarde).
-    container.replaceChildren(renderTitle(() => launch(false), hasSavedGame() ? () => launch(true) : undefined));
+    const showTitle = (): void => {
+      container.replaceChildren(
+        renderTitle({
+          onStart: () => launch(false),
+          // Partie interrompue : « Continuer » passe devant « Jouer » (qui repart du début et remplace la sauvegarde).
+          onResume: hasSavedGame() ? () => launch(true) : undefined,
+          onHelp() {
+            void import("./ui/help").then(({ renderHelp }) => container.replaceChildren(renderHelp(GAME_URL, showTitle)));
+          },
+        }),
+      );
+    };
+    showTitle();
   },
 };

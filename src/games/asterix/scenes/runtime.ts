@@ -161,11 +161,10 @@ export interface VideoOptions {
 const TEXT_COLOR = 0x7e;
 
 /**
- * Démo : `153c:01c0` pose un clic simulé après 100 lectures sans entrée réelle (`DS:64ae`). L'original lit les entrées
- * une fois par image d'écran ; le portage lit le clic à chaque tick et compte donc en ticks, à la cadence des écrans du
- * socle (4 ticks par image) : un clic simulé toutes les 400 ticks.
+ * Démo : `153c:01c0` compte dans `DS:64ae` les lectures d'entrées sans entrée réelle, et pose un clic simulé à la
+ * lecture qui suit la centième (`153c:0263`).
  */
-export const DEMO_CLICK_TICKS = 400;
+export const DEMO_CLICK_READS = 100;
 
 export class Runtime {
   /** Planche commune `m43sa.hy8` (`DS:6451`) : pion, dé, flèche, croix, coche, porte de prison. */
@@ -200,9 +199,11 @@ export class Runtime {
   demo = false;
   /** `DS:64b1` : une entrée réelle a été lue ; en démo, chaque écran rend alors la main jusqu'au menu. */
   demoInterrupted = false;
-  /** `DS:64ae` : ticks lus sans entrée réelle depuis le dernier clic simulé, et tick du dernier décompte. */
+  /** `DS:64ae` : lectures sans entrée réelle depuis le dernier clic simulé, et tick de la dernière lecture comptée. */
   private idleReads = 0;
   private idleTick = -1;
+  /** Clic simulé posé par une lecture de la démo (`DS:4b6b = 1`), en attente du prochain `click`. */
+  private simulated = false;
   /**
    * Image restée à l'écran après un nettoyage `1a93:000e`. L'original restaure le fond dans le tampon A sans le
    * présenter : l'écran garde sa dernière image jusqu'au prochain dessin. Ici A est ce que le moteur présente : tant que
@@ -289,6 +290,7 @@ export class Runtime {
     const held = (input.pressed("up") ? UP : 0) | (input.pressed("down") ? DOWN : 0) | (input.pressed("left") ? LEFT : 0) | (input.pressed("right") ? RIGHT : 0);
     const read = held | this.latched;
     this.latched = 0;
+    this.demoRead();
     return read;
   }
 
@@ -300,7 +302,12 @@ export class Runtime {
   click(zones?: readonly (Zone | null)[], outsideValidates = false): Click {
     const { input } = this.ctx;
     if (!this.fresh()) return null;
-    if (!input.justPressed("validate")) return this.demo && this.simulatedClick() ? this.use("current") : null;
+    if (!input.justPressed("validate")) {
+      this.demoRead();
+      if (!this.simulated) return null;
+      this.simulated = false;
+      return this.use("current");
+    }
     const at = input.validateAt;
     if (!zones || at === null) return this.use("current");
     const index = zones.findIndex((z) => z !== null && at.x >= z.x1 && at.x <= z.x2 && at.y >= z.y1 && at.y <= z.y2);
@@ -321,6 +328,7 @@ export class Runtime {
     this.demo = true;
     this.demoInterrupted = false;
     this.idleReads = 0;
+    this.simulated = false;
   }
 
   /** `DS:64b2 = 0` à l'entrée du menu (`19e2:05c3`). */
@@ -328,6 +336,7 @@ export class Runtime {
     this.demo = false;
     this.demoInterrupted = false;
     this.idleReads = 0;
+    this.simulated = false;
   }
 
   /** Démo interrompue par une entrée réelle (`DS:64b2 && DS:64b1`) : l'écran courant doit rendre la main. */
@@ -335,15 +344,25 @@ export class Runtime {
     return this.demo && this.demoInterrupted;
   }
 
-  /** Clic simulé de la démo (`153c:0252`) : vrai une fois toutes les `DEMO_CLICK_TICKS` lectures sans entrée réelle. */
-  private simulatedClick(): boolean {
-    if (this.realInput()) return false;
+  /**
+   * Lecture des entrées en démo (`153c:0252`), faite par `dirs` et par `click` : sans entrée réelle, elle compte dans
+   * `DS:64ae` ; les `DEMO_CLICK_READS` premières consomment un tirage (`153c:0272` : le test `rnd() % 20 == 20` qui suit
+   * n'est jamais vrai), la suivante pose un clic simulé et remet le compteur à zéro. Une lecture par tick au plus : les
+   * écrans du portage relisent les entrées à chaque tick, là où une boucle d'écran de l'original les lit une fois par
+   * passage. Le clic posé attend le prochain `click` (l'original le garde dans `DS:4b6b` jusqu'à la lecture suivante).
+   */
+  private demoRead(): void {
+    if (!this.demo) return;
     const { ticks } = this.ctx.clock;
-    if (ticks === this.idleTick) return false;
+    if (ticks === this.idleTick) return;
     this.idleTick = ticks;
-    if (++this.idleReads <= DEMO_CLICK_TICKS) return false;
+    if (this.realInput()) return;
+    if (++this.idleReads <= DEMO_CLICK_READS) {
+      this.rnd();
+      return;
+    }
     this.idleReads = 0;
-    return true;
+    this.simulated = true;
   }
 
   /**

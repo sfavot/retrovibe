@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseHy8 } from "../../../src/engine/infogrames/data/hy8";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
-import { GAUGE_VALUES, MODULE, TOO_LATE, gainFor, olympiques, type OlympiquesState } from "../../../src/games/asterix/scenes/minigames/m30";
+import { MODULE, TOO_LATE, gainFor, type OlympiquesState } from "../../../src/games/asterix/scenes/minigames/m30";
 import type { Launched } from "../game-helpers";
-import { hasOriginalFiles, readOriginal } from "../helpers";
+import { exeTables, hasOriginalFiles, readOriginal } from "../helpers";
 import { launchMinigame, minigamePlayer, minigameState, untilMinigameOver } from "./harness";
 import { BEST_LEVEL, playM30, throwAt } from "./m30-player";
 
@@ -11,7 +10,9 @@ import { BEST_LEVEL, playM30, throwAt } from "./m30-player";
  * Mini-jeu des Jeux olympiques (`docs/asterix/minigames/m30.md`) : lancé seul par sa case, joué au clic ou au clavier sur
  * le moteur de test. L'état lu est celui que le mini-jeu expose aux robots (`rt.hint.state`).
  */
-registerMinigame(MODULE, olympiques);
+
+/** Table `DS:310e` de l'exécutable. */
+const GAUGE_VALUES = hasOriginalFiles ? exeTables().gauge : [];
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 /** Couleur d'un pixel de la dernière image présentée. */
@@ -34,12 +35,9 @@ async function throwAndFinish(level: number, seed = 1): Promise<{ run: Launched;
 
 describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu des Jeux olympiques (M30)", () => {
   it("la table de la jauge est celle de l'exécutable (DS:310e)", () => {
-    const exe = readOriginal("ASTERIX.EXE");
-    const view = new DataView(exe.buffer, exe.byteOffset, exe.byteLength);
-    const at = view.getUint16(8, true) * 16 + (0x2de2 - 0x1000) * 16 + 0x310e;
-    expect(GAUGE_VALUES.map((_, i) => view.getInt16(at + 2 * i, true))).toEqual([...GAUGE_VALUES]);
+    expect(GAUGE_VALUES).toEqual([0, 0, 0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
     expect(BEST_LEVEL).toBe(8);
-    expect([1, 4, 5, 6, 7, 8, 9, 10].map(gainFor)).toEqual([0, 0, 1, 1, 2, 3, 0, 0]);
+    expect([1, 4, 5, 6, 7, 8, 9, 10].map((level) => gainFor(GAUGE_VALUES, level))).toEqual([0, 0, 1, 1, 2, 3, 0, 0]);
   });
 
   it("la case 33 lance le mini-jeu inscrit, après son annonce : la vidéo de l'élan, jauge vide", async () => {
@@ -92,7 +90,7 @@ describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu des Jeux olympiques (M30)
   });
 
   for (const level of [5, 6, 7, 8]) {
-    it(`clic à ${level} cases : le javelot part et retombe, ${gainFor(level)} sesterce(s)`, async () => {
+    it(`clic à ${level} cases : le javelot part et retombe, ${gainFor(GAUGE_VALUES, level)} sesterce(s)`, async () => {
       const { run, state } = await throwAndFinish(level, 10 + level);
       expect(state).toMatchObject({ level, clicked: true, stopped: true, frame: 40 });
       expect(minigamePlayer(run).sesterces).toBe(GAUGE_VALUES[level]);

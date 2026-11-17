@@ -1,10 +1,9 @@
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
 import type { Point } from "../../data/exe";
 import type { MinigameEntry } from "../../game/rules";
 import type { Play } from "../game";
 import type { Script, Zone } from "../runtime";
 import { changeSesterces } from "../squares";
-import { Anim, beginPlay, endPlay, fadeSoundOut, flushInput } from "./common";
+import { ARROW_RGB, Anim, arrowCursor, beginPlay, endPlay, fadeSoundOut, flushInput, movePointer } from "./common";
 
 /**
  * Mini-jeux « Les sangliers » (case 20, `MDF/28`) et « Pirates à bâbord ! » (case 52, `MDF/29`) : un seul segment,
@@ -54,14 +53,6 @@ export const DRIFT_STEP = 2;
 export const DRIFT_MAX = 300;
 export const DRIFT_MIN = 0x14;
 
-/** Curseur flèche `153c:05b4` : 9 × 15 octets en `DS:114c`, dessinés avec la valeur + 1 (`0xff` noir, `0xfe` couleur 255). */
-const CURSOR_WIDTH = 9;
-const CURSOR_HEIGHT = 15;
-const CURSOR_SHAPE = 0x114c;
-/** Couleur 255, celle de la flèche (`153c:06b9(0x80, 0, 0x80)`). */
-const CURSOR_COLOR = [0x80, 0, 0x80] as const;
-/** Emplacements des cibles : `DS:3182 + 0x3c × jeu + 4 × emplacement`. */
-const SPOTS = 0x3182;
 /** Bit de miroir du numéro de sprite (`DS:709c = 0x8000`). */
 const MIRROR = 0x8000;
 
@@ -136,20 +127,6 @@ export function targetBox(state: SangliersState): Zone {
   };
 }
 
-/** Lit dans l'exécutable les emplacements des deux jeux et la forme de la flèche (décision D4). */
-function readTables(bytes: Uint8Array): { spots: Point[][]; cursor: Uint8Array } {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  // Format MZ : l'image suit l'en-tête ; DGROUP est le segment `2de2` d'une image chargée en `1000`.
-  const data = view.getUint16(8, true) * 16 + (0x2de2 - 0x1000) * 16;
-  const spots = GAMES.map((_, game) =>
-    Array.from({ length: SPOT_COUNT }, (_spot, i) => {
-      const at = data + SPOTS + game * SPOT_COUNT * 4 + i * 4;
-      return { x: view.getInt16(at, true), y: view.getInt16(at + 2, true) };
-    }),
-  );
-  return { spots, cursor: bytes.slice(data + CURSOR_SHAPE, data + CURSOR_SHAPE + CURSOR_WIDTH * CURSOR_HEIGHT) };
-}
-
 /** `24e3:0406(jeu)`. */
 export function* script(play: Play, entry: MinigameEntry): Script {
   const { rt, board } = play;
@@ -158,17 +135,15 @@ export function* script(play: Play, entry: MinigameEntry): Script {
   const game = entry.argument === 1 ? 1 : 0;
   const pirates = game === 1;
   const files = GAMES[game];
-  const [appearSound, leaveSound, hitSounds, missSounds, sheets, executable] = yield* rt.load(
+  const [appearSound, leaveSound, hitSounds, missSounds, sheets] = yield* rt.load(
     Promise.all([
       resources.sound(files.appear),
       resources.sound(files.leave),
       Promise.all(files.hits.map((name) => resources.sound(name))),
       Promise.all(files.misses.map((name) => resources.sound(name))),
       Promise.all(files.sheets.map((name) => resources.hy8(name))),
-      resources.bytes("ASTERIX.EXE"),
     ]),
   );
-  const tables = readTables(executable);
   yield* rt.picture(files.picture, 1);
   yield* rt.music(files.music);
   rt.commit();
@@ -178,7 +153,7 @@ export function* script(play: Play, entry: MinigameEntry): Script {
   const level = player.action;
   const s: SangliersState = {
     game,
-    spots: tables.spots[game],
+    spots: rt.tables.targetSpots[game],
     phase: PHASE_IDLE,
     spot: 0,
     variant: 0,
@@ -271,27 +246,16 @@ export function* script(play: Play, entry: MinigameEntry): Script {
   };
 
   /** `153c:05b4` : la flèche, pointe en haut à gauche sur la position du pointeur, coupée aux bords de l'écran. */
-  const drawCursor = (): void => {
-    const { work } = surface;
-    for (let row = 0; row < CURSOR_HEIGHT; row++) {
-      for (let column = 0; column < CURSOR_WIDTH; column++) {
-        const value = tables.cursor[row * CURSOR_WIDTH + column];
-        const x = input.mouseX + column;
-        const y = input.mouseY + row;
-        if (value !== 0 && x < SCREEN_WIDTH && y < SCREEN_HEIGHT) work[y * SCREEN_WIDTH + x] = (value + 1) & 0xff;
-      }
-    }
-  };
+  const arrow = arrowCursor(rt);
 
   yield* flushInput(rt);
-  input.warpMouse(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-  palette.setColor(0xff, ...CURSOR_COLOR);
+  palette.setColor(0xff, ...ARROW_RGB);
 
   /** Image du jeu sans la flèche : celle-ci est reposée à chaque tick, à la position courante du pointeur. */
   const frame = new Uint8Array(surface.work.length);
   const present = (): void => {
     surface.work.set(frame);
-    drawCursor();
+    arrow.drawAtPointer();
   };
   /** Sens de la dérive (variable locale `BP − 1`). */
   let driftingBack = false;
@@ -317,7 +281,7 @@ export function* script(play: Play, entry: MinigameEntry): Script {
       }
       yield;
       // Pointeur au clavier (`1902:03c0`, actif tant que `DS:0144 == 1`).
-      input.moveMouseByKeys();
+      movePointer(rt);
       if (rt.click() !== null) shot ??= input.validateAt ?? { x: input.mouseX, y: input.mouseY };
       present();
     }
@@ -328,7 +292,7 @@ export function* script(play: Play, entry: MinigameEntry): Script {
   rt.restore();
   while (voice.effectPlaying) yield;
   yield* rt.wait(25);
-  yield* fadeSoundOut(rt, 1);
+  yield* fadeSoundOut(rt);
   yield* rt.cleanup();
   yield* rt.fadeOut(16);
 

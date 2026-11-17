@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createSession } from "../../../src/games/asterix/game/state";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   GAIN,
   MODULE,
@@ -8,14 +7,12 @@ import {
   TARGET_SHIFT,
   ZONE_END,
   ZONE_FIRST,
-  coloriages,
-  parseArrow,
   timeLimit,
   viewSeconds,
   type ColoriagesState,
 } from "../../../src/games/asterix/scenes/minigames/m35";
 import type { Launched } from "../game-helpers";
-import { hasOriginalFiles, readOriginal } from "../helpers";
+import { exeTables, hasOriginalFiles } from "../helpers";
 import { launchMinigame, minigamePlayer, minigameState, untilMinigameOver } from "./harness";
 import { isBlank, paintWrong, paintZone, playM35, selectSwatch, swatchColor, swatchFor, swatchPoint, zonePixel, zonesLeft } from "./m35-player";
 
@@ -23,7 +20,6 @@ import { isBlank, paintWrong, paintZone, playM35, selectSwatch, swatchColor, swa
  * Mini-jeu des Coloriages (`docs/asterix/minigames/m35.md`) : lancé seul par sa case, joué à la souris ou au clavier sur
  * le moteur de test. L'état lu est celui que le mini-jeu expose aux robots (`rt.hint.state`).
  */
-registerMinigame(MODULE, coloriages);
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 const rgb = (run: Launched, color: number): number[] => Array.from(run.rt.ctx.palette.colors.subarray(color * 3, color * 3 + 3));
@@ -35,7 +31,7 @@ const solved = (run: Launched): boolean => {
 
 describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu des Coloriages (M35)", () => {
   it("la flèche du curseur lue dans l'exécutable : 9 × 15, contour et intérieur", () => {
-    const arrow = parseArrow(readOriginal("ASTERIX.EXE"));
+    const arrow = exeTables().arrow;
     expect(arrow).toHaveLength(135);
     expect(Array.from(arrow.subarray(0, 9))).toEqual([0xff, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect(Array.from(arrow.subarray(18, 27))).toEqual([0xff, 0xfe, 0xff, 0, 0, 0, 0, 0, 0]);
@@ -43,7 +39,7 @@ describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu des Coloriages (M35)", ()
   });
 
   it("la case 27 lance le mini-jeu inscrit, après son annonce : le modèle, puis les zones blanchies", async () => {
-    const run = await launchMinigame({ module: MODULE }, { seed: 3 });
+    const run = await launchMinigame({ module: MODULE, reflexion: 1 }, { seed: 3 });
     expect(run.rt.hint.module).toBe(MODULE);
     expect(minigamePlayer(run).pos).toBe(26);
     expect(loaded(run, "K60TE4")).toBe(true);

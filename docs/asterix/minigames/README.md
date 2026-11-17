@@ -7,13 +7,16 @@ Brief commun aux agents qui portent un mini-jeu. Le pilote est **M22, les Poisso
 | Module | Jeu | Segment | État |
 |---|---|---|---|
 | M22 | Des poissons pas très frais | `2580` | porté (pilote) |
-| M23 à M36 | les 14 autres | voir `../re-index.md` | écran provisoire |
+| M23 à M36 | les 14 autres | voir `../re-index.md` | portés (une fiche `mNN.md` chacun) |
+
+Les outils que les mini-jeux avaient écrits chacun de leur côté sont mis en commun (`common.ts`, `runtime.ts`, `data/exe.ts`, `Session`) : les tableaux ci-dessous en donnent la liste.
 
 ## Principe
 
 - Référence unique : le désassemblage (`archives/asterix/re/disasm.txt` pour les arguments exacts, `decomp/<seg>_<off>_*.c` pour la structure). Lire **tout le segment**, pas seulement la fonction d'entrée. La décompilation Ghidra perd des arguments (`FUN_1a93_016d()` au lieu de `(3)`) : toujours recouper avec les `PUSH` du désassemblage ; les arguments sont empilés de droite à gauche, un `PUSH` 32 bits vaut deux mots.
 - Un mini-jeu est un **script** (générateur) : une fonction d'origine = une fonction du portage, un `yield` = un tick de 1/60 s, primitives de `scenes/runtime.ts` citées par adresse. Pas de classe `Scene`.
-- Les nombres (positions, vitesses, durées, probabilités) sont ceux du code ; les tables de données lues dans l'exécutable passent par `data/exe.ts` (décision D4) quand il y en a.
+- Les nombres (positions, vitesses, durées, probabilités) sont ceux du code ; les tables de données de l'exécutable sont lues par `data/exe.ts` (décision D4) et arrivent par `rt.tables` : un mini-jeu ne charge jamais `ASTERIX.EXE` lui-même et ne recopie pas une table en dur. Pour une table de plus : un champ de `ExeTables`, lu dans `parseExeTables` (`dataOffset(exe, 0xNNNN)` donne la position de `DS:NNNN`).
+- Une mémoire que l'original garde d'une partie à l'autre (décision D13) est un champ de `Session` (`game/state.ts`), pas une variable du module.
 - Ordre des tirages `rt.rnd()` identique à l'original (les tests et les parties rejouées en dépendent).
 
 ## Fichiers à créer
@@ -27,12 +30,12 @@ Brief commun aux agents qui portent un mini-jeu. Le pilote est **M22, les Poisso
 
 Et **une ligne** dans chacun de ces deux fichiers partagés (relire le fichier juste avant de l'éditer, d'autres agents y ajoutent la leur) :
 
-- `src/games/asterix/scenes/minigames/index.ts` : `registerMinigame(mNN.MODULE, mNN.script);` ;
+- `src/games/asterix/scenes/minigames/index.ts` : `registerMinigame(mNN.MODULE, mNN.script);` (le test n'a pas à réinscrire le mini-jeu) ;
 - `test/asterix/minigames/players.ts` : `NN: playMNN,`.
 
 Cas particuliers : le segment `24e3` sert M28 et M29 (un fichier, deux inscriptions, l'argument est dans `entry.argument`) ; `23d1:09c1` (M34, Idéfix) est aussi lancé du menu avec l'argument 0.
 
-**Ne pas modifier** pendant la vague : `common.ts` (des mini-jeux), `scenes/runtime.ts`, `scenes/minigame.ts`, le moteur `src/engine/infogrames/`, les autres jeux. Si un outil manque, l'écrire dans son `mNN.ts` et le signaler dans le rapport : il sera mis en commun ensuite. Les tables de `../re-index.md` entre marqueurs `GEN` sont générées : ne pas les éditer.
+Un outil qui manque et servira à plusieurs mini-jeux va dans `common.ts` (primitive de la bibliothèque du jeu), `scenes/runtime.ts` (socle) ou `data/exe.ts` (table), jamais en copie locale. Le moteur `src/engine/infogrames/` est partagé avec les Schtroumpfs : n'y toucher qu'avec leurs tests verts. Les tables de `../re-index.md` entre marqueurs `GEN` sont générées : ne pas les éditer.
 
 ## Squelette du script
 
@@ -73,20 +76,26 @@ Le script est appelé par `minigameSquare` (`scenes/minigame.ts`) **après l'ann
 | Dessin | `rt.sprite(planche, n, x, y)`, `rt.text`, `rt.frame`, `rt.fill`, `rt.copyRect` | `2bdb:0477`, `2cd0:001e`, `2c8b`, `2c66`, `1481:045e` |
 | Sons | `rt.effect(son)` (canal mélangé), `rt.ctx.voice.play(son)` (voie), `rt.music(nom)`, `rt.stopSound()`, `rt.waitSound()` | `16cb:0a4f`, `16cb:08c9` |
 | Voix | `rt.voice(n, clé)` : `K{dossier}TE{n + 1}` ; la clé d'un dossier est `DS:6412 + 100 × DS:6410` (table `VOICE_FOLDERS`) | `135a:02ac` |
-| Vidéo | `rt.video(nom, options)`, `rt.moduleVideo(module, lettre, options)`, `rt.overlayVideo` ; options `overlay` (`0x1000`), `shift` (`0x4000`), `keepPalette` (`0x4`), `loop`, `skip`, `draw` et `target` (rappel d'image `0x80`), `poll` ; marqueurs `08` : `video.marker` dans `draw` | `1948:04cc`, `15d7:06eb`, `07f7` |
+| Vidéo | `rt.video(nom, options)`, `rt.moduleVideo(module, lettre, options)`, `rt.namedVideo(nom)`, `rt.overlayVideo` ; options `overlay` (`0x1000`), `shift` (`0x4000`), `keepPalette` (`0x4`), `loop`, `skip`, `target` (tampon de décodage, `0x80`), `draw` (composition, à chaque tick), `poll` (à chaque tick, avant le décodage) | `1948:04cc`, `15d7:06eb`, `07f7`, `08e9` |
+| Vidéo qui pilote un jeu | options `block(video, n)` (`cb_bloc` : une fois par image, `video.marker` vaut encore celui de l'image précédente) et `frame(video, n)` (`cb_image` : une fois par image décodée, `video.marker` est celui de l'image ; rendre vrai arrête la vidéo une fois l'image montrée). Le rappel lit `video.marker` (`DS:6425`) et le remet à 0 comme l'original. Ne pas compter `video.shown` dans `draw` | `1948:018e`, `1948:0373` |
+| Démo | `rt.demo`, `rt.demoStopped` : en démo `rt.click()` rend un clic simulé ; un mini-jeu n'a rien à tester | `153c:0252` |
 | Sesterces | `changeSesterces(rt, joueur, delta, attendre)` (`scenes/squares.ts`) | `1d24:0912` |
 
 `scenes/minigames/common.ts` :
 
 | Outil | Origine |
 |---|---|
-| `Anim` (`init`, `select`, `step`, `wrapped`, `sprite`, `draw`) : objet animation HY8 | `1345:0082`, `0007`/`0143`, `00c0` |
+| `Anim` (`init`, `select`, `step`, `wrapped`, `sprite`, `draw`) : objet animation HY8 ; `rank` (`+0x16`, prochaine image), `tag` (`+0x1a`, second mot de l'image posée), `dx`, `dy` (`+0x1c`, `+0x1e`, déplacement cumulé) | `1345:0082`, `0007`/`0143`, `00c0` |
 | `restoreRects(rt, ...rectangles)` : rectangles du fond vers l'écran, avec les arrondis d'origine | `1481:07c3` |
-| `flushInput(rt)` | `153c:0004` |
+| `flushInput(rt)` : entrées vidées, pointeur recentré | `153c:0004` |
+| Pointeur libre : `pointerAt(rt)`, `movePointer(rt)` (flèches, à chaque tick), `centrePointer(rt)`, `pointerClick(rt)` (clic gauche 1 ou droit 2 avec sa position) | `DS:4b67`, `1902:03c0`, `153c:0030`, `DS:4b6b` |
+| Curseurs : `arrowCursor(rt)` (flèche 9 × 15, couleur 255 à poser avec `ARROW_RGB`), `libraryCursor(rt)` (16 × 16) ; `SoftCursor` : `draw`, `drawAtPointer`, `erase`, `forget` | `153c:05b4` (`DS:114c`), `18a1:0262` (`DS:11d4`) |
+| `waitReading(rt, cs, lire, retenu)` : attente qui retient un clic | portage |
+| `openMuk(rt, nom)`, `playMuk(rt, nom, rappel)`, `MUK_FPS` | `19b9:000c`, `19b9:019f` |
 | `waitFrame(ticks, chaqueTick)` | `1831:030a(n, rappel)` |
 | `touchDirs(rt, zones)`, `TOP_HALF`, `BOTTOM_HALF`, `LEFT_HALF`, `RIGHT_HALF` : direction par clic ou toucher | D11 |
 | `EffectLoop` : bruitage en boucle | `16cb:0a4f` option `0x200000` |
-| `fadeSoundOut(rt, cs)` : fondu sonore puis voie coupée | `13e5:0039` |
+| `fadeSoundOut(rt)` : fondu sonore (20 cs par cran, l'argument de l'original est ignoré) puis voie coupée | `13e5:0039` |
 | `beginPlay(rt, module, état)`, `endPlay(rt)` : repère des robots | portage |
 
 Pièges relevés sur le pilote :
@@ -96,7 +105,9 @@ Pièges relevés sur le pilote :
 - L'original dessine dans le tampon A et ne montre qu'à `1a93:003a` ; dans le portage tout le travail d'une image se fait dans un même tick, avant le `yield`. Si le code relit la mémoire vidéo (`DS:402e`), garder une copie de la dernière image présentée (voir `screen` dans `m22.ts`).
 - Un clic ne reste en file qu'un tick : le lire à chaque tick (`waitFrame`), pas une fois par image de jeu. Les directions, elles, sont retenues par `rt.dirs()`.
 - Bruitages `16cb:0a4f` : dans l'original ils ne s'entendent que si la voie principale joue (`../engine.md` §5.2) ; le noter si un mini-jeu en lance voie muette.
-- Les mini-jeux des Schtroumpfs (`src/games/teleportaschtroumpf/scenes/minigames/`) sont des classes `Scene`, pas des scripts : s'en inspirer pour les mécaniques communes aux deux jeux, sans importer leur code. Équivalents : `Clip` → `rt.video` ; `SoundHush` → `fadeSoundOut` ; `copyRect`, `fillRect`, `drawFrame` → `rt.copyRect`, `rt.fill`, `rt.frame` ; `Pointer` (curseur libre) → `rt.ctx.input.mouseX/Y` et `moveMouseByKeys()`, à écrire dans le premier mini-jeu à pointeur puis à mettre en commun.
+- Les mini-jeux des Schtroumpfs (`src/games/teleportaschtroumpf/scenes/minigames/`) sont des classes `Scene`, pas des scripts : s'en inspirer pour les mécaniques communes aux deux jeux, sans importer leur code. Équivalents : `Clip` → `rt.video` ; `SoundHush` → `fadeSoundOut` ; `copyRect`, `fillRect`, `drawFrame` → `rt.copyRect`, `rt.fill`, `rt.frame` ; `Pointer` (curseur libre) → `pointerAt`, `movePointer` et les curseurs de `common.ts`.
+- Nettoyage `1a93:000e` (`rt.cleanup()`) : l'original restaure le fond dans le tampon A **sans le présenter**. Le portage garde donc à l'écran l'image d'avant le nettoyage tant que rien n'est redessiné (fondu, voix, chargement) : inutile de recopier l'écran dans le fond pour l'éviter. `surface.commitBackground()` reste à sa place là où l'original le fait (`138e:037e`, `1a93:0051`).
+- Sous une vraie souris, le navigateur ne peut pas déplacer le pointeur : `centrePointer` et la dérive du pointeur de M28/M29 n'ont d'effet qu'au clavier et au toucher.
 
 ## Clic et toucher directs (D11)
 
@@ -110,7 +121,7 @@ L'écart est noté dans `mNN.md`. Aucun texte n'est ajouté à l'écran du jeu ;
 ## Robot et tests
 
 - `beginPlay(rt, MODULE, state)` expose l'état vivant du mini-jeu : `rt.screen === "minigame"`, `rt.hint = { module, state }`. Le robot le lit mais ne l'écrit jamais : il joue au clavier et à la souris (`run.tap("ArrowUp")`, `run.click(x, y)`).
-- `test/asterix/minigames/harness.ts` : `launchMinigame({ module, action, reflexion }, { seed })` lance le mini-jeu seul par sa case (annonce comprise) et s'arrête au début de la phase jouable ; `minigameState<T>(run)`, `minigamePlayer(run)` (ses sesterces), `untilMinigameOver(run)`.
+- `test/asterix/minigames/harness.ts` : `launchMinigame({ module, action, reflexion }, { seed })` (niveaux 0 par défaut, les plus simples) lance le mini-jeu seul par sa case (annonce comprise) et s'arrête au début de la phase jouable ; `minigameState<T>(run)`, `minigamePlayer(run)` (ses sesterces), `untilMinigameOver(run)`.
 - `mNN-player.ts` exporte `playMNN: MinigamePlayer = async (run, win) => …` : joue jusqu'à la fin de la phase jouable, pour gagner ou pour perdre. Inscrit dans `players.ts`, il sert aussi au **parcours** (`test/asterix/playthrough.test.ts`) : à l'écran `"minigame"`, le robot du parcours appelle le robot du module, ou répond à l'écran provisoire s'il n'y en a pas. Le rapport du parcours compte les mini-jeux portés joués.
 - `mNN.test.ts` couvre au moins : la case lance bien le script inscrit ; victoire à chaque niveau (0, 1, 2) avec l'effet du niveau mesuré ; défaite ; gains et pertes exacts ; clic ou toucher direct ; `run.rt.missing` vide. Le temps est simulé : une partie de 30 s coûte quelques dizaines de millisecondes.
 - Le test de l'écran provisoire (`game-flow.test.ts`) choisit seul un mini-jeu pas encore porté : rien à y changer.

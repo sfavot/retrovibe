@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   DANGER_FRAMES,
   GAIN,
@@ -14,7 +13,6 @@ import {
   MOVE_NONE,
   MOVE_RIGHT,
   START_POS,
-  tempete,
   videoName,
   zoneOf,
   type TempeteState,
@@ -28,7 +26,6 @@ import { DANGER_FIRST, DANGER_LAST, playM27, wavesOf, type Wave } from "./m27-pl
  * Mini-jeu de la Tempête (`docs/asterix/minigames/m27.md`) : lancé seul par sa case, joué au clavier ou au clic sur le
  * moteur de test. L'état lu est celui que le mini-jeu expose aux robots (`rt.hint.state`).
  */
-registerMinigame(MODULE, tempete);
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 

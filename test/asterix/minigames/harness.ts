@@ -10,9 +10,9 @@ import { launch, type LaunchOptions, type Launched } from "../game-helpers";
 /** Robot d'un mini-jeu : joue la phase jouable (écran `"minigame"`) jusqu'à sa fin, pour gagner ou pour perdre. */
 export type MinigamePlayer = (run: Launched, win: boolean) => Promise<void>;
 
-/** Lance le mini-jeu et avance jusqu'au début de sa phase jouable. */
+/** Lance le mini-jeu et avance jusqu'au début de sa phase jouable. Niveaux par défaut : 0, le plus simple. */
 export async function launchMinigame(start: MinigameStart, options: LaunchOptions = {}): Promise<Launched> {
-  const run = await launch({ ...options, minigame: start });
+  const run = await launch({ ...options, minigame: { reflexion: 0, action: 0, ...start } });
   await run.untilScreen("minigame");
   return run;
 }

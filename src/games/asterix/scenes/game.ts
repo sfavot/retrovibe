@@ -46,8 +46,8 @@ const TURN_ARROWS: readonly (readonly [number, number])[] = [
 
 /**
  * `1abf:01b4(v)` : lance la voix d'annonce sans attendre et fait clignoter le pion par pas de 10 cs, 8 pas au moins puis
- * jusqu'à la fin de la voix. Un clic gauche coupe la voix ; sans voix (`v < 0`), il arrête aussitôt le clignotement
- * (`1abf:022f`).
+ * jusqu'à la fin de la voix. Un clic gauche coupe la voix (pas un clic simulé de la démo) ; sans voix (`v < 0`), il
+ * arrête aussitôt le clignotement (`1abf:022f`).
  */
 function* announce(play: Play, voice: number): Script {
   const { rt, board } = play;
@@ -61,10 +61,13 @@ function* announce(play: Play, voice: number): Script {
     if (i % 2 !== 0) rt.restore();
     if (yield* rt.waitOrClick(10)) {
       if (voice < 0) return;
-      yield* board.drawPawn();
-      rt.stopSound();
-      yield* rt.waitRelease();
-      break;
+      // `1abf:0233` : en démo, un clic simulé ne coupe pas l'annonce ; il faut une entrée réelle.
+      if (!rt.demo || rt.demoInterrupted) {
+        yield* board.drawPawn();
+        rt.stopSound();
+        yield* rt.waitRelease();
+        break;
+      }
     }
     i++;
     if (i > 7 && (voice < 0 || !rt.ctx.voice.voicePlaying)) break;
@@ -257,12 +260,15 @@ function* playTurn(play: Play): Script {
       roll = true;
     }
   }
-  if (game.quit || game.abandoned) return;
+  // Démo interrompue par une entrée réelle : le tour s'arrête après le menu (`1abf:10cd`, `1abf:1141`).
+  if (game.quit || game.abandoned || rt.demoStopped) return;
 
   const face = yield* rollDie(play);
   yield* movePawn(play, face);
   // Avec tous ses objets on gagne dès l'arrivée : la case n'est pas jouée (§9.9).
   if (testVictory(game)) return;
+  // `1abf:1199`.
+  if (rt.demoStopped) return;
 
   // Effet de la case d'arrivée (table `1abf:13cf`) ; espion, piège et surprise-espion font jouer la nouvelle case.
   let chained = false;
@@ -299,7 +305,8 @@ function* playTurn(play: Play): Script {
     else if (square === SQUARE.surprise) chained = yield* surpriseSquare(play);
     testVictory(game);
     if (!chained && !again) return;
-    if (game.quit || game.abandoned || game.victory) return;
+    // `1abf:13b8` : la démo interrompue ne joue pas la case suivante.
+    if (game.quit || game.abandoned || game.victory || rt.demoStopped) return;
   }
 }
 
@@ -357,6 +364,11 @@ function* endScreen(rt: Runtime): Script {
 /**
  * `1abf:2431` : une partie entière. `replay` : REJOUER (sans les écrans de réglage) ; `resume` : reprise d'une partie
  * sauvegardée, au début du tour où elle s'était arrêtée. Rend faux si la partie a été annulée à l'écran des joueurs.
+ *
+ * Partie de démo (`rt.demo`) : elle ne mémorise pas la configuration de REJOUER (`1abf:24b7`), ne baisse pas
+ * `session.noGameYet` (`1abf:256e`) et ne touche pas à la sauvegarde du navigateur (décision D6). Une entrée réelle
+ * l'arrête : pendant les réglages la partie est annulée (`1abf:244e`, `1abf:2460`), ensuite elle s'arrête à la fin du
+ * tour en cours, sans écran de fin (`1abf:25c5`, `1abf:2607`).
  */
 export function* playGame(rt: Runtime, replay: boolean, resume: GameSave | null = null): Script<boolean> {
   const { session } = rt;
@@ -369,18 +381,19 @@ export function* playGame(rt: Runtime, replay: boolean, resume: GameSave | null 
     session.objectsRequired = resume.state.objectsRequired;
     session.shownRow = -1;
   } else {
-    clearSave(storage);
+    if (!rt.demo) clearSave(storage);
     rt.game = initGame(session, rt.rnd, replay);
     if (!replay) {
-      if (!(yield* choosePlayers(rt))) return false;
+      if (!(yield* choosePlayers(rt)) || rt.demoStopped) return false;
       yield* settings(rt);
+      if (rt.demoStopped) return false;
     }
   }
   const { game } = rt;
   const board = new Board(rt);
   const play: Play = { rt, board };
   yield* board.loadPortraits();
-  if (!replay && !resume) saveSetup(session, game);
+  if (!replay && !resume && !rt.demo) saveSetup(session, game);
 
   // Le chrono 1 (temps de partie) démarre ici, après les réglages.
   rt.startChrono(1);
@@ -388,20 +401,22 @@ export function* playGame(rt: Runtime, replay: boolean, resume: GameSave | null 
 
   do {
     game.abandoned = false;
-    // Décision D6 : la partie est sauvegardée au début de chaque tour.
-    writeSave(storage, {
-      version: SAVE_VERSION,
-      state: structuredClone(game),
-      rng: rt.ctx.rng.current,
-      elapsed: rt.elapsedCentiseconds(1),
-      setup: structuredClone(session.saved),
-    });
+    // Décision D6 : la partie est sauvegardée au début de chaque tour (pas une partie de démo).
+    if (!rt.demo) {
+      writeSave(storage, {
+        version: SAVE_VERSION,
+        state: structuredClone(game),
+        rng: rt.ctx.rng.current,
+        elapsed: rt.elapsedCentiseconds(1),
+        setup: structuredClone(session.saved),
+      });
+    }
     if (game.current === 0) {
       // Début d'un tour de table : moins de 60 s restantes, c'est le dernier.
       game.elapsedRead = rt.chrono(1);
       if (game.duration - game.elapsedRead < 60) game.lastRound = true;
       if (game.round === 1 || game.players.length > 1) yield* scoreScreen(rt, game.round === 1);
-      session.noGameYet = false;
+      if (!rt.demo) session.noGameYet = false;
       game.beforeFirstRound = false;
     }
     yield* playTurn(play);
@@ -413,9 +428,11 @@ export function* playGame(rt: Runtime, replay: boolean, resume: GameSave | null 
       game.round++;
       if (game.lastRound) game.over = true;
     }
-  } while (!game.over && !game.quit);
+  } while (!game.over && !game.quit && !rt.demoStopped);
 
-  clearSave(storage);
+  if (!rt.demo) clearSave(storage);
+  // `1abf:2607` : la démo interrompue revient au menu sans écran de fin ni voix d'adieu.
+  if (rt.demoStopped) return true;
   if (!game.quit) yield* endScreen(rt);
   else {
     // FIN demandée : aucune image, seulement les voix d'adieu de Panoramix.

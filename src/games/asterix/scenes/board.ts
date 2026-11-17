@@ -91,7 +91,8 @@ export class Board {
 
   /**
    * `1d24:038d` : défilement de 66 ou 132 pixels par pas de 2, sur 251 pixels de large. L'ancienne image est d'abord
-   * réaffichée avec le panneau du joueur courant ; Échap ou un bouton coupe le défilement.
+   * réaffichée avec le panneau du joueur courant ; Échap ou un bouton coupe le défilement, sauf en démo (`1d24:052d`,
+   * `1d24:05d9`).
    */
   private *scroll(next: Picture, distance: number): Script {
     const { rt } = this;
@@ -103,7 +104,7 @@ export class Board {
     for (let offset = 2; offset <= distance; offset += 2) {
       rt.copyRect(old, 0, offset, 0, 0, BOARD_WIDTH, 199 - offset);
       rt.copyRect(next.pixels, 0, 199 - distance, 0, 199 - offset, BOARD_WIDTH, offset);
-      if (rt.buttonHeld || rt.ctx.input.pressed("skip")) break;
+      if (!rt.demo && (rt.buttonHeld || rt.ctx.input.pressed("skip"))) break;
       yield;
     }
   }

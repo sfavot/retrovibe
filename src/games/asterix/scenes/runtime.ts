@@ -141,12 +141,31 @@ export interface VideoOptions {
    * les pixels codés y sont écrits, ce qu'il contenait reste visible ailleurs.
    */
   target?: Uint8Array;
-  /** Appelé à chaque tick de la lecture ; rendre vrai arrête la vidéo (rappel de la pause M48). */
+  /** Appelé à chaque tick de la lecture, avant le décodage ; rendre vrai arrête la vidéo (rappel de la pause M48). */
   poll?(): boolean;
+  /**
+   * `cb_bloc` de `1948:04cc` : appelé une fois par image, à la lecture de son bloc vidéo. Le marqueur `08` d'une image
+   * suit son bloc vidéo dans le fichier : `video.marker` (`DS:6425`) vaut encore ce qu'il valait à la fin de l'image
+   * précédente, le marqueur d'une image n'est donc vu ici qu'à l'image suivante.
+   */
+  block?(video: VideoPlayer, index: number): void;
+  /**
+   * `cb_image` de `1948:04cc` : appelé une fois par image décodée, dans l'ordre, après `block` et après le décodage sur
+   * `target` ; `video.marker` porte le marqueur lu avec cette image. Rendre vrai arrête la vidéo une fois l'image
+   * montrée (l'original lève `DS:631e`). `index` est le numéro de l'image, 0 pour la première.
+   */
+  frame?(video: VideoPlayer, index: number): boolean | void;
 }
 
 /** Couleur des textes après le nettoyage `1a93:000e` (police `DS:19e8`). */
 const TEXT_COLOR = 0x7e;
+
+/**
+ * Démo : `153c:01c0` pose un clic simulé après 100 lectures sans entrée réelle (`DS:64ae`). L'original lit les entrées
+ * une fois par image d'écran ; le portage lit le clic à chaque tick et compte donc en ticks, à la cadence des écrans du
+ * socle (4 ticks par image) : un clic simulé toutes les 400 ticks.
+ */
+export const DEMO_CLICK_TICKS = 400;
 
 export class Runtime {
   /** Planche commune `m43sa.hy8` (`DS:6451`) : pion, dé, flèche, croix, coche, porte de prison. */
@@ -177,6 +196,20 @@ export class Runtime {
   hint: Record<string, unknown> = {};
   /** Fichiers demandés et absents (l'original affiche une boîte d'erreur) : doit rester vide. */
   readonly missing: string[] = [];
+  /** `DS:64b2` : démonstration automatique en cours (§3.4), lancée par le menu après 60 s sans clic. */
+  demo = false;
+  /** `DS:64b1` : une entrée réelle a été lue ; en démo, chaque écran rend alors la main jusqu'au menu. */
+  demoInterrupted = false;
+  /** `DS:64ae` : ticks lus sans entrée réelle depuis le dernier clic simulé, et tick du dernier décompte. */
+  private idleReads = 0;
+  private idleTick = -1;
+  /**
+   * Image restée à l'écran après un nettoyage `1a93:000e`. L'original restaure le fond dans le tampon A sans le
+   * présenter : l'écran garde sa dernière image jusqu'au prochain dessin. Ici A est ce que le moteur présente : tant que
+   * le script n'y a rien redessiné, c'est cette image qui est montrée (`showHeld`, `tick`).
+   */
+  private held: Uint8Array | null = null;
+  private showingHeld = false;
 
   constructor(
     readonly ctx: SceneContext,
@@ -238,6 +271,12 @@ export class Runtime {
    */
   tick(): void {
     const { input } = this.ctx;
+    // Le tampon A reprend son contenu (le fond) le temps du pas du script.
+    if (this.showingHeld) {
+      this.ctx.surface.restoreBackground();
+      this.showingHeld = false;
+    }
+    if (this.realInput()) this.demoInterrupted = true;
     if (input.justPressed("up")) this.latched |= UP;
     if (input.justPressed("down")) this.latched |= DOWN;
     if (input.justPressed("left")) this.latched |= LEFT;
@@ -260,13 +299,51 @@ export class Runtime {
    */
   click(zones?: readonly (Zone | null)[], outsideValidates = false): Click {
     const { input } = this.ctx;
-    if (!this.fresh() || !input.justPressed("validate")) return null;
+    if (!this.fresh()) return null;
+    if (!input.justPressed("validate")) return this.demo && this.simulatedClick() ? this.use("current") : null;
     const at = input.validateAt;
     if (!zones || at === null) return this.use("current");
     const index = zones.findIndex((z) => z !== null && at.x >= z.x1 && at.x <= z.x2 && at.y >= z.y1 && at.y <= z.y2);
     // `outsideValidates` : écrans où les zones ne font que choisir (niveaux, réglages) ; cliquer ailleurs valide.
     if (index < 0) return outsideValidates ? this.use("current") : null;
     return this.use(index);
+  }
+
+  /** Une entrée réelle est en cours : un bouton ou une direction, tenu ou tout juste enfoncé (`153c:023d`). */
+  private realInput(): boolean {
+    const { input } = this.ctx;
+    const actions = ["validate", "cancel", "up", "down", "left", "right"] as const;
+    return actions.some((action) => input.pressed(action) || input.justPressed(action));
+  }
+
+  /** `DS:64b2 = 1` : la démo commence, sans interruption relevée ni lecture comptée (`19e2:08dc`). */
+  startDemo(): void {
+    this.demo = true;
+    this.demoInterrupted = false;
+    this.idleReads = 0;
+  }
+
+  /** `DS:64b2 = 0` à l'entrée du menu (`19e2:05c3`). */
+  endDemo(): void {
+    this.demo = false;
+    this.demoInterrupted = false;
+    this.idleReads = 0;
+  }
+
+  /** Démo interrompue par une entrée réelle (`DS:64b2 && DS:64b1`) : l'écran courant doit rendre la main. */
+  get demoStopped(): boolean {
+    return this.demo && this.demoInterrupted;
+  }
+
+  /** Clic simulé de la démo (`153c:0252`) : vrai une fois toutes les `DEMO_CLICK_TICKS` lectures sans entrée réelle. */
+  private simulatedClick(): boolean {
+    if (this.realInput()) return false;
+    const { ticks } = this.ctx.clock;
+    if (ticks === this.idleTick) return false;
+    this.idleTick = ticks;
+    if (++this.idleReads <= DEMO_CLICK_TICKS) return false;
+    this.idleReads = 0;
+    return true;
   }
 
   /**
@@ -318,7 +395,28 @@ export class Runtime {
     this.textColor = TEXT_COLOR;
     this.latched = 0;
     yield* this.waitRelease();
+    const { work, background } = this.ctx.surface;
+    const shown = sameBytes(work, background) ? null : work.slice();
     this.restore();
+    this.held = shown;
+  }
+
+  /**
+   * Après le pas du script (`ScriptScene.render`) : si un nettoyage vient de restaurer le fond et que le script n'a rien
+   * redessiné depuis, l'image d'avant le nettoyage reste montrée, comme sur l'écran de l'original.
+   */
+  showHeld(): void {
+    if (!this.held || this.showingHeld) return;
+    const { work, background } = this.ctx.surface;
+    if (sameBytes(work, background)) {
+      work.set(this.held);
+      this.showingHeld = true;
+    } else this.held = null;
+  }
+
+  /** L'écran est redessiné : l'image gardée par le nettoyage n'a plus cours. */
+  private release(): void {
+    this.held = null;
   }
 
   /** `1a93:02a5(n)` sans le clic : le chrono 0 a atteint `n` secondes. */
@@ -353,11 +451,15 @@ export class Runtime {
 
   /** `1481:0448` : restaure le fond (B vers A). */
   restore(): void {
+    this.release();
     this.ctx.surface.restoreBackground();
   }
 
   /** `1a93:0051` : l'écran courant devient le fond, et la palette courante est envoyée. */
   commit(): void {
+    // Après un nettoyage, l'écran est encore l'image gardée : c'est elle qui devient le fond.
+    if (this.held) this.ctx.surface.work.set(this.held);
+    this.release();
     this.ctx.surface.commitBackground();
     this.ctx.fade.reset();
   }
@@ -417,6 +519,7 @@ export class Runtime {
       fade.out(steps);
       while (fade.active) yield;
     }
+    this.release();
     surface.clear();
   }
 
@@ -456,6 +559,7 @@ export class Runtime {
   draw(picture: Picture, flags = 0): void {
     const { surface, palette, fade } = this.ctx;
     const visible = !palette.black;
+    this.release();
     surface.drawMcg(picture);
     if (!(flags & 4) || !visible) palette.load(picture.palette);
     if (flags & 0x4000) this.shiftUp();
@@ -534,7 +638,7 @@ export class Runtime {
     const { voice } = this.ctx;
     voice.play(sound);
     while (voice.voicePlaying) {
-      if (n >= 0 && this.click() !== null) {
+      if (n >= 0 && !this.demo && this.click() !== null) {
         voice.stop();
         break;
       }
@@ -573,16 +677,29 @@ export class Runtime {
       }
     }
     const skip = options.skip ?? "any";
+    const callbacks = options.block !== undefined || options.frame !== undefined;
     let interrupted = false;
     do {
       let done = false;
+      /** Un rappel d'image a demandé l'arrêt : la vidéo s'arrête une fois cette image montrée. */
+      let stop = false;
+      /** `DS:6425` tel que les rappels le voient et le laissent. */
+      let marker = 0;
+      /** Images décodées dont les rappels restent à appeler : numéro, et marqueur lu avec l'image s'il y en a un. */
+      const decoded: { video: VideoPlayer; index: number; read: number | null }[] = [];
       const scene = new VideoScene({
         file: name,
         skippable: false,
         backdrop,
         keepPalette: options.keepPalette,
         draw: options.draw && ((_ctx, video) => options.draw!(video)),
-        onFrame: options.target && ((_ctx, _frame, _markers, video) => video.compose(options.target!)),
+        onFrame:
+          options.target || callbacks
+            ? (_ctx, index, markers, video) => {
+                if (options.target) video.compose(options.target);
+                if (callbacks) decoded.push({ video, index, read: markers.length > 0 ? video.marker : null });
+              }
+            : undefined,
         onEnd: () => {
           done = true;
         },
@@ -590,12 +707,19 @@ export class Runtime {
       yield scene.load(ctx);
       scene.enter(ctx);
       for (;;) {
-        if ((skip !== "none" && this.skipPressed(skip === "any")) || options.poll?.()) {
+        if ((skip !== "none" && this.skipPressed(skip === "any")) || options.poll?.() || stop) {
           interrupted = true;
           break;
         }
         scene.update(ctx);
         if (done) break;
+        for (const { video, index, read } of decoded.splice(0)) {
+          video.marker = marker;
+          options.block?.(video, index);
+          if (read !== null) video.marker = read;
+          if (options.frame?.(video, index) === true) stop = true;
+          marker = video.marker;
+        }
         scene.render(ctx);
         yield;
       }
@@ -611,9 +735,19 @@ export class Runtime {
 
   /** `15d7:06eb(module, c, 0, options)` : vidéo interruptible ; `15d7:07f7` est la même, non interruptible. */
   *moduleVideo(module: number, letter: number, options: VideoOptions = {}): Script<boolean> {
-    // `15d7:06eb` attend d'abord le relâchement des boutons et d'Échap.
-    if ((options.skip ?? "any") !== "none") while (this.buttonHeld || this.ctx.input.pressed("skip")) yield;
+    if ((options.skip ?? "any") !== "none") yield* this.waitSkipRelease();
     return yield* this.video(Runtime.videoName(module, letter), options);
+  }
+
+  /** `15d7:08e9(nom)` : boutons et Échap relâchés, puis la vidéo `nom` en plein écran, interruptible (`0x22D08`). */
+  *namedVideo(name: string): Script<boolean> {
+    yield* this.waitSkipRelease();
+    return yield* this.video(name);
+  }
+
+  /** Attente du relâchement des boutons et d'Échap, en tête de `15d7:06eb` et de `15d7:08e9`. */
+  *waitSkipRelease(): Script {
+    while (this.buttonHeld || this.ctx.input.pressed("skip")) yield;
   }
 
   /** Surimpression `0x5000` de Panoramix et des personnages qui parlent par-dessus un écran du jeu. */
@@ -636,6 +770,11 @@ export class Runtime {
   }
 }
 
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 /**
  * Scène unique du jeu : déroule le script racine, un pas par tick. Les écrans dessinent directement dans le tampon de
  * travail pendant leur pas (c'est ce que le moteur présente), donc `render` n'a rien à faire.
@@ -652,6 +791,8 @@ export class ScriptScene implements Scene {
   finished = false;
   /** Appelé à chaque tick avant le pas du script (lecture des entrées du socle). */
   beforeStep: (() => void) | null = null;
+  /** Appelé avant chaque présentation, après les pas du script. */
+  beforePresent: (() => void) | null = null;
 
   constructor(private readonly start: (ctx: SceneContext) => Script) {}
 
@@ -696,5 +837,7 @@ export class ScriptScene implements Scene {
     }
   }
 
-  render(): void {}
+  render(): void {
+    this.beforePresent?.();
+  }
 }

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   DELAY_PER_LEVEL,
   GAIN,
@@ -13,7 +12,6 @@ import {
   ROCK_ALIGN_Y,
   ROCK_SPEED,
   ROCK_SPEED_PER_LEVEL,
-  ciel,
   type CielState,
 } from "../../../src/games/asterix/scenes/minigames/m36";
 import type { Launched } from "../game-helpers";
@@ -23,9 +21,8 @@ import { dodge, playM36, threatened } from "./m36-player";
 
 /**
  * Mini-jeu du Ciel sur la tête (`docs/asterix/minigames/m36.md`) : lancé seul par sa case, joué au clavier ou au clic
- * sur le moteur de test. Inscrit ici en attendant `minigames/index.ts`.
+ * sur le moteur de test.
  */
-registerMinigame(MODULE, ciel);
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 /** Images de la vidéo : marqueur 1 (fin de la pluie) et marqueur 2 (gagné). */

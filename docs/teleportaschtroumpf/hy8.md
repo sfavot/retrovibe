@@ -60,7 +60,7 @@ nb frames × 8 octets { [u16 sprite|drapeaux][u16 = 1][i16 dx][i16 dy] }
 
 - `12d7:00c1` (`12d7:00e9`..`00fe`) recopie `u16[0]` dans `+0x18` de l'objet : c'est le premier argument de `31fe:0481` (index de sprite sur 12 bits, drapeaux miroir 0x8000 / 0x2000 sur les bits hauts), par exemple `FUN_31fe_0481(uRam0003ccf4, 0x46, 0xb0, hy8)` en `1c78:0005`.
 - Le compteur de frames passe à 0 quand il atteint le total (`12d7:0120`), l'animation boucle donc ; le jeu teste ce retour à 0 pour détecter la fin (`iRam0003cd16 == 0` en `1c78:0005`).
-- `u16[1]` est copié en `+0x1a`, `dx`/`dy` sont cumulés en `+0x1c`/`+0x1e` (`12d7:00d2`, `12d7:00e1`) : aucun code étudié ne lit ces champs. Dans les 742 frames des fichiers, `u16[1]` vaut toujours 1 et `dx = dy = 0`. Leur rôle (durée ? déplacement par frame ?) est une supposition.
+- `u16[1]` est copié en `+0x1a`, `dx`/`dy` sont cumulés en `+0x1c`/`+0x1e` (`12d7:00d2`, `12d7:00e1`) : aucun code de `SMURF.EXE` ne lit ces champs. Dans les 742 frames des fichiers des Schtroumpfs, `u16[1]` vaut toujours 1 et `dx = dy = 0`. Ils ne sont pourtant pas inertes : *Astérix : le défi de César*, sur le même moteur, s'en sert. `u16[1]` y est une marque libre lue par le jeu (2 dans `m31s.hy8` sur l'image qui déclenche un bruitage, segment `27ba`), pas une durée, et le déplacement cumulé est lu par la Bagarre (segment `26a6`) : voir `docs/asterix/minigames/m31.md` et `m32.md`.
 - Les animations vides (`00 00`) existent : S02A000S (1 animation sans frame), S33A001S (36 sur 37).
 
 ## Section finale (`h[3]`..`h[5]`)

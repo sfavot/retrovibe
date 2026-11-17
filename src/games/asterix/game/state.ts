@@ -131,6 +131,12 @@ export interface Session {
   noGameYet: boolean;
   /** `DS:2198` : dernière rangée affichée par l'écran de jeu, −1 au départ. */
   shownRow: number;
+  /** `DS:2a00` (M24) : dernier tirage `rnd() & 7` de la Loupe. */
+  lastLoupeDraw: number;
+  /** `DS:245a` (M25) : dernière image des Anachronismes. */
+  lastAnachronism: number;
+  /** `DS:6ad8` (M35) : dernier dessin des Coloriages tiré à chaque niveau Réflexion. */
+  lastColouring: number[];
   /** `DS:1f9d`, `DS:1f9f` : derniers réglages (ceux de l'image au lancement). */
   duration: number;
   objectsRequired: number;
@@ -147,6 +153,9 @@ export function createSession(defaults: { duration: number; objectsRequired: num
     lastComment: 0,
     noGameYet: true,
     shownRow: -1,
+    lastLoupeDraw: 0,
+    lastAnachronism: 0,
+    lastColouring: [0, 0, 0],
     duration: defaults.duration,
     objectsRequired: defaults.objectsRequired,
     saved: { players: [], duration: defaults.duration, objectsRequired: defaults.objectsRequired },

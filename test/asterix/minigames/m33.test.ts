@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   ABSENT,
   COLUMNS,
@@ -11,7 +10,6 @@ import {
   arrowZone,
   columnZone,
   gainFor,
-  hieroglyphes,
   paletteZone,
   symbolCount,
   timeLimit,
@@ -27,7 +25,6 @@ import { compose, playM33, validate } from "./m33-player";
  * moteur de test. L'inscription définitive est dans `scenes/minigames/index.ts` ; elle est refaite ici pour que le test
  * ne dépende pas de l'ordre des portages.
  */
-registerMinigame(MODULE, hieroglyphes);
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 

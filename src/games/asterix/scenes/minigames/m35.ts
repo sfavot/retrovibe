@@ -1,9 +1,8 @@
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
-import type { Session } from "../../game/state";
+import { SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
 import type { Play } from "../game";
 import type { Script } from "../runtime";
 import { changeSesterces } from "../squares";
-import { beginPlay, endPlay, fadeSoundOut, flushInput, waitFrame } from "./common";
+import { ARROW_RGB, arrowCursor, beginPlay, centrePointer, endPlay, fadeSoundOut, flushInput, movePointer, pointerClick, waitFrame, type PointerClick } from "./common";
 
 /**
  * Mini-jeu « Coloriages » (case 27, `MDF/35`, segment `1fe6` : `1fe6:0043` et `1fe6:000c`).
@@ -64,38 +63,9 @@ export const FRAME_TICKS = 12;
 const FLASHES = 30;
 /** Pas du pointeur au clavier pendant le jeu (`DS:4048 = 1` : 2 pixels par tick). */
 const KEY_POINTER_SHIFT = 1;
-/** Couleur 255 du curseur (`153c:06b9(0x80, 0, 0x80)`). */
-const CURSOR_RGB = [0x80, 0, 0x80] as const;
 
 /** Clé du dossier de voix `MDF/35` (`DS:6412 = 0x45`, `DS:6410 = 1`). */
 const VOICE_KEY = 169;
-
-const EXECUTABLE = "ASTERIX.EXE";
-/** Segment de chargement de la décompilation et segment de données (comme `data/exe.ts`). */
-const LOAD_SEGMENT = 0x1000;
-const DGROUP = 0x2de2;
-const ARROW_WIDTH = 9;
-const ARROW_HEIGHT = 15;
-
-/** Flèche 9 × 15 du curseur logiciel (`DS:114c`, lue dans `ASTERIX.EXE` : décision D4), un octet par pixel, 0 = transparent. */
-export function parseArrow(exe: Uint8Array): Uint8Array {
-  const view = new DataView(exe.buffer, exe.byteOffset, exe.byteLength);
-  const at = view.getUint16(8, true) * 16 + (DGROUP - LOAD_SEGMENT) * 16 + 0x114c;
-  return exe.slice(at, at + ARROW_WIDTH * ARROW_HEIGHT);
-}
-
-/**
- * `DS:6ad8` : dernier dessin tiré à chaque niveau, jamais remis à zéro entre deux parties (décision D13 : mémoire de
- * séance). Gardé ici faute de champ dans `Session` ; à zéro au départ, le premier dessin d'un niveau n'est donc jamais
- * le premier de son groupe.
- */
-const LAST_PICTURES = new WeakMap<Session, number[]>();
-
-function lastPictures(session: Session): number[] {
-  let memory = LAST_PICTURES.get(session);
-  if (!memory) LAST_PICTURES.set(session, (memory = [0, 0, 0]));
-  return memory;
-}
 
 /** État du mini-jeu (variables locales de `1fe6:0043`), exposé aux robots par `rt.hint.state`. */
 export interface ColoriagesState {
@@ -129,16 +99,19 @@ export function* coloriages(play: Play): Script {
   const level = player.reflexion;
   rt.voiceKey = VOICE_KEY;
 
-  const memory = lastPictures(rt.session);
+  // `DS:6ad8` : dernier dessin tiré à chaque niveau, jamais remis à zéro entre deux parties (décision D13). À zéro au
+  // départ : le premier dessin d'un niveau n'est donc jamais le premier de son groupe.
+  const memory = rt.session.lastColouring;
   let drawn: number;
   do drawn = rt.rnd() & 3;
   while (memory[level] === drawn);
   memory[level] = drawn;
   const picture = drawn + 4 * level;
   yield* rt.picture(PICTURES[picture].file, 1);
-  const [selectSound, rightSound, wrongSound, arrow] = yield* rt.load(
-    Promise.all([resources.sound("b35-01b.voc"), resources.sound("b24-03a.voc"), resources.sound("m35b0000.voc"), resources.bytes(EXECUTABLE).then(parseArrow)]),
+  const [selectSound, rightSound, wrongSound] = yield* rt.load(
+    Promise.all([resources.sound("b35-01b.voc"), resources.sound("b24-03a.voc"), resources.sound("m35b0000.voc")]),
   );
+  const arrow = arrowCursor(rt);
   yield* rt.music("m35m.voc");
   rt.commit();
 
@@ -180,26 +153,17 @@ export function* coloriages(play: Play): Script {
     const top = s.selected * SWATCH_STEP;
     rt.frame(SWATCH_X1, top + 1, SWATCH_X2, top + 0x17, BLANK_COLOR);
     rt.frame(SWATCH_X1 + 1, top + 2, SWATCH_X2 - 1, top + 0x16, 1);
-    if (!cursor) return;
-    for (let row = 0; row < ARROW_HEIGHT; row++) {
-      for (let column = 0; column < ARROW_WIDTH; column++) {
-        const shape = arrow[row * ARROW_WIDTH + column];
-        const x = input.mouseX + column;
-        const y = input.mouseY + row;
-        if (shape !== 0 && x < SCREEN_WIDTH && y < SCREEN_HEIGHT) surface.work[y * SCREEN_WIDTH + x] = (shape + 1) & 0xff;
-      }
-    }
+    if (cursor) arrow.drawAtPointer();
   };
 
   /** Clic gauche ou droit de ce tick, retenu avec sa position jusqu'à la prochaine lecture de la boucle. */
-  let pending: { button: number; x: number; y: number } | null = null;
+  let pending: PointerClick | null = null;
   const pointer = (): void => {
-    input.moveMouseByKeys();
-    const button = rt.click() !== null ? 1 : input.justPressed("cancel") ? 2 : 0;
-    if (button !== 0) pending = { button, x: input.mouseX, y: input.mouseY };
+    movePointer(rt);
+    pending = pointerClick(rt) ?? pending;
     redraw(true);
   };
-  const takeClick = (): { button: number; x: number; y: number } | null => {
+  const takeClick = (): PointerClick | null => {
     const click = pending;
     pending = null;
     return click;
@@ -238,8 +202,8 @@ export function* coloriages(play: Play): Script {
     reveal();
   }
 
-  palette.setColor(0xff, ...CURSOR_RGB);
-  input.warpMouse(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+  palette.setColor(0xff, ...ARROW_RGB);
+  centrePointer(rt);
   redraw(true);
   const keyPointerShift = input.keyPointerShift;
   input.keyPointerShift = KEY_POINTER_SHIFT;
@@ -270,7 +234,7 @@ export function* coloriages(play: Play): Script {
 
   while (voice.effectPlaying) yield;
   yield* rt.wait(25);
-  yield* fadeSoundOut(rt, 20);
+  yield* fadeSoundOut(rt);
   yield* rt.wait(25);
   if (s.won) {
     yield* changeSesterces(rt, player, GAIN, true);

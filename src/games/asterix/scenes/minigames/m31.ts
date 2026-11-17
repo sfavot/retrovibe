@@ -1,4 +1,3 @@
-import type { Hy8, Hy8Frame } from "../../../../engine/infogrames/data/hy8";
 import type { Play } from "../game";
 import { UP, VOICES, type Script } from "../runtime";
 import { changeSesterces } from "../squares";
@@ -103,34 +102,6 @@ export interface FakirState {
   frames: number;
 }
 
-/**
- * Objet animation dont le segment `27ba` lit deux champs de plus que le sprite : le rang (`+0x16`, la prochaine image :
- * testé à 0 et à 7) et le second mot de l'image posée (`+0x1a` : 2 sur l'image qui déclenche le bruitage).
- */
-class RankedAnim extends Anim {
-  rank = 0;
-  tag = 0;
-  private frames: readonly Hy8Frame[];
-
-  constructor(sheet: Hy8) {
-    super(sheet);
-    this.frames = sheet.animations[0].frames;
-  }
-
-  override select(animation: number): void {
-    super.select(animation);
-    this.rank = 0;
-    this.frames = this.sheet.animations[animation].frames;
-  }
-
-  override step(): void {
-    super.step();
-    if (this.frames.length === 0) return;
-    this.tag = this.frames[this.rank].duration;
-    this.rank = (this.rank + 1) % this.frames.length;
-  }
-}
-
 /** `27ba:0561`. */
 export function* fakir(play: Play): Script {
   const { rt, board } = play;
@@ -156,7 +127,7 @@ export function* fakir(play: Play): Script {
   yield* rt.picture(`M31DA00${count - CARPETS_MIN}.mcc`, 1);
   yield* rt.music("m31m.voc");
   surface.commitBackground();
-  const hero = new RankedAnim(sheet);
+  const hero = new Anim(sheet);
   hero.select(s.pose);
   hero.step();
   /** `DS:73b7` : bruitage de la pose en cours, joué sur l'image marquée de son animation. */
@@ -165,9 +136,9 @@ export function* fakir(play: Play): Script {
   const screen = new Uint8Array(surface.work.length);
 
   // `27ba:0009` : un tapis par étage, abscisse tirée jusqu'à ce que son ordonnée tienne dans la course, sens tiré.
-  const anims: RankedAnim[] = [];
+  const anims: Anim[] = [];
   for (let i = 0; i < count; i++) {
-    const anim = new RankedAnim(sheet);
+    const anim = new Anim(sheet);
     anim.select(CARPET_FLY);
     anim.step();
     let x: number;

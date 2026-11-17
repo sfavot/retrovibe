@@ -17,12 +17,10 @@ import { Anim, beginPlay, endPlay, waitFrame } from "./common";
 export const MODULE = 30;
 
 /**
- * Table `DS:310e` (20 mots) : valeur de la case de jauge `n`, 0 trop tôt, 1 à 3 la zone du lancer (et les sesterces
- * gagnés), 4 trop tard. L'indice 0 (jauge vide) n'est jamais lu. Copie de l'exécutable, vérifiée par le test contre
- * `ASTERIX.EXE` (à lire par `data/exe.ts`, décision D4, quand le fichier ne sera plus partagé entre agents).
+ * Valeur d'une case de la jauge (table `DS:310e`, 20 mots, lue dans l'exécutable : `rt.tables.gauge`, décision D4) : 0
+ * trop tôt, 1 à 3 la zone du lancer (et les sesterces gagnés), 4 trop tard, à partir de laquelle un clic n'est plus
+ * accepté. L'indice 0 (jauge vide) n'est jamais lu.
  */
-export const GAUGE_VALUES = [0, 0, 0, 0, 0, 1, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4] as const;
-/** Valeur à partir de laquelle un clic n'est plus accepté. */
 export const TOO_LATE = 4;
 /** Marqueurs `08` de la vidéo : 1 une case de jauge de plus (images 31 à 39), 2 l'instant du lancer (image 40). */
 export const MARKER_STEP = 1;
@@ -65,9 +63,9 @@ export interface OlympiquesState {
   frame: number;
 }
 
-/** Sesterces du lancer pour une jauge figée à `level` cases (0 : trop court). */
-export function gainFor(level: number): number {
-  const value = GAUGE_VALUES[level];
+/** Sesterces du lancer pour une jauge figée à `level` cases (0 : trop court), d'après la table `DS:310e`. */
+export function gainFor(gauge: readonly number[], level: number): number {
+  const value = gauge[level];
   return value > 0 && value < TOO_LATE ? value : 0;
 }
 
@@ -102,6 +100,7 @@ export function* olympiques(play: Play): Script {
   const { rt, board } = play;
   const { surface, resources, palette, fade, voice, input } = rt.ctx;
   const player = board.player;
+  const GAUGE_VALUES = rt.tables.gauge;
   yield* rt.fadeOut(16);
   const [throwSound, landingSound, sheet, track, field] = yield* rt.load(
     Promise.all([
@@ -145,18 +144,19 @@ export function* olympiques(play: Play): Script {
   yield* rt.video("m30a.mux", {
     skip: "none",
     target: buffer,
-    poll: () => s.stopped,
-    draw: (video) => {
+    poll: () => {
       // Un clic ne reste en file qu'un tick : il est retenu jusqu'à l'image suivante (`DS:4b6b == 1` : bouton gauche).
-      if (rt.click() !== null) pressed = true;
-      if (video.shown !== s.frame) {
-        s.frame = video.shown;
-        judge(video, pressed || input.pressed("validate"));
-        pressed = false;
-        if (s.level !== 0) gauge(buffer);
-      }
-      surface.work.set(buffer);
+      if (!s.stopped && rt.click() !== null) pressed = true;
+      return false;
     },
+    frame: (video, index) => {
+      s.frame = index;
+      judge(video, pressed || input.pressed("validate"));
+      pressed = false;
+      if (s.level !== 0) gauge(buffer);
+      return s.stopped;
+    },
+    draw: () => surface.work.set(buffer),
   });
   endPlay(rt);
 
@@ -186,7 +186,7 @@ export function* olympiques(play: Play): Script {
       yield* waitFrame(FRAME_TICKS);
     } while (!javelin.wrapped);
     yield* rt.waitSound();
-    const gain = gainFor(s.level);
+    const gain = gainFor(GAUGE_VALUES, s.level);
     if (gain > 0) yield* changeSesterces(rt, player, gain, true);
     yield* rt.cleanup();
   }

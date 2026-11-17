@@ -4,6 +4,7 @@ import { AnimationPlayer } from "../../../engine/infogrames/sprites";
 import { parseCredits, type CreditsLine } from "../data/credits";
 import { intro } from "./boot";
 import { playGame } from "./game";
+import { idefix as idefixGame } from "./minigames/m34";
 import { DOWN, LEFT, RIGHT, Runtime, UP, VOICES, colorBounds, type Script, type Zone } from "./runtime";
 import type { GameSave } from "./save";
 import { confirm } from "./screens";
@@ -19,13 +20,19 @@ const IDEFIX = { x: 0x1c, y: 0x62, width: 0x37, height: 0x4b };
 const CHOICE_IDEFIX = 4;
 /** Partie « longue » : au retour d'une partie de plus de 20 tours de table, Panoramix dit `K63TE08`. */
 const LONG_GAME_ROUNDS = 20;
+/** Délai de la validation `1a93:02a5(60)` du menu : sans clic, la démonstration commence. */
+const DEMO_DELAY = 60;
 
-/** `15d7:0e8b` : les trois vidéos de la règle du jeu, chacune sautée d'un clic. */
+/**
+ * `15d7:0e8b` : les trois vidéos de la règle du jeu, chacune sautée d'un clic. En démo, une entrée réelle arrête la suite
+ * (`15d7:0ec3`, `15d7:0f01`) : les vidéos restantes et le fondu final ne sont pas joués.
+ */
 function* rules(rt: Runtime): Script {
   yield* rt.fadeOut();
   for (const name of ["M44AB.mux", "M44AC.mux", "M44AD.mux"]) {
     yield* rt.video(name, { skip: "buttons" });
     while (rt.buttonHeld || rt.ctx.input.pressed("skip")) yield;
+    if (rt.demoStopped) return;
   }
   yield* rt.fadeOut();
 }
@@ -107,13 +114,19 @@ function* credits(rt: Runtime): Script {
 }
 
 /**
- * Boucle du menu principal : JOUER, REJOUER, REGLE, FIN et Idéfix. Rend la main quand le joueur a confirmé FIN.
- * Écarts : la démonstration automatique (60 s sans clic) et le jeu d'Idéfix hors partie (mini-jeu M34, vague E) ne sont
- * pas portés.
+ * Boucle du menu principal : JOUER, REJOUER, REGLE, FIN et Idéfix (son jeu hors partie, `23d1:09c1(0)`). Rend la main
+ * quand le joueur a confirmé FIN.
+ *
+ * Démonstration (§1.3) : après 60 s sans clic (chrono lancé une fois à l'entrée du menu, la navigation ne le relance
+ * pas), le menu lance lui-même le choix `rotation` (`[BP−4]` de `main`) en mode démo (`19e2:08d9`) : le jeu d'Idéfix,
+ * puis la règle du jeu, puis une partie, et ainsi de suite. La démo s'arrête à l'entrée suivante dans le menu
+ * (`19e2:05c3`).
  */
 function* mainMenu(rt: Runtime): Script {
   const { palette, resources, surface, voice } = rt.ctx;
   let longGame = false;
+  // `[BP−4]` : prochain choix de la démo. Il survit aux retours au menu, et suit aussi les choix faits au clic.
+  let rotation = CHOICE_IDEFIX;
   for (;;) {
     rt.voiceKey = VOICES.panoramix;
     yield* rt.fadeOut();
@@ -136,15 +149,30 @@ function* mainMenu(rt: Runtime): Script {
       if (frame) surface.drawFrame(idefix, frame, 0x23, 0xad);
     };
     if (longGame) {
-      yield* rt.voice(7);
+      // Au retour d'une partie de démo, la voix n'est pas dite (`19e2:0597`).
+      if (!rt.demo) yield* rt.voice(7);
       longGame = false;
     }
     yield* rt.music("m07m.voc");
+    // `19e2:05c3` : la démo est finie.
+    rt.endDemo();
     // Zones (D11) : les pancartes par leur couleur, et Idéfix.
     const zones: (Zone | null)[] = [122, 123, 124, 125].map((color) => colorBounds(picture.pixels, [color], 4));
     zones.push({ x1: IDEFIX.x, y1: IDEFIX.y, x2: IDEFIX.x + IDEFIX.width, y2: IDEFIX.y + IDEFIX.height });
     let choice = 0;
     let refresh = true;
+    let clicked = false;
+    // Clic de cette lecture : sur une zone (D11), il choisit d'abord l'option visée. Rend vrai s'il valide.
+    const readClick = (): boolean => {
+      const click = rt.click(zones);
+      if (typeof click === "number" && click !== choice) {
+        choice = click;
+        refresh = true;
+        if (click === CHOICE_IDEFIX) animate(3);
+        else if (state >= 3) animate(0);
+      }
+      return click !== null;
+    };
     rt.screen = "menu";
     rt.startChrono(0);
     for (;;) {
@@ -173,13 +201,7 @@ function* mainMenu(rt: Runtime): Script {
         select(0);
         animate(0);
       }
-      const click = rt.click(zones);
-      if (typeof click === "number" && click !== choice) {
-        choice = click;
-        refresh = true;
-        if (click === CHOICE_IDEFIX) animate(3);
-        else if (state >= 3) animate(0);
-      }
+      let pressed = readClick();
       if (refresh) {
         refresh = false;
         // L'option choisie devient blanche.
@@ -206,19 +228,27 @@ function* mainMenu(rt: Runtime): Script {
         }
       }
       // Cadence du menu : 4 ticks, 15 images par seconde.
-      let pressed = click !== null;
       for (let tick = 0; tick < 4 && !pressed; tick++) {
         yield;
-        if (tick < 3 && rt.click(zones) !== null) pressed = true;
+        if (tick < 3) pressed = readClick();
       }
       if (moved) yield* rt.wait(0x1e);
-      if (pressed) break;
+      // Validation `1a93:02a5(60)` : un clic gauche, ou 60 s au chrono 0.
+      if (pressed) {
+        clicked = true;
+        break;
+      }
+      if (rt.timedOut(DEMO_DELAY)) break;
     }
     rt.screen = "";
     yield* rt.music(null);
     rt.stopSound();
     voice.stopEffect();
-    if (choice !== CHOICE_IDEFIX) rt.sound("menuValidate");
+    if (!clicked) {
+      // `19e2:08d9` : sans clic, le choix est celui de la rotation et la démo commence, sans son de validation.
+      choice = rotation;
+      rt.startDemo();
+    } else if (choice !== CHOICE_IDEFIX) rt.sound("menuValidate");
     yield* rt.waitRelease();
     if (choice === CHOICE_IDEFIX) {
       // Animation de départ d'Idéfix, avec son aboiement.
@@ -234,11 +264,21 @@ function* mainMenu(rt: Runtime): Script {
     yield* rt.waitSound();
     yield* rt.wait(0x19);
     yield* rt.cleanup();
+    // Aiguillage `19e2:0b14` ; la rotation de la démo avance que le choix vienne d'un clic ou de la démo.
     if (choice === 0 || choice === 1) {
       yield* rt.fadeOut();
       if ((yield* playGame(rt, choice === 1)) && rt.game.round > LONG_GAME_ROUNDS) longGame = true;
+      // `19e2:0a53`.
+      rotation = CHOICE_IDEFIX;
     } else if (choice === 2) {
       yield* rules(rt);
+      // `19e2:0a9b`.
+      if (rotation === 2) rotation = 0;
+    } else if (choice === CHOICE_IDEFIX) {
+      // `19e2:0ac0` : le jeu d'Idéfix hors partie (argument 0 : aucun gain).
+      yield* rt.fadeOut();
+      yield* idefixGame(rt, null);
+      rotation = 2;
     } else if (choice === 3) {
       // FIN : question `K63TE44` ; l'image de la question n'est pas passée par l'original (hypothèse : celle d'Astérix).
       if (yield* confirm(rt, 0x2b, 0)) return;

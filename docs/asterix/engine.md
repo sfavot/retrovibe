@@ -61,7 +61,7 @@ Chaque vidéo est interruptible séparément (bouton ou Échap) ; une interrupti
 
 **Validation** : `1a93:02a5(60)` : clic gauche, **ou 60 secondes après l'entrée dans le menu** (la navigation ne relance pas le chrono). Sur clic : son `DS:19fc` (pour Idéfix : animation 2 et son `DS:19fe`), attente de la fin du son, 25 cs, nettoyage `1a93:000e`.
 
-**Démo** : si les 60 s s'écoulent sans clic, `DS:64b2 = 1` et le choix est pris dans une variable de rotation qui vaut 4 au départ : premier délai, jeu d'Idéfix (4) ; deuxième, REGLE (2) ; troisième, partie de démonstration (0) ; puis de nouveau 4. Les entrées de la démo sont décrites au §3.4.
+**Démo** : si les 60 s s'écoulent sans clic, `DS:64b2 = 1` et le choix est pris dans une variable de rotation (`[BP−4]` de `main`) qui vaut 4 au départ : premier délai, jeu d'Idéfix (4) ; deuxième, REGLE (2) ; troisième, partie de démonstration (0) ; puis de nouveau 4. La variable change au clic comme en démo : 4 après une partie (`19e2:0a53`), 0 après REGLE si elle valait 2 (`19e2:0a9b`), 2 après Idéfix (`19e2:0ad0`). La démo cesse à l'entrée suivante dans le menu (`19e2:05c3`). Les entrées de la démo sont décrites au §3.4.
 
 **Après chaque choix** : fondu `13e5:0021(1)` (32 pas) et retour au menu. Si `DS:64a8 != 0` : sortie du programme (§1.1, étape 5).
 
@@ -171,7 +171,7 @@ Aucun écran du socle ne teste la position du clic. Tout se pilote par les quatr
 
 ### 3.4 Démo : clic simulé (sûr)
 
-En mode démo (`DS:64b2`), `153c:01c0` compte dans `DS:64ae` les lectures sans entrée réelle ; au-delà de 100, il pose `DS:4b6b = 1` (un clic simulé) et remet le compteur à 0. La branche « direction au hasard » qui suit est morte (`rnd() % 20 == 20`), et le drapeau `DS:64b0` qui l'autorise n'a donc aucun effet. Une vraie entrée met `DS:64b1 = 1` : chaque écran teste ce drapeau et rend la main, jusqu'au menu principal. Un clic simulé n'interrompt ni les voix ni les vidéos.
+En mode démo (`DS:64b2`), `153c:01c0` compte dans `DS:64ae` les lectures sans entrée réelle ; au-delà de 100, il pose `DS:4b6b = 1` (un clic simulé) et remet le compteur à 0. La branche « direction au hasard » qui suit est morte (`rnd() % 20 == 20`), et le drapeau `DS:64b0` qui l'autorise n'a donc aucun effet. Une vraie entrée met `DS:64b1 = 1` : chaque écran teste ce drapeau et rend la main, jusqu'au menu principal. Un clic simulé n'interrompt ni les voix ni les vidéos. Chaque lecture sans clic consomme un tirage `rnd()` (`153c:0272`, test `% 20 == 20` jamais vrai). Dans M08 rien n'est scripté : le curseur se pose seul sur l'emplacement libre le plus à droite, puis sur JOUER à quatre inscrits, et chaque clic simulé valide l'élément courant. Une entrée réelle vaut ANNULER dans M08 (`1abf:18d6`, `1d6d`, `1eb9`), fait quitter M09 sans validation (`1abf:2347`), arrête la partie à la fin du tour en cours (`1abf:10cd`, `1141`, `1199`, `13b8`, `25c5`) sans écran de fin (`1abf:2607`), et arrête la règle du jeu après la vidéo en cours (`15d7:0ec3`, `0f01`). En démo l'annonce du tour n'est pas coupée (`1abf:0233`) et le défilement du plateau ne se saute pas (`1d24:052d`, `05d9`).
 
 Le manuel dit qu'un clic interrompt la démo et que « le retour au menu se fait à la fin du jeu en cours » : conforme au dépilage observé.
 
@@ -241,7 +241,7 @@ Tampons de 768 octets : `DS:576e` palette courante (couleur `i` en `DS:576e + 3i
 - `15b0:01f5(n)` : fondu au noir en `n + 1` pas, un par retour vertical, puis **efface l'écran**.
 - `15b0:00e6(n)` : fondu d'entrée.
 - `15b0:0233(palette, début, nombre)` : envoi au DAC.
-- `13e5:000e(k)` et `13e5:0021(k)` : fondus de `(k + 1) × 16` pas. `13e5:0039(d)` : fondu sonore (volume ramené à 1 pas par pas, `d` cs entre deux).
+- `13e5:000e(k)` et `13e5:0021(k)` : fondus de `(k + 1) × 16` pas. `13e5:0039` : fondu sonore, le volume `DS:027a` est ramené à 1 pas par pas, **20 cs** entre deux (3 s au volume maximal de 15) ; la fonction ne lit pas l'argument que ses appelants empilent (1 ou 20 selon le mini-jeu).
 
 **Couleurs réservées de l'interface** (sûr) :
 
@@ -340,7 +340,7 @@ Le conteneur `.vid` du portage garde le masque des pixels écrits (`formats.md`)
 | `27/M27AA` à `AF` | `2840:014c` | vague E |
 | `30/M30A.MUX` | `24a1:0219` | vague E |
 | `36/M36A.MUX` | `1f84:0388` | vague E |
-| `34/M34AA` à `AF` | segment `23d1` | vague E |
+| `34/M34AA` à `AF`, `K34TE01` à `03` | aucun | fichiers jamais ouverts : le segment `23d1` (Idéfix) ne joue aucune vidéo MUX ni aucune voix `K34TE` ; son animation de fin est `m34ag.muk`, voix `m34ag1` et `m34ag2` |
 | `07/M07A.MUX` | aucun relevé | fichier apparemment inutilisé par le menu (§14) |
 
 **Exemple lu : `M06AC` et `15d7:093b`** (sûr). Avant la vidéo, six décors sont chargés avec leurs palettes P1 à P6 ; les couleurs 133 et 137 de P1 et P2 sont retouchées en (0x63, 0x38, 0x4C) et (0x75, 0x4C, 0xB7) ; `DS:6425 = -1`. À chaque image décodée : si `DS:6425` vaut 1 à 10, charger la palette du plan et retenir le plan (`DS:5ae6`) ; copier le décor du plan courant dans A ; redécoder le bloc en attente par-dessus (le personnage se pose sur le décor) ; si un marqueur vient d'arriver, envoyer la palette ; présenter ; `DS:6425 = -1`.

@@ -248,7 +248,7 @@ export function* poissons(play: Play): Script {
 
   dazedLoop.release();
   yield* dazedLoop.wait();
-  yield* fadeSoundOut(rt, 1);
+  yield* fadeSoundOut(rt);
   yield* rt.cleanup();
   if (s.won) {
     // Image de la victoire sous la vidéo `M22AA` en surimpression (`0x1000`), puis le sesterce.

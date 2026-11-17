@@ -1,20 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { createSession } from "../../../src/games/asterix/game/state";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   GAIN,
   MODULE,
   PICTURES,
   TIME_LIMIT,
   TIME_PER_LEVEL,
-  anachronismes,
   hitZone,
   pictureFile,
-  readAnachronisms,
   type AnachronismesState,
 } from "../../../src/games/asterix/scenes/minigames/m25";
 import type { Launched } from "../game-helpers";
-import { hasOriginalFiles, readOriginal } from "../helpers";
+import { exeTables, hasOriginalFiles } from "../helpers";
 import { launchMinigame, minigamePlayer, minigameState, untilMinigameOver } from "./harness";
 import { steerPointer } from "./m24-player";
 import { playM25, zoneCentre } from "./m25-player";
@@ -23,7 +20,6 @@ import { playM25, zoneCentre } from "./m25-player";
  * Mini-jeu des Anachronismes (`docs/asterix/minigames/m25.md`) : lancé seul par sa case, joué au clic ou au clavier sur
  * le moteur de test. L'état lu est celui que le mini-jeu expose aux robots (`rt.hint.state`).
  */
-registerMinigame(MODULE, anachronismes);
 
 const SCREEN_WIDTH = 320;
 const DARK = 0x7e;
@@ -35,7 +31,7 @@ const pixel = (run: Launched, x: number, y: number): number => run.rt.ctx.surfac
 
 describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu des Anachronismes (M25)", () => {
   it("table DS:22a2 : 44 images, chacune d'un niveau, zone dans l'écran", () => {
-    const table = readAnachronisms(readOriginal("ASTERIX.EXE"));
+    const table = exeTables().anachronisms;
     expect(table).toHaveLength(PICTURES);
     expect([0, 1, 2].map((level) => table.filter((item) => item.level === level).length)).toEqual([17, 13, 14]);
     for (const item of table) {
@@ -71,7 +67,7 @@ describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu des Anachronismes (M25)",
 
   for (const reflexion of [0, 1, 2]) {
     it(`niveau Réflexion ${reflexion} : une image du niveau, ${TIME_LIMIT - TIME_PER_LEVEL * reflexion} s, victoire et ${GAIN} sesterce`, async () => {
-      const table = readAnachronisms(readOriginal("ASTERIX.EXE"));
+      const table = exeTables().anachronisms;
       const run = await launchMinigame({ module: MODULE, reflexion }, { seed: 60 + reflexion });
       const state = minigameState<AnachronismesState>(run);
       expect(table[state.picture].level).toBe(reflexion);

@@ -115,19 +115,11 @@ export function* barde(play: Play): Script {
 
   const s: BardeState = { sequence: [], length: 0, index: 0, phase: "show", waiting: false, failed: false, timedOut: false, rounds: -1 };
   const bard = new Anim(sheet);
-  /** `+0x16` de l'objet animation : rang de l'image à venir, 0 quand l'animation vient de boucler. */
-  let rank = 0;
-  let frames = 1;
-  const select = (animation: number): void => {
-    bard.select(animation);
-    frames = sheet.animations[animation].frames.length;
-    rank = 0;
-  };
+  const select = (animation: number): void => bard.select(animation);
   /** Une image : fond, un pas d'animation, le barde, présentation. */
   const show = (x = BARD_X): void => {
     rt.restore();
     bard.step();
-    rank = (rank + 1) % frames;
     bard.draw(rt, x, BARD_Y);
   };
   /** `275a:000a(n)` : son `n` de la table, sur la voie principale (`16cb:08c9`, `0x800001` ou `0x800004`). */
@@ -138,7 +130,7 @@ export function* barde(play: Play): Script {
       show(x);
       eachFrame?.();
       yield* waitFrame(FRAME_TICKS);
-    } while (rank !== 0);
+    } while (bard.rank !== 0);
   };
 
   rt.startChrono(2);
@@ -162,7 +154,7 @@ export function* barde(play: Play): Script {
       const string = s.sequence[s.index];
       select(ANIM_SHOW);
       yield* animate(BARD_X + STRING_STEP * string, () => {
-        if (rank === SHOW_NOTE_RANK) note(string);
+        if (bard.rank === SHOW_NOTE_RANK) note(string);
       });
     }
 
@@ -216,7 +208,7 @@ export function* barde(play: Play): Script {
   // Gagné : `M23AB`. Perdu (fausse note, ou moins de cinq suites) : `M23AC`, `AD` ou `AE` au hasard. `0x20d00` : interruptible.
   const won = s.rounds >= WIN_ROUNDS;
   yield* rt.video(won ? "M23AB.mux" : `M23A${"CDE"[rt.rnd() % 3]}.mux`);
-  // L'original ne présente pas le fond que restaure le nettoyage : la dernière image de la vidéo reste à l'écran.
+  // La dernière image de la vidéo devient le fond : c'est sur elle que la bourse du gain est dessinée.
   surface.commitBackground();
   yield* rt.cleanup();
   if (won) yield* changeSesterces(rt, player, gain(s.rounds), true);

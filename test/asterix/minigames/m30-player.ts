@@ -1,9 +1,10 @@
-import { GAUGE_VALUES, type OlympiquesState } from "../../../src/games/asterix/scenes/minigames/m30";
+import type { OlympiquesState } from "../../../src/games/asterix/scenes/minigames/m30";
 import type { Launched } from "../game-helpers";
+import { exeTables, hasOriginalFiles } from "../helpers";
 import { minigameState, type MinigamePlayer } from "./harness";
 
 /** Jauge du meilleur lancer : la dernière case avant « trop tard » (3 sesterces). */
-export const BEST_LEVEL = GAUGE_VALUES.lastIndexOf(3);
+export const BEST_LEVEL = hasOriginalFiles ? exeTables().gauge.lastIndexOf(3) : 0;
 
 /** Attend que la jauge atteigne `level` cases et clique aussitôt (la case suivante s'allume 5 ticks plus tard). */
 export async function throwAt(run: Launched, state: OlympiquesState, level: number): Promise<void> {

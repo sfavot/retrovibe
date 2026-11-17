@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
-import { DURATION, FRAME_TICKS, MODULE, ROUND_TIME, STRINGS, WIN_ROUNDS, barde, gain, stringZones, type BardeState } from "../../../src/games/asterix/scenes/minigames/m23";
+import { DURATION, FRAME_TICKS, MODULE, ROUND_TIME, STRINGS, WIN_ROUNDS, gain, stringZones, type BardeState } from "../../../src/games/asterix/scenes/minigames/m23";
 import type { Launched } from "../game-helpers";
 import { hasOriginalFiles } from "../helpers";
 import { launchMinigame, minigamePlayer, minigameState, untilMinigameOver } from "./harness";
@@ -10,7 +9,6 @@ import { STRING_KEYS, playM23, playNote, playRounds, untilWaiting } from "./m23-
  * Mini-jeu du Barde (`docs/asterix/minigames/m23.md`) : lancé seul par sa case, joué au clavier ou au clic sur le moteur
  * de test. L'état lu est celui que le mini-jeu expose aux robots (`rt.hint.state`).
  */
-registerMinigame(MODULE, barde);
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 const LOSER_VIDEOS = ["M23AC.MUX", "M23AD.MUX", "M23AE.MUX"];

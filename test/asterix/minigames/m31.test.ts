@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { parseHy8 } from "../../../src/engine/infogrames/data/hy8";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   CARPETS_MIN,
   CARPET_FLY,
@@ -21,7 +20,6 @@ import {
   ROW_HEIGHT,
   TIME_LIMIT,
   TURN_FALL_RANK,
-  fakir,
   type FakirState,
 } from "../../../src/games/asterix/scenes/minigames/m31";
 import type { Launched } from "../game-helpers";
@@ -33,7 +31,6 @@ import { FLY_FRAMES, JUMP_FRAMES, TURN_FRAMES, carpetAfter, jumpLands, mustHop, 
  * Mini-jeu du Fakir (`docs/asterix/minigames/m31.md`) : lancé seul par sa case, joué au clavier ou au clic sur le moteur
  * de test. L'état lu est celui que le mini-jeu expose aux robots (`rt.hint.state`).
  */
-registerMinigame(MODULE, fakir);
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 

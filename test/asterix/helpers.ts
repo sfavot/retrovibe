@@ -1,3 +1,4 @@
+import { parseExeTables, type ExeTables } from "../../src/games/asterix/data/exe";
 import { originalFiles } from "../support/original";
 
 const original = originalFiles("asterix", "ASTERIX.EXE");
@@ -23,4 +24,11 @@ export function withSuffix(suffix: string): (name: string) => boolean {
 
 export function fromBase64(text: string): Uint8Array {
   return new Uint8Array(Buffer.from(text, "base64"));
+}
+
+let tables: ExeTables | null = null;
+
+/** Tables de `ASTERIX.EXE` (`data/exe.ts`), lues une fois. */
+export function exeTables(): ExeTables {
+  return (tables ??= parseExeTables(readOriginal("ASTERIX.EXE")));
 }

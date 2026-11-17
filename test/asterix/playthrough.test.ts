@@ -7,7 +7,7 @@ import { Robot, type RobotOptions, type RobotReport } from "./playthrough/robot"
  * moteur de test (`playthrough/robot.ts`). Les mini-jeux portés sont joués par leur robot (`minigames/players.ts`), les
  * autres sont l'écran provisoire ; gagnés ou perdus selon la politique.
  *
- * Le temps est simulé : les quatre parties (jusqu'à 30 minutes de jeu chacune) se jouent en une quinzaine de secondes
+ * Le temps est simulé : les cinq parties (jusqu'à 30 minutes de jeu chacune) se jouent en une quinzaine de secondes
  * réelles, donc le parcours fait partie de `npm test`.
  *
  *     npx vitest run test/asterix/playthrough.test.ts --reporter=verbose
@@ -22,6 +22,7 @@ const SCENARIOS: (RobotOptions & { name: string; expected: RobotReport["outcome"
   { name: "4 joueurs, victoire", seed: 23, characters: [0, 1, 4, 5], durationIndex: 3, aim: "victory", expected: "victoire" },
   { name: "1 joueur, temps écoulé", seed: 5, characters: [3], durationIndex: 0, aim: "timeout", expected: "temps écoulé" },
   { name: "4 joueurs, temps écoulé", seed: 42, characters: [2, 3, 1, 0], durationIndex: 0, aim: "timeout", expected: "temps écoulé" },
+  { name: "Idéfix au menu, puis 1 joueur, temps écoulé", seed: 7, characters: [1], durationIndex: 0, aim: "timeout", expected: "temps écoulé", idefixFirst: true },
 ];
 
 function describeReport(name: string, r: RobotReport, realSeconds: number): string {
@@ -48,6 +49,7 @@ describe.skipIf(!hasOriginalFiles)("parties d'Astérix jouées par un robot", ()
       expect(report.missing).toEqual([]);
       expect(report.outcome).toBe(scenario.expected);
       expect(report.backToMenu).toBe(true);
+      expect(report.menuIdefix).toBe(scenario.idefixFirst === true);
       // Une sauvegarde par tour joué (le compteur de tours de table a une avance d'un sur les tours finis).
       expect(report.saves).toBeGreaterThanOrEqual(report.rounds - 1);
     });

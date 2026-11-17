@@ -78,9 +78,11 @@ export interface Hy8Sprite {
  *
  * - `sprite` : index dans `Hy8.sprites` (12 bits bas du u16).
  * - `flags` : 4 bits hauts du u16 (0x8000 = miroir en x, 0x2000 = miroir en y selon `31fe:0481`).
- * - `duration` : u16 en +2, recopié par le moteur sans que le code étudié le lise ; vaut 1 partout.
- * - `dx`, `dy` : i16 en +4 et +6, cumulés par `12d7:00c1` dans l'objet animation sans que le code
- *   étudié les lise ; valent 0 partout.
+ * - `duration` : u16 en +2, recopié par le moteur dans l'objet animation (`+0x1a`). Ce n'est pas une durée mais une
+ *   marque libre : 1 partout dans les Schtroumpfs, dont le code ne la lit pas ; dans Astérix elle vaut 2 sur l'image
+ *   de `m31s.hy8` qui déclenche un bruitage (segment `27ba`). Le nom du champ est historique.
+ * - `dx`, `dy` : i16 en +4 et +6, cumulés par `12d7:00c1` dans l'objet animation (`+0x1c`, `+0x1e`) ; 0 partout dans
+ *   les Schtroumpfs, dont le code ne les lit pas ; lus par la Bagarre d'Astérix (segment `26a6`).
  */
 export interface Hy8Frame {
   sprite: number;

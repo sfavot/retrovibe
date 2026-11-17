@@ -1,20 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   GAIN,
   MODULE,
   PHASE_REVEAL,
   PHASE_SEARCH,
   SCENE_COUNT,
-  brouillard,
   endMarker,
-  parseFogTables,
   viewSeconds,
   zoneCount,
   type BrouillardState,
 } from "../../../src/games/asterix/scenes/minigames/m26";
 import type { Launched } from "../game-helpers";
-import { hasOriginalFiles, readOriginal } from "../helpers";
+import { exeTables, hasOriginalFiles } from "../helpers";
 import { launchMinigame, minigamePlayer, minigameState, untilMinigameOver } from "./harness";
 import { inZone, outsideZone, playM26, zoneCentre } from "./m26-player";
 
@@ -22,7 +19,6 @@ import { inZone, outsideZone, playM26, zoneCentre } from "./m26-player";
  * Mini-jeu du Brouillard (`docs/asterix/minigames/m26.md`) : lancé seul par sa case, joué à la souris ou au clavier sur
  * le moteur de test. L'état lu est celui que le mini-jeu expose aux robots (`rt.hint.state`).
  */
-registerMinigame(MODULE, brouillard);
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 const letter = (state: BrouillardState): string => String.fromCharCode(0x41 + state.scene);
@@ -37,7 +33,7 @@ async function untilSearch(run: Launched): Promise<BrouillardState> {
 
 describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu du Brouillard (M26)", () => {
   it("les tables de l'exécutable : cinq scènes de dix zones, chacune avec son cri, et la flèche", () => {
-    const tables = parseFogTables(readOriginal("ASTERIX.EXE"));
+    const tables = { ...exeTables().fog, cursor: exeTables().libraryCursor };
     expect(tables.sounds).toHaveLength(35);
     expect(tables.sounds[0]).toBe("b26-01a.voc");
     expect(tables.sounds[34]).toBe("b26-35a.voc");
@@ -62,7 +58,7 @@ describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu du Brouillard (M26)", () 
   });
 
   it("la case 8 lance le mini-jeu inscrit, après son annonce : la scène, le brouillard, puis la flèche", async () => {
-    const run = await launchMinigame({ module: MODULE }, { seed: 5 });
+    const run = await launchMinigame({ module: MODULE, reflexion: 1 }, { seed: 5 });
     expect(run.rt.hint.module).toBe(MODULE);
     expect(minigamePlayer(run).pos).toBe(7);
     expect(loaded(run, "K60TE1")).toBe(true);
@@ -85,7 +81,7 @@ describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu du Brouillard (M26)", () 
       const state = await untilSearch(run);
       expect(state.zones).toHaveLength(zoneCount(reflexion));
       expect(state.target).toBeLessThan(state.zones.length);
-      const tables = parseFogTables(readOriginal("ASTERIX.EXE"));
+      const tables = exeTables().fog;
       expect(state.zones).toEqual(tables.zones[state.scene].slice(reflexion * 3, reflexion * 3 + zoneCount(reflexion)));
       const zone = state.zones[state.target];
       expect(loaded(run, tables.sounds[zone.sound].replace("-", "_").toUpperCase())).toBe(true);

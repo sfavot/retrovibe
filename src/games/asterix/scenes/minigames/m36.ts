@@ -220,13 +220,12 @@ export function* ciel(play: Play): Script {
   };
 
   let touched = 0;
-  let stop = false;
   /**
    * `1f84:0388` : rappel de chaque image décodée. Toutes les images de `M36A` sont complètes : le décodage efface les
    * sprites de l'image précédente. Marqueurs : −1 jeu en cours (non remis à zéro), 1 fin de la pluie, 2 gagné.
    */
-  const onFrame = (video: VideoPlayer): void => {
-    s.frame = video.shown;
+  const onFrame = (video: VideoPlayer, index: number): boolean => {
+    s.frame = index;
     surface.drawFullScreen(video.pixels);
     if (video.marker === -1) s.phase = -1;
     else if (video.marker === 1) {
@@ -241,27 +240,27 @@ export function* ciel(play: Play): Script {
     if (s.hit) {
       // Image suivant le choc : elle devient le fond (`138e:037e`), et la vidéo s'arrête (`DS:3755 = 0`, `DS:631e = 1`).
       surface.commitBackground();
-      stop = true;
-      return;
+      return true;
     }
-    if (s.phase === 0 || s.phase === 2) return;
+    if (s.phase === 0 || s.phase === 2) return false;
     const directions = rt.dirs() | touched;
     touched = 0;
     stepHero(directions);
     collide();
     stepRock();
+    return false;
   };
 
   yield* flushInput(rt);
   beginPlay(rt, MODULE, s);
   yield* rt.video("M36A.mux", {
     skip: "none",
-    draw: (video) => {
-      if (video.shown !== s.frame) onFrame(video);
-    },
+    frame: onFrame,
+    // Entre deux images, l'écran garde ce que le rappel y a dessiné.
+    draw: () => {},
     poll: () => {
       touched |= touchDirs(rt, TOUCH);
-      return stop;
+      return false;
     },
   });
   endPlay(rt);

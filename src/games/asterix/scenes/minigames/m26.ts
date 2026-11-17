@@ -1,9 +1,11 @@
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
-import { VideoPlayer } from "../../../../engine/infogrames/video";
+import type { FogZone } from "../../data/exe";
 import type { Play } from "../game";
-import { VOICES, type Runtime, type Script } from "../runtime";
+import { VOICES, type Script } from "../runtime";
 import { changeSesterces } from "../squares";
-import { beginPlay, endPlay } from "./common";
+import { MUK_FPS, beginPlay, centrePointer, endPlay, libraryCursor, movePointer, playMuk, pointerClick } from "./common";
+
+export { MUK_FPS };
+export type { FogZone };
 
 /**
  * Mini-jeu « Le brouillard » (case 8, `MDF/26`, segment `1f31` : `1f31:0294` et ses quatre fonctions).
@@ -19,22 +21,14 @@ export const MODULE = 26;
 export const GAIN = 1;
 /** Scènes (`rnd() % 5`) : lettre A à E du nom des fichiers. */
 export const SCENE_COUNT = 5;
-/** Zones décrites par scène dans `DS:2524` : trois au niveau 0, trois au niveau 1, quatre au niveau 2. */
-const ZONES_PER_SCENE = 10;
-/** Noms de sons de `DS:2498` ; le premier est le son de l'erreur. */
-const SOUND_COUNT = 35;
+/**
+ * Tables de l'exécutable (`rt.tables.fog`) : `DS:2524`, dix zones par scène (trois au niveau 0, trois au niveau 1,
+ * quatre au niveau 2) ; `DS:2498`, les 35 noms de sons, dont le premier est le son de l'erreur.
+ */
 /** Couleurs 1 à 4 des volutes de `m26aa.mux` : rouge de chacune (`DS:5771`…), vert et bleu à `0xa0`. */
 const FOG_REDS = [0x63, 0x7a, 0x6b, 0x8c] as const;
 /** Clé du dossier de voix `MDF/26` (`DS:6412 = 0x36`, `DS:6410 = 1`) : `K26TE01` à `06` perdu, `07` à `12` gagné, par personnage. */
 const VOICE_KEY = 154;
-/** Centre de l'écran, où `153c:0030` replace le pointeur. */
-const CENTER_X = 160;
-const CENTER_Y = 100;
-/**
- * Cadence des MUK. L'original les déroule sans temporisation (`19b9:019f` : au rythme du lecteur de CD et du décodeur) ;
- * le portage prend la cadence par défaut du moteur commun pour une vidéo sans en-tête, 11 images par seconde.
- */
-export const MUK_FPS = 11;
 
 /** Secondes pendant lesquelles la scène reste visible avant le brouillard (`1a93:01c3(8 − 2 × niveau)`). */
 export function viewSeconds(level: number): number {
@@ -56,70 +50,6 @@ export const PHASE_START = 0;
 export const PHASE_SEARCH = 1;
 export const PHASE_STOP = 2;
 export const PHASE_REVEAL = 3;
-
-/** Une zone de `DS:2524` (10 octets) : rectangle en pixels d'écran et rang du cri dans `DS:2498`. */
-export interface FogZone {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  sound: number;
-}
-
-/** Un pixel du curseur de bibliothèque. */
-interface CursorPixel {
-  x: number;
-  y: number;
-  color: number;
-}
-
-export interface FogTables {
-  /** `DS:2498` : noms des sons (pointeurs lointains vers `DS:2718`…). */
-  sounds: string[];
-  /** `DS:2524 + 100 × scène + 10 × zone`. */
-  zones: FogZone[][];
-  /** `DS:11d4` : flèche 16 × 16 du curseur de bibliothèque (`18a1`), noire à l'intérieur blanc (couleurs 0 et 255). */
-  cursor: CursorPixel[];
-}
-
-const EXECUTABLE = "ASTERIX.EXE";
-/** Segment de chargement de la décompilation et segment de données (comme `data/exe.ts`). */
-const LOAD_SEGMENT = 0x1000;
-const DGROUP = 0x2de2;
-const CURSOR_SIZE = 16;
-
-/** Lit dans `ASTERIX.EXE` les tables du mini-jeu (décision D4). */
-export function parseFogTables(exe: Uint8Array): FogTables {
-  const view = new DataView(exe.buffer, exe.byteOffset, exe.byteLength);
-  const ds = view.getUint16(8, true) * 16 + (DGROUP - LOAD_SEGMENT) * 16;
-  const text = (offset: number): string => {
-    let end = ds + offset;
-    while (exe[end] !== 0) end++;
-    return String.fromCharCode(...exe.subarray(ds + offset, end));
-  };
-  const sounds = Array.from({ length: SOUND_COUNT }, (_, i) => text(view.getUint16(ds + 0x2498 + 4 * i, true)));
-  const zones = Array.from({ length: SCENE_COUNT }, (_, scene) =>
-    Array.from({ length: ZONES_PER_SCENE }, (_, i): FogZone => {
-      const at = ds + 0x2524 + 100 * scene + 10 * i;
-      return { x1: view.getInt16(at, true), y1: view.getInt16(at + 2, true), x2: view.getInt16(at + 4, true), y2: view.getInt16(at + 6, true), sound: exe[at + 8] };
-    }),
-  );
-  // Format de `18a1:0559`, ligne par ligne : nombre de segments ; par segment, pixels sautés, puis un mot (octet bas :
-  // nombre de quadruplets, octet haut : nombre d'octets) et les pixels ; enfin les pixels sautés en fin de ligne.
-  const cursor: CursorPixel[] = [];
-  let at = ds + 0x11d4;
-  for (let y = 0; y < CURSOR_SIZE; y++) {
-    let x = 0;
-    for (let segments = exe[at++]; segments > 0; segments--) {
-      x += exe[at++];
-      const length = exe[at] * 4 + exe[at + 1];
-      at += 2;
-      for (let i = 0; i < length; i++) cursor.push({ x: x++, y, color: exe[at++] });
-    }
-    at++;
-  }
-  return { sounds, zones, cursor };
-}
 
 /** État du mini-jeu (globales `DS:69f9` à `DS:6a5f`), exposé aux robots par `rt.hint.state`. */
 export interface BrouillardState {
@@ -143,32 +73,14 @@ export interface BrouillardState {
   lost: boolean;
 }
 
-/**
- * `19b9:019f(nom, rappel)` : joue un MUK en entier, puis attend la fin de la voie. Chaque image apporte sa palette
- * (envoyée aussitôt, entrée 0 à noir) et se décode sur l'image précédente ; `each` est le rappel d'image.
- */
-function* playMuk(rt: Runtime, name: string, each?: (frame: number) => void): Script {
-  const { surface, palette, resources, clock } = rt.ctx;
-  const video = new VideoPlayer(yield* rt.load(resources.video(name)));
-  const start = clock.ticks;
-  for (let frame = 0; frame < video.frameCount; frame++) {
-    video.seek(frame);
-    palette.load(video.palette);
-    video.compose(surface.work);
-    each?.(frame);
-    while ((clock.ticks - start) * MUK_FPS < (frame + 1) * 60) yield;
-  }
-  yield* rt.waitSound();
-}
-
 /** `1f31:0294`. */
 export function* brouillard(play: Play): Script {
   const { rt, board } = play;
-  const { surface, palette, resources, input, voice } = rt.ctx;
+  const { surface, palette, resources, voice } = rt.ctx;
   const player = board.player;
   const level = player.reflexion;
   rt.voiceKey = VOICE_KEY;
-  const tables = parseFogTables(yield* rt.load(resources.bytes(EXECUTABLE)));
+  const tables = rt.tables.fog;
 
   const scene = rt.rnd() % SCENE_COUNT;
   const stem = `M26D${String.fromCharCode(0x41 + scene)}`;
@@ -197,18 +109,12 @@ export function* brouillard(play: Play): Script {
   FOG_REDS.forEach((red, i) => palette.setColor(i + 1, red, 0xa0, 0xa0));
 
   /** Curseur de bibliothèque (`18a1:0262(0)`), coin haut gauche sur le pointeur, coupé au bord de l'écran. */
-  const drawCursor = (): void => {
-    for (const { x, y, color } of tables.cursor) {
-      const px = input.mouseX + x;
-      const py = input.mouseY + y;
-      if (px < SCREEN_WIDTH && py < SCREEN_HEIGHT) surface.work[py * SCREEN_WIDTH + px] = color;
-    }
-  };
+  const cursor = libraryCursor(rt);
 
   // Les volutes `m26aa.mux` par-dessus l'écran (`0x210c` : à même l'écran, palette gardée, non interruptible), pointeur
   // libre (`DS:0144 = 1`) recentré. Le rappel `1f31:01c5` lance le cri, attend le clic et arrête la vidéo, au clic ou
   // au marqueur du niveau.
-  input.warpMouse(CENTER_X, CENTER_Y);
+  centrePointer(rt);
   const screen = surface.work.slice();
   let marker = 0;
   beginPlay(rt, MODULE, s);
@@ -219,19 +125,19 @@ export function* brouillard(play: Play): Script {
     draw: (video) => {
       marker = video.marker;
       surface.work.set(screen);
-      if (s.phase !== PHASE_START) drawCursor();
+      if (s.phase !== PHASE_START) cursor.drawAtPointer();
     },
     poll: () => {
-      input.moveMouseByKeys();
+      movePointer(rt);
       if (s.phase === PHASE_START) {
         rt.effect(cry);
         s.phase = PHASE_SEARCH;
       } else if (s.phase === PHASE_SEARCH) {
-        const button = rt.click() !== null ? 1 : input.justPressed("cancel") ? 2 : 0;
-        if (button !== 0) {
-          s.clickX = input.mouseX;
-          s.clickY = input.mouseY;
-          s.button = button;
+        const click = pointerClick(rt);
+        if (click) {
+          s.clickX = click.x;
+          s.clickY = click.y;
+          s.button = click.button;
           s.phase = PHASE_STOP;
         }
       } else return true;

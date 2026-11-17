@@ -1,9 +1,7 @@
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
-import type { Session } from "../../game/state";
 import type { Play } from "../game";
 import { VOICES, type Runtime, type Script, type Zone } from "../runtime";
 import { changeSesterces } from "../squares";
-import { beginPlay, endPlay, fadeSoundOut, flushInput } from "./common";
+import { ARROW_RGB, arrowCursor, beginPlay, endPlay, fadeSoundOut, flushInput, movePointer, pointerAt } from "./common";
 
 /**
  * Mini-jeu « Des détails à la loupe » (case 4, `MDF/24`, segment `207c` : une seule fonction, `207c:000c`).
@@ -46,8 +44,6 @@ const DARK = 0x7e;
 const LIGHT = 0x7f;
 /** Le cadre du morceau demandé est tracé quand l'horloge en centièmes a ce bit (`1a93:01ab(0x10)`) : 16 cs sur 32. */
 const BLINK_MASK = 0x10;
-/** Couleur 255 de la flèche (`153c:06b9(0x80, 0, 0x80)`). */
-const ARROW_RGB = [0x80, 0, 0x80] as const;
 
 /** Clé du dossier de voix `MDF/24` (`DS:6412 = 0`, `DS:6410 = 1`). */
 const VOICE_KEY = 100;
@@ -56,100 +52,6 @@ const WIN_VOICE = 0x12;
 const VOICE_STEP = 6;
 /** Temps écoulé : `K63TE02`, dossier de Panoramix (`DS:6412 = 7`, `DS:6410 = 6`). */
 const TIMEOUT_VOICE = 1;
-
-// --- Outils de pointeur libre (candidats à `common.ts`) -------------------------------------------
-
-const EXECUTABLE = "ASTERIX.EXE";
-/** DGROUP (`2de2`) relatif au segment de chargement de la décompilation (`1000`), comme dans `data/exe.ts`. */
-const DGROUP_PARAGRAPHS = 0x2de2 - 0x1000;
-
-/** Position dans le fichier `ASTERIX.EXE` (format MZ) de l'adresse `DS:offset`. */
-export function dataOffset(exe: Uint8Array, offset: number): number {
-  return (exe[8] | (exe[9] << 8)) * 16 + DGROUP_PARAGRAPHS * 16 + offset;
-}
-
-/** Charge l'exécutable pour une table que `data/exe.ts` ne lit pas encore (décision D4). */
-export function* loadExecutable(rt: Runtime): Script<Uint8Array> {
-  return yield* rt.load(rt.ctx.resources.bytes(EXECUTABLE));
-}
-
-/**
- * Curseur logiciel posé par-dessus l'image présentée : il garde ce qu'il recouvre et le rend quand on l'efface, comme
- * `153c:04c4` / `153c:0533` (flèche) et `18a1:044c` / `18a1:0413` (curseur de bibliothèque). `pixels` vaut −1 pour un
- * point transparent. Point chaud en haut à gauche.
- */
-export class SoftCursor {
-  private readonly under: Int16Array;
-  private at: { x: number; y: number } | null = null;
-
-  constructor(
-    private readonly rt: Runtime,
-    readonly width: number,
-    readonly height: number,
-    readonly pixels: Int16Array,
-  ) {
-    this.under = new Int16Array(pixels.length);
-  }
-
-  /** Dessine le curseur en (x, y), coupé aux bords de l'écran. */
-  draw(x: number, y: number): void {
-    this.each(x, y, (target, i) => {
-      const { work } = this.rt.ctx.surface;
-      this.under[i] = work[target];
-      work[target] = this.pixels[i];
-    });
-    this.at = { x, y };
-  }
-
-  /** Rend ce que le curseur recouvrait. */
-  erase(): void {
-    if (!this.at) return;
-    this.each(this.at.x, this.at.y, (target, i) => {
-      this.rt.ctx.surface.work[target] = this.under[i];
-    });
-    this.at = null;
-  }
-
-  /** Le tampon a été redessiné sans le curseur : rien à rendre. */
-  forget(): void {
-    this.at = null;
-  }
-
-  private each(x: number, y: number, visit: (target: number, i: number) => void): void {
-    for (let row = 0; row < this.height; row++) {
-      for (let column = 0; column < this.width; column++) {
-        const i = row * this.width + column;
-        if (this.pixels[i] < 0 || x + column >= SCREEN_WIDTH || y + row >= SCREEN_HEIGHT) continue;
-        visit((y + row) * SCREEN_WIDTH + x + column, i);
-      }
-    }
-  }
-}
-
-/** Flèche 9 × 15 de `153c:05b4` (forme `DS:114c`) : un octet non nul `v` donne la couleur `v + 1` (contour 0, corps 255). */
-export function arrowCursor(rt: Runtime, exe: Uint8Array): SoftCursor {
-  const width = 9;
-  const height = 15;
-  const start = dataOffset(exe, 0x114c);
-  const pixels = Int16Array.from(exe.subarray(start, start + width * height), (value) => (value === 0 ? -1 : (value + 1) & 0xff));
-  return new SoftCursor(rt, width, height, pixels);
-}
-
-/** Position du pointeur libre (`DS:4b67`, `DS:4b65`) : la souris, le doigt, ou le point mené aux flèches. */
-export function pointerAt(rt: Runtime): { x: number; y: number } {
-  const { input } = rt.ctx;
-  return { x: input.mouseX, y: input.mouseY };
-}
-
-/** Pointeur libre (`DS:0144 == 1`) : à chaque tick les flèches tenues le déplacent (`1902:03c0`, 4 pixels au départ). */
-export function movePointer(rt: Runtime): void {
-  rt.ctx.input.moveMouseByKeys();
-}
-
-/** `153c:0030` : pointeur au centre (160, 100). Sans effet sous une vraie souris, que le jeu ne peut pas déplacer. */
-export function centrePointer(rt: Runtime): void {
-  rt.ctx.input.warpMouse(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-}
 
 // --- Le mini-jeu ----------------------------------------------------------------------------------
 
@@ -195,12 +97,6 @@ export function slotZone(piece: LoupePiece): Zone {
   return { x1, y1, x2: x1 + PIECE_WIDTH - 1, y2: y1 + PIECE_HEIGHT - 1 };
 }
 
-/**
- * `DS:2a00` : dernier tirage `rnd() & 7` d'avant le chargement, gardé d'une partie à l'autre (décision D13). Il ne sert
- * à rien d'autre qu'à consommer des tirages : l'image vient d'un tirage suivant (voir `loupe`).
- */
-const LAST_DRAW = new WeakMap<Session, number>();
-
 /** `207c:000c`. */
 export function* loupe(play: Play): Script {
   const { rt, board } = play;
@@ -208,13 +104,13 @@ export function* loupe(play: Play): Script {
   const player = board.player;
   const count = player.reflexion + BASE_PIECES;
 
-  // Tirage « différent de la dernière fois »… dont le résultat n'est pas l'image chargée plus bas.
+  // Tirage « différent de la dernière fois » (`DS:2a00`, mémoire de séance : décision D13)… qui ne sert qu'à consommer
+  // des tirages : l'image chargée plus bas vient d'un tirage suivant.
   let draw: number;
   do draw = rt.rnd() & 7;
-  while (draw === (LAST_DRAW.get(rt.session) ?? 0));
-  LAST_DRAW.set(rt.session, draw);
+  while (draw === rt.session.lastLoupeDraw);
+  rt.session.lastLoupeDraw = draw;
   const [goodSound, wrongSound] = yield* rt.load(Promise.all([resources.sound("b24-03a.voc"), resources.sound("b24-01a.voc")]));
-  const exe = yield* loadExecutable(rt);
 
   // Image chargée dans le tampon sous un écran noir ; la case vide du haut de la colonne est recopiée pour les
   // morceaux au-delà du quatrième (l'image n'en dessine que quatre).
@@ -255,9 +151,8 @@ export function* loupe(play: Play): Script {
   yield* rt.waitClick(s.showSeconds);
   yield* rt.waitRelease();
   yield* flushInput(rt);
-  centrePointer(rt);
   palette.setColor(0xff, ...ARROW_RGB);
-  const arrow = arrowCursor(rt, exe);
+  const arrow = arrowCursor(rt);
   rt.startChrono(2);
 
   beginPlay(rt, MODULE, s);
@@ -315,7 +210,7 @@ export function* loupe(play: Play): Script {
   for (const piece of s.pieces) if (!piece.found) frameHole(rt, piece);
   while (voice.effectPlaying) yield;
   yield* rt.wait(0x19);
-  yield* fadeSoundOut(rt, 1);
+  yield* fadeSoundOut(rt);
   yield* rt.wait(0x19);
   if (won) {
     rt.restore();

@@ -1,7 +1,7 @@
 import type { Play } from "../game";
 import { DOWN, LEFT, RIGHT, UP, type Click, type Script, type Zone } from "../runtime";
 import { changeSesterces } from "../squares";
-import { beginPlay, endPlay, fadeSoundOut, flushInput, restoreRects, type Rect } from "./common";
+import { beginPlay, endPlay, fadeSoundOut, flushInput, restoreRects, waitReading, type Rect } from "./common";
 
 /**
  * Mini-jeu « Les hiéroglyphes de Cléopâtre » (case 44, `MDF/33`, segment `2353` : la seule fonction `2353:0005`).
@@ -179,13 +179,6 @@ export function* hieroglyphes(play: Play): Script {
   const readClick = (): Click => rt.click(zones, true);
   /** Clic arrivé pendant une attente : l'original relit le bouton tenu, un clic bref y serait perdu. */
   let queued: Click = null;
-  function* waitReading(centiseconds: number): Script {
-    const end = rt.cs + centiseconds;
-    while (rt.cs < end) {
-      queued ??= readClick();
-      yield;
-    }
-  }
 
   const stepUp = (): void => {
     if (--s.cursor < 0) s.cursor = s.symbols - 1;
@@ -271,13 +264,13 @@ export function* hieroglyphes(play: Play): Script {
         rt.effect(answerSounds[s.answers[i]]);
         const set = s.answers[i] === PLACED ? SPRITES_PLACED : s.answers[i] === MISPLACED ? SPRITES_MISPLACED : SPRITES_NEUTRAL;
         rt.sprite(sheet, set + s.guess[i], i * GUESS_STEP + GUESS_X, ANSWER_Y - (s.tries - 1) * ANSWER_STEP);
-        yield* waitReading(ANSWER_CS);
+        queued = yield* waitReading(rt, ANSWER_CS, readClick, queued);
       }
       // Une validation donnée pendant les réponses ne vaut pas pour l'essai suivant.
       if (queued === "current") queued = null;
     }
     if (moved) {
-      yield* waitReading(MOVE_CS);
+      queued = yield* waitReading(rt, MOVE_CS, readClick, queued);
       moved = false;
     }
     if (s.won || s.lost || rt.chrono(2) >= s.limit) break;
@@ -286,7 +279,7 @@ export function* hieroglyphes(play: Play): Script {
   endPlay(rt);
 
   while (voice.effectPlaying) yield;
-  yield* fadeSoundOut(rt, 1);
+  yield* fadeSoundOut(rt);
   if (s.won) {
     // L'écran devient le fond, sous la vidéo `M33AC` en surimpression (`15d7:06eb(0x21, 2, 0, 0x5000)`).
     surface.commitBackground();

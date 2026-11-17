@@ -17,7 +17,8 @@ const GREY = 0xb4;
 /**
  * Écran des niveaux (`M08DB00{perso}.mcc`) du joueur en cours d'inscription. Bulle de gauche : Réflexion ; bulle de
  * droite : Action ; haut et bas changent le niveau (0 facile, 2 difficile, 1 au départ). Validation au clic ou après
- * 30 s ; Échap annule ce personnage. Rend `null` si le personnage est annulé.
+ * 30 s ; Échap annule ce personnage. Rend `null` si le personnage est annulé, ou si une entrée réelle a interrompu la
+ * démo (`1abf:1d6d` : le personnage n'est pas inscrit et l'écran des joueurs sera quitté).
  */
 function* chooseLevels(rt: Runtime, character: number): Script<{ reflexion: number; action: number } | null> {
   const { palette, input } = rt.ctx;
@@ -103,13 +104,15 @@ function* chooseLevels(rt: Runtime, character: number): Script<{ reflexion: numb
       yield* rt.voice(4, VOICES.setup);
     }
     if (rt.helpRequested()) rt.voiceKey = VOICES.setup;
-    if (click === "current" || rt.timedOut(30)) break;
+    if (rt.demoStopped || click === "current" || rt.timedOut(30)) break;
     yield;
   }
   rt.screen = "";
   if (cancelled) return null;
   rt.sound("validate");
   yield* rt.waitRelease();
+  // `1abf:1dd4` : démo interrompue, rien de plus (ni voix ni inscription).
+  if (rt.demoStopped) return null;
   neutral();
   yield* rt.waitSound();
   yield* rt.voice(character + 6, VOICES.setup);
@@ -119,6 +122,10 @@ function* chooseLevels(rt: Runtime, character: number): Script<{ reflexion: numb
 /**
  * `1abf:1532` : choix des joueurs, de 1 à 4 parmi six personnages, dans l'ordre d'inscription. Rend vrai (JOUER) ou faux
  * (ANNULER). À quatre inscrits le curseur est forcé sur JOUER ; JOUER sans joueur est refusé (`K08TE06`).
+ *
+ * En démo, rien n'est scripté : chaque clic simulé valide l'élément sous le curseur, que l'écran pose de lui-même sur le
+ * dernier personnage libre puis, à quatre inscrits, sur JOUER ; l'écran des niveaux est validé tel quel (niveaux moyens).
+ * Une entrée réelle vaut ANNULER (`1abf:18d6`), et fait quitter l'écran au retour des niveaux (`1abf:1eb9`).
  */
 export function* choosePlayers(rt: Runtime): Script<boolean> {
   const { game, tables } = rt;
@@ -188,6 +195,11 @@ export function* choosePlayers(rt: Runtime): Script<boolean> {
       rt.copyColor(125, cursor === CANCEL ? 127 : 126);
       if (moved) yield* rt.wait(0x19);
       if (rt.chrono(0) === 5 && game.players.length > 0 && game.players.length < MAX_PLAYERS) yield* rt.voice(game.players.length);
+      // `1abf:18d6` : démo interrompue, le curseur passe sur ANNULER et l'écran est validé.
+      if (rt.demoStopped) {
+        cursor = CANCEL;
+        break;
+      }
       if (click !== null && (cursor > 5 || !taken(cursor))) break;
       yield;
     }
@@ -201,22 +213,24 @@ export function* choosePlayers(rt: Runtime): Script<boolean> {
       // Gourdes de départ : `3 − niveau Réflexion` (`createPlayer`).
       if (levels) game.players.push(createPlayer(character, levels.reflexion, levels.action));
       yield* rt.waitRelease();
-      // Retour à l'écran des joueurs sans fondu : image et palette d'origine, pancartes en teinte normale.
-      rt.draw(picture);
-      rt.copyColor(124, 126);
-      rt.copyColor(125, 126);
-      rt.commit();
-      continue;
-    }
-    if (cursor === PLAY && game.players.length === 0) {
+      // `1abf:1eb9` : la démo interrompue quitte l'écran ici, comme par ANNULER.
+      if (!rt.demoStopped) {
+        // Retour à l'écran des joueurs sans fondu : image et palette d'origine, pancartes en teinte normale.
+        rt.draw(picture);
+        rt.copyColor(124, 126);
+        rt.copyColor(125, 126);
+        rt.commit();
+        continue;
+      }
+    } else if (cursor === PLAY && game.players.length === 0) {
       yield* rt.waitSound();
       yield* rt.voice(5);
-      continue;
+      if (!rt.demoStopped) continue;
     }
     palette.load(picture.palette);
     yield* rt.cleanup();
     yield* rt.waitSound();
-    if (cursor === CANCEL) return false;
+    if (cursor !== PLAY || game.players.length === 0) return false;
     yield* rt.voice(game.players.length === 1 ? 0xd : 0xe);
     return true;
   }
@@ -307,6 +321,12 @@ export function* settings(rt: Runtime): Script {
     }
     if (rt.helpRequested()) rt.voiceKey = VOICES.setup;
     if (rt.chrono(0) === 7) yield* rt.voice(0xc);
+    // `1abf:2347` : démo interrompue, l'écran est quitté sans validation ni réglage retenu.
+    if (rt.demoStopped) {
+      rt.screen = "";
+      yield* rt.cleanup();
+      return;
+    }
     if (click === "current") {
       clicked = true;
       break;

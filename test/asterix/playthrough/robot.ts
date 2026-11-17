@@ -1,6 +1,11 @@
 import { SQUARE } from "../../../src/games/asterix/game/state";
 import { launch, type LaunchOptions, type Launched } from "../game-helpers";
+import type { IdefixState } from "../../../src/games/asterix/scenes/minigames/m34";
 import { MINIGAME_PLAYERS } from "../minigames/players";
+
+/** Module du jeu d'Idéfix, et un point de sa zone au menu principal ((0x1c, 0x62), 0x37 × 0x4b). */
+const IDEFIX_MODULE = 34;
+const MENU_IDEFIX = { x: 0x1c + 0x1b, y: 0x62 + 0x25 };
 
 /**
  * Robot joueur d'Astérix : une partie complète, du menu principal au menu principal, jouée comme un joueur sur le moteur de
@@ -14,6 +19,8 @@ export interface RobotOptions extends LaunchOptions {
   durationIndex: number;
   /** Vise la victoire (bonnes réponses, achats, mini-jeux gagnés) ou laisse le temps s'écouler (tout raté). */
   aim: "victory" | "timeout";
+  /** Joue d'abord le jeu d'Idéfix depuis le menu principal (hors partie), puis lance la partie. */
+  idefixFirst?: boolean;
   /** Plafond de temps simulé, en secondes. */
   maxSeconds?: number;
   /** Journal des écrans (diagnostic). */
@@ -32,6 +39,8 @@ export interface RobotReport {
   /** Mini-jeux portés joués par leur robot, par module. */
   minigames: Record<number, number>;
   missing: string[];
+  /** Le jeu d'Idéfix a été joué depuis le menu, hors partie (`idefixFirst`). */
+  menuIdefix: boolean;
   winner: number;
   backToMenu: boolean;
   /** Sauvegardes écrites (une par tour). */
@@ -43,6 +52,7 @@ export class Robot {
   private readonly screens: Record<string, number> = {};
   private readonly minigames: Record<number, number> = {};
   private registered = 0;
+  private menuIdefix = false;
 
   constructor(private readonly options: RobotOptions) {}
 
@@ -60,6 +70,7 @@ export class Robot {
     const winning = options.aim === "victory";
     switch (screen) {
       case "menu":
+        if (options.idefixFirst && !this.menuIdefix) await this.playMenuIdefix();
         await run.tap("Space");
         break;
       case "players": {
@@ -162,6 +173,17 @@ export class Robot {
     }
   }
 
+  /** Clic sur Idéfix au menu principal : son jeu est joué hors partie par son robot, puis le menu revient. */
+  private async playMenuIdefix(): Promise<void> {
+    const { run } = this;
+    await run.click(MENU_IDEFIX.x, MENU_IDEFIX.y);
+    await run.untilScreen("minigame");
+    this.note("minigame");
+    this.menuIdefix = run.rt.hint.module === IDEFIX_MODULE && !(run.rt.hint.state as IdefixState).inGame;
+    await MINIGAME_PLAYERS[IDEFIX_MODULE](run, this.options.aim === "victory");
+    await run.untilScreen("menu");
+  }
+
   async play(): Promise<RobotReport> {
     const { options } = this;
     const run = (this.run = await launch(options));
@@ -241,6 +263,7 @@ export class Robot {
       squares,
       minigames: this.minigames,
       missing: [...new Set(run.game.runtime?.missing ?? [])],
+      menuIdefix: this.menuIdefix,
       winner,
       backToMenu,
       saves,

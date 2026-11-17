@@ -52,9 +52,6 @@ const boatX = (pos: number): number => (pos << 6) - 0x60;
 /** Chaque image du choc reste 16 ticks. */
 const HIT_TICKS = 0x10;
 
-/** Valeur posée dans `VideoPlayer.marker` une fois le marqueur pris : aucun marqueur lu depuis. */
-const NO_MARKER = 0x7fff;
-
 /** Décision D11 : toucher ou cliquer la moitié gauche de l'écran pousse la barque à gauche, la moitié droite à droite. */
 const TOUCH = [
   [LEFT_HALF, LEFT],
@@ -105,8 +102,6 @@ export function* tempete(play: Play): Script {
   let sprite = -1;
   /** `DS:754e` : son abscisse. */
   let x = 0;
-  /** `DS:6425` : dernier marqueur `08` lu par le lecteur. */
-  let marker = 0;
   /** `DS:631d` : la vidéo a reçu son ordre d'arrêt. */
   let stopped = false;
   let touched = 0;
@@ -142,13 +137,14 @@ export function* tempete(play: Play): Script {
     }
   };
 
-  /** `2840:014c` : le marqueur lu avec l'image précédente arme ses zones ou donne la victoire ; les dangers s'usent. */
-  const stepMarkers = (): void => {
+  /** `2840:014c` : le marqueur lu avec l'image précédente (`DS:6425`) arme ses zones ou donne la victoire ; les dangers s'usent. */
+  const stepMarkers = (video: VideoPlayer): void => {
+    const marker = video.marker;
     if (marker === MARKER_START || (marker >= 1 && marker <= MARKER_WIN)) {
       s.phase = marker;
       for (const zone of MARKER_ZONES[marker] ?? []) s.danger[zone] = DANGER_FRAMES;
       if (marker === MARKER_WIN) s.won = true;
-      marker = 0;
+      video.marker = 0;
     }
     for (let zone = 0; zone < 3; zone++) if (s.danger[zone] !== 0) s.danger[zone]--;
   };
@@ -158,21 +154,18 @@ export function* tempete(play: Play): Script {
    * son bloc vidéo dans le fichier, il n'est donc vu qu'à l'image suivante. `2840:01e6` (à chaque image décodée) : au
    * choc, l'image devient le fond et la vidéo s'arrête ; la barque est dessinée par-dessus l'image.
    */
-  const onImage = (video: VideoPlayer): void => {
-    if (video.shown === s.frame) return;
-    for (; s.frame < video.shown; s.frame++) {
-      stepBoat();
-      stepMarkers();
-    }
-    if (video.marker !== NO_MARKER) {
-      marker = video.marker;
-      video.marker = NO_MARKER;
-    }
+  const onBlock = (video: VideoPlayer, index: number): void => {
+    s.frame = index;
+    stepBoat();
+    stepMarkers(video);
+  };
+  const onImage = (): boolean => {
     if (s.hit && !stopped) {
       stopped = true;
       surface.commitBackground();
     }
     if (sprite !== -1) rt.sprite(sheet, sprite, x, BOAT_Y);
+    return stopped;
   };
 
   // Fondu au noir, palette du jeu (`m27s.pal`, celle des vidéos étant ignorée : `0x4`), puis la vidéo du niveau.
@@ -185,10 +178,11 @@ export function* tempete(play: Play): Script {
     skip: "none",
     keepPalette: true,
     target: surface.work,
-    draw: onImage,
+    block: onBlock,
+    frame: onImage,
     poll: () => {
       touched |= touchDirs(rt, TOUCH);
-      return stopped;
+      return false;
     },
   });
 
@@ -205,9 +199,6 @@ export function* tempete(play: Play): Script {
     }
     yield* rt.waitSound();
     s.over = true;
-  } else {
-    // L'original ne présente pas le fond que restaure le nettoyage : la dernière image reste à l'écran jusqu'à la vidéo.
-    surface.commitBackground();
   }
   endPlay(rt);
   yield* rt.cleanup();

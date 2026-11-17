@@ -1,11 +1,9 @@
 import type { Sound } from "../../../../engine/infogrames/audio/sound";
-import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
 import { SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
-import { AnimationPlayer, SPRITE_MIRROR_X } from "../../../../engine/infogrames/sprites";
 import type { Play } from "../game";
 import { DOWN, LEFT, RIGHT, UP, type Script, type Zone } from "../runtime";
 import { changeSesterces } from "../squares";
-import { beginPlay, endPlay, flushInput, waitFrame } from "./common";
+import { Anim, beginPlay, endPlay, flushInput, waitFrame } from "./common";
 
 /**
  * Mini-jeu « Bagarre avec les Romains » (case 42, `MDF/32`, segment `26a6` : `26a6:0804` et ses quatre fonctions).
@@ -135,46 +133,10 @@ export function heroIdle(state: BagarreState): boolean {
   return state.heroAnim === state.facing + HERO_IDLE && !state.heroHit;
 }
 
-/**
- * Objet animation du séquenceur `1345` avec les champs que ce mini-jeu lit en plus du sprite : le rang (`+0x16`) et le
- * déplacement cumulé de l'animation (`+0x1c`), remis à zéro quand elle boucle ou qu'on en choisit une autre.
- */
-class Mover {
-  private player: AnimationPlayer;
-  sprite = 0;
-  dx = 0;
-
-  constructor(readonly sheet: Hy8) {
-    this.player = new AnimationPlayer(sheet, 0);
-  }
-
-  /** `1345:0143(objet, n)`. */
-  select(animation: number): void {
-    this.player = new AnimationPlayer(this.sheet, animation);
-    this.dx = 0;
-  }
-
-  /** `1345:00c0(objet)`. */
-  step(): void {
-    const frame = this.player.frame;
-    if (frame) {
-      this.dx += frame.dx;
-      this.sprite = frame.sprite | (frame.flags & SPRITE_MIRROR_X);
-    }
-    this.player.advance();
-    if (this.player.frameIndex === 0) this.dx = 0;
-  }
-
-  /** `+0x16` : 0 juste après le pas qui a montré la dernière image. */
-  get frame(): number {
-    return this.player.frameIndex;
-  }
-}
-
 /** `26a6:0804`. */
 export function* bagarre(play: Play): Script {
   const { rt, board } = play;
-  const { surface, resources, voice, input } = rt.ctx;
+  const { surface, resources, voice } = rt.ctx;
   const player = board.player;
   yield* rt.fadeOut(16);
   // Le décor va dans le tampon et dans le fond ; l'écran reste noir jusqu'à la première image de la vidéo.
@@ -203,12 +165,12 @@ export function* bagarre(play: Play): Script {
     romans: [],
     frames: 0,
   };
-  const hero = new Mover(heroSheet);
+  const hero = new Anim(heroSheet);
   hero.select(s.heroAnim);
   hero.step();
-  const movers: Mover[] = [];
+  const movers: Anim[] = [];
   for (let i = 0; i < ROMANS; i++) {
-    movers.push(new Mover(romanSheet));
+    movers.push(new Anim(romanSheet));
     s.romans.push({ active: false, side: FROM_RIGHT, kind: KIND_HIGH, x: 0, speed: 0, delay: i * 10 + 0xf + (rt.rnd() % 5), anim: 0, frame: 0 });
   }
   yield* flushInput(rt);
@@ -258,17 +220,17 @@ export function* bagarre(play: Play): Script {
       return;
     }
     mover.step();
-    roman.frame = mover.frame;
-    if (mover.frame === 0 && roman.anim < ROMAN_GUARD) roman.x += roman.speed;
+    roman.frame = mover.rank;
+    if (mover.rank === 0 && roman.anim < ROMAN_GUARD) roman.x += roman.speed;
     rt.sprite(romanSheet, mover.sprite, roman.x + mover.dx - X_OFFSET, i * ROMAN_SPREAD + ROMAN_Y);
     // Le coup porte, sauf si le joueur est en train de donner le coup de poing de même hauteur vers ce Romain.
-    if (roman.anim === roman.side + ROMAN_HIGH && mover.frame === HIGH_HIT_FRAME && 1 - roman.side + HERO_HIGH !== s.heroAnim) {
+    if (roman.anim === roman.side + ROMAN_HIGH && mover.rank === HIGH_HIT_FRAME && 1 - roman.side + HERO_HIGH !== s.heroAnim) {
       hitHero(HERO_HIT_HIGH, hitHighSound);
     }
-    if (roman.anim === roman.side + ROMAN_LOW && mover.frame === LOW_HIT_FRAME && 1 - roman.side + HERO_LOW !== s.heroAnim) {
+    if (roman.anim === roman.side + ROMAN_LOW && mover.rank === LOW_HIT_FRAME && 1 - roman.side + HERO_LOW !== s.heroAnim) {
       hitHero(HERO_HIT_LOW, hitLowSound);
     }
-    if (mover.frame !== 0) return;
+    if (mover.rank !== 0) return;
     // Fin d'une animation (table de sauts `26a6:0434`, par groupes de quatre).
     switch (roman.anim >> 2) {
       case 0: {
@@ -315,7 +277,7 @@ export function* bagarre(play: Play): Script {
     } else s.input = 0;
     // Le coup de poing porte à sa troisième image, sur tout Romain arrivé du côté regardé.
     s.romans.forEach((roman, i) => {
-      if (!roman.active || hero.frame !== PUNCH_FRAME || roman.kind + roman.side === roman.anim || roman.side === s.facing) return;
+      if (!roman.active || hero.rank !== PUNCH_FRAME || roman.kind + roman.side === roman.anim || roman.side === s.facing) return;
       if (s.heroAnim === s.facing + HERO_LOW) {
         setRoman(i, roman.side + ROMAN_KO_LOW);
         play32(punchLowSound);
@@ -327,9 +289,9 @@ export function* bagarre(play: Play): Script {
     });
     if (!anyRoman() && !s.heroHit && s.heroAnim === s.facing + HERO_IDLE && rt.chrono(2) >= DURATION) s.won = true;
     hero.step();
-    s.heroFrame = hero.frame;
+    s.heroFrame = hero.rank;
     rt.sprite(heroSheet, hero.sprite, HERO_X, HERO_Y);
-    if (hero.frame !== 0) return;
+    if (hero.rank !== 0) return;
     if (s.heroHit) s.lost = true;
     else setHero(s.facing + HERO_IDLE);
   };
@@ -382,19 +344,20 @@ export function* bagarre(play: Play): Script {
   beginPlay(rt, MODULE, s);
   // `1948:04cc("M32AA.MUX", 0x20104, 26a6:078b, 26a6:000c)` : la vidéo se décode à l'écran avec la palette du décor ;
   // le jeu avance d'une image à chaque image décodée et l'arrête dès qu'il est fini.
-  let seen = -1;
   yield* rt.video("M32AA.MUX", {
     skip: "none",
     keepPalette: true,
+    frame: () => {
+      if (!s.lost && !s.won) gameFrame();
+      return s.lost || s.won;
+    },
     draw: (video) => {
-      const last = Math.min(video.shown, video.frameCount - 1);
-      for (; seen < last && !s.lost && !s.won; seen++) gameFrame();
       screen.set(video.pixels);
       present();
     },
     poll: () => {
       readInput();
-      return s.lost || s.won;
+      return false;
     },
   });
   inVideo = false;
@@ -409,13 +372,8 @@ export function* bagarre(play: Play): Script {
   endPlay(rt);
 
   yield* rt.cleanup();
-  present();
   yield* rt.fadeOut(16);
-  // `15d7:08e9(nom)` : boutons et Échap relâchés, puis la vidéo plein écran, interruptible.
   const result = s.won ? "M32AB.mux" : LOSS_VIDEOS[s.heroAnim - HERO_HIT_LOW];
-  if (result) {
-    while (rt.buttonHeld || input.pressed("skip")) yield;
-    yield* rt.video(result);
-  }
+  if (result) yield* rt.namedVideo(result);
   if (s.won) yield* changeSesterces(rt, player, GAIN, true);
 }

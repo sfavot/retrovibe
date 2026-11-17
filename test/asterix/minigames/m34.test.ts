@@ -16,18 +16,17 @@ import {
   TYPE_HIGH,
   TYPE_LOW,
   WARMUP_FRAMES,
-  parseIdefixTables,
   script,
   type IdefixState,
 } from "../../../src/games/asterix/scenes/minigames/m34";
 import type { Launched } from "../game-helpers";
-import { hasOriginalFiles, readOriginal } from "../helpers";
+import { exeTables, hasOriginalFiles } from "../helpers";
 import { launchMinigame, minigamePlayer, minigameState, untilMinigameOver } from "./harness";
 import { clear, nextObstacle, playM34 } from "./m34-player";
 
 /**
  * Mini-jeu d'Idéfix (`docs/asterix/minigames/m34.md`) : lancé seul par sa case, joué au clavier ou au clic sur le moteur
- * de test. Inscrit ici en attendant `minigames/index.ts` ; `menu` lance la version du menu principal (argument 0).
+ * de test. Réinscrit ici pour que `menu` puisse lancer la version du menu principal (argument 0).
  */
 let menu = false;
 registerMinigame(MODULE, (play, entry) => script(play, menu ? { ...entry, argument: 0 } : entry));
@@ -66,7 +65,7 @@ async function untilObstacle(run: Launched, type: number, age: number): Promise<
 }
 
 describe.skipIf(!hasOriginalFiles)("Astérix, mini-jeu d'Idéfix (M34)", () => {
-  const tables = parseIdefixTables(readOriginal("ASTERIX.EXE"));
+  const tables = exeTables().idefix;
 
   it("tables de l'exécutable : sept parcours, de plus en plus chargés", () => {
     expect(tables.courses.map((course) => course.size)).toEqual([7, 11, 11, 13, 13, 14, 14]);

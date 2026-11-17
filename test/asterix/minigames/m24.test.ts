@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   BASE_PIECES,
   GAIN,
@@ -11,7 +10,6 @@ import {
   TIME_LIMIT,
   TIME_PER_LEVEL,
   holeZone,
-  loupe,
   slotZone,
   type LoupePiece,
   type LoupeState,
@@ -25,7 +23,6 @@ import { holeCentre, playM24, steerPointer, wrongPiece } from "./m24-player";
  * Mini-jeu de la Loupe (`docs/asterix/minigames/m24.md`) : lancé seul par sa case, joué au clic ou au clavier sur le
  * moteur de test. L'état lu est celui que le mini-jeu expose aux robots (`rt.hint.state`).
  */
-registerMinigame(MODULE, loupe);
 
 const SCREEN_WIDTH = 320;
 const DARK = 0x7e;

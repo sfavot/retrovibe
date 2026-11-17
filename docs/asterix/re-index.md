@@ -236,7 +236,7 @@ Toutes les fonctions hors segment `1000`, par segment. Nom vide : pas de nom pro
 | `13e5:000e` |  | 19 | fondu d'entrée de (k+1)×16 pas | `1343:000c (1.00)` | lue | sûr |
 | `13e5:0021` |  | 19 | fondu au noir de (k+1)×16 pas | `1343:000c (1.00)` | lue | sûr |
 | `13e5:0034` |  | 5 | vide | `1343:0032 (1.00)` | lue | sûr |
-| `13e5:0039` |  | 50 | fondu sonore : volume DS:027a → 1, d cs par pas | `1343:0037 (1.00)` | lue | sûr |
+| `13e5:0039` |  | 50 | fondu sonore : volume DS:027a → 1, 20 cs par pas (argument ignoré) | `1343:0037 (1.00)` | lue | sûr |
 | `13e5:006b` |  | 5 | vide | `1343:0032 (1.00)` | lue | sûr |
 | `13e5:0070` |  | 53 | fondu sonore 15 pas (sans appelant) | `1343:006e (0.96)` | lue | sûr |
 
@@ -420,7 +420,7 @@ Toutes les fonctions hors segment `1000`, par segment. Nom vide : pas de nom pro
 | Adresse | Nom | Octets | Rôle | Équivalent SMURF.EXE | Statut | Confiance |
 |---|---|---:|---|---|---|---|
 | `18a1:0227` |  | 59 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:021f (1.00)` | survolée | hypothèse |
-| `18a1:0262` |  | 88 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:025a (1.00)` | survolée | hypothèse |
+| `18a1:0262` |  | 88 | curseur 16×16 de bibliothèque : montre (0) ou retire (0x400000) le curseur, forme DS:11d4 | `30d4:025a (1.00)` | lue | sûr |
 | `18a1:02ba` |  | 59 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:02b2 (1.00)` | survolée | hypothèse |
 | `18a1:02f5` |  | 19 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:02ed (1.00)` | survolée | hypothèse |
 | `18a1:0308` |  | 60 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:0300 (1.00)` | survolée | hypothèse |
@@ -430,8 +430,8 @@ Toutes les fonctions hors segment `1000`, par segment. Nom vide : pas de nom pro
 | `18a1:0413` |  | 57 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:040b (0.95)` | survolée | hypothèse |
 | `18a1:044c` |  | 93 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:0444 (0.97)` | survolée | hypothèse |
 | `18a1:04a9` |  | 1 | curseur graphique 16×16 de bibliothèque (fragment ou saut de 1 o) |  | non lue | hypothèse |
-| `18a1:04aa` |  | 175 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:04a2 (1.00)` | survolée | hypothèse |
-| `18a1:0559` |  | 186 | curseur graphique 16×16 de bibliothèque (rôle de l'équivalent) | `30d4:0551 (1.00)` | survolée | hypothèse |
+| `18a1:04aa` |  | 175 | curseur 16×16 de bibliothèque : rappel d'horloge, efface et redessine le curseur à l'écran | `30d4:04a2 (1.00)` | lue | sûr |
+| `18a1:0559` |  | 186 | curseur 16×16 de bibliothèque : dessin de la forme DS:11d4 (segments par ligne, couleurs 0 et 255) | `30d4:0551 (1.00)` | lue | sûr |
 
 #### `1902` : Clavier et manette (18 fonctions, 787 octets)
 

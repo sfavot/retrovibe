@@ -2,6 +2,8 @@ import type { Sound } from "../../../../engine/infogrames/audio/sound";
 import type { Hy8 } from "../../../../engine/infogrames/data/hy8";
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from "../../../../engine/infogrames/data/mcg";
 import { AnimationPlayer } from "../../../../engine/infogrames/sprites";
+import { VideoPlayer } from "../../../../engine/infogrames/video";
+import { ARROW_HEIGHT, ARROW_WIDTH, LIBRARY_CURSOR_SIZE } from "../../data/exe";
 import type { Runtime, Script, Zone } from "../runtime";
 
 /**
@@ -9,9 +11,14 @@ import type { Runtime, Script, Zone } from "../runtime";
  * jeu que plusieurs segments de mini-jeux appellent, et le repère des robots. Ce qui ne sert qu'à un mini-jeu reste dans
  * son fichier. Gabarit de portage : `docs/asterix/minigames/README.md`.
  *
- * - `Anim` : objet animation du séquenceur HY8 (`1345:0082`, `1345:0007`, `1345:00c0`) ;
+ * - `Anim` : objet animation du séquenceur HY8 (`1345:0082`, `1345:0007`, `1345:00c0`), avec son rang, sa marque et
+ *   son déplacement cumulé ;
  * - `restoreRects` : restauration de rectangles du fond (`1481:07c3`) ;
- * - `flushInput` : entrées vidées avant de jouer (`153c:0004`) ;
+ * - `flushInput` : entrées vidées et pointeur recentré avant de jouer (`153c:0004`) ;
+ * - pointeur libre : `pointerAt`, `movePointer`, `centrePointer`, `pointerClick`, et les curseurs logiciels
+ *   `arrowCursor` (`153c:05b4`) et `libraryCursor` (`18a1`) ;
+ * - `waitReading` : attente qui retient un clic ;
+ * - `openMuk`, `playMuk` : lecteur MUK (`19b9:000c`, `19b9:019f`) ;
  * - `touchDirs` et les quatre moitiés d'écran : direction donnée par un clic ou un toucher (décision D11) ;
  * - `EffectLoop` : bruitage en boucle du canal mélangé (`16cb:0a4f`, option `0x200000`) ;
  * - `fadeSoundOut` : fondu sonore de fin (`13e5:0039`) ;
@@ -23,13 +30,19 @@ import type { Runtime, Script, Zone } from "../runtime";
 
 /**
  * Objet animation de l'original (36 octets : planche en `+0`, nombre d'images en `+0x14`, rang en `+0x16`, sprite
- * courant en `+0x18`). `step` pose le sprite de l'image courante **puis** avance : le sprite affiché après le pas `k`
- * est l'image `k − 1`, et `wrapped` (`+0x16 == 0`) est vrai juste après le pas qui a montré la dernière image.
+ * courant en `+0x18`, marque en `+0x1a`, déplacement cumulé en `+0x1c` et `+0x1e`). `step` pose le sprite de l'image
+ * courante **puis** avance : le sprite affiché après le pas `k` est l'image `k − 1`, et `wrapped` (`+0x16 == 0`) est
+ * vrai juste après le pas qui a montré la dernière image.
  */
 export class Anim {
   private player: AnimationPlayer;
   /** `+0x18` : numéro du sprite à dessiner (`2bdb:0477(sprite, x, y, planche)`), bit de miroir compris. */
   sprite = 0;
+  /** `+0x1a` : second mot de l'image posée par le dernier pas (2 sur l'image qui déclenche un bruitage, M31). */
+  tag = 0;
+  /** `+0x1c`, `+0x1e` : déplacement cumulé des images posées, remis à zéro quand l'animation boucle ou change. */
+  dx = 0;
+  dy = 0;
 
   /** `1345:0082(objet, planche)` : rattache la planche et choisit l'animation 0. */
   constructor(public sheet: Hy8) {
@@ -45,18 +58,30 @@ export class Anim {
   /** `1345:0007(objet, n)` (alias `1345:0143`) : animation `n` de la planche, depuis sa première image. */
   select(animation: number): void {
     this.player = new AnimationPlayer(this.sheet, animation);
+    this.dx = this.dy = 0;
   }
 
   /** `1345:00c0(objet)` : un pas. */
   step(): void {
     const frame = this.player.frame;
-    if (frame) this.sprite = frame.sprite | (frame.flags & 0x8000);
+    if (frame) {
+      this.sprite = frame.sprite | (frame.flags & 0x8000);
+      this.tag = frame.duration;
+      this.dx += frame.dx;
+      this.dy += frame.dy;
+    }
     this.player.advance();
+    if (this.player.frameIndex === 0) this.dx = this.dy = 0;
   }
 
-  /** `+0x16 == 0` : l'animation vient de boucler (ou n'a pas encore fait de pas). */
+  /** `+0x16` : rang de la prochaine image ; 0 quand l'animation vient de boucler (ou n'a pas encore fait de pas). */
+  get rank(): number {
+    return this.player.frameIndex;
+  }
+
+  /** `+0x16 == 0`. */
   get wrapped(): boolean {
-    return this.player.frameIndex === 0;
+    return this.rank === 0;
   }
 
   /** Dessine le sprite courant, ancré comme tous les sprites HY8 (x = bord gauche, y = ligne du bas). */
@@ -100,11 +125,136 @@ export function restoreRects(rt: Runtime, ...rects: Rect[]): void {
 
 // --- Entrées --------------------------------------------------------------------------------------
 
-/** `153c:0004` : attend 3 cs, oublie les directions déjà enfoncées, attend 3 cs (l'original recentre aussi le pointeur). */
+/** `153c:0004` : attend 3 cs, oublie les directions déjà enfoncées, attend 3 cs, puis recentre le pointeur (`153c:0030`). */
 export function* flushInput(rt: Runtime): Script {
   yield* rt.wait(3);
   rt.dirs();
   yield* rt.wait(3);
+  centrePointer(rt);
+}
+
+/** Position du pointeur libre (`DS:4b67`, `DS:4b65`) : la souris, le doigt, ou le point mené aux flèches. */
+export function pointerAt(rt: Runtime): { x: number; y: number } {
+  const { input } = rt.ctx;
+  return { x: input.mouseX, y: input.mouseY };
+}
+
+/** Pointeur libre (`DS:0144 == 1`) : à chaque tick les flèches tenues le déplacent (`1902:03c0`, 4 pixels au départ). */
+export function movePointer(rt: Runtime): void {
+  rt.ctx.input.moveMouseByKeys();
+}
+
+/** `153c:0030` : pointeur au centre (160, 100). Sans effet sous une vraie souris, que le jeu ne peut pas déplacer. */
+export function centrePointer(rt: Runtime): void {
+  rt.ctx.input.warpMouse(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+}
+
+/** Un clic et la position du pointeur à cet instant : bouton 1 gauche (ou Espace), 2 droit (ou Entrée). */
+export interface PointerClick {
+  button: number;
+  x: number;
+  y: number;
+}
+
+/** Clic gauche ou droit de ce tick (`DS:4b6b`), avec la position du pointeur ; `null` sans clic. Lu à l'enfoncement. */
+export function pointerClick(rt: Runtime): PointerClick | null {
+  const { input } = rt.ctx;
+  const button = rt.click() !== null ? 1 : input.justPressed("cancel") ? 2 : 0;
+  return button === 0 ? null : { button, x: input.mouseX, y: input.mouseY };
+}
+
+/**
+ * Attend `centiseconds` centièmes en lisant le clic à chaque tick (`read`) : rend `held` s'il y en avait déjà un, sinon
+ * le premier lu pendant l'attente. L'original relit le bouton tenu après l'attente : un clic bref y serait perdu.
+ */
+export function* waitReading<T>(rt: Runtime, centiseconds: number, read: () => T | null, held: T | null = null): Script<T | null> {
+  const end = rt.cs + centiseconds;
+  while (rt.cs < end) {
+    held ??= read();
+    yield;
+  }
+  return held;
+}
+
+/** Couleur 255 du curseur flèche (`153c:06b9(0x80, 0, 0x80)`). */
+export const ARROW_RGB = [0x80, 0, 0x80] as const;
+
+/**
+ * Curseur logiciel posé par-dessus l'image présentée : il garde ce qu'il recouvre et le rend quand on l'efface, comme
+ * `153c:04c4` / `153c:0533` (flèche) et `18a1:044c` / `18a1:0413` (curseur de bibliothèque). `pixels` vaut −1 pour un
+ * point transparent. Point chaud en haut à gauche.
+ */
+export class SoftCursor {
+  private readonly under: Int16Array;
+  private at: { x: number; y: number } | null = null;
+
+  constructor(
+    private readonly rt: Runtime,
+    readonly width: number,
+    readonly height: number,
+    readonly pixels: Int16Array,
+  ) {
+    this.under = new Int16Array(pixels.length);
+  }
+
+  /** Dessine le curseur en (x, y), coupé aux bords de l'écran. */
+  draw(x: number, y: number): void {
+    this.each(x, y, (target, i) => {
+      const { work } = this.rt.ctx.surface;
+      this.under[i] = work[target];
+      work[target] = this.pixels[i];
+    });
+    this.at = { x, y };
+  }
+
+  /** Dessine le curseur à la position du pointeur. */
+  drawAtPointer(): void {
+    const { x, y } = pointerAt(this.rt);
+    this.draw(x, y);
+  }
+
+  /** Rend ce que le curseur recouvrait. */
+  erase(): void {
+    if (!this.at) return;
+    this.each(this.at.x, this.at.y, (target, i) => {
+      this.rt.ctx.surface.work[target] = this.under[i];
+    });
+    this.at = null;
+  }
+
+  /** Le tampon a été redessiné sans le curseur : rien à rendre. */
+  forget(): void {
+    this.at = null;
+  }
+
+  private each(x: number, y: number, visit: (target: number, i: number) => void): void {
+    for (let row = 0; row < this.height; row++) {
+      for (let column = 0; column < this.width; column++) {
+        const i = row * this.width + column;
+        if (this.pixels[i] < 0 || x + column >= SCREEN_WIDTH || y + row >= SCREEN_HEIGHT) continue;
+        visit((y + row) * SCREEN_WIDTH + x + column, i);
+      }
+    }
+  }
+}
+
+/**
+ * Flèche 9 × 15 de `153c:05b4` (forme `DS:114c`, lue dans l'exécutable) : un octet non nul `v` donne la couleur `v + 1`
+ * (contour 0, corps 255). La couleur 255 est à poser par l'appelant (`ARROW_RGB`).
+ */
+export function arrowCursor(rt: Runtime): SoftCursor {
+  const pixels = Int16Array.from(rt.tables.arrow, (value) => (value === 0 ? -1 : (value + 1) & 0xff));
+  return new SoftCursor(rt, ARROW_WIDTH, ARROW_HEIGHT, pixels);
+}
+
+/**
+ * Curseur 16 × 16 de la bibliothèque (`18a1:0262(0)` le montre, le rappel d'horloge `18a1:04aa` le dessine à l'écran),
+ * forme `DS:11d4` : couleurs 0 (contour) et 255 (corps).
+ */
+export function libraryCursor(rt: Runtime): SoftCursor {
+  const pixels = new Int16Array(LIBRARY_CURSOR_SIZE * LIBRARY_CURSOR_SIZE).fill(-1);
+  for (const { x, y, color } of rt.tables.libraryCursor) pixels[y * LIBRARY_CURSOR_SIZE + x] = color;
+  return new SoftCursor(rt, LIBRARY_CURSOR_SIZE, LIBRARY_CURSOR_SIZE, pixels);
 }
 
 /** Moitiés de l'écran, pour `touchDirs`. */
@@ -155,16 +305,19 @@ export class EffectLoop {
   }
 }
 
+/** Durée d'un cran du fondu sonore `13e5:0039`, en centièmes : 3 s au volume maximal (15). */
+export const SOUND_FADE_STEP = 20;
+
 /**
- * `13e5:0039(d)` puis `16cb:08c9(0, 0x400000)` : le volume descend d'un cran tous les `d` centièmes jusqu'à 1, puis la
- * voie est coupée (musique comprise) et le volume rendu.
+ * `13e5:0039` puis `16cb:08c9(0, 0x400000)` : le volume descend d'un cran tous les 20 centièmes jusqu'à 1 (la fonction
+ * ignore l'argument que ses appelants empilent), puis la voie est coupée (musique comprise) et le volume rendu.
  */
-export function* fadeSoundOut(rt: Runtime, centiseconds: number): Script {
+export function* fadeSoundOut(rt: Runtime): Script {
   const { voice } = rt.ctx;
   const volume = voice.volume;
   for (let level = volume; level > 0; level--) {
     voice.setVolume(level);
-    yield* rt.wait(centiseconds);
+    yield* rt.wait(SOUND_FADE_STEP);
   }
   voice.setMusic(null);
   voice.stop();
@@ -200,4 +353,35 @@ export function* waitFrame(ticks: number, each?: () => void): Script {
     yield;
     each?.();
   }
+}
+
+// --- MUK (segment `19b9`) -------------------------------------------------------------------------
+
+/**
+ * Cadence des MUK. L'original les déroule sans temporisation (`19b9:019f` : au rythme du lecteur de CD et du décodeur) ;
+ * le portage prend la cadence par défaut du moteur commun pour une vidéo sans en-tête, 11 images par seconde.
+ */
+export const MUK_FPS = 11;
+
+/** `19b9:000c(nom)` : ouvre un MUK, que l'appelant déroule image par image (`seek(n)` puis `compose(tampon)`). */
+export function* openMuk(rt: Runtime, name: string): Script<VideoPlayer> {
+  return new VideoPlayer(yield* rt.load(rt.ctx.resources.video(name)));
+}
+
+/**
+ * `19b9:019f(nom, rappel)` : joue un MUK en entier, puis attend la fin de la voie. Chaque image apporte sa palette
+ * (envoyée aussitôt, entrée 0 à noir) et se décode sur l'image précédente ; `each` est le rappel d'image.
+ */
+export function* playMuk(rt: Runtime, name: string, each?: (frame: number) => void): Script {
+  const { surface, palette, clock } = rt.ctx;
+  const video = yield* openMuk(rt, name);
+  const start = clock.ticks;
+  for (let frame = 0; frame < video.frameCount; frame++) {
+    video.seek(frame);
+    palette.load(video.palette);
+    video.compose(surface.work);
+    each?.(frame);
+    while ((clock.ticks - start) * MUK_FPS < (frame + 1) * 60) yield;
+  }
+  yield* rt.waitSound();
 }

@@ -52,6 +52,7 @@ export function createGame(options: StartOptions = {}): AsterixGame {
     yield* main(runtime, options.resume ?? null, options.skipIntro || options.minigame !== undefined);
   });
   scene.beforeStep = () => runtime?.tick();
+  scene.beforePresent = () => runtime?.showHeld();
   return {
     scene,
     get runtime() {

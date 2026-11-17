@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   DURATION,
   FACING_LEFT,
@@ -21,7 +20,6 @@ import {
   ROMAN_KO_HIGH,
   ROMAN_KO_LOW,
   ROMAN_LOW,
-  bagarre,
   heroIdle,
   type BagarreState,
   type Roman,
@@ -36,7 +34,6 @@ import { arrived, decide, facingRoman, playM32, playM32ByTouch, turnKey } from "
  * moteur de test. L'inscription définitive est dans `scenes/minigames/index.ts` ; elle est refaite ici pour que le test
  * ne dépende pas de l'ordre des portages.
  */
-registerMinigame(MODULE, bagarre);
 
 const loaded = (run: Launched, name: string): boolean => run.host.loaded.some((path) => path.toUpperCase().includes(name));
 

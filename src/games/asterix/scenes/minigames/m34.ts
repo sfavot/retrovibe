@@ -1,10 +1,12 @@
-import { VideoPlayer } from "../../../../engine/infogrames/video";
+import type { IdefixTables } from "../../data/exe";
 import type { MinigameEntry } from "../../game/rules";
 import type { Player } from "../../game/state";
 import type { Play } from "../game";
 import { DOWN, UP, type Runtime, type Script } from "../runtime";
 import { changeSesterces } from "../squares";
-import { Anim, BOTTOM_HALF, TOP_HALF, beginPlay, endPlay, touchDirs, waitFrame } from "./common";
+import { Anim, BOTTOM_HALF, TOP_HALF, beginPlay, endPlay, openMuk, touchDirs, waitFrame } from "./common";
+
+export type { IdefixTables };
 
 /**
  * Mini-jeu « Idéfix dans la pyramide » (case 47, `MDF/34`, segment `23d1` : `23d1:09c1` et ses six fonctions), aussi
@@ -66,6 +68,8 @@ const DOG_Y = 0x74;
 /** En saut, Idéfix est au-dessus de l'obstacle aux sprites 18 à 21 (`> 0x11` et `!= 0x16`). */
 const AIRBORNE_AFTER = 0x11;
 const LANDING_SPRITE = 0x16;
+/** Décors différents (`rnd() % 5`), chacun avec son étendue et son attente (`DS:306a`, `DS:306f`). */
+const DECOR_KINDS = 5;
 /** Objets : 0 et 1 les obstacles, 2 à 14 le décor. */
 const OBJECT_COUNT = 15;
 const FIRST_DECOR = 2;
@@ -80,47 +84,6 @@ const TOUCH = [
   [TOP_HALF, UP],
   [BOTTOM_HALF, DOWN],
 ] as const;
-
-// --- Tables de `ASTERIX.EXE` (décision D4) ----------------------------------------------------------
-
-const EXECUTABLE = "ASTERIX.EXE";
-const LOAD_SEGMENT = 0x1000;
-const DGROUP = 0x2de2;
-/** `DS:2ec4` : sept parcours de 15 couples (moment, type), le moment en doubles images, −1 pour finir. */
-const COURSES = 0x2ec4;
-const COURSE_COUNT = 7;
-const COURSE_ENTRIES = 15;
-/** `DS:306a` et `DS:306f` : pour chacun des cinq décors, l'étendue de son ordonnée et l'attente avant le suivant. */
-const DECOR_SPANS = 0x306a;
-const DECOR_DELAYS = 0x306f;
-const DECOR_KINDS = 5;
-
-export interface IdefixTables {
-  /** Par parcours (0 hors partie, 1 à 6 en partie) : type de l'obstacle par moment (`DS:6f3a >> 1`). */
-  courses: Map<number, number>[];
-  decorSpans: number[];
-  decorDelays: number[];
-}
-
-/** Lit les tables du mini-jeu dans l'exécutable (même adressage que `data/exe.ts`). */
-export function parseIdefixTables(exe: Uint8Array): IdefixTables {
-  const view = new DataView(exe.buffer, exe.byteOffset, exe.byteLength);
-  const data = view.getUint16(8, true) * 16 + (DGROUP - LOAD_SEGMENT) * 16;
-  const courses: Map<number, number>[] = [];
-  for (let course = 0; course < COURSE_COUNT; course++) {
-    const entries = new Map<number, number>();
-    for (let i = 0; i < COURSE_ENTRIES; i++) {
-      const at = data + COURSES + (course * COURSE_ENTRIES + i) * 4;
-      const moment = view.getInt16(at, true);
-      if (moment === -1) break;
-      // `23d1:01a9` rend le type de la première entrée dont le moment correspond.
-      if (!entries.has(moment)) entries.set(moment, view.getInt16(at + 2, true));
-    }
-    courses.push(entries);
-  }
-  const bytes = (offset: number): number[] => Array.from(exe.subarray(data + offset, data + offset + DECOR_KINDS));
-  return { courses, decorSpans: bytes(DECOR_SPANS), decorDelays: bytes(DECOR_DELAYS) };
-}
 
 // --- État ---------------------------------------------------------------------------------------------
 
@@ -175,7 +138,7 @@ const pixels = (value: number): number => Math.trunc((value * 5) / 100);
  */
 export function* idefix(rt: Runtime, player: Player | null): Script {
   const { surface, resources, voice } = rt.ctx;
-  const [jumpSound, duckSound, hitSound, runSheet, hitSheet, objectSheet, endVoice1, endVoice2, exe] = yield* rt.load(
+  const [jumpSound, duckSound, hitSound, runSheet, hitSheet, objectSheet, endVoice1, endVoice2] = yield* rt.load(
     Promise.all([
       resources.sound("m34b0000.voc"),
       resources.sound("m34b0001.voc"),
@@ -185,10 +148,10 @@ export function* idefix(rt: Runtime, player: Player | null): Script {
       resources.hy8("m34sa002.hy8"),
       resources.sound("m34ag1.voc"),
       resources.sound("m34ag2.voc"),
-      resources.bytes(EXECUTABLE),
     ]),
   );
-  const tables = parseIdefixTables(exe);
+  // Tables `DS:2ec4`, `DS:306a` et `DS:306f` de l'exécutable (décision D4).
+  const tables = rt.tables.idefix;
   yield* rt.picture("m34da000.mcc", 3);
   surface.commitBackground();
 
@@ -211,7 +174,7 @@ export function* idefix(rt: Runtime, player: Player | null): Script {
   const decor = s.objects.slice(FIRST_DECOR);
   const dog = new Anim(runSheet);
   // `19b9:000c` lit la première image de l'animation finale dès maintenant, sans la décoder.
-  const ending = new VideoPlayer(yield* rt.load(resources.video("m34ag.muk")));
+  const ending = yield* openMuk(rt, "m34ag.muk");
 
   /** `23d1:0209(n, 0)` : un décor entre à droite, à une hauteur tirée au hasard, alternativement haute et basse. */
   const spawnDecor = (): void => {

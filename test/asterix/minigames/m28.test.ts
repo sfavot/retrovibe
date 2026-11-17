@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { registerMinigame } from "../../../src/games/asterix/scenes/minigame";
 import {
   BOX,
   DELAY_BASE,
@@ -18,7 +17,6 @@ import {
   PHASE_LEAVING,
   PHASE_WAITING,
   SPOT_COUNT,
-  script,
   targetBox,
   type SangliersState,
 } from "../../../src/games/asterix/scenes/minigames/m28";
@@ -32,8 +30,6 @@ import { aim, playM28, playM29, shootTarget, targetUp } from "./m28-player";
  * case 20 (argument 0) ou la case 52 (argument 1), joué à la souris, au doigt ou au clavier sur le moteur de test.
  * L'inscription définitive est dans `scenes/minigames/index.ts` ; elle est refaite ici pour que ce fichier se suffise.
  */
-registerMinigame(MODULE_SANGLIERS, script);
-registerMinigame(MODULE_PIRATES, script);
 
 const TICK_MS = 1000 / 60;
 const FRAME_MS = FRAME_TICKS * TICK_MS;

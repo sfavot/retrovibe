@@ -29,7 +29,7 @@
 13e5:000e	FUN_13e5_000e	19	Divers moteur	sûr	fondu d'entrée de (k+1)×16 pas	statut : lue ; SMURF.EXE : 1343:000c (1.00)
 13e5:0021	FUN_13e5_0021	19	Divers moteur	sûr	fondu au noir de (k+1)×16 pas	statut : lue ; SMURF.EXE : 1343:000c (1.00)
 13e5:0034	FUN_13e5_0034	5	Divers moteur	sûr	vide	statut : lue ; SMURF.EXE : 1343:0032 (1.00)
-13e5:0039	FUN_13e5_0039	50	Divers moteur	sûr	fondu sonore : volume DS:027a → 1, d cs par pas	statut : lue ; SMURF.EXE : 1343:0037 (1.00)
+13e5:0039	FUN_13e5_0039	50	Divers moteur	sûr	fondu sonore : volume DS:027a → 1, 20 cs par pas (argument ignoré)	statut : lue ; SMURF.EXE : 1343:0037 (1.00)
 13e5:006b	FUN_13e5_006b	5	Divers moteur	sûr	vide	statut : lue ; SMURF.EXE : 1343:0032 (1.00)
 13e5:0070	FUN_13e5_0070	53	Divers moteur	sûr	fondu sonore 15 pas (sans appelant)	statut : lue ; SMURF.EXE : 1343:006e (0.96)
 13ef:0005	FUN_13ef_0005	127	Fichiers et chemins	sûr	sépare un chemin en dossier et fichier	statut : lue ; SMURF.EXE : 134d:0000 (0.98)
@@ -153,7 +153,7 @@
 1884:00bf	manettes_1884_00bf	193	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	manettes (port 201h) (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 309e:00bd (1.00)
 1884:0185	manettes_1884_0185	86	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	manettes (port 201h) (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 309e:0183 (1.00)
 18a1:0227	FUN_18a1_0227	59	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:021f (1.00)
-18a1:0262	FUN_18a1_0262	88	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:025a (1.00)
+18a1:0262	FUN_18a1_0262	88	Assembleur divers (copies, MSCDEX, mélange)	sûr	curseur 16×16 de bibliothèque : montre (0) ou retire (0x400000) le curseur, forme DS:11d4	statut : lue ; SMURF.EXE : 30d4:025a (1.00)
 18a1:02ba	FUN_18a1_02ba	59	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:02b2 (1.00)
 18a1:02f5	FUN_1000_8d05	19	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:02ed (1.00)
 18a1:0308	FUN_18a1_0308	60	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:0300 (1.00)
@@ -163,8 +163,8 @@
 18a1:0413	FUN_18a1_0413	57	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:040b (0.95)
 18a1:044c	FUN_1000_8e5c	93	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:0444 (0.97)
 18a1:04a9	FUN_18a1_04a9	1	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (fragment ou saut de 1 o)	statut : non lue ; SMURF.EXE : aucun
-18a1:04aa	FUN_18a1_04aa	175	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:04a2 (1.00)
-18a1:0559	FUN_18a1_0559	186	Assembleur divers (copies, MSCDEX, mélange)	hypothèse	curseur graphique 16×16 de bibliothèque (rôle de l'équivalent)	statut : survolée ; SMURF.EXE : 30d4:0551 (1.00)
+18a1:04aa	FUN_18a1_04aa	175	Assembleur divers (copies, MSCDEX, mélange)	sûr	curseur 16×16 de bibliothèque : rappel d'horloge, efface et redessine le curseur à l'écran	statut : lue ; SMURF.EXE : 30d4:04a2 (1.00)
+18a1:0559	FUN_18a1_0559	186	Assembleur divers (copies, MSCDEX, mélange)	sûr	curseur 16×16 de bibliothèque : dessin de la forme DS:11d4 (segments par ligne, couleurs 0 et 255)	statut : lue ; SMURF.EXE : 30d4:0551 (1.00)
 1902:0050	frag_1902_0050	186	Clavier et manette	sûr	pas du code : tables du clavier (traduction, échange AZERTY, cibles)	statut : lue ; SMURF.EXE : 3134:0080 (0.87)
 1902:0200	frag_1902_0200	18	Clavier et manette	probable	fragment de l'ISR clavier INT 9	statut : lue ; SMURF.EXE : aucun
 1902:0213	frag_1902_0213	96	Clavier et manette	probable	ISR clavier : traduction du scancode, DS:4040	statut : lue ; SMURF.EXE : 3134:021b (0.97)

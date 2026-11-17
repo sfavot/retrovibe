@@ -106,6 +106,41 @@ describe.skipIf(!hasOriginalFiles)("héros complet (fichiers du jeu)", () => {
     expect(hero.ego).toBe(0);
   });
 
+  it("au pied d'un objet bloquant (coffre), le héros au clavier s'arrête au lieu de marcher sur place", () => {
+    const t = new Session();
+    t.skipIntro();
+    const hero = t.hero;
+    const state = t.engine.state!;
+    const terrain = t.engine.currentTerrain!;
+    // Même réglage que le test du mur : salle 1, plan 0, rangée 3 (P 28), sol praticable. Le héros (largeur 20) part en X 60.
+    hero.plane = 0;
+    hero.p = 28;
+    hero.x = 60;
+    hero.y = groundHeight(terrain.grid, 0, 60, 28);
+    hero.ground = 2;
+    hero.speedX = 0;
+    hero.speedP = 0;
+    hero.err = 0;
+    // Un coffre immobile (Txt 0, donc bloquant) sur sa route, même profondeur, recouvrement horizontal au départ.
+    const chest = state.createObject({ typ: 2, num: 319, gst: 0, mob: 0, dep: 0, txt: 0 });
+    state.moveToRoom(chest, hero.room!);
+    chest.p = 28;
+    chest.x = 50;
+    chest.y = hero.y;
+    chest.width = 12;
+    chest.height = 40;
+    chest.presence = 2;
+    const x0 = hero.x;
+    t.host.key({ type: "nav", key: "left" });
+    t.run(60);
+    expect([hero.speedX, hero.speedP]).toEqual([0, 0]); // le héros s'est arrêté
+    expect(hero.x).toBe(x0); // sans franchir le coffre
+    const stopped = hero.x;
+    t.run(40);
+    expect(hero.x).toBe(stopped); // plus aucun mouvement
+    expect(hero.ego).toBe(0);
+  });
+
   it("bottes : le trajet du clic est suivi jusqu'à l'arrivée", () => {
     const hero = s.hero;
     s.host.pointer(284, 10, 1);

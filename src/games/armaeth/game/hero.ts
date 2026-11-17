@@ -561,11 +561,12 @@ function walkTick(h: H): number {
       case 5:
         if (!o.path.defined) return enterFall(h, 8, o.ego === 0 ? 6 : 12);
         return gated(h);
-      // Au pied d'un obstacle (mur, avant-plan, marche trop haute), le héros au clavier s'arrête au lieu de marcher sur place ;
-      // en trajet, le suivi (`30d9:0006`) contourne ou recalcule, comme dans l'original.
+      // Au pied d'un obstacle (mur, avant-plan, marche trop haute, objet bloquant), le héros au clavier s'arrête au lieu de
+      // marcher sur place ; en trajet, le suivi (`30d9:0006`) contourne ou recalcule, comme dans l'original.
       case ERR.wall:
       case ERR.depthMask:
       case ERR.stepTooHigh:
+      case ERR.contact:
         if (!o.path.defined) {
           halt(o);
           o.err = 0;

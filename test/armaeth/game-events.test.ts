@@ -109,8 +109,13 @@ describe.skipIf(!hasOriginalFiles)("événements différés : jeu complet", () =
     state.events.operate(bear, 9, EventOp.Set, 1, 4);
     run(60);
     expect(state.findByNum(4)).toBeUndefined();
-    expect(state.findByNum(5)).toBeDefined();
-    expect(state.findByNum(15)).toBeDefined();
+    const fur = state.findByNum(5)!;
+    expect(fur).toBeDefined();
+    // `26da:0800` (désassemblé) : la fourrure est ramassable, vaut 20 et pèse 30.
+    expect([fur.pickable, fur.value, fur.weight]).toEqual([7, 20, 30]);
+    const carcass = state.findByNum(15)!;
+    expect(carcass).toBeDefined();
+    expect(carcass.weight).toBe(100);
   });
 
   it("Prytwen (101, événement 7) enfermé dans la salle 110 meurt de faim : un squelette (Num 112) en X 0x2C, P 0x2F, butin laissé", () => {

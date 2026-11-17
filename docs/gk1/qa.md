@@ -465,8 +465,8 @@ Aucun bogue du moteur connu sur le chemin joué.
   SetFade` à chaque image, tremblements `ShakeScreen`, éclairs de palette quand l'idole se brise, le sol fendu, Malia
   suspendue), les bandes dessinées 891 à 894 ; l'épilogue (Grace et Gabriel, ou Grace et Mosely), la fenêtre du score
   et ses trois chiffres, le générique qui défile.
-- **Fin du jeu** : après le générique, la page doit revenir à son écran titre (le moteur rend « terminé ») ; à vérifier
-  dans le navigateur, ainsi qu'un appui pendant le générique (il l'arrête).
+- **Fin du jeu** : vérifié dans le navigateur (« Recette navigateur ») : après le générique, ou sur un appui pendant le
+  générique, la page revient à son écran titre.
 - **Didascalies du jour 10** affichées en entier, en minuscules : « (Parlant à un Mosely absent qui lui a laissé une
   piste.) », « (Il active un élevateur secret, il est excité.) » : même règle que plus haut, à comparer.
 - **Didascalies** : « (HORRIFIE--VIENT JUSTE DE TROUVER MOSELY 'MORT') » est bien retirée (tout en capitales) ; « <en
@@ -475,10 +475,126 @@ Aucun bogue du moteur connu sur le chemin joué.
   du square, non en venant de la rue de Madame Cazaunoux), sans effet visible : les icônes répondent dans les deux cas.
   À comparer à ScummVM si un curseur paraît figé sur la carte.
 - **Passants du square** : Gabriel s'arrête net quand un passant coupe sa route (pièce 430, jour 3, en (105, 84)) et ne
-  repart pas seul. À comparer à ScummVM : l'original le fait-il contourner ou attendre ?
+  repart pas seul. C'est le script `sAvoid` du passant qui lui retire la main (« Recette navigateur », question a).
 - **Son** : aucune vérification possible ici (musiques de chaque pièce, bruitages, voix, lèvres). Au jour 10 : la musique 895
   pendant la patrouille du docteur John et le retour de la 550, les tambours Rada de la cellule, la musique 904 de la
   seconde fin, celle du générique.
+
+## Recette navigateur (16/11/2026)
+
+Page `#/gk1` du serveur de développement (`gk1-site`, port 5322), dans le navigateur intégré. Captures dans
+`/private/tmp/claude-501/-Users-suzy-Repositories-retrovibe/7cc71ed3-b672-4e29-a72e-0c1abb90c1d5/scratchpad/gk1-qa/` (noms entre parenthèses ci-dessous).
+
+**Méthode.** La première moitié (écran titre, aide, menus, fin du jeu, mort, sauvegardes, barre d'icônes, cartons, éditeur
+de la tombe, livre des tambours, traqueur, momies, lampe, hounfour, rituel) a été regardée **à cadence réelle** (60 images
+par seconde mesurées), souris et clavier réels. Le volet du navigateur a ensuite été masqué (onglet « caché », plus
+d'images) : la suite (thermostat, horloge, jumelles, questions d'ergonomie, mobile) a été pilotée par `loop.step()`, les
+entrées injectées par la file d'évènements ou par des `PointerEvent` de type `touch`, et les images relues depuis le
+canvas. Les étapes lointaines sont atteintes par les points de reprise du parcours : l'image JSON est écrite dans
+`localStorage` sous `gk1:slot20` (`{ savedAt, save }`), puis chargée par « Menu → Charger » ; aucun crochet de
+développement n'a été ajouté.
+
+### Verdict par point
+
+| Point | Verdict | Détail |
+| --- | --- | --- |
+| Écran titre du site, « Jouer », « Continuer » | correct | mise en page, jaquette, note « Dernière sauvegarde » (`00-site-titre`) ; « Charger une partie » est affiché, pas essayé |
+| Aide et crédits | correct | `MANUEL.pdf` et `BD.pdf` répondent 200 en `application/pdf`, liens en nouvel onglet (`00-site-aide`) |
+| Menu, « Son », volume, pause | correct | le jeu s'arrête fenêtre ouverte et en pause ; focus rendu au canvas (`00-site-menu`, `00-site-pause`) |
+| Plein écran | à vérifier | le volet refuse le vrai plein écran ; le repli (`is-fullscreen`) agrandit bien l'écran |
+| Écran titre du jeu : JOUER, SORTIR | correct | SORTIR arrête le jeu, la page revient à son écran titre (`01-jeu-titre`) ; INTRO et RETABLIR de cet écran pas essayés (RETABLIR vu depuis l'écran de la mort) |
+| Carton « Jour 1 », première scène, accents | correct | (`01-carton-jour1`) |
+| Barre d'icônes, panneau de réglages, « À propos », aide du jeu | correct | (`01-barre-icones`, `01-panneau-reglages`) |
+| Fenêtre « Sauvegarder » du jeu, nom tapé au clavier (« Rec été ») | correct | accents en CP850, curseur clignotant ; la première frappe remplace le nom proposé, une touche d'édition le garde (`03-sauvegarder-jeu`) |
+| Menu du site « Sauvegarder / Charger », rechargement, « Continuer » | correct | les deux chemins écrivent les mêmes emplacements |
+| Mort (python du musée) : RETABLIR, RECOMMENCER, QUITTER | correct | RETABLIR ouvre la fenêtre du jeu (« Annuler » y est grisé, comme attendu après une mort) ; RECOMMENCER ramène à l'écran titre du jeu ; QUITTER rend la page à son écran titre (`05-mort-boutons`, `05-mort-retablir`) |
+| Fin du jeu depuis `j10-fin` : rituel, bandes dessinées, épilogue, score, générique | correct | « 301 sur 342 » ; la fenêtre du score se ferme d'un clic **à côté** (curseur SORTIE), pas dessus : c'est le script (`finalInset::doit`, script 670) ; fin du générique ou clic pendant le générique : la page revient à son écran titre (`10-epilogue`, `10-score-final`, `10-generique-programmeurs`) |
+| Thermostat (jour 2) | correct | l'aiguille suit le pointeur, curseur borné au cadran (`02-thermostat`) |
+| Horloge (jour 4) | correct | cadran extérieur tourné, aiguilles (`04-horloge`, `04-horloge-cadran`) |
+| Jumelles (jour 4) | correct | masque à deux lentilles, scène dedans (`04-jumelles-2`) |
+| Écran de la mort, musée dans le noir | correct | palette sombre, python (`05-mort`) |
+| Livre des tambours (jour 6) | correct | police des signes, panneaux de droite (`06-livre-tambours`) |
+| Éditeur de la tombe (jour 6) | correct | grille, signes posés, barre EFFACER LETTRE / MESSAGE SUIVANT / SORTIE. Le compteur de cette barre affiche « sur 340 » : cels fixes du script 302 (`codeBar`), donnée d'origine (`06-editeur-tombe`) |
+| Carte, libellé du lieu | correct | « La Résidence Moonbeam » (`06-carte`) |
+| Bayou, radar du traqueur | correct | (`06-bayou-traqueur`, `k6-conclave`) |
+| Tombeau dans le noir (jour 7) | correct, à comparer | disque de lumière qui glisse vers le clic ; un point clair de 2 × 2 pixels reste visible en (259, 120) : la vue 3291 de Gabriel dans le noir (`07-tombe-lampe`, `k7-torch`) |
+| Chapelle, anneau des momies, pierres (jours 7 et 9) | correct | priorités et torches (`k7-kneel`, `k9-tiles`, `k9-chase`) |
+| Hounfour : salle de l'ascenseur, rituel du jour 10 | correct | texte rouge « Ahhhhhhhhh! », feu (`k10-hall`, `j10-rituel`) |
+| Didascalies entre parenthèses | non revu | pas de nouvelle scène vue avec une didascalie ; règle inchangée, à comparer (D6) |
+
+Rien de cassé dans le rendu : pas de débordement de fenêtre de texte, pas de défaut de priorité ni d'échelle sur les
+scènes vues.
+
+### Questions d'ergonomie
+
+- **(a) Passant qui arrête Gabriel : fidèle.** Mesuré sur la place (pièce 430, jour 3) : Gabriel bute sur une passante
+  (bit « obstacle »), puis c'est la passante bloquée qui lance `sAvoid` (script 401, `PedActor::doit`). `sAvoid` appelle
+  `GK::handsOff`, qui retire son mouvement à Gabriel (`setMotion: 0`), fait faire un écart au passant et rend la main.
+  Rien ne relance la marche : il faut recliquer. `DoBresen` suit `kDoBresen` de ScummVM (pas refusé, client rétabli,
+  `moveDone` jugé sur la position tentée), et la table `gk1Signatures` reprise dans `game/fixes.ts` n'a rien pour ce script.
+- **(b) Barre d'icônes pendant une scène : fidèle.** `GK::handsOff` désactive les icônes, pas la barre
+  (`IconBar::handleEvent` ne s'arrête que sur le bit 4 de `state`). Elle s'ouvre donc avec le seul panneau de réglages,
+  et le jeu attend qu'on la quitte (`5b-scene-pointeur-haut`).
+- **(c) Sorties au bord : fidèle.** Les zones sont étroites dans les scripts (place Jackson : ouest 4 pixels, nord 10,
+  sud 10) et ne changent que le curseur (`ExitFeature::doit`). Le clic est une marche ordinaire vers le point cliqué ;
+  Gabriel ne sort qu'en atteignant le bord (`GKEgo::doit` : x ≤ 0, x ≥ 319, y ≥ 141, y ≤ horizon). Mesuré : un clic en
+  x = 3 l'amène en (3, 50) sans sortir ; au nord, toute la zone est au-dessus de l'horizon et un clic au milieu suffit.
+  `ExitFeature::handleEvent`, qui enverrait Gabriel jusqu'au bord, existe mais aucun script ne l'appelle.
+- **(d) Garde de la salle 5 : fidèle aux scripts corrigés.** `rightWay` (script 710) pose le garde en (63, 111) et le
+  lance sur Gabriel après 4 cycles (`PChase`, distance 15). Gabriel entre en (75, 142) : un clic au milieu de la sortie
+  le fait monter tout droit, à 11 pixels du garde, donc pris quelle que soit la cadence. Un clic à droite de la zone
+  (x = 91) passe à 17 pixels et sort. À comparer à ScummVM (D6), dont vient l'initialisation complète du garde.
+
+### Mobile et accessibilité
+
+- **Portrait 375 × 812** : pas de défilement horizontal, écran sur toute la largeur, bouton « Menu » de 44 pixels ; le
+  menu porte « Son », « Plein écran » et « Quitter » (`6-mobile-portrait`). Les icônes de la barre du jeu y font une
+  vingtaine de pixels : jouable, plus confortable en paysage.
+- **Paysage 736 × 414** : écran de 616 × 385, contrôles sur les côtés (`6-mobile-paysage`).
+- **Toucher** : toucher = clic gauche, appui long = curseur suivant, toucher en haut = la barre s'ouvre sans cliquer, le
+  toucher suivant choisit l'icône (`6-mobile-barre`).
+- **Nom de sauvegarde au toucher** : le champ de la page se pose sur celui du jeu, prend le focus, écrit le nom
+  (« Mobile é »), Entrée sauve, Échap annule (`6-mobile-saisie`).
+- **Accessibilité de la page** : ordre de tabulation canvas, retour, Son, Menu, Aide, Plein écran ; contrastes de 8,8 et
+  11,3 ; messages en `role="status"`.
+
+### Corrigé
+
+- **Champ du nom de sauvegarde sur téléphone** : sa police faisait 12 px, taille sous laquelle Safari sur iOS agrandit la
+  page au focus sans la rétablir. Le champ garde une police de 16 px et il est réduit par `transform: scale` pour couvrir
+  exactement le champ du jeu (`textEntryLayout`, `ui/text-entry.ts`). Test : `test/gk1/ui/text-entry.test.ts`. Vu dans le
+  navigateur en 375 × 812 (`6-mobile-champ-apres-correctif`) ; **pas vérifié sur un vrai iPhone**.
+- **Textes** (`copy.ts`) : la présentation et l'aide disaient encore « portage en cours, le début du jeu est jouable » ;
+  le nom accessible du bouton « Menu » oubliait « sauvegarder » et « charger » ; l'aide explique maintenant les sorties
+  au bord, le passant, les fenêtres qui se ferment d'un clic à côté et la barre pendant une scène. Test :
+  `test/gk1/ui/copy.test.ts`.
+
+### Propositions (à décider)
+
+- **Module commun `src/ui/game-shell.ts`** : le canvas a un `aria-label` mais pas de rôle, donc pas de nom annoncé de façon
+  fiable ; lui donner `role="application"`, comme la page de développement. La page du jeu n'a pas de titre `h1`.
+- **Région `aria-live` pour les répliques** : faisable sans toucher au moteur. `afterTicks` lirait les textes des plans
+  de texte (ce que fait `texts()` du banc) et les écrirait dans un paragraphe `role="status"` masqué à l'écran. Il manque
+  au shell un point d'accroche pour ce paragraphe (`stageChildren` est fixé par `mountPointClickApp`) : petite évolution
+  de `src/ui/point-click-app.ts`.
+- **Sorties (c)** : si on veut adoucir, la voie propre est un correctif de script qui fait appeler
+  `ExitFeature::handleEvent` par les régions (401, 301, 450). Écart à l'original.
+- **Barre pendant les scènes (b)** et **passants (a)** : laissés fidèles ; l'aide les explique.
+- **Champ de saisie et rotation du téléphone** : le champ n'est placé qu'à l'ouverture ; une rotation fenêtre ouverte le
+  laisse décalé. À reprendre avec un test de la page dans un faux DOM.
+
+### Reste à vérifier à l'oreille
+
+Rien n'a pu être écouté pendant cette recette. À faire sur une vraie machine, son activé :
+
+- musique de chaque pièce et de la carte, fondus, reprise après une fenêtre et après la pause ;
+- voix anglaises calées sur le texte, lèvres des portraits, mode « voix », « texte » ou les deux du panneau ;
+- bruitages numérisés ; curseurs VITESSE, MUSIQUE, BRUITAGE du panneau ; bouton « Son » et volume de la page ;
+- répliques d'ambiance (radio du motard) : se ferment-elles seules ;
+- tambours du livre (lettres au rythme), tambours Rada de la cellule ;
+- jour 10 : musique 895 pendant la patrouille du docteur John et retour de la 550, musique 904 de la seconde fin,
+  musique du générique ;
+- premier son après « Jouer » sur téléphone (déblocage par le geste), et chargement de la soundfont en fond.
 
 ## Hors de portée d'un test
 

@@ -8,7 +8,7 @@
 export const copy = {
   title: "Gabriel Knight: Sins of the Fathers",
   description:
-    "L'aventure en pointer-et-cliquer de Jane Jensen (Sierra On-Line, 1993), dans sa version CD française : textes en français, voix en anglais. Gabriel Knight, libraire et romancier à La Nouvelle-Orléans, enquête sur les « meurtres vaudous ». Portage en cours : le début du jeu est jouable.",
+    "L'aventure en pointer-et-cliquer de Jane Jensen (Sierra On-Line, 1993), dans sa version CD française : textes en français, voix en anglais. Gabriel Knight, libraire et romancier à La Nouvelle-Orléans, enquête sur les « meurtres vaudous ». Le jeu se joue en entier, du premier jour au générique.",
   coverAlt: "Écran titre de Gabriel Knight: Sins of the Fathers.",
   sound: "Son",
 
@@ -37,7 +37,7 @@ export const copy = {
 
   // Barre tactile et pied de page.
   menu: "Menu",
-  menuLabel: "Menu du site : volume, pause, aide, écran titre",
+  menuLabel: "Menu du site : sauvegarder, charger, volume, pause, aide, écran titre",
   skipLabel: "Passer la cinématique (Échap)",
   pause: "Pause",
   pauseLabel: "Mettre le jeu en pause ou le reprendre",
@@ -92,7 +92,8 @@ export const copy = {
     "Gabriel Knight tient une librairie de livres rares à La Nouvelle-Orléans et prépare un roman sur le vaudou. Une série de meurtres rituels lui donne son sujet, et bien plus qu'il ne cherchait. Le jeu se joue à la souris : le curseur montre l'action en cours, et un clic gauche l'applique à ce qu'il désigne.",
     "Un clic droit passe au curseur suivant : marcher, regarder, parler, interroger, prendre, ouvrir ou fermer, actionner, pousser. La barre d'icônes du jeu, qui apparaît quand le curseur touche le haut de l'écran, donne les mêmes actions, l'inventaire, le magnétophone où réécouter les conversations, et le panneau de réglages du jeu (texte, voix ou les deux, vitesse du jeu).",
     "Au doigt : toucher l'écran vaut un clic gauche, un appui long vaut un clic droit, et toucher le haut de l'image ouvre la barre d'icônes. Une fenêtre de texte se ferme d'un clic ou avec la touche Entrée ; Échap, ou le bouton « Passer » au doigt, interrompt une cinématique.",
-    "Ce portage est en cours : l'écran titre, l'introduction et le début du premier jour sont jouables, avec la musique et les voix. Le manuel d'origine et la bande dessinée fournie dans la boîte, en français, sont en lien plus bas.",
+    "Pour changer de lieu, amener le curseur au bord de l'image : il devient une flèche de sortie, et il faut cliquer tout contre le bord pour que Gabriel sorte. Si un passant lui coupe la route, Gabriel s'arrête : cliquer de nouveau le fait repartir. Une fenêtre posée sur l'image (gros plan, score final) se ferme d'un clic à côté d'elle. La barre d'icônes s'ouvre aussi pendant une scène ; le jeu attend alors qu'on la quitte en descendant le curseur.",
+    "Le jeu se joue en entier, avec la musique et les voix. Le manuel d'origine et la bande dessinée fournie dans la boîte, en français, sont en lien plus bas.",
   ],
   helpKeysTitle: "Raccourcis clavier",
   helpKeys: [

@@ -15,6 +15,59 @@ export interface TextEntryOverlayOptions {
   wanted?(): boolean;
 }
 
+/** Rectangle à l'écran, en pixels CSS (`getBoundingClientRect`). */
+export interface ScreenBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Place et taille du champ de la page, dans le repère du parent du canvas. */
+export interface TextEntryLayout {
+  left: number;
+  top: number;
+  /** Taille avant réduction (`scale`) : à l'écran le champ couvre exactement celui du jeu. */
+  width: number;
+  height: number;
+  fontSize: number;
+  /** Réduction appliquée au champ (`transform: scale`, origine en haut à gauche) ; 1 : aucune. */
+  scale: number;
+}
+
+/**
+ * Taille de police en dessous de laquelle Safari sur iOS agrandit la page quand un champ de saisie prend le focus (et ne
+ * la rétablit pas ensuite).
+ */
+export const MIN_FOCUS_FONT_PX = 16;
+/** Plus petite taille de texte montrée dans le champ. */
+const MIN_SHOWN_FONT_PX = 12;
+/** Part de la hauteur du champ occupée par le texte. */
+const FONT_HEIGHT_RATIO = 0.7;
+
+/**
+ * Où poser le champ de la page pour qu'il couvre le champ du jeu `rect` (320 × 200), le canvas étant montré en `shown` et
+ * son parent en `frame`. Sur un téléphone tenu droit le champ du jeu fait une douzaine de pixels de haut : le texte y est
+ * plus petit que `MIN_FOCUS_FONT_PX`. Le champ garde alors cette taille de police, il est agrandi d'autant et réduit par
+ * `scale` : à l'écran il a la place et la taille de texte voulues, et le navigateur ne zoome pas.
+ */
+export function textEntryLayout(shown: ScreenBox, frame: Pick<ScreenBox, "left" | "top">, rect: TextEntryRequest["rect"]): TextEntryLayout {
+  const scaleX = shown.width / SCREEN_WIDTH;
+  const scaleY = shown.height / SCREEN_HEIGHT;
+  const width = (rect.right - rect.left) * scaleX;
+  const height = (rect.bottom - rect.top) * scaleY;
+  const shownFont = Math.max(MIN_SHOWN_FONT_PX, height * FONT_HEIGHT_RATIO);
+  const scale = shownFont < MIN_FOCUS_FONT_PX ? shownFont / MIN_FOCUS_FONT_PX : 1;
+  return {
+    left: shown.left - frame.left + rect.left * scaleX,
+    top: shown.top - frame.top + rect.top * scaleY,
+    width: width / scale,
+    height: height / scale,
+    fontSize: shownFont / scale,
+    scale,
+  };
+}
+
 /**
  * Saisie de texte au toucher (`docs/gk1/plan.md`, D10) : un canvas ne fait pas monter le clavier d'un téléphone. Quand le jeu
  * ouvre un champ (`EditText`, le nom d'une sauvegarde), un `<input>` est posé exactement dessus ; son contenu remplace celui
@@ -23,7 +76,7 @@ export interface TextEntryOverlayOptions {
  *
  * Avec une souris et un clavier, rien n'est posé : les touches vont au jeu par le canvas, et le champ du jeu les affiche.
  * Le clavier virtuel ne monte que sur un geste : si le navigateur refuse le focus donné à l'ouverture, toucher le champ le
- * donne.
+ * donne. La taille de police du champ ne descend pas sous `MIN_FOCUS_FONT_PX` (`textEntryLayout`).
  *
  * Renvoie la fonction qui débranche tout.
  */
@@ -34,17 +87,16 @@ export function mountTextEntryOverlay(options: TextEntryOverlayOptions): () => v
 
   const place = (element: HTMLInputElement, canvas: HTMLCanvasElement, rect: TextEntryRequest["rect"]): void => {
     // Mesures à l'écran : le canvas peut être centré ou mis à l'échelle dans la scène, son parent (positionné) sert de repère.
-    const shown = canvas.getBoundingClientRect();
-    const frame = canvas.parentElement!.getBoundingClientRect();
-    const scaleX = shown.width / SCREEN_WIDTH;
-    const scaleY = shown.height / SCREEN_HEIGHT;
+    const layout = textEntryLayout(canvas.getBoundingClientRect(), canvas.parentElement!.getBoundingClientRect(), rect);
     Object.assign(element.style, {
       position: "absolute",
-      left: `${shown.left - frame.left + rect.left * scaleX}px`,
-      top: `${shown.top - frame.top + rect.top * scaleY}px`,
-      width: `${(rect.right - rect.left) * scaleX}px`,
-      height: `${(rect.bottom - rect.top) * scaleY}px`,
-      fontSize: `${Math.max(12, (rect.bottom - rect.top) * scaleY * 0.7)}px`,
+      left: `${layout.left}px`,
+      top: `${layout.top}px`,
+      width: `${layout.width}px`,
+      height: `${layout.height}px`,
+      fontSize: `${layout.fontSize}px`,
+      transformOrigin: "0 0",
+      transform: layout.scale === 1 ? "none" : `scale(${layout.scale})`,
     });
   };
 

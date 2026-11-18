@@ -1,4 +1,5 @@
 import { armaeth } from "./armaeth";
+import { asterix } from "./asterix";
 import { bass } from "./bass";
 import { croisiere } from "./croisiere";
 import { drascula } from "./drascula";
@@ -18,7 +19,7 @@ import { ween } from "./ween";
 import { yoda } from "./yoda";
 
 /** Jeux disponibles, dans l'ordre d'affichage. Pour en ajouter un : créer `src/games/<id>/index.ts` exportant une `GameDefinition` et l'ajouter ici. */
-export const games: readonly GameDefinition[] = [indy, yoda, lostInTime, ween, teleportaschtroumpf, mathemagique, armaeth, swiv3d, zoombinis, drascula, fotaq, lure, bass, croisiere, voyageurs, tim3, gk1];
+export const games: readonly GameDefinition[] = [indy, yoda, lostInTime, ween, teleportaschtroumpf, mathemagique, armaeth, swiv3d, zoombinis, drascula, fotaq, lure, bass, croisiere, voyageurs, tim3, gk1, asterix];
 
 export function findGame(id: string): GameDefinition | undefined {
   return games.find((g) => g.id === id);

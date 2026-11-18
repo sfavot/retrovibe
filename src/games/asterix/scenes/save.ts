@@ -4,7 +4,8 @@ import type { GameState, SavedSetup } from "../game/state";
 
 /**
  * Sauvegarde de la partie en cours (décision D6 : adaptation web, l'original n'en a pas). Elle est écrite au début de
- * chaque tour, jamais au milieu d'une case ou d'un mini-jeu, et effacée en fin de partie et au lancement d'une nouvelle.
+ * chaque tour, jamais au milieu d'une case ou d'un mini-jeu, effacée en fin de partie, et remplacée au premier tour d'une
+ * nouvelle partie (pas avant : une partie annulée à l'écran des joueurs laisse la sauvegarde en place).
  * Une partie interrompue se reprend au début du tour où elle s'est arrêtée (« Continuer » sur l'écran de présentation).
  * Les mémoires de séance (décision D13) n'y sont pas : elles repartent de zéro au rechargement de la page.
  */

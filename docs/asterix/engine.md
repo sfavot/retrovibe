@@ -884,6 +884,7 @@ Image `M03DA00{perso}.mcg` (fondu). Clé 600 (dossier 62). Compteurs du joueur c
 
 - **ABANDON, non** : le marbre est rechargé, on reste dans le menu (`s = 0`).
 - **ABANDON, oui, à plusieurs** : `1d24:0be9` retire le joueur. Si un pari du devin est en cours : il est annulé si le joueur retiré est le parieur, et l'indice du parieur est décrémenté s'il est plus grand. Le portrait est libéré, les structures suivantes sont tassées, `DS:64a7 = 1`, `nb - 1`, `courant - 1` (ou `nb - 1` s'il devient négatif), de sorte que l'incrément de fin de tour tombe sur le joueur qui suivait. **Les autres continuent.**
+  - Conséquence quand c'est le **premier** joueur (indice 0) qui abandonne : `courant` devient `nb - 2`, le dernier indice du tableau tassé, donc la fin de tour de `1abf:2431` y voit le dernier joueur : `courant = 0` (celui qui suivait), mais aussi `DS:6487 + 1` (un tour de table compté alors que les autres n'ont pas joué) et, pendant le dernier tour, fin de partie immédiate (`DS:64aa = 1`). Étrange mais fidèle, repris tel quel (relu le 18/11/2026).
 - **S'il ne reste alors qu'un joueur** : image `M49DA00{perso du joueur restant}`, voix `K46TE{perso + 8}` (08 à 13) puis `K46TE07`, puis question oui/non sans autre voix : oui, le dernier joueur continue seul (`DS:64a8 = 0`) ; non, la partie s'arrête (`DS:64a8 = 1`).
 - **ABANDON, oui, en solo** : `DS:64a8 = 1`, fin de partie.
 - **FIN, oui** : `DS:64a8 = 1`, la partie s'arrête pour tous (voix d'adieu du §9.9, pas d'écran de fin) ; **non** : retour au menu.

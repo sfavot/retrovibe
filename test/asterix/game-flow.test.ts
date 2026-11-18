@@ -406,4 +406,76 @@ describe.skipIf(!hasOriginalFiles)("déroulé d'une partie d'Astérix", () => {
     expect(run.rt.game.players.map((p) => p.character)).toEqual([4, 2]);
     expect([run.rt.game.duration, run.rt.game.objectsRequired]).toEqual([5400, 7]);
   });
+
+  it("reprise au milieu d'un tour de table, FIN, puis REJOUER : la configuration de la partie reprise (D6)", async () => {
+    const run = await toFirstTurn([4, 2]);
+    allSquares(run, SQUARE.potion);
+    await roll(run);
+    await run.until(() => run.rt.game.current === 1 && run.screen === "turn");
+    const saved = readSave(run.host.storage)!;
+    expect(saved.state.current).toBe(1);
+
+    // Rechargement de la page : mémoires de séance neuves (`DS:1a02` à 1), la partie reprise est pourtant une vraie partie.
+    const resumed = await launch({ resume: structuredClone(saved) });
+    await resumed.untilScreen("turn");
+    expect(resumed.rt.game.current).toBe(1);
+    expect(resumed.rt.session.noGameYet).toBe(false);
+    await resumed.click(285, 137);
+    await resumed.untilScreen("marble");
+    await resumed.click(250, 167);
+    await answerYes(resumed);
+    await resumed.untilScreen("menu");
+    await resumed.tap("ArrowDown");
+    await resumed.run(500);
+    await resumed.tap("Space");
+    await resumed.until(() => resumed.screen === "score" || resumed.screen === "turn");
+    expect(resumed.rt.game.replay).toBe(true);
+    expect(resumed.rt.game.players.map((p) => p.character)).toEqual([4, 2]);
+    expect([resumed.rt.game.duration, resumed.rt.game.objectsRequired]).toEqual([5400, 7]);
+  });
+
+  it("JOUER puis ANNULER à l'écran des joueurs : la partie sauvegardée reste reprenable (D6)", async () => {
+    const run = await toFirstTurn([3]);
+    const saved = readSave(run.host.storage)!;
+    // La page est rouverte par « Jouer » (pas « Continuer ») : même stockage.
+    const again = await launch({ host: run.host });
+    await again.untilScreen("menu");
+    await again.tap("Space");
+    await again.untilScreen("players");
+    // Bas (JOUER), gauche (ANNULER), valider.
+    await again.tap("ArrowDown");
+    await again.run(500);
+    await again.tap("ArrowLeft");
+    await again.run(500);
+    await again.tap("Space");
+    await again.untilScreen("menu");
+    expect(readSave(again.host.storage)).toEqual(saved);
+    // Une nouvelle partie réellement lancée la remplace, à son premier tour.
+    await again.tap("ArrowDown");
+    await again.run(500);
+    await again.tap("Space");
+    await again.until(() => again.screen === "score" || again.screen === "turn");
+    expect(readSave(again.host.storage)!.state.players.map((p) => p.character)).toEqual([0]);
+  });
+
+  it("abandon du premier de trois joueurs : le suivant joue, le tour de table est compté (1d24:0be9)", async () => {
+    const run = await toFirstTurn([0, 1, 2]);
+    allSquares(run, SQUARE.potion);
+    await run.click(285, 137);
+    await run.untilScreen("marble");
+    await run.click(250, 137);
+    await answerYes(run);
+    await run.until(() => run.rt.game.players.length === 2 && run.screen === "turn");
+    expect(run.rt.game.players.map((p) => p.character)).toEqual([1, 2]);
+    // Fidèle à l'original : le joueur courant devient `nb − 2`, le dernier indice, donc la fin de tour compte un tour de table.
+    expect([run.rt.game.current, run.rt.game.round]).toEqual([0, 2]);
+    expect(readSave(run.host.storage)!.state.players.length).toBe(2);
+    await roll(run);
+    await run.until(() => run.rt.game.current === 1 && run.screen === "turn");
+    await roll(run);
+    await run.until(() => run.rt.game.current === 0 && run.screen === "turn");
+    expect(run.rt.game.players.map((p) => p.gourds)).toEqual([3, 3]);
+    expect(run.rt.game.round).toBe(3);
+    expect(run.rt.missing).toEqual([]);
+  });
 });

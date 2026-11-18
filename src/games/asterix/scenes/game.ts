@@ -380,8 +380,11 @@ export function* playGame(rt: Runtime, replay: boolean, resume: GameSave | null 
     session.duration = resume.state.duration;
     session.objectsRequired = resume.state.objectsRequired;
     session.shownRow = -1;
+    // Une vraie partie est en cours : sans cela, après un rechargement de la page, la boucle ne baisserait `DS:1a02`
+    // qu'au tour de table suivant, et un REJOUER venu avant (FIN, victoire) lancerait Astérix seul (`1abf:13e5`).
+    session.noGameYet = false;
   } else {
-    if (!rt.demo) clearSave(storage);
+    // La sauvegarde précédente n'est remplacée qu'au premier tour (`writeSave`) : ANNULER à l'écran des joueurs la garde.
     rt.game = initGame(session, rt.rnd, replay);
     if (!replay) {
       if (!(yield* choosePlayers(rt)) || rt.demoStopped) return false;

@@ -12,7 +12,7 @@ Ces fichiers sont versionnés dans `original/<jeu>/` et servis tels quels, ce qu
 | [Lost in Time (Coktel Vision, 1993)](https://sfavot.github.io/retrovibe/#/lost-in-time) | jouable (en cours de validation) |
 | [Le Téléportaschtroumpf (Infogrames Multimedia, 1995)](https://sfavot.github.io/retrovibe/#/teleportaschtroumpf) | jouable (en cours de validation) |
 | [Math Workshop / Mathémagique (Broderbund, 1994)](https://sfavot.github.io/retrovibe/#/mathemagique) | jouable (en cours de validation) |
-| [Armaeth (Grandslam Video, 1994)](https://sfavot.github.io/retrovibe/#/armaeth) | jouable (en cours de validation) |
+| [Armaeth (Grandslam Video, 1994)](https://sfavot.github.io/retrovibe/#/armaeth) | jouable |
 | [SWIV 3D (SCi, 1997)](https://sfavot.github.io/retrovibe/#/swiv3d) | jouable (en cours de validation) |
 | [L'Odyssée des Zoombinis (Broderbund / TERC, 1996)](https://sfavot.github.io/retrovibe/#/zoombinis) | en préparation (données et études faites, moteur à venir) |
 | [Drascula: The Vampire Strikes Back (Alcachofa Soft, 1996)](https://sfavot.github.io/retrovibe/#/drascula) | jouable (en cours de validation) |
@@ -181,7 +181,7 @@ Avec `npm run dev` : `src/games/mathemagique/ui/dev.html` lance le jeu seul, san
 
 ## Armaeth
 
-*Armaeth* (Grandslam Video, 1994, CD pour DOS adapté par Rob Northen Computing) : jeu d'action et d'aventure en vue de côté, où l'on tape aussi des commandes. Le moteur `AM1.EXE` (Microsoft C, mode réel) et son pilote vidéo résident `VGA.EXE` sont reconstitués par rétro-ingénierie avec Ghidra. Le moteur est réécrit en TypeScript et le jeu est jouable dans le navigateur (en cours de validation) : musique AdLib (OPL2), souris, clavier et écran tactile, sauvegarde dans le navigateur (F2 / F3), et une page d'aide (les indices de `SOS.EXE`, dévoilés un par un) depuis l'écran de présentation. Un robot joue la solution complète sur le moteur sans tête (`test/armaeth/walkthrough.test.ts`) : il va au bout sur 63 graines du hasard sur 64, la graine 56 étant abandonnée (limite du robot).
+*Armaeth* (Grandslam Video, 1994, CD pour DOS adapté par Rob Northen Computing) : jeu d'action et d'aventure en vue de côté, où l'on tape aussi des commandes. Le moteur `AM1.EXE` (Microsoft C, mode réel) et son pilote vidéo résident `VGA.EXE` sont reconstitués par rétro-ingénierie avec Ghidra. Le moteur est réécrit en TypeScript et le jeu est jouable dans le navigateur : musique AdLib (OPL2), souris, clavier et écran tactile, sauvegarde dans le navigateur (F2 / F3), et une page d'aide (les indices de `SOS.EXE`, dévoilés un par un) depuis l'écran de présentation. Un robot joue la solution complète sur le moteur sans tête (`test/armaeth/walkthrough.test.ts`) : il va au bout sur 63 graines du hasard sur 64, la graine 56 étant abandonnée (limite du robot).
 
 ### Lancer le jeu
 

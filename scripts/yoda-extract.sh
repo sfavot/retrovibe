@@ -25,6 +25,7 @@ ec_init_tmp
 echo "ISO -> fichiers..."
 7zz x -y -bso0 -bsp0 "-o$tmp/iso" "$iso" 'YODA/YODESK.DTA' 'YODA/YODESK.EXE' 'YODA/YODESK.HLP' 'YODA/YODESK.CNT' 'YODA/SFX/*.WAV'
 
+ec_refuser_liens "$tmp/iso"
 mkdir -p "$tmp/out/SFX"
 cp "$tmp/iso/YODA/YODESK.DTA" "$tmp/iso/YODA/YODESK.EXE" "$tmp/iso/YODA/YODESK.HLP" "$tmp/iso/YODA/YODESK.CNT" "$tmp/out/"
 cp "$tmp/iso/YODA/SFX/"*.WAV "$tmp/out/SFX/"

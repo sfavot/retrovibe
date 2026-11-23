@@ -41,6 +41,8 @@ export const SIGNAL_REG: Reg = 0xffff;
 
 const SEGMENT_FACTOR = 0x10000;
 const WORD_MASK = 0xffff;
+/** Cases d'une table au plus (un indice tient sur un mot). */
+export const TABLE_CAPACITY = WORD_MASK + 1;
 /** Octets par case de variable (les adresses de variables comptent en octets). */
 const CELL_BYTES = 2;
 

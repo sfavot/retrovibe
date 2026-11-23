@@ -72,6 +72,12 @@ describe("sauvegarde : format", () => {
       JSON.stringify({ ...good, state: { ...good.state, players: [{ ...good.state.players[0], screen: 99 }] } }),
       JSON.stringify({ ...good, rng: "x" }),
       JSON.stringify({ ...good, commentary: null }),
+      JSON.stringify({ ...good, warning: 9999 }),
+      JSON.stringify({ ...good, warning: 30 }),
+      JSON.stringify({ ...good, state: { ...good.state, paused: true } }),
+      JSON.stringify({ ...good, state: { ...good.state, turn: { ...good.state.turn, inside: [1] } } }),
+      JSON.stringify({ ...good, state: { ...good.state, turn: { ...good.state.turn, released: "x" } } }),
+      JSON.stringify({ ...good, commentary: { ...good.commentary, said: [1e9] } }),
     ];
     for (const raw of bad) {
       const storage = new MemoryStorage();
@@ -79,5 +85,13 @@ describe("sauvegarde : format", () => {
       expect(readSave(storage), String(raw)).toBeNull();
       expect(storage.get(SAVE_KEY)).toBeFalsy();
     }
+  });
+
+  it("n'en retient que les champs connus et accepte les vidéos d'avertissement 31 à 35", () => {
+    const { rng, game, commentary } = sample();
+    const good = captureSave(game, rng, { commentary: commentary.snapshot(), introShown: true, warning: 35 });
+    const parsed = parseSave({ ...good, extra: "x" });
+    expect(parsed).toEqual(good);
+    expect(parsed && "extra" in parsed).toBe(false);
   });
 });

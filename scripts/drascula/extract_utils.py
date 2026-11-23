@@ -40,11 +40,15 @@ def cmd_copier(base, francais, dest):
     for nom in sorted(os.listdir(base)):
         if ext(nom) not in EXT_GARDEES:
             continue
+        if os.path.islink(os.path.join(base, nom)):
+            sys.exit('Lien symbolique refusé : ' + nom)
         shutil.copyfile(os.path.join(base, nom), os.path.join(dest, nom))
         nb[ext(nom)] = nb.get(ext(nom), 0) + 1
     remplaces = 0
     for nom in sorted(os.listdir(francais)):
         if ext(nom) in EXT_FRANCAIS or nom.upper() in NOMS_FRANCAIS:
+            if os.path.islink(os.path.join(francais, nom)):
+                sys.exit('Lien symbolique refusé : ' + nom)
             if not os.path.exists(os.path.join(dest, nom)):
                 sys.exit('Fichier français sans équivalent dans la base : ' + nom)
             shutil.copyfile(os.path.join(francais, nom), os.path.join(dest, nom))

@@ -9,6 +9,7 @@
  * vite ; `cursor=0` laisse le curseur du système ; `intro=1` joue l'introduction (Échap : la passer ; sans `intro`, la partie commence directement). L'état est exposé dans `window.lure` (`engine`, `host`, `renderer`, `step(n)` : n ticks
  * à la main, pour les vérifications : un onglet masqué ne reçoit pas `requestAnimationFrame`).
  */
+import { h } from "../../../ui/dom";
 import { MemoryStorage } from "../../../engine/storage";
 import { fetchBytes } from "../../../ui/files";
 import { IndexedPresenter } from "../../../ui/indexed-canvas";
@@ -71,11 +72,18 @@ async function start(): Promise<void> {
   const renderer = new LureRenderer(data, { cursor: params.get("cursor") !== "0" });
 
   const form = document.createElement("form");
-  form.innerHTML = `<label>pièce <input name="room" type="number" min="1" max="55" value="${params.get("room") ?? ""}" /></label>
-    <label>graine <input name="seed" type="number" min="0" value="${params.get("seed") ?? "1"}" /></label>
-    <label>vitesse <input name="fast" type="number" min="1" max="20" value="${params.get("fast") ?? "1"}" /></label>
-    <label><input name="cursor" type="checkbox" value="1" ${params.get("cursor") === "0" ? "" : "checked"} /> curseur dessiné</label>
-    <button>Recharger</button>`;
+  // Construction DOM (pas d'innerHTML) : les valeurs viennent de l'URL.
+  form.append(
+    h("label", {}, "pièce ", h("input", { name: "room", type: "number", min: 1, max: 55, value: params.get("room") ?? "" })),
+    " ",
+    h("label", {}, "graine ", h("input", { name: "seed", type: "number", min: 0, value: params.get("seed") ?? "1" })),
+    " ",
+    h("label", {}, "vitesse ", h("input", { name: "fast", type: "number", min: 1, max: 20, value: params.get("fast") ?? "1" })),
+    " ",
+    h("label", {}, h("input", { name: "cursor", type: "checkbox", value: "1", checked: params.get("cursor") !== "0" }), " curseur dessiné"),
+    " ",
+    h("button", {}, "Recharger"),
+  );
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const next = new URLSearchParams();

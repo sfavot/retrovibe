@@ -38,6 +38,7 @@ py extraire "$iso" "$tmp/iso"
 # CD complet : construit dans $tmp, puis substitué d'un bloc.
 mkdir -p "$(dirname "$cd_complet")"
 rm -rf "$cd_complet.new"
+ec_refuser_liens "$tmp/iso"
 cp -R "$tmp/iso" "$cd_complet.new"
 rm -rf "$cd_complet"
 mv "$cd_complet.new" "$cd_complet"

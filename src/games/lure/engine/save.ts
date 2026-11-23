@@ -31,6 +31,8 @@
  */
 
 import { gameTextToUnicode } from "../data/charset";
+import { ROOM_PATHS_HEIGHT, ROOM_PATHS_WIDTH } from "../data/lure-dat";
+import { NUM_SERVE_CUSTOMERS } from "./bar";
 import type { LureEngine } from "./game";
 import { Hotspot } from "./hotspot";
 import { Cursor, GameState, HotspotId, NUM_VALUE_FIELDS, TickProc } from "./ids";
@@ -328,8 +330,13 @@ function referencesExist(engine: LureEngine, save: SaveData): boolean {
     }
     seen.push(a.values.hotspotId ?? -1);
   }
-  const fieldKeys = Object.keys(state.hotspots[0] ?? {});
-  for (const d of save.hotspotData) for (const key of Object.keys(d.fields)) if (!fieldKeys.includes(key)) return false;
+  // Champs d'un hotspot : uniquement des champs scalaires existants (jamais `npcSchedule`, réécrit à part, ni un champ objet).
+  const sample = (state.hotspots[0] ?? {}) as unknown as Record<string, unknown>;
+  for (const d of save.hotspotData) {
+    for (const key of Object.keys(d.fields)) {
+      if (!Object.hasOwn(sample, key) || typeof sample[key] === "object") return false;
+    }
+  }
   return true;
 }
 
@@ -494,7 +501,23 @@ function isPathFinder(value: unknown): value is PathFinderState {
       return false;
     }
   }
-  return true;
+  // Compteurs de balayage : bornés à la grille réelle (une valeur énorme ferait boucler `processPath` quasiment indéfiniment).
+  const { xCtr, yCtr } = value as { xCtr: number; yCtr: number };
+  return xCtr >= 0 && xCtr <= ROOM_PATHS_WIDTH && yCtr >= 0 && yCtr <= ROOM_PATHS_HEIGHT;
+}
+
+/** État du barman (`BarSave`) : absent (ancienne sauvegarde) ou structure complète, indices dans les plages réelles. */
+function isBarSave(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isObject(value) || !Array.isArray(value.bars) || typeof value.ewanXOffset !== "boolean") return false;
+  return value.bars.every(
+    (b) =>
+      isObject(b) &&
+      (b.currentCustomer === null || (isInt(b.currentCustomer) && b.currentCustomer >= 0 && b.currentCustomer < NUM_SERVE_CUSTOMERS)) &&
+      Array.isArray(b.customers) &&
+      b.customers.length <= NUM_SERVE_CUSTOMERS &&
+      b.customers.every((c) => isObject(c) && isInt(c.hotspotId) && isInt(c.serveFlags)),
+  );
 }
 
 function isTalkDialog(value: unknown): value is TalkDialogState {
@@ -558,7 +581,8 @@ export function parseSave(value: unknown): SaveData | null {
     isInt(display.destRoomNumber) &&
     isInt(display.cursorState) &&
     (display.talkDialog === null || isTalkDialog(display.talkDialog)) &&
-    isIntList(value.sounds);
+    isIntList(value.sounds) &&
+    isBarSave(value.bar);
   if (!ok) return null;
   const save = value as unknown as SaveData;
   if (save.exitJoins.some((j) => j.index < 0) || save.randomActions.some((r) => r.index < 0)) return null;

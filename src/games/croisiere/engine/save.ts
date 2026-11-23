@@ -477,8 +477,17 @@ function restoreOverlays(e: EngineState, saved: CroisiereSave["overlays"]): void
     s.data.code.procs.forEach((runs, k) => data.procs[k] && applyRuns(data.procs[k]!.data, runs));
     s.data.code.rels.forEach((runs, k) => data.rels[k] && applyRuns(data.rels[k]!.data, runs));
     applyRuns(data.initData, s.data.code.initData);
-    for (const [k, h] of s.data.code.msgRelHeaders) data.msgRelHeaders[k] = { ...h };
-    for (const [k, v] of s.data.code.states) if (data.states[k]) setParams(data.states[k]!, v);
+    // Indices venus de la sauvegarde : entiers dans les bornes de l'overlay rechargé (jamais une clé libre comme `__proto__`).
+    for (const [k, h] of s.data.code.msgRelHeaders) {
+      const target = Number.isInteger(k) ? data.msgRelHeaders[k] : undefined;
+      if (!target) throw new Error(`Sauvegarde : lien message/verbe ${String(k)} hors de l'overlay ${s.name}`);
+      for (const key of Object.keys(target) as (keyof MsgRelHeader)[]) if (typeof h[key] === "number") target[key] = h[key];
+    }
+    for (const [k, v] of s.data.code.states) {
+      const target = Number.isInteger(k) ? data.states[k] : undefined;
+      if (!target) throw new Error(`Sauvegarde : état ${String(k)} hors de l'overlay ${s.name}`);
+      setParams(target, v);
+    }
   }
 }
 
@@ -517,6 +526,7 @@ function restoreCells(e: EngineState, saved: CroisiereSave["cells"]): void {
     });
     return c;
   });
+  // `parseSave` a déjà vérifié les liens (bornes et absence de cycle) ; ceci ne fait que les résoudre.
   const at = (id: number): Cell | null => (id < 0 ? null : id === 0 ? head : (nodes[id - 1] ?? null));
   head.next = at(saved.head.next);
   head.prev = at(saved.head.prev);
@@ -619,12 +629,54 @@ export function restoreSave(e: EngineState, save: CroisiereSave): void {
   e.renderer.present?.(e);
 }
 
+const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const isNumArray = (v: unknown, length?: number): v is number[] => Array.isArray(v) && (length === undefined || v.length === length) && v.every(isNum);
+const isRuns = (v: unknown): v is ByteRuns => Array.isArray(v) && v.every((r) => Array.isArray(r) && r.length === 2 && isInt(r[0]) && typeof r[1] === "string");
+
+/**
+ * Liste des cellules : champs numériques, liens entiers dans `[-1, nodes.length]`, et chaînes `next` (depuis la tête) et `prev`
+ * (depuis la dernière) sans cycle, sinon le parcours de la liste gèlerait l'onglet.
+ */
+function validCells(c: unknown): boolean {
+  const cells = c as CroisiereSave["cells"];
+  if (!cells.head || !Array.isArray(cells.nodes)) return false;
+  const n = cells.nodes.length;
+  const okLink = (id: unknown) => isInt(id) && id >= -1 && id <= n;
+  if (!okLink(cells.head.next) || !okLink(cells.head.prev)) return false;
+  if (!cells.nodes.every((x) => x && isNumArray(x.fields, CELL_KEYS.length) && okLink(x.next) && okLink(x.prev))) return false;
+  const nextOf = (id: number) => (id === 0 ? cells.head.next : cells.nodes[id - 1]!.next);
+  const prevOf = (id: number) => (id === 0 ? cells.head.prev : cells.nodes[id - 1]!.prev);
+  for (const link of [nextOf, prevOf]) {
+    // Une chaîne valide visite chaque nœud au plus une fois, tête comprise (id 0).
+    let id = link(0);
+    for (let steps = 0; id > 0; steps++) {
+      if (steps > n) return false;
+      id = link(id);
+    }
+  }
+  return true;
+}
+
+function validOverlayData(d: unknown): boolean {
+  if (d === null) return true;
+  const o = d as SavedOverlayData;
+  if (!o || typeof o !== "object" || typeof o.bss !== "string" || !Array.isArray(o.objVars) || !o.objVars.every((v) => isNumArray(v, 6)) || !o.code) return false;
+  const code = o.code;
+  if (!Array.isArray(code.procs) || !code.procs.every(isRuns) || !Array.isArray(code.rels) || !code.rels.every(isRuns) || !isRuns(code.initData)) return false;
+  if (!Array.isArray(code.msgRelHeaders) || !code.msgRelHeaders.every((m) => Array.isArray(m) && isInt(m[0]) && m[0] >= 0 && !!m[1] && typeof m[1] === "object" && Object.values(m[1]).every(isNum))) return false;
+  return Array.isArray(code.states) && code.states.every((m) => Array.isArray(m) && isInt(m[0]) && m[0] >= 0 && isNumArray(m[1], 6));
+}
+
 /** Valide une valeur lue d'un emplacement (`SaveSlots.parse`) : la sauvegarde, ou `null` si ce n'est pas une sauvegarde de cette version. */
 export function parseSave(value: unknown): CroisiereSave | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Partial<CroisiereSave>;
   if (v.version !== SAVE_VERSION || typeof v.background !== "string" || !v.basic || !v.extra || !v.sound || !v.display || !v.overlays) return null;
   if (typeof v.globalVars !== "string" || !Array.isArray(v.files) || !Array.isArray(v.procs) || !Array.isArray(v.rels) || !v.cells || !Array.isArray(v.incrusts) || !Array.isArray(v.actors) || !v.walk) return null;
-  if (v.files.some((f) => !f || f.slot < 0 || f.slot >= NUM_FILE_ENTRIES)) return null;
+  if (v.files.some((f) => !f || !isInt(f.slot) || f.slot < 0 || f.slot >= NUM_FILE_ENTRIES)) return null;
+  if (!validCells(v.cells)) return null;
+  const ov = v.overlays;
+  if (!isInt(ov.numOfLoaded) || !Array.isArray(ov.entries) || !ov.entries.every((en) => en && typeof en.name === "string" && validOverlayData(en.data))) return null;
   return v as CroisiereSave;
 }

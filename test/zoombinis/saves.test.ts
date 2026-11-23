@@ -247,6 +247,17 @@ describe("liste et parties (rôle du .WHO)", () => {
     expect(store.save("Ana", newGame()).entry.file).toBe("ZOOM0002");
   });
 
+  it("écarte de la liste un nom forgé : trop long ou hors du jeu de caractères", () => {
+    const storage = new MemoryStorage();
+    const store = new SaveStore(storage, CHARSET);
+    store.save("Léa", newGame());
+    const key = `${STORAGE_PREFIX}who`;
+    const who = JSON.parse(storage.data.get(key)!);
+    who.games.push({ name: "x".repeat(100_000), file: "ZOOM0001" }, { name: "é\u0000", file: "ZOOM0002" }, { name: "Bob", file: "ZOOM0003" });
+    storage.data.set(key, JSON.stringify(who));
+    expect(store.list().map((e) => e.name)).toEqual(["Léa", "Bob"]);
+  });
+
   it("comparaison exacte des noms (casse comprise)", () => {
     const store = new SaveStore(new MemoryStorage(), CHARSET);
     store.save("max", newGame());

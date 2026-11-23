@@ -55,7 +55,13 @@ function runLengthEncode(bytes: Uint8Array): Uint8Array {
   return Uint8Array.from(out);
 }
 
+/** Octets décodés au plus : plafond de la mémoire qu'une longueur annoncée par une sauvegarde peut faire allouer. */
+const UNPACK_MAX = 128 * 1024 * 1024;
+
 function runLengthDecode(data: Uint8Array, length: number): Uint8Array {
+  // Une plage de `RUN_MAX` octets tient en deux octets codés : une longueur annoncée au-delà est forcément fausse, et se refuse
+  // avant toute allocation.
+  if (length > UNPACK_MAX || length > data.length * (RUN_MAX / 2)) throw new Error("GK1 : sauvegarde illisible (longueur d'un bloc)");
   const out = new Uint8Array(length);
   let at = 0;
   let i = 0;
@@ -99,7 +105,7 @@ export function packBytes(bytes: Uint8Array): string {
 export function unpackBytes(text: string): Uint8Array {
   const colon = text.indexOf(":");
   const length = Number(text.slice(0, colon));
-  if (colon < 0 || !Number.isInteger(length) || length < 0) throw new Error("GK1 : sauvegarde illisible (bloc d'octets)");
+  if (colon < 0 || !Number.isSafeInteger(length) || length < 0) throw new Error("GK1 : sauvegarde illisible (bloc d'octets)");
   return runLengthDecode(fromBase64(text.slice(colon + 1)), length);
 }
 
@@ -188,6 +194,14 @@ const TYPED_ARRAYS = {
 } as const;
 type TypedArrayKind = keyof typeof TYPED_ARRAYS;
 type TypedArray = InstanceType<(typeof TYPED_ARRAYS)[TypedArrayKind]>;
+
+/** Noms qui ne sont jamais un champ d'état : écrits sur un objet, ils en changeraient le prototype. */
+const FORBIDDEN_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
+function checkKey(key: string): string {
+  if (FORBIDDEN_KEYS.has(key)) throw corrupt(`champ « ${key} »`);
+  return key;
+}
 
 /** Clé réservée des nœuds qui ne sont pas des objets simples. */
 const TAG = "$";
@@ -326,7 +340,7 @@ class Decoder {
     if (tag === undefined) {
       const hints = current !== null && typeof current === "object" && isPlainObject(current) ? (current as Record<string, unknown>) : {};
       const out: Record<string, unknown> = {};
-      for (const [key, field] of Object.entries(node)) out[key] = this.decode(field, hints[key]);
+      for (const [key, field] of Object.entries(node)) out[checkKey(key)] = this.decode(field, hints[key]);
       return out;
     }
     switch (tag) {
@@ -344,7 +358,7 @@ class Decoder {
         return value;
       }
       case "t": {
-        const constructor = TYPED_ARRAYS[node.k as TypedArrayKind];
+        const constructor = typeof node.k === "string" && Object.hasOwn(TYPED_ARRAYS, node.k) ? TYPED_ARRAYS[node.k as TypedArrayKind] : undefined;
         if (!constructor || typeof node.d !== "string") throw corrupt("tableau typé");
         const bytes = unpackPlanes(node.d, constructor.BYTES_PER_ELEMENT);
         const array = new constructor(bytes.buffer as ArrayBuffer, 0, bytes.length / constructor.BYTES_PER_ELEMENT);
@@ -382,7 +396,7 @@ class Decoder {
         const hints = Array.isArray(current) ? [...(current as unknown[])] : [];
         const items = node.r.map((row, index) => {
           if (!Array.isArray(row) || row.length !== keys.length) throw corrupt(`ligne de ${entry.name}`);
-          return this.decodeInstance(entry, Object.fromEntries(keys.map((key, at) => [key as string, row[at]])), hints[index]);
+          return this.decodeInstance(entry, Object.fromEntries(keys.map((key, at) => [checkKey(String(key)), row[at]])), hints[index]);
         });
         if (!Array.isArray(current)) return items;
         current.length = 0;
@@ -401,6 +415,7 @@ class Decoder {
   }
 
   private decodeInstance(entry: StateClass, fields: { [key: string]: Json }, current: unknown): object {
+    for (const key of Object.keys(fields)) checkKey(key);
     let target: Record<string, unknown>;
     if (current instanceof entry.ctor) {
       target = current as Record<string, unknown>;

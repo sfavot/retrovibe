@@ -66,6 +66,7 @@ cd_="$tmp/cd"
 while IFS='|' read -r nom taille_attendue sha_attendu copie; do
   controler "$cd_/$nom" "$nom" "$taille_attendue" "$sha_attendu"
   if [ "$copie" = 1 ]; then
+    [ ! -L "$cd_/$nom" ] || { echo "$nom : lien symbolique refusé" >&2; exit 1; }
     cp "$cd_/$nom" "$tmp/out/$nom"
     [ "$(sha256 "$tmp/out/$nom")" = "$sha_attendu" ] || { echo "$nom : copie différente de la source" >&2; exit 1; }
   fi
@@ -82,12 +83,14 @@ LISTE
 
 # VERSION : l'ISO le nomme « VERSION. » (pas d'extension), le jeu l'ouvre sous le nom « VERSION ».
 controler "$cd_/VERSION." VERSION 50 ae18577ab942546d9d6037b57129aad24a61d24d77ab1674df9aa64f7bb11de7
+[ ! -L "$cd_/VERSION." ] || { echo "VERSION. : lien symbolique refusé" >&2; exit 1; }
 cp "$cd_/VERSION." "$tmp/out/VERSION"
 [ "$(sha256 "$tmp/out/VERSION")" = "$(sha256 "$cd_/VERSION.")" ] || { echo "VERSION : copie différente de la source" >&2; exit 1; }
 
 # Cinématiques, telles quelles.
 nb_seq=0
 for f in "$cd_"/SEQ/*.SEQ; do
+  [ ! -L "$f" ] || { echo "$f : lien symbolique refusé" >&2; exit 1; }
   cp "$f" "$tmp/out/SEQ/"
   nb_seq=$((nb_seq + 1))
 done

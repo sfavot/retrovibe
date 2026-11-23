@@ -31,11 +31,19 @@ ec_conserver() {
   done
 }
 
+# ec_refuser_liens <dossier>... : échoue si un lien symbolique se trouve dans un dossier issu d'une archive (avant tout cp).
+ec_refuser_liens() {
+  local d
+  for d in "$@"; do
+    if [ -n "$(find "$d" -type l -print -quit)" ]; then echo "Lien symbolique refusé dans $d" >&2; exit 1; fi
+  done
+}
+
 # ec_publier <out> <sortie> : génère files.json dans <out> (scripts/manifest.py) puis substitue <sortie> d'un bloc.
 # À appeler seulement quand tout a réussi.
 ec_publier() {
   python3 -I "$racine/scripts/manifest.py" "$1"
-  rm -rf "$2"
+  rm -rf "${2:?ec_publier : sortie vide}"
   mv "$1" "$2"
 }
 

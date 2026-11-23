@@ -428,6 +428,8 @@ export class SaveStore {
     for (const item of Array.isArray(root.games) ? root.games : []) {
       const e = typeof item === "object" && item !== null ? (item as Raw) : {};
       if (typeof e.name !== "string" || typeof e.file !== "string" || !/^ZOOM\d{4}$/.test(e.file)) continue;
+      // Un nom que la saisie ne pourrait pas produire (trop long, hors du jeu de caractères) est une entrée abîmée : il gèlerait le rendu.
+      if (normalizeName(e.name, this.charset) !== e.name) continue;
       if (games.length < MAX_SAVES && !games.some((g) => g.name === e.name)) games.push({ name: e.name, file: e.file });
     }
     const used = games.reduce((n, g) => Math.max(n, Number(g.file.slice(4)) + 1), 0);

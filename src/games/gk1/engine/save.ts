@@ -48,7 +48,7 @@ import { ArrayType, LIST_MAX_RECURSION } from "./ids";
 import { lipSyncOf } from "./kernel/audio";
 import { soundDriverOf, soundManagerOf } from "./kernel/sound";
 import { currentRoom } from "./loop";
-import { type LocalsSegment, NULL_REG, type Reg, SciArray, type SciBitmap, SciError, type SciList, type SciNode, type ScriptSegment, SegmentKind, type Table } from "./memory";
+import { type LocalsSegment, NULL_REG, type Reg, SciArray, type SciBitmap, SciError, type SciList, type SciNode, type ScriptSegment, SegmentKind, type Table, TABLE_CAPACITY } from "./memory";
 import { messagesOf } from "./message";
 import { SciObject } from "./object";
 import { loadInstance, packBytes, packWords, saveInstance, unpackBytes, unpackWords } from "./save-codec";
@@ -264,6 +264,34 @@ export function captureGame(vm: Vm, name = "", gameVersion = ""): SaveImage {
 // Reprise
 // -------------------------------------------------------------------------------------------------------------------------------
 
+const isCount = (value: unknown, max: number): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= max;
+const isCountList = (value: unknown, max: number): value is number[] => Array.isArray(value) && value.every((item) => isCount(item, max));
+
+/**
+ * Vérifie les nombres de l'image qui servent de tailles ou d'indices, avant toute allocation : une image forgée ou abîmée est
+ * refusée ici (`SciError`, comme les autres images incohérentes) au lieu de réserver une mémoire démesurée ou de boucler longtemps.
+ */
+function checkMemoryImage(image: MemoryImage): void {
+  const bad = (what: string): never => {
+    throw new SciError(`sauvegarde : ${what} invalide`);
+  };
+  const table = (what: string, t: TableImage): void => {
+    if (!t || !isCount(t.length, TABLE_CAPACITY) || !isCountList(t.index, t.length - 1) || !isCountList(t.free, t.length - 1)) bad(`table des ${what}`);
+  };
+  table("clones", image.clones);
+  table("listes", image.lists);
+  table("nœuds", image.nodes);
+  table("tableaux", image.arrays);
+  table("bitmaps", image.bitmaps);
+  const { clones, arrays, bitmaps } = image;
+  if (!isCountList(clones.freed, TABLE_CAPACITY) || !isCountList(clones.sizes, 0xffff) || clones.sizes.length !== clones.index.length) bad("clones");
+  if (!isCountList(arrays.types, 0xff) || !isCountList(arrays.sizes, 0xffff) || arrays.types.length !== arrays.index.length || arrays.sizes.length !== arrays.index.length) bad("tableaux");
+  const dimensions = [bitmaps.widths, bitmaps.heights, bitmaps.skips];
+  if (!dimensions.every((list) => Array.isArray(list) && list.length === bitmaps.index.length) || !isCountList(bitmaps.widths, 0xffff) || !isCountList(bitmaps.heights, 0xffff)) bad("bitmaps");
+  const strings = [image.stack, image.classes, clones.origin, clones.vars, image.lists.data, image.nodes.data, arrays.bytes, arrays.words, bitmaps.pixels];
+  if (strings.some((text) => typeof text !== "string")) bad("bloc de valeurs");
+}
+
 function loadTable<T>(table: Table<T>, image: TableImage, entries: readonly T[]): void {
   if (entries.length !== image.index.length) throw new SciError("sauvegarde : table tronquée");
   const cells = new Array<T | undefined>(image.length).fill(undefined);
@@ -295,6 +323,7 @@ function savedSegment(image: ScriptImage | LocalsImage): SavedSegment {
 
 function loadMemory(vm: Vm, image: MemoryImage): void {
   const memory = vm.memory;
+  checkMemoryImage(image);
   memory.reset();
   const stack = unpackWords(image.stack);
   if (stack.length !== memory.stack.length) throw new SciError("sauvegarde : pile d'une autre taille");
@@ -337,6 +366,14 @@ function loadMemory(vm: Vm, image: MemoryImage): void {
 
   const bytes = unpackBytes(image.arrays.bytes);
   const words = unpackWords(image.arrays.words);
+  // Les tailles annoncées doivent correspondre exactement aux octets et mots fournis (aucune boucle sur une taille non couverte).
+  let byteTotal = 0;
+  let wordTotal = 0;
+  image.arrays.types.forEach((type, at) => {
+    if (type === ArrayType.Byte || type === ArrayType.String) byteTotal += image.arrays.sizes[at];
+    else wordTotal += image.arrays.sizes[at];
+  });
+  if (byteTotal !== bytes.length || wordTotal !== words.length) throw new SciError("sauvegarde : tableaux d'une autre taille");
   let byteAt = 0;
   let wordAt = 0;
   loadTable(

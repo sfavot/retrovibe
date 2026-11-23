@@ -99,11 +99,68 @@ describe.skipIf(!hasOriginalFiles)("sauvegarde : refus", () => {
     expect(canSave(e)).toBe(false);
   });
 
+  it("restoreSave : un indice hors bornes lève une erreur sans toucher à Array.prototype", () => {
+    const { engine } = replayBench("bench-first-room-l2.trace.gz", null, null, 3500);
+    const save = JSON.parse(JSON.stringify(captureSave(engine.state)));
+    save.overlays.entries.find((o: { data: unknown }) => o.data).data.code.states.push([1e6, [7, 7, 7, 7, 7, 7]]);
+    const target = replayBench("bench-first-room-l2.trace.gz", null, null, 3500).engine;
+    expect(() => restoreSave(target.state, save)).toThrow(/Sauvegarde/);
+    expect(Object.hasOwn(Array.prototype, "X")).toBe(false);
+  });
+
   it("parseSave refuse une autre version", () => {
     const { engine } = replayBench("bench-first-room-l2.trace.gz", null, null, 3500);
     const save = JSON.parse(JSON.stringify(captureSave(engine.state)));
     expect(parseSave(save)).not.toBeNull();
     expect(parseSave({ ...save, version: 2 })).toBeNull();
     expect(parseSave(null)).toBeNull();
+  });
+});
+
+describe("sauvegarde forgée", () => {
+  const key = "__proto__";
+  const fields = new Array(23).fill(0);
+  /** Sauvegarde minimale : seules les parties que `parseSave` inspecte sont réalistes. */
+  const skeleton = () => ({
+    version: 1, background: "S33", basic: {}, extra: {}, sound: {}, display: {}, globalVars: "", files: [], procs: [], rels: [], incrusts: [], actors: [], walk: {},
+    overlays: {
+      numOfLoaded: 1, stateID: 0,
+      entries: [{ name: "X", loaded: true, executeScripts: 0, state: 0, data: { bss: "", objVars: [[0, 0, 0, 0, 0, 0]], code: { procs: [], rels: [], initData: [], msgRelHeaders: [], states: [] } } }],
+    },
+    cells: { head: { next: 1, prev: 2 }, nodes: [{ fields, next: 2, prev: 0 }, { fields, next: -1, prev: 1 }] },
+  });
+  type Forged = ReturnType<typeof skeleton> & Record<string, any>;
+
+  it("accepte la forme écrite par le jeu, refuse un cycle de cellules et des liens hors bornes", () => {
+    expect(parseSave(skeleton())).not.toBeNull();
+    const chain = (mutate: (s: Forged) => void) => {
+      const s: Forged = skeleton();
+      mutate(s);
+      return parseSave(s);
+    };
+    expect(chain((s) => (s.cells.nodes[1]!.next = 1))).toBeNull(); // 1 -> 2 -> 1
+    expect(chain((s) => (s.cells.nodes[1]!.next = 2))).toBeNull(); // la cellule 2 se pointe elle-même
+    expect(chain((s) => (s.cells.nodes[1]!.next = 0))).not.toBeNull(); // retour à la tête : fin de chaîne valide
+    expect(chain((s) => (s.cells.head.prev = 1))).not.toBeNull(); // `prev` cohérent ou non, tant qu'il est acyclique
+    expect(chain((s) => (s.cells.nodes[0]!.prev = 2))).toBeNull(); // cycle sur `prev` : 2 -> 1 -> 2
+    expect(chain((s) => (s.cells.head.next = 1e9))).toBeNull();
+    expect(chain((s) => (s.cells.head.prev = 0.5))).toBeNull();
+    expect(chain((s) => (s.cells.nodes[0]!.fields = [1, 2]))).toBeNull();
+  });
+
+  it("refuse une clé __proto__ ou des valeurs mal typées dans le code d'un overlay, sans toucher aux prototypes", () => {
+    const code = (mutate: (c: any) => void) => {
+      const s: Forged = skeleton();
+      mutate(s.overlays.entries[0]!.data.code);
+      return parseSave(s);
+    };
+    expect(code((c) => c.states.push([key, [1, 2, 3, 4, 5, 6]]))).toBeNull();
+    expect(code((c) => c.states.push([0, [1, 2, 3]]))).toBeNull();
+    expect(code((c) => c.states.push([0, [1, 2, 3, 4, 5, 6]]))).not.toBeNull();
+    expect(code((c) => c.msgRelHeaders.push([key, { type: 1 }]))).toBeNull();
+    expect(code((c) => c.msgRelHeaders.push([0, { type: "x" }]))).toBeNull();
+    expect(code((c) => c.procs.push([[key, "AA=="]]))).toBeNull();
+    expect(Object.hasOwn(Array.prototype, "X")).toBe(false);
+    expect(({} as Record<string, unknown>).X).toBeUndefined();
   });
 });

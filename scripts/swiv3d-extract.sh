@@ -67,6 +67,7 @@ rm -f "$bin"
 # CD complet, patch et installeur : construits à côté, puis substitués d'un bloc.
 mkdir -p "$dossier_archives"
 rm -rf "$dossier_archives/cd.new" "$dossier_archives/patch.new" "$dossier_archives/setup.new"
+ec_refuser_liens "$tmp/iso"
 cp -R "$tmp/iso" "$dossier_archives/cd.new"
 remplacer "$dossier_archives/cd.new" "$dossier_archives/cd"
 
@@ -75,12 +76,14 @@ mkdir "$tmp/patch"
 7zz x -y -bso0 -bsp0 "-o$tmp/patch" "$patch"
 find "$tmp/patch" \( -name '.DS_Store' -o -name '._*' \) -type f -delete
 rm -rf "$tmp/patch/__MACOSX"
+ec_refuser_liens "$tmp/patch"
 cp -R "$tmp/patch" "$dossier_archives/patch.new"
 remplacer "$dossier_archives/patch.new" "$dossier_archives/patch"
 
 echo "Installeur Inno Setup..."
 mkdir "$tmp/setup"
 innoextract -s -d "$tmp/setup" "$installeur" >/dev/null
+ec_refuser_liens "$tmp/setup"
 cp -R "$tmp/setup" "$dossier_archives/setup.new"
 remplacer "$dossier_archives/setup.new" "$dossier_archives/setup"
 

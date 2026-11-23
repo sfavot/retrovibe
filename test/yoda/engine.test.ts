@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Assets } from "../../src/engine/desktop-adventures/assets";
 import { HotspotType, Layer } from "../../src/engine/desktop-adventures/data/types";
-import { Game, MAX_HEALTH, type Presenter } from "../../src/engine/desktop-adventures/game";
+import { Game, type GameSnapshot, MAX_HEALTH, type Presenter } from "../../src/engine/desktop-adventures/game";
+import { parseSnapshot } from "../../src/engine/desktop-adventures/snapshot";
 import { readPeStrings } from "../../src/engine/desktop-adventures/data/pe-resources";
 import { Rng } from "../../src/engine/desktop-adventures/rng";
 import { WorldSize } from "../../src/engine/desktop-adventures/world";
@@ -206,5 +207,19 @@ describe.skipIf(!hasOriginalFiles)("moteur Yoda Stories", () => {
       await drive(game, game.step());
     }
     expect(game.zone).toBeDefined();
+  });
+});
+
+describe.skipIf(!hasOriginalFiles)("sauvegardes Yoda Stories", () => {
+  // Les mondes sont tirés au hasard : la validation des sauvegardes doit accepter toute partie réelle, quelle que soit la graine.
+  it("accepte telle quelle la sauvegarde de mondes générés de toutes tailles", async () => {
+    for (const size of [WorldSize.Small, WorldSize.Medium, WorldSize.Large]) {
+      for (let seed = 1; seed <= 12; seed++) {
+        const { game, assets } = await newGame(seed, size);
+        for (let i = 0; i < 20; i++) await drive(game, game.step());
+        const snapshot = JSON.parse(JSON.stringify(game.snapshot())) as GameSnapshot;
+        expect(parseSnapshot(snapshot, assets), `graine ${seed}, taille ${size}`).toEqual(snapshot);
+      }
+    }
   });
 });

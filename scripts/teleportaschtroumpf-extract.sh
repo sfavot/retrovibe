@@ -35,8 +35,8 @@ ec_init_tmp
 echo "Extraction de l'archive..."
 mkdir "$tmp/rar"
 bsdtar -xf "$archive" -C "$tmp/rar"
-bin="$(find "$tmp/rar" -iname 'Teleport.bin' | head -1)"
-cue="$(find "$tmp/rar" -iname 'Teleport.cue' | head -1)"
+bin="$(find "$tmp/rar" -type f -iname 'Teleport.bin' | head -1)"
+cue="$(find "$tmp/rar" -type f -iname 'Teleport.cue' | head -1)"
 [ -n "$bin" ] && [ -n "$cue" ] || { echo "Teleport.bin/.cue absents de l'archive" >&2; exit 1; }
 
 # Nombre de secteurs de la piste 1 (données), lu dans le .cue.

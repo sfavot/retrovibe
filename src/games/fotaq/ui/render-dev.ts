@@ -14,6 +14,7 @@
  * (échelle de Joe en %), `outfit` (`normal`, `underwear` ou `dress`), `fullscreen=1` (plein écran), `say` (texte dit par Joe, au-dessus
  * de lui), `font=1` (texte de contrôle des accents), `fast` (le temps du moteur passe N fois plus vite), `cursor=0` (sans curseur).
  */
+import { h } from "../../../ui/dom";
 import { MemoryStorage } from "../../../engine/storage";
 import { fetchBytes } from "../../../ui/files";
 import { IndexedPresenter } from "../../../ui/indexed-canvas";
@@ -100,19 +101,41 @@ async function start(): Promise<void> {
   const engine = new FotaqEngine(host, entry === null ? { room, stage, seed: 1, script: fotaqScript } : { entryObject: entry, stage, seed: 1, script: fotaqScript });
 
   const form = document.createElement("form");
-  form.innerHTML = `<label>pièce <input name="room" type="number" min="1" max="126" value="${room}" /></label>
-    <label>x <input name="x" type="number" value="${params.get("x") ?? ""}" /></label>
-    <label>y <input name="y" type="number" value="${params.get("y") ?? ""}" /></label>
-    <label>échelle <input name="scale" type="number" min="1" max="100" value="${params.get("scale") ?? ""}" /></label>
-    <label>tenue <select name="outfit"><option>normal</option><option>underwear</option><option>dress</option></select></label>
-    <label><input name="fullscreen" type="checkbox" value="1" ${params.has("fullscreen") ? "checked" : ""} /> plein écran</label>
-    <label>texte <input name="say" value="${(params.get("say") ?? "").replace(/"/g, "&quot;")}" /></label>
-    <label>réplique <input name="line" value="${(params.get("line") ?? "").replace(/"/g, "&quot;")}" /></label>
-    <label>personne <input name="person" type="number" min="1" value="${params.get("person") ?? ""}" /></label>
-    <label>dialogue <input name="dog" value="${params.get("dog") ?? ""}" /></label>
-    <label>cinématique <input name="cut" value="${params.get("cut") ?? ""}" /></label>
-    <label>états <input name="states" value="${params.get("states") ?? ""}" /></label>
-    <button>Afficher</button>`;
+  // Construction DOM (pas d'innerHTML) : les valeurs viennent de l'URL.
+  const text = (name: string, label: string, props: Record<string, string | number> = {}): HTMLElement =>
+    h("label", {}, `${label} `, h("input", { name, ...props, value: params.get(name) ?? "" }));
+  form.append(
+    h("label", {}, "pièce ", h("input", { name: "room", type: "number", min: 1, max: 126, value: room })),
+    " ",
+    text("x", "x", { type: "number" }),
+    " ",
+    text("y", "y", { type: "number" }),
+    " ",
+    text("scale", "échelle", { type: "number", min: 1, max: 100 }),
+    " ",
+    h(
+      "label",
+      {},
+      "tenue ",
+      h("select", { name: "outfit" }, h("option", {}, "normal"), h("option", {}, "underwear"), h("option", {}, "dress")),
+    ),
+    " ",
+    h("label", {}, h("input", { name: "fullscreen", type: "checkbox", value: "1", checked: params.has("fullscreen") }), " plein écran"),
+    " ",
+    text("say", "texte"),
+    " ",
+    text("line", "réplique"),
+    " ",
+    text("person", "personne", { type: "number", min: 1 }),
+    " ",
+    text("dog", "dialogue"),
+    " ",
+    text("cut", "cinématique"),
+    " ",
+    text("states", "états"),
+    " ",
+    h("button", {}, "Afficher"),
+  );
   (form.elements.namedItem("outfit") as HTMLSelectElement).value = params.get("outfit") ?? "normal";
 
   const canvas = document.createElement("canvas");

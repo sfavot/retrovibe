@@ -408,6 +408,29 @@ describe("sauvegarde : valeur illisible = emplacement vide", () => {
     store.set("slot02", JSON.stringify({ savedAt: 1, save: { ...good, version: SAVE_VERSION + 1 } }));
     expect(createSaveSlots(store).read(2)).toBeNull();
   });
+
+  it.skipIf(!hasOriginalFiles)("une sauvegarde forgée (barman, compteurs de chemin, champs d'hotspot) est refusée avant toute restauration", () => {
+    const { engine, host } = makeEngine();
+    new Driver(engine, host).ticks(5);
+    const good = snapshot(engine);
+    const a0 = good.active[0]!;
+    const withPath = (patch: object): SaveData => ({ ...good, active: [{ ...a0, pathFinder: { ...a0.pathFinder, ...patch } }, ...good.active.slice(1)] });
+    expect(parseSave(withPath({ xCtr: 2_000_000_000 }))).toBeNull();
+    expect(parseSave(withPath({ xCtr: -1 }))).toBeNull();
+    expect(parseSave(withPath({ yCtr: 1e9 }))).toBeNull();
+    expect(parseSave({ ...good, bar: "x" })).toBeNull();
+    expect(parseSave({ ...good, bar: { bars: [null], ewanXOffset: false } })).toBeNull();
+    expect(parseSave({ ...good, bar: { bars: [{ currentCustomer: 9, customers: [] }], ewanXOffset: false } })).toBeNull();
+    expect(parseSave({ ...good, bar: { bars: [{ currentCustomer: null, customers: [null] }], ewanXOffset: false } })).toBeNull();
+    expect(parseSave({ ...good, bar: undefined })).not.toBeNull();
+
+    // Un champ d'hotspot objet (`npcSchedule`) ferait planter la restauration en cours de route : refusé par `restoreSave`, moteur intact.
+    const forged = { ...good, hotspotData: [{ index: 0, fields: { npcSchedule: 1 }, schedule: [] }] };
+    const target = makeEngine().engine;
+    const before = JSON.stringify(captureSave(target));
+    expect(restoreSave(target, parseSave(JSON.parse(JSON.stringify(forged)))!)).toBe(false);
+    expect(JSON.stringify(captureSave(target))).toBe(before);
+  });
 });
 
 describe.skipIf(!hasOriginalFiles)("sauvegarde : sons à relancer", () => {

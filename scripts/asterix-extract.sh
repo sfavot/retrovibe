@@ -68,6 +68,7 @@ pdf() {
   [ -n "$f" ] || { echo "PDF $1 absent de $manuels" >&2; exit 1; }
   [ "$(wc -c <"$f" | tr -d ' ')" -eq "$3" ] || { echo "$2 : $3 octets attendus" >&2; exit 1; }
   [ "$(sha256 "$f")" = "$4" ] || { echo "$2 : SHA-256 inattendu" >&2; exit 1; }
+  [ ! -L "$f" ] || { echo "$f : lien symbolique refusé" >&2; exit 1; }
   cp "$f" "$tmp/out/$2"
 }
 pdf '*(Manuel).pdf' MANUEL.pdf 4866036 5055638ec1a7e52249521e469497539c63d2965599f93ce06a3b28d4cd5dbe43

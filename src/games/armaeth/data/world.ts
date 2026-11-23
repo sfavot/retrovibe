@@ -11,6 +11,8 @@ import { BinaryReader } from "../../../data/reader";
 
 export const WORLD_SIGNATURE = [0x786b, 0x00ca] as const;
 export const WORLD_HEADER_WORDS = 27;
+/** Plus haut niveau dont le drapeau tient dans l'en-tête (octet `0x4b73 - 0x4b46 + niveau` < 54). */
+export const MAX_LEVEL = 8;
 export const SCORE_ENTRY_BYTES = 8;
 export const DEFERRED_EVENT_BYTES = 12;
 export const ROOM_BYTES = 42;
@@ -179,6 +181,8 @@ export function parseWorld(bytes: Uint8Array): World {
   const words: number[] = [];
   for (let i = 0; i < WORLD_HEADER_WORDS; i++) words.push(r.u16());
   if (words[0] !== WORLD_SIGNATURE[0] || words[1] !== WORLD_SIGNATURE[1]) throw new Error("Monde invalide : signature");
+  // Niveau (`chapterLevel % 100`) : les drapeaux de niveau sont des octets de l'en-tête (de 4b68 / 4b73 + niveau), le dernier est l'octet 53.
+  if (words[4] % 100 > MAX_LEVEL) throw new Error(`Monde invalide : niveau ${words[4] % 100}`);
   const header: WorldHeader = {
     words,
     lastSerial: words[2],

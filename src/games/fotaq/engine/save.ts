@@ -17,7 +17,11 @@
  */
 
 import type { JasArea, JasItem, JasObject, JasObjectDescription, JasWalkOff } from "../data/jas";
-import type { SavedBam } from "./specials/bam";
+import { BamFlag, type SavedBam } from "./specials/bam";
+import { CAR_DATA } from "./specials/group-4/car-data";
+import { Room as CarRoom } from "./specials/group-4/ids";
+import { FIGHT_TABLES } from "./specials/group-5/fight-data";
+import { Room as FightRoom } from "./specials/group-5/ids";
 import {
   Direction,
   GAME_STATE_COUNT,
@@ -159,7 +163,21 @@ export function matchesGame(save: SaveData, data: GameData): boolean {
   if (save.walkOffs.length !== jas.walkOffs.length || save.objectDescriptions.length !== jas.objectDescriptions.length) return false;
   if (save.areas.length !== jas.rooms.length || save.areas.some((rows, room) => rows.length !== jas.rooms[room].areas.length)) return false;
   if (save.entryObject < 0 || save.entryObject >= save.objects.length) return false;
+  if (!bamMatchesGame(save)) return false;
   return save.inventory.every((item) => item >= 0 && item < save.items.length);
+}
+
+/**
+ * La ligne et la table de l'animation de la course (pièce 74) ou du combat (pièce 69) existent : `updateCar` / `updateFight`
+ * lisent `table[index]` à chaque image et lèveraient une exception sur une ligne hors table. À l'arrêt, rien n'est lu.
+ */
+function bamMatchesGame(save: SaveData): boolean {
+  const { bam, room } = save;
+  if (bam.fightTable >= FIGHT_TABLES.length) return false;
+  if (bam.flag === BamFlag.Stop) return true;
+  if (room === CarRoom.CarChase) return bam.index < CAR_DATA.length;
+  if (room === FightRoom.FinalFight) return bam.index < FIGHT_TABLES[bam.fightTable].length;
+  return true;
 }
 
 // --- Lecture d'un JSON inconnu -------------------------------------------------------------------------------------------------

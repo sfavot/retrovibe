@@ -1,6 +1,6 @@
 import type { HostStorage } from "../../../engine/storage";
-import { parseWorld } from "../data/world";
 import type { ArmaethStorage } from "../engine/host";
+import { loadWorldState } from "../engine/save";
 
 /** Octets -> base64 (par blocs : `String.fromCharCode(...bytes)` dépasse la pile pour 21 868 octets). */
 export function encodeBase64(bytes: Uint8Array): string {
@@ -34,10 +34,10 @@ export function createSaveStorage(store: HostStorage): ArmaethStorage {
       const bytes = decodeBase64(text);
       if (bytes) {
         try {
-          parseWorld(bytes);
+          loadWorldState(bytes); // lecture complète (liens des objets compris) : le moteur ne reçoit que ce qu'il sait installer
           return bytes;
         } catch {
-          // fichier de monde invalide : traité comme absent
+          // fichier de monde invalide ou incohérent : traité comme absent
         }
       }
       console.warn(`Armaeth : la sauvegarde « ${slot} » est illisible et ignorée.`);

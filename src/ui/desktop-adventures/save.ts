@@ -1,16 +1,19 @@
+import type { Assets } from "../../engine/desktop-adventures/assets";
 import { type GameSnapshot, migrateSnapshot } from "../../engine/desktop-adventures/game";
+import { parseSnapshot } from "../../engine/desktop-adventures/snapshot";
 import { storage } from "./storage";
 
 export type SaveSlot = ReturnType<typeof createSaveSlot>;
 
-/** Sauvegarde locale d'un jeu (un seul emplacement, clé `key`). Le stockage peut être indisponible : on échoue sans bruit. */
-export function createSaveSlot(key: string) {
+/** Sauvegarde locale d'un jeu (un seul emplacement, clé `key`). Le stockage peut être indisponible : on échoue sans bruit.
+ * Une sauvegarde illisible, forgée ou incohérente avec les données du jeu (`assets`) est traitée comme absente. */
+export function createSaveSlot(key: string, assets: Assets) {
   return {
     read(): GameSnapshot | null {
       const raw = storage.get(key);
       if (!raw) return null;
       try {
-        return migrateSnapshot(JSON.parse(raw));
+        return parseSnapshot(migrateSnapshot(JSON.parse(raw)), assets);
       } catch {
         return null;
       }

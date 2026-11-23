@@ -13,8 +13,10 @@
  * Écart volontaire : les révisions anciennes (5, `importOldCompact`) ne sont pas lues (erreur).
  */
 
-import { FILE_LIST_SIZE } from "./files";
-import { NUM_SCRIPT_VARS } from "./ids";
+import { FONT_SPECS } from "../data/font";
+import { SECTION_COUNT } from "../data/ids";
+import { FILE_LIST_SIZE, ITEM_LIST_SIZE } from "./files";
+import { NUM_SCRIPT_VARS, Var } from "./ids";
 
 export const SAVE_FILE_REVISION = 6;
 /** Mots de l'en-tête (taille, révision, version, 2 effets, musique, police, curseur, palette). */
@@ -85,11 +87,19 @@ export function parseSaveWords(words: Uint16Array, expectedCompactWords: number)
     palette: u32(14),
   };
   if (header.revision !== SAVE_FILE_REVISION) throw new Error(`révision de sauvegarde ${header.revision} non lue (${SAVE_FILE_REVISION} attendue)`);
+  // Police : indice dans `FONT_SPECS` (`Text.setFont` lève hors plage, après la restitution partielle).
+  if (header.charSet >= FONT_SPECS.length) throw new Error(`police ${header.charSet} de la sauvegarde invalide`);
   let pos = HEADER_WORDS;
   const vars = new Uint32Array(NUM_SCRIPT_VARS);
   for (let i = 0; i < NUM_SCRIPT_VARS; i++, pos += 2) vars[i] = u32(pos);
+  // Section en cours : `loadSection((section + 1) & 0xff)` n'a de fichiers que pour les sections du jeu.
+  if (vars[Var.CUR_SECTION]! >= SECTION_COUNT - 1) throw new Error(`section ${vars[Var.CUR_SECTION]} de la sauvegarde invalide`);
   const reloadList = new Uint32Array(FILE_LIST_SIZE);
   for (let i = 0; i < FILE_LIST_SIZE; i++, pos += 2) reloadList[i] = u32(pos);
+  // Liste des fichiers à recharger : terminée par 0 avant la fin de la table, emplacements dans `_itemList`.
+  const end = reloadList.indexOf(0);
+  if (end < 0 || end >= FILE_LIST_SIZE) throw new Error("liste de fichiers de la sauvegarde non terminée");
+  for (let i = 0; i < end; i++) if ((reloadList[i]! & 2047) >= ITEM_LIST_SIZE) throw new Error(`emplacement de fichier ${reloadList[i]! & 2047} invalide`);
   const compactWords = words.subarray(pos, pos + expectedCompactWords);
   pos += expectedCompactWords;
   if (compactWords.length !== expectedCompactWords || pos * 2 !== header.size) {

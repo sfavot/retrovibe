@@ -82,13 +82,13 @@ export class App {
     this.basePalette = basePalette;
     this.loadManual = loadManual;
     this.loadManualContents = loadManualContents;
-    this.saveSlot = createSaveSlot(`${def.key}-desktop-save`);
     this.progressStore = createProgressStore(`${def.key}-desktop-progress`, def.progress);
     this.speedSetting = createSpeedSetting(`${def.key}-desktop-speed`);
     this.audioPrefs = audioPrefs(def.key);
     this.tickMs = this.speedSetting.read();
     this.walkCursors = new WalkCursors(cursors, def.walkCursorFirstId);
     this.assets = new Assets(data);
+    this.saveSlot = createSaveSlot(`${def.key}-desktop-save`, this.assets);
     this.palette = new PaletteAnimation(basePalette, COLOR_CYCLES[def.variant.id]);
     this.audio = new AudioPlayer(def.sounds);
     this.audio.soundEnabled = this.audioPrefs.readSound();
@@ -267,7 +267,12 @@ export class App {
       const resume = h("button", { class: "primary", type: "button" }, this.copy.resumeGame);
       resume.addEventListener("click", () => {
         this.audio.unlock();
-        void this.resumeGame(saved);
+        this.resumeGame(saved).catch((e: unknown) => {
+          // Reprise impossible malgré la validation : la sauvegarde est écartée, comme si elle n'existait pas.
+          console.error(e);
+          this.saveSlot.clear();
+          this.showTitle();
+        });
       });
       resumeSection = h("div", { class: "resume" }, resume, h("p", { class: "muted" }, this.copy.resumeHint));
       queueMicrotask(() => resume.focus());

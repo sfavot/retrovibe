@@ -273,6 +273,36 @@ describe("codage des sauvegardes", () => {
     expect(() => unpackBytes("n'importe quoi")).toThrow();
   });
 
+  it("octets : une longueur annoncée démesurée est refusée avant toute allocation", () => {
+    expect(() => unpackBytes("4000000000:AAAA")).toThrow(/illisible/);
+    expect(() => unpackBytes("-1:AAAA")).toThrow(/illisible/);
+    expect(() => unpackBytes("1e300:AAAA")).toThrow(/illisible/);
+    expect(() => unpackBytes("1000:AAAA")).toThrow(/illisible/);
+  });
+
+  it("état d'une instance : une clé forgée (__proto__, constructor) est refusée sans toucher aux prototypes", () => {
+    class Holder {
+      value = 0;
+      rect = { left: 1 };
+    }
+    declareState(Holder, { name: "test.Holder" });
+    const holder = new Holder();
+    const state = saveInstance(holder);
+    const forge = (json: string): never => JSON.parse(json) as never;
+    const forged = [
+      forge('{"$":"c","n":"test.Holder","f":{"__proto__":{"polluted":1}}}'),
+      forge('{"$":"c","n":"test.Holder","f":{"constructor":1}}'),
+      forge('{"$":"c","n":"test.Holder","f":{"value":0,"rect":{"__proto__":{"polluted":1}}}}'),
+      forge('{"$":"c","n":"test.Holder","f":{"value":{"$":"t","k":"__proto__","d":"0:"}}}'),
+    ];
+    for (const node of forged) expect(() => loadInstance(holder, node)).toThrow();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.getPrototypeOf(holder.rect)).toBe(Object.prototype);
+    expect(holder.value).toBe(0);
+    // L'état écrit par le jeu se relit toujours.
+    expect(() => loadInstance(holder, JSON.parse(JSON.stringify(state)) as never)).not.toThrow();
+  });
+
   it("état d'une instance : relu en place, objets partagés gardés, services ignorés", () => {
     class Part {
       level = 0;
@@ -675,6 +705,32 @@ describe.skipIf(!original.has)("sauvegardes sur le jeu réel", () => {
     storage.set("slot02", good.replace('"gameVersion":""', '"gameVersion":"01.000.000"'));
     expect(callKernel(vm, "CheckSaveGame", stringReg(vm, "GK"), 1, stringReg(vm, "01.100.000"))).toBe(0);
     expect(callKernel(vm, "CheckSaveGame", stringReg(vm, "GK"), 1, stringReg(vm, "01.000.000"))).toBe(1);
+  });
+
+  it("une image forgée (longueur de table ou taille de tableau démesurée, indice hors table) est refusée, l'état d'avant rétabli", { timeout: 120_000 }, () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const vm = resume(images().bookshop);
+    step(vm, 5);
+    const before = stateOf(vm);
+    const forgeries: ((image: SaveImage) => void)[] = [
+      (image) => (image.memory.arrays.length = 4e9),
+      (image) => (image.memory.clones.length = -1),
+      (image) => image.memory.lists.index.push(1e9),
+      (image) => {
+        image.memory.arrays.index.push(image.memory.arrays.length);
+        image.memory.arrays.length++;
+        image.memory.arrays.types.push(ArrayType.Byte);
+        image.memory.arrays.sizes.push(65535);
+      },
+      (image) => (image.memory.bitmaps.widths = [1e9]),
+      (image) => (image.memory.stack = "4000000000:AAAA"),
+    ];
+    for (const forge of forgeries) {
+      const image = JSON.parse(before) as SaveImage;
+      forge(image);
+      expect(() => restoreGame(vm, image)).toThrow();
+    }
+    expect(stateOf(vm)).toBe(before);
   });
 
   it("pas de sauvegarde pendant une cinématique ; RestartGame ramène à l'écran titre", { timeout: 120_000 }, () => {

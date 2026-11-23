@@ -55,6 +55,7 @@ while IFS='|' read -r nom taille_attendue sha_attendu; do
   f="$(trouver "$nom")"
   [ "$(taille "$f")" -eq "$taille_attendue" ] || { echo "$nom : $taille_attendue octets attendus" >&2; exit 1; }
   [ "$(sha256 "$f")" = "$sha_attendu" ] || { echo "$nom : SHA-256 inattendu" >&2; exit 1; }
+  [ ! -L "$f" ] || { echo "$nom : lien symbolique refusé" >&2; exit 1; }
   cp "$f" "$tmp/out/$nom"
   [ "$(sha256 "$tmp/out/$nom")" = "$sha_attendu" ] || { echo "$nom : copie différente de la source" >&2; exit 1; }
 done <<'LISTE'

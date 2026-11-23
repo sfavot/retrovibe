@@ -69,6 +69,9 @@ export function readSave(storage: HostStorage): GameSave | null {
   return save;
 }
 
+/** Numéros des vidéos d'avertissement de temps (`s42a031..035`, voir `grand-schtroumpf.ts`). */
+const WARNING_VIDEOS = [31, 35] as const;
+
 type Json = Record<string, unknown>;
 
 const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -98,7 +101,7 @@ function validState(s: unknown): s is GameState {
     players.length >= 1 &&
     players.length <= 4 &&
     players.every(validPlayer) &&
-    isInt(s.durationSeconds, 1) &&
+    isInt(s.durationSeconds, 1, 100_000) &&
     isInt(s.messageIndex, 0, 8) &&
     isInt(s.current, 0, players.length - 1) &&
     isInt(s.round, 1) &&
@@ -109,27 +112,46 @@ function validState(s: unknown): s is GameState {
     isInt(s.goal.ingredients, 0, 0xff) &&
     isInt(s.goal.points, 1) &&
     s.phase === "turn" &&
-    isObject(s.turn) &&
-    Array.isArray(s.turn.inside) &&
-    isNumber(s.turn.elapsed) &&
+    validTurn(s.turn) &&
     s.pending === null &&
     s.result === null &&
     isInt(s.bonusTag, 0) &&
     isInt(s.iceCrossings, 0) &&
     isInt(s.bridgeCrossings, 0) &&
     typeof s.warned10 === "boolean" &&
-    typeof s.warned5 === "boolean"
+    typeof s.warned5 === "boolean" &&
+    s.paused === false
+  );
+}
+
+function validTurn(t: unknown): boolean {
+  return (
+    isObject(t) &&
+    isNumber(t.elapsed) &&
+    t.elapsed >= 0 &&
+    typeof t.wellOpen === "boolean" &&
+    typeof t.acted === "boolean" &&
+    typeof t.hint1Done === "boolean" &&
+    typeof t.hint2Done === "boolean" &&
+    Array.isArray(t.inside) &&
+    t.inside.length <= 16 &&
+    t.inside.every((k) => typeof k === "string" && k.length <= 32) &&
+    isNumber(t.dwell) &&
+    t.dwell >= 0 &&
+    (t.released === null || t.released === "jail" || t.released === "turlusiphon")
   );
 }
 
 function validCommentary(c: unknown): c is CommentarySnapshot {
-  return isObject(c) && Array.isArray(c.said) && c.said.every((n) => isInt(n)) && isInt(c.lastProgressRound) && isInt(c.lastCommentRound);
+  return isObject(c) && Array.isArray(c.said) && c.said.length <= 1000 && c.said.every((n) => isInt(n, 0, 999)) && isInt(c.lastProgressRound) && isInt(c.lastCommentRound);
 }
 
 /** Vérifie la forme d'une sauvegarde lue ; `null` si elle n'est pas reprenable. */
 export function parseSave(value: unknown): GameSave | null {
   if (!isObject(value) || value.version !== SAVE_VERSION) return null;
   if (!validState(value.state) || !isInt(value.rng, 0, 0xffffffff) || !validCommentary(value.commentary)) return null;
-  if (typeof value.introShown !== "boolean" || !(value.warning === null || isInt(value.warning))) return null;
-  return value as unknown as GameSave;
+  if (typeof value.introShown !== "boolean" || !(value.warning === null || isInt(value.warning, WARNING_VIDEOS[0], WARNING_VIDEOS[1]))) return null;
+  // Seuls les champs connus sont retenus.
+  const { version, state, rng, commentary, introShown, warning } = value as unknown as GameSave;
+  return { version, state, rng, commentary, introShown, warning };
 }

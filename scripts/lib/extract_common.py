@@ -185,6 +185,8 @@ def liste_fichiers(racine):
     for dossier, _, noms in os.walk(racine):
         for n in sorted(noms):
             c = os.path.join(dossier, n)
+            if os.path.islink(c):
+                continue  # lien symbolique issu d'une archive : jamais suivi
             yield c, os.path.relpath(c, racine).replace(os.sep, '/')
 
 
@@ -201,6 +203,11 @@ def copier_filtre(source, dest, classer, sous_dossier='', convertir=None):
     for dossier, _, fichiers in os.walk(source):
         for nom in sorted(fichiers):
             chemin = os.path.join(dossier, nom)
+            if os.path.islink(chemin):
+                # Lien symbolique issu d'une archive : jamais suivi (il pourrait pointer hors de source).
+                e = exclus.setdefault('lien symbolique', [0, 0])
+                e[0] += 1
+                continue
             rel = os.path.relpath(chemin, source)
             taille = os.path.getsize(chemin)
             categorie, garde = classer(chemin, rel, nom)

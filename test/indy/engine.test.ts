@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseSnapshot } from "../../src/engine/desktop-adventures/snapshot";
 import { indyVariant } from "../../src/games/indy/variant";
 import { HotspotType, Layer } from "../../src/engine/desktop-adventures/data/types";
 import { Assets } from "../../src/engine/desktop-adventures/assets";
@@ -471,6 +472,7 @@ describe.skipIf(!hasOriginalFiles)("moteur de jeu", () => {
     await steps(game, 1);
     game.hurtHero(40);
     const snapshot = JSON.parse(JSON.stringify(game.snapshot())) as GameSnapshot;
+    expect(parseSnapshot(snapshot, assets)).toEqual(snapshot);
     const presenter = new FakePresenter();
     const resumed = new Game(indyVariant, assets, storyFromSnapshot(snapshot), presenter, snapshot.settings);
     await resumed.resume(snapshot);

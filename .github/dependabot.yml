@@ -1,0 +1,7 @@
+version: 2
+updates:
+  # Actions du workflow de déploiement : épinglées par SHA (exigé par le dépôt), Dependabot met à jour le SHA et le commentaire de version.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

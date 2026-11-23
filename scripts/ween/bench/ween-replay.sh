@@ -15,7 +15,7 @@ root="$(cd "$here/../../.." && pwd -P)"
 : "${SCUMMVM:?SCUMMVM = chemin du binaire ScummVM patché}"
 : "${WEEN_GAME_DIR:?WEEN_GAME_DIR = dossier du jeu extrait de l installeur}"
 OUT=$1; STOP=$2; IN=${3:-}; MAX=${4:-1800}
-rm -rf "$OUT"; mkdir -p "$OUT/shots"
+rm -rf "${OUT:?}"; mkdir -p "$OUT/shots"
 sed "s#@GAME_DIR@#$WEEN_GAME_DIR#" "$here/ween.ini.in" > "$OUT/scummvm.ini"
 if [ -n "${SCENARIO:-}" ]; then scen=$SCENARIO; else
   scen="$OUT/scenario.txt"; printf 'realmouse\nwait 86400000\nquit\n' > "$scen"   # attend ; GOB_STOP_FRAME met fin au lancement

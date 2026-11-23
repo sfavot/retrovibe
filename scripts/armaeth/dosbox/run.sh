@@ -112,7 +112,7 @@ FULL_SCENARIO="$OUT/scenario.txt"
 EXPECTS="$OUT/expects.txt"
 : > "$FULL_SCENARIO"; : > "$EXPECTS"
 if [ "$SKIP_INTRO" = 1 ]; then
-  for k in $(seq 0 13); do echo "$(python3 -c "print(11.5 + 1.6 * $k)") enter" >> "$FULL_SCENARIO"; done
+  for k in $(seq 0 13); do echo "$(python3 -I -c 'import sys; print(11.5 + 1.6 * int(sys.argv[1]))' "$k") enter" >> "$FULL_SCENARIO"; done
   printf '38.4 enter\n40 enter\n41.6 enter\n43.2 enter\n' >> "$FULL_SCENARIO"
   # S14 apparaît (~39,1 s) puis se ferme (~41,1 s) : deux changements d'écran importants, sinon les touches se perdent
   [ "$INTRO_EXPECT" = 1 ] && printf '38.8 39.7 20000\n40.6 41.9 20000\n' >> "$EXPECTS"
@@ -174,7 +174,7 @@ echo "vidéo : $OUT/video.avi ($(ffprobe -v error -show_entries format=duration 
 tail -3 "$OUT/console.log" | sed 's/^/console : /'
 
 # 5. PNG (ffmpeg) : instants précis ou séquence. 320x200 par défaut (pixels du jeu), 640x400 avec -r 1.
-W=$(python3 -c "print(int(640*$SCALE))"); H=$(python3 -c "print(int(400*$SCALE))")
+W=$(python3 -I -c 'import sys; print(int(640*float(sys.argv[1])))' "$SCALE"); H=$(python3 -I -c 'import sys; print(int(400*float(sys.argv[1])))' "$SCALE")
 png() { # png <entrée.avi> <sortie.png> <options d'entrée…>
   ffmpeg -loglevel error -y "${@:3}" -i "$1" -frames:v 1 -vf "crop=640:400:0:0,scale=$W:$H:flags=neighbor" -pix_fmt pal8 "$2"
 }
@@ -187,5 +187,5 @@ fi
 if [ -n "$FPS" ]; then
   mkdir -p "$OUT/frames"
   ffmpeg -loglevel error -y -i "$OUT/video.avi" -vf "fps=$FPS,crop=640:400:0:0,scale=$W:$H:flags=neighbor" -pix_fmt pal8 "$OUT/frames/f%05d.png"
-  echo "PNG : $OUT/frames/ (une image toutes les $(python3 -c "print(1/$FPS)") s)"
+  echo "PNG : $OUT/frames/ (une image toutes les $(python3 -I -c 'import sys; print(1/float(sys.argv[1]))' "$FPS") s)"
 fi

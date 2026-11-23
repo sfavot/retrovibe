@@ -95,6 +95,19 @@ describe.skipIf(!hasOriginalFiles)("sauvegarde : instantané et lecture", () => 
     expect(matchesGame({ ...save, entryObject: save.objects.length }, data)).toBe(false);
     expect(matchesGame({ ...save, inventory: [save.items.length, 0, 0, 0] }, data)).toBe(false);
   });
+
+  it("une ligne de l'animation hors de la table de la course ou du combat est refusée (sinon une exception à chaque image)", () => {
+    const data = gameData();
+    const save = sampleSave();
+    const withBam = (room: number, bam: Partial<SaveData["bam"]>): SaveData => ({ ...save, room, bam: { ...save.bam, flag: BamFlag.Play, ...bam } });
+    expect(matchesGame(withBam(74, { index: 74, fightTable: 0 }), data)).toBe(true);
+    expect(matchesGame(withBam(74, { index: 5000 }), data)).toBe(false);
+    expect(matchesGame(withBam(69, { index: 5000, fightTable: 1 }), data)).toBe(false);
+    expect(matchesGame(withBam(69, { index: 0, fightTable: 3 }), data)).toBe(false);
+    expect(matchesGame(withBam(69, { index: 0, fightTable: 2 }), data)).toBe(true);
+    // Animation arrêtée : aucune ligne n'est lue.
+    expect(matchesGame(withBam(74, { flag: BamFlag.Stop, index: 5000 }), data)).toBe(true);
+  });
 });
 
 describe.skipIf(!hasOriginalFiles)("sauvegarde : une valeur qui n'en est pas une est refusée", () => {
